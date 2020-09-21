@@ -117,9 +117,9 @@ public class ExceptionAnalyzerMain {
 			String[] sk = s.split("=");
 			if (sk[0].equals("label")) {
 				label = sk[1];
-			} else if (sk[1].equals("version")) {
+			} else if (sk[0].equals("version")) {
 				version = sk[1];
-			} else if (sk[1].equals("clientSecretJson")) {
+			} else if (sk[0].equals("clientSecretJson")) {
 				clientSecretJson = sk[1];
 			}
 		}
