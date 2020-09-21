@@ -115,11 +115,11 @@ public class ExceptionAnalyzerMain {
     	String clientSecretJson = "";
 		for (String s : args) {
 			String[] sk = s.split("=");
-			if (sk[0].equals("label")) {
+			if (sk[0].equals("--label")) {
 				label = sk[1];
-			} else if (sk[0].equals("version")) {
+			} else if (sk[0].equals("--version")) {
 				version = sk[1];
-			} else if (sk[0].equals("clientSecretJson")) {
+			} else if (sk[0].equals("--clientSecretJson")) {
 				clientSecretJson = sk[1];
 			}
 		}
