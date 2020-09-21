@@ -145,7 +145,7 @@ public class ExceptionAnalyzerMain {
 
 	private static void downloadAttachments(String clientSecretFile, String lbl) throws IOException {
 		// Build a new authorized API client service.
-        Gmail service = getGmailService(lbl);
+        Gmail service = getGmailService(clientSecretFile);
 
         // Print the labels in the user's account.
         String user = "me";
