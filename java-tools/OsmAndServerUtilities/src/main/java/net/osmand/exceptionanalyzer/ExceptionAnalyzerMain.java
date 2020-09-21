@@ -124,7 +124,7 @@ public class ExceptionAnalyzerMain {
 				"Utility to download exceptions." + 
 		        "\nDownload emails with label='%s' (change with --label=) " + 
 				"\nMake report with version='%s' (change with --version=).",
-				version, label));
+				label, version));
 		if (DOWNLOAD_MESSAGES && Algorithms.isEmpty(label)) {
 			downloadAttachments(label);
 		}
