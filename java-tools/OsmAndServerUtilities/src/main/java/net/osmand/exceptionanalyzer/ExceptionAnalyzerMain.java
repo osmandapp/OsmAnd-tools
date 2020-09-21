@@ -22,12 +22,13 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 import net.osmand.exceptionanalyzer.data.ExceptionText;
+import net.osmand.util.Algorithms;
 
 public class ExceptionAnalyzerMain {
-	 private static final String LABEL = "TRASH";
+	private static final String LABEL_DEFAULT = "TRASH";
 //	private static final String LABEL = "OsmAnd Bug";
 	private static final boolean DOWNLOAD_MESSAGES = true;
-    private static final String VERSION_FILTER = "3.0";
+    private static final String VERSION_FILTER_DEFAULT = "3.0";
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
     		"/"+ "attachments_logs");
     
@@ -108,19 +109,25 @@ public class ExceptionAnalyzerMain {
 
     public static void main(String[] args) throws IOException {
     	FOLDER_WITH_LOGS.mkdirs();
-    	if(DOWNLOAD_MESSAGES) {
-    		downloadAttachments();
-    	}
-        makeReport();
+    	String version = VERSION_FILTER_DEFAULT;
+    	String label = LABEL_DEFAULT;
+    	
+		System.out.println(String.format(
+				"Utility to download exceptions: label='%s' (change with --label=) version='%s' (change with --version=).",
+				version, label));
+		if (DOWNLOAD_MESSAGES && Algorithms.isEmpty(label)) {
+			downloadAttachments(label);
+		}
+        makeReport(version);
     }
 
-	public static void makeReport() {
+	public static void makeReport(String version) {
 		System.out.println("Analyzing the exceptions...");
-        Map<String, List<ExceptionText>> result = analyzeExceptions(VERSION_FILTER);
+        Map<String, List<ExceptionText>> result = analyzeExceptions(version);
         writeResultToFile(result);
 	}
 
-	private static void downloadAttachments() throws IOException {
+	private static void downloadAttachments(String lbl) throws IOException {
 		// Build a new authorized API client service.
         Gmail service = getGmailService();
 
@@ -134,11 +141,11 @@ public class ExceptionAnalyzerMain {
         }
         System.out.println("Labels:");
         for (Label label : labels) {
-            if (label.getName().toUpperCase().equals(LABEL.toUpperCase())) {
+            if (label.getName().toUpperCase().equals(lbl.toUpperCase())) {
                 List<String> trash = new ArrayList<>();
                 trash.add(label.getId());
                 List<Message> result = listMessagesWithLabels(service, user, trash);
-				System.out.println("Messages in " + LABEL + ": " + result.size());
+				System.out.println("Messages in " + lbl + ": " + result.size());
                 getAttachments(result, user, service);
             }
         }
