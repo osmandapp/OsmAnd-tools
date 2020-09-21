@@ -111,9 +111,19 @@ public class ExceptionAnalyzerMain {
     	FOLDER_WITH_LOGS.mkdirs();
     	String version = VERSION_FILTER_DEFAULT;
     	String label = LABEL_DEFAULT;
+		for (String s : args) {
+			String[] sk = s.split("=");
+			if (sk[0].equals("label")) {
+				label = sk[1];
+			} else if (sk[1].equals("version")) {
+				version = sk[1];
+			}
+		}
     	
 		System.out.println(String.format(
-				"Utility to download exceptions: label='%s' (change with --label=) version='%s' (change with --version=).",
+				"Utility to download exceptions." + 
+		        "\nDownload emails with label='%s' (change with --label=) " + 
+				"\nMake report with version='%s' (change with --version=).",
 				version, label));
 		if (DOWNLOAD_MESSAGES && Algorithms.isEmpty(label)) {
 			downloadAttachments(label);
