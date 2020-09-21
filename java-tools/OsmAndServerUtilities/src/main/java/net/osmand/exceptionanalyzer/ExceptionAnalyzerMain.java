@@ -73,13 +73,14 @@ public class ExceptionAnalyzerMain {
      * @return an authorized Credential object.
      * @throws IOException
      */
-    public static Credential authorize() throws IOException {
+    public static Credential authorize(String clientScretFile) throws IOException {
         // Load client secrets.
-        InputStream in =
-                ExceptionAnalyzerMain.class.getResourceAsStream("/client_secret.json");
+        InputStream in = Algorithms.isEmpty(clientScretFile)  ?
+                ExceptionAnalyzerMain.class.getResourceAsStream("/client_secret.json") :
+                new FileInputStream(clientScretFile);
         GoogleClientSecrets clientSecrets =
                 GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
-
+        in.close();
         // Build flow and trigger user authorization request.
         GoogleAuthorizationCodeFlow flow =
                 new GoogleAuthorizationCodeFlow.Builder(
@@ -101,8 +102,8 @@ public class ExceptionAnalyzerMain {
      * @return an authorized Gmail client service
      * @throws IOException
      */
-    public static Gmail getGmailService() throws IOException {
-        Credential credential = authorize();
+    public static Gmail getGmailService(String clientSecretFile) throws IOException {
+        Credential credential = authorize(clientSecretFile);
         return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential).setApplicationName(APPLICATION_NAME)
                 .build();
     }
@@ -111,24 +112,29 @@ public class ExceptionAnalyzerMain {
     	FOLDER_WITH_LOGS.mkdirs();
     	String version = VERSION_FILTER_DEFAULT;
     	String label = LABEL_DEFAULT;
+    	String clientSecretJson = "";
 		for (String s : args) {
 			String[] sk = s.split("=");
 			if (sk[0].equals("label")) {
 				label = sk[1];
 			} else if (sk[1].equals("version")) {
 				version = sk[1];
+			} else if (sk[1].equals("clientSecretJson")) {
+				clientSecretJson = sk[1];
 			}
 		}
     	
 		System.out.println(String.format(
 				"Utility to download exceptions." + 
-		        "\nDownload emails with label='%s' (change with --label=) " + 
-				"\nMake report with version='%s' (change with --version=).",
-				label, version));
-		if (DOWNLOAD_MESSAGES && Algorithms.isEmpty(label)) {
-			downloadAttachments(label);
+		        "\nDownload emails with label='%s' (change with --label=, leave empty to skip) to %s. " + 
+				"\nMake report with version='%s' (change with --version=, leave empty to skip).",
+				label, FOLDER_WITH_LOGS.getAbsolutePath(), version));
+		if (DOWNLOAD_MESSAGES && !Algorithms.isEmpty(label)) {
+			downloadAttachments(clientSecretJson, label);
 		}
-        makeReport(version);
+		if (!Algorithms.isEmpty(label)) {
+			makeReport(version);
+		}
     }
 
 	public static void makeReport(String version) {
@@ -137,9 +143,9 @@ public class ExceptionAnalyzerMain {
         writeResultToFile(result);
 	}
 
-	private static void downloadAttachments(String lbl) throws IOException {
+	private static void downloadAttachments(String clientSecretFile, String lbl) throws IOException {
 		// Build a new authorized API client service.
-        Gmail service = getGmailService();
+        Gmail service = getGmailService(lbl);
 
         // Print the labels in the user's account.
         String user = "me";
