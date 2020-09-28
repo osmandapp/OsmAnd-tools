@@ -6,6 +6,7 @@ import java.util.List;
 
 import net.osmand.data.changeset.CalculateOsmChangesets;
 import net.osmand.data.changeset.OsmAndLiveReports;
+import net.osmand.exceptionanalyzer.ExceptionAnalyzerMain;
 import net.osmand.live.subscriptions.UpdateSubscription;
 import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.server.osmgpx.DownloadOsmGPX;
@@ -20,6 +21,8 @@ public class ServerUtilities {
 			UpdateSubscription.main(subArgsArray);
 		} else if (utl.equals("send-email")) {
 			EmailSenderMain.main(subArgsArray);
+		} else if (utl.equals("analyze-exceptions")) {
+			ExceptionAnalyzerMain.main(subArgsArray);
 		} else if (utl.equals("update-countries-for-changeset")) {
 			CalculateOsmChangesets.calculateCountries();
 		} else if (utl.equals("download-changeset")) {

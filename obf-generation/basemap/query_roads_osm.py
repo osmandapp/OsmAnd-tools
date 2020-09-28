@@ -19,8 +19,8 @@ def esc(s):
 	return s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'","&apos;")
 
 def process_roads(cond, filename, fields):
-	print "Query %s" % cond
-	conn_string = "host='127.0.0.1' dbname='osm' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
+	print("Query %s" % cond)
+	conn_string = "host='127.0.0.1' dbname='"+os.environ['DB_NAME']+"' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 	f.write('<osm version="0.6">\n')
@@ -41,7 +41,7 @@ def process_roads(cond, filename, fields):
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
-	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,0,true),94326))," + \
+	sql = "select osm_id, ST_AsText(ST_Transform(ST_Simplify(way,0,true),4326))," + \
 	      " name, ref, tags->'int_ref' as int_ref " + selectFields + \
 	      " from planet_osm_line where (" + cond + ") and osm_id > 0 order by osm_id asc, pg_column_size(way) desc;"
 	      # "LIMIT 1000"
@@ -59,7 +59,7 @@ def process_roads(cond, filename, fields):
 		node_xml = ""
 
 		if way_id == row[0]:
-			print "Warning duplicate road id %s in db" % row[0]
+			print("Warning duplicate road id %s in db" % row[0])
 			wd_id = wd_id + 1
 			way_xml = '\n<way version="1" id="%s" >\n' % (wd_id)
 		else:

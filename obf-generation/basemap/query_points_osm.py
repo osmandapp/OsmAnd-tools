@@ -21,7 +21,7 @@ def esc(s):
 
 def process_points(cond, filename, array):
 	f = open(filename,'w')
-	conn_string = "host='127.0.0.1' dbname='osm' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
+	conn_string = "host='127.0.0.1' dbname='"+os.environ['DB_NAME']+"' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 	f.write('<osm version="0.6">\n')
 	conn = psycopg2.connect(conn_string)
@@ -56,10 +56,10 @@ def process_points(cond, filename, array):
 		array.append(nm)
 		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
 		
-	sql = "select ST_AsText(ST_Transform(way,94326)), osm_id  " + queryFields + \
+	sql = "select ST_AsText(ST_Transform(way,4326)), osm_id  " + queryFields + \
 	      " from planet_osm_point where " + cond + ";"
 	      # "LIMIT 2"
-	print sql
+	print(sql)
 	cursor.execute(sql)
  	
 	node_id =-1000
@@ -91,7 +91,7 @@ def process_points(cond, filename, array):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	print "Process points"
+	print("Process points")
 	process_points("place in ('continent','sea','ocean','state','country') "
 				   " or \"natural\" in ('strait')", 'points_main.osm',
 				   ['name', 'name:en', 'place', 'population'])

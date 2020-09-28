@@ -19,7 +19,7 @@ def esc(s):
 	return s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'","&apos;")
 
 def process_polygons(tags, filename):
-	conn_string = "host='127.0.0.1' dbname='osm' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
+	conn_string = "host='127.0.0.1' dbname='"+os.environ['DB_NAME']+"' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 	f.write('<osm version="0.6">\n')
@@ -95,7 +95,7 @@ def process_polygons(tags, filename):
 			array.append(tag)
 			queryFields += ", " + tag
 			conditions += " or "+tag+" <> ''"
-	sql =( "select osm_id, ST_AsText(ST_Transform(ST_SimplifyPreserveTopology(way, 500), 94326)) " + queryFields +
+	sql =( "select osm_id, ST_AsText(ST_Transform(ST_SimplifyPreserveTopology(way, 500), 4326)) " + queryFields +
 	       " from planet_osm_polygon where way_area > 10000000"+
 	       " and ("+conditions+") "+
 	       # "LIMIT 1000"
@@ -168,7 +168,7 @@ def process_polygons(tags, filename):
 						way_xml += '\t<nd ref="%s" />\n' % (nid)
 					way_xml += '</way>'
 				else:
-					print "Empty ring!"
+					print("Empty ring!")
 			xml += '</relation>'	
 			f.write(node_xml)
 			f.write(way_xml)
@@ -178,7 +178,7 @@ def process_polygons(tags, filename):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-		print "Process polygons"
+		print("Process polygons")
 		process_polygons(['lake', 'seamark:type', 'seamark:restricted_area:category'], 'polygon_lake_water.osm')
 		process_polygons(['landuse', 'natural', 'wetland', 'historic','leisure'], 'polygon_natural_landuse.osm')
 		process_polygons(['aeroway', 'military', 'abandoned', 'iata', 'icao', 'faa', 'power', 'tourism'], 'polygon_aeroway_military_tourism.osm')

@@ -22,12 +22,13 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 import net.osmand.exceptionanalyzer.data.ExceptionText;
+import net.osmand.util.Algorithms;
 
 public class ExceptionAnalyzerMain {
-	 private static final String LABEL = "TRASH";
+	private static final String LABEL_DEFAULT = "TRASH";
 //	private static final String LABEL = "OsmAnd Bug";
 	private static final boolean DOWNLOAD_MESSAGES = true;
-    private static final String VERSION_FILTER = "3.0";
+    private static final String VERSION_FILTER_DEFAULT = "3.0";
     private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
     		"/"+ "attachments_logs");
     
@@ -72,13 +73,14 @@ public class ExceptionAnalyzerMain {
      * @return an authorized Credential object.
      * @throws IOException
      */
-    public static Credential authorize() throws IOException {
+    public static Credential authorize(String clientSecretJson) throws IOException {
         // Load client secrets.
-        InputStream in =
-                ExceptionAnalyzerMain.class.getResourceAsStream("/client_secret.json");
+        InputStream in = Algorithms.isEmpty(clientSecretJson)  ?
+                ExceptionAnalyzerMain.class.getResourceAsStream("/client_secret.json") :
+                new FileInputStream(clientSecretJson);
         GoogleClientSecrets clientSecrets =
                 GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
-
+        in.close();
         // Build flow and trigger user authorization request.
         GoogleAuthorizationCodeFlow flow =
                 new GoogleAuthorizationCodeFlow.Builder(
@@ -100,29 +102,50 @@ public class ExceptionAnalyzerMain {
      * @return an authorized Gmail client service
      * @throws IOException
      */
-    public static Gmail getGmailService() throws IOException {
-        Credential credential = authorize();
+    public static Gmail getGmailService(String clientSecretFile) throws IOException {
+        Credential credential = authorize(clientSecretFile);
         return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential).setApplicationName(APPLICATION_NAME)
                 .build();
     }
 
     public static void main(String[] args) throws IOException {
     	FOLDER_WITH_LOGS.mkdirs();
-    	if(DOWNLOAD_MESSAGES) {
-    		downloadAttachments();
-    	}
-        makeReport();
+    	String version = VERSION_FILTER_DEFAULT;
+    	String label = LABEL_DEFAULT;
+    	String clientSecretJson = "";
+		for (String s : args) {
+			String[] sk = s.split("=");
+			if (sk[0].equals("--label")) {
+				label = sk[1];
+			} else if (sk[0].equals("--version")) {
+				version = sk[1];
+			} else if (sk[0].equals("--clientSecretJson")) {
+				clientSecretJson = sk[1];
+			}
+		}
+    	
+		System.out.println(String.format(
+				"Utility to download exceptions." + 
+		        "\nDownload emails with label='%s' (change with --label=, leave empty to skip) to %s. " + 
+				"\nMake report with version='%s' (change with --version=, leave empty to skip).",
+				label, FOLDER_WITH_LOGS.getAbsolutePath(), version));
+		if (DOWNLOAD_MESSAGES && !Algorithms.isEmpty(label)) {
+			downloadAttachments(clientSecretJson, label);
+		}
+		if (!Algorithms.isEmpty(label)) {
+			makeReport(version);
+		}
     }
 
-	public static void makeReport() {
+	public static void makeReport(String version) {
 		System.out.println("Analyzing the exceptions...");
-        Map<String, List<ExceptionText>> result = analyzeExceptions(VERSION_FILTER);
+        Map<String, List<ExceptionText>> result = analyzeExceptions(version);
         writeResultToFile(result);
 	}
 
-	private static void downloadAttachments() throws IOException {
+	private static void downloadAttachments(String clientSecretFile, String lbl) throws IOException {
 		// Build a new authorized API client service.
-        Gmail service = getGmailService();
+        Gmail service = getGmailService(clientSecretFile);
 
         // Print the labels in the user's account.
         String user = "me";
@@ -134,11 +157,11 @@ public class ExceptionAnalyzerMain {
         }
         System.out.println("Labels:");
         for (Label label : labels) {
-            if (label.getName().toUpperCase().equals(LABEL.toUpperCase())) {
+            if (label.getName().toUpperCase().equals(lbl.toUpperCase())) {
                 List<String> trash = new ArrayList<>();
                 trash.add(label.getId());
                 List<Message> result = listMessagesWithLabels(service, user, trash);
-				System.out.println("Messages in " + LABEL + ": " + result.size());
+				System.out.println("Messages in " + lbl + ": " + result.size());
                 getAttachments(result, user, service);
             }
         }

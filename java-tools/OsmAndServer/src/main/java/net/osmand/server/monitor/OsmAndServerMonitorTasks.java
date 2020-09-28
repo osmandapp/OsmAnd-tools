@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
@@ -360,9 +361,12 @@ public class OsmAndServerMonitorTasks {
 
 	private String getTirexStatus() {
 		try {
-			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://mapnik.osmand.net/tirex-status.json").openStream());
-			String res = prepareTirexResult(rs.toString());
-			StringBuilder date = Algorithms.readFromInputStream(new URL("https://mapnik.osmand.net/osmupdate/state.txt").openStream());
+			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
+			res = prepareAccessStats(res);
+			
+			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/renderd.stats").openStream());
+			res += prepareRenderdResult(rs.toString());
+			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			res += "\nTile DB: " + date;
 			return res;
 		} catch (Exception e) {
@@ -370,6 +374,48 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 	
+	private static String prepareAccessStats(String lns) {
+		String[] spl = lns.split("\n");
+		if (spl.length >= 2) {
+			String result = "\n";
+			String[] percents = spl[0].split("\\s+");
+			String[] timings = spl[1].split("\\s+");
+			for (int i = 1; i < timings.length && i < percents.length; i++) {
+				double d = Double.parseDouble(timings[i].trim());
+				result += String.format("%.2fs (%s) ", d, percents[i]);
+			}
+			return result;
+		}
+		return "";
+	}
+
+	private String prepareRenderdResult(String res) {
+		String result = "\nTile queue: ";
+		String[] lns = res.split("\n");
+		for (String ln : lns) {
+			if (ln.startsWith("ReqQueueLength:")) {
+				result = addToResult("Q", result, "ReqQueueLength:", ln);
+			} else if (ln.startsWith("ReqPrioQueueLength:")) {
+				result = addToResult("PQ", result, "ReqPrioQueueLength:", ln);
+			} else if (ln.startsWith("ReqLowQueueLength:")) {
+				result = addToResult("LQ", result, "ReqLowQueueLength:", ln);
+			} else if (ln.startsWith("ReqBulkQueueLength:")) {
+				result = addToResult("BQ", result, "ReqBulkQueueLength:", ln);
+			} else if (ln.startsWith("DirtQueueLength:")) {
+				result = addToResult("DQ", result, "DirtQueueLength:", ln);
+			}
+		}
+		return result;
+	}
+	
+	private String addToResult(String pr, String result, String suf, String ln) {
+		String vl = ln.substring(suf.length()).trim();
+		if (!vl.equals("0")) {
+			result += pr + "-" + vl + " ";
+		}
+		return result;
+	}
+
 	protected String getOwnTirexStatus() {
 		String txStatus = "tirex-status -r";
 		String res = runCmd(txStatus, new File("."), null);

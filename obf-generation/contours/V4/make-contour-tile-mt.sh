@@ -1,6 +1,6 @@
 #!/bin/bash
 # Multithreaded tiff tile to contour (osm) converter for OsmAnd
-# requires "parallel"
+# requires "parallel" and "lbzip2"
 # usage make-contour-tile-mt.sh input-directory output-directory number-of-threads
 
 # directory for python tools
@@ -48,11 +48,11 @@ process_tiff ()
 		if [ $? -ne 0 ]; then echo $(date)' Error creating shapefile' & exit 4;fi
 	
 		echo "Building osm file …"
-		time ${working_dir}/ogr2osm.py ${TMP_DIR}$filename.shp -o $outdir$filename.osm -t contours.py
+		time ${working_dir}/ogr2osm.py ${TMP_DIR}$filename.shp -o $outdir$filename.osm -e 4326 -t contours.py
 		if [ $? -ne 0 ]; then echo $(date)' Error creating OSM file' & exit 5;fi
 	
 		echo "Compressing to osm.bz2 …"
-		bzip2 -f $outdir$filename.osm
+		lbzip2 -f $outdir$filename.osm
 		if [ $? -ne 0 ]; then echo $(date)' Error compressing OSM file' & exit 6;fi
 		if [ -f ${TMP_DIR}$filename.shp ]; then rm ${TMP_DIR}$filename.shp ${TMP_DIR}$filename.dbf ${TMP_DIR}$filename.prj ${TMP_DIR}$filename.shx; fi
 	else echo "Skipping "$1 "(already processed)"

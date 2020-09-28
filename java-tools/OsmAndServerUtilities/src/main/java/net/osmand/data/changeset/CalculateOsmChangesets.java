@@ -350,14 +350,14 @@ public class CalculateOsmChangesets {
 		WorldRegion worldRegion = or.getWorldRegion();
 		boolean newCountriesInserted = false;
 		if (testMissing) {
-			ResultSet rs = conn.createStatement().executeQuery("SELECT id, fullname, map from countries where map = 1");
+			ResultSet allCountriesRs = conn.createStatement().executeQuery("SELECT id, fullname, map from countries");
 			Set<String> existingMaps = new TreeSet<>();
 			int maxid = 0;
-			while (rs.next()) {
-				maxid = Math.max(maxid, rs.getInt(1));
-				existingMaps.add(rs.getString(2));
+			while (allCountriesRs.next()) {
+				maxid = Math.max(maxid, allCountriesRs.getInt(1));
+				existingMaps.add(allCountriesRs.getString(2));
 			}
-			rs.close();
+			allCountriesRs.close();
 			PreparedStatement insert = conn.prepareStatement(
 					"INSERT INTO countries(id, parentid, name, fullname, downloadname, clat, clon, map)"
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
@@ -369,7 +369,7 @@ public class CalculateOsmChangesets {
 			while (!queue.isEmpty()) {
 				WorldRegion wr = queue.pollFirst();
 				test.setString(1, wr.getRegionId());
-				rs = test.executeQuery();
+				ResultSet rs = test.executeQuery();
 				if (rs.next()) {
 					existingMaps.remove(wr.getRegionId());
 					map.put(wr, rs.getInt(1));

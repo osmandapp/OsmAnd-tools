@@ -967,7 +967,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
 					List<RouteSegmentResult> searchRoute = gpx ? 
-							router.searchGpxRoute(gctx, gpxPoints, null).result : 
+							getGpxAproximation(router, gctx, gpxPoints) : 
 							router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
@@ -997,6 +997,20 @@ public class MapRouterLayer implements MapPanelLayer {
 			System.out.println("Finding self routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
+	}
+
+	private static boolean TEST_INTERMEDIATE_POINTS = true;
+	private List<RouteSegmentResult> getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
+			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
+		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
+		if(!TEST_INTERMEDIATE_POINTS) {
+			return r.result;
+		}
+		List<RouteSegmentResult> rsr = new ArrayList<RouteSegmentResult>();
+		for(GpxPoint pnt : r.finalPoints) {
+			rsr.addAll(pnt.routeToTarget);
+		}
+		return rsr;
 	}
 
 	private void throwExceptionIfRouteNotFound(final RoutingContext ctx, List<RouteSegmentResult> searchRoute) {
