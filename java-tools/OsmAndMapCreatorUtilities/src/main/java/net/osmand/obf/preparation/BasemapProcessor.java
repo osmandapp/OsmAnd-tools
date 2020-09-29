@@ -401,7 +401,6 @@ public class BasemapProcessor {
                         wats[j] = renderingTypes.getTypeByInternalId(w.addTypes[j]).getTargetId();
                     }
                 }
-
                 MapData mapData = writer.writeMapData(w.id - baseId,
                         quad.x << (31 - quad.zoom), quad.y << (31 - quad.zoom), false,
                         w.coordinates, w.innerCoordinates, wts, wats, w.names, new byte[0], null, stringTable, dataBlock, level.getMaxZoom() > 15); //TODO check
@@ -699,15 +698,14 @@ public class BasemapProcessor {
 					    }
 				    }
 				    Algorithms.writeInt(bcoordinates, 0);
-				    Algorithms.writeInt(bcoordinates, 0);
-				    
+				    Algorithms.writeInt(bcoordinates, 0);    
 			    } catch (IOException e1) {
 				    throw new IllegalStateException(e1);
 			    }
 		    }
 	    }
 	    data.innerCoordinates = bcoordinates.toByteArray();
-        quad.addQuadData(zoomPair, data);
+	    quad.addQuadData(zoomPair, data);
     }
 
     private int getViewZoom(int minZoom, int maxZoom) {
