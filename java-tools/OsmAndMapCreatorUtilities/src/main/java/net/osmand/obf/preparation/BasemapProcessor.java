@@ -572,9 +572,12 @@ public class BasemapProcessor {
 				if (OsmMapUtils.polygonAreaPixels(list, zoomToEncode) < PIXELS_THRESHOLD_AREA) {
 					it.remove();
 				} else {
-					OsmMapUtils.simplifyDouglasPeucker(list, zoomToEncode - 1 + 8 + zoomWaySmoothness, 4, list, false);
-					if (list.size() <= 3) {
+					List<Node> result = new ArrayList<Node>();
+					OsmMapUtils.simplifyDouglasPeucker(list, zoomToEncode - 1 + 8 + zoomWaySmoothness, 4, result, false);
+					if (result.size() <= 3) {
 						it.remove();
+					} else {
+						list = result;
 					}
 				}
 			}
@@ -695,13 +698,14 @@ public class BasemapProcessor {
 					    }
 				    }
 				    Algorithms.writeInt(bcoordinates, 0);
-				    Algorithms.writeInt(bcoordinates, 0);
+				    Algorithms.writeInt(bcoordinates, 0);    
 			    } catch (IOException e1) {
 				    throw new IllegalStateException(e1);
 			    }
 		    }
 	    }
-        quad.addQuadData(zoomPair, data);
+	    data.innerCoordinates = bcoordinates.toByteArray();
+	    quad.addQuadData(zoomPair, data);
     }
 
     private int getViewZoom(int minZoom, int maxZoom) {
