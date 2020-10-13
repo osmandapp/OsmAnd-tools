@@ -58,9 +58,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     
     @Override
 	protected void configure(HttpSecurity http) throws Exception {
-    	for(String admin: adminEmails.split(",")) {
-    		adminEmailsSet.add(admin.trim());
-    	}
+		for (String admin : adminEmails.split(",")) {
+			adminEmailsSet.add(admin.trim());
+		}
     	LOG.info("Admin logins are:" + adminEmailsSet);
     	// http.csrf().disable().antMatcher("/**");
     	Set<String> enabledMethods = new TreeSet<>(
@@ -82,8 +82,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				}
 				return false;
 			}
-		})
-    	.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
+		}).csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
     	
     	// all top level are accessible without login
     	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
