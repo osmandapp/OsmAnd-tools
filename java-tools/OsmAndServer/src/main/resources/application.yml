@@ -75,7 +75,7 @@ server:
   port: 8090
   tomcat.max-threads: 50
   session:
-     timeout: 432000
+     timeout: 18000 #432000 #servlet.session.timeout
   address: 127.0.0.1 #keep it behind proxy
   tomcat:
     protocol_header: x-forwarded-proto

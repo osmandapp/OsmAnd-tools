@@ -454,15 +454,8 @@ public class UpdateSubscription {
 						.build();
 		Builder bld = new LocalServerReceiver.Builder();
 		bld.setPort(5000);
-//		if(System.getenv("HOSTNAME") != null) {
-//			bld.setHost(System.getenv("HOSTNAME"));
-//		}
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
 		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());		
-		
-
-//
-
 		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
 				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
 
