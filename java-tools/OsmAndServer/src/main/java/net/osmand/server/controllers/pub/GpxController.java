@@ -84,6 +84,10 @@ public class GpxController {
 	@ResponseBody
 	public String clear(HttpServletRequest request, HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
+		for (File f : ctx.tempFiles) {
+			f.delete();
+		}
+		ctx.tempFiles.clear();
 		ctx.files.clear();
 		ctx.analysis.clear();
 		return gson.toJson(GPXSessionInfo.getInfo(ctx));
