@@ -11,7 +11,6 @@ import javax.servlet.http.HttpSessionListener;
 
 import org.springframework.stereotype.Component;
 
-import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
 
 @WebListener
@@ -23,7 +22,7 @@ public class UserSessionResources implements HttpSessionListener {
 	static class GPXSessionContext {
 		
 		List<File> tempFiles = new ArrayList<>();
-		List<GPXFile> files = new ArrayList<>();
+		List<File> files = new ArrayList<>();
 		List<GPXTrackAnalysis> analysis = new ArrayList<>();
 		
 	}

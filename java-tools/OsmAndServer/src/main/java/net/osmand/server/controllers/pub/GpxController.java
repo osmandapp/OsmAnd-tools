@@ -1,9 +1,9 @@
 package net.osmand.server.controllers.pub;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.Gson;
@@ -39,6 +40,7 @@ import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -104,12 +106,19 @@ public class GpxController {
 	@PostMapping(path = {"/upload-session-gpx"}, produces = "application/json")
 	@ResponseBody
 	public String uploadGpx(HttpServletRequest request, HttpSession httpSession,
-			@RequestParam(required = true) String gpxContent) throws IOException {
-		GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpxContent.getBytes()));
+			@RequestParam(required = true) MultipartFile file) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		ctx.tempFiles.add(tmpGpx);
+		InputStream is = file.getInputStream();
+		FileOutputStream fous = new FileOutputStream(tmpGpx);
+		Algorithms.streamCopy(is, fous);
+		is.close();
+		fous.close();
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
 		if (gpxFile != null) {
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-			ctx.files.add(gpxFile);
+			ctx.files.add(tmpGpx);
 			ctx.analysis.add(analysis);
 		}
 		return gson.toJson(GPXSessionInfo.getInfo(ctx));
@@ -120,7 +129,7 @@ public class GpxController {
 	
 	@RequestMapping(path = { "/download-obf"})
 	@ResponseBody
-    public ResponseEntity<Resource> indexesPhp(@RequestParam(defaultValue="", required=false) String gzip,
+    public ResponseEntity<Resource> downloadObf(@RequestParam(defaultValue="", required=false) String gzip,
     		 HttpSession httpSession, HttpServletResponse resp) throws IOException, FactoryConfigurationError, XMLStreamException, SQLException, InterruptedException, XmlPullParserException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm");
@@ -130,7 +139,8 @@ public class GpxController {
 			List<Node> nodes = new ArrayList<>();
 			List<Way> ways = new ArrayList<>();
 			long id = -1;
-			for (GPXFile f : ctx.files) {
+			for (File gf : ctx.files) {
+				GPXFile f = GPXUtilities.loadGPXFile(gf);
 				id = createOsmFromGPX(nodes, ways, id, f);
 			}
 			OsmStorageWriter osmWriter = new OsmStorageWriter();
@@ -157,7 +167,9 @@ public class GpxController {
 			MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(null, fileName);
 			ic.setMapFileName(fileName);
 			// IProgress.EMPTY_PROGRESS
-			ic.generateIndexes(tmpOsm, IProgress.EMPTY_PROGRESS, null, MapZooms.getDefault(), types, null);
+			IProgress prog = IProgress.EMPTY_PROGRESS;
+			prog = new ConsoleProgressImplementation();
+			ic.generateIndexes(tmpOsm, prog, null, MapZooms.getDefault(), types, null);
 			new File(folder, ic.getMapFileName()).renameTo(targetObf);
 			ctx.tempFiles.add(targetObf);
 		} finally {
@@ -182,6 +194,7 @@ public class GpxController {
 				int color = s.getColor(0);
 				if(color != 0) {
 					w.putTag("color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
+					w.putTag("color_int", Algorithms.colorToString(color));
 				}
 				ways.add(w);
 			}
@@ -221,6 +234,7 @@ public class GpxController {
 		int color = p.getColor(0);
 		if(color != 0) {
 			n.putTag("color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
+			n.putTag("color_int", Algorithms.colorToString(color));
 		}
 		if (!Double.isNaN(p.ele)) {
 			n.putTag("ele", p.ele + "");
