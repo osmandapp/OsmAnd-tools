@@ -47,6 +47,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.util.Algorithms;
+import rtree.RTree;
 
 
 @RestController
@@ -146,6 +147,7 @@ public class GpxController {
 		settings.indexTransport = false;
 		settings.indexRouting = false;
 		String sessionId = httpSession.getId();
+		RTree.clearCache();
 		File folder = new File(tmpOsm.getParentFile(), sessionId);
 		String fileName = "gpx_" + sessionId;
 		File targetObf = new File(folder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
