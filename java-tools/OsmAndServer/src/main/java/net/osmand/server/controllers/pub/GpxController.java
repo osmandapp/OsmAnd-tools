@@ -118,9 +118,9 @@ public class GpxController {
     public ResponseEntity<Resource> indexesPhp(@RequestParam(defaultValue="", required=false) String gzip,
     		 HttpSession httpSession, HttpServletResponse resp) throws IOException, FactoryConfigurationError, XMLStreamException, SQLException, InterruptedException, XmlPullParserException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
-		File ttmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm");
-		ctx.tempFiles.add(ttmpOsm);
-		FileOutputStream fous = new FileOutputStream(ttmpOsm);
+		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm");
+		ctx.tempFiles.add(tmpOsm);
+		FileOutputStream fous = new FileOutputStream(tmpOsm);
 		try {
 			List<Node> nodes = new ArrayList<>();
 			List<Way> ways = new ArrayList<>();
@@ -137,21 +137,23 @@ public class GpxController {
         
         IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
-		settings.indexAddress = true;
+		settings.indexAddress = false;
 		settings.indexPOI = true;
-		settings.indexTransport = true;
-		settings.indexRouting = true;
+		settings.indexTransport = false;
+		settings.indexRouting = false;
 		String sessionId = httpSession.getId();
-		File folder = new File(ttmpOsm.getAbsoluteFile(), sessionId);
-		String fileName = "gpx_"+sessionId;
+		File folder = new File(tmpOsm.getParentFile(), sessionId);
+		String fileName = "gpx_" + sessionId;
 		File targetObf = new File(folder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
 		try {
 			folder.mkdirs();
 			IndexCreator ic = new IndexCreator(folder, settings);
-			MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(fileName, "");
+			MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(null, fileName);
 			ic.setMapFileName(fileName);
-			ic.generateIndexes(ttmpOsm, IProgress.EMPTY_PROGRESS, null, MapZooms.getDefault(), types, null);
+			// IProgress.EMPTY_PROGRESS
+			ic.generateIndexes(tmpOsm, IProgress.EMPTY_PROGRESS, null, MapZooms.getDefault(), types, null);
 			new File(folder, ic.getMapFileName()).renameTo(targetObf);
+			ctx.tempFiles.add(targetObf);
 		} finally {
 			Algorithms.removeAllFiles(folder);
 		}
