@@ -6,3 +6,4 @@ WikipediaConverter/target
 WikipediaConverter/gwtwiki/
 OsmAndMapCreator/regions.ocbf
 obf-generation/basemap/admin_levels/*.osm
+*.pyc

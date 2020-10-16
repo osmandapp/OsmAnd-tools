@@ -52,7 +52,7 @@ blur_tiff ()
 		if [ $? -ne 0 ]; then echo $(date)' Error creating vrt' & exit 5;fi
 
 		echo "Blurring …"
-		time python3 ${working_dir}/raster_chunk_processing.py -p 4 -m blur_gauss -o 25 -s 1500 --verbose -r 15 -d 1 ${TMP_DIR}$filename.vrt $outdir$filename.tif
+		time python3 ${working_dir}/raster_chunk_processing.py -p 4 -m blur_gauss -o 25 -s 1500 --verbose -r 15 -d 2 ${TMP_DIR}$filename.vrt $outdir$filename.tif
 		if [ $? -ne 0 ]; then echo $(date)' Error blurring' & exit 6;fi
 		rm ${TMP_DIR}$filename.vrt
 		gdalwarp -ts 3602 3602 -ot Int16 -co "COMPRESS=LZW" $outdir$filename.tif $outdir$filename.tmp
