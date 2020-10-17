@@ -120,7 +120,7 @@ public class DownloadOsmGPX {
 				qp.osmFile = new File(args[1]);
 			}
 			utility.queryGPXForBBOX(qp);
-		} else if ("query".equals(main)) {
+		} else if ("query".equals(main) || "obf-gen".equals(main)) {
 			QueryParams qp = new QueryParams();
 			for (int i = 1; i < args.length; i++) {
 				String[] s = args[i].split("=");
@@ -168,7 +168,11 @@ public class DownloadOsmGPX {
 					break;
 				}
 			}
-			utility.queryGPXForBBOX(qp);
+			if("query".equals(main)) {
+				utility.queryGPXForBBOX(qp);
+			} else {
+				utility.generateObfFile(qp);
+			}
 		} else if ("redownload_tags_and_description".equals(main)) {
 			utility.redownloadTagsDescription();
 		} else if ("recalculateminmax".equals(main)) {
@@ -265,6 +269,11 @@ public class DownloadOsmGPX {
 		ctx.endDocument();
 		
 		System.out.println(String.format("Fetched %d tracks %d segments", ctx.tracks, ctx.segments));
+		generateObfFile(qp);
+	}
+
+	private void generateObfFile(QueryParams qp)
+			throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		if(qp.obfFile != null) {
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
