@@ -224,7 +224,7 @@ public class DownloadOsmGPX {
 		}
 		String query = "SELECT t.id, s.data, t.name, t.description, t.\"user\", t.date, t.tags from " + GPX_METADATA_TABLE_NAME
 				+ " t join " + GPX_FILES_TABLE_NAME + " s on s.id = t.id "
-				+ " where 1 = 1 " + conditions;
+				+ " where 1 = 1 " + conditions + " order by t.date asc";
 		System.out.println(query);
 		ResultSet rs = dbConn.createStatement().executeQuery(query);
 		OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
