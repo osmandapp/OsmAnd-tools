@@ -58,6 +58,7 @@ import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -228,9 +229,12 @@ public class DownloadOsmGPX {
 		ResultSet rs = dbConn.createStatement().executeQuery(query);
 		OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
 		ctx.startDocument();
+		Date lastTimestamp = null; 
 		while (rs.next()) {
-			if (ctx.tracks % 1000 == 0) {
-				System.out.println(String.format("Fetched %d tracks %d segments", ctx.tracks, ctx.segments));
+			if ((ctx.tracks + 1) % 1000 == 0) {
+				System.out.println(
+						String.format("Fetched %d tracks %d segments - last %s (now %s)", ctx.tracks + 1, ctx.segments, lastTimestamp, 
+								new Date()));
 			}
 			OsmGpxFile gpxInfo = new OsmGpxFile();
 			gpxInfo.id = rs.getLong(1);
@@ -242,6 +246,7 @@ public class DownloadOsmGPX {
 			gpxInfo.description = rs.getString(4);
 			gpxInfo.user = rs.getString(5);
 			gpxInfo.timestamp = new Date(rs.getDate(6).getTime());
+			lastTimestamp = gpxInfo.timestamp;
 			Array tags = rs.getArray(7);
 			Map<String, String> trackTags = new TreeMap<String, String>(); 
 			if (tags != null) {
@@ -276,9 +281,8 @@ public class DownloadOsmGPX {
 				IndexCreator ic = new IndexCreator(folder, settings);
 				MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(null, fileName);
 				ic.setMapFileName(fileName);
-				// IProgress.EMPTY_PROGRESS
 				IProgress prog = IProgress.EMPTY_PROGRESS;
-				// prog = new ConsoleProgressImplementation();
+				prog = new ConsoleProgressImplementation();
 				ic.generateIndexes(qp.osmFile, prog, null, MapZooms.getDefault(), types, null);
 				new File(folder, ic.getMapFileName()).renameTo(targetObf);
 			} finally {
