@@ -55,9 +55,15 @@ import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
+import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.MapZooms;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.io.Base64;
 import net.osmand.util.Algorithms;
+import rtree.RTree;
 
 public class DownloadOsmGPX {
 
@@ -136,7 +142,13 @@ public class DownloadOsmGPX {
 					qp.details = Integer.parseInt(val);
 					break;
 				case "--out":
-					qp.osmFile = new File(val);
+					if (val.endsWith(".obf")) {
+						qp.obfFile = new File(val);
+						File dir = qp.obfFile.getParentFile();
+						qp.osmFile = new File(dir, Algorithms.getFileNameWithoutExtension(qp.obfFile) + ".osm.gz");
+					} else {
+						qp.osmFile = new File(val);
+					}
 					break;
 				case "--user":
 					qp.user = val;
@@ -171,7 +183,7 @@ public class DownloadOsmGPX {
 	
 	
 	
-	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException {
+	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
 		String conditions = "";
 		if (!Algorithms.isEmpty(qp.user)) {
 			conditions += " and t.\"user\" = '" + qp.user + "'";
@@ -248,6 +260,31 @@ public class DownloadOsmGPX {
 		ctx.endDocument();
 		
 		System.out.println(String.format("Fetched %d tracks %d segments", ctx.tracks, ctx.segments));
+		if(qp.obfFile != null) {
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexMap = true;
+			settings.indexAddress = false;
+			settings.indexPOI = true;
+			settings.indexTransport = false;
+			settings.indexRouting = false;
+			RTree.clearCache();
+			File folder = new File(qp.obfFile.getParentFile(), "gen");
+			String fileName = qp.obfFile.getName();
+			File targetObf = qp.obfFile;
+			try {
+				folder.mkdirs();
+				IndexCreator ic = new IndexCreator(folder, settings);
+				MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(null, fileName);
+				ic.setMapFileName(fileName);
+				// IProgress.EMPTY_PROGRESS
+				IProgress prog = IProgress.EMPTY_PROGRESS;
+				// prog = new ConsoleProgressImplementation();
+				ic.generateIndexes(qp.osmFile, prog, null, MapZooms.getDefault(), types, null);
+				new File(folder, ic.getMapFileName()).renameTo(targetObf);
+			} finally {
+				Algorithms.removeAllFiles(folder);
+			}
+		}
 	}
 
 	
@@ -716,6 +753,7 @@ public class DownloadOsmGPX {
 		
 		public int details = DETAILS_ELE_SPEED;
 		public File osmFile;
+		public File obfFile;
 		public String tag;
 		public int limit = -1;
 		public String user;
