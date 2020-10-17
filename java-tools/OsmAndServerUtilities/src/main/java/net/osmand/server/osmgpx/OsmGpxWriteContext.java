@@ -99,6 +99,7 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "version", "1");
 				serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().lat));
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().lon));
+				tagValue(serializer, "gpx", "segment");
 				addGenericInfoTags(serializer, gpxInfo, null);
 				addAnalysisTags(serializer, analysis);
 				addTrackSpecificTags(serializer, trackTags);
@@ -117,7 +118,7 @@ public class OsmGpxWriteContext {
 					long idStart = id;
 					for (WptPt p : s.points) {
 						long nid = id--;
-						writePoint(nid, p);
+						writePoint(nid, p, null);
 					}
 					long endid = id;
 					serializer.startTag(null, "way");
@@ -130,6 +131,7 @@ public class OsmGpxWriteContext {
 						serializer.attribute(null, "ref", nid + "");
 						serializer.endTag(null, "nd");
 					}
+					tagValue(serializer, "gpx", "segment");
 					addGenericInfoTags(serializer, gpxInfo, t);
 					addAnalysisTags(serializer, analysis);
 					addTrackSpecificTags(serializer, trackTags);
@@ -139,7 +141,7 @@ public class OsmGpxWriteContext {
 			
 			for (WptPt p : gpxFile.getPoints()) {
 				long nid = id--;
-				writePoint(nid, p);
+				writePoint(nid, p, "point");
 			}
 		}
 		tracks++;
@@ -165,7 +167,6 @@ public class OsmGpxWriteContext {
 	}
 
 	private void addGenericInfoTags(XmlSerializer serializer, OsmGpxFile gpxInfo, Track p) throws IOException {
-		tagValue(serializer, "osmgpx", "segment");
 		if (p != null) {
 			if (!Algorithms.isEmpty(p.name)) {
 				tagValue(serializer, "name", p.name);
@@ -212,14 +213,16 @@ public class OsmGpxWriteContext {
 		}
 	}
 	
-	private Node writePoint(long id, WptPt p) throws IOException {
-		Node n = new Node(p.lat, p.lon, id);
+	private void writePoint(long id, WptPt p, String gpxValue) throws IOException {
 		serializer.startTag(null, "node");
 		serializer.attribute(null, "lat", latLonFormat.format(p.lat));
 		serializer.attribute(null, "lon", latLonFormat.format(p.lon));
 		serializer.attribute(null, "id", id + "");
 		serializer.attribute(null, "action", "modify");
 		serializer.attribute(null, "version", "1");
+		if (gpxValue != null) {
+			tagValue(serializer, "gpx", gpxValue);
+		}
 		if (!Algorithms.isEmpty(p.name)) {
 			tagValue(serializer, "name", p.name);
 		}
@@ -258,7 +261,6 @@ public class OsmGpxWriteContext {
 			}
 		}
 		serializer.endTag(null, "node");
-		return n;
 	}
 
 	private void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
