@@ -182,6 +182,7 @@ public class OsmGpxWriteContext {
 		}
 		if (gpxInfo != null) {
 			tagValue(serializer, "trackid", gpxInfo.id + "");
+			tagValue(serializer, "ref", gpxInfo.id % 1000 + "");
 			tagValue(serializer, "name", gpxInfo.name);
 			tagValue(serializer, "user", gpxInfo.user);
 			tagValue(serializer, "date", gpxInfo.timestamp.toString());
