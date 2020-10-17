@@ -5,9 +5,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -34,20 +31,15 @@ import com.google.gson.Gson;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.GPXUtilities.Track;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
-import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
-import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
+import net.osmand.server.osmgpx.DownloadOsmGPX.QueryParams;
+import net.osmand.server.osmgpx.OsmGpxWriteContext;
 import net.osmand.util.Algorithms;
 import rtree.RTree;
 
@@ -130,27 +122,24 @@ public class GpxController {
 	@RequestMapping(path = { "/download-obf"})
 	@ResponseBody
     public ResponseEntity<Resource> downloadObf(@RequestParam(defaultValue="", required=false) String gzip,
-    		 HttpSession httpSession, HttpServletResponse resp) throws IOException, FactoryConfigurationError, XMLStreamException, SQLException, InterruptedException, XmlPullParserException {
+			HttpSession httpSession, HttpServletResponse resp) throws IOException, FactoryConfigurationError,
+			XMLStreamException, SQLException, InterruptedException, XmlPullParserException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
-		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm");
+		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm.gz");
+		QueryParams qp = new QueryParams();
+		qp.osmFile = tmpOsm;
+		qp.details = QueryParams.DETAILS_ELE_SPEED;
 		ctx.tempFiles.add(tmpOsm);
-		FileOutputStream fous = new FileOutputStream(tmpOsm);
-		try {
-			List<Node> nodes = new ArrayList<>();
-			List<Way> ways = new ArrayList<>();
-			long id = -1;
-			for (File gf : ctx.files) {
-				GPXFile f = GPXUtilities.loadGPXFile(gf);
-				id = createOsmFromGPX(nodes, ways, id, f);
-			}
-			OsmStorageWriter osmWriter = new OsmStorageWriter();
-			osmWriter.writeOSM(fous, null, nodes, ways, Collections.emptyList());
-		} finally {
-			fous.close();
+		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
+		writeCtx.startDocument();
+		for (File gf : ctx.files) {
+			GPXFile f = GPXUtilities.loadGPXFile(gf);
+			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
+			writeCtx.writeTrack(null, null, f, analysis);
 		}
-		
-        
-        IndexCreatorSettings settings = new IndexCreatorSettings();
+		writeCtx.endDocument();
+
+		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
 		settings.indexAddress = false;
 		settings.indexPOI = true;
@@ -168,7 +157,7 @@ public class GpxController {
 			ic.setMapFileName(fileName);
 			// IProgress.EMPTY_PROGRESS
 			IProgress prog = IProgress.EMPTY_PROGRESS;
-			prog = new ConsoleProgressImplementation();
+			// prog = new ConsoleProgressImplementation();
 			ic.generateIndexes(tmpOsm, prog, null, MapZooms.getDefault(), types, null);
 			new File(folder, ic.getMapFileName()).renameTo(targetObf);
 			ctx.tempFiles.add(targetObf);
@@ -176,74 +165,14 @@ public class GpxController {
 			Algorithms.removeAllFiles(folder);
 		}
 		HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
-        headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
-		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 	}
 
-	private long createOsmFromGPX(List<Node> nodes, List<Way> ways, long id, GPXFile f) {
-		for (Track t : f.tracks) {
-			for (TrkSegment s : t.segments) {
-				Way w = new Way(id--);
-				w.putTag("gpx", "segment");
-				for (WptPt p : s.points) {
-					Node n = createPoint(id--, p);
-					w.addNode(n);
-					nodes.add(n);
-				}
-				int color = s.getColor(0);
-				if(color != 0) {
-					w.putTag("color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-					w.putTag("color_int", Algorithms.colorToString(color));
-				}
-				ways.add(w);
-			}
-		}
+	
 
-		for (WptPt p : f.getPoints()) {
-			Node n = createPoint(id--, p);
-			n.putTag("gpx", "point");
-			nodes.add(n);
-		}
-		return id;
-	}
-
-	private Node createPoint(long id, WptPt p) {
-		Node n = new Node(p.lat, p.lon, id);
-		if (!Algorithms.isEmpty(p.name)) {
-			n.putTag("name", p.name);
-		}
-		if (!Algorithms.isEmpty(p.desc)) {
-			n.putTag("description", p.desc);
-		}
-		if (!Algorithms.isEmpty(p.category)) {
-			n.putTag("category", p.category);
-		}
-		if (!Algorithms.isEmpty(p.comment)) {
-			n.putTag("comment", p.comment);
-		}
-		if (!Algorithms.isEmpty(p.link)) {
-			n.putTag("link", p.link);
-		}
-		if (!Algorithms.isEmpty(p.getIconName())) {
-			n.putTag("icon", p.getIconName());
-		}
-		if (!Algorithms.isEmpty(p.getBackgroundType())) {
-			n.putTag("bg", p.getBackgroundType());
-		}
-		int color = p.getColor(0);
-		if(color != 0) {
-			n.putTag("color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-			n.putTag("color_int", Algorithms.colorToString(color));
-		}
-		if (!Double.isNaN(p.ele)) {
-			n.putTag("ele", p.ele + "");
-		}
-		if (!Double.isNaN(p.speed)) {
-			n.putTag("speed", p.speed + "");
-		}
-		return n;
-	}
+	
 	
 
 }
