@@ -21,7 +21,7 @@ INTER_COMPRESS="${INTER_COMPRESS:-LZW}"
 
 if [ -z "$START_STAGE" ]; then
 	START_STAGE=1
-	
+fi	
 if [ -z "$END_STAGE" ]; then
 	END_STAGE=10
 fi
