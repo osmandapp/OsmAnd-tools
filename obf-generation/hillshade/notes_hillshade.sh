@@ -14,10 +14,10 @@ TMP_DIR=tmp
 FINAL_COMPRESS="${FINAL_COMPRESS:-LZW}"
 INTER_COMPRESS="${INTER_COMPRESS:-LZW}"
 
-# NUM_THREADS=16
-# START_STAGE=1
-# END_STAGE=9
-# PROCESS=composite
+#NUM_THREADS=8
+#START_STAGE=1
+#END_STAGE=9
+#PROCESS=composite
 
 if [ -z "$START_STAGE" ]; then
 	START_STAGE=1
@@ -40,6 +40,8 @@ mkdir -p $TMP_DIR
 
 export DIR
 export TMP_DIR
+export FINAL_COMPRESS
+export INTER_COMPRESS
 
 create_gdaldem_tiles ()
 {
@@ -50,6 +52,7 @@ create_gdaldem_tiles ()
 		gdaldem hillshade -z 2 -co "COMPRESS=$INTER_COMPRESS" -s 111120 -compute_edges $1 hillshade/hs_$name
 		gdaldem slope -co "COMPRESS=$INTER_COMPRESS" -compute_edges -s 111120 $1 $TMP_DIR/slopes_$name
 		gdaldem color-relief -co "COMPRESS=$INTER_COMPRESS" $TMP_DIR/slopes_$name $DIR/color_slope.txt slopes/s_$name
+		
 		rm -f $TMP_DIR/slopes_$name || true
 	fi
 }
