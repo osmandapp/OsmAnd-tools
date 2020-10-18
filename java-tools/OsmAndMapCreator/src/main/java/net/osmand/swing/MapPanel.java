@@ -1170,8 +1170,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 									if(n == null) {
 										n = o.getLocation();
 									}
-									Node nt = new Node(n.getLatitude(), n.getLongitude(), -1);
-									points.registerObject(n.getLatitude(), n.getLongitude(), nt);
+									if (n != null) {
+										Node nt = new Node(n.getLatitude(), n.getLongitude(), -1);
+										points.registerObject(n.getLatitude(), n.getLongitude(), nt);
+									}
 								}
 							}
 						}
