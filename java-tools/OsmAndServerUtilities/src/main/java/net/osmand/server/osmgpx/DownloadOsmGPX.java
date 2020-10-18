@@ -27,9 +27,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.TimeZone;
-import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -252,19 +250,20 @@ public class DownloadOsmGPX {
 			gpxInfo.timestamp = new Date(rs.getDate(6).getTime());
 			lastTimestamp = gpxInfo.timestamp;
 			Array tags = rs.getArray(7);
-			Map<String, String> trackTags = new TreeMap<String, String>(); 
+			List<String> trackTags = new ArrayList<>(); 
 			if (tags != null) {
 				ResultSet rsar = tags.getResultSet();
 				while (rsar.next()) {
 					String tg = rsar.getString(2);
-					trackTags.put("tag_" + tg.toLowerCase(), tg.toLowerCase());
+					trackTags.add(tg.toLowerCase());
 				}
 			}
+			gpxInfo.tags = trackTags.toArray(new String[trackTags.size()]);
 
 			ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(gpxInfo.timestamp.getTime());
-			ctx.writeTrack(gpxInfo, trackTags,gpxFile, analysis);
+			ctx.writeTrack(gpxInfo, null, gpxFile, analysis);
 		}
 		ctx.endDocument();
 		

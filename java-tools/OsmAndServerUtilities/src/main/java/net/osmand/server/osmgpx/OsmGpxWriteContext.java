@@ -9,6 +9,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.zip.GZIPOutputStream;
@@ -76,8 +77,9 @@ public class OsmGpxWriteContext {
 	}
 	
 
-	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> trackTags, GPXFile gpxFile, GPXTrackAnalysis analysis)
+	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GPXFile gpxFile, GPXTrackAnalysis analysis)
 			throws IOException, SQLException {
+		Map<String, String> gpxTrackTags = new LinkedHashMap<String, String>();
 		if (qp.details < QueryParams.DETAILS_TRACKS) {
 			boolean validTrack = false;
 			for (Track t : gpxFile.tracks) {
@@ -99,9 +101,10 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().lat));
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().lon));
 				tagValue(serializer, "gpx", "segment");
-				addGenericInfoTags(serializer, gpxInfo, null);
-				addAnalysisTags(serializer, analysis);
-				addTrackSpecificTags(serializer, trackTags);
+				addGenericTags(gpxTrackTags, null);
+				addGpxInfoTags(gpxTrackTags, gpxInfo);
+				addAnalysisTags(gpxTrackTags, analysis);
+				seraizeTags(extraTrackTags, gpxTrackTags);
 				serializer.endTag(null, "node");
 			}
 		} else {
@@ -131,9 +134,11 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "gpx", "segment");
-					addGenericInfoTags(serializer, gpxInfo, t);
-					addAnalysisTags(serializer, analysis);
-					addTrackSpecificTags(serializer, trackTags);
+					addGenericTags(gpxTrackTags, t);
+					addGpxInfoTags(gpxTrackTags, gpxInfo);
+					addAnalysisTags(gpxTrackTags, analysis);
+					
+					seraizeTags(extraTrackTags, gpxTrackTags);
 					serializer.endTag(null, "way");
 				}
 			}
@@ -146,6 +151,17 @@ public class OsmGpxWriteContext {
 		tracks++;
 	}
 
+	private void seraizeTags(Map<String, String> extraTrackTags, Map<String, String> gpxTrackTags) throws IOException {
+		if(extraTrackTags != null) {
+			gpxTrackTags.putAll(extraTrackTags);
+		}
+		Iterator<Entry<String, String>> it = gpxTrackTags.entrySet().iterator();
+		while (it.hasNext()) {
+			Entry<String, String> e = it.next();
+			tagValue(serializer, e.getKey(), e.getValue());
+		}
+	}
+
 	public void endDocument() throws IOException {
 		if(serializer != null) {
 			serializer.endDocument();
@@ -154,61 +170,85 @@ public class OsmGpxWriteContext {
 		}		
 	}
 	
-	private void addTrackSpecificTags(XmlSerializer serializer, Map<String, String> tags)
-			throws SQLException, IOException {
-		if (tags != null && !tags.isEmpty()) {
-			Iterator<Entry<String, String>> it = tags.entrySet().iterator();
-			while (it.hasNext()) {
-				Entry<String, String> e = it.next();
-				tagValue(serializer, e.getKey(), e.getValue());
-			}
-		}
-	}
 
-	private void addGenericInfoTags(XmlSerializer serializer, OsmGpxFile gpxInfo, Track p) throws IOException {
+	private void addGenericTags(Map<String, String> gpxTrackTags, Track p) throws IOException {
 		if (p != null) {
 			if (!Algorithms.isEmpty(p.name)) {
-				tagValue(serializer, "name", p.name);
+				gpxTrackTags.put("name", p.name);
 			}
 			if (!Algorithms.isEmpty(p.desc)) {
-				tagValue(serializer, "description", p.desc);
+				gpxTrackTags.put("description", p.desc);
 			}
 			int color = p.getColor(0);
 			if (color != 0) {
-				tagValue(serializer, "color",
+				gpxTrackTags.put("color",
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-				tagValue(serializer, "color_int", Algorithms.colorToString(color));
+				gpxTrackTags.put("color_int", Algorithms.colorToString(color));
 			}
-		}
-		if (gpxInfo != null) {
-			tagValue(serializer, "trackid", gpxInfo.id + "");
-			tagValue(serializer, "ref", gpxInfo.id % 1000 + "");
-			tagValue(serializer, "name", gpxInfo.name);
-			tagValue(serializer, "user", gpxInfo.user);
-			tagValue(serializer, "date", gpxInfo.timestamp.toString());
-			tagValue(serializer, "description", gpxInfo.description);
 		}
 	}
 
-	private void addAnalysisTags(XmlSerializer serializer, GPXTrackAnalysis analysis) throws IOException {
-		tagValue(serializer, "distance", latLonFormat.format(analysis.totalDistance));
+	private void addGpxInfoTags(Map<String, String> gpxTrackTags, OsmGpxFile gpxInfo) {
+		if (gpxInfo != null) {
+			gpxTrackTags.put("trackid", gpxInfo.id + "");
+			gpxTrackTags.put("ref", gpxInfo.id % 1000 + "");
+			gpxTrackTags.put("name", gpxInfo.name);
+			gpxTrackTags.put("user", gpxInfo.user);
+			gpxTrackTags.put("date", gpxInfo.timestamp.toString());
+			gpxTrackTags.put("description", gpxInfo.description);
+			// red, blue, green, orange, yellow
+			String color = null;
+			for (String tg : gpxInfo.tags) {
+				gpxTrackTags.put("tag_" + tg, tg);
+				color = getColorFromTag(color, tg);
+			}
+			if (color != null) {
+				// gpxTrackTags.put("gpx_icon", "");
+				gpxTrackTags.put("gpx_bg", color + "_hexagon_3_road_shield");
+				gpxTrackTags.put("color", color);
+			}
+		}
+	}
+
+	private String getColorFromTag(String color, String tg) {
+		switch(tg) {
+		case "mountainbiking":
+		case "bike":
+		case "cycling":
+			return "blue";
+		case "driving":
+		case "car":
+			return "green";
+		case "skating":
+		case "riding":
+			return "yellow";
+		case "running":
+		case "walking":
+		case "hiking":
+			return "orange";
+		}
+		return color;
+	}
+
+	private void addAnalysisTags(Map<String, String> gpxTrackTags, GPXTrackAnalysis analysis) throws IOException {
+		gpxTrackTags.put("distance", latLonFormat.format(analysis.totalDistance));
 		if (analysis.isTimeSpecified()) {
-			tagValue(serializer, "time_span", analysis.timeSpan + "");
-			tagValue(serializer, "time_span_no_gaps", analysis.timeSpanWithoutGaps + "");
-			tagValue(serializer, "time_moving", analysis.timeMoving + "");
-			tagValue(serializer, "time_moving_no_gaps", analysis.timeMovingWithoutGaps + "");
+			gpxTrackTags.put("time_span", analysis.timeSpan + "");
+			gpxTrackTags.put("time_span_no_gaps", analysis.timeSpanWithoutGaps + "");
+			gpxTrackTags.put("time_moving", analysis.timeMoving + "");
+			gpxTrackTags.put("time_moving_no_gaps", analysis.timeMovingWithoutGaps + "");
 		}
 		if (analysis.hasElevationData) {
-			tagValue(serializer, "avg_ele", latLonFormat.format(analysis.avgElevation));
-			tagValue(serializer, "min_ele", latLonFormat.format(analysis.minElevation));
-			tagValue(serializer, "max_ele", latLonFormat.format(analysis.maxElevation));
-			tagValue(serializer, "diff_ele_up", latLonFormat.format(analysis.diffElevationUp));
-			tagValue(serializer, "diff_ele_down", latLonFormat.format(analysis.diffElevationDown));
+			gpxTrackTags.put("avg_ele", latLonFormat.format(analysis.avgElevation));
+			gpxTrackTags.put("min_ele", latLonFormat.format(analysis.minElevation));
+			gpxTrackTags.put("max_ele", latLonFormat.format(analysis.maxElevation));
+			gpxTrackTags.put("diff_ele_up", latLonFormat.format(analysis.diffElevationUp));
+			gpxTrackTags.put("diff_ele_down", latLonFormat.format(analysis.diffElevationDown));
 		}
 		if (analysis.hasSpeedData) {
-			tagValue(serializer, "avg_speed", latLonFormat.format(analysis.avgSpeed));
-			tagValue(serializer, "max_speed", latLonFormat.format(analysis.maxSpeed));
-			tagValue(serializer, "min_speed", latLonFormat.format(analysis.minSpeed));
+			gpxTrackTags.put("avg_speed", latLonFormat.format(analysis.avgSpeed));
+			gpxTrackTags.put("max_speed", latLonFormat.format(analysis.maxSpeed));
+			gpxTrackTags.put("min_speed", latLonFormat.format(analysis.minSpeed));
 			
 		}
 	}
@@ -239,10 +279,10 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "link", p.link);
 		}
 		if (!Algorithms.isEmpty(p.getIconName())) {
-			tagValue(serializer, "icon", p.getIconName());
+			tagValue(serializer, "gpx_icon", p.getIconName());
 		}
 		if (!Algorithms.isEmpty(p.getBackgroundType())) {
-			tagValue(serializer, "bg", p.getBackgroundType());
+			tagValue(serializer, "gpx_bg", p.getBackgroundType());
 		}
 		int color = p.getColor(0);
 		if(color != 0) {
