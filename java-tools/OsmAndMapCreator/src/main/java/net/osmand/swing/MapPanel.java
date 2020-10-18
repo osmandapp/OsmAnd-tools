@@ -73,6 +73,8 @@ import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.NetworkUtils;
 import net.osmand.swing.NativeSwingRendering.MapDiff;
 import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
@@ -81,6 +83,8 @@ import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
+
+import gnu.trove.list.array.TIntArrayList;
 
 
 public class MapPanel extends JPanel implements IMapDownloaderCallback {
@@ -1144,13 +1148,35 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 								.getPoint().y);
 						System.out.println("Search objects at " + x + " " + y);
 						RenderedObject[] ls = nativeLibRendering.searchRenderedObjectsFromContext(ctx.context, x, y, true);
+						DataTileManager<Entity> points = new DataTileManager<Entity>(6);
 						if(ls != null && ls.length > 0) {
-							for(RenderedObject o : ls) {
-								System.out.println((o.isText() ? o.getName() : "Icon") + " "
-											+o.getId() + " " + o.getTags() + " (" + o.getBbox() + ") " + 
-										" order = " + o.getOrder() + " visible = " + o.isVisible());
+							for (RenderedObject o : ls) {
+								System.out.println((o.isText() ? o.getName() : "Icon") + " " + o.getId() + " "
+										+ o.getTags() + " (" + o.getBbox() + ") " + " order = " + o.getOrder()
+										+ " visible = " + o.isVisible());
+								Way w = new Way(-1);
+								TIntArrayList x1 = o.getX();
+								TIntArrayList y1 = o.getY();
+								if (x1.size() > 1) {
+									for (int i = 0; i < x1.size(); i++) {
+										Node n = new Node(MapUtils.get31LatitudeY(y1.get(i)),
+												MapUtils.get31LongitudeX(x1.get(i)), -1);
+										w.addNode(n);
+									}
+									LatLon n = w.getLatLon();
+									points.registerObject(n.getLatitude(), n.getLongitude(), w);
+								} else {
+									LatLon n = o.getLabelLatLon();
+									if(n == null) {
+										n = o.getLocation();
+									}
+									Node nt = new Node(n.getLatitude(), n.getLongitude(), -1);
+									points.registerObject(n.getLatitude(), n.getLongitude(), nt);
+								}
 							}
 						}
+						setPoints(points);
+						repaint();
 					}
 				}
 			}
