@@ -1,8 +1,5 @@
 package net.osmand.travel;
 
-import info.bliki.wiki.filter.Encoder;
-import info.bliki.wiki.filter.HTMLConverter;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -24,7 +21,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
@@ -32,16 +28,6 @@ import java.util.zip.GZIPOutputStream;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
-
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.WptPt;
-import net.osmand.PlatformUtil;
-import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.preparation.DBDialect;
-import net.osmand.wiki.CustomWikiModel;
-import net.osmand.wiki.WikiDatabasePreparation;
-import net.osmand.wiki.WikiDatabasePreparation.LatLon;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
@@ -54,9 +40,26 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
+import info.bliki.wiki.filter.Encoder;
+import info.bliki.wiki.filter.HTMLConverter;
+import net.osmand.GPXUtilities;
+import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.WptPt;
+import net.osmand.PlatformUtil;
+import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.preparation.DBDialect;
+import net.osmand.wiki.CustomWikiModel;
+import net.osmand.wiki.WikiDatabasePreparation;
+import net.osmand.wiki.WikiDatabasePreparation.LatLon;
+
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);	
 	private static boolean uncompressed;
+	public static final String EMAIL = "Email";
+	public static final String DIRECTIONS = "Directions";
+	public static final String WORKING_HOURS = "Working hours";
+	public static final String PRICE = "Price";
+	public static final String PHONE = "Phone";
 	
 	
 	public enum WikivoyageTemplates {
@@ -414,19 +417,19 @@ public class WikivoyageLangPreparation {
 										|| field.equalsIgnoreCase("متن")) {
 									point.desc = value;
 								} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל") || field.equalsIgnoreCase("پست الکترونیکی")) {
-									extraValues.put("Email", value);
+									extraValues.put(EMAIL, value);
 								} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel") || field.equalsIgnoreCase("téléphone")
 										|| field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
-									extraValues.put("Phone", value);
+									extraValues.put(PHONE, value);
 								} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo") || field.equalsIgnoreCase("prix") 
 										|| field.equalsIgnoreCase("מחיר") || field.equalsIgnoreCase("بها")) {
-									extraValues.put("Price", value);
+									extraValues.put(PRICE, value);
 								} else if (field.equalsIgnoreCase("hours") || field.equalsIgnoreCase("orari") || field.equalsIgnoreCase("horaire") 
 										|| field.equalsIgnoreCase("funcionamento") || field.equalsIgnoreCase("שעות") || field.equalsIgnoreCase("ساعت‌ها")) {
-									extraValues.put("Working hours", value);
+									extraValues.put(WORKING_HOURS, value);
 								} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction") || field.equalsIgnoreCase("הוראות")
 										|| field.equalsIgnoreCase("مسیرها")) {
-									extraValues.put("Directions", value);
+									extraValues.put(DIRECTIONS, value);
 								}
 							} catch (Exception e) {}
 						}
@@ -438,7 +441,7 @@ public class WikivoyageLangPreparation {
 							point.desc += "\n\r";
 						}
 						String value = extraValues.get(key);
-						if(areaCode.length() > 0 && key.equals("Phone")) {
+						if(areaCode.length() > 0 && key.equals(PHONE)) {
 							value = areaCode + " " + value;
 						}
 						point.desc += key + ": " + value; // ". " backward compatible

@@ -213,6 +213,7 @@ public class OsmGpxWriteContext {
 	private String getColorFromTag(String color, String tg) {
 		switch(tg) {
 		case "mountainbiking":
+		case "mtb":
 		case "bike":
 		case "cycling":
 			return "blue";

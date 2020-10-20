@@ -44,7 +44,7 @@ public class WikivoyageGenOSM {
 	public static final String CAT_OTHER = "other"; // 10%
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private static final int LIMIT = 1000;
+	private static final int LIMIT = 10000;
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	
 	
@@ -56,7 +56,7 @@ public class WikivoyageGenOSM {
 	
 	
 	public static void main(String[] args) throws SQLException, IOException {
-		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage.sqlite");
+		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
 		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"));
 	}
 
@@ -127,7 +127,7 @@ public class WikivoyageGenOSM {
 		// 						population, country, region, city_type, osm_i,
 		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, gpx_gz from travel_articles order by trip_id asc");
 		int count = 0, emptyLocation = 0, emptyContent = 0;
-		CombinedWikivoyageArticle cac = new CombinedWikivoyageArticle();
+		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
 		XmlSerializer serializer = null;
 		OutputStream outputStream = null;
 		if(outputFile != null) {
@@ -146,10 +146,10 @@ public class WikivoyageGenOSM {
 		while (rs.next()) {
 			int rind = 1;
 			long tripId = rs.getLong(rind++);
-			if (tripId != cac.tripId && cac.tripId != -1) {
-				wrap(cac, serializer);
+			if (tripId != combinedArticle.tripId && combinedArticle.tripId != -1) {
+				wrap(combinedArticle, serializer);
 			}
-			cac.tripId = tripId;
+			combinedArticle.tripId = tripId;
 			String title = rs.getString(rind++);
 			String lang = rs.getString(rind++);
 			double lat = rs.getDouble(rind++);
@@ -158,7 +158,7 @@ public class WikivoyageGenOSM {
 			String content = Algorithms.gzipToString(rs.getBytes(rind++));
 			GZIPInputStream bytesStream = new GZIPInputStream(new ByteArrayInputStream(rs.getBytes(rind++)));
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(bytesStream);
-			cac.addArticle(lang, title, gpxFile, lat, lon, content);
+			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
 				if(lat == 0 && lon == 0) {
 					emptyLocation++;
@@ -171,7 +171,7 @@ public class WikivoyageGenOSM {
 			}
 			count++;
 		}
-		wrap(cac, serializer);
+		wrap(combinedArticle, serializer);
 		if(serializer != null) {
 			serializer.endTag(null, "osm");
 			serializer.flush();
@@ -221,7 +221,9 @@ public class WikivoyageGenOSM {
 			}
 			categories.put(cat, nt == null ? 1 : (nt.intValue() + 1));
 		}
+		
 		int i = 0;
+		long idStart = NODE_ID ;
 		for (GPXFile f : article.points) {
 			for (WptPt p : f.getPoints()) {
 				if (p.lat >= 90 || p.lat <= -90 || p.lon >= 180 || p.lon <= -180) {
@@ -229,32 +231,82 @@ public class WikivoyageGenOSM {
 				}
 				String cat = simplifyWptCategory(p.category, CAT_OTHER);
 				serializer.startTag(null, "node");
-				serializer.attribute(null, "id", NODE_ID-- + "");
+				long id = NODE_ID--;
+				serializer.attribute(null, "id", id + "");
 				serializer.attribute(null, "action", "modify");
 				serializer.attribute(null, "version", "1");
 				serializer.attribute(null, "lat", latLonFormat.format(p.lat));
 				serializer.attribute(null, "lon", latLonFormat.format(p.lon));
+				// TODO combine point languages & main tags
 				String lng = article.langs.get(i);
-				tagValue(serializer, "description:" + lng, p.desc);
-				tagValue(serializer, "name:" + lng, p.name);
-				tagValue(serializer, "wikivoyage_title:" + lng, article.titles.get(i));
-				tagValue(serializer, "wikivoyage", "point");
+				String tagSuffix = ":" + lng;
+
+				extractTagsFromDesc(serializer, "phone" + tagSuffix, WikivoyageLangPreparation.PHONE, p.desc);
+				extractTagsFromDesc(serializer, "email" + tagSuffix, WikivoyageLangPreparation.EMAIL, p.desc);
+				extractTagsFromDesc(serializer, "price" + tagSuffix, WikivoyageLangPreparation.PRICE, p.desc);
+				extractTagsFromDesc(serializer, "opening_hours" + tagSuffix, WikivoyageLangPreparation.WORKING_HOURS,
+						p.desc);
+				extractTagsFromDesc(serializer, "directions" + tagSuffix, WikivoyageLangPreparation.DIRECTIONS, p.desc);
+				tagValue(serializer, "description" + tagSuffix, p.desc);
+				tagValue(serializer, "name" + tagSuffix, p.name);
+				tagValue(serializer, "route_name" + tagSuffix, article.titles.get(i));
 				tagValue(serializer, "wikivoyage:" + lng, "yes");
+				
+				
+				// TODO combine point languages & main tags
 				if ("en".equals(lng)) {
 					tagValue(serializer, "description", p.desc);
 					tagValue(serializer, "name", p.name);
 				}
-				tagValue(serializer, "wikivoyage_category", cat);
+				tagValue(serializer, "route_object", "point");
+				tagValue(serializer, "route_type", "wikivoyage");
+				tagValue(serializer, "route_id", article.tripId + "");
+				tagValue(serializer, "route_object_category", cat);
 				serializer.endTag(null, "node");
 				cats.add(cat);
 			}
 			i++;
 		}
+		
+		long idEnd = NODE_ID;
+		serializer.startTag(null, "way");
+		long id = NODE_ID--;
+		serializer.attribute(null, "id", id + "");
+		serializer.attribute(null, "action", "modify");
+		serializer.attribute(null, "version", "1");
+		tagValue(serializer, "wikivoyage", "article");
+		tagValue(serializer, "tripid", article.tripId + "");
+		for(int it = 0; it < article.langs.size(); it++) {
+			String lng = article.langs.get(it);
+			String title= article.titles.get(it);
+			tagValue(serializer, "route_object", "points_collection");
+			tagValue(serializer, "route_id:" + lng, title);
+			tagValue(serializer, "name:"+lng, title);
+			tagValue(serializer, "description:"+lng, article.contents.get(it));
+		}
+		for(long nid  = idStart ; nid > idEnd; nid--  ) {
+			serializer.startTag(null, "nd");
+			serializer.attribute(null, "ref", nid +"");
+			serializer.endTag(null, "nd");
+		}
+		serializer.endTag(null, "way");
+		
 		article.clear();
 	}
 	
 	
 	
+	private static void extractTagsFromDesc(XmlSerializer serializer, String tag, String key, String desc) throws IOException {
+		if (desc != null && !desc.isEmpty()) {
+			for (String ln : desc.split("\n")) {
+				String line = ln.trim();
+				if (line.startsWith(key + ":")) {
+					tagValue(serializer, tag, line.substring(key.length() + 1).trim());
+				}
+			}
+		}
+	}
+
 	public static String simplifyWptCategory(String category, String defaultCat) {
 		if (category == null) {
 			category = "";
