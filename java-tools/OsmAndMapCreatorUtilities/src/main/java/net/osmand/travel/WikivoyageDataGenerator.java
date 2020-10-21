@@ -46,6 +46,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
+import info.bliki.wiki.filter.Encoder;
+
 public class WikivoyageDataGenerator {
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageDataGenerator.class);
@@ -179,7 +181,7 @@ public class WikivoyageDataGenerator {
 			}
 			if(!existingImagesMapping.containsKey(imageTitle)) {
 				existingImagesMapping.put(imageTitle, null);
-				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + imageTitle + "&action=raw";
+				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + Encoder.encodeUrl(imageTitle) + "&action=raw";
 				try {
 					URL url = new URL(metadataUrl);
 					BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
