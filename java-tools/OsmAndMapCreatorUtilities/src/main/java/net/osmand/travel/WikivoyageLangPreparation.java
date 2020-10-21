@@ -319,7 +319,7 @@ public class WikivoyageLangPreparation {
 					} else if (name.equals("text")) {
 						if (parseText ) {
 							if (cInfo == null) {
-								System.out.println("Empty page prop: " + title + " " + cid);
+								// System.out.println("Empty page prop: " + title + " " + cid);
 							} else if(cInfo.wikidataId == null) {
 								System.out.println("Empty wikidata id prop: " + title + " " + cid);
 							} else {
