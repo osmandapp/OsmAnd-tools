@@ -89,9 +89,8 @@ public class WikivoyageDataGenerator {
 		generator.regions.prepareFile();
 		generator.regions.cacheAllCountries();
 		
-		
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_banner_title ON travel_articles(banner_title);");
 		
 		printStep("Download/Copy proper headers for articles");
 		generator.updateProperHeaderForArticles(conn, workingDir);
@@ -108,8 +107,8 @@ public class WikivoyageDataGenerator {
 		printStep("Populate popular articles");
 		generator.createPopularArticlesTable(conn);
 		
-		conn.createStatement().execute("DROP INDEX IF EXISTS index_orig_id");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_banner_title ");
 		conn.close();
 	}
 
@@ -315,135 +314,7 @@ public class WikivoyageDataGenerator {
 		rs.close();
 	}
 
-	private void generateSameTripIdForDifferentLang(final File langlinkFile, Connection conn)
-			throws SQLException {
-		DBDialect dialect = DBDialect.SQLITE;
-		Connection langlinkConn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
-		PreparedStatement langlinkStatement = langlinkConn
-				.prepareStatement("SELECT id FROM langlinks WHERE title = ? AND lang = ?");
-		PreparedStatement updateTripId = conn
-				.prepareStatement("UPDATE travel_articles SET trip_id = ? WHERE title = ? AND lang = ?");
-		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of FROM travel_articles");
-
-		ResultSet rs = data.executeQuery();
-		int batch = 0;
-		while (rs.next()) {
-			String title = rs.getString("title");
-			String lang = rs.getString("lang");
-			long id = getCityId(langlinkStatement, title, lang);
-			updateTripId.setLong(1, id);
-			updateTripId.setString(2, title);
-			updateTripId.setString(3, lang);
-			updateTripId.addBatch();
-			if (batch++ > BATCH_SIZE) {
-				updateTripId.executeBatch();
-				batch = 0;
-			}
-		}
-		finishPrep(updateTripId);
-		langlinkStatement.close();
-		langlinkConn.close();
-	}
-
-	private long getCityId(PreparedStatement langlinkStatement, String title, String lang) throws SQLException {
-		langlinkStatement.setString(1, title);
-		langlinkStatement.setString(2, lang);
-		ResultSet rs = langlinkStatement.executeQuery();
-		if (rs.next()) {
-			return rs.getLong("id");
-		}
-		return 0;
-	}
-
-	private void createLangLinksIfMissing(File langlinkFile, File langlinkFolder, Connection conn)
-			throws IOException, SQLException {
-		if (langlinkFolder.exists() && !langlinkFile.exists()) {
-			processLangLinks(langlinkFolder, langlinkFile, conn);
-		}
-	}
-
-	private void processLangLinks(File langlinkFolder, File langlinkFile, Connection wikivoyageConnection)
-			throws IOException, SQLException {
-		if (!langlinkFolder.isDirectory()) {
-			System.err.println("Specified langlink folder is not a directory");
-			System.exit(-1);
-		}
-		DBDialect dialect = DBDialect.SQLITE;
-		Connection conn = (Connection) dialect.getDatabaseConnection(langlinkFile.getAbsolutePath(), log);
-		conn.createStatement()
-				.execute("CREATE TABLE langlinks (id long NOT NULL DEFAULT 0, lang text NOT NULL DEFAULT '', "
-						+ "title text NOT NULL DEFAULT '', UNIQUE (lang, title) ON CONFLICT IGNORE)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON langlinks(title);");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_lang ON langlinks(lang);");
-		PreparedStatement prep = conn.prepareStatement("INSERT OR IGNORE INTO langlinks VALUES (?, ?, ?)");
-		PreparedStatement articleQuery = wikivoyageConnection
-				.prepareStatement("SELECT title FROM travel_articles WHERE original_id = ? AND lang = ?");
-		Set<Long> ids = new HashSet<>();
-		Set<Long> currentFileIds = new HashSet<>();
-		Map<Long, Long> currMapping = new HashMap<>();
-		File[] files = langlinkFolder.listFiles();
-		final String[] lang = new String[1];
-		InsertValueProcessor p = new InsertValueProcessor() {
-
-			private int batch = 0;
-			private long maxId = 0;
-
-			@Override
-			public void process(List<String> insValues) {
-				long id = Long.valueOf(insValues.get(0));
-				try {
-					articleQuery.setLong(1, id);
-					articleQuery.setString(2, lang[0]);
-					ResultSet rs = articleQuery.executeQuery();
-					String thisTitle = "";
-					while (rs.next()) {
-						thisTitle = rs.getString("title");
-					}
-					articleQuery.clearParameters();
-					maxId = Math.max(maxId, id);
-					Long genId = currMapping.get(id);
-					if (genId == null) {
-						if (ids.contains(id)) {
-							genId = ++maxId;
-							currMapping.put(id, genId);
-						}
-					}
-					id = genId == null ? id : genId;
-					currentFileIds.add(id);
-					if (!thisTitle.isEmpty()) {
-						prep.setLong(1, id);
-						prep.setString(2, lang[0]);
-						prep.setString(3, thisTitle);
-						prep.addBatch();
-						batch++;
-					}
-					prep.setLong(1, id);
-					prep.setString(2, insValues.get(1));
-					prep.setString(3, insValues.get(2));
-					prep.addBatch();
-					if (batch++ > BATCH_SIZE) {
-						prep.executeBatch();
-						batch = 0;
-					}
-				} catch (SQLException e) {
-					System.err.println(e.getMessage());
-				}
-			}
-		};
-		for (File f : files) {
-			lang[0] = f.getName().replace("wikivoyage-latest-langlinks.sql.gz", "");
-			SqlInsertValuesReader.readInsertValuesFile(f.getAbsolutePath(), p);
-			ids.addAll(currentFileIds);
-			currentFileIds.clear();
-			currMapping.clear();
-		}
-		prep.addBatch();
-		prep.executeBatch();
-		prep.close();
-		conn.createStatement().execute("DROP INDEX IF EXISTS index_orig_id;");
-		articleQuery.close();
-		conn.close();
-	}
+	
 
 	public void finishPrep(PreparedStatement ps) throws SQLException {
 		ps.addBatch();
@@ -483,62 +354,6 @@ public class WikivoyageDataGenerator {
 		}
 	}
 
-	private void generateIdsIfMissing(Connection conn, File langlinkfile) throws SQLException {
-		long maxId = 0;
-		DBDialect dialect = DBDialect.SQLITE;
-		Connection langConn = (Connection) dialect.getDatabaseConnection(langlinkfile.getAbsolutePath(), log);
-		Statement st = langConn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT MAX(id) FROM langlinks");
-		if (rs.next()) {
-			maxId = rs.getLong(1) + 1;
-		}
-		st.close();
-		rs.close();
-
-		langConn.close();
-		if (maxId == 0) {
-			System.err.println("MAX ID is 0");
-			throw new IllegalStateException();
-		}
-		int batch = 0;
-		Statement ps = conn.createStatement();
-		PreparedStatement prep = conn
-				.prepareStatement("UPDATE travel_articles SET trip_id = ? WHERE title = ? AND lang = ?");
-		ResultSet res = ps.executeQuery("SELECT title, lang FROM travel_articles WHERE trip_id = 0");
-		int updated = 0;
-		while (res.next()) {
-			updated++;
-			String title = res.getString("title");
-			String lang = res.getString("lang");
-			prep.setLong(1, maxId++);
-			prep.setString(2, title);
-			prep.setString(3, lang);
-			prep.addBatch();
-			if (batch++ > 500) {
-				prep.executeBatch();
-				batch = 0;
-			}
-		}
-		prep.addBatch();
-		prep.executeBatch();
-		prep.close();
-		res.close();
-		ps.close();
-
-		System.out.println("Updated " + updated + " trip_id with max id " + maxId);
-		Statement st2 = conn.createStatement();
-		rs = st2.executeQuery("SELECT count(*) FROM travel_articles WHERE trip_id = 0");
-		if (rs.next()) {
-			System.out.println("Count travel articles with empty trip_id: " + rs.getInt(1));
-
-		}
-		rs.close();
-		st2.close();
-
-	}
-	
-
-	
 
 
 	private void addCitiesData(File citiesObf, Connection conn) throws FileNotFoundException, IOException,
