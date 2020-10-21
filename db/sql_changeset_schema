@@ -20,7 +20,7 @@ ALTER TABLE supporters ADD PRIMARY KEY (userid);
 CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
-        valid boolean, checktime timestamp);
+        paymentstate int, valid boolean, checktime timestamp);
 CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);        
 CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);        
 
