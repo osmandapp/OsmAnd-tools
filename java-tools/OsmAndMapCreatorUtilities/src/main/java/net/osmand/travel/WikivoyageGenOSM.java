@@ -29,10 +29,12 @@ import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
-import net.osmand.TspAnt;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.travel.WikivoyageLangPreparation.WikivoyageOSMTags;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 public class WikivoyageGenOSM {
 	public static final String CAT_SEE = "see"; // 27%
@@ -45,7 +47,7 @@ public class WikivoyageGenOSM {
 	public static final String CAT_OTHER = "other"; // 10%
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private static final int LIMIT = -1;
+	private static final int LIMIT = 10000;
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
@@ -56,14 +58,14 @@ public class WikivoyageGenOSM {
 	static Map<String, String> categoriesExample = new HashMap<>();
 	
 	
-	
 
-	// TODO 1 
-	// 1. use p.link, category, iconname, color
+	// +1. use p.link, category, iconname, color
+	// +2. take tags from gpx extension
+	// +3. write wikidata id for points
+	
 	// 1b. add article: banner_icon, contents, partof, gpx? 
-	// 2. take tags from gpx extension
-	// 3. change tripId to wikidataId
-	// 4. write wikidata id for points
+	// TODO combine point languages & main tags (merge points)
+	// TODO investigate what to do with article points 
 	
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
@@ -81,15 +83,19 @@ public class WikivoyageGenOSM {
 		
 		
 		public void addArticle(String lang, String title, GPXFile gpxFile, double lat, double lon, String content) {
-			points.add(gpxFile);
-			titles.add(title);
-			langs.add(lang);
+			int ind = size();
+			if(lang.equals("en")) {
+				ind = 0;
+			}
+			points.add(ind, gpxFile);
+			titles.add(ind, title);
+			langs.add(ind, lang);
 			LatLon ll = null;
 			if (lat != 0 && lon != 0) {
 				ll = new LatLon(lat, lon);
 			}
-			latlons.add(ll);
-			contents.add(content);
+			latlons.add(ind, ll);
+			contents.add(ind, content);
 		}
 		
 		public void clear() {
@@ -114,6 +120,10 @@ public class WikivoyageGenOSM {
 				i++;
 			}
 			return cats;
+		}
+
+		public int size() {
+			return langs.size();
 		}
 	}
 
@@ -157,7 +167,8 @@ public class WikivoyageGenOSM {
 			int rind = 1;
 			long tripId = rs.getLong(rind++);
 			if (tripId != combinedArticle.tripId && combinedArticle.tripId != -1) {
-				wrap(combinedArticle, serializer);
+				combineAndSave(combinedArticle, serializer);
+				combinedArticle.clear();
 			}
 			combinedArticle.tripId = tripId;
 			String title = rs.getString(rind++);
@@ -181,7 +192,7 @@ public class WikivoyageGenOSM {
 			}
 			count++;
 		}
-		wrap(combinedArticle, serializer);
+		combineAndSave(combinedArticle, serializer);
 		if(serializer != null) {
 			serializer.endTag(null, "osm");
 			serializer.flush();
@@ -219,7 +230,7 @@ public class WikivoyageGenOSM {
 
 	
 
-	private static void wrap(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
+	private static void combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
 		List<String> lst = new ArrayList<>();
 		List<String> cats = article.getCategories(lst);
 		for(int i = 0; i< cats.size() ; i++) {
@@ -233,25 +244,36 @@ public class WikivoyageGenOSM {
 		}
 		
 		long idStart = NODE_ID ;
+		LatLon mainArticlePoint = article.latlons.get(0);
 		List<WptPt> points = new ArrayList<GPXUtilities.WptPt>();
-		for(int i = 0; i < article.points.size(); i++) {
+		for(int i = 0; i < article.size(); i++) {
 			String lng = article.langs.get(i);
 			GPXFile file = article.points.get(i);
 			String titleId = article.titles.get(i);
-			// TODO combine point languages & main tags (merge points)
+			if (mainArticlePoint == null) {
+				mainArticlePoint = article.latlons.get(i);
+			}
 			for (WptPt p : file.getPoints()) {
-				// TODO investigate what to do with article points
 				if (p.lat >= 90 || p.lat <= -90 || p.lon >= 180 || p.lon <= -180) {
 					continue;
 				}
 				p.getExtensionsToWrite().put(LANG, lng);
 				p.getExtensionsToWrite().put(TITLE, titleId);
 				points.add(p);
+				if (mainArticlePoint == null) {
+					mainArticlePoint = new LatLon(p.getLatitude(), p.getLongitude());
+				}
 			}
 		}
-//		points = sortPoints(points);
+		if (mainArticlePoint == null) {
+			System.out.println(String.format("Skip article as it has no points: %s", article.titles));
+			return;
+		}
+
+		addEmptyPoint(serializer, mainArticlePoint);
+		points = sortPoints(mainArticlePoint, points);
 		for (WptPt p : points) {
-			String cat = simplifyWptCategory(p.category, CAT_OTHER);
+			String category = simplifyWptCategory(p.category, CAT_OTHER);
 			serializer.startTag(null, "node");
 			long id = NODE_ID--;
 			serializer.attribute(null, "id", id + "");
@@ -263,31 +285,51 @@ public class WikivoyageGenOSM {
 			String title = p.getExtensionsToRead().get(TITLE);
 			String tagSuffix = ":" + lng;
 
-			extractTagsFromDesc(serializer, "phone" + tagSuffix, WikivoyageLangPreparation.PHONE, p.desc);
-			extractTagsFromDesc(serializer, "email" + tagSuffix, WikivoyageLangPreparation.EMAIL, p.desc);
-			extractTagsFromDesc(serializer, "price" + tagSuffix, WikivoyageLangPreparation.PRICE, p.desc);
-			extractTagsFromDesc(serializer, "opening_hours" + tagSuffix, WikivoyageLangPreparation.WORKING_HOURS,
-					p.desc);
-			extractTagsFromDesc(serializer, "directions" + tagSuffix, WikivoyageLangPreparation.DIRECTIONS, p.desc);
-
-
+			for (WikivoyageOSMTags tg : WikivoyageOSMTags.values()) {
+				String v = p.getExtensionsToRead().get(tg.tag());
+				if (!Algorithms.isEmpty(v)) {
+					tagValue(serializer, tg.tag() + tagSuffix, v);
+				}
+			}
+			
 			tagValue(serializer, "description" + tagSuffix, p.desc);
 			tagValue(serializer, "name" + tagSuffix, p.name);
 			tagValue(serializer, "route_name" + tagSuffix, title);
 			tagValue(serializer, "wikivoyage:" + lng, "yes");
 
-			// TODO combine point languages & main tags
 			if ("en".equals(lng)) {
-				tagValue(serializer, "description", p.desc);
-				tagValue(serializer, "name", p.name);
+				if (!Algorithms.isEmpty(p.name)) {
+					tagValue(serializer, "name", p.name);
+				}
+				if (!Algorithms.isEmpty(p.desc)) {
+					tagValue(serializer, "description", p.desc);
+				}
+				if (!Algorithms.isEmpty(p.link)) {
+					tagValue(serializer, "link" + tagSuffix, p.link);
+				}
+				if (!Algorithms.isEmpty(p.comment)) {
+					tagValue(serializer, "comment" + tagSuffix, p.comment);
+				}
+				if (!Algorithms.isEmpty(p.getIconName())) {
+					tagValue(serializer, "gpx_icon", p.getIconName());
+				}
+				if (!Algorithms.isEmpty(p.getBackgroundType())) {
+					tagValue(serializer, "gpx_bg", p.getBackgroundType());
+				}
+				int color = p.getColor(0);
+				if(color != 0) {
+					tagValue(serializer, "color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
+					tagValue(serializer, "color_int", Algorithms.colorToString(color));
+				}
 			}
+			tagValue(serializer, "category", category);
 			tagValue(serializer, "route_object", "point");
 			tagValue(serializer, "route_type", "wikivoyage");
-			tagValue(serializer, "route_id", article.tripId + "");
-			tagValue(serializer, "route_object_category", cat);
+			tagValue(serializer, "route_id", "Q"+article.tripId);
 			serializer.endTag(null, "node");
-			cats.add(cat);
+			cats.add(category);
 		}
+		
 		
 		long idEnd = NODE_ID;
 		serializer.startTag(null, "way");
@@ -296,14 +338,14 @@ public class WikivoyageGenOSM {
 		serializer.attribute(null, "action", "modify");
 		serializer.attribute(null, "version", "1");
 		tagValue(serializer, "wikivoyage", "article");
-		tagValue(serializer, "route_id", article.tripId + "");
-		for(int it = 0; it < article.langs.size(); it++) {
+		tagValue(serializer, "route_id", "Q"+article.tripId);
+		for (int it = 0; it < article.langs.size(); it++) {
 			String lng = article.langs.get(it);
-			String title= article.titles.get(it);
+			String title = article.titles.get(it);
 			tagValue(serializer, "route_object", "points_collection");
 			tagValue(serializer, "route_name:" + lng, title);
-			tagValue(serializer, "name:"+lng, title);
-			tagValue(serializer, "description:"+lng, article.contents.get(it));
+			tagValue(serializer, "name:" + lng, title);
+			tagValue(serializer, "description:" + lng, article.contents.get(it));
 		}
 		for(long nid  = idStart ; nid > idEnd; nid--  ) {
 			serializer.startTag(null, "nd");
@@ -312,60 +354,66 @@ public class WikivoyageGenOSM {
 		}
 		serializer.endTag(null, "way");
 		
-		article.clear();
 	}
 	
+	private static void addEmptyPoint(XmlSerializer serializer, LatLon l) throws IOException {
+		serializer.startTag(null, "node");
+		long id = NODE_ID--;
+		serializer.attribute(null, "id", id + "");
+		serializer.attribute(null, "action", "modify");
+		serializer.attribute(null, "version", "1");
+		serializer.attribute(null, "lat", latLonFormat.format(l.getLatitude()));
+		serializer.attribute(null, "lon", latLonFormat.format(l.getLongitude()));
+		serializer.endTag(null, "node");
+	}
 	
-	
-	private static List<WptPt> sortPoints(List<WptPt> points) {
-		if(points.size() < 3 || points.size() > 10) {
-			return points;
-		}
-		System.out.println(points.size());
+	private static List<WptPt> sortPoints(LatLon pnt, List<WptPt> points) {
 		List<WptPt> res = new ArrayList<WptPt>();
-		ArrayList<LatLon> sort = new ArrayList<LatLon>();
-		for(WptPt p : points) {
-			sort.add(new LatLon(p.getLatitude(), p.getLongitude()));
-		}
-		TspAnt t = new TspAnt().readGraph(sort, sort.get(0), sort.get(1));
-		int [] ans = t.solve();		
-		int[] order = new int[ans.length];
-		double[] dist = new double[ans.length];
-		order[0] = 0;
-		for (int k = 0; k < ans.length; k++) {
-			if (ans[k] < points.size()) {
-				res.add(points.get(ans[k]));
-			}
-//			if(k == ans.length - 1) {
-//				int p = mixedOrder[ans[k - 1] - 1];
-//				dist[k] = MapUtils.getDistance(l.get(p), end);
-//				order[k] = ans[k];
-//			} else {
-//				int c = mixedOrder[ans[k] - 1];
-//				order[k] = c + 1;
-//				if (k == 1) {
-//					dist[k] = MapUtils.getDistance(start, l.get(c));
-//				} else {
-//					int p = mixedOrder[ans[k - 1] - 1];
-//					dist[k] = MapUtils.getDistance(l.get(p), l.get(c));
-//				}
-//			}
-//			s += dist[k];
+		WptPt p = null;
+		while ((p = peakClosest(pnt, points)) != null) {
+			res.add(p);
+			pnt = new LatLon(p.getLatitude(), p.getLongitude());
 		}
 		return res;
-		
 	}
-
-	private static void extractTagsFromDesc(XmlSerializer serializer, String tag, String key, String desc) throws IOException {
-		if (desc != null && !desc.isEmpty()) {
-			for (String ln : desc.split("\n")) {
-				String line = ln.trim();
-				if (line.startsWith(key + ":")) {
-					tagValue(serializer, tag, line.substring(key.length() + 1).trim());
-				}
+	
+	private static WptPt peakClosest(LatLon pnt, List<WptPt> points) {
+		WptPt r = null;
+		double d = Double.POSITIVE_INFINITY;
+		for (int i = 0; i < points.size(); i++) {
+			double ds = MapUtils.getDistance(pnt, points.get(i).getLatitude(), points.get(i).getLongitude());
+			if (ds < d) {
+				d = ds;
+				r = points.get(i);
 			}
 		}
+		points.remove(r);
+		return r;
 	}
+
+//	private static List<WptPt> sortPoints(LatLon mainArticlePoint, List<WptPt> points) {
+//		if(points.size() < 3 || points.size() > 10) {
+//			return points;
+//		}
+//		System.out.println(points.size());
+//		List<WptPt> res = new ArrayList<WptPt>();
+//		ArrayList<LatLon> sort = new ArrayList<LatLon>();
+//		for(WptPt p : points) {
+//			sort.add(new LatLon(p.getLatitude(), p.getLongitude()));
+//		}
+//		TspAnt t = new TspAnt().readGraph(sort, sort.get(0), sort.get(1));
+//		int [] ans = t.solve();		
+//		int[] order = new int[ans.length];
+//		double[] dist = new double[ans.length];
+//		order[0] = 0;
+//		for (int k = 0; k < ans.length; k++) {
+//			if (ans[k] < points.size()) {
+//				res.add(points.get(ans[k]));
+//			}
+//		}
+//		return res;
+//		
+//	}
 
 	public static String simplifyWptCategory(String category, String defaultCat) {
 		if (category == null) {
