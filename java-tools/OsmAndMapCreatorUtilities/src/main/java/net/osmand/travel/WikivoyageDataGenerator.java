@@ -255,7 +255,7 @@ public class WikivoyageDataGenerator {
 		System.out.println("Articles without image (" + imageColumn + "):");
 		ResultSet rs = statement.executeQuery(
 				"select count(*), lang from travel_articles where " + imageColumn + " = '' or " + imageColumn
-						+ " is nullgroup by lang");
+						+ " is null group by lang");
         while(rs.next()) {
         	System.out.println("\t" + rs.getString(2) + " " + rs.getInt(1));
         }
