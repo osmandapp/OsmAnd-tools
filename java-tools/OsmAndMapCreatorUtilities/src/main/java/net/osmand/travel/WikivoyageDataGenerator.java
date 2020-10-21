@@ -95,7 +95,8 @@ public class WikivoyageDataGenerator {
 		printStep("Download/Copy proper headers for articles");
 		generator.updateProperHeaderForArticles(conn, workingDir);
 		printStep("Copy headers between lang");
-		generator.copyHeaders(conn);
+		generator.copyImagesBetweenArticles(conn, "image_title");
+		generator.copyImagesBetweenArticles(conn, "banner_title");
 		printStep("Generate agg part of");
 		generator.generateAggPartOf(conn);
 		printStep("Generate search table");
@@ -139,14 +140,22 @@ public class WikivoyageDataGenerator {
 			}
 		}
 		rs1.close();
+		updateImagesToSource(conn, imagesConn, existingImagesMapping, sourceImages, "banner_title");
+		//updateImagesToSource(conn, imagesConn, existingImagesMapping, sourceImages, "image_title");
 		
+		imagesConn.close();
 		
+	}
+
+	private void updateImagesToSource(Connection wikivoyageConn, Connection imagesConn, Map<String, String> existingImagesMapping,
+			TreeSet<String> sourceImages, String imageColumn) throws SQLException {
 		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
 //		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
 		//PreparedStatement pDelete = imagesConn.prepareStatement("DELETE FROM images WHERE file = ?");
 		PreparedStatement pInsert = imagesConn.prepareStatement("INSERT INTO images(file, url, metadata, sourcefile) VALUES (?, ?, ?, ?)");
-		ResultSet rs = conn.createStatement().executeQuery("SELECT distinct image_title, title, lang FROM travel_articles where image_title <> ''");
-		PreparedStatement pInsertSource = conn.prepareStatement("INSERT INTO source_image(banner_image, source_image) VALUES(?, ?)");
+		ResultSet rs = wikivoyageConn.createStatement().executeQuery("SELECT distinct " + imageColumn
+				+ ", title, lang FROM travel_articles where " + imageColumn + " <> ''");
+		PreparedStatement pInsertSource = wikivoyageConn.prepareStatement("INSERT INTO source_image(banner_image, source_image) VALUES(?, ?)");
 		
 		int imagesFetched = 0;
 		int imagesProcessed = 0;
@@ -210,13 +219,10 @@ public class WikivoyageDataGenerator {
 		}
 		rs.close();
 		System.out.println("Updating images " + imagesToUpdate + ".");
-		int updated = conn.createStatement().executeUpdate("UPDATE travel_articles SET image_title = "
-				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles.image_title) "
-				+ " WHERE image_title IN (SELECT distinct banner_image from source_image)");
+		int updated = wikivoyageConn.createStatement().executeUpdate("UPDATE travel_articles SET " + imageColumn + " = "
+				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles." + imageColumn
+				+ ") " + " WHERE " + imageColumn + " IN (SELECT distinct banner_image from source_image)");
 		System.out.println("Update to full size images finished, updated: " + updated);
-		
-		imagesConn.close();
-		
 	}
 
 	private String stripImageName(String sourceFile) {
@@ -235,16 +241,18 @@ public class WikivoyageDataGenerator {
 		return sourceFile;
 	}
 
-	private void copyHeaders(Connection conn) throws SQLException {
+	private void copyImagesBetweenArticles(Connection conn, String imageColumn) throws SQLException {
 		Statement statement = conn.createStatement();
-		boolean update = statement.execute("update or ignore travel_articles set image_title=(SELECT image_title FROM travel_articles t "
+		boolean update = statement.execute("update or ignore travel_articles set " + imageColumn + "=(SELECT "
+				+ imageColumn + " FROM travel_articles t "
 				+ "WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en')"
-				+ " where travel_articles.image_title='' and travel_articles.lang <>'en'");
+				+ " where (travel_articles."+imageColumn+" is null or travel_articles."+imageColumn+ " ) and travel_articles.lang <>'en'");
         System.out.println("Copy headers from english language to others: " + update);
         statement.close();
         statement = conn.createStatement();
-        System.out.println("Articles without banner image:");
-        ResultSet rs = statement.executeQuery("select count(*), lang from travel_articles where image_title = '' group by lang");
+		System.out.println("Articles without banner image (" + imageColumn + "):");
+		ResultSet rs = statement.executeQuery(
+				"select count(*), lang from travel_articles where " + imageColumn + " = '' group by lang");
         while(rs.next()) {
         	System.out.println("\t" + rs.getString(2) + " " + rs.getInt(1));
         }
