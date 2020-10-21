@@ -33,7 +33,6 @@ import net.osmand.TspAnt;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
 
 public class WikivoyageGenOSM {
 	public static final String CAT_SEE = "see"; // 27%
@@ -58,6 +57,13 @@ public class WikivoyageGenOSM {
 	
 	
 	
+
+	// TODO 1 
+	// 1. use p.link, category, iconname, color
+	// 1b. add article: banner_icon, contents, partof, gpx? 
+	// 2. take tags from gpx extension
+	// 3. change tripId to wikidataId
+	// 4. write wikidata id for points
 	
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
@@ -79,7 +85,7 @@ public class WikivoyageGenOSM {
 			titles.add(title);
 			langs.add(lang);
 			LatLon ll = null;
-			if(lat != 0 && lon != 0) {
+			if (lat != 0 && lon != 0) {
 				ll = new LatLon(lat, lon);
 			}
 			latlons.add(ll);
@@ -263,6 +269,8 @@ public class WikivoyageGenOSM {
 			extractTagsFromDesc(serializer, "opening_hours" + tagSuffix, WikivoyageLangPreparation.WORKING_HOURS,
 					p.desc);
 			extractTagsFromDesc(serializer, "directions" + tagSuffix, WikivoyageLangPreparation.DIRECTIONS, p.desc);
+
+
 			tagValue(serializer, "description" + tagSuffix, p.desc);
 			tagValue(serializer, "name" + tagSuffix, p.name);
 			tagValue(serializer, "route_name" + tagSuffix, title);

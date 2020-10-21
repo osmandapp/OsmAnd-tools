@@ -82,8 +82,6 @@ public class WikivoyageDataGenerator {
 		}
 		System.out.println("Process " + wikivoyageFile.getName() + " " + (uncompressed ? "uncompressed" : ""));
 		
-		final File langlinkFolder = new File(workingDir, "langlinks");
-		final File langlinkFile = new File(workingDir, "langlink.sqlite");
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getAbsolutePath(), log);
 		WikivoyageDataGenerator generator = new WikivoyageDataGenerator();
@@ -95,12 +93,6 @@ public class WikivoyageDataGenerator {
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_orig_id ON travel_articles(original_id);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 		
-		printStep("Processing langlink file " + langlinkFile.getAbsolutePath());
-		generator.createLangLinksIfMissing(langlinkFile, langlinkFolder, conn);
-		printStep("Connect translations ");
-		generator.generateSameTripIdForDifferentLang(langlinkFile, conn);
-		printStep("Generate missing ids");
-		generator.generateIdsIfMissing(conn, langlinkFile);
 		printStep("Download/Copy proper headers for articles");
 		generator.updateProperHeaderForArticles(conn, workingDir);
 		printStep("Copy headers between lang");

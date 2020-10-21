@@ -34,7 +34,6 @@ import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.travel.WikivoyageLangPreparation.WikidataConnection;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.wiki.wikidata.WikiDataHandler;
 
@@ -96,8 +95,7 @@ public class WikiDatabasePreparation {
 
 	}
     
-	public static String removeMacroBlocks(String text, Map<String, List<String>> blocksMap,
-			String lang, WikidataConnection wikidata) throws IOException, SQLException {
+	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
@@ -126,7 +124,7 @@ public class WikiDatabasePreparation {
 				openCnt--;
 				endInd = i;
 				String val = text.substring(beginInd, endInd);
-				if (val.startsWith("allery")) {
+				if (val.startsWith("gallery")) {
 					bld.append(parseGalleryString(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
@@ -145,13 +143,13 @@ public class WikiDatabasePreparation {
 				} else if (key.equals(WikivoyageTemplates.METRIC_DATA.getType())) {
 					parseAndAppendMetricData(val, bld);
 				}
-				if (!key.isEmpty()) {
+				if (!key.isEmpty() && blockResults != null) {
 					if (key.contains("|")) {
 						for (String str : key.split("\\|")) {
-							addToMap(blocksMap, str, val);
+							addToMap(blockResults, str, val);
 						}
 					} else {
-						addToMap(blocksMap, key, val);
+						addToMap(blockResults, key, val);
 					}
 				}
 				i++;
@@ -513,8 +511,8 @@ public class WikiDatabasePreparation {
 				} catch (Exception e) {}
 			}
 		}
-		if (wikiLink.isEmpty() && !wikiData.isEmpty()) {
-			wikiLink = getWikidata(wikiLang, wikiData, wikiDataconn);
+		if (wikiLink.isEmpty() && !wikiData.isEmpty() && wikiDataconn != null) {
+			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData); 
 		}
 		if (!wikiLink.isEmpty()) {
 			bld.append(addWikiLink(wikiLang, wikiLink, lat, lon));
@@ -527,29 +525,6 @@ public class WikiDatabasePreparation {
 	}
 	
 
-	private static String getWikidata(String wikiLang, String wikiData, WikidataConnection wikiDataconn) throws SQLException {
-		if(wikiDataconn == null) {
-			return "";
-		}
-		JsonObject metadata = wikiDataconn.getMetadata(wikiData);
-		if(metadata == null) {
-			metadata = wikiDataconn.downloadMetadata(wikiData);
-		}
-		if(metadata == null) {
-			return "";
-		}
-		try {
-			JsonObject ks = metadata.get("entities").getAsJsonObject();
-			JsonElement siteLinksElement = ks.get(ks.entrySet().iterator().next().getKey()).getAsJsonObject().get("sitelinks");
-			if(siteLinksElement.isJsonObject() &&  siteLinksElement.getAsJsonObject().has(wikiLang + "wiki")) {
-
-				return siteLinksElement.getAsJsonObject().get(wikiLang + "wiki").getAsJsonObject().get("title").getAsString();
-			}
-		} catch (IllegalStateException e) {
-			System.err.println("Error parsing wikidata Json " + wikiData + " "  + metadata);
-		}
-		return "";
-	}
 
 	public static String appendSqareBracketsIfNeeded(int i, String[] parts, String value) {
 		while (StringUtils.countMatches(value, "[[") > StringUtils.countMatches(value, "]]") && i + 1 < parts.length) {
@@ -617,13 +592,14 @@ public class WikiDatabasePreparation {
 		cm.initialize(WikiDatabasePreparation.class.getClassLoader());
 		Parser parser = cm.getInstance(Parser.class, Syntax.MEDIAWIKI_1_0.toIdString());
 		FileReader fr = new FileReader(new File("/Users/victorshcherb/Documents/b.src.html"));
-		BufferedReader br = new BufferedReader(fr);
 		String content = "";
 		String s;
+		BufferedReader br = new BufferedReader(fr);
 		while((s = br.readLine()) != null) {
 			content += s;
 		}
-		content = removeMacroBlocks(content, new HashMap<>(), "en", null);
+		br.close();
+		content = removeMacroBlocks(content, null, "en", null);
 		
 		XDOM xdom = parser.parse(new StringReader(content));
 		        
