@@ -860,7 +860,7 @@ public class IndexCreator {
 //		settings.indexAddress = true;
 		settings.indexPOI = true;
 //		settings.indexTransport = true;
-		settings.indexRouting = true;
+//		settings.indexRouting = true;
 //		settings.keepOnlySeaObjects = true;
 //		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 //		settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
@@ -874,13 +874,7 @@ public class IndexCreator {
 //		creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-//		String file = rootFolder + "/temp/netherlands_map.osm";
-//		String file = rootFolder + "/temp/netherlands_rcn_ref.osm";
-//		String file = rootFolder + "/temp/test_czech_route.osm";
-//		String file = rootFolder + "/temp/czech_rwn.osm";
-//		String file = rootFolder + "/temp/us_new-jersey_northamerica.osm";
-//		String file = rootFolder + "/temp/germany_nwn.osm";
-		String file = rootFolder + "/temp/Diff-start.osm";
+		String file = rootFolder + "/maps/wikivoyage/wikivoyage.osm.gz";
 //		String file = rootFolder + "/temp/map.osm";
 		
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";

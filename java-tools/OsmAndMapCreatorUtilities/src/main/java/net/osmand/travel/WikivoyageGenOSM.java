@@ -59,11 +59,10 @@ public class WikivoyageGenOSM {
 	
 	
 
-	// +1. use p.link, category, iconname, color
-	// +2. take tags from gpx extension
-	// +3. write wikidata id for points
+	// TODO add point image
+	// TODO add article: image / banner
+	// 1b. add article: banner_icon, contents, partof, gpx?
 	
-	// 1b. add article: banner_icon, contents, partof, gpx? 
 	// TODO combine point languages & main tags (merge points)
 	// TODO investigate what to do with article points 
 	
@@ -296,6 +295,12 @@ public class WikivoyageGenOSM {
 			tagValue(serializer, "name" + tagSuffix, p.name);
 			tagValue(serializer, "route_name" + tagSuffix, title);
 			tagValue(serializer, "wikivoyage:" + lng, "yes");
+			if (!Algorithms.isEmpty(p.link)) {
+				tagValue(serializer, "link" + tagSuffix, p.link);
+			}
+			if (!Algorithms.isEmpty(p.comment)) {
+				tagValue(serializer, "note" + tagSuffix, p.comment);
+			}
 
 			if ("en".equals(lng)) {
 				if (!Algorithms.isEmpty(p.name)) {
@@ -304,12 +309,7 @@ public class WikivoyageGenOSM {
 				if (!Algorithms.isEmpty(p.desc)) {
 					tagValue(serializer, "description", p.desc);
 				}
-				if (!Algorithms.isEmpty(p.link)) {
-					tagValue(serializer, "link" + tagSuffix, p.link);
-				}
-				if (!Algorithms.isEmpty(p.comment)) {
-					tagValue(serializer, "comment" + tagSuffix, p.comment);
-				}
+				
 				if (!Algorithms.isEmpty(p.getIconName())) {
 					tagValue(serializer, "gpx_icon", p.getIconName());
 				}
@@ -323,6 +323,7 @@ public class WikivoyageGenOSM {
 				}
 			}
 			tagValue(serializer, "category", category);
+			tagValue(serializer, "gpx", "point");
 			tagValue(serializer, "route_object", "point");
 			tagValue(serializer, "route_type", "wikivoyage");
 			tagValue(serializer, "route_id", "Q"+article.tripId);

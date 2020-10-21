@@ -247,14 +247,15 @@ public class WikivoyageDataGenerator {
 		Statement statement = conn.createStatement();
 		boolean update = statement.execute("update or ignore travel_articles set " + imageColumn + "=(SELECT "
 				+ imageColumn + " FROM travel_articles t "
-				+ "WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en')"
-				+ " where (travel_articles."+imageColumn+" is null or travel_articles."+imageColumn+ " ) and travel_articles.lang <>'en'");
-        System.out.println("Copy headers from english language to others: " + update);
+				+ "WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en')" + " where (travel_articles."
+				+ imageColumn + " is null or travel_articles." + imageColumn + " ) and travel_articles.lang <>'en'");
+		System.out.println("Copy headers from english language to others: " + update);
         statement.close();
         statement = conn.createStatement();
-		System.out.println("Articles without banner image (" + imageColumn + "):");
+		System.out.println("Articles without image (" + imageColumn + "):");
 		ResultSet rs = statement.executeQuery(
-				"select count(*), lang from travel_articles where " + imageColumn + " = '' group by lang");
+				"select count(*), lang from travel_articles where " + imageColumn + " = '' or " + imageColumn
+						+ " is nullgroup by lang");
         while(rs.next()) {
         	System.out.println("\t" + rs.getString(2) + " " + rs.getInt(1));
         }
