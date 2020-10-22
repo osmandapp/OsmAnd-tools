@@ -1224,9 +1224,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 				addOsmcNewTags(tags, tokensToAdd, "");
 			}
-			if (tags.containsKey("osmc_text") && (tags.get("osmc_text").equals(tags.get("ref")))) {
-				tags.put("ref", "");
-			}
 		}
 		if (tags.containsKey("color")) {
 			tags = new LinkedHashMap<String, String>(tags);
