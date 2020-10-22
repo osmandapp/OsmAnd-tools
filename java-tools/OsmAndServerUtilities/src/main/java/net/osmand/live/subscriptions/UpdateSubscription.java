@@ -94,7 +94,7 @@ public class UpdateSubscription {
 					+ " valid = ? " + " WHERE userid = ? and purchaseToken = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, paymentstate = ?, "
 					+ " kind = ?, orderid = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
 					+ " valid = ? " + " WHERE userid = ? and purchaseToken = ? and sku = ?";
@@ -396,6 +396,11 @@ public class UpdateSubscription {
 				updStat.setNull(ind++, Types.INTEGER);
 			}
 		} else {
+			if (subscription.getPaymentState() == null) {
+				updStat.setNull(ind++, Types.INTEGER);
+			} else {
+				updStat.setInt(ind++, subscription.getPaymentState());
+			}
 			updStat.setString(ind++, subscription.getKind());
 			updStat.setString(ind++, subscription.getOrderId());
 			updStat.setString(ind++, subscription.getDeveloperPayload());

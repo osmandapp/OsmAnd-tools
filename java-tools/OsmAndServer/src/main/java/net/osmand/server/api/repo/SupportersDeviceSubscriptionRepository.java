@@ -3,6 +3,7 @@ package net.osmand.server.api.repo;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 import javax.persistence.Column;
@@ -23,7 +24,9 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 	// AS OF JANUARY 2019
 	// userId + sku is a key by design and by new data (due to historical mistake, currently key is userId + sku + purchaseToken)
 	Optional<SupporterDeviceSubscription> findTopByUserIdAndSkuOrderByTimestampDesc(Long userId, String sku);
-	
+
+	List<SupporterDeviceSubscription> findByPayload(String payload);
+
 	Optional<SupporterDeviceSubscription> findTopByPurchaseTokenIn(Collection<String> purchaseTokens);
 
 	@Entity
@@ -50,6 +53,18 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 		@Temporal(TemporalType.TIMESTAMP)
 		public Date timestamp;
 
+		@Column(name = "expiretime")
+		@Temporal(TemporalType.TIMESTAMP)
+		public Date expiretime;
+
+		@Column(name = "autorenewing")
+		public Boolean autorenewing;
+
+		@Column(name = "paymentstate")
+		public Integer paymentstate;
+
+		@Column(name = "valid")
+		public Boolean valid;
 	}
 
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {

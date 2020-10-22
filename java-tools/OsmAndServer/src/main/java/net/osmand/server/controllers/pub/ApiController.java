@@ -11,6 +11,8 @@ import net.osmand.server.api.repo.EmailSupportSurveyRepository;
 import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
@@ -44,9 +46,12 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.servlet.http.HttpServletRequest;
@@ -86,6 +91,9 @@ public class ApiController {
     
     @Autowired
 	private IpLocationService locationService;
+
+	@Autowired
+	private SupportersDeviceSubscriptionRepository subscriptionsRepository;
 
 	private ObjectMapper jsonMapper;
 
@@ -257,7 +265,59 @@ public class ApiController {
 		FileSystemResource fsr = new FileSystemResource(file);
 		return fsr;
 	}
-    
+
+	@GetMapping(path = { "/subscriptions/get" })
+	@ResponseBody
+	public String getSubscriptions(
+			@RequestParam() String userId,
+			@RequestParam() String userToken,
+			@RequestHeader HttpHeaders headers, HttpServletRequest request) throws IOException, ParseException {
+	MessageParams params = new MessageParams();
+		params.hostAddress = request.getRemoteAddr();
+		if (headers.getFirst("X-Forwarded-For") != null) {
+			params.hostAddress = headers.getFirst("X-Forwarded-For");
+		}
+
+		if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
+			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByPayload(userId + " " + userToken);
+			List<Object> res = new ArrayList<>();
+			for (SupporterDeviceSubscription sub : subscriptions) {
+				Map<String, String> subMap = new HashMap<>();
+				subMap.put("sku", sub.sku);
+				if (sub.valid != null) {
+					subMap.put("valid", sub.valid.toString());
+				}
+				String state = "undefined";
+				if (sub.expiretime != null && sub.paymentstate != null && sub.autorenewing != null) {
+					long expiryTimeMillis = sub.expiretime.getTime();
+					int paymentState = sub.paymentstate;
+					boolean autoRenewing = sub.autorenewing;
+					if (expiryTimeMillis > System.currentTimeMillis()) {
+						if (paymentState == 1 && autoRenewing) {
+							state = "active";
+						} else if (paymentState == 1 && !autoRenewing) {
+							state = "cancelled";
+						} else if (paymentState == 0 && autoRenewing) {
+							state = "in_grace_period";
+						}
+					} else {
+						if (paymentState == 0 && autoRenewing) {
+							state = "on_hold";
+						} else if (paymentState == 1 && autoRenewing) {
+							state = "paused";
+						} else if (paymentState == 1 && !autoRenewing) {
+							state = "expired";
+						}
+					}
+				}
+				subMap.put("state", state);
+				res.add(subMap);
+			}
+			return jsonMapper.writeValueAsString(res);
+		}
+		return "{}";
+	}
+
     @GetMapping(path = {"/motd", "/motd.php"})
     @ResponseBody
     public String getMessage(@RequestParam(required = false) String version,
@@ -289,7 +349,7 @@ public class ApiController {
 			}
 		}
 		
-        HashMap<String,Object> body = motdService.getMessage(params);
+        HashMap<String, Object> body = motdService.getMessage(params);
         if (body != null) {
             return jsonMapper.writeValueAsString(body);
         }
