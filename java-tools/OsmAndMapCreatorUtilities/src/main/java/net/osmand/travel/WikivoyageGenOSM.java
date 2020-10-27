@@ -62,6 +62,7 @@ public class WikivoyageGenOSM {
 	// TODO add point image
 	// TODO add article: image / banner
 	// 1b. add article: banner_icon, contents, partof, gpx?
+	// TODO combine tags of OsmGpxWriteContext, WikivoyageGenOSM
 	
 	// TODO combine point languages & main tags (merge points)
 	// TODO investigate what to do with article points 
@@ -282,8 +283,14 @@ public class WikivoyageGenOSM {
 			serializer.attribute(null, "lon", latLonFormat.format(p.lon));
 			String lng = p.getExtensionsToRead().get(LANG);
 			String title = p.getExtensionsToRead().get(TITLE);
+			tagValue(serializer, "description:" + lng, p.desc);
+			tagValue(serializer, "name:" + lng, p.name);
+			tagValue(serializer, "route_name:" + lng, title);
+			tagValue(serializer, "lang:" + lng, "yes");
+			
+			
+			// TODO
 			String tagSuffix = ":" + lng;
-
 			for (WikivoyageOSMTags tg : WikivoyageOSMTags.values()) {
 				String v = p.getExtensionsToRead().get(tg.tag());
 				if (!Algorithms.isEmpty(v)) {
@@ -291,10 +298,8 @@ public class WikivoyageGenOSM {
 				}
 			}
 			
-			tagValue(serializer, "description" + tagSuffix, p.desc);
-			tagValue(serializer, "name" + tagSuffix, p.name);
-			tagValue(serializer, "route_name" + tagSuffix, title);
-			tagValue(serializer, "wikivoyage:" + lng, "yes");
+			
+
 			if (!Algorithms.isEmpty(p.link)) {
 				tagValue(serializer, "link" + tagSuffix, p.link);
 			}
@@ -323,8 +328,7 @@ public class WikivoyageGenOSM {
 				}
 			}
 			tagValue(serializer, "category", category);
-			tagValue(serializer, "gpx", "point");
-			tagValue(serializer, "route_object", "point");
+			tagValue(serializer, "route", "point");
 			tagValue(serializer, "route_type", "wikivoyage");
 			tagValue(serializer, "route_id", "Q"+article.tripId);
 			serializer.endTag(null, "node");
@@ -343,7 +347,7 @@ public class WikivoyageGenOSM {
 		for (int it = 0; it < article.langs.size(); it++) {
 			String lng = article.langs.get(it);
 			String title = article.titles.get(it);
-			tagValue(serializer, "route_object", "points_collection");
+			tagValue(serializer, "route", "points_collection");
 			tagValue(serializer, "route_name:" + lng, title);
 			tagValue(serializer, "name:" + lng, title);
 			tagValue(serializer, "description:" + lng, article.contents.get(it));
@@ -391,30 +395,6 @@ public class WikivoyageGenOSM {
 		points.remove(r);
 		return r;
 	}
-
-//	private static List<WptPt> sortPoints(LatLon mainArticlePoint, List<WptPt> points) {
-//		if(points.size() < 3 || points.size() > 10) {
-//			return points;
-//		}
-//		System.out.println(points.size());
-//		List<WptPt> res = new ArrayList<WptPt>();
-//		ArrayList<LatLon> sort = new ArrayList<LatLon>();
-//		for(WptPt p : points) {
-//			sort.add(new LatLon(p.getLatitude(), p.getLongitude()));
-//		}
-//		TspAnt t = new TspAnt().readGraph(sort, sort.get(0), sort.get(1));
-//		int [] ans = t.solve();		
-//		int[] order = new int[ans.length];
-//		double[] dist = new double[ans.length];
-//		order[0] = 0;
-//		for (int k = 0; k < ans.length; k++) {
-//			if (ans[k] < points.size()) {
-//				res.add(points.get(ans[k]));
-//			}
-//		}
-//		return res;
-//		
-//	}
 
 	public static String simplifyWptCategory(String category, String defaultCat) {
 		if (category == null) {

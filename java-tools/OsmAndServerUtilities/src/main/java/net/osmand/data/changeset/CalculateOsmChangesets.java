@@ -50,7 +50,7 @@ public class CalculateOsmChangesets {
 	private static final int MAX_COUNTRY_SIZE = 7;
 	private static final long INITIAL_CHANGESET = 60714185l;
 	private static final Log LOG = PlatformUtil.getLog(CalculateOsmChangesets.class);
-	private static final int MAX_QUERIES = 10;
+	private static final int MAX_QUERIES = 50;
 	private static final int MAX_QUERY_1 = 99;
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
