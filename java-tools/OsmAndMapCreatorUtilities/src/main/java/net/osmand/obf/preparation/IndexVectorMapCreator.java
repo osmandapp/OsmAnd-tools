@@ -1037,18 +1037,19 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 					int[] typeUse = mdo.getTypes();
 					int[] addtypeUse = mdo.getAdditionalTypes();
-					byte[] coordinates = new byte[8 * mdo.getPointsLength()];					
+					byte[] coordinates = new byte[8 * mdo.getPointsLength()];
 					for (int t = 0; t < mdo.getPointsLength(); t++) {
 						Algorithms.putIntToBytes(coordinates, 8 * t, mdo.getPoint31XTile(t));
 						Algorithms.putIntToBytes(coordinates, 8 * t + 4, mdo.getPoint31YTile(t));
 					}
 					
-					if (mdo.getLabelX() == 0 && mdo.getLabelY() == 0) {
-						byte[] labelCoordinates = new byte[0];
+					byte[] labelCoordinates;
+					if (mdo.isLabelSpecified()) {
+						labelCoordinates = new byte[0];
 					} else {
-						byte[] labelCoordinates = new byte[8];
+						labelCoordinates = new byte[8];
 						Algorithms.putIntToBytes(labelCoordinates, 0, mdo.getLabelX());
-						Algorithms.putIntToBytes(labelCoordinates, 4, mdo.getLabelY());						
+						Algorithms.putIntToBytes(labelCoordinates, 4, mdo.getLabelY());
 					}
 					
 					byte[] innerPolygonTypes = new byte[0];
