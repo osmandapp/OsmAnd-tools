@@ -1045,11 +1045,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					
 					byte[] labelCoordinates;
 					if (mdo.isLabelSpecified()) {
-						labelCoordinates = new byte[0];
-					} else {
 						labelCoordinates = new byte[8];
 						Algorithms.putIntToBytes(labelCoordinates, 0, mdo.getLabelX());
 						Algorithms.putIntToBytes(labelCoordinates, 4, mdo.getLabelY());
+					} else {
+						labelCoordinates = new byte[0];
 					}
 					
 					byte[] innerPolygonTypes = new byte[0];
