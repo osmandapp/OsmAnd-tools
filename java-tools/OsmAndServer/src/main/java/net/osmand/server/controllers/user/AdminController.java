@@ -898,31 +898,43 @@ public class AdminController {
 				}
 			}
 		}
-		System.out.println("Annual retentions: ");
+		System.out.println("Annual retentions (MOVE TO WEB PAGE): ");
 		for (String s : skuRetentions.keySet()) {
 			TIntArrayList arrays = skuRetentions.get(s);
 			StringBuilder bld = new StringBuilder();
 			double partLeft = 1;
 			double sum = 1;
-			double retained = 1;
-			for(int i = 0; i < arrays.size(); i+=2) {
+			if (s.endsWith("-%")) {
+				sum = 0.5;
+			}
+			double retainedAvg = 0;
+			int retainedAvgCnt = 0;
+			for (int i = 0; i < arrays.size(); i += 2) {
 				int t = arrays.get(i);
 				int l = arrays.get(i + 1);
-				if(t == 0 || l == 0) {
+				if (t == 0 || l == 0) {
 					break;
 				}
-				retained = ((double) l) / t;
+				double retained = ((double) l) / t;
 				partLeft = partLeft * retained;
+				if (i > 0) {
+					retainedAvg += retained;
+					retainedAvgCnt++;
+				}
 				sum += partLeft;
 				bld.append(((int) (100 * retained))).append("%, ");
 			}
-			retained = Math.min(retained, 0.9);
-			sum += partLeft * retained / (1 - retained); // add tail
-			System.out.println(s + " - " + ((float) sum) + " " + bld.toString());
+			double retainedTail = 0.95;
+			if (retainedAvgCnt > 0 && retainedAvg / retainedAvgCnt < retainedTail) {
+				retainedTail = retainedAvg / retainedAvgCnt;
+			}
+			bld.append('[').append(((int) (100 * retainedTail))).append("%]");
+			sum += partLeft * retainedTail / (1 - retainedTail); // add tail
+			System.out.println(s + " - $ x " + ((float) sum) + " - " + bld.toString());
 		}
-		for(Subscription s : subs) {
-			if(s.currentPeriod == 0) {
-				s.calculateLTVValue(skuRetentions.get(s.getSku()));
+		for (Subscription s : subs) {
+			if (s.currentPeriod == 0) {
+				s.calculateLTVValue();
 			}
 		}
 		return subs;
@@ -952,21 +964,22 @@ public class AdminController {
 	
 	private void setDefaultSkuValues(Subscription s) {
 		switch(s.sku) {
-		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
-		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
+		// retention values need to be adjusted and should be equal to average of the last periods (not first) 
+		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
+		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
 		
-		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.65; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
-		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.73; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
-		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.81; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.72; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.83; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.82; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.89; s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
+		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.58; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.85; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
+		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
 
-		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.61; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.65; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
 	}
@@ -1045,20 +1058,13 @@ public class AdminController {
 			return ended; 
 		}
 		
-		public void calculateLTVValue(TIntArrayList retentionsList) {
-			for (int i = currentPeriod + 1; i < totalPeriods; i++) {
+		public void calculateLTVValue() {
+			priceLTVEurMillis += introPriceEurMillis;
+			for (int i = 1; i < totalPeriods; i++) {
 				priceLTVEurMillis += fullPriceEurMillis;
 			}
-			if (currentPeriod >= 0) {
-				priceLTVEurMillis += introPriceEurMillis;
-			}
-			// we could take into account autorenewing but retention will change 
+			// we could take into account autorenewing but retention will change
 			if (!isEnded()) {
-				if (2 * totalPeriods + 1 < retentionsList.size() && retentionsList.get(2 * totalPeriods) > 0
-						&& retentionsList.get(2 * totalPeriods + 1) > 0) {
-					retention = Math.min(0.95, ((double) retentionsList.get(2 * totalPeriods + 1))
-							/ retentionsList.get(2 * totalPeriods));
-				}
 				priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
 			}
 		}

@@ -25,6 +25,7 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlSerializer;
 
+
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.WptPt;
@@ -47,7 +48,7 @@ public class WikivoyageGenOSM {
 	public static final String CAT_OTHER = "other"; // 10%
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private static final int LIMIT = 10000;
+	private static final int LIMIT = 1000;
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
@@ -314,7 +315,6 @@ public class WikivoyageGenOSM {
 				if (!Algorithms.isEmpty(p.desc)) {
 					tagValue(serializer, "description", p.desc);
 				}
-				
 				if (!Algorithms.isEmpty(p.getIconName())) {
 					tagValue(serializer, "gpx_icon", p.getIconName());
 				}
@@ -369,11 +369,12 @@ public class WikivoyageGenOSM {
 		serializer.attribute(null, "version", "1");
 		serializer.attribute(null, "lat", latLonFormat.format(l.getLatitude()));
 		serializer.attribute(null, "lon", latLonFormat.format(l.getLongitude()));
-		serializer.endTag(null, "node");
+		serializer.endTag(null, "node");	
 	}
 	
 	private static List<WptPt> sortPoints(LatLon pnt, List<WptPt> points) {
 		List<WptPt> res = new ArrayList<WptPt>();
+//		res.add(pn)
 		WptPt p = null;
 		while ((p = peakClosest(pnt, points)) != null) {
 			res.add(p);

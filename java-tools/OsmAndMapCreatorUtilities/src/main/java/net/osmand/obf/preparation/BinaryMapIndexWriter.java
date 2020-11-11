@@ -736,7 +736,6 @@ public class BinaryMapIndexWriter {
 			int y = (Algorithms.parseIntFromBytes(labelCoordinates, 4)) >> LABEL_SHIFT;
 			long labelX = (sumLabelX / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
 			long labelY = (sumLabelY / sumLabelCount) << (SHIFT_COORDINATES - LABEL_SHIFT);
-			// TODO put a threshold
 			boolean isPOI = true;
 			if ((Math.abs(labelX) > LABEL_THRESHOLD && Math.abs(labelY) > LABEL_THRESHOLD) || isPOI) {
 				writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(x - (int) labelX));
