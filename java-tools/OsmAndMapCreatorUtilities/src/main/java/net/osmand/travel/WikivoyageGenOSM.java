@@ -48,7 +48,7 @@ public class WikivoyageGenOSM {
 	public static final String CAT_OTHER = "other"; // 10%
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private static final int LIMIT = 1000;
+	private static final int LIMIT = 10000;
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
@@ -64,9 +64,7 @@ public class WikivoyageGenOSM {
 	// TODO add article: image / banner
 	// 1b. add article: banner_icon, contents, partof, gpx?
 	// TODO combine tags of OsmGpxWriteContext, WikivoyageGenOSM
-	
-	// TODO combine point languages & main tags (merge points)
-	// TODO investigate what to do with article points 
+	// TODO combine point languages and extra tags (merge points possibly by wikidata id)
 	
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
@@ -271,8 +269,19 @@ public class WikivoyageGenOSM {
 			return;
 		}
 
-		addEmptyPoint(serializer, mainArticlePoint);
 		points = sortPoints(mainArticlePoint, points);
+		serializer.startTag(null, "node");
+		long mainArticleid = NODE_ID--;
+		serializer.attribute(null, "id", mainArticleid + "");
+		serializer.attribute(null, "action", "modify");
+		serializer.attribute(null, "version", "1");
+		serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
+		serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
+		tagValue(serializer, "route", "point");
+		tagValue(serializer, "wikivoyage", "article");
+		addArticleTags(article, serializer);
+		serializer.endTag(null, "node");
+		
 		for (WptPt p : points) {
 			String category = simplifyWptCategory(p.category, CAT_OTHER);
 			serializer.startTag(null, "node");
@@ -282,54 +291,15 @@ public class WikivoyageGenOSM {
 			serializer.attribute(null, "version", "1");
 			serializer.attribute(null, "lat", latLonFormat.format(p.lat));
 			serializer.attribute(null, "lon", latLonFormat.format(p.lon));
-			String lng = p.getExtensionsToRead().get(LANG);
-			String title = p.getExtensionsToRead().get(TITLE);
-			tagValue(serializer, "description:" + lng, p.desc);
-			tagValue(serializer, "name:" + lng, p.name);
-			tagValue(serializer, "route_name:" + lng, title);
-			tagValue(serializer, "lang:" + lng, "yes");
 			
-			
-			// TODO
-			String tagSuffix = ":" + lng;
-			for (WikivoyageOSMTags tg : WikivoyageOSMTags.values()) {
-				String v = p.getExtensionsToRead().get(tg.tag());
-				if (!Algorithms.isEmpty(v)) {
-					tagValue(serializer, tg.tag() + tagSuffix, v);
-				}
-			}
-			
-			
-
-			if (!Algorithms.isEmpty(p.link)) {
-				tagValue(serializer, "link" + tagSuffix, p.link);
-			}
-			if (!Algorithms.isEmpty(p.comment)) {
-				tagValue(serializer, "note" + tagSuffix, p.comment);
-			}
-
-			if ("en".equals(lng)) {
-				if (!Algorithms.isEmpty(p.name)) {
-					tagValue(serializer, "name", p.name);
-				}
-				if (!Algorithms.isEmpty(p.desc)) {
-					tagValue(serializer, "description", p.desc);
-				}
-				if (!Algorithms.isEmpty(p.getIconName())) {
-					tagValue(serializer, "gpx_icon", p.getIconName());
-				}
-				if (!Algorithms.isEmpty(p.getBackgroundType())) {
-					tagValue(serializer, "gpx_bg", p.getBackgroundType());
-				}
-				int color = p.getColor(0);
-				if(color != 0) {
-					tagValue(serializer, "color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-					tagValue(serializer, "color_int", Algorithms.colorToString(color));
-				}
-			}
-			tagValue(serializer, "category", category);
 			tagValue(serializer, "route", "point");
-			tagValue(serializer, "route_type", "wikivoyage");
+			tagValue(serializer, "wikivoyage", "article_point");
+			tagValue(serializer, "category", category);
+			String lng = p.getExtensionsToRead().get(LANG);
+			addPointTags(article, serializer, p, lng);
+			addPointTags(article, serializer, p, "");
+			
+			tagValue(serializer, "route_source", "wikivoyage");
 			tagValue(serializer, "route_id", "Q"+article.tripId);
 			serializer.endTag(null, "node");
 			cats.add(category);
@@ -338,20 +308,15 @@ public class WikivoyageGenOSM {
 		
 		long idEnd = NODE_ID;
 		serializer.startTag(null, "way");
-		long id = NODE_ID--;
-		serializer.attribute(null, "id", id + "");
+		long wayId = NODE_ID--;
+		serializer.attribute(null, "id", wayId + "");
 		serializer.attribute(null, "action", "modify");
 		serializer.attribute(null, "version", "1");
-		tagValue(serializer, "wikivoyage", "article");
-		tagValue(serializer, "route_id", "Q"+article.tripId);
-		for (int it = 0; it < article.langs.size(); it++) {
-			String lng = article.langs.get(it);
-			String title = article.titles.get(it);
-			tagValue(serializer, "route", "points_collection");
-			tagValue(serializer, "route_name:" + lng, title);
-			tagValue(serializer, "name:" + lng, title);
-			tagValue(serializer, "description:" + lng, article.contents.get(it));
-		}
+		
+		tagValue(serializer, "route", "points_collection");
+		tagValue(serializer, "wikivoyage", "article_points");
+		addArticleTags(article, serializer);
+		
 		for(long nid  = idStart ; nid > idEnd; nid--  ) {
 			serializer.startTag(null, "nd");
 			serializer.attribute(null, "ref", nid +"");
@@ -360,17 +325,59 @@ public class WikivoyageGenOSM {
 		serializer.endTag(null, "way");
 		
 	}
-	
-	private static void addEmptyPoint(XmlSerializer serializer, LatLon l) throws IOException {
-		serializer.startTag(null, "node");
-		long id = NODE_ID--;
-		serializer.attribute(null, "id", id + "");
-		serializer.attribute(null, "action", "modify");
-		serializer.attribute(null, "version", "1");
-		serializer.attribute(null, "lat", latLonFormat.format(l.getLatitude()));
-		serializer.attribute(null, "lon", latLonFormat.format(l.getLongitude()));
-		serializer.endTag(null, "node");	
+
+	private static void addArticleTags(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
+		tagValue(serializer, "route_id", "Q"+article.tripId);
+		tagValue(serializer, "route_source", "wikivoyage");
+		for (int it = 0; it < article.langs.size(); it++) {
+			String lng = article.langs.get(it);
+			String title = article.titles.get(it);
+			tagValue(serializer, "route_name:" + lng, title);
+			tagValue(serializer, "name:" + lng, title);
+			tagValue(serializer, "description:" + lng, article.contents.get(it));
+		}
 	}
+
+	private static void addPointTags(CombinedWikivoyageArticle article, XmlSerializer serializer, WptPt p, String lngSuffix)
+			throws IOException {
+		String title = p.getExtensionsToRead().get(TITLE);
+		tagValue(serializer, "description" + lngSuffix, p.desc);
+		tagValue(serializer, "name" + lngSuffix, p.name);
+		tagValue(serializer, "route_name" + lngSuffix, title);
+		if (!lngSuffix.isEmpty()) {
+			tagValue(serializer, "lang" + lngSuffix, "yes");
+		}
+
+		for (WikivoyageOSMTags tg : WikivoyageOSMTags.values()) {
+			String v = p.getExtensionsToRead().get(tg.tag());
+			if (!Algorithms.isEmpty(v)) {
+				tagValue(serializer, tg.tag() + lngSuffix, v);
+			}
+		}
+		if (!Algorithms.isEmpty(p.link)) {
+			tagValue(serializer, "link" + lngSuffix, p.link);
+		}
+		if (!Algorithms.isEmpty(p.comment)) {
+			tagValue(serializer, "note" + lngSuffix, p.comment);
+		}
+
+		if (lngSuffix.isEmpty()) {
+			if (!Algorithms.isEmpty(p.getIconName())) {
+				tagValue(serializer, "gpx_icon", p.getIconName());
+			}
+			if (!Algorithms.isEmpty(p.getBackgroundType())) {
+				tagValue(serializer, "gpx_bg", p.getBackgroundType());
+			}
+			int color = p.getColor(0);
+			if (color != 0) {
+				tagValue(serializer, "color",
+						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
+				tagValue(serializer, "color_int", Algorithms.colorToString(color));
+			}
+		}
+
+	}
+	
 	
 	private static List<WptPt> sortPoints(LatLon pnt, List<WptPt> points) {
 		List<WptPt> res = new ArrayList<WptPt>();
