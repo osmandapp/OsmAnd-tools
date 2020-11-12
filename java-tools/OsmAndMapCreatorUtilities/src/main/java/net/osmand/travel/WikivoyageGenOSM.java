@@ -62,7 +62,6 @@ public class WikivoyageGenOSM {
 	// - TODO add point image
 	// - TODO add article: image / banner
 	// - 1b. add article: banner_icon, contents, partof, gpx?
-	// - TODO combine tags of OsmGpxWriteContext, WikivoyageGenOSM
 	// FUTURE:
 	// - Combine point languages and extra tags (merge points possibly by wikidata id)
 	

@@ -100,7 +100,7 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "version", "1");
 				serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().lat));
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().lon));
-				tagValue(serializer, "gpx", "segment");
+				tagValue(serializer, "route", "segment");
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo);
 				addAnalysisTags(gpxTrackTags, analysis);
@@ -120,7 +120,7 @@ public class OsmGpxWriteContext {
 					long idStart = id;
 					for (WptPt p : s.points) {
 						long nid = id--;
-						writePoint(nid, p, null);
+						writePoint(nid, p, null, null, null);
 					}
 					long endid = id;
 					serializer.startTag(null, "way");
@@ -133,7 +133,7 @@ public class OsmGpxWriteContext {
 						serializer.attribute(null, "ref", nid + "");
 						serializer.endTag(null, "nd");
 					}
-					tagValue(serializer, "gpx", "segment");
+					tagValue(serializer, "route", "segment");
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo);
 					addAnalysisTags(gpxTrackTags, analysis);
@@ -145,7 +145,7 @@ public class OsmGpxWriteContext {
 			
 			for (WptPt p : gpxFile.getPoints()) {
 				long nid = id--;
-				writePoint(nid, p, "point");
+				writePoint(nid, p, "point", "OSM" + gpxInfo.id, gpxInfo.name);
 			}
 		}
 		tracks++;
@@ -190,9 +190,10 @@ public class OsmGpxWriteContext {
 
 	private void addGpxInfoTags(Map<String, String> gpxTrackTags, OsmGpxFile gpxInfo) {
 		if (gpxInfo != null) {
-			gpxTrackTags.put("trackid", gpxInfo.id + "");
+			gpxTrackTags.put("route_id", gpxInfo.id + "");
 			gpxTrackTags.put("ref", gpxInfo.id % 1000 + "");
 			gpxTrackTags.put("name", gpxInfo.name);
+			gpxTrackTags.put("route_name", gpxInfo.name);
 			gpxTrackTags.put("user", gpxInfo.user);
 			gpxTrackTags.put("date", gpxInfo.timestamp.toString());
 			gpxTrackTags.put("description", gpxInfo.description);
@@ -254,15 +255,18 @@ public class OsmGpxWriteContext {
 		}
 	}
 	
-	private void writePoint(long id, WptPt p, String gpxValue) throws IOException {
+	private void writePoint(long id, WptPt p, String routeType,String routeId, String routeName) throws IOException {
 		serializer.startTag(null, "node");
 		serializer.attribute(null, "lat", latLonFormat.format(p.lat));
 		serializer.attribute(null, "lon", latLonFormat.format(p.lon));
 		serializer.attribute(null, "id", id + "");
 		serializer.attribute(null, "action", "modify");
 		serializer.attribute(null, "version", "1");
-		if (gpxValue != null) {
-			tagValue(serializer, "gpx", gpxValue);
+		if (routeType != null) {
+			tagValue(serializer, "route", routeType);
+//			tagValue(serializer, "route_type", routeType);
+			tagValue(serializer, "route_id", routeId);
+			tagValue(serializer, "route_name", routeName);
 		}
 		if (!Algorithms.isEmpty(p.name)) {
 			tagValue(serializer, "name", p.name);
@@ -274,10 +278,10 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "category", p.category);
 		}
 		if (!Algorithms.isEmpty(p.comment)) {
-			tagValue(serializer, "comment", p.comment);
+			tagValue(serializer, "note", p.comment);
 		}
 		if (!Algorithms.isEmpty(p.link)) {
-			tagValue(serializer, "link", p.link);
+			tagValue(serializer, "url", p.link);
 		}
 		if (!Algorithms.isEmpty(p.getIconName())) {
 			tagValue(serializer, "gpx_icon", p.getIconName());
