@@ -134,7 +134,7 @@ public class WikivoyageGenOSM {
 		// 					 	is_part_of, aggregated_part_of, contents_json
 		// 						population, country, region, city_type, osm_i,
 		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, gpx_gz from travel_articles order by trip_id asc");
-		int count = 0, emptyLocation = 0, emptyContent = 0;
+		int count = 0, totalArticles = 0, emptyLocation = 0, emptyContent = 0;
 		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
 		XmlSerializer serializer = null;
 		OutputStream outputStream = null;
@@ -155,7 +155,10 @@ public class WikivoyageGenOSM {
 			int rind = 1;
 			long tripId = rs.getLong(rind++);
 			if (tripId != combinedArticle.tripId && combinedArticle.tripId != -1) {
-				combineAndSave(combinedArticle, serializer);
+				boolean res = combineAndSave(combinedArticle, serializer);
+				if (res) {
+					totalArticles++;
+				}
 				combinedArticle.clear();
 			}
 			combinedArticle.tripId = tripId;
@@ -169,7 +172,7 @@ public class WikivoyageGenOSM {
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(bytesStream);
 			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
-				if(lat == 0 && lon == 0) {
+				if (lat == 0 && lon == 0) {
 					emptyLocation++;
 				} else {
 					emptyContent++;
@@ -203,8 +206,8 @@ public class WikivoyageGenOSM {
 			System.out.println(String.format("%#.2f%% %s  %d %s", cnt * 100.0 / total, s,  cnt, 
 					categoriesExample.get(s)));
 		}
-		System.out.println(String.format("Total articles: %d", count));
-		System.out.println(String.format("Empty article: %d no points in article / %d no location for an article", emptyContent, emptyLocation));
+		System.out.println(String.format("Total saved articles: %d", totalArticles));
+		System.out.println(String.format("Empty article: %d no points in article + %d no location page articles (total %d) ", emptyContent, emptyLocation, total));
 	}
 	
 	private static void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
@@ -219,7 +222,7 @@ public class WikivoyageGenOSM {
 
 	
 
-	private static void combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
+	private static boolean combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
 		List<String> lst = new ArrayList<>();
 		List<String> cats = article.getCategories(lst);
 		for(int i = 0; i< cats.size() ; i++) {
@@ -255,8 +258,8 @@ public class WikivoyageGenOSM {
 			}
 		}
 		if (mainArticlePoint == null) {
-			System.out.println(String.format("Skip article as it has no points: %s", article.titles));
-			return;
+			// System.out.println(String.format("Skip article as it has no points: %s", article.titles));
+			return false;
 		}
 
 		points = sortPoints(mainArticlePoint, points);
@@ -313,7 +316,7 @@ public class WikivoyageGenOSM {
 			serializer.endTag(null, "nd");
 		}
 		serializer.endTag(null, "way");
-		
+		return true;	
 	}
 
 	private static void addArticleTags(CombinedWikivoyageArticle article, XmlSerializer serializer, boolean addDescription) throws IOException {
