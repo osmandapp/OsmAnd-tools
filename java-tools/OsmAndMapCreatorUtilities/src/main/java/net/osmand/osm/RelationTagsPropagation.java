@@ -204,6 +204,7 @@ public class RelationTagsPropagation {
 	
 	public void addPropogatedTags(MapRenderingTypesEncoder renderingTypes, EntityConvertApplyType tp, Entity e) {
 		EntityId eid = EntityId.valueOf(e);
+		String looseNetworkTag = getNetworkTagIfPresent(e);
 		PropagateEntityTags proptags = propogatedTags.get(eid);
 		if (proptags != null) {
 			Iterator<Entry<String, String>> iterator = proptags.putThroughTags.entrySet().iterator();
@@ -246,10 +247,25 @@ public class RelationTagsPropagation {
 					mod++;
 				}
 			}
-		}		
+		}
+		if (looseNetworkTag != null && e.getTag("network") == null) {
+			e.putTag("network", looseNetworkTag);
+			e.putTag("route_bicycle", "");
+		}
 	}
 	
-	
+	private String getNetworkTagIfPresent(Entity e) {
+			if (e.getTag("icn") != null) {
+				return "icn";
+			} else if (e.getTag("ncn") != null) {
+				return "ncn";
+			} else if (e.getTag("rcn") != null) {
+				return "rcn";
+			} else if (e.getTag("lcn") != null) {
+				return "lcn";
+			}
+			return null;
+	}
 	
 	private static String sortAndAttachUniqueValue(String list, String value) {
 		if(list == null) {

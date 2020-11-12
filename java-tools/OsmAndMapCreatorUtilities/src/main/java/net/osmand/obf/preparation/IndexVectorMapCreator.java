@@ -731,23 +731,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e);
 			
-			//out-of-necessity solution. There shouldn't be a network tags on segments outside relations, but there are still many such cases on OSM
-			if (e.getTag("network") == null) {				
-				if (e.getTag("lcn") != null) {
-					e.putTag("network", "lcn");
-					e.putTag("route_bicycle", "");
-				} else if (e.getTag("rcn") != null) {
-					e.putTag("network", "rcn");
-					e.putTag("route_bicycle", "");
-				} else if (e.getTag("ncn") != null) {
-					e.putTag("network", "ncn");
-					e.putTag("route_bicycle", "");
-				} else if (e.getTag("icn") != null) {
-					e.putTag("network", "icn");
-					e.putTag("route_bicycle", "");
-				}
-			}
-			
 			// manipulate what kind of way to load
 			long originalId = e.getId();
 			long assignedId = e.getId();
