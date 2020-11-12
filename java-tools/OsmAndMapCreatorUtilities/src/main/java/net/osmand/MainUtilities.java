@@ -32,6 +32,7 @@ import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
+import net.osmand.travel.WikivoyageGenOSM;
 import net.osmand.travel.WikivoyageLangPreparation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.CombineSRTMIntoFile;
@@ -146,6 +147,12 @@ public class MainUtilities {
 			} else if (utl.equals("generate-wikivoyage-raw-lang")) {
 				WikivoyageLangPreparation.main(subArgsArray);
 			} else if (utl.equals("process-wikivoyage")) {
+				for (String s : subArgsArray) {
+					if (s.startsWith("--generate-osm=")) {
+						WikivoyageGenOSM.genWikivoyageOsm(new File(subArgsArray[0]), new File(s.substring("--generate-osm=".length())), -1);
+						return;
+					}
+				}
 				WikivoyageDataGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-obf-extract-script")) {
 				GenerateExtractScript.main(subArgsArray);

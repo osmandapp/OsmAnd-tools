@@ -48,7 +48,6 @@ public class WikivoyageGenOSM {
 	public static final String CAT_OTHER = "other"; // 10%
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private static final int LIMIT = 100; // total 100 000
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
@@ -67,7 +66,8 @@ public class WikivoyageGenOSM {
 	
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
-		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"));
+		// TOTAL 100 000
+		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 100);
 	}
 
 	
@@ -125,17 +125,7 @@ public class WikivoyageGenOSM {
 		}
 	}
 
-	/**
-	 * @param filepath
-	 * @throws SQLException
-	 * @throws IOException
-	 */
-	/**
-	 * @param wikivoyageFile
-	 * @throws SQLException
-	 * @throws IOException
-	 */
-	private static void genWikivoyageOsm(File wikivoyageFile, File outputFile) throws SQLException, IOException {
+	public static void genWikivoyageOsm(File wikivoyageFile, File outputFile, int LIMIT) throws SQLException, IOException {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection connection = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getCanonicalPath(), log );
 		Statement statement = connection.createStatement();
