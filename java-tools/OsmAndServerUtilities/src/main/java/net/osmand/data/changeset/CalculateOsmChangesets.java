@@ -394,6 +394,7 @@ public class CalculateOsmChangesets {
 							LOG.error(String.format(
 									"Country '%s' couldn't be downloaded anymore, so database should be updated! '%d' -> '0'",
 									downloadName, mp));
+							LOG.info(String.format("UPDATE countries SET map = 0 WHERE fullname = '%s'", wr.getRegionId()));
 						}
 					}
 
