@@ -419,7 +419,7 @@ public class CalculateOsmChangesets {
 			if (!existingMaps.isEmpty()) {
 				for (String mp : existingMaps) {
 					LOG.error(String.format("Country '%s' should be deleted (update to map = 0 in db)", mp));
-					LOG.info(String.format("UPDATE countries SET map = 0 WHERE fullname = '%s';", mp));
+					LOG.info(String.format("DELETE FROM countries WHERE fullname = '%s';", mp));
 				}
 			}
 		}
