@@ -101,6 +101,7 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().lat));
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().lon));
 				tagValue(serializer, "route", "segment");
+				tagValue(serializer, "route_type", "track");
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo);
 				addAnalysisTags(gpxTrackTags, analysis);
@@ -264,7 +265,7 @@ public class OsmGpxWriteContext {
 		serializer.attribute(null, "version", "1");
 		if (routeType != null) {
 			tagValue(serializer, "route", routeType);
-//			tagValue(serializer, "route_type", routeType);
+			tagValue(serializer, "route_type", "track_point");
 			tagValue(serializer, "route_id", routeId);
 			tagValue(serializer, "route_name", routeName);
 		}

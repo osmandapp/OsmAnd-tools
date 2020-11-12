@@ -60,9 +60,10 @@ public class WikivoyageGenOSM {
 
 	// - TODO add point image
 	// - TODO add article: image / banner
-	// - 1b. add article: banner_icon, contents, partof, gpx?
+	// - 1b. add article: banner_icon, contents, partof
 	// FUTURE:
-	// - Combine point languages and extra tags (merge points possibly by wikidata id)
+	// - Combine point languages and extra tags (merge points possibly by wikidata id) 
+	// 	 NOTE: do not duplicate description:* (they are all  visible in context menu)
 	
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
@@ -289,7 +290,8 @@ public class WikivoyageGenOSM {
 			tagValue(serializer, "route_type", "article_point");
 			tagValue(serializer, "category", category);
 			String lng = p.getExtensionsToRead().get(LANG);
-			addPointTags(article, serializer, p, ":" + lng);
+			tagValue(serializer, "lang" + lng, "yes");
+//			addPointTags(article, serializer, p, ":" + lng);
 			addPointTags(article, serializer, p, "");
 			
 			tagValue(serializer, "route_source", "wikivoyage");
@@ -339,10 +341,6 @@ public class WikivoyageGenOSM {
 		tagValue(serializer, "description" + lngSuffix, p.desc);
 		tagValue(serializer, "name" + lngSuffix, p.name);
 		tagValue(serializer, "route_name" + lngSuffix, title);
-		if (!lngSuffix.isEmpty()) {
-			tagValue(serializer, "lang" + lngSuffix, "yes");
-		}
-
 		for (WikivoyageOSMTags tg : WikivoyageOSMTags.values()) {
 			String v = p.getExtensionsToRead().get(tg.tag());
 			if (!Algorithms.isEmpty(v)) {
