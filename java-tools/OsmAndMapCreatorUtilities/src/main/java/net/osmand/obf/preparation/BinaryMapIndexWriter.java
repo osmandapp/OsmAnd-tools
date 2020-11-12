@@ -1657,6 +1657,7 @@ public class BinaryMapIndexWriter {
 
 		for (Map.Entry<PoiAdditionalType, String> rt : additionalNames.entrySet()) {
 			int targetPoiId = rt.getKey().getTargetId();
+			String tg = rt.getKey().getTag();
 			if (targetPoiId < 0) {
 				throw new IllegalStateException("Illegal target poi id");
 			}
@@ -1665,7 +1666,8 @@ public class BinaryMapIndexWriter {
 			} else {
 				builder.addTextCategories(targetPoiId);
 				String vl = rt.getValue();
-				if (vl != null && limitZip != -1 && vl.length() >= limitZip) {
+				// bug with opening hours zipping (fixed in 3.9)
+				if (vl != null && limitZip != -1 && vl.length() >= limitZip && !"opening_hours".equals(tg)) {
 					ByteArrayOutputStream bous = new ByteArrayOutputStream(vl.length());
 					GZIPOutputStream gz = new GZIPOutputStream(bous);
 					byte[] bts = vl.getBytes("UTF-8");
