@@ -48,7 +48,7 @@ public class WikivoyageGenOSM {
 	public static final String CAT_OTHER = "other"; // 10%
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private static final int LIMIT = 10000;
+	private static final int LIMIT = 1000;
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
@@ -57,7 +57,6 @@ public class WikivoyageGenOSM {
 	static long NODE_ID = -1000;
 	static Map<String, Integer> categories = new HashMap<>();
 	static Map<String, String> categoriesExample = new HashMap<>();
-	
 	
 
 	// TODO add point image
@@ -278,8 +277,8 @@ public class WikivoyageGenOSM {
 		serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
 		serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
 		tagValue(serializer, "route", "point");
-		tagValue(serializer, "wikivoyage", "article");
-		addArticleTags(article, serializer);
+		tagValue(serializer, "route:type", "article");
+		addArticleTags(article, serializer, true);
 		serializer.endTag(null, "node");
 		
 		for (WptPt p : points) {
@@ -293,10 +292,10 @@ public class WikivoyageGenOSM {
 			serializer.attribute(null, "lon", latLonFormat.format(p.lon));
 			
 			tagValue(serializer, "route", "point");
-			tagValue(serializer, "wikivoyage", "article_point");
+			tagValue(serializer, "route:type", "article_point");
 			tagValue(serializer, "category", category);
 			String lng = p.getExtensionsToRead().get(LANG);
-			addPointTags(article, serializer, p, lng);
+			addPointTags(article, serializer, p, ":" + lng);
 			addPointTags(article, serializer, p, "");
 			
 			tagValue(serializer, "route_source", "wikivoyage");
@@ -314,8 +313,8 @@ public class WikivoyageGenOSM {
 		serializer.attribute(null, "version", "1");
 		
 		tagValue(serializer, "route", "points_collection");
-		tagValue(serializer, "wikivoyage", "article_points");
-		addArticleTags(article, serializer);
+		tagValue(serializer, "route:type", "article_points");
+		addArticleTags(article, serializer, false);
 		
 		for(long nid  = idStart ; nid > idEnd; nid--  ) {
 			serializer.startTag(null, "nd");
@@ -326,7 +325,7 @@ public class WikivoyageGenOSM {
 		
 	}
 
-	private static void addArticleTags(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
+	private static void addArticleTags(CombinedWikivoyageArticle article, XmlSerializer serializer, boolean addDescription) throws IOException {
 		tagValue(serializer, "route_id", "Q"+article.tripId);
 		tagValue(serializer, "route_source", "wikivoyage");
 		for (int it = 0; it < article.langs.size(); it++) {
@@ -334,7 +333,9 @@ public class WikivoyageGenOSM {
 			String title = article.titles.get(it);
 			tagValue(serializer, "route_name:" + lng, title);
 			tagValue(serializer, "name:" + lng, title);
-			tagValue(serializer, "description:" + lng, article.contents.get(it));
+			if (addDescription) {
+				tagValue(serializer, "description:" + lng, article.contents.get(it));
+			}
 		}
 	}
 
