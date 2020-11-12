@@ -445,9 +445,11 @@ public class WikivoyageLangPreparation {
 					String[] info = s.split("\\|");
 					WptPt point = new WptPt();
 					String category = info[0].replaceAll("\n", "").trim();
-					point.category = (category.equalsIgnoreCase("vcard") 
-							|| category.equalsIgnoreCase("listing")) ? transformCategory(info) : category;
-					if(!isEmpty(point.category)) {
+					point.category = category;
+					if (category.equalsIgnoreCase("vcard") || category.equalsIgnoreCase("listing")) {
+						point.category = transformCategory(info);
+					}
+					if (!isEmpty(point.category)) {
 						point.category = capitalizeFirstLetterAndLowercase(point.category.trim());
 					}
 					String areaCode = "";
@@ -509,30 +511,30 @@ public class WikivoyageLangPreparation {
 							} catch (Exception e) {}
 						}
 					}
-					for(String key : extraValues.keySet()) {
-						if(point.desc == null) {
+					for (String key : extraValues.keySet()) {
+						if (point.desc == null) {
 							point.desc = "";
 						} else {
 							point.desc += "\n\r";
 						}
 						String value = extraValues.get(key);
-						if(areaCode.length() > 0 && key.equals(PHONE)) {
+						if (areaCode.length() > 0 && key.equals(PHONE)) {
 							value = areaCode + " " + value;
 						}
 						point.desc += key + ": " + value; // ". " backward compatible
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
 						if (point.category != null) {
-							if (category.equalsIgnoreCase("see") || category.equalsIgnoreCase("do")) {
+							if (point.category.equalsIgnoreCase("see") || point.category.equalsIgnoreCase("do")) {
 								point.setColor(0xCC10A37E);
 								point.setIconName("special_photo_camera");
-							} else if (category.equalsIgnoreCase("eat") || category.equalsIgnoreCase("drink")) {
+							} else if (point.category.equalsIgnoreCase("eat") || point.category.equalsIgnoreCase("drink")) {
 								point.setColor(0xCCCA2D1D);
 								point.setIconName("restaurants");
-							} else if (category.equalsIgnoreCase("sleep")) {
+							} else if (point.category.equalsIgnoreCase("sleep")) {
 								point.setColor(0xCC0E53C9);
 								point.setIconName("tourism_hotel");
-							} else if (category.equalsIgnoreCase("buy") || category.equalsIgnoreCase("listing")) {
+							} else if (point.category.equalsIgnoreCase("buy") || point.category.equalsIgnoreCase("listing")) {
 								point.setColor(0xCC8F2BAB);
 								point.setIconName("shop_department_store");
 							}

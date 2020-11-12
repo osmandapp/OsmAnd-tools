@@ -70,7 +70,7 @@ public class WikivoyageGenOSM {
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
 		// TOTAL 100 000
-		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 10000);
+		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 1000);
 	}
 
 	
@@ -107,24 +107,30 @@ public class WikivoyageGenOSM {
 			latlons.clear();
 		}
 
-		public List<String> getCategories(List<String> names) {
+		public int size() {
+			return langs.size();
+		}
+
+		public void updateCategoryCounts() {
 			List<String> cats = new ArrayList<>();
+			List<String> names = new ArrayList<>();
 			int i = 0;
 			for (GPXFile f : points) {
 				for (WptPt p : f.getPoints()) {
 					String cat = simplifyWptCategory(p.category, null);
 					cats.add(cat);
-					if (names != null) {
-						names.add(langs.get(i) + " " + titles.get(i) + " " + p.name);
-					}
+					names.add(langs.get(i) + " " + titles.get(i) + " " + p.name);
 				}
 				i++;
 			}
-			return cats;
-		}
-
-		public int size() {
-			return langs.size();
+			for (i = 0; i < cats.size(); i++) {
+				String cat = cats.get(i);
+				Integer nt = categories.get(cat);
+				if (nt == null) {
+					categoriesExample.put(cat, names.get(i));
+				}
+				categories.put(cat, nt == null ? 1 : (nt.intValue() + 1));
+			}
 		}
 	}
 
@@ -226,18 +232,7 @@ public class WikivoyageGenOSM {
 	
 
 	private static boolean combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
-		List<String> lst = new ArrayList<>();
-		List<String> cats = article.getCategories(lst);
-		for(int i = 0; i< cats.size() ; i++) {
-			String cat = cats.get(i);
-			String name = lst.get(i);
-			Integer nt = categories.get(cat);
-			if(nt == null) {
-				categoriesExample.put(cat, name);
-			}
-			categories.put(cat, nt == null ? 1 : (nt.intValue() + 1));
-		}
-		
+		article.updateCategoryCounts();		
 		long idStart = NODE_ID ;
 		LatLon mainArticlePoint = article.latlons.get(0);
 		List<WptPt> points = new ArrayList<GPXUtilities.WptPt>();
@@ -299,7 +294,6 @@ public class WikivoyageGenOSM {
 			tagValue(serializer, "route_source", "wikivoyage");
 			tagValue(serializer, "route_id", "Q"+article.tripId);
 			serializer.endTag(null, "node");
-			cats.add(category);
 		}
 		
 		
