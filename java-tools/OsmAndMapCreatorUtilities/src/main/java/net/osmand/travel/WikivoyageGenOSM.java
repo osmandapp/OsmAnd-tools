@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -56,6 +57,7 @@ public class WikivoyageGenOSM {
 	static long NODE_ID = -1000;
 	static Map<String, Integer> categories = new HashMap<>();
 	static Map<String, String> categoriesExample = new HashMap<>();
+	private static Map<String, String> wptCategories;
 	
 
 	// - TODO add point image
@@ -68,7 +70,7 @@ public class WikivoyageGenOSM {
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
 		// TOTAL 100 000
-		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 100);
+		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 10000);
 	}
 
 	
@@ -290,7 +292,7 @@ public class WikivoyageGenOSM {
 			tagValue(serializer, "route_type", "article_point");
 			tagValue(serializer, "category", category);
 			String lng = p.getExtensionsToRead().get(LANG);
-			tagValue(serializer, "lang" + lng, "yes");
+			tagValue(serializer, "lang:" + lng, "yes");
 //			addPointTags(article, serializer, p, ":" + lng);
 			addPointTags(article, serializer, p, "");
 			
@@ -402,158 +404,160 @@ public class WikivoyageGenOSM {
 			category = "";
 		}
 		category = category.toLowerCase();
-		switch (category) {
-		case "מוקדי":
-		case "tourist information":
-			category = CAT_OTHER;
-			break;
-		case "aller":
-		case "go":
-		case "around": // ?
-			category = CAT_DO;
-			break;
-		case "university":
-		case "port":
-		case "post":
-		case "pharmacy":
-		case "hospital":
-		case "train":
-		case "bus":
-		case "police":
-		case "embassy":
-		case "bank":
-		case "library":
-		case "office":
-		case "school":
-		case "town hall":
-		case "airport":
-		case "surgery":
-		case "clinic":
-		case "other":
-		case "municipality":
-			category = CAT_OTHER;
-			break;
-		case "cinema":
-		case "aquarium":
-		case "theater":
-		case "swimming pool":
-		case "swimming":
-		case "beach":
-		case "amusement park":
-		case "golf":
-		case "club":
-		case "sports":
-		case "music":
-		case "spa":
-		case "انجام‌دادن":
-			category = CAT_DO;
-			break;
-		case "mall":
-		case "market":
-		case "shop":
-		case "supermarket":
-			category = CAT_BUY;
-			break;
-		case "beer garden":
-		case "bar":
-		case "brewery":
-		case "שתייה":
-		case "discotheque":
-		case "نوشیدن":
-		case "pub":
-			category = CAT_DRINK;
-			break;
-		case "veja":
-		case "voir":
-		case "zoo":
-		case "temple":
-		case "mosque":
-		case "synagogue":
-		case "monastery":
-		case "church":
-		case "palace":
-		case "building":
-		case "château":
-		case "museum":
-		case "attraction":
-		case "gallery":
-		case "memorial":
-		case "archaeological site":
-		case "fort":
-		case "monument":
-		case "castle":
-		case "park":
-		case "دیدن":
-		case "tower":
-		case "cave":
-		case "botanical garden":
-		case "square":
-		case "cathedral":
-		case "lake":
-		case "landmark":
-		case "cemetery":
-		case "garden":
-		case "arts centre":
-		case "national park":
-		case "waterfall":
-		case "viewpoint":
-		case "mountain":
-		case "mill":
-		case "house":
-		case "ruins":
-			category = CAT_SEE;
-			break;
-		case "restaurant":
-		case "restaurant and_bar":
-		case "restaurant and bar":
-		case "cafe":
-		case "bakery":
-		case "manger":
-		case "coma":
-		case "אוכל":
-		case "bistro":
-		case "snack bar":
-			category = CAT_EAT;
-			break;
-		case "destination":
-		case "listing":
-		case "destinationlist":
-		case "רשימה": // listing - example airport
-			category = CAT_MARKER;
-			break;
-		case "hotel":
-		case "motel":
-		case "לינה":
-		case "hostel":
-		case "se loger":
-		case "guest house":
-		case "campsite":
-		case "holiday flat":
-		case "alpine hut":
-		case "youth hostel":
-		case "caravan site":
-		case "appartment":
-		case "خوابیدن":
-		case "boarding house":
-		case "hotel garni":
-		case "durma":
-			category = CAT_SLEEP;
-			break;
-		case "city":
-		case "vicinity":
-		case "village":
-		case "town":
-			category = CAT_MARKER;
-			break;
-		case "":
-			category = CAT_OTHER;
-			break;
-		default:
-			if(defaultCat != null) {
-				category = defaultCat;
-				break;
+		if (wptCategories == null) {
+			wptCategories = buildCategories();
+		}
+		String cat = wptCategories.get(category);
+		if (cat != null) {
+			return cat;
+		}
+		for (String key : wptCategories.keySet()) {
+			// check if it is present as a first tag
+			if (category.endsWith(" " + key) || category.startsWith(key + ",") || category.contains(" " + key + ",")) {
+				return wptCategories.get(key);
 			}
 		}
+		if (defaultCat != null) {
+			return defaultCat;
+		}
+		if (category.isEmpty()) {
+			return CAT_OTHER;
+		}
 		return category;
+	}
+	
+	private static Map<String, String> buildCategories() {
+		Map<String, String> categories = new LinkedHashMap<String, String>();
+        categories.put("מוקדי", CAT_OTHER);
+		categories.put("tourist information", CAT_OTHER);
+
+		categories.put("aller", CAT_DO);
+		categories.put("go", CAT_DO);
+		categories.put("around", CAT_DO); // ?
+			
+		categories.put("university", CAT_OTHER);
+		categories.put("port", CAT_OTHER);
+		categories.put("post", CAT_OTHER);
+		categories.put("pharmacy", CAT_OTHER);
+		categories.put("hospital", CAT_OTHER);
+		categories.put("train", CAT_OTHER);
+		categories.put("bus", CAT_OTHER);
+		categories.put("police", CAT_OTHER);
+		categories.put("embassy", CAT_OTHER);
+		categories.put("bank", CAT_OTHER);
+		categories.put("library", CAT_OTHER);
+		categories.put("office", CAT_OTHER);
+		categories.put("school", CAT_OTHER);
+		categories.put("town hall", CAT_OTHER);
+		categories.put("airport", CAT_OTHER);
+		categories.put("surgery", CAT_OTHER);
+		categories.put("clinic", CAT_OTHER);
+		categories.put("other", CAT_OTHER);
+		categories.put("municipality", CAT_OTHER);
+			
+		categories.put("cinema", CAT_DO);
+		categories.put("aquarium", CAT_DO);
+		categories.put("theater", CAT_DO);
+		categories.put("swimming pool", CAT_DO);
+		categories.put("swimming", CAT_DO);
+		categories.put("beach", CAT_DO);
+		categories.put("amusement park", CAT_DO);
+		categories.put("golf", CAT_DO);
+		categories.put("club", CAT_DO);
+		categories.put("sports", CAT_DO);
+		categories.put("music", CAT_DO);
+		categories.put("spa", CAT_DO);
+		categories.put("انجام‌دادن", CAT_DO);
+			
+		categories.put("mall", CAT_BUY);
+		categories.put("market", CAT_BUY);
+		categories.put("shop", CAT_BUY);
+		categories.put("supermarket", CAT_BUY);
+			
+		categories.put("veja", CAT_SEE);
+		categories.put("voir", CAT_SEE);
+		categories.put("zoo", CAT_SEE);
+		categories.put("temple", CAT_SEE);
+		categories.put("mosque", CAT_SEE);
+		categories.put("synagogue", CAT_SEE);
+		categories.put("monastery", CAT_SEE);
+		categories.put("church", CAT_SEE);
+		categories.put("palace", CAT_SEE);
+		categories.put("building", CAT_SEE);
+		categories.put("château", CAT_SEE);
+		categories.put("museum", CAT_SEE);
+		categories.put("attraction", CAT_SEE);
+		categories.put("gallery", CAT_SEE);
+		categories.put("memorial", CAT_SEE);
+		categories.put("archaeological site", CAT_SEE);
+		categories.put("fort", CAT_SEE);
+		categories.put("monument", CAT_SEE);
+		categories.put("castle", CAT_SEE);
+		categories.put("park", CAT_SEE);
+		categories.put("دیدن", CAT_SEE);
+		categories.put("tower", CAT_SEE);
+		categories.put("cave", CAT_SEE);
+		categories.put("botanical garden", CAT_SEE);
+		categories.put("square", CAT_SEE);
+		categories.put("cathedral", CAT_SEE);
+		categories.put("lake", CAT_SEE);
+		categories.put("landmark", CAT_SEE);
+		categories.put("cemetery", CAT_SEE);
+		categories.put("garden", CAT_SEE);
+		categories.put("arts centre", CAT_SEE);
+		categories.put("national park", CAT_SEE);
+		categories.put("waterfall", CAT_SEE);
+		categories.put("viewpoint", CAT_SEE);
+		categories.put("mountain", CAT_SEE);
+		categories.put("mill", CAT_SEE);
+		categories.put("house", CAT_SEE);
+		categories.put("ruins", CAT_SEE);
+			
+		categories.put("restaurant", CAT_EAT);
+		categories.put("cafe", CAT_EAT);
+		categories.put("bakery", CAT_EAT);
+		categories.put("manger", CAT_EAT);
+		categories.put("coma", CAT_EAT);
+		categories.put("אוכל", CAT_EAT);
+		categories.put("bistro", CAT_EAT);
+		categories.put("snack bar", CAT_EAT);
+		
+
+		categories.put("beer garden", CAT_DRINK);
+		categories.put("bar", CAT_DRINK);
+		categories.put("brewery", CAT_DRINK);
+		categories.put("שתייה", CAT_DRINK);
+		categories.put("discotheque", CAT_DRINK);
+		categories.put("نوشیدن", CAT_DRINK);
+		categories.put("pub", CAT_DRINK);
+			
+			
+		categories.put("destination", CAT_MARKER);
+		categories.put("listing", CAT_MARKER);
+		categories.put("destinationlist", CAT_MARKER);
+		categories.put("רשימה", CAT_MARKER); // listing - example airport
+			
+		categories.put("hotel", CAT_SLEEP);
+		categories.put("motel", CAT_SLEEP);
+		categories.put("לינה", CAT_SLEEP);
+		categories.put("hostel", CAT_SLEEP);
+		categories.put("se loger", CAT_SLEEP);
+		categories.put("guest house", CAT_SLEEP);
+		categories.put("campsite", CAT_SLEEP);
+		categories.put("holiday flat", CAT_SLEEP);
+		categories.put("alpine hut", CAT_SLEEP);
+		categories.put("youth hostel", CAT_SLEEP);
+		categories.put("caravan site", CAT_SLEEP);
+		categories.put("appartment", CAT_SLEEP);
+		categories.put("خوابیدن", CAT_SLEEP);
+		categories.put("boarding house", CAT_SLEEP);
+		categories.put("hotel garni", CAT_SLEEP);
+		categories.put("durma", CAT_SLEEP);
+			
+		categories.put("city", CAT_MARKER);
+		categories.put("vicinity", CAT_MARKER);
+		categories.put("village", CAT_MARKER);
+		categories.put("town", CAT_MARKER);
+		return categories;
 	}
 }
