@@ -42,7 +42,8 @@ public class IndexCreatorSettings {
 	
 	public boolean suppressWarningsForDuplicateIds = true;
 
-	public boolean poiZipLongStrings = false;
+	// make by default
+	public boolean poiZipLongStrings = true;
 	
 	public int poiZipStringLimit = 100;
 	

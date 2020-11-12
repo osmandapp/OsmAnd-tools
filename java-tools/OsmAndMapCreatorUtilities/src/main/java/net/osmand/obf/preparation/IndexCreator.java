@@ -855,8 +855,8 @@ public class IndexCreator {
 //		if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexCreatorSettings settings = new IndexCreatorSettings();
-//		settings.poiZipLongStrings = false;
-		settings.indexMap = true;
+//		settings.poiZipLongStrings = true;
+//		settings.indexMap = true;
 //		settings.indexAddress = true;
 		settings.indexPOI = true;
 //		settings.indexTransport = true;

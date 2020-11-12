@@ -48,7 +48,7 @@ public class WikivoyageGenOSM {
 	public static final String CAT_OTHER = "other"; // 10%
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private static final int LIMIT = 1000;
+	private static final int LIMIT = 100; // total 100 000
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
@@ -59,11 +59,12 @@ public class WikivoyageGenOSM {
 	static Map<String, String> categoriesExample = new HashMap<>();
 	
 
-	// TODO add point image
-	// TODO add article: image / banner
-	// 1b. add article: banner_icon, contents, partof, gpx?
-	// TODO combine tags of OsmGpxWriteContext, WikivoyageGenOSM
-	// TODO combine point languages and extra tags (merge points possibly by wikidata id)
+	// - TODO add point image
+	// - TODO add article: image / banner
+	// - 1b. add article: banner_icon, contents, partof, gpx?
+	// - TODO combine tags of OsmGpxWriteContext, WikivoyageGenOSM
+	// FUTURE:
+	// - Combine point languages and extra tags (merge points possibly by wikidata id)
 	
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
@@ -213,7 +214,8 @@ public class WikivoyageGenOSM {
 			System.out.println(String.format("%#.2f%% %s  %d %s", cnt * 100.0 / total, s,  cnt, 
 					categoriesExample.get(s)));
 		}
-		System.out.println(String.format("Empty article: %d no points  + %d no location out of %d", emptyContent, emptyLocation, count));
+		System.out.println(String.format("Total articles: %d", count));
+		System.out.println(String.format("Empty article: %d no points in article / %d no location for an article", emptyContent, emptyLocation));
 	}
 	
 	private static void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
@@ -277,7 +279,7 @@ public class WikivoyageGenOSM {
 		serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
 		serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
 		tagValue(serializer, "route", "point");
-		tagValue(serializer, "route:type", "article");
+		tagValue(serializer, "route_type", "article");
 		addArticleTags(article, serializer, true);
 		serializer.endTag(null, "node");
 		
@@ -292,7 +294,7 @@ public class WikivoyageGenOSM {
 			serializer.attribute(null, "lon", latLonFormat.format(p.lon));
 			
 			tagValue(serializer, "route", "point");
-			tagValue(serializer, "route:type", "article_point");
+			tagValue(serializer, "route_type", "article_point");
 			tagValue(serializer, "category", category);
 			String lng = p.getExtensionsToRead().get(LANG);
 			addPointTags(article, serializer, p, ":" + lng);
@@ -313,7 +315,7 @@ public class WikivoyageGenOSM {
 		serializer.attribute(null, "version", "1");
 		
 		tagValue(serializer, "route", "points_collection");
-		tagValue(serializer, "route:type", "article_points");
+		tagValue(serializer, "route_type", "article_points");
 		addArticleTags(article, serializer, false);
 		
 		for(long nid  = idStart ; nid > idEnd; nid--  ) {
@@ -356,7 +358,7 @@ public class WikivoyageGenOSM {
 			}
 		}
 		if (!Algorithms.isEmpty(p.link)) {
-			tagValue(serializer, "link" + lngSuffix, p.link);
+			tagValue(serializer, "url" + lngSuffix, p.link);
 		}
 		if (!Algorithms.isEmpty(p.comment)) {
 			tagValue(serializer, "note" + lngSuffix, p.comment);
