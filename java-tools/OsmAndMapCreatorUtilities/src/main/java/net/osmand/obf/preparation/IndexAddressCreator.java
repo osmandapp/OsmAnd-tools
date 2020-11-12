@@ -604,7 +604,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (City c : nearestObjects) {
 			Boundary boundary = cityBoundaries.get(c);
 			if (isInNames.contains(c.getName()) || (boundary != null && boundary.containsPoint(location))) {
-				if (boundary.getCityType() != null && boundary.getCityType().storedAsSeparateAdminEntity()) {
+				if (boundary != null && boundary.getCityType() != null && boundary.getCityType().storedAsSeparateAdminEntity()) {
 					result.add(c);
 				}
 			}
