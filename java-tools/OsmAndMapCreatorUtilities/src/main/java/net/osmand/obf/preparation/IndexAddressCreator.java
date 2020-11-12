@@ -602,9 +602,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		nearestObjects.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
 		//either we found a city boundary the street is in
 		for (City c : nearestObjects) {
-			Boundary boundary = cityBoundaries.get(c);
-			if (isInNames.contains(c.getName()) || (boundary != null && boundary.containsPoint(location))) {
-				result.add(c);
+			if (c.getType() != CityType.NEIGHBOURHOOD && c.getType() != CityType.BOROUGH 
+					&& c.getType() != CityType.DISTRICT && c.getType() != CityType.SUBURB){
+				Boundary boundary = cityBoundaries.get(c);
+				if (isInNames.contains(c.getName()) || (boundary != null && boundary.containsPoint(location))) {
+					result.add(c);
+				}
 			}
 		}
 		// or we need to find closest city
