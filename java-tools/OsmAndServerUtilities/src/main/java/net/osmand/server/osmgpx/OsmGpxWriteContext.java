@@ -135,6 +135,7 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
+					tagValue(serializer, "route_type", "track");
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo);
 					addAnalysisTags(gpxTrackTags, analysis);
