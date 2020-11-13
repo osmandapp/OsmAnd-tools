@@ -70,7 +70,7 @@ public class WikivoyageGenOSM {
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
 		// TOTAL 100 000
-		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 1000);
+		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 10000);
 	}
 
 	
@@ -411,11 +411,11 @@ public class WikivoyageGenOSM {
 				return wptCategories.get(key);
 			}
 		}
-		if (defaultCat != null) {
-			return defaultCat;
-		}
 		if (category.isEmpty()) {
 			return CAT_OTHER;
+		}
+		if (defaultCat != null) {
+			return defaultCat;
 		}
 		return category;
 	}
@@ -424,10 +424,13 @@ public class WikivoyageGenOSM {
 		Map<String, String> categories = new LinkedHashMap<String, String>();
         categories.put("מוקדי", CAT_OTHER);
 		categories.put("tourist information", CAT_OTHER);
+		categories.put(CAT_OTHER, CAT_OTHER);
+
 
 		categories.put("aller", CAT_DO);
 		categories.put("go", CAT_DO);
 		categories.put("around", CAT_DO); // ?
+		categories.put(CAT_DO, CAT_DO);
 			
 		categories.put("university", CAT_OTHER);
 		categories.put("port", CAT_OTHER);
@@ -467,6 +470,8 @@ public class WikivoyageGenOSM {
 		categories.put("market", CAT_BUY);
 		categories.put("shop", CAT_BUY);
 		categories.put("supermarket", CAT_BUY);
+		categories.put(CAT_BUY, CAT_BUY);
+
 			
 		categories.put("veja", CAT_SEE);
 		categories.put("voir", CAT_SEE);
@@ -506,6 +511,8 @@ public class WikivoyageGenOSM {
 		categories.put("mill", CAT_SEE);
 		categories.put("house", CAT_SEE);
 		categories.put("ruins", CAT_SEE);
+		categories.put(CAT_SEE, CAT_SEE);
+
 			
 		categories.put("restaurant", CAT_EAT);
 		categories.put("cafe", CAT_EAT);
@@ -515,7 +522,8 @@ public class WikivoyageGenOSM {
 		categories.put("אוכל", CAT_EAT);
 		categories.put("bistro", CAT_EAT);
 		categories.put("snack bar", CAT_EAT);
-		
+		categories.put(CAT_EAT, CAT_EAT);
+
 
 		categories.put("beer garden", CAT_DRINK);
 		categories.put("bar", CAT_DRINK);
@@ -524,12 +532,15 @@ public class WikivoyageGenOSM {
 		categories.put("discotheque", CAT_DRINK);
 		categories.put("نوشیدن", CAT_DRINK);
 		categories.put("pub", CAT_DRINK);
-			
+		categories.put(CAT_DRINK, CAT_DRINK);
+
 			
 		categories.put("destination", CAT_MARKER);
 		categories.put("listing", CAT_MARKER);
 		categories.put("destinationlist", CAT_MARKER);
 		categories.put("רשימה", CAT_MARKER); // listing - example airport
+		categories.put(CAT_MARKER, CAT_MARKER);
+
 			
 		categories.put("hotel", CAT_SLEEP);
 		categories.put("motel", CAT_SLEEP);
@@ -547,6 +558,8 @@ public class WikivoyageGenOSM {
 		categories.put("boarding house", CAT_SLEEP);
 		categories.put("hotel garni", CAT_SLEEP);
 		categories.put("durma", CAT_SLEEP);
+		categories.put(CAT_SLEEP, CAT_SLEEP);
+
 			
 		categories.put("city", CAT_MARKER);
 		categories.put("vicinity", CAT_MARKER);
