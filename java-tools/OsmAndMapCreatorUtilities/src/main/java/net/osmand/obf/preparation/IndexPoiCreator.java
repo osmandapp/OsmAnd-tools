@@ -210,7 +210,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setInt(3, MapUtils.get31TileNumberY(amenity.getLocation().getLatitude()));
 		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
-		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getInternalAdditionalInfoMap(), amenity.getName(), amenity.getEnName(false)));
+		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
 		addBatch(poiPreparedStatement);
 	}
 
@@ -228,19 +228,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final char SPECIAL_CHAR = ((char) -1);
 
-	private String encodeAdditionalInfo(Amenity amenity, Map<String, String> tempNames, String name, String nameEn) {
-		tempNames = new HashMap<String, String>(tempNames);
+	private String encodeAdditionalInfo(Amenity amenity, String name) {
+		
+		Map<String, String> tempNames = new LinkedHashMap<String, String>(); 
 		if (!Algorithms.isEmpty(name)) {
 			tempNames.put("name", name);
 		}
-		if (!Algorithms.isEmpty(nameEn) && !Algorithms.objectEquals(name, nameEn)) {
-			tempNames.put("name:en", nameEn);
-		}
-		Iterator<Entry<String, String>> it = amenity.getNamesMap(false).entrySet().iterator();
+		Iterator<Entry<String, String>> it = amenity.getNamesMap(true).entrySet().iterator();
 		while (it.hasNext()) {
 			Entry<String, String> next = it.next();
 			tempNames.put("name:" + next.getKey(), next.getValue());
 		}
+		for(String e : amenity.getAdditionalInfoKeys()) {
+			tempNames.put(e, amenity.getAdditionalInfo(e));
+		}
+		
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<String, String> e : tempNames.entrySet()) {
 			boolean text = poiTypes.isTextAdditionalInfo(e.getKey(), e.getValue());
