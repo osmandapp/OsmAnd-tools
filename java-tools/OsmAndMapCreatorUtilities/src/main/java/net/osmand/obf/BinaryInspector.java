@@ -91,8 +91,7 @@ public class BinaryInspector {
 					// road
 //					"-latlon=48.8416,17.4115",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-//					System.getProperty("maps.dir")+"/Map.obf"
-					System.getProperty("maps.dir")+"/Wikivoyage.obf"
+					System.getProperty("maps.dir")+"/Map.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1287,12 +1286,12 @@ public class BinaryInspector {
 			lrs.clear();
 			for (int pnt : s.getReferencesToRoutes()) {
 				TransportRoute route;
-				if (!lrs.contains(pnt)) {
+				if (!rs.containsKey((long) pnt)) {
 					TIntObjectHashMap<TransportRoute> pts = index.getTransportRoutes(new int[] { pnt });
 					route = pts.valueCollection().iterator().next();
 					rs.put((long) pnt, route);
 				} else {
-					route = rs.get(pnt);
+					route = rs.get((long) pnt);
 				}
 				if (route != null) {
 					//lrs.add(route.getRef() + " " + route.getName(verbose.lang));
@@ -1366,10 +1365,10 @@ public class BinaryInspector {
 					@Override
 					public boolean publish(Amenity object) {
 						StringBuilder s = new StringBuilder();
-						printNames(" ", object.getAdditionalInfo(), s);
+						printNames(" ", object.getInternalAdditionalInfoMap(), s);
 						printNames(" name:", object.getNamesMap(true), s);
 						
-
+						System.out.println("!!!! " + object.getDescription(""));
 						long id = (object.getId() );
 						if(id > 0) {
 							id = id >> 1;

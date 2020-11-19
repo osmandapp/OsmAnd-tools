@@ -191,9 +191,13 @@ public class BinaryComparator {
 			printMapObject(POI_DETAILS, a0,
 					"Amenity subtypes are not equal " + a0.getSubType() + " <> " + a1.getSubType());
 		}
-		if (!Algorithms.objectEquals(a0.getAdditionalInfo(), a1.getAdditionalInfo())) {
+		if (!Algorithms.objectEquals(a0.getAdditionalInfoKeys(), a1.getAdditionalInfoKeys())) {
 			printMapObject(POI_DETAILS, a0,
-					"Amenity info is not equal " + a0.getAdditionalInfo() + " <> " + a1.getAdditionalInfo());
+					"Amenity info is not equal " + a0.getAdditionalInfoKeys() + " <> " + a1.getAdditionalInfoKeys());
+		}
+		if (!Algorithms.objectEquals(a0.getAdditionalInfoValues(false), a1.getAdditionalInfoValues(false))) {
+			printMapObject(POI_DETAILS, a0,
+					"Amenity info is not equal " + a0.getAdditionalInfoKeys() + " <> " + a1.getAdditionalInfoKeys());
 		}
 		if (!Algorithms.objectEquals(a0.getNamesMap(true), a1.getNamesMap(true))) {
 			printMapObject(POI_DETAILS, a0,

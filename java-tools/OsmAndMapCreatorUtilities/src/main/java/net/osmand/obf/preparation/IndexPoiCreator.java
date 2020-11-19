@@ -210,7 +210,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setInt(3, MapUtils.get31TileNumberY(amenity.getLocation().getLatitude()));
 		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
-		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getAdditionalInfo(), amenity.getName(), amenity.getEnName(false)));
+		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getInternalAdditionalInfoMap(), amenity.getName(), amenity.getEnName(false)));
 		addBatch(poiPreparedStatement);
 	}
 
