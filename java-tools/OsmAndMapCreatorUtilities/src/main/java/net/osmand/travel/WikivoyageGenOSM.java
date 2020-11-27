@@ -191,7 +191,6 @@ public class WikivoyageGenOSM {
 			double lon = rs.getDouble(rind++);
 //			rind++;
 			String content = Algorithms.gzipToString(rs.getBytes(rind++));
-			System.out.println(String.format("UNZIPPED CONTENT for %s : %s", title, content));
 			GZIPInputStream bytesStream = new GZIPInputStream(new ByteArrayInputStream(rs.getBytes(rind++)));
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(bytesStream);
 			String imageTitle = rs.getString(rind++);
