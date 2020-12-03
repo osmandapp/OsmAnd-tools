@@ -260,14 +260,14 @@ public class DownloadIndexesService  {
 
 		public boolean acceptFile(File f) {
 			switch (this) {
+			case WIKIVOYAGE:
+				return f.getName().endsWith(".sqlite") || f.getName().endsWith(".travel.obf.zip") || f.getName().endsWith(".travel.obf");
 			case MAP:
 			case ROAD_MAP:
 			case WIKIMAP:
 			case DEPTH:
 			case SRTM_MAP:
 				return f.getName().endsWith(".obf.zip") || f.getName().endsWith(".obf") || f.getName().endsWith(".extra.zip");
-			case WIKIVOYAGE:
-				return f.getName().endsWith(".sqlite");
 			case HILLSHADE:
 			case SLOPE:
 				return f.getName().endsWith(".sqlitedb");
