@@ -674,10 +674,10 @@ public class IndexUploader {
 		boolean fir = true;
 		if (fileName.contains(".srtm")) {
 			summary = "SRTM" + summary;
-		} else if (fileName.contains("_wiki")) {
-			summary = "Wikipedia" + summary;
 		} else if (fileName.contains(".travel")){
-			summary = "Wikivoyage" + summary;
+			summary = "Travel guide" + summary;
+		} else if (fileName.contains("_wiki.")) {
+			summary = "Wikipedia" + summary;
 		} else {
 			if (reader.containsAddressData()) {
 				summary = "Address" + (fir ? "" : ", ") + summary;
@@ -769,6 +769,7 @@ public class IndexUploader {
 		try {
 			log.info("Upload index " + fileName + " (log file: " + logFileName + ")" );
 			boolean uploaded = uploadFileToServer(toUpload, summary, uc);
+				
 			// remove source file if file was split
 			if (uploaded && targetDirectory != null && !targetDirectory.equals(directory)) {
 				File toBackup = new File(targetDirectory, fileName);
