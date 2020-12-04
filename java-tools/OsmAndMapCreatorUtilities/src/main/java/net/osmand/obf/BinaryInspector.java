@@ -91,7 +91,8 @@ public class BinaryInspector {
 					// road
 //					"-latlon=48.8416,17.4115",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-					System.getProperty("maps.dir")+"/Map.obf"
+//					System.getProperty("maps.dir")+"/Map.obf"
+					System.getProperty("maps.dir")+"/wikivoyage/Wikivoyage.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

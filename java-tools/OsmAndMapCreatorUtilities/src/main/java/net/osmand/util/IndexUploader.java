@@ -851,6 +851,7 @@ public class IndexUploader {
 		public void upload(IndexUploader uploader, File toUpload, String summary, String size, String date)
 				throws IOException, JSchException {
 			// do nothing
+			log.info("Uploading dummy file " + toUpload.getName() + " " + size + " MB " + date + " of ");
 		}
 	}
 
