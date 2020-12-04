@@ -74,6 +74,7 @@ public class DownloadIndexDocument {
 		Collections.sort(fonts, cmp);
 		Collections.sort(depths, cmp);
 		Collections.sort(wikimaps, cmp);
+		Collections.sort(wikivoyages, cmp);
 	}
 
 	public List<DownloadIndex> getMaps() {

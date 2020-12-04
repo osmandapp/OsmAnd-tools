@@ -133,6 +133,7 @@ public class IndexUploader {
 	private boolean roadProcess;
 	private boolean wikiProcess;
 	private boolean srtmProcess;
+	private boolean travelProcess;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -215,6 +216,8 @@ public class IndexUploader {
 			} else if (args[start].startsWith("--srtm")) {
 				srtmProcess = true;
 				start++;
+			} else if (args[start].startsWith("--travel")) {
+				travelProcess = true;
 			}
 		} while (p != start);
 		if (fileFilter != null) {
@@ -407,8 +410,9 @@ public class IndexUploader {
 		boolean srtmFile = mainFile.getName().contains(".srtm");
 		boolean roadFile = mainFile.getName().contains(".road");
 		boolean wikiFile = mainFile.getName().contains(".wiki");
+		boolean travelFile = mainFile.getName().contains(".travel");
 		boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
-		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !worldFile;
+		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !worldFile && !travelFile;
 		if (srtmFile != this.srtmProcess) {
 			return null;
 		}
@@ -416,6 +420,9 @@ public class IndexUploader {
 			return null;
 		}
 		if (wikiFile != this.wikiProcess) {
+			return null;
+		}
+		if (travelFile != this.travelProcess) {
 			return null;
 		}
 		if (regionFile && !fileName.contains("_ext_")) {
@@ -669,6 +676,8 @@ public class IndexUploader {
 			summary = "SRTM" + summary;
 		} else if (fileName.contains("_wiki")) {
 			summary = "Wikipedia" + summary;
+		} else if (fileName.contains(".travel")){
+			summary = "Wikivoyage" + summary;
 		} else {
 			if (reader.containsAddressData()) {
 				summary = "Address" + (fir ? "" : ", ") + summary;
