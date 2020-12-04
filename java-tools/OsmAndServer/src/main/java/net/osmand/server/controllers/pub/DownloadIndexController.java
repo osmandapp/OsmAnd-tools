@@ -231,7 +231,7 @@ public class DownloadIndexController {
 	}
 	
 	private boolean isWiki(MultiValueMap<String, String> params) {
-		return isContainAndEqual("wikivoyage", params) || isContainAndEqual("wiki", params); 
+		return isContainAndEqual("wikivoyage", params) || isContainAndEqual("wiki", params) || isContainAndEqual("travel", params); 
 	}
 	
 	private boolean isLiveMaps(MultiValueMap<String, String> params) {
