@@ -412,7 +412,7 @@ public class IndexUploader {
 		boolean wikiFile = mainFile.getName().contains(".wiki");
 		boolean travelFile = mainFile.getName().contains(".travel");
 		boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
-		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !worldFile;
+		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !worldFile && !travelFile;
 		if (srtmFile != this.srtmProcess) {
 			return null;
 		}
@@ -420,6 +420,9 @@ public class IndexUploader {
 			return null;
 		}
 		if (wikiFile != this.wikiProcess) {
+			return null;
+		}
+		if (travelFile != this.travelProcess) {
 			return null;
 		}
 		if (regionFile && !fileName.contains("_ext_")) {
