@@ -218,6 +218,7 @@ public class IndexUploader {
 				start++;
 			} else if (args[start].startsWith("--travel")) {
 				travelProcess = true;
+				start++;
 			}
 		} while (p != start);
 		if (fileFilter != null) {
