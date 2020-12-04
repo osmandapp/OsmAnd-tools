@@ -161,6 +161,8 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.DEPTH;
 			} else if (v.equals("wikivoyage")) {
 				dt = DownloadIndexesService.DownloadType.WIKIVOYAGE;
+			} else if (v.equals("travel")) {
+				dt = DownloadIndexesService.DownloadType.TRAVEL;
 			} else if (v.equals("wikimap")) {
 				dt = DownloadIndexesService.DownloadType.WIKIMAP;
 			} else if (v.equals("srtm_map")) {

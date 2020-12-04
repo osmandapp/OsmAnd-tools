@@ -169,6 +169,7 @@ public class IndexController {
 		model.addAttribute("srtmcountry", doc.getSrtmMaps());
 		model.addAttribute("wiki", doc.getWikimaps());
 		model.addAttribute("wikivoyage", doc.getWikivoyages());
+		model.addAttribute("travel", doc.getTravelGuides());
         return "pub/indexes";
     }
 
