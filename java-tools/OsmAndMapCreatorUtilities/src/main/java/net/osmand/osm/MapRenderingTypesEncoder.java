@@ -362,10 +362,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if (appType == EntityConvertApplyType.POI && originalOH != null) {
 			String oh = originalOH;
 			for (Entry<String, String> e : tags.entrySet()) {
-				if (e.getKey().startsWith("opening_hours:") && 
-						!e.getKey().equals("opening_hours:lastcheck")) {
-					oh += " || " + e.getValue() + " \"" 
-							+ Algorithms.capitalizeFirstLetter(e.getKey().substring("opening_hours:".length())) + "\""; 
+				if (e.getKey().startsWith("opening_hours:")) {
+					String subkey = e.getKey().substring("opening_hours:".length());
+					if (!subkey.equals("lastcheck") && !subkey.equals("last_check")) {
+						oh += " || " + e.getValue() + " \"" + Algorithms.capitalizeFirstLetter(subkey) + "\"";
+					}
 				}
 			}
 			if (oh.length() > originalOH.length()) {				
