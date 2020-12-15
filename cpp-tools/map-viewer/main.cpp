@@ -946,7 +946,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         else
         {
-            amenitySymbolsProvider.reset(new OsmAnd::AmenitySymbolsProvider(obfsCollection));
+            amenitySymbolsProvider.reset(new OsmAnd::AmenitySymbolsProvider(obfsCollection, 1.0f, 256.0f));
             renderer->addSymbolsProvider(amenitySymbolsProvider);
         }
         break;
