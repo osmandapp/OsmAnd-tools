@@ -754,7 +754,8 @@ public class BasemapProcessor {
 			
 			IndexCreator creator = new IndexCreator(folder, settings); //$NON-NLS-1$
 			creator.setDialects(
-					detailed ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY, DBDialect.SQLITE_IN_MEMORY);
+					detailed ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY, 
+					detailed ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY);
 			creator.setMapFileName(fileName);
 			List<File> src = new ArrayList<File>();
 			parseFiles(folder, src);
