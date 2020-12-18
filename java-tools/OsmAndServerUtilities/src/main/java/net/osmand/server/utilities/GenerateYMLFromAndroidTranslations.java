@@ -30,10 +30,15 @@ public class GenerateYMLFromAndroidTranslations {
 		outDir.mkdir();
 		for (File f : fs.listFiles()) {
 			File str = new File(f, "strings.xml");
-			if (str.exists()) {
-				
-				FileOutputStream output = new FileOutputStream(new File(outDir, f.getName() + ".yml"));
+			if (str.exists() && f.getName().startsWith("values")) {
+				FileOutputStream output = new FileOutputStream(new File(outDir, "android-" + f.getName() + ".yml"));
 				parse(str, output);
+				output.close();
+			}
+			File phr = new File(f, "phrases.xml");
+			if (phr.exists()) {
+				FileOutputStream output = new FileOutputStream(new File(outDir, "phrases-" + f.getName() + ".yml"));
+				parse(phr, output);
 				output.close();
 			}
 		}

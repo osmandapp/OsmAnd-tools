@@ -35,7 +35,7 @@ public class ServerUtilities {
 		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
 		} else {
-			System.err.println("Uknown command");
+			System.err.println("Unknown command");
 			System.exit(1);
 		}
 	}
