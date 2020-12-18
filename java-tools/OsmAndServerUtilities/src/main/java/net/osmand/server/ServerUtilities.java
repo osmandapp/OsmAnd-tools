@@ -10,6 +10,7 @@ import net.osmand.exceptionanalyzer.ExceptionAnalyzerMain;
 import net.osmand.live.subscriptions.UpdateSubscription;
 import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.server.osmgpx.DownloadOsmGPX;
+import net.osmand.server.utilities.GenerateYMLFromAndroidTranslations;
 
 public class ServerUtilities {
 
@@ -29,6 +30,8 @@ public class ServerUtilities {
 			CalculateOsmChangesets.downloadChangesets();
 		} else if (utl.equals("download-osm-gpx")) {
 			DownloadOsmGPX.main(subArgsArray);
+		} else if (utl.equals("generate-yml-translations")) {
+			GenerateYMLFromAndroidTranslations.convertTranslationsToYml(subArgsArray[0]);
 		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
 		} else {

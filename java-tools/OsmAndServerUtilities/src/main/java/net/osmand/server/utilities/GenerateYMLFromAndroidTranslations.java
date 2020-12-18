@@ -3,9 +3,12 @@ package net.osmand.server.utilities;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.Reader;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -16,14 +19,29 @@ import net.osmand.PlatformUtil;
 public class GenerateYMLFromAndroidTranslations {
 
 	public static void main(String[] args) throws XmlPullParserException, IOException {
-//		parse("/strings.xml");
-//		parse("-de/strings.xml");
-		parse("-ru/strings.xml");
+		String path = "../../../android/OsmAnd/res/";
+		convertTranslationsToYml(path);
 	}
 
-	private static void parse(String name) throws XmlPullParserException, IOException {
+	public static void convertTranslationsToYml(String path)
+			throws FileNotFoundException, XmlPullParserException, IOException {
+		File fs = new File(path);
+		File outDir = new File("yml-translations");
+		outDir.mkdir();
+		for (File f : fs.listFiles()) {
+			File str = new File(f, "strings.xml");
+			if (str.exists()) {
+				
+				FileOutputStream output = new FileOutputStream(new File(outDir, f.getName() + ".yml"));
+				parse(str, output);
+				output.close();
+			}
+		}
+	}
+
+	private static void parse(File f, OutputStream out) throws XmlPullParserException, IOException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
-		FileInputStream fis = new FileInputStream(new File("../../../android/OsmAnd/res/values" + name));
+		FileInputStream fis = new FileInputStream(f);
 		parser.setInput(getUTF8Reader(fis));
 		int tok;
 		String key = "";
@@ -40,7 +58,7 @@ public class GenerateYMLFromAndroidTranslations {
 				String tag = parser.getName();
 				if ("string".equals(tag)) {
 					// replace("\"", "\\\"")
-					System.out.println(key + ": \"" + processLine(vl) + "\"");
+					out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
 				}
 				vl.setLength(0);
 			}
@@ -54,13 +72,19 @@ public class GenerateYMLFromAndroidTranslations {
 				vl.insert(i, '\\');
 			} else if (vl.charAt(i) == '\'' && vl.charAt(i - 1) == '\\') {
 				vl.deleteCharAt(i - 1);
+			} else if (vl.charAt(i) == '?' && vl.charAt(i - 1) == '\\') {
+				vl.deleteCharAt(i - 1);
+			} else if (vl.charAt(i) == 't' && vl.charAt(i - 1) == '\\') {
+				vl.deleteCharAt(i);
+				vl.deleteCharAt(i - 1);
+				vl.insert(i - 1, '\t');
 			} else if (vl.charAt(i) == 'n' && vl.charAt(i - 1) == '\\') {
 				vl.deleteCharAt(i);
-				vl.deleteCharAt(i -1);
+				vl.deleteCharAt(i - 1);
 				vl.insert(i - 1, ' ');
 			}
 		}
-		
+
 		return vl.toString().trim();
 	}
 
