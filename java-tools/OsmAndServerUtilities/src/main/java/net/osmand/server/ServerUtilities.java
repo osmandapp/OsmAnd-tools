@@ -30,7 +30,7 @@ public class ServerUtilities {
 			CalculateOsmChangesets.downloadChangesets();
 		} else if (utl.equals("download-osm-gpx")) {
 			DownloadOsmGPX.main(subArgsArray);
-		} else if (utl.equals("generate-yml-translations")) {
+		} else if (utl.equals("generate-translations")) {
 			GenerateYMLFromAndroidTranslations.convertTranslationsToYml(subArgsArray[0]);
 		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
