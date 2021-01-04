@@ -60,8 +60,6 @@ public class WikivoyageGenOSM {
 	private static Map<String, String> wptCategories;
 	
 
-	// - TODO add point image
-	// - TODO add article: image / banner
 	// - 1b. add article: banner_icon, contents, partof
 	// FUTURE:
 	// - Combine point languages and extra tags (merge points possibly by wikidata id) 
