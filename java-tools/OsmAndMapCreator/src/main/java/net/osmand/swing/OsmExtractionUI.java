@@ -215,7 +215,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 							try {
 								// BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"),
 								// obf);
-								BinaryMapIndexReader bmir = cache.getReader(obf);
+								BinaryMapIndexReader bmir = cache.getReader(obf, true);
 								RandomAccessFile raf = new RandomAccessFile(obf, "r");
 								BinaryMapIndexReader bmir2 = new BinaryMapIndexReader(raf, bmir);
 								files.add(bmir2);
