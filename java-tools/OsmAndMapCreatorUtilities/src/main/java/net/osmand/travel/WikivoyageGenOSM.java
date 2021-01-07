@@ -60,14 +60,11 @@ public class WikivoyageGenOSM {
 	private static Map<String, String> wptCategories;
 	
 
-	// - 1b. add article: banner_icon, contents, partof
 	// FUTURE:
 	// - Combine point languages and extra tags (merge points possibly by wikidata id) 
 	// 	 NOTE: do not duplicate description:* (they are all  visible in context menu)
-	
 	public static void main(String[] args) throws SQLException, IOException {
-//		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
-		File f = new File("/home/madwasp79/OsmAnd-maps/Wikivoyage/wikivoyage.sqlite");
+		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
 		// TOTAL 100 000
 		genWikivoyageOsm(f, new File(f.getParentFile(), "wikivoyage.osm.gz"), 10000);
 	}

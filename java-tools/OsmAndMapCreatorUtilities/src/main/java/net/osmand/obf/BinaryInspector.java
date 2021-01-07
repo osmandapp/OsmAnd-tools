@@ -79,7 +79,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
+					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -92,8 +92,8 @@ public class BinaryInspector {
 //					"-latlon=48.8416,17.4115",
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/Map.obf"
-					System.getProperty("maps.dir")+"Germany_saarland_europe_2.srtm.obf"
-//					System.getProperty("maps.dir")+"/wikivoyage/Wikivoyage.obf"
+//					System.getProperty("maps.dir")+"Germany_saarland_europe_2.srtm.obf"
+					System.getProperty("maps.dir")+"/Wikivoyage.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1370,7 +1370,6 @@ public class BinaryInspector {
 						printNames(" ", object.getInternalAdditionalInfoMap(), s);
 						printNames(" name:", object.getNamesMap(true), s);
 						
-						System.out.println("!!!! " + object.getDescription(""));
 						long id = (object.getId() );
 						if(id > 0) {
 							id = id >> 1;
