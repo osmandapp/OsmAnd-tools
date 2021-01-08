@@ -102,7 +102,7 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 				if (from != null) {
 					mid.firstName = from.getFirstName();
 					mid.lastName = from.getLastName();
-					mid.userId = from.getId() == null ? null : new Long(from.getId());
+					mid.userId = from.getId() == null ? null : Long.valueOf(from.getId());
 				}
 				addMonitoringChatId(mid);
 				snd.setText("Monitoring of OsmAnd server has started");

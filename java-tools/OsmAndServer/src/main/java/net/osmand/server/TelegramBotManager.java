@@ -24,23 +24,19 @@ public class TelegramBotManager {
 	
 	public void init() {
 		TelegramBotsApi telegramBotsApi = new TelegramBotsApi();
-        try {
-        	if(osmAndServerMonitoringBot.isTokenPresent()) {
-                telegramBotsApi.registerBot(osmAndServerMonitoringBot);
-    		}
-        	if(osmAndAssistantBot.isTokenPresent()) {
-                telegramBotsApi.registerBot(osmAndAssistantBot);
-    		}
-            LOG.info("Telegram Initialized");
-        } catch(TelegramApiException e) {
-        	LOG.error(e.getMessage(), e);
-        	e.printStackTrace();
-        }
+		try {
+			if (osmAndServerMonitoringBot.isTokenPresent()) {
+				telegramBotsApi.registerBot(osmAndServerMonitoringBot);
+			}
+			if (osmAndAssistantBot.isTokenPresent()) {
+				telegramBotsApi.registerBot(osmAndAssistantBot);
+			}
+			LOG.info("Telegram Initialized");
+		} catch (TelegramApiException e) {
+			LOG.error(e.getMessage(), e);
+			e.printStackTrace();
+		}
 	}
-	
-	
-	
-
 	
 	
 }

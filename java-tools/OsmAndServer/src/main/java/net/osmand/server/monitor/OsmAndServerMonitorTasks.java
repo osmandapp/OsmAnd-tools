@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
@@ -19,9 +18,6 @@ import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
-
-import net.osmand.server.TelegramBotManager;
-import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,6 +34,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+
+import net.osmand.server.TelegramBotManager;
+import net.osmand.util.Algorithms;
 
 @Component
 public class OsmAndServerMonitorTasks {
@@ -75,6 +74,10 @@ public class OsmAndServerMonitorTasks {
 	private static final SimpleDateFormat TIME_FORMAT_UTC = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 	static {
 		TIME_FORMAT_UTC.setTimeZone(TimeZone.getTimeZone("UTC"));
+	}
+	private static final SimpleDateFormat TIMESTAMP_FORMAT_OPR = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
+	static {
+		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 	
 
@@ -367,7 +370,9 @@ public class OsmAndServerMonitorTasks {
 			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/renderd.stats").openStream());
 			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
-			res += "\nTile DB: " + date;
+			long t = TIMESTAMP_FORMAT_OPR.parse(date.toString()).getTime();
+			float h = (float) ((System.currentTimeMillis() - t) / (60 * 60 * 1000.0));
+			res += String.format("\n<b>Tile Postgis Time</b>: %.1f h ago ", h); 
 			return res;
 		} catch (Exception e) {
 			return "Error: " + e.getMessage();
@@ -390,19 +395,19 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String prepareRenderdResult(String res) {
-		String result = "\nTile queue: ";
+		String result = "\n<b>Tile queue</b>: ";
 		String[] lns = res.split("\n");
 		for (String ln : lns) {
 			if (ln.startsWith("ReqQueueLength:")) {
-				result = addToResult("Q", result, "ReqQueueLength:", ln);
+				result = addToResult("Queue", result, "ReqQueueLength:", ln);
 			} else if (ln.startsWith("ReqPrioQueueLength:")) {
-				result = addToResult("PQ", result, "ReqPrioQueueLength:", ln);
+				result = addToResult("Priority", result, "ReqPrioQueueLength:", ln);
 			} else if (ln.startsWith("ReqLowQueueLength:")) {
-				result = addToResult("LQ", result, "ReqLowQueueLength:", ln);
+				result = addToResult("Low", result, "ReqLowQueueLength:", ln);
 			} else if (ln.startsWith("ReqBulkQueueLength:")) {
-				result = addToResult("BQ", result, "ReqBulkQueueLength:", ln);
+				result = addToResult("Bulk", result, "ReqBulkQueueLength:", ln);
 			} else if (ln.startsWith("DirtQueueLength:")) {
-				result = addToResult("DQ", result, "DirtQueueLength:", ln);
+				result = addToResult("Ddirty", result, "DirtQueueLength:", ln);
 			}
 		}
 		return result;
@@ -523,7 +528,36 @@ public class OsmAndServerMonitorTasks {
 			msg += r.fullString() + "\n";
 		}
 		msg += getTileServerMessage();
+		msg += getOpenPlaceReviewsMessage();
 		return msg;
+	}
+
+	private String getOpenPlaceReviewsMessage() {
+		return String.format("\n<a href='https://openplacereviews.org/api/admin'>OpenPlaceReviews</a>: "
+				+ "<b>%s</b> (test %s).", getOprSyncStatus("openplacereviews.org"),  getOprSyncStatus("test.openplacereviews.org"));
+	}
+
+	private String getOprSyncStatus(String url) {
+		long minTimestamp = 0;
+		try {
+			JSONObject object = new JSONObject(new JSONTokener(
+					new URL("https://" + url + "/api/objects-by-id?type=sys.bot&key=osm-sync").openStream()));
+			JSONArray jsonArray = object.getJSONArray("objects");
+			if (jsonArray.length() > 0) {
+				JSONObject osmTags = jsonArray.getJSONObject(0).getJSONObject("bot-state").getJSONObject("osm-tags");
+				for (String key : osmTags.keySet()) {
+					String dt = osmTags.getJSONObject(key).getString("date");
+					long tm = TIMESTAMP_FORMAT_OPR.parse(dt).getTime();
+					if (minTimestamp == 0 || minTimestamp > tm) {
+						minTimestamp = tm;
+					}
+				}
+			}
+			float h = (float) ((System.currentTimeMillis() - minTimestamp) / (60 * 60 * 1000.0));
+			return minTimestamp == 0 ? "failed" : String.format(" %.1f h ago", h);
+		} catch (Exception e) {
+			return "Error: " + e.getMessage();
+		}
 	}
 
 	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
