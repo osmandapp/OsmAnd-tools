@@ -375,6 +375,7 @@ public class OsmAndServerMonitorTasks {
 			res += String.format("\n<b>Tile Postgis Time</b>: %.1f h ago ", h); 
 			return res;
 		} catch (Exception e) {
+			LOG.warn(e.getMessage(), e);
 			return "Error: " + e.getMessage();
 		}
 	}
@@ -556,6 +557,7 @@ public class OsmAndServerMonitorTasks {
 			float h = (float) ((System.currentTimeMillis() - minTimestamp) / (60 * 60 * 1000.0));
 			return minTimestamp == 0 ? "failed" : String.format(" %.1f h ago", h);
 		} catch (Exception e) {
+			LOG.warn(e.getMessage(), e);
 			return "Error: " + e.getMessage();
 		}
 	}
