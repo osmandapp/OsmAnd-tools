@@ -371,8 +371,7 @@ public class OsmAndServerMonitorTasks {
 			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			long t = TIMESTAMP_FORMAT_OPR.parse(date.toString()).getTime();
-			float h = (float) ((System.currentTimeMillis() - t) / (60 * 60 * 1000.0));
-			res += String.format("\n<b>Tile Postgis Time</b>: %.1f h ago ", h); 
+			res += String.format("\n<b>Tile Postgis Time</b>: %s", timeAgo(t)); 
 			return res;
 		} catch (Exception e) {
 			LOG.warn(e.getMessage(), e);
@@ -554,12 +553,18 @@ public class OsmAndServerMonitorTasks {
 					}
 				}
 			}
-			float h = (float) ((System.currentTimeMillis() - minTimestamp) / (60 * 60 * 1000.0));
-			return minTimestamp == 0 ? "failed" : String.format(" %.1f h ago", h);
+			return minTimestamp == 0 ? "failed" : timeAgo(minTimestamp);
 		} catch (Exception e) {
 			LOG.warn(e.getMessage(), e);
 			return "Error: " + e.getMessage();
 		}
+	}
+
+	private String timeAgo(long tm) {
+		float hr = (float) ((System.currentTimeMillis() - tm) / (60 * 60 * 1000.0));
+		int h = (int) hr;
+		int m = (int) ((hr * 60) - 60 * h);
+		return String.format("%d:%d ago", h, m);
 	}
 
 	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
