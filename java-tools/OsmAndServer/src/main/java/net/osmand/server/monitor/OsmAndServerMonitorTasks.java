@@ -371,7 +371,7 @@ public class OsmAndServerMonitorTasks {
 			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			long t = TIMESTAMP_FORMAT_OPR.parse(date.toString()).getTime();
-			res += String.format("\n<b>Tile Postgis Time</b>: %s", timeAgo(t)); 
+			res += String.format("\n<a href='https://tile.osmand.net:8080/'>Tile Postgis DB</a>: %s", timeAgo(t)); 
 			return res;
 		} catch (Exception e) {
 			LOG.warn(e.getMessage(), e);
@@ -533,8 +533,9 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getOpenPlaceReviewsMessage() {
-		return String.format("\n<a href='https://openplacereviews.org/api/admin'>OpenPlaceReviews</a>: "
-				+ "<b>%s</b> (test %s).", getOprSyncStatus("openplacereviews.org"),  getOprSyncStatus("test.openplacereviews.org"));
+		return String.format("\n<a href='https://r2.openplacereviews.org:890'>OpenPlaceReviews</a>: "
+				+ "<a href='https://openplacereviews.org/api/admin'>%s</a> (test <a href='https://test.openplacereviews.org/api/admin'>%s</a>).", 
+				getOprSyncStatus("openplacereviews.org"),  getOprSyncStatus("test.openplacereviews.org"));
 	}
 
 	private String getOprSyncStatus(String url) {
