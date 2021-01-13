@@ -263,7 +263,7 @@ public class DownloadOsmGPX {
 			ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(gpxInfo.timestamp.getTime());
-			ctx.writeTrack(gpxInfo, null, gpxFile, analysis);
+			ctx.writeTrack(gpxInfo, null, gpxFile, analysis, "OG");
 		}
 		ctx.endDocument();
 		

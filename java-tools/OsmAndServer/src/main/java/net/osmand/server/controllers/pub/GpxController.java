@@ -135,7 +135,7 @@ public class GpxController {
 		for (File gf : ctx.files) {
 			GPXFile f = GPXUtilities.loadGPXFile(gf);
 			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
-			writeCtx.writeTrack(null, null, f, analysis);
+			writeCtx.writeTrack(null, null, f, analysis, "GPX");
 		}
 		writeCtx.endDocument();
 
