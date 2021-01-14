@@ -897,12 +897,8 @@ public class WikiDatabasePreparation {
 							}
 							selectPrep.clearParameters();
 							if (wikiId != 0 ) {
-								String text = removeMacroBlocks(ctext.toString(), new HashMap<>(),
-										lang, null);
-								final HTMLConverter converter = new HTMLConverter(false);
-								CustomWikiModel wikiModel = new CustomWikiModel("http://"+lang+".wikipedia.org/wiki/${image}", "http://"+lang+".wikipedia.org/wiki/${title}", true);
-								String plainStr = wikiModel.render(converter, text);
-								plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>").replaceAll("<p>/div\n</p>", "</div>");
+								String contentText = ctext.toString();
+								String plainStr = generateHtmlArticle(contentText, lang);
 								if (++counter % ARTICLES_BATCH == 0) {
 									log.info("Article accepted " + cid + " " + title.toString());
 								}
@@ -929,9 +925,20 @@ public class WikiDatabasePreparation {
 				throw new SAXException(e);
 			}
 		}
-
-
 	}
+	
+	private static String generateHtmlArticle(String contentText, String lang) throws IOException, SQLException {
+		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
+		final HTMLConverter converter = new HTMLConverter(false);
+		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
+				"http://" + lang + ".wikipedia.org/wiki/${title}", true);
+		String plainStr = wikiModel.render(converter, text);
+		plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
+				.replaceAll("<p>/div\n</p>", "</div>");
+		return plainStr;
+	}
+
+
 
 	/**
 	 * Gets distance in meters
