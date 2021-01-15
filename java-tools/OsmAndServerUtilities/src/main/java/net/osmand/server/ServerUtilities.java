@@ -31,7 +31,9 @@ public class ServerUtilities {
 		} else if (utl.equals("download-osm-gpx")) {
 			DownloadOsmGPX.main(subArgsArray);
 		} else if (utl.equals("generate-translations")) {
-			GenerateYMLFromAndroidTranslations.convertTranslationsToYml(subArgsArray[0]);
+			GenerateYMLFromAndroidTranslations.convertAndroidTranslationsToYml(subArgsArray[0]);
+		} else if (utl.equals("generate-ios-translations")) {
+			GenerateYMLFromAndroidTranslations.convertIosTranslationsToYml(subArgsArray[0]);
 		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
 		} else {
