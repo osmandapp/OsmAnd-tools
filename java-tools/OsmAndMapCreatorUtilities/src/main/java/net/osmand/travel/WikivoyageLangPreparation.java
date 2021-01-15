@@ -88,6 +88,8 @@ public class WikivoyageLangPreparation {
 		REGION_LIST("regionlist"), 
 		WARNING("warningbox"),
 		CITATION("citation"),
+		IATA ("iata"),
+		STATION ("station"),
 		METRIC_DATA("metric");
 
 		private String type;

@@ -65,7 +65,7 @@ import com.google.gson.JsonObject;
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
 
-	private static final Set<String> unitsOfDistance = new HashSet<>(Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi"));
+	private static final Set<String> unitsOfDistance = new HashSet<>(Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi", "m2"));
 	
 	public static class LatLon {
 		private final double longitude;
@@ -140,6 +140,10 @@ public class WikiDatabasePreparation {
 					appendWarning(bld, val);
 				} else if (key.equals(WikivoyageTemplates.CITATION.getType())) {
 					parseAndAppendCitation(val, bld);
+				} else if (key.equals(WikivoyageTemplates.IATA.getType())) {
+					parseAndAppendIATA(val, bld);
+				} else if (key.equals(WikivoyageTemplates.STATION.getType())) {
+					parseAndAppendStation(val, bld);
 				} else if (key.equals(WikivoyageTemplates.METRIC_DATA.getType())) {
 					parseAndAppendMetricData(val, bld);
 				}
@@ -364,6 +368,27 @@ public class WikiDatabasePreparation {
 			bld.append("[").append(url).append("]");
 		}
 	}
+	
+	private static void parseAndAppendIATA(String ref, StringBuilder bld) {
+		String[] parts = ref.split("\\|");
+		if (parts.length > 1) {
+			bld.append(parts[1]);
+		}
+	}
+	
+	private static void parseAndAppendStation(String ref, StringBuilder bld) {
+		String[] parts = ref.split("\\|");
+		String[] stations = Arrays.copyOfRange(parts, 2, parts.length);
+		
+		if(stations.length>0) {
+			String st = "|";
+			for (String station : stations) {
+				st = st + station + "|";
+			}
+			bld.append(parts[0]).append(" ").append(parts[1]).append(" ").append(st);
+		} else
+		bld.append(parts[0]).append(" ").append(parts[1]);
+	}
 
 	private static int calculateHeaderLevel(String s, int index) {
 		int res = 0;
@@ -574,6 +599,10 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.WARNING.getType();
 		} else if (str.startsWith("cite")) {
 			return WikivoyageTemplates.CITATION.getType();
+		} else if (str.startsWith("iata")) {
+			return WikivoyageTemplates.IATA.getType();
+		} else if (str.startsWith("station") || str.startsWith("rint")) {
+			return WikivoyageTemplates.STATION.getType();
 		} else {
 			Set<String> parts = new HashSet<>(Arrays.asList(str.split("\\|")));
 			if (parts.contains("convert") || parts.contains("unité")) {
