@@ -73,17 +73,19 @@ public class GenerateYMLFromAndroidTranslations {
 	private static void parseText(File f, OutputStream out) throws XmlPullParserException, IOException {
 		BufferedReader br = new BufferedReader(new FileReader(f));
 		String line = "";
-		while((line += br.readLine())!= null) {
-			line = line.trim();
-			int eq = line.indexOf('=');
-			if (line.endsWith(";") && line.startsWith("\"") && eq != -1) {
-				String keyRaw = line.substring(0, eq);
-				String valueRaw = line.substring(eq + 1);
+		String oline = "";
+		while ((line = br.readLine()) != null) {
+			oline += line.trim();;
+			if (oline.endsWith(";")) {
+				int eq = oline.indexOf('=');
+				String keyRaw = oline.substring(0, eq);
+				String valueRaw = oline.substring(eq + 1);
 				String key = keyRaw.substring(keyRaw.indexOf('\"') + 1, keyRaw.lastIndexOf('\"'));
 				StringBuilder vl = new StringBuilder(valueRaw.substring(valueRaw.indexOf('\"') + 1, valueRaw.lastIndexOf('\"')));
 				out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
+				oline = "";
 			} else {
-				line = "\n";
+				oline += "\n";
 			}
 		}
 		br.close();
