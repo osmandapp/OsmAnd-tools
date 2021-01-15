@@ -1,10 +1,12 @@
 package net.osmand.server.utilities;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -19,11 +21,13 @@ import net.osmand.PlatformUtil;
 public class GenerateYMLFromAndroidTranslations {
 
 	public static void main(String[] args) throws XmlPullParserException, IOException {
-		String path = "../../../android/OsmAnd/res/";
-		convertTranslationsToYml(path);
+		convertAndroidTranslationsToYml("../../../android/OsmAnd/res/");
+		convertIosTranslationsToYml("../../../ios/Resources/");
 	}
+	
+	
 
-	public static void convertTranslationsToYml(String path)
+	public static void convertAndroidTranslationsToYml(String path)
 			throws FileNotFoundException, XmlPullParserException, IOException {
 		File fs = new File(path);
 		File outDir = new File("yml-translations");
@@ -32,19 +36,62 @@ public class GenerateYMLFromAndroidTranslations {
 			File str = new File(f, "strings.xml");
 			if (str.exists() && f.getName().startsWith("values")) {
 				FileOutputStream output = new FileOutputStream(new File(outDir, "android-" + f.getName() + ".yml"));
-				parse(str, output);
+				parseXml(str, output);
 				output.close();
 			}
 			File phr = new File(f, "phrases.xml");
 			if (phr.exists()) {
 				FileOutputStream output = new FileOutputStream(new File(outDir, "phrases-" + f.getName() + ".yml"));
-				parse(phr, output);
+				parseXml(phr, output);
 				output.close();
 			}
 		}
 	}
+	
+	public static void convertIosTranslationsToYml(String path)
+			throws FileNotFoundException, XmlPullParserException, IOException {
+		File fs = new File(path);
+		File outDir = new File("yml-translations");
+		outDir.mkdir();
+		for (File f : fs.listFiles()) {
+			File str = new File(f, "Localizable.strings");
+			if (str.exists() && f.getName().endsWith(".lproj")) {
+				String loc = f.getName().substring(0, f.getName().indexOf('.'));
+				if (loc.equals("en")) {
+					loc = "";
+				} else {
+					loc = "-" + loc;
+				}
+				FileOutputStream output = new FileOutputStream(new File(outDir, "ios-values" + loc + ".yml"));
+				parseText(str, output);
+				output.close();
+			}
+		}
+	}
+	
 
-	private static void parse(File f, OutputStream out) throws XmlPullParserException, IOException {
+	private static void parseText(File f, OutputStream out) throws XmlPullParserException, IOException {
+		BufferedReader br = new BufferedReader(new FileReader(f));
+		String line = "";
+		while((line += br.readLine())!= null) {
+			line = line.trim();
+			int eq = line.indexOf('=');
+			if (line.endsWith(";") && line.startsWith("\"") && eq != -1) {
+				String keyRaw = line.substring(0, eq);
+				String valueRaw = line.substring(eq + 1);
+				String key = keyRaw.substring(keyRaw.indexOf('\"') + 1, keyRaw.lastIndexOf('\"'));
+				StringBuilder vl = new StringBuilder(valueRaw.substring(valueRaw.indexOf('\"') + 1, valueRaw.lastIndexOf('\"')));
+				out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
+			} else {
+				line = "\n";
+			}
+		}
+		br.close();
+	}
+	
+
+
+	private static void parseXml(File f, OutputStream out) throws XmlPullParserException, IOException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		FileInputStream fis = new FileInputStream(f);
 		parser.setInput(getUTF8Reader(fis));
@@ -70,6 +117,7 @@ public class GenerateYMLFromAndroidTranslations {
 		}
 		fis.close();
 	}
+	
 
 	private static String processLine(StringBuilder vl) {
 		for (int i = 1; i < vl.length(); i++) {
