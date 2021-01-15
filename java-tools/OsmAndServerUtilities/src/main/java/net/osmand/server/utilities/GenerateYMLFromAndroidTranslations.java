@@ -131,6 +131,9 @@ public class GenerateYMLFromAndroidTranslations {
 
 	private static String processLine(StringBuilder vl) {
 		for (int i = 1; i < vl.length(); i++) {
+			if (vl.charAt(i) == '“') {
+				vl.setCharAt(i, '"');
+			}
 			if (vl.charAt(i) == '"' && vl.charAt(i - 1) != '\\') {
 				vl.insert(i, '\\');
 			} else if (vl.charAt(i) == '\'' && vl.charAt(i - 1) == '\\') {
