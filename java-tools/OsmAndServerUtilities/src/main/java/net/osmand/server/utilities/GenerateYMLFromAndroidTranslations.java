@@ -12,6 +12,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -71,18 +75,22 @@ public class GenerateYMLFromAndroidTranslations {
 	
 
 	private static void parseText(File f, OutputStream out) throws XmlPullParserException, IOException {
-		BufferedReader br = new BufferedReader(new FileReader(f));
+		BufferedReader br = new BufferedReader(new FileReader(f, StandardCharsets.UTF_8));
 		String line = "";
 		String oline = "";
+		Set<String> uniqueKeys = new TreeSet<>();
 		while ((line = br.readLine()) != null) {
-			oline += line.trim();;
+			oline += line.trim();
 			if (oline.endsWith(";")) {
 				int eq = oline.indexOf('=');
 				String keyRaw = oline.substring(0, eq);
 				String valueRaw = oline.substring(eq + 1);
 				String key = keyRaw.substring(keyRaw.indexOf('\"') + 1, keyRaw.lastIndexOf('\"'));
-				StringBuilder vl = new StringBuilder(valueRaw.substring(valueRaw.indexOf('\"') + 1, valueRaw.lastIndexOf('\"')));
-				out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
+				if (!uniqueKeys.contains(key)) {
+					uniqueKeys.add(key);
+					StringBuilder vl = new StringBuilder(valueRaw.substring(valueRaw.indexOf('\"') + 1, valueRaw.lastIndexOf('\"')));
+					out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
+				}
 				oline = "";
 			} else {
 				oline += "\n";
