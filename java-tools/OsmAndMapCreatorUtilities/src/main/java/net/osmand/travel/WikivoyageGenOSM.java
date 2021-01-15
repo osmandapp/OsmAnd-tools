@@ -79,13 +79,14 @@ public class WikivoyageGenOSM {
 		List<GPXFile> points = new ArrayList<>();
 		List<String> imageTitles = new ArrayList<>();
 		List<String> partsOf = new ArrayList<>();
+		List<String> parentOf = new ArrayList<>();
 		List<String> aggrPartsOf = new ArrayList<>();
 		List<String> jsonContents = new ArrayList<>();
-		
-		public void addArticle(String lang, String title, GPXFile gpxFile, double lat, double lon, 
-				String content, String imageTitle, String partOf, String aggrPartOf, String jsonContent) {
+
+		public void addArticle(String lang, String title, GPXFile gpxFile, double lat, double lon, String content,
+							   String imageTitle, String partOf, String isParentOf, String aggrPartOf, String jsonContent) {
 			int ind = size();
-			if(lang.equals("en")) {
+			if (lang.equals("en")) {
 				ind = 0;
 			}
 			points.add(ind, gpxFile);
@@ -99,9 +100,9 @@ public class WikivoyageGenOSM {
 			contents.add(ind, content);
 			imageTitles.add(ind, imageTitle);
 			partsOf.add(ind, partOf);
+			parentOf.add(isParentOf);
 			aggrPartsOf.add(ind, aggrPartOf);
 			jsonContents.add(jsonContent);
-			
 		}
 		
 		public void clear() {
@@ -113,6 +114,7 @@ public class WikivoyageGenOSM {
 			imageTitles.clear();
 			partsOf.clear();
 			aggrPartsOf.clear();
+			parentOf.clear();
 			jsonContents.clear();
 		}
 
@@ -151,7 +153,7 @@ public class WikivoyageGenOSM {
 		// travel_articles: 	
 		// 						population, country, region, city_type, osm_i,
 		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, "
-				+ "gpx_gz, image_title, is_part_of, aggregated_part_of, contents_json from travel_articles order by trip_id asc");
+				+ "gpx_gz, image_title, is_part_of, is_parent_of, aggregated_part_of, contents_json from travel_articles order by trip_id asc");
 		int count = 0, totalArticles = 0, emptyLocation = 0, emptyContent = 0;
 		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
 		XmlSerializer serializer = null;
@@ -190,9 +192,11 @@ public class WikivoyageGenOSM {
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(bytesStream);
 			String imageTitle = rs.getString(rind++);
 			String isPartOf = rs.getString(rind++);
+			String isParentOf = rs.getString(rind++);
 			String isAggrPartOf = rs.getString(rind++);
-			String contentJson = rs.getString(rind++);
-			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle, isPartOf, isAggrPartOf, contentJson);
+			String contentJson = rs.getString(rind);
+			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle, isPartOf, isParentOf,
+					isAggrPartOf, contentJson);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
 				if (lat == 0 && lon == 0) {
 					emptyLocation++;
@@ -337,16 +341,13 @@ public class WikivoyageGenOSM {
 		for (int it = 0; it < article.langs.size(); it++) {
 			String lng = article.langs.get(it);
 			String title = article.titles.get(it);
-			String imgTitle = article.imageTitles.get(it);
-			String partOf = article.partsOf.get(it);
-			String aggrPartOf = article.aggrPartsOf.get(it);
-			String contentJson = article.jsonContents.get(it);
 			tagValue(serializer, "route_name:" + lng, title);
 			tagValue(serializer, "name:" + lng, title);
-			tagValue(serializer, "image_title:" + lng, imgTitle);
-			tagValue(serializer, "is_part:" + lng, partOf);
-			tagValue(serializer, "is_aggr_part:" + lng, aggrPartOf);
-			tagValue(serializer, "content_json:" + lng, contentJson);
+			tagValue(serializer, "image_title:" + lng, article.imageTitles.get(it));
+			tagValue(serializer, "is_part:" + lng, article.partsOf.get(it));
+			tagValue(serializer, "is_aggr_part:" + lng, article.aggrPartsOf.get(it));
+			tagValue(serializer, "is_parent_of:" + lng, article.parentOf.get(it));
+			tagValue(serializer, "content_json:" + lng, article.jsonContents.get(it));
 			if (addDescription) {
 				tagValue(serializer, "description:" + lng, article.contents.get(it));
 			}
