@@ -362,12 +362,12 @@ public class ReportsController {
 					rep.walletEstFee, rep.balance.defaultFee);
 			return res;
 		}
-//		if (rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
-//			res.validationError = String.format(
-//					"Last wallet tx '%s' is not equal to the last transaction in report '%s', update transactions.json and rerun report.",
-//					rep.walletLasttx, rep.txs.get(0).transactions.get(0));
-//			return res;
-//		}
+		if (rep.txs.size() > 0 && !rep.txs.get(0).transactions.get(0).equals(rep.walletLasttx)) {
+			res.validationError = String.format(
+					"Last wallet tx '%s' is not equal to the last transaction in report '%s', update transactions.json and rerun report.",
+					rep.walletLasttx, rep.txs.get(0).transactions.get(0));
+			return res;
+		}
 		if (batchSize < 50) {
 			res.validationError = "Don't use batch size less than 50";
 			return res;
