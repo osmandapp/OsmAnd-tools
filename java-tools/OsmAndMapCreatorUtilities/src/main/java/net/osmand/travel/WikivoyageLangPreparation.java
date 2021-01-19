@@ -1,10 +1,12 @@
 package net.osmand.travel;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -51,6 +53,8 @@ public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
 	private static boolean uncompressed;
 	
+	private static final boolean DEBUG = false;
+	
 	public enum WikivoyageOSMTags {
 		TAG_WIKIDATA ("wikidata"),
 		TAG_WIKIPEDIA ("wikipedia"),
@@ -88,9 +92,10 @@ public class WikivoyageLangPreparation {
 		REGION_LIST("regionlist"), 
 		WARNING("warningbox"),
 		CITATION("citation"),
-		IATA ("iata"),
+		TWO_PART ("two"),
 		STATION ("station"),
-		METRIC_DATA("metric");
+		METRIC_DATA("metric"),
+		TRANSLATION("translation");
 
 		private String type;
 		WikivoyageTemplates(String s) {
@@ -105,6 +110,7 @@ public class WikivoyageLangPreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException {
 		String lang = "";
 		String folder = "";
+		
 		if (args.length > 0) {
 			lang = args[0];
 		}
@@ -352,6 +358,15 @@ public class WikivoyageLangPreparation {
 						String plainStr = wikiModel.render(converter, text);
 						plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
 								.replaceAll("<p>/div\n</p>", "</div>");
+						
+						if (DEBUG) {
+							String savePath = "/Users/plotva/Documents";
+							File myFile = new File(savePath, "page.html");
+							BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
+							htmlFileWriter.write(plainStr);
+							htmlFileWriter.close();
+						}
+						
 						// prep.setString(column++, Encoder.encodeUrl(title.toString()));
 						prep.setString(column++, title.toString());
 						prep.setBytes(column++, stringToCompressedByteArray(bous, plainStr));

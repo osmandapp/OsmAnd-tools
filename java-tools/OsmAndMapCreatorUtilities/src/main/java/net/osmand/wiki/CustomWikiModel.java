@@ -94,7 +94,11 @@ public class CustomWikiModel extends WikiModel {
 		String imageSrc = getThumbUrl(imageName);
 		if (imageSrc.isEmpty()) {
 			return;
-		}	
+		}
+		if (imageSrc.endsWith(".svg")) {
+			imageSrc += ".png";
+		}
+		
 		String type = imageFormat.getType();
 		TagToken tag = null;
 		if ("thumb".equals(type) || "frame".equals(type)) {
@@ -104,7 +108,19 @@ public class CustomWikiModel extends WikiModel {
 			reduceTokenStack(Configuration.HTML_DIV_OPEN);
 		}
 		imageFormat.setType("thumbnail");
-		imageFormat.setWidth(-1);
+		
+		String[] parts = rawImageLink.split("\\|");
+
+		for (String part : parts) {
+			if (part.contains("px")) {
+				imageFormat.setSize(part);
+			}
+		}
+
+		if (imageFormat.getWidth() == 0) {
+			imageFormat.setWidth(-1);
+		}
+
 		appendInternalImageLink(imageHref, imageSrc, imageFormat);
 		if (tag instanceof PTag) {
 			pushNode(new PTag());
