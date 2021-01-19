@@ -5,11 +5,13 @@ import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -128,9 +130,7 @@ public class WikiDatabasePreparation {
 					bld.append(parseGalleryString(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
-				} else if (val.toLowerCase().startsWith("lang-")) {
-					parseAndAppendLangSpelling(val, bld);
-				}
+				}  
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
 					bld.append(parseListing(val, wikidata, lang));
@@ -140,13 +140,15 @@ public class WikiDatabasePreparation {
 					appendWarning(bld, val);
 				} else if (key.equals(WikivoyageTemplates.CITATION.getType())) {
 					parseAndAppendCitation(val, bld);
-				} else if (key.equals(WikivoyageTemplates.IATA.getType())) {
-					parseAndAppendIATA(val, bld);
+				} else if (key.equals(WikivoyageTemplates.TWO_PART.getType())) {
+					parseAndAppendTwoPartFormat(val, bld);
 				} else if (key.equals(WikivoyageTemplates.STATION.getType())) {
 					parseAndAppendStation(val, bld);
 				} else if (key.equals(WikivoyageTemplates.METRIC_DATA.getType())) {
 					parseAndAppendMetricData(val, bld);
-				}
+				} else if (key.equals(WikivoyageTemplates.TRANSLATION.getType())) {
+					parseAndAppendTranslation(val, bld);
+				} 	
 				if (!key.isEmpty() && blockResults != null) {
 					if (key.contains("|")) {
 						for (String str : key.split("\\|")) {
@@ -155,6 +157,9 @@ public class WikiDatabasePreparation {
 					} else {
 						addToMap(blockResults, key, val);
 					}
+				}
+				if (text.charAt(i + 1) != ' ' && text.charAt(i) != '}') {
+					i--;
 				}
 				i++;
 			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'r' && text.charAt(i + 2) == 'e'
@@ -212,14 +217,7 @@ public class WikiDatabasePreparation {
 		bld.append(parseGalleryString(val));
 		return --endInd;
 	}
-
-	private static void parseAndAppendLangSpelling(String val, StringBuilder bld) {
-		String[] parts = val.split("\\|");
-		if (parts.length > 1) {
-			bld.append(parts[1]);
-		}
-	}
-
+	
 	private static void parseAndAppendWeatherTable(String val, StringBuilder bld) {
 		String[] parts = val.split("\\|");
 		Map<String, String> headerMappings = new HashMap<>();
@@ -369,8 +367,8 @@ public class WikiDatabasePreparation {
 		}
 	}
 	
-	private static void parseAndAppendIATA(String ref, StringBuilder bld) {
-		String[] parts = ref.split("\\|");
+	private static void parseAndAppendTwoPartFormat(String ref, StringBuilder bld) {
+		String[] parts = ref.split("\\|+|:");
 		if (parts.length > 1) {
 			bld.append(parts[1]);
 		}
@@ -379,17 +377,31 @@ public class WikiDatabasePreparation {
 	private static void parseAndAppendStation(String ref, StringBuilder bld) {
 		String[] parts = ref.split("\\|");
 		String[] stations = Arrays.copyOfRange(parts, 2, parts.length);
-		
-		if(stations.length>0) {
+
+		if (stations.length > 0) {
 			String st = "|";
 			for (String station : stations) {
 				st = st + station + "|";
 			}
 			bld.append(parts[0]).append(" ").append(parts[1]).append(" ").append(st);
 		} else
-		bld.append(parts[0]).append(" ").append(parts[1]);
+			bld.append(parts[0]).append(" ").append(parts[1]);
 	}
-
+	
+	private static void parseAndAppendTranslation(String ref, StringBuilder bld) {
+		String[] parts = ref.split("\\|");
+		String lang = "";
+		for (String part : parts) {
+			if (part.startsWith("lang-")) {
+				lang = part.split("-")[1] + " = ";
+			}
+		}
+		if (!lang.isEmpty()) {
+			bld.append(lang).append(parts[1]);
+		} else
+			bld.append("[").append(parts[1]).append("]");
+	}
+	
 	private static int calculateHeaderLevel(String s, int index) {
 		int res = 0;
 		while (index < s.length() - 1 && s.charAt(index) == '=') {
@@ -546,7 +558,7 @@ public class WikiDatabasePreparation {
 		if (lat != null && lon != null) {
 			bld.append(" geo:").append(lat).append(",").append(lon);
 		}
-		return bld.toString() + "\n";
+		return bld.toString();
 	}
 	
 
@@ -574,7 +586,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("istinkat")  || str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی")) {
 			return WikivoyageTemplates.PART_OF.getType();
-		} else if (str.startsWith("do") || str.startsWith("see") 
+		} else if (str.startsWith("do") || str.startsWith("see")
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
 				|| str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("se loger") 
@@ -583,7 +595,8 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("coma") || str.startsWith("אוכל") || str.startsWith("שתייה") 
 				|| str.startsWith("לינה") || str.startsWith("מוקדי") || str.startsWith("רשימה")
 				|| str.startsWith("marker") || str.startsWith("خوابیدن") || str.startsWith("دیدن")
-				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")) {
+				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")
+				|| str.startsWith("event")) {
 			return WikivoyageTemplates.POI.getType();
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
@@ -599,10 +612,12 @@ public class WikiDatabasePreparation {
 			return WikivoyageTemplates.WARNING.getType();
 		} else if (str.startsWith("cite")) {
 			return WikivoyageTemplates.CITATION.getType();
-		} else if (str.startsWith("iata")) {
-			return WikivoyageTemplates.IATA.getType();
+		} else if (str.startsWith("iata")|| str.startsWith("formatnum")) {
+			return WikivoyageTemplates.TWO_PART.getType();
 		} else if (str.startsWith("station") || str.startsWith("rint")) {
 			return WikivoyageTemplates.STATION.getType();
+		} else if (str.startsWith("ipa") || str.startsWith("lang-")) {
+			return WikivoyageTemplates.TRANSLATION.getType();
 		} else {
 			Set<String> parts = new HashSet<>(Arrays.asList(str.split("\\|")));
 			if (parts.contains("convert") || parts.contains("unité")) {
@@ -628,7 +643,14 @@ public class WikiDatabasePreparation {
 			content += s;
 		}
 		br.close();
-		content = removeMacroBlocks(content, null, "en", null);
+		//content = removeMacroBlocks(content, null, "en", null);
+		//for testing file.html after removeMacroBlocks and generating new file.html
+		content = generateHtmlArticle(content,"en");
+		String savePath = "/Users/plotva/Documents";
+		File myFile = new File(savePath, "page.html");
+		BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
+		htmlFileWriter.write(content);
+        htmlFileWriter.close();
 		
 		XDOM xdom = parser.parse(new StringReader(content));
 		        
