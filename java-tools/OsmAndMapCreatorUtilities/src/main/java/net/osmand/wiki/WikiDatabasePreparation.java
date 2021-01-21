@@ -391,15 +391,17 @@ public class WikiDatabasePreparation {
 	private static void parseAndAppendTranslation(String ref, StringBuilder bld) {
 		String[] parts = ref.split("\\|");
 		String lang = "";
-		for (String part : parts) {
-			if (part.startsWith("lang-")) {
-				lang = part.split("-")[1] + " = ";
+		if (parts.length > 1) {
+			for (String part : parts) {
+				if (part.startsWith("lang-")) {
+					lang = part.split("-")[1] + " = ";
+				}
 			}
+			if (!lang.isEmpty()) {
+				bld.append(lang).append(parts[1]);
+			} else
+				bld.append("[").append(parts[1]).append("]");
 		}
-		if (!lang.isEmpty()) {
-			bld.append(lang).append(parts[1]);
-		} else
-			bld.append("[").append(parts[1]).append("]");
 	}
 	
 	private static int calculateHeaderLevel(String s, int index) {
