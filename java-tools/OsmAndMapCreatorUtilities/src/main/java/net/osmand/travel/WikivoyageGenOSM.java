@@ -100,7 +100,7 @@ public class WikivoyageGenOSM {
 			contents.add(ind, content);
 			imageTitles.add(ind, imageTitle);
 			partsOf.add(ind, partOf);
-			parentOf.add(isParentOf);
+			parentOf.add(ind, isParentOf);
 			aggrPartsOf.add(ind, aggrPartOf);
 			jsonContents.add(jsonContent);
 		}
