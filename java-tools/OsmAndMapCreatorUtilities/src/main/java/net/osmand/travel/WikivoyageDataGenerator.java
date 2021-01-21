@@ -86,10 +86,10 @@ public class WikivoyageDataGenerator {
 		generator.regions = new OsmandRegions();
 		generator.regions.prepareFile();
 		generator.regions.cacheAllCountries();
-		
+
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_banner_title ON travel_articles(banner_title);");
-		
+
 		printStep("Download/Copy proper headers for articles");
 		generator.updateProperHeaderForArticles(conn, workingDir);
 		printStep("Copy headers between lang");
@@ -97,6 +97,8 @@ public class WikivoyageDataGenerator {
 		generator.copyImagesBetweenArticles(conn, "banner_title");
 		printStep("Generate agg part of");
 		generator.generateAggPartOf(conn);
+		printStep("Generate is parent of");
+		generator.generateIsParentOf(conn);
 		printStep("Generate search table");
 		generator.generateSearchTable(conn);
 		if (citiesObfFile != null) {
@@ -105,7 +107,7 @@ public class WikivoyageDataGenerator {
 		generator.addCitiesData(citiesObfFile, conn);
 		printStep("Populate popular articles");
 		generator.createPopularArticlesTable(conn);
-		
+
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_banner_title ");
 		conn.close();
@@ -287,6 +289,34 @@ public class WikivoyageDataGenerator {
 		rs.close();
 	}
 
+	public void generateIsParentOf(Connection conn) throws SQLException {
+		try {
+			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN is_parent_of");
+		} catch (Exception e) {
+			System.err.println("Column is_parent_of already exists");
+		}
+		PreparedStatement updateIsParentOf = conn
+				.prepareStatement("UPDATE travel_articles SET is_parent_of = ? WHERE title = ? AND lang = ?");
+		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang FROM travel_articles");
+		ResultSet rs = data.executeQuery();
+		int batch = 0;
+		while (rs.next()) {
+			String title = rs.getString("title");
+			String lang = rs.getString("lang");
+			updateIsParentOf.setString(1, getParentOf(conn, rs.getString("title"), lang));
+			updateIsParentOf.setString(2, title);
+			updateIsParentOf.setString(3, lang);
+			updateIsParentOf.addBatch();
+			if (batch++ > BATCH_SIZE) {
+				updateIsParentOf.executeBatch();
+				batch = 0;
+			}
+		}
+		finishPrep(updateIsParentOf);
+		data.close();
+		rs.close();
+	}
+
 	public void generateSearchTable(Connection conn) throws SQLException {
 		conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
 		conn.createStatement()
@@ -361,6 +391,25 @@ public class WikivoyageDataGenerator {
 		}
 	}
 
+
+	public String getParentOf(Connection conn, String title, String lang) throws SQLException {
+		if (title.isEmpty()) {
+			return "";
+		}
+		StringBuilder res = new StringBuilder();
+		PreparedStatement ps = conn
+				.prepareStatement("SELECT title FROM travel_articles WHERE is_part_of = ? AND lang = '" + lang + "'");
+		ps.setString(1, title);
+		ResultSet rs = ps.executeQuery();
+		String buf = "";
+
+		while (rs.next()) {
+			buf = rs.getString(1);
+			res.append(buf);
+			res.append(';');
+		}
+		return res.length() > 0 ? res.substring(0, res.length() - 1) : "";
+	}
 
 
 	private void addCitiesData(File citiesObf, Connection conn) throws FileNotFoundException, IOException,
