@@ -13,12 +13,10 @@ def filterTags(attrs):
 	if int(height) != 0:
 		if int(height) % 100 == 0:
 			tags.update({'contourtype':'100m'})
-			tags.update({'name':height})
 		elif int(height) % 50 == 0:
 			tags.update({'contourtype':'50m'})
 		elif int(height) % 20 == 0:
 			tags.update({'contourtype':'20m'})
 		elif int(height) % 10 == 0:
 			tags.update({'contourtype':'10m'})
-
 	return tags

@@ -1,8 +1,7 @@
 #!/bin/bash
 # Multithreaded tiff tile to contour (osm) converter for OsmAnd
-# requires "parallel", "lbzip2" and a lot of RAM
+# requires "gdal", "parallel", "lbzip2" and a lot of RAM
 # optional: -p option requires qgis
-# usage: make-contour-tile-mt.sh input-directory output-directory smooth(true/false)
 
 # Load balancing depending on tiff size
 # 128Gb RAM 32 threads:
@@ -11,22 +10,27 @@ threads_number_2=16 # 13M-20M  Max RAM per process: ~10 Gb
 threads_number_3=30 # <14M  Max RAM per process: ~5 Gb
 
 TMP_DIR="/var/tmp"
+isolines_step=10
+translation_script=contours.py
 
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s [true/false] -p [true/false] }"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s [true/false] -p [true/false] -f}"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
+	echo "-f: make contours in feet"
 }
 
-while getopts ":i:o:s:p" opt; do
+while getopts ":i:o:spf" opt; do
   case $opt in
     i) indir="$OPTARG"
     ;;
     o) outdir="$OPTARG"
     ;;
-    s) smooth="$OPTARG"
+    s) smooth=true
     ;;
     p) split_lines=true
+    ;;
+    f) make_feet=true
     ;;
     \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
 	usage
@@ -34,8 +38,20 @@ while getopts ":i:o:s:p" opt; do
   esac
 done
 
-if [[ $smooth != "false" ]] || [[ -z $smooth ]] ; then
-	smooth=true
+# if [[ $smooth != "false" ]] || [[ -z $smooth ]] ; then
+# 	smooth=true
+# fi
+if [[ $make_feet == "true" ]] ; then
+	isolines_step=40
+	translation_script=contours_feet.py
+else
+	make_feet=false
+fi
+if [[ $split_lines != "true" ]] ; then
+	split_lines=false
+fi
+if [[ $smooth != "true" ]]; then
+	smooth=false
 fi
 if [[ -z $indir ]] ; then
 	echo "Input dir not found"
@@ -60,6 +76,8 @@ echo "Input dir:" $indir
 echo "Output dir:" $outdir
 echo "smooth:" $smooth
 echo "split_lines:" $split_lines
+echo "make_feet:" $make_feet
+echo "isolines_step:" $isolines_step
 
 working_dir=$(pwd)
 # thread_number=$3
@@ -70,6 +88,9 @@ export TMP_DIR
 export working_dir
 export smooth
 export split_lines
+export make_feet
+export isolines_step
+export translation_script
 
 process_tiff ()
 {
@@ -80,6 +101,10 @@ process_tiff ()
 		echo "Processing "$1
 		echo "----------------------------------------------"
 		src_tiff=$1
+		if [[ $make_feet == "true" ]] ; then
+			gdal_calc.py -A $1 --outfile=${TMP_DIR}/$filename.tif --calc="A/0.3048"
+			src_tiff=${TMP_DIR}/$filename.tif
+		fi
 		lat=${filename:1:2}
 		smoothed_path=${1%/*}/${filename}_smooth.tif
 		if [[ $smooth == "true" ]] ; then
@@ -92,17 +117,17 @@ process_tiff ()
 				height_mod=$(( $height / 2))
 				width_mod_2=$(( $width ))
 				height_mod_2=$(( $height ))
-				gdalwarp -overwrite -ts $width_mod $height_mod -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $1 $smoothed_path
+				gdalwarp -overwrite -ts $width_mod $height_mod -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
 				gdalwarp -overwrite -ts $width_mod_2 $height_mod_2 -of GTiff -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $smoothed_path ${smoothed_path}_2
 				rm -f $smoothed_path && mv ${smoothed_path}_2 $smoothed_path
 			else
-				gdalwarp -overwrite -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $1 $smoothed_path
+				gdalwarp -overwrite -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
 			fi
 			src_tiff=$smoothed_path
 		fi
 		echo "Extracting shapefile …"
 		if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
-		gdal_contour -i 10 -a height $src_tiff ${TMP_DIR}/$filename.shp
+		gdal_contour -i $isolines_step -a height $src_tiff ${TMP_DIR}/$filename.shp
 		if [ $? -ne 0 ]; then echo $(date)' Error creating shapefile' & exit 4;fi
 		if [[ -f $smoothed_path ]] ; then
 			rm -f $smoothed_path
@@ -120,7 +145,8 @@ process_tiff ()
 		fi
 		echo "Building osm file …"
 		if [[ -f $outdir/$filename.osm ]] ; then rm -f $outdir/$filename.osm ; fi
-		${working_dir}/ogr2osm.py ${TMP_DIR}/$filename.shp -o $outdir/$filename.osm -e 4326 -t contours.py
+		if [[ -f ${TMP_DIR}/$filename.tif ]] ; then rm -f ${TMP_DIR}/$filename.tif ; fi
+		${working_dir}/ogr2osm.py ${TMP_DIR}/$filename.shp -o $outdir/$filename.osm -e 4326 -t $translation_script
 		if [ $? -ne 0 ]; then echo $(date)' Error creating OSM file' & exit 5;fi
 	
 		echo "Compressing to osm.bz2 …"
@@ -132,7 +158,7 @@ process_tiff ()
 }
 export -f process_tiff
 #find "$indir" -maxdepth 1 -type f -name "*.tif" | sort -R | parallel -P 5 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "S*.tif" -size +19M | sort -R | parallel -P $threads_number_1 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "S*.tif" -size +13M -size -20M | sort -R | parallel -P $threads_number_2 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "S*.tif" -size -14M | sort -R | parallel -P $threads_number_3 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel -P $threads_number_1 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel -P $threads_number_2 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel -P $threads_number_3 --no-notice --bar time process_tiff '{}'
 rm -rf $outdir/processing
