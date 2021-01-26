@@ -54,21 +54,21 @@ if [[ $smooth != "true" ]]; then
 	smooth=false
 fi
 if [[ -z $indir ]] ; then
-	echo "Input dir not found"
+	echo "input dir is not defined"
 	usage
 	exit 1
 fi
 if [[ -z $outdir ]] ; then
-	echo "Output dir not found"
+	echo "output dir is not defined"
 	usage
 	exit 1
 fi
 if [ ! -d $indir ]; then
-	echo "input dir not found"
+	echo "input dir is not found"
 	exit 3
 fi
 if [ ! -d $outdir ]; then
-	echo "output directory not found"
+	echo "output dir is not found"
 	exit 3
 fi
 
