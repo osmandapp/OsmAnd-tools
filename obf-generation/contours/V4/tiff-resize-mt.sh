@@ -35,7 +35,6 @@ resize ()
 {
 	filenamefull=$(basename $1)
 	filename=${filenamefull%%.*}
-	echo 111 $outdir/$filename.$ext_in
 	if [ ! -f $outdir/$filename.$ext_in ]; then
 		echo "----------------------------------------------"
 		echo "Processing "$1
@@ -46,4 +45,4 @@ resize ()
 	fi
 }
 export -f resize
-find "$indir" -maxdepth 1 -type f -name "*.$ext_in" | sort | parallel -P $3 --no-notice --bar resize '{}'
+find "$indir" -maxdepth 1 -type f -name "*.$ext_in" | sort | parallel -P $thread_number --no-notice --bar resize '{}'

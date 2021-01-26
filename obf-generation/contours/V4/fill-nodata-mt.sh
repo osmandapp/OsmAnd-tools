@@ -51,4 +51,4 @@ resize ()
 	fi
 }
 export -f resize
-find "$indir" -maxdepth 1 -type f -name "*.$ext_in" | sort | parallel -P $3 --no-notice --bar resize '{}'
+find "$indir" -maxdepth 1 -type f -name "*.$ext_in" | sort | parallel -P $thread_number --no-notice --bar resize '{}'

@@ -1,12 +1,7 @@
 #!/bin/bash
 # requires "parallel"
-# usage blur-mt.sh input-directory output-directory number-of-threads
+# usage: blur-mt.sh input-directory output-directory number-of-threads
 
-# gdalbuildvrt -r cubic -srcnodata -9999 N55E044.vrt N55E044.tif
-# python3 raster_chunk_processing.py -p 6 -m blur_gauss -o 25 -s 1500 --verbose -r 15 -d 1 1/N55E044.vrt out2.tiff
-
-# directory for python tools
-TOOL_DIR="."
 TMP_DIR="/home/xmd5a/tmp/"
 
 echo $1 $2 $3
@@ -24,8 +19,7 @@ if [ ! -d $2 ]; then
   exit 3
 fi
 if [ ! $3 ]; then
-  thread_number=1
-  exit 3
+  thread_number=$(( $(nproc) - 2))
 fi
 working_dir=$(pwd)
 indir=$1
@@ -52,7 +46,7 @@ blur_tiff ()
 		if [ $? -ne 0 ]; then echo $(date)' Error creating vrt' & exit 5;fi
 
 		echo "Blurring …"
-		time python3 ${working_dir}/raster_chunk_processing.py -p 1 -m blur_gauss -o 25 -s 1500 --verbose -r 15 -d 2 ${TMP_DIR}$filename.vrt $outdir$filename.tif
+		python3 ${working_dir}/raster_chunk_processing.py -p 1 -m blur_gauss -o 25 -s 1500 --verbose -r 15 -d 2 ${TMP_DIR}$filename.vrt $outdir$filename.tif
 		if [ $? -ne 0 ]; then echo $(date)' Error blurring' & exit 6;fi
 		rm ${TMP_DIR}$filename.vrt
 		gdalwarp -ts 3602 3602 -ot Int16 -of GTiff -co "COMPRESS=LZW" $outdir$filename.tif $outdir$filename.tmp
@@ -62,4 +56,4 @@ blur_tiff ()
 	fi
 }
 export -f blur_tiff
-find "$indir" -maxdepth 1 -type f -name "*.tif" | sort | parallel -P $3 --no-notice --bar blur_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" | sort | parallel -P $thread_number --no-notice --bar time blur_tiff '{}'
