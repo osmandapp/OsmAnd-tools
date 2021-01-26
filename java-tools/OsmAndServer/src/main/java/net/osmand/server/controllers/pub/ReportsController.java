@@ -379,7 +379,7 @@ public class ReportsController {
 				batchSize++;
 				continue;
 			}
-			toPay.put(add.btcAddress, ((double) add.toPay / BITCOIN_SATOSHI) + "");
+			toPay.put(add.btcAddress, String.format("%.8f", (double) add.toPay / BITCOIN_SATOSHI));
 		}
 		if (toPay.size() > 0) {
 			rep.balance.date = 0;
@@ -730,8 +730,11 @@ public class ReportsController {
 		String res = specifiedBtc.replace("-", "").replace(" ", "").trim();
 		if (res.equals("3c9e8e73bff140b391e71eae311cdcce")) {
 			return OSMAND_BTC_DONATION_ADDR;
-			// second own address
+		} else if (res.equals("bc1qdm04a03l30d5d99fkmfjew2mysa0vq5e9w3msl")) {
+			// change address
+			return OSMAND_BTC_DONATION_ADDR;
 		} else if (res.equals("3MHyi4qtrmaxEy9A336RMwZaYqUzcbF2gr")) {
+			// change address
 			return OSMAND_BTC_DONATION_ADDR;
 		} else if (res.equals("3")) {
 			// not valid address dmpr0
