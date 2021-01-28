@@ -1,26 +1,28 @@
 #!/bin/bash
 # Multithreaded tiff tile to contour (osm) converter for OsmAnd
 # requires "gdal", "parallel", "lbzip2" and a lot of RAM
-# optional: -p option requires qgis
+# optional: -p and -d options requires qgis
 
 # Load balancing depending on tiff size
 # 128Gb RAM 32 threads:
-threads_number_1=7 # >19M  Max RAM per process: ~30 Gb
-threads_number_2=16 # 13M-20M  Max RAM per process: ~10 Gb
-threads_number_3=30 # <14M  Max RAM per process: ~5 Gb
+threads_number_1=17 # >19M  Max RAM per process without simplifying: ~30 Gb
+threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
+threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
 
+export QT_LOGGING_RULES="qt5ct.debug=false"
 TMP_DIR="/var/tmp"
 isolines_step=10
 translation_script=contours.py
 
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s [true/false] -p [true/false] -f}"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s [true/false] -p [true/false] -f -d}"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
 	echo "-f: make contours in feet"
+	echo "-d: slightly simplify with Douglas-Pecker algorithm to reduce file size in half"
 }
 
-while getopts ":i:o:spf" opt; do
+while getopts ":i:o:spfd" opt; do
   case $opt in
     i) indir="$OPTARG"
     ;;
@@ -32,15 +34,14 @@ while getopts ":i:o:spf" opt; do
     ;;
     f) make_feet=true
     ;;
+    d) simplify=true
+    ;;
     \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
 	usage
     ;;
   esac
 done
 
-# if [[ $smooth != "false" ]] || [[ -z $smooth ]] ; then
-# 	smooth=true
-# fi
 if [[ $make_feet == "true" ]] ; then
 	isolines_step=40
 	translation_script=contours_feet.py
@@ -49,6 +50,9 @@ else
 fi
 if [[ $split_lines != "true" ]] ; then
 	split_lines=false
+fi
+if [[ $simplify != "true" ]] ; then
+	simplify=false
 fi
 if [[ $smooth != "true" ]]; then
 	smooth=false
@@ -72,12 +76,13 @@ if [ ! -d $outdir ]; then
 	exit 3
 fi
 
-echo "Input dir:" $indir
-echo "Output dir:" $outdir
-echo "smooth:" $smooth
-echo "split_lines:" $split_lines
-echo "make_feet:" $make_feet
-echo "isolines_step:" $isolines_step
+echo -e "\e[104minput dir: $indir\e[49m"
+echo -e "\e[104moutput dir: $outdir\e[49m"
+echo -e "\e[104msmooth: $smooth\e[49m"
+echo -e "\e[104msimplify: $simplify\e[49m"
+echo -e "\e[104msplit_lines: $split_lines\e[49m"
+echo -e "\e[104mmake_feet: $make_feet\e[49m"
+echo -e "\e[104misolines_step: $isolines_step\e[49m"
 
 working_dir=$(pwd)
 # thread_number=$3
@@ -87,6 +92,7 @@ export outdir
 export TMP_DIR
 export working_dir
 export smooth
+export simplify
 export split_lines
 export make_feet
 export isolines_step
@@ -131,6 +137,17 @@ process_tiff ()
 		if [ $? -ne 0 ]; then echo $(date)' Error creating shapefile' & exit 4;fi
 		if [[ -f $smoothed_path ]] ; then
 			rm -f $smoothed_path
+		fi
+		if [[ $simplify == "true" ]] ; then
+			echo "Simplifying lines with Douglas-Pecker algorithm …"
+			time python3 $working_dir/run_alg.py -alg "native:simplifygeometries" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 METHOD -value2 0 -param3 TOLERANCE -value3 1e-05 -param4 OUTPUT -value4 ${TMP_DIR}/${filename}_simplified.shp
+			if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
+			if [ -f ${TMP_DIR}/${filename}_simplified.shp ]; then
+				mv ${TMP_DIR}/${filename}_simplified.shp ${TMP_DIR}/$filename.shp
+				mv ${TMP_DIR}/${filename}_simplified.dbf ${TMP_DIR}/$filename.dbf
+				mv ${TMP_DIR}/${filename}_simplified.prj ${TMP_DIR}/$filename.prj
+				mv ${TMP_DIR}/${filename}_simplified.shx ${TMP_DIR}/$filename.shx
+			fi
 		fi
 		if [[ $split_lines == "true" ]] ; then
 			echo "Splitting lines by length …"
