@@ -4,7 +4,7 @@
 # optional: -p and -d options requires qgis
 
 # Load balancing depending on tiff size
-# 128Gb RAM 32 threads:
+# For 128Gb RAM and 32 threads machine:
 threads_number_1=17 # >19M  Max RAM per process without simplifying: ~30 Gb
 threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
 threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
@@ -15,7 +15,8 @@ isolines_step=10
 translation_script=contours.py
 
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s [true/false] -p [true/false] -f -d}"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s -p -f -d}"
+	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
 	echo "-f: make contours in feet"
@@ -112,7 +113,7 @@ process_tiff ()
 			src_tiff=${TMP_DIR}/$filename.tif
 		fi
 		lat=${filename:1:2}
-		smoothed_path=${1%/*}/${filename}_smooth.tif
+		smoothed_path=${TMP_DIR}/${filename}_smooth.tif
 		if [[ $smooth == "true" ]] ; then
 			echo "Smoothing raster…"
 			if [[ $((10#$lat)) -ge 65 ]] ; then
