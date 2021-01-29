@@ -470,10 +470,10 @@ public class AdminController {
 
 		private String total(int[] kept, int[] lost, int[] totalAr) {
 			int total = 0;
-			for(int kn = 0; kn < kept.length; kn++) {
+			for(int kn = 0; kept != null && kn < kept.length; kn++) {
 				total += kept[kn];
 			}
-			for(int kn = 0; kn < lost.length; kn++) {
+			for(int kn = 0; lost != null && kn < lost.length; kn++) {
 				total += lost[kn];
 			}
 			if (total == 0) {
@@ -481,19 +481,20 @@ public class AdminController {
 			}
 			StringBuilder r = new StringBuilder();
 			r.append("+").append(total);
-			if (lost.length == 0) {
-				return r.toString();
-			}
 			int totalLost = 0; 
-			for (int kn = 0; kn < lost.length - 1; kn++) {
+			for (int kn = 0; lost != null && kn < lost.length - 1; kn++) {
 				totalLost += lost[kn];
 				r.append("<br>-").append(lost[kn]).append(" (").append(percent(lost[kn], total));
 			}
 			r.append("<br>=").append(total - totalLost).append(" (").append(percent(total - totalLost, total));
 			
-			totalLost += lost[lost.length - 1];
-			r.append("<br>*-").append(lost[lost.length - 1]).append(" (").append(percent(lost[lost.length - 1], total));
-			r.append("<br>*+").append(kept[kept.length - 1]).append(" (").append(percent(kept[kept.length - 1], total));
+			if (lost != null && lost.length > 0) {
+				totalLost += lost[lost.length - 1];
+				r.append("<br>*-").append(lost[lost.length - 1]).append(" (").append(percent(lost[lost.length - 1], total));
+			}
+			if (kept != null && kept.length > 0) {
+				r.append("<br>*+").append(kept[kept.length - 1]).append(" (").append(percent(kept[kept.length - 1], total));
+			}
 			r.append("<br>*=").append(total - totalLost).append(" (").append(percent(total - totalLost, total));
 			
 			return r.toString();
