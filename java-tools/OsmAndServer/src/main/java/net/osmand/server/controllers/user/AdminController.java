@@ -454,7 +454,7 @@ public class AdminController {
 				}
 			}
 			if (totalPossiblyGone > 0) {
-				r.append("<br>?-").append(totalPossiblyGone).append(percent(totalPossiblyGone, total));
+				r.append("<br>?. ").append(-totalPossiblyGone).append(percent(totalPossiblyGone, total));
 			}
 			
 			return r.toString();
