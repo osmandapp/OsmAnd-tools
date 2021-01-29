@@ -421,26 +421,20 @@ public class AdminController {
 	public static class YearSubscriptionRetentionReport {
 		public String month;
 		public int[] iOSRenew;
-		public String[] strIOSRenew;
 		public int[] iOSNonRenew;
-		public String[] strIOSNonRenew;
 		public int[] androidV2Renew;
-		public String[] strAndroidV2Renew;
 		public int[] androidV2NonRenew;
-		public String[] strAndroidV2NonRenew;
 		public int[] androidV1Renew;
-		public String[] strAndroidV1Renew;
 		public int[] androidV1NonRenew;
-		public String[] strAndroidV1NonRenew;
 		
 		public int[] totalLost;
-		public String[] strTotalLost;
-		
 		public int[] totalKeep;
-		public String[] strTotalKeep;
-		
 		public int[] allTotal;
-		public String[] strAllTotal;
+		
+		public String strIOS;
+		public String strAndroidV1;
+		public String strAndroidV2;
+		public String strAllTotal;
 		
 		
 		public YearSubscriptionRetentionReport(String month) {
@@ -468,43 +462,45 @@ public class AdminController {
 			allTotal = addArrayToArray(allTotal, totalKeep);
 			allTotal = addArrayToArray(allTotal, totalLost);
 
-			strIOSNonRenew = total(iOSNonRenew, allTotal);
-			strIOSRenew = total(iOSRenew, allTotal);
-			strAndroidV2Renew = total(androidV2Renew, allTotal);
-			strAndroidV1Renew = total(androidV1Renew, allTotal);
-			strAndroidV2NonRenew = total(androidV2NonRenew, allTotal);
-			strAndroidV1NonRenew = total(androidV1NonRenew, allTotal);
-			strTotalLost = total(totalLost, allTotal);
-			strTotalKeep = total(totalKeep, allTotal);
-			strAllTotal = total(allTotal, allTotal);
+			strIOS = total(iOSRenew, iOSNonRenew, allTotal);
+			strAndroidV2 = total(androidV2Renew, androidV2NonRenew, allTotal);
+			strAndroidV1 = total(androidV1Renew, androidV1NonRenew, allTotal);
+			strAllTotal = total(totalKeep, totalLost, allTotal);
 		}
 
-		private String[] total(int[] s, int[] tot) {
-			String[] res = new String[3];
+		private String total(int[] kept, int[] lost, int[] totalAr) {
+			int total = 0;
+			for(int kn = 0; kn < kept.length; kn++) {
+				total += kept[kn];
+			}
+			for(int kn = 0; kn < lost.length; kn++) {
+				total += lost[kn];
+			}
+			if (total == 0) {
+				return "";
+			}
 			StringBuilder r = new StringBuilder();
-			int valsum = 0; 
-			int totval = 0;
-			for(int kn = 0; kn < tot.length; kn++) {
-				totval += tot[kn];
+			r.append("+").append(total);
+			if (lost.length == 0) {
+				return r.toString();
 			}
-			if (s != null) {
-				for (int k = 0; k < s.length; k++) {
-					if (k > 0) {
-						r.append("+");
-					}
-					int val = s[k];
-					r.append(val);
-					valsum += val;
-				}
+			int totalLost = 0; 
+			for (int kn = 0; kn < lost.length - 1; kn++) {
+				totalLost += lost[kn];
+				r.append("<br>-").append(lost[kn]).append(" (").append(percent(lost[kn], total));
 			}
-			res[0] = r.toString();
-			res[1] = valsum +"";
-			if (totval > 0 && valsum > 0) {
-				res[2] = ((int) valsum * 1000 / totval) / 10.0 + "%";
-			} else {
-				res[2] = "";
-			}
-			return res;
+			r.append("<br>=").append(total - totalLost).append(" (").append(percent(total - totalLost, total));
+			
+			totalLost += lost[lost.length - 1];
+			r.append("<br>*-").append(lost[lost.length - 1]).append(" (").append(percent(lost[lost.length - 1], total));
+			r.append("<br>*+").append(kept[kept.length - 1]).append(" (").append(percent(kept[kept.length - 1], total));
+			r.append("<br>*=").append(total - totalLost).append(" (").append(percent(total - totalLost, total));
+			
+			return r.toString();
+		}
+
+		private String percent(int valsum, int totval) {
+			return ((int) valsum * 1000 / totval) / 10.0 + "%";
 		}
 	}
 	
