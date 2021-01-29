@@ -418,86 +418,43 @@ public class AdminController {
 	
 	
 	
-	public static class YearSubscriptionRetentionReport {
-		public String month;
-		public int[] iOSRenew;
-		public int[] iOSNonRenew;
-		public int[] androidV2Renew;
-		public int[] androidV2NonRenew;
-		public int[] androidV1Renew;
-		public int[] androidV1NonRenew;
-		
-		public int[] totalLost;
-		public int[] totalKeep;
-		public int[] allTotal;
-		
-		public String strIOS;
-		public String strAndroidV1;
-		public String strAndroidV2;
-		public String strAllTotal;
-		
-		
-		public YearSubscriptionRetentionReport(String month) {
-			this.month = month;
-		}
-		
-		public void plus(YearSubscriptionRetentionReport r) {
-			iOSNonRenew = addArrayToArray(iOSNonRenew, r.iOSNonRenew);
-			iOSRenew = addArrayToArray(iOSRenew, r.iOSRenew);
-			androidV2Renew = addArrayToArray(androidV2Renew, r.androidV2Renew);
-			androidV2NonRenew = addArrayToArray(androidV2NonRenew, r.androidV2NonRenew);
-			androidV1Renew = addArrayToArray(androidV1Renew, r.androidV1Renew);
-			androidV1NonRenew = addArrayToArray(androidV1NonRenew, r.androidV1NonRenew);
-		}
-		
-		public void total() {
-			totalLost = addArrayToArray(totalLost, iOSNonRenew);
-			totalLost = addArrayToArray(totalLost, androidV2NonRenew);
-			totalLost = addArrayToArray(totalLost, androidV1NonRenew);
-			
-			totalKeep = addArrayToArray(totalKeep, iOSRenew);
-			totalKeep = addArrayToArray(totalKeep, androidV2Renew);
-			totalKeep = addArrayToArray(totalKeep, androidV1Renew);
-			
-			allTotal = addArrayToArray(allTotal, totalKeep);
-			allTotal = addArrayToArray(allTotal, totalLost);
+	public static class YearSubRetentionGroup {
+		public int[] active;
+		public int[] gone;
+		public int[] possiblyGone;
 
-			strIOS = total(iOSRenew, iOSNonRenew, allTotal);
-			strAndroidV2 = total(androidV2Renew, androidV2NonRenew, allTotal);
-			strAndroidV1 = total(androidV1Renew, androidV1NonRenew, allTotal);
-			strAllTotal = total(totalKeep, totalLost, allTotal);
-		}
-
-		private String total(int[] kept, int[] lost, int[] totalAr) {
+		public String html() {
 			int total = 0;
-			for(int kn = 0; kept != null && kn < kept.length; kn++) {
-				total += kept[kn];
+			for(int kn = 0; active != null && kn < active.length; kn++) {
+				total += active[kn];
 			}
-			for(int kn = 0; lost != null && kn < lost.length; kn++) {
-				total += lost[kn];
+			for(int kn = 0; gone != null && kn < gone.length; kn++) {
+				total += gone[kn];
+			}
+			for(int kn = 0; possiblyGone != null && kn < possiblyGone.length; kn++) {
+				total += possiblyGone[kn];
 			}
 			if (total == 0) {
 				return "";
 			}
-			StringBuilder r = new StringBuilder();
 			int totalLost = 0; 
-			int totalPending = 0;
-			for (int kn = 0; kept != null && kn < kept.length - 1; kn++) {
-				totalPending += kept[kn];
+			int totalPossiblyGone = 0;
+			for (int kn = 0; possiblyGone != null && kn < possiblyGone.length; kn++) {
+				totalPossiblyGone += possiblyGone[kn];
 			}
-			for (int kn = 0; lost != null && kn < lost.length; kn++) {
-				totalLost += lost[kn];
+			for (int kn = 0; gone != null && kn < gone.length; kn++) {
+				totalLost += gone[kn];
 			}
-			r.append(String.format("<b>%d</b> -> <b>%d</b> %s" , total, total - totalLost - totalPending, percent(total - totalLost - totalPending, total)));
-			
-			for (int kn = 0; lost != null && kn < lost.length - 1; kn++) {
-				r.append("<br>--").append(lost[kn]).append(percent(lost[kn], total));				
+			StringBuilder r = new StringBuilder();
+			r.append(String.format("<b>%d</b> → <b>%d</b> %s" , total, 
+					total - totalLost - totalPossiblyGone, percent(total - totalLost - totalPossiblyGone, total)));
+			for (int kn = 0; gone != null && kn < gone.length; kn++) {
+				if (gone[kn] > 0) {
+					r.append("<br>" + (kn + 1) + ". ").append(-gone[kn]).append(percent(gone[kn], total));
+				}
 			}
-			if (totalPending > 0) {
-				r.append("<br>*?").append(totalPending).append(percent(totalPending, total));
-			}
-			if (lost != null && lost.length > 0) {
-				r.append("<br>*-").append(lost[lost.length - 1]).append(percent(lost[lost.length - 1], total));
+			if (totalPossiblyGone > 0) {
+				r.append("<br>?-").append(totalPossiblyGone).append(percent(totalPossiblyGone, total));
 			}
 			
 			return r.toString();
@@ -506,6 +463,46 @@ public class AdminController {
 		private String percent(int valsum, int totval) {
 			return " (" + ((int) valsum * 1000 / totval) / 10.0 + "%)";
 		}
+
+		public void addNumber(int years, int active, int possiblyGone, int gone) {
+			addNumberToArr(years, this.active, active);
+			addNumberToArr(years, this.possiblyGone, possiblyGone);
+			addNumberToArr(years, this.gone, gone);
+		}
+
+		public void addReport(YearSubRetentionGroup r) {
+			this.active = addArrayToArray(this.active, r.active);
+			this.gone = addArrayToArray(this.gone, r.gone);
+			this.possiblyGone = addArrayToArray(this.possiblyGone, r.possiblyGone);
+		}
+	}
+	
+	public static class YearSubscriptionRetentionReport {
+		public String month;
+		public YearSubRetentionGroup ios = new YearSubRetentionGroup();
+		public YearSubRetentionGroup iosFull = new YearSubRetentionGroup();
+		public YearSubRetentionGroup iosIntro = new YearSubRetentionGroup();
+		public YearSubRetentionGroup android = new YearSubRetentionGroup();
+		public YearSubRetentionGroup androidFull = new YearSubRetentionGroup();
+		public YearSubRetentionGroup androidIntro = new YearSubRetentionGroup();
+		public YearSubRetentionGroup androidV2 = new YearSubRetentionGroup();
+		public YearSubRetentionGroup total = new YearSubRetentionGroup();
+		
+		public YearSubscriptionRetentionReport(String month) {
+			this.month = month;
+		}
+		
+		public void plus(YearSubscriptionRetentionReport r) {
+			this.ios.addReport(r.ios);
+			this.iosFull.addReport(r.iosFull);
+			this.iosIntro.addReport(r.iosIntro);
+			this.android.addReport(r.android);
+			this.androidFull.addReport(r.androidFull);
+			this.androidIntro.addReport(r.androidIntro);
+			this.androidV2.addReport(r.androidV2);
+			this.total.addReport(r.total);
+		}
+
 	}
 	
 	private static int[] addArrayToArray(int[] res, int[] add) {
@@ -535,41 +532,50 @@ public class AdminController {
 	
 	private Collection<YearSubscriptionRetentionReport> getYearSubscriptionsRetentionReport() {
 		final Map<String, YearSubscriptionRetentionReport> res = new LinkedHashMap<String, YearSubscriptionRetentionReport>(); 
-		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", " + 
-				"        round(extract(day from expiretime - starttime)/365) \"years\", sku, " + 
-				"        count(*) FILTER (WHERE autorenewing and valid) \"auto\", " + 
-				"        count(*) FILTER (WHERE not autorenewing or not valid) \"non-auto\"," + 
-				"        count(*) FILTER (WHERE autorenewing is null) \"auto-null\" " + 
-				"    from supporters_device_sub where sku like '%annual%'  and extract(day from expiretime - starttime) > 180" + 
-				"    group by \"start\", \"years\", sku " + 
-				"    order by 1 desc, 2, 3;", new RowCallbackHandler() {
+		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", \n"
+				+ "    round(extract(day from expiretime - starttime)/365) \"years\", \n"
+				+ "    sku, introcycles,\n"
+				+ "    count(*) FILTER (WHERE valid and     (autorenewing and now() - '15 days'::interval < expiretime)) \"active\",\n"
+				+ "    count(*) FILTER (WHERE valid and not (autorenewing and now() - '15 days'::interval < expiretime)) \"possiblygone\",\n"
+				+ "    count(*) FILTER (WHERE not valid) \"gone\"\n"
+				+ "    from supporters_device_sub \n"
+				+ "    where sku like '%annual%' and extract(day from expiretime - starttime) > 180\n"
+				+ "    group by \"start\", \"years\", sku, introcycles\n"
+				+ "    order by 1 desc, 2, 3, 4;", new RowCallbackHandler() {
 
 					@Override
 					public void processRow(ResultSet rs) throws SQLException {
-						String month = rs.getString(1);
-						int years = rs.getInt(2);
-						String sku = rs.getString(3);
-						int renewing = rs.getInt(4);
-						int nonrenewing = rs.getInt(5);
-						int unknown = rs.getInt(6);
+						int ind = 1;
+						String month = rs.getString(ind++);
+						int years = rs.getInt(ind++);
+						String sku = rs.getString(ind++);
+						boolean intro = rs.getInt(ind++) > 0; 
+						int active = rs.getInt(ind++);
+						int possibleGone = rs.getInt(ind++);
+						int gone = rs.getInt(ind++);
 						YearSubscriptionRetentionReport report  = res.get(month);
 						if(report == null) {
 							report = new YearSubscriptionRetentionReport(month);
 							res.put(month, report);
 						}
 						if(sku.startsWith("net.osmand")) {
-							report.iOSRenew = addNumberToArr(years, report.iOSRenew, renewing);
-							report.iOSNonRenew = addNumberToArr(years, report.iOSNonRenew, nonrenewing);
-							report.iOSNonRenew = addNumberToArr(years, report.iOSNonRenew, unknown);
+							report.ios.addNumber(years, active, possibleGone, gone);
+							if (intro) {
+								report.iosIntro.addNumber(years, active, possibleGone, gone);
+							} else {
+								report.iosFull.addNumber(years, active, possibleGone, gone);
+							}
 						} else if(sku.contains("v1")) {
-							report.androidV1Renew = addNumberToArr(years, report.androidV1Renew, renewing);
-							report.androidV1NonRenew = addNumberToArr(years, report.androidV1NonRenew, nonrenewing);
-							report.androidV1NonRenew = addNumberToArr(years, report.androidV1NonRenew, unknown);
+							report.android.addNumber(years, active, possibleGone, gone);
+							if (intro) {
+								report.androidIntro.addNumber(years, active, possibleGone, gone);
+							} else {
+								report.androidFull.addNumber(years, active, possibleGone, gone);
+							}
 						} else if(sku.contains("v2")) {
-							report.androidV2Renew = addNumberToArr(years, report.androidV2Renew, renewing);
-							report.androidV2NonRenew = addNumberToArr(years, report.androidV2NonRenew, nonrenewing);
-							report.androidV2NonRenew = addNumberToArr(years, report.androidV2NonRenew, unknown);
+							report.androidV2.addNumber(years, active, possibleGone, gone);
 						}
+						report.total.addNumber(years, active, possibleGone, gone);
 					}
 
 					
@@ -578,7 +584,6 @@ public class AdminController {
 		YearSubscriptionRetentionReport totalAll = new YearSubscriptionRetentionReport("All");
 		Map<String, YearSubscriptionRetentionReport> yearsTotal = new TreeMap<String, AdminController.YearSubscriptionRetentionReport>();
 		for (YearSubscriptionRetentionReport r : res.values()) {
-			r.total();
 			String year = r.month.substring(0, 4);
 			YearSubscriptionRetentionReport yearSubscriptionReport = yearsTotal.get(year);
 			if (yearSubscriptionReport == null) {
@@ -588,9 +593,7 @@ public class AdminController {
 			yearSubscriptionReport.plus(r);
 			totalAll.plus(r);
 		}
-		totalAll.total();
 		for (YearSubscriptionRetentionReport y : yearsTotal.values()) {
-			y.total();
 			list.add(0, y);
 		}
 		list.add(0, totalAll);
