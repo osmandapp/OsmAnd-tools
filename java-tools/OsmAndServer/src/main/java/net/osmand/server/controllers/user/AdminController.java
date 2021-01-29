@@ -488,7 +488,7 @@ public class AdminController {
 			for (int kn = 0; lost != null && kn < lost.length; kn++) {
 				totalLost += lost[kn];
 			}
-			r.append(total).append(" -> ").append(total - totalLost - totalPending).append(percent(total - totalLost - totalPending, total));
+			r.append(String.format("<b>%d</b> -> <b>%d</b> %s" , total, total - totalLost - totalPending, percent(total - totalLost - totalPending, total)));
 			
 			for (int kn = 0; lost != null && kn < lost.length - 1; kn++) {
 				r.append("<br>--").append(lost[kn]).append(percent(lost[kn], total));				
@@ -504,7 +504,7 @@ public class AdminController {
 		}
 
 		private String percent(int valsum, int totval) {
-			return " (" + ((int) valsum * 1000 / totval) / 10.0 + "% )";
+			return " (" + ((int) valsum * 1000 / totval) / 10.0 + "%)";
 		}
 	}
 	
