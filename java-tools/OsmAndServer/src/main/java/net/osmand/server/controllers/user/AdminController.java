@@ -446,7 +446,7 @@ public class AdminController {
 				totalLost += gone[kn];
 			}
 			StringBuilder r = new StringBuilder();
-			r.append(String.format("<b>%d</b> → <b>%d</b> %s" , total, 
+			r.append(String.format("<b>%d</b><br> → <b>%d</b> %s" , total, 
 					total - totalLost - totalPossiblyGone, percent(total - totalLost - totalPossiblyGone, total)));
 			for (int kn = 0; gone != null && kn < gone.length; kn++) {
 				if (gone[kn] > 0) {
