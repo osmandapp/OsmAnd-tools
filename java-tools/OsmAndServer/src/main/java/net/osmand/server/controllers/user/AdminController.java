@@ -554,11 +554,11 @@ public class AdminController {
 						int possibleGone = rs.getInt(ind++);
 						int gone = rs.getInt(ind++);
 						YearSubscriptionRetentionReport report  = res.get(month);
-						if(report == null) {
+						if (report == null) {
 							report = new YearSubscriptionRetentionReport(month);
 							res.put(month, report);
 						}
-						if(sku.startsWith("net.osmand")) {
+						if (sku.startsWith("net.osmand")) {
 							report.ios.addNumber(years, active, possibleGone, gone);
 							if (intro) {
 								report.iosIntro.addNumber(years, active, possibleGone, gone);
@@ -573,6 +573,7 @@ public class AdminController {
 								report.androidFull.addNumber(years, active, possibleGone, gone);
 							}
 						} else if(sku.contains("v2")) {
+							report.android.addNumber(years, active, possibleGone, gone);
 							report.androidV2.addNumber(years, active, possibleGone, gone);
 						}
 						report.total.addNumber(years, active, possibleGone, gone);
