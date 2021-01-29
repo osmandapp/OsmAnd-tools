@@ -480,28 +480,31 @@ public class AdminController {
 				return "";
 			}
 			StringBuilder r = new StringBuilder();
-			r.append("+").append(total);
+			
 			int totalLost = 0; 
+			int totalPending = 0;
+			for (int kn = 0; kept != null && kn < kept.length - 1; kn++) {
+				totalPending += kept[kn];
+			}
 			for (int kn = 0; lost != null && kn < lost.length - 1; kn++) {
 				totalLost += lost[kn];
-				r.append("<br>-").append(lost[kn]).append(" (").append(percent(lost[kn], total));
+				r.append("<br>-").append(lost[kn]).append(percent(lost[kn], total));
 			}
-			r.append("<br>=").append(total - totalLost).append(" (").append(percent(total - totalLost, total));
-			
+			r.append("<br>*=").append(total - totalLost).append(percent(total - totalLost, total));
 			if (lost != null && lost.length > 0) {
 				totalLost += lost[lost.length - 1];
-				r.append("<br>*-").append(lost[lost.length - 1]).append(" (").append(percent(lost[lost.length - 1], total));
+				r.append("<br>*-").append(lost[lost.length - 1]).append(percent(lost[lost.length - 1], total));
 			}
-			if (kept != null && kept.length > 0) {
-				r.append("<br>*+").append(kept[kept.length - 1]).append(" (").append(percent(kept[kept.length - 1], total));
+			if (totalPending > 0) {
+				r.append("<br>*+").append(totalPending).append(percent(totalPending, total));
 			}
-			r.append("<br>*=").append(total - totalLost).append(" (").append(percent(total - totalLost, total));
+			r.append("<br>==").append(total - totalLost).append(percent(total - totalLost, total));
 			
 			return r.toString();
 		}
 
 		private String percent(int valsum, int totval) {
-			return ((int) valsum * 1000 / totval) / 10.0 + "%";
+			return " (" + ((int) valsum * 1000 / totval) / 10.0 + "% )";
 		}
 	}
 	
