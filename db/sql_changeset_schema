@@ -1,12 +1,17 @@
-# DDL for changeset database
-# DDL
+/* !!! RUN AS OWNER USER  */ 
+
+-- psql 
+-- create database changeset owner test;
+-- psql -U test -d changeset
+/*  DDL for changeset database */
+
 CREATE TABLE pending_changesets (id text, created_at text) ;
 CREATE TABLE changesets (id text, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, created_by text, minlat float, minlon float, maxlat float, maxlon float, changes_count int, PRIMARY KEY(id));
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));
 CREATE TABLE changeset_country(changesetid text, countryid int, small int);
 CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text);
 
-# mail group
+-- mail group
 CREATE TABLE email_free_users(aid text, email text, os text, updatetime timestamp);
 CREATE TABLE email_blocked(email text, reason text, timestamp timestamp);
 CREATE TABLE email_unsubscribed(email text, channel text, updatetime timestamp);
@@ -21,8 +26,8 @@ CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, 
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
         paymentstate int, valid boolean, checktime timestamp);
-CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);        
-CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);        
+CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);
+CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);
 
 CREATE TABLE exchange_rates(currency text, month date, eurrate double precision	);
 
@@ -32,17 +37,17 @@ CREATE INDEX changesets_username_idx on changesets(username);
 CREATE INDEX changesets_country_country_idx on changeset_country(countryid);
 CREATE INDEX changesets_country_changeset_idx on changeset_country(changesetid);
 
-CREATE TABLE final_reports (name text, month text, region text, report text, time int) ;
-CREATE INDEX final_reports_grp_idx on final_reports(name,month,region) ;
+CREATE TABLE final_reports (name text, month text, region text, report text, time int);
+CREATE INDEX final_reports_grp_idx on final_reports(name,month,region);
 
-# CURRENT MONTH MATERIALIZED VIEW
+--  CURRENT MONTH MATERIALIZED VIEW
 CREATE MATERIALIZED VIEW changesets_view AS SELECT * FROM changesets where 
 closed_at > ( (SELECT max(closed_at) FROM changesets)::date - '60 day'::interval) WITH DATA;
 CREATE MATERIALIZED VIEW changeset_country_view AS SELECT * FROM changeset_country c where exists (select 1 from changesets_view d where d.id = c.changesetid) WITH DATA;
-# REFRESH MATERIALIZED VIEW  changesets_view ;
-# REFRESH MATERIALIZED VIEW  changeset_country_view ;
+--  REFRESH MATERIALIZED VIEW  changesets_view ;
+--  REFRESH MATERIALIZED VIEW  changeset_country_view ;
 
-###### TELEGRAM SERVER MONITORING ########
+--  TELEGRAM SERVER MONITORING 
 CREATE TABLE telegram_monitoring (
   id bigint NOT NULL,
   first_name varchar(100)  DEFAULT NULL,
@@ -50,9 +55,9 @@ CREATE TABLE telegram_monitoring (
   user_id bigint DEFAULT NULL,
   data jsonb,
   PRIMARY KEY (id)
-) ;
+);
 
-###### TELEGRAM TRACKER CONFIGURATION ########
+--  TELEGRAM TRACKER CONFIGURATION 
 CREATE TABLE telegram_devices (
     id bigint NOT NULL,
     chat_id bigint NOT NULL,
@@ -86,7 +91,8 @@ CREATE SEQUENCE telegram_tracker_configuration_id_seq
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
-    CACHE 1;
+    CACHE 1
+;
 ALTER TABLE ONLY telegram_tracker_configuration ALTER COLUMN id SET DEFAULT nextval('telegram_tracker_configuration_id_seq'::regclass);
 ALTER SEQUENCE telegram_tracker_configuration_id_seq OWNED BY telegram_tracker_configuration.id;
 
@@ -102,12 +108,8 @@ CREATE INDEX lottery_rounds_series_idx on lottery_rounds(series);
 CREATE TABLE lottery_series(name text, type text, promocodes text, usedpromos text, rounds integer, status text, emailtemplate text, updatetime timestamp);
 
 
-ALTER TABLE <table_name> OWNER TO <user>;
-GRANT ALL privileges ON ALL TABLES IN SCHEMA public to <user>;
-GRANT ALL privileges ON supporters_seq to <user>;
-GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;
 
-###### ANALYTICS ########
+--  ANALYTICS 
 CREATE TABLE analytics (
     ip text,
     date timestamp,
@@ -120,3 +122,10 @@ CREATE TABLE analytics (
     finish_date timestamp,
     data bytea
 );
+
+-- SPECIFY USER -- -- -- -- -- -- -- -- -- -- -- -- 
+-- \set DBUSER test;
+-- GRANT ALL privileges ON ALL TABLES IN SCHEMA public to :DBUSER;
+-- GRANT ALL privileges ON supporters_seq to  <user>;
+-- GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;
+-- ALTER TABLE <table_name> OWNER TO <user>;
