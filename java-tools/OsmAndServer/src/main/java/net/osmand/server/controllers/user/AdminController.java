@@ -465,9 +465,9 @@ public class AdminController {
 		}
 
 		public void addNumber(int years, int active, int possiblyGone, int gone) {
-			addNumberToArr(years, this.active, active);
-			addNumberToArr(years, this.possiblyGone, possiblyGone);
-			addNumberToArr(years, this.gone, gone);
+			this.active = addNumberToArr(years, this.active, active);
+			this.possiblyGone = addNumberToArr(years, this.possiblyGone, possiblyGone);
+			this.gone = addNumberToArr(years, this.gone, gone);
 		}
 
 		public void addReport(YearSubRetentionGroup r) {
