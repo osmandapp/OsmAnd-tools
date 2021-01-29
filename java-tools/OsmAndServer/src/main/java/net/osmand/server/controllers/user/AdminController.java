@@ -577,11 +577,11 @@ public class AdminController {
 		ArrayList<YearSubscriptionRetentionReport> list = new ArrayList<>(res.values());
 		YearSubscriptionRetentionReport totalAll = new YearSubscriptionRetentionReport("All");
 		Map<String, YearSubscriptionRetentionReport> yearsTotal = new TreeMap<String, AdminController.YearSubscriptionRetentionReport>();
-		for(YearSubscriptionRetentionReport r: res.values()) {
+		for (YearSubscriptionRetentionReport r : res.values()) {
 			r.total();
 			String year = r.month.substring(0, 4);
 			YearSubscriptionRetentionReport yearSubscriptionReport = yearsTotal.get(year);
-			if(yearSubscriptionReport == null) {
+			if (yearSubscriptionReport == null) {
 				yearSubscriptionReport = new YearSubscriptionRetentionReport(year);
 				yearsTotal.put(year, yearSubscriptionReport);
 			}
@@ -589,11 +589,11 @@ public class AdminController {
 			totalAll.plus(r);
 		}
 		totalAll.total();
-		for(YearSubscriptionRetentionReport y : yearsTotal.values()) {
+		for (YearSubscriptionRetentionReport y : yearsTotal.values()) {
 			y.total();
-			list.add(y);
+			list.add(0, y);
 		}
-		list.add(totalAll);
+		list.add(0, totalAll);
 		return list;
 	}
 	
