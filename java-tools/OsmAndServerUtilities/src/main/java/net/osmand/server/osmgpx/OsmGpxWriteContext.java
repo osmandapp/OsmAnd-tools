@@ -202,14 +202,19 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("description", gpxInfo.description);
 			// red, blue, green, orange, yellow
 			String color = null;
+			String activityType = null;
 			for (String tg : gpxInfo.tags) {
 				gpxTrackTags.put("tag_" + tg, tg);
 				color = getColorFromTag(color, tg);
+				activityType = getActivityType(activityType, tg);
 			}
 			if (color != null) {
 				// gpxTrackTags.put("gpx_icon", "");
 				gpxTrackTags.put("gpx_bg", color + "_hexagon_3_road_shield");
 				gpxTrackTags.put("color", color);
+			}
+			if (activityType != null) {
+				gpxTrackTags.put("route_activity_type", activityType);
 			}
 		}
 	}
@@ -233,6 +238,25 @@ public class OsmGpxWriteContext {
 			return "orange";
 		}
 		return color;
+	}
+
+	private static String getActivityType(String activityType, String tg) {
+		switch (tg) {
+			case "bicycle":
+			case "cycling":
+			case "mtb":
+			case "velo":
+				return "bicycle";
+			case "hiking":
+			case "hike":
+			case "walking":
+			case "walk":
+				return "pedestrian";
+			case "car":
+			case "auto":
+				return "car";
+		}
+		return activityType;
 	}
 
 	private void addAnalysisTags(Map<String, String> gpxTrackTags, GPXTrackAnalysis analysis) throws IOException {
