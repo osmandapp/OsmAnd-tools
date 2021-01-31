@@ -763,17 +763,30 @@ public class AdminController {
 			String periodId = period == MONTH ? s.startPeriodMonth
 					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
 			processSub(s, periodId);
-			if (s.currentPeriod == 0 && (period == MONTH || period == YEAR)) {
-				// properly calculate active  and % of LTV paid
+			if (s.currentPeriod == 0 && period == MONTH) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
-				String aperiodId = null;
 				for (int k = 0; k < s.totalMonths; k++) {
 					c.add(Calendar.MONTH, 1);
 					String nperiodId = dateFormat.format(c.getTime());
 					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
-					if (vls != null && !nperiodId.equals(aperiodId)) {
-						aperiodId = nperiodId;
+					if (vls != null) {
+						for (int i = 0; i < columns.size(); i++) {
+							if (columns.get(i).filter(s)) {
+								vls.get(i).active++;
+							}
+						}
+					}
+				}
+			}
+			if (s.currentPeriod == 0 && period == YEAR) {
+				Calendar c = Calendar.getInstance();
+				c.setTimeInMillis(s.startPeriodTime);
+				for (int k = 0; k < s.totalMonths / 12; k++) {
+					c.add(Calendar.YEAR, 1);
+					String nperiodId = dateFormat.format(c.getTime());
+					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
+					if (vls != null) {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
 								vls.get(i).active++;
