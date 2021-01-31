@@ -333,8 +333,9 @@ public class AdminController {
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
 		List<Subscription> allSubs = parseSubscriptions();
-		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, true));
-		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, false));
+		model.addAttribute("subRevenueReportYear", getRevenueReport(allSubs, AdminGenericSubReport.YEAR));
+		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, AdminGenericSubReport.MONTH));
+		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, AdminGenericSubReport.DAY));
 		
 		
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
@@ -708,7 +709,10 @@ public class AdminController {
 	}
 	
 	public static class AdminGenericSubReport {
-		public boolean month; // month or day
+		public static final int MONTH = 0;
+		public static final int YEAR = 1;
+		public static final int DAY = -1;
+		public int period; // month == 0 or day == -1 or year == 1
 		public int count; 
 		public List<AdminGenericSubReportColumn> columns = new ArrayList<>();
 		public Map<String, List<AdminGenericSubReportColumnValue>> values = new TreeMap<>(new Comparator<String>() {
@@ -724,20 +728,19 @@ public class AdminController {
 		});
 		public List<Subscription> subs;
 		
-		
 		public Map<String, List<AdminGenericSubReportColumnValue>> getValues(int limit) {
-			SimpleDateFormat dateFormat = month ? Subscription.monthFormat : Subscription.dayFormat;
+			SimpleDateFormat dateFormat = period == MONTH ? Subscription.monthFormat
+					: (period == YEAR ? Subscription.yearFormat : Subscription.dayFormat);
+			
 			Calendar c = Calendar.getInstance();
 			c.setTimeInMillis(System.currentTimeMillis());
 			for (int i = 0; i < limit; i++) {
 				values.put(dateFormat.format(c.getTime()), initColumns());
-				if (month) {
-					values.put(Subscription.yearFormat.format(c.getTime()), initColumns());
-				}  
-				c.add(month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
+				c.add(period == MONTH ? Calendar.MONTH
+						: (period == YEAR ? Calendar.YEAR : Calendar.DAY_OF_MONTH), -1);
 			}
 			for(Subscription s : subs) {
-				addResult(s);
+				addResult(s, dateFormat);
 			}
 			return values;
 		}
@@ -750,18 +753,21 @@ public class AdminController {
 			return lst;
 		}
 
-		public void addResult(Subscription s) {
-			String periodId = month ? s.startPeriodMonth : s.startPeriodDay;
+		public void addResult(Subscription s, SimpleDateFormat dateFormat) {
+			String periodId = period == MONTH ? s.startPeriodMonth
+					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
 			List<AdminGenericSubReportColumnValue> vls = processSub(s, periodId);
-			if (s.currentPeriod == 0 && month) {
-				processSub(s, s.startPeriodYear);
-				
+			if (s.currentPeriod == 0 && (period == MONTH || period == YEAR)) {
+				// calculate active
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
+				String aperiodId = null;
 				for (int k = 0; k < s.totalMonths; k++) {
 					c.add(Calendar.MONTH, 1);
-					vls = values.get(Subscription.monthFormat.format(c.getTime()));
-					if (vls != null) {
+					String nperiodId = dateFormat.format(c.getTime());
+					vls = values.get(nperiodId);
+					if (vls != null && !nperiodId.equals(aperiodId)) {
+						nperiodId = aperiodId;
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
 								vls.get(i).active++;
@@ -785,9 +791,9 @@ public class AdminController {
 	}
 	
 	
-	private AdminGenericSubReport getRevenueReport(List<Subscription> subs, boolean month) {
+	private AdminGenericSubReport getRevenueReport(List<Subscription> subs, int period) {
 		AdminGenericSubReport report = new AdminGenericSubReport();
-		report.month = month;
+		report.period = period;
 		report.subs = subs;
 		String h = ""; //"<br>New + Renew <br> - Cancel";
 		report.columns.add(new AdminGenericSubReportColumn("All"));
