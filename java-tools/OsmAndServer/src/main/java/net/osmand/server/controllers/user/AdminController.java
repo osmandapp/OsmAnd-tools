@@ -667,7 +667,7 @@ public class AdminController {
 		}
 		
 		public void process(Subscription sub, AdminGenericSubReportColumnValue value) {
-			if(!filter(sub)) {
+			if (!filter(sub)) {
 				return;
 			}
 			int eurMillis = sub.priceEurMillis;
@@ -711,20 +711,29 @@ public class AdminController {
 		public boolean month; // month or day
 		public int count; 
 		public List<AdminGenericSubReportColumn> columns = new ArrayList<>();
-		public Map<String, List<AdminGenericSubReportColumnValue>> values = new LinkedHashMap<>();
+		public Map<String, List<AdminGenericSubReportColumnValue>> values = new TreeMap<>(new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				int s = Integer.compare(o1.length(), o2.length());
+				if (s != 0) {
+					return s;
+				}
+				return -o1.compareTo(o2);
+			}
+		});
 		public List<Subscription> subs;
 		
+		
 		public Map<String, List<AdminGenericSubReportColumnValue>> getValues(int limit) {
-			SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
-			SimpleDateFormat dateFormat = month ? new SimpleDateFormat("yyyy-MM") : dayFormat;
+			SimpleDateFormat dateFormat = month ? Subscription.monthFormat : Subscription.dayFormat;
 			Calendar c = Calendar.getInstance();
 			c.setTimeInMillis(System.currentTimeMillis());
 			for (int i = 0; i < limit; i++) {
-				List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
-				for(AdminGenericSubReportColumn col : columns) {
-					lst.add(col.initValue());
-				}
-				values.put(dateFormat.format(c.getTime()), lst);
+				values.put(dateFormat.format(c.getTime()), initColumns());
+				if (month) {
+					values.put(Subscription.yearFormat.format(c.getTime()), initColumns());
+				}  
 				c.add(month ? Calendar.MONTH : Calendar.DAY_OF_MONTH, -1);
 			}
 			for(Subscription s : subs) {
@@ -733,14 +742,20 @@ public class AdminController {
 			return values;
 		}
 
-		public void addResult(Subscription s) {
-			List<AdminGenericSubReportColumnValue> vls = values.get(month ? s.startPeriodMonth : s.startPeriodDay);
-			if (vls != null) {
-				for (int i = 0; i < columns.size(); i++) {
-					columns.get(i).process(s, vls.get(i));
-				}
+		private List<AdminGenericSubReportColumnValue> initColumns() {
+			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
+			for(AdminGenericSubReportColumn col : columns) {
+				lst.add(col.initValue());
 			}
+			return lst;
+		}
+
+		public void addResult(Subscription s) {
+			String periodId = month ? s.startPeriodMonth : s.startPeriodDay;
+			List<AdminGenericSubReportColumnValue> vls = processSub(s, periodId);
 			if (s.currentPeriod == 0 && month) {
+				processSub(s, s.startPeriodYear);
+				
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
 				for (int k = 0; k < s.totalMonths; k++) {
@@ -756,6 +771,16 @@ public class AdminController {
 					
 				}
 			}
+		}
+
+		private List<AdminGenericSubReportColumnValue> processSub(Subscription s, String periodId) {
+			List<AdminGenericSubReportColumnValue> vls = values.get(periodId);
+			if (vls != null) {
+				for (int i = 0; i < columns.size(); i++) {
+					columns.get(i).process(s, vls.get(i));
+				}
+			}
+			return vls;
 		}
 	}
 	
@@ -1003,6 +1028,7 @@ public class AdminController {
 		public double retention;
 		static SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
 		static SimpleDateFormat monthFormat = new SimpleDateFormat("yyyy-MM");
+		static SimpleDateFormat yearFormat = new SimpleDateFormat("yyyy") ;
 
 		public Subscription() {
 		}
@@ -1048,9 +1074,10 @@ public class AdminController {
 		// current calculated 
 		protected int currentPeriod;
 		protected boolean introPeriod;
-		protected String startPeriodDay;
 		protected long startPeriodTime;
+		protected String startPeriodDay;
 		protected String startPeriodMonth;
+		protected String startPeriodYear;
 		protected int fullPriceEurMillis;
 		protected int introPriceEurMillis;
 		protected int priceEurMillis;
@@ -1077,6 +1104,7 @@ public class AdminController {
 			this.startPeriodTime = time.getTime();
 			this.startPeriodDay = dayFormat.format(time.getTime());
 			this.startPeriodMonth = monthFormat.format(time.getTime());
+			this.startPeriodYear = yearFormat.format(time.getTime());
 			this.currentPeriod = period;
 			
 			this.fullPriceEurMillis = defPriceEurMillis;
