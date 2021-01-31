@@ -747,7 +747,7 @@ public class AdminController {
 
 		private List<AdminGenericSubReportColumnValue> initColumns() {
 			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
-			for(AdminGenericSubReportColumn col : columns) {
+			for (AdminGenericSubReportColumn col : columns) {
 				lst.add(col.initValue());
 			}
 			return lst;
@@ -767,7 +767,7 @@ public class AdminController {
 					String nperiodId = dateFormat.format(c.getTime());
 					vls = values.get(nperiodId);
 					if (vls != null && !nperiodId.equals(aperiodId)) {
-						nperiodId = aperiodId;
+						aperiodId = nperiodId;
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
 								vls.get(i).active++;
