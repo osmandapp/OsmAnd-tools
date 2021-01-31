@@ -612,6 +612,7 @@ public class AdminController {
 		public long valueOld;
 		public long valueEnd;
 		public long valueNewLTV;
+		public long valuePaidLTV;
 		
 		@Override
 		public String toString() {
@@ -636,6 +637,10 @@ public class AdminController {
 			}
 			if ((formatVersion & (1 << 3)) > 0) {
 				row.append(String.format("<br>€ %d", valueNewLTV / 1000));
+			}
+			if ((formatVersion & (1 << 4)) > 0 && valueNewLTV > 0) {
+				row.append(String.format("<br>€ %d %d%%", valuePaidLTV / 1000, 
+						(valuePaidLTV * 100) / (valueNewLTV)));
 			}
 			
 			return row.toString();
@@ -678,6 +683,7 @@ public class AdminController {
 			} else if (sub.currentPeriod == 0) {
 				value.totalNew++;
 				value.valueNewLTV += sub.priceLTVEurMillis;
+				value.valuePaidLTV += sub.priceTotalPaidEurMillis;
 				value.valueNew += eurMillis;
 			} else {
 				value.totalEnd++;
@@ -756,16 +762,16 @@ public class AdminController {
 		public void addResult(Subscription s, SimpleDateFormat dateFormat) {
 			String periodId = period == MONTH ? s.startPeriodMonth
 					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
-			List<AdminGenericSubReportColumnValue> vls = processSub(s, periodId);
+			processSub(s, periodId);
 			if (s.currentPeriod == 0 && (period == MONTH || period == YEAR)) {
-				// calculate active
+				// properly calculate active  and % of LTV paid
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
 				String aperiodId = null;
 				for (int k = 0; k < s.totalMonths; k++) {
 					c.add(Calendar.MONTH, 1);
 					String nperiodId = dateFormat.format(c.getTime());
-					vls = values.get(nperiodId);
+					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
 					if (vls != null && !nperiodId.equals(aperiodId)) {
 						aperiodId = nperiodId;
 						for (int i = 0; i < columns.size(); i++) {
@@ -774,7 +780,6 @@ public class AdminController {
 							}
 						}
 					}
-					
 				}
 			}
 		}
@@ -1089,6 +1094,7 @@ public class AdminController {
 		protected int priceEurMillis;
 		
 		protected int priceLTVEurMillis;
+		protected int priceTotalPaidEurMillis;
 		
 		private boolean isEnded() {
 			boolean ended = (System.currentTimeMillis() - endTime) >= 1000l * 60 * 60 * 24 * 10;
@@ -1096,10 +1102,11 @@ public class AdminController {
 		}
 		
 		public void calculateLTVValue() {
-			priceLTVEurMillis += introPriceEurMillis;
+			priceTotalPaidEurMillis = introPriceEurMillis;
 			for (int i = 1; i < totalPeriods; i++) {
-				priceLTVEurMillis += fullPriceEurMillis;
+				priceTotalPaidEurMillis += fullPriceEurMillis;
 			}
+			priceLTVEurMillis = priceTotalPaidEurMillis;
 			// we could take into account autorenewing but retention will change
 			if (!isEnded()) {
 				priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
