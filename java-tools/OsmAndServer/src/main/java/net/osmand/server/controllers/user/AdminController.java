@@ -782,7 +782,7 @@ public class AdminController {
 			if (s.currentPeriod == 0 && period == YEAR) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
-				for (int k = 0; k < s.totalMonths / 12; k++) {
+				for (int k = 0; k < s.totalMonths; k+= 12) {
 					c.add(Calendar.YEAR, 1);
 					String nperiodId = dateFormat.format(c.getTime());
 					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
