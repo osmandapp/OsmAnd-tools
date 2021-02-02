@@ -62,6 +62,7 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.RouteActivityType;
 import net.osmand.osm.io.Base64;
 import net.osmand.util.Algorithms;
 import rtree.RTree;

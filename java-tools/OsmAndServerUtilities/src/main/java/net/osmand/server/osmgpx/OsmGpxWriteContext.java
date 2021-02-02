@@ -23,6 +23,7 @@ import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.RouteActivityType;
 import net.osmand.server.osmgpx.DownloadOsmGPX.OsmGpxFile;
 import net.osmand.server.osmgpx.DownloadOsmGPX.QueryParams;
 import net.osmand.util.Algorithms;
