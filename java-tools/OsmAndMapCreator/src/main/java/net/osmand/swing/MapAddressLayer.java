@@ -100,7 +100,6 @@ public class MapAddressLayer implements MapPanelLayer {
 					map.setPoints(points);
 					map.repaint();
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
@@ -127,7 +126,6 @@ public class MapAddressLayer implements MapPanelLayer {
 					map.setPoints(points);
 					map.repaint();
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
