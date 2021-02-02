@@ -144,6 +144,7 @@ public class DownloadOsmGPX {
 							qp.activityTypes.add(RouteActivityType.valueOf(av.trim().toUpperCase()));
 						}
 					}
+					break;
 				case "--bbox":
 					String[] vls = val.split(",");
 					qp.minlat = Double.parseDouble(vls[0]);
