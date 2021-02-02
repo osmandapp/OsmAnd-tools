@@ -24,6 +24,18 @@ public enum RouteActivityType {
 		return color;
 	}
 	
+	public static RouteActivityType getTypeFromTags(String[] tags) {
+		RouteActivityType activityType = null;
+		for (String tg : tags) {
+			RouteActivityType rat = RouteActivityType.convertFromOsmGPXTag(tg);
+			if (rat != null) {
+				if (activityType == null || activityType.ordinal() > rat.ordinal()) {
+					activityType = rat;
+				}
+			}
+		}
+		return activityType;
+	}
 	
 	public static RouteActivityType convertFromOsmGPXTag(String tg) {
 		String t = tg.toLowerCase();

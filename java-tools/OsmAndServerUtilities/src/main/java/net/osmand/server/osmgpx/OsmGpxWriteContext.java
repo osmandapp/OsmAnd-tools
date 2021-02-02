@@ -200,15 +200,9 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("user", gpxInfo.user);
 			gpxTrackTags.put("date", gpxInfo.timestamp.toString());
 			gpxTrackTags.put("description", gpxInfo.description);
-			RouteActivityType activityType = null; 
+			RouteActivityType activityType = RouteActivityType.getTypeFromTags(gpxInfo.tags); 
 			for (String tg : gpxInfo.tags) {
 				gpxTrackTags.put("tag_" + tg, tg);
-				RouteActivityType rat = RouteActivityType.convertFromOsmGPXTag(tg);
-				if (rat != null) {
-					if (activityType == null || activityType.ordinal() > rat.ordinal()) {
-						activityType = rat;
-					}
-				}
 			}
 			if (activityType != null) {
 				// red, blue, green, orange, yellow

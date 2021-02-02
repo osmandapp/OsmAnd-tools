@@ -27,7 +27,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -130,6 +132,17 @@ public class DownloadOsmGPX {
 					continue;
 				}
 				switch (s[0]) {
+				case "--acitivity-type":
+					if (val.trim().length() > 0) {
+						qp.activityTypes = new TreeSet<RouteActivityType>();
+						String[] avls = val.split(",");
+						for (String av : avls) {
+							if (av.trim().length() == 0) {
+								continue;
+							}
+							qp.activityTypes.add(RouteActivityType.valueOf(av.toUpperCase()));
+						}
+					}
 				case "--bbox":
 					String[] vls = val.split(",");
 					qp.minlat = Double.parseDouble(vls[0]);
@@ -259,6 +272,13 @@ public class DownloadOsmGPX {
 				}
 			}
 			gpxInfo.tags = trackTags.toArray(new String[trackTags.size()]);
+			if (qp.activityTypes != null) {
+				RouteActivityType rat = RouteActivityType.getTypeFromTags(gpxInfo.tags);
+				if (rat == null || !qp.activityTypes.contains(rat)) {
+					continue;
+				}
+			}
+				
 
 			ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
@@ -771,6 +791,7 @@ public class DownloadOsmGPX {
 		public String user;
 		public String datestart;
 		public String dateend;
+		public Set<RouteActivityType> activityTypes = null;
 		public double minlat = OsmGpxFile.ERROR_NUMBER;
 		public double maxlat = OsmGpxFile.ERROR_NUMBER;
 		public double maxlon = OsmGpxFile.ERROR_NUMBER;
