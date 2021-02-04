@@ -702,7 +702,7 @@ public class DownloadOsmGPX {
 
 	private static OsmGpxFile parseGPXFiles(StringReader inputReader, List<OsmGpxFile> gpxFiles)
 			throws XmlPullParserException, IOException, ParseException {
-		XmlPullParser parser = new KXmlParser();
+		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(inputReader);
 		int tok;
 		OsmGpxFile p = null;

@@ -19,6 +19,7 @@ import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
+import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
@@ -35,7 +36,7 @@ public class ReadTest {
 		reg.prepareFile();
 		reg.cacheAllCountries();
 		
-		XmlPullParser ps = new KXmlParser();
+		XmlPullParser ps = PlatformUtil.newXMLPullParser();
 		ps.setInput(zis, "UTF-8");
 		int next;
 		while ((next = ps.next()) != XmlPullParser.END_DOCUMENT) {

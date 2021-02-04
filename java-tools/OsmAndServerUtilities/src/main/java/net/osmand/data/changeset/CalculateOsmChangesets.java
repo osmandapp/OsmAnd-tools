@@ -146,7 +146,7 @@ public class CalculateOsmChangesets {
 					}
 				});
 				StringBuilder sb = Algorithms.readFromInputStream(con.getInputStream());
-				XmlPullParser parser = new KXmlParser();
+				XmlPullParser parser = PlatformUtil.newXMLPullParser();
 				parser.setInput(new StringReader(sb.toString()));
 				int tok;
 				ChangesetProps p = null;
