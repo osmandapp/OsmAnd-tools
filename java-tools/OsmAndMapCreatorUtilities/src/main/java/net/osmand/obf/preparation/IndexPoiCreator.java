@@ -58,7 +58,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
-	private static final int CHARACTERS_TO_BUILD = 4;
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
@@ -659,8 +658,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// && name.charAt(i) != '\''
 				if (prev != -1) {
 					String substr = name.substring(prev, i);
-					if (substr.length() > CHARACTERS_TO_BUILD) {
-						substr = substr.substring(0, CHARACTERS_TO_BUILD);
+					if (substr.length() > settings.charsToBuildPoiNameIndex) {
+						substr = substr.substring(0, settings.charsToBuildPoiNameIndex);
 					}
 					String val = substr.toLowerCase();
 					if (!poiData.containsKey(val)) {

@@ -47,6 +47,9 @@ public class IndexCreatorSettings {
 	
 	public int poiZipStringLimit = 100;
 	
+	public int charsToBuildPoiNameIndex = 4;
+	
+	public int charsToBuildAddressNameIndex = 4;
 	
 
 	public String getString(String key) {

@@ -112,7 +112,7 @@ public class MainUtilities {
 				settings.indexTransport = true;
 				settings.indexRouting = true;
 				scanSrtmFolder(subArgs, settings);
-				checkAddRegionArgsArgs(subArgs, settings);
+				parseIndexCreatorArgs(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
 				generateObf(toArray(subArgs), ic);
@@ -123,7 +123,7 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
-				checkAddRegionArgsArgs(subArgs, settings);
+				parseIndexCreatorArgs(subArgs, settings);
 				scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
@@ -133,7 +133,7 @@ public class MainUtilities {
 				settings.indexMap = true;
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				scanSrtmFolder(subArgs, settings);
-				checkAddRegionArgsArgs(subArgs, settings);
+				parseIndexCreatorArgs(subArgs, settings);
 				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
 				generateObf(toArray(subArgs), ic);
 			} else if (utl.equals("split-obf")) {
@@ -161,6 +161,7 @@ public class MainUtilities {
 				settings.indexAddress = true;
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
+				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgsArray, ic);
 			} else if (utl.equals("extract-roads-only")) {
 				File mainFile = new File(subArgsArray[0]);
@@ -173,6 +174,7 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
+				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgsArray, ic);
 
 			} else if (utl.equals("delete-unused-strings")) {
@@ -189,7 +191,7 @@ public class MainUtilities {
 			} else if (utl.equals("generate-roads")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexRouting = true;
-				checkAddRegionArgsArgs(subArgs, settings);
+				parseIndexCreatorArgs(subArgs, settings);
 				scanSrtmFolder(subArgs, settings);
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
@@ -238,12 +240,21 @@ public class MainUtilities {
 		}
 	}
 		
-	private static void checkAddRegionArgsArgs(List<String> subArgs, IndexCreatorSettings settings) {
+	private static void parseIndexCreatorArgs(List<String> subArgs, IndexCreatorSettings settings) {
 		Iterator<String> it = subArgs.iterator();
 		while(it.hasNext()) {
 			String s = it.next();
 			if (s.equals("--add-region-tags")) {
 				settings.addRegionTag = true;
+				it.remove();
+			} else if (s.equals("--keep-only-sea-objects")) {
+				settings.keepOnlySeaObjects = true;
+				it.remove();
+			} else if (s.startsWith("--chars-build-poi-nameindex=")) {
+				settings.charsToBuildPoiNameIndex = Integer.parseInt(s.substring("--chars-build-poi-nameindex=".length()));
+				it.remove();
+			} else if (s.startsWith("--chars-build-addr-nameindex=")) {
+				settings.charsToBuildAddressNameIndex = Integer.parseInt(s.substring("--chars-build-addr-nameindex=".length()));
 				it.remove();
 			}
 		}

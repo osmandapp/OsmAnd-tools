@@ -289,6 +289,7 @@ public class BinaryMerger {
 
 	private void combineAddressIndex(String name, BinaryMapIndexWriter writer, AddressRegion[] addressRegions, BinaryMapIndexReader[] indexes)
 			throws IOException {
+		IndexCreatorSettings settings = new IndexCreatorSettings();
 		Set<String> attributeTagsTableSet = new TreeSet<String>();
 		for (int i = 0; i != addressRegions.length; i++) {
 			AddressRegion region = addressRegions[i];
@@ -352,10 +353,10 @@ public class BinaryMerger {
 				BinaryFileReference ref = writer.writeCityHeader(city, cityType, tagRules);
 				refs.add(ref);
 				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
-				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer());
+				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 				if (!city.isPostcode()) {
 					for (Street s : city.getStreets()) {
-						IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset());
+						IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
 					}
 				}
 

@@ -85,7 +85,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 
-	private static final int ADDRESS_NAME_CHARACTERS_TO_INDEX = 4;
 	private TreeSet<String> langAttributes = new TreeSet<String>();
 	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
 
@@ -1103,7 +1102,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < posts.size(); i++) {
 			City postCode = posts.get(i);
 			BinaryFileReference ref = refs.get(i);
-			putNamedMapObject(namesIndex, postCode, ref.getStartPointer());
+			putNamedMapObject(namesIndex, postCode, ref.getStartPointer(), settings);
 			ArrayList<Street> streets = new ArrayList<Street>(postCode.getStreets());
 			Collections.sort(streets, new Comparator<Street>() {
 				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
@@ -1180,12 +1179,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset) {
+	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset, 
+			IndexCreatorSettings settings) {
 		String name = o.getName();
-		parsePrefix(name, o, namesIndex);
+		parsePrefix(name, o, namesIndex, settings);
 		for (String nm : o.getAllNames()) {
 			if (!nm.equals(name)) {
-				parsePrefix(nm, o, namesIndex);
+				parsePrefix(nm, o, namesIndex, settings);
 			}
 		}
 		if (fileOffset > Integer.MAX_VALUE) {
@@ -1207,7 +1207,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return retName;
 	}
 
-	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex) {
+	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex, 
+			IndexCreatorSettings settings) {
 		int prev = -1;
 		List<String> namesToAdd = new ArrayList<>();
 		name = Algorithms.normalizeSearchText(name);
@@ -1246,8 +1247,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		
 		// add to the map
 		for(String substr : namesToAdd) {
-			if (substr.length() > ADDRESS_NAME_CHARACTERS_TO_INDEX) {
-				substr = substr.substring(0, ADDRESS_NAME_CHARACTERS_TO_INDEX);
+			if (substr.length() > settings.charsToBuildAddressNameIndex) {
+				substr = substr.substring(0, settings.charsToBuildAddressNameIndex);
 			}
 			String val = substr.toLowerCase();
 			List<MapObject> list = namesIndex.get(val);
@@ -1276,7 +1277,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < cities.size(); i++) {
 			City city = cities.get(i);
 			BinaryFileReference ref = refs.get(i);
-			putNamedMapObject(namesIndex, city, ref.getStartPointer());
+			putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 			if (type == CITIES_TYPE) {
 				progress.progress(1);
 			} else {
@@ -1304,7 +1305,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			int bCount = 0;
 			// register postcodes and name index
 			for (Street s : streets) {
-				putNamedMapObject(namesIndex, s, s.getFileOffset());
+				putNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
 
 				for (Building b : s.getBuildings()) {
 					bCount++;
