@@ -173,10 +173,9 @@ public class MainUtilities {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexPOI = true;
 				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				parseIndexCreatorArgs(subArgs, settings);
-				generateObf(subArgsArray, ic);
-
+				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
+				generateObf(toArray(subArgs), ic);
 			} else if (utl.equals("delete-unused-strings")) {
 				ResourceDeleter.main(subArgsArray);
 			} else if (utl.equals("index-uploader-std")) {
