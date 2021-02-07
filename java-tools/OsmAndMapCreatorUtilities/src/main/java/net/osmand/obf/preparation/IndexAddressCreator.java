@@ -602,6 +602,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		nearestObjects.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
 		//either we found a city boundary the street is in
 		for (City c : nearestObjects) {
+			if(!c.getType().storedAsSeparateAdminEntity())
+				//ignore "city" thar never store in city table, see of IndexCreator.java methods: writeCitiesIntoDb && parameters of calling createMissingCity
+				continue;
 			Boundary boundary = cityBoundaries.get(c);
 			if (isInNames.contains(c.getName()) || (boundary != null && boundary.containsPoint(location))) {
 				// revert due to massive problems with suburb, village and other inside city objects
@@ -620,7 +623,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		});
 		for (City c : nearestObjects) {
-			if (relativeDistance(location, c) > 0.2) {
+			if(!c.getType().storedAsSeparateAdminEntity())
+				//ignore "city" thar never store in city table, see of IndexCreator.java methods: writeCitiesIntoDb && parameters of calling createMissingCity
+				continue;
+			if (relativeDistance(location, c) > 0.2) { //TODO what is magic 0.2 number ???
 				if (result.isEmpty()) {
 					result.add(c);
 				}
