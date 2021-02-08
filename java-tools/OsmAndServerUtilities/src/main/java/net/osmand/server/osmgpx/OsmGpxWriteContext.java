@@ -210,7 +210,7 @@ public class OsmGpxWriteContext {
 				// gpxTrackTags.put("gpx_icon", "");
 				gpxTrackTags.put("gpx_bg", activityType.getColor() + "_hexagon_3_road_shield");
 				gpxTrackTags.put("color", activityType.getColor());
-				gpxTrackTags.put("route_activity_type", activityType.name().toLowerCase());
+				gpxTrackTags.put("route_activity_type", activityType.getName().toLowerCase());
 			}
 		}
 	}
