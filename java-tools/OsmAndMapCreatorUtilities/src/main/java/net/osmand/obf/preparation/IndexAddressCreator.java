@@ -603,7 +603,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		//either we found a city boundary the street is in
 		for (City c : nearestObjects) {
 			if(!c.getType().storedAsSeparateAdminEntity())
-				//ignore "city" thar never store in city table, see of IndexCreator.java methods: writeCitiesIntoDb && parameters of calling createMissingCity
+				//ignore districts, boroughs, neighbourhood, so we don't get streets missing in the final obf
 				continue;
 
 			Boundary boundary = cityBoundaries.get(c);
@@ -625,10 +625,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		});
 		for (City c : nearestObjects) {
 			if(!c.getType().storedAsSeparateAdminEntity())
-				//ignore "city" thar never store in city table, see of IndexCreator.java methods: writeCitiesIntoDb && parameters of calling createMissingCity
+				//ignore districts, boroughs, neighbourhood, so we don't get streets missing in the final obf
 				continue;
 			
-			if (relativeDistance(location, c) > 0.2) { //TODO what is magic 0.2 number ???
+			if (relativeDistance(location, c) > 0.2) {
 				if (result.isEmpty()) {
 					result.add(c);
 				}
