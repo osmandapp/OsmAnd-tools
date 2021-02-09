@@ -141,7 +141,7 @@ public class DownloadOsmGPX {
 							if (av.trim().length() == 0) {
 								continue;
 							}
-							qp.activityTypes.add(RouteActivityType.valueOf(av.trim().toUpperCase()));
+							qp.activityTypes.add(RouteActivityType.getOrCreateTypeFromName(av.trim()));
 						}
 					}
 					break;
