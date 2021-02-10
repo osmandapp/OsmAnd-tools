@@ -1611,12 +1611,14 @@ public class BinaryMapIndexWriter {
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift,
 			String type, String subtype, Map<PoiAdditionalType, String> additionalNames,
-			PoiCreatorCategories globalCategories, int limitZip) throws IOException {
+			PoiCreatorCategories globalCategories, int limitZip, int x26shift, int y26shift) throws IOException {
 		checkPeekState(POI_DATA);
 		TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
 		OsmAndPoiBoxDataAtom.Builder builder = OsmandOdb.OsmAndPoiBoxDataAtom.newBuilder();
 		builder.setDx(x24shift);
 		builder.setDy(y24shift);
+		builder.setPreciseDx(x26shift);
+		builder.setPreciseDy(y26shift);
 		for (int i = 0; i < types.size(); i++) {
 			int j = types.get(i);
 			builder.addCategories(j);
