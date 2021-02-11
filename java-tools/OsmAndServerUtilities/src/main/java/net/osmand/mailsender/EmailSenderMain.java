@@ -174,9 +174,9 @@ public class EmailSenderMain {
                 "SELECT ?, ?, ? " +
                 "WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=?)");
         Gson gson = new Gson();
-        System.out.println(response);
         BlockedUser[] users = gson.fromJson(response, BlockedUser[].class);
         int batchSize = 0;
+        int updated = 0;
         for (BlockedUser user : users) {
             ps.setString(1, user.getEmail());
             ps.setString(2, user.getReason());
@@ -184,14 +184,26 @@ public class EmailSenderMain {
             ps.setString(4, user.getEmail());
             ps.addBatch();
             if (++batchSize > 500) {
-                ps.executeBatch();
+                int[] batch = ps.executeBatch();
+                updated += sumBatch(batch);
             }
         }
-        ps.executeBatch();
+        int[] batch = ps.executeBatch();
+        updated += sumBatch(batch);
         ps.close();
+        LOGGER.info(String.format("Updated blocked from sendgrid: %d blocked sendgrid, %d updated in db.", users.length, updated));
+        
     }
 
-    private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
+	private static int sumBatch(int[] batch) {
+		int s = 0;
+		for (int i = 0; i < batch.length; i++) {
+			s += batch[i];
+		}
+		return s;
+	}
+
+	private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
         String query = buildQuery(false, p.mailingGroups, p.daySince);
         LOGGER.info("SQL query is " + query);
         PreparedStatement ps = conn.prepareStatement(query);
