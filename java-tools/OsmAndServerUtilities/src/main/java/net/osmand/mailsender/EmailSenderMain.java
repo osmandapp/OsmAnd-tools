@@ -76,7 +76,9 @@ public class EmailSenderMain {
             } else if (arg.startsWith("--test_addr=")) {
             	p.testAddresses = val;
             } else if (arg.startsWith("--since-days-ago=")) {
-            	p.daySince = Integer.parseInt(val);
+            	if(val.length() > 0) {
+            		p.daySince = Integer.parseInt(val);
+            	}
             } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
             }
