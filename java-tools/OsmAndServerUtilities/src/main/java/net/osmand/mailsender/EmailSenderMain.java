@@ -269,15 +269,15 @@ public class EmailSenderMain {
         prep.close();
         LOGGER.info("Total: " + total);
         
+        LOGGER.info("Blocked/unsubscribed for selected topic: " + unsubscribed.size());
+        
         prep = conn.prepareStatement("SELECT count(*) FROM email_unsubscribed");
         rs = prep.executeQuery();
         int count = 0;
         while (rs.next()) {
             count = rs.getInt(1);
         }
-        LOGGER.info("Unsubscribed in total: " + count);
-        LOGGER.info("Blocked/unsubscribed on db: " + unsubscribed.size());
-        LOGGER.info("Fetching the invalid/blocked emails...");
+        LOGGER.info("Total Unsubscribed: " + count);
         prep.close();
         rs.close();
         count = 0;
@@ -287,7 +287,7 @@ public class EmailSenderMain {
         while (rs.next()) {
             count = rs.getInt(1);
         }
-        LOGGER.info("Total blocked: " + count);
+        LOGGER.info("Total Blocked: " + count);
     }
 
     private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) {
