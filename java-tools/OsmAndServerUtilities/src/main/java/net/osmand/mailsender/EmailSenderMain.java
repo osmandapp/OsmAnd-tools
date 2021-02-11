@@ -3,6 +3,7 @@ package net.osmand.mailsender;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -16,8 +17,6 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
-import net.osmand.mailsender.data.BlockedUser;
-
 import com.google.gson.Gson;
 import com.sendgrid.Email;
 import com.sendgrid.FooterSetting;
@@ -28,6 +27,8 @@ import com.sendgrid.Personalization;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
+
+import net.osmand.mailsender.data.BlockedUser;
 
 
 // Uses SendGrid's Java Library
@@ -48,7 +49,8 @@ public class EmailSenderMain {
         String mailFrom;
         int sentSuccess = 0;
         int sentFailed = 0;
-		public String giveawaySeries;
+        int daySince;
+		String giveawaySeries;
     }
 
     public static void main(String[] args) throws SQLException {
@@ -73,6 +75,8 @@ public class EmailSenderMain {
             	p.runMode = val;
             } else if (arg.startsWith("--test_addr=")) {
             	p.testAddresses = val;
+            } else if (arg.startsWith("--since-days-ago=")) {
+            	p.daySince = Integer.parseInt(val);
             } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
             }
@@ -186,7 +190,7 @@ public class EmailSenderMain {
     }
 
     private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
-        String query = buildQuery(p.mailingGroups);
+        String query = buildQuery(p.mailingGroups, p.daySince);
         LOGGER.info("SQL query is " + query);
         PreparedStatement ps = conn.prepareStatement(query);
         ResultSet resultSet = ps.executeQuery();
@@ -199,33 +203,37 @@ public class EmailSenderMain {
         LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
     }
 
-    private static String buildQuery(String mailingGroups) {
-        String[] groups = mailingGroups.split(",");
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < groups.length; i++) {
+    // 	email_free_users_android, email_free_users_ios, supporters, osm_recipients
+	private static String buildQuery(String mailingGroups, int daysSince) {
+		String[] groups = mailingGroups.split(",");
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < groups.length; i++) {
 			if (i > 0) {
 				sb.append(" UNION ");
 			}
-            sb.append("SELECT ");
-            String table = groups[i].trim();
-            sb.append((table.equals("supporters") ? "useremail" : "email"));
-            sb.append(" FROM ");
-            if(table.startsWith("email_free")) {
-            	sb.append(" email_free_users ");
-            	if(!table.contains("ios")) {
-            		sb.append(" WHERE os <> 'ios' or os is null");
-            	} else {
-            		sb.append(" WHERE os = 'ios' ");
-            	}
-            } else {
-            	sb.append(table);	
-            }
-        }
-        return sb.toString();
-    }
+			sb.append("SELECT ");
+			String table = groups[i].trim();
+			sb.append((table.equals("supporters") ? "useremail" : "email"));
+			sb.append(" FROM ");
+			if (table.startsWith("email_free")) {
+				sb.append(" email_free_users ");
+				if (!table.contains("ios")) {
+					sb.append(" WHERE (os <> 'ios' or os is null) ");
+				} else {
+					sb.append(" WHERE (os = 'ios') ");
+				}
+				if(daysSince > 0 && !table.equals("supporters")) {
+					sb.append(" and updatetime > now() - interval '" + daysSince + "' day ");
+				}
+			} else {
+				sb.append(table);
+			}
+		}
+		return sb.toString();
+	}
 
     private static void printStats(Connection conn, EmailParams p, Set<String> unsubscribed ) throws SQLException {
-        LOGGER.info("TEST SQL query for the databases: " + buildQuery(p.mailingGroups));
+        LOGGER.info("TEST SQL query for the databases: " + buildQuery(p.mailingGroups, p.daySince));
         String[] groups = p.mailingGroups.split(",");
         for (String group : groups) {
             group = group.trim();
@@ -360,8 +368,8 @@ public class EmailSenderMain {
         			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
         			+ "target='_blank'>%s</a></td></tr></tbody>"
         			+ "</table></td></tr></tbody></table></td></tr></table>",
-							"https://osmand.net/giveaway?series=" + URLEncoder.encode(p.giveawaySeries) + "&email="
-									+ URLEncoder.encode(mailTo), "Participate in a Giveaway!");
+							"https://osmand.net/giveaway?series=" + URLEncoder.encode(p.giveawaySeries, StandardCharsets.UTF_8) + "&email="
+									+ URLEncoder.encode(mailTo, StandardCharsets.UTF_8), "Participate in a Giveaway!");
         	footer = giv + footer;
         }
         footerSetting.setHtml("<html>"+footer+"</html>");
