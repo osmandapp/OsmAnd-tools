@@ -192,7 +192,7 @@ public class EmailSenderMain {
     }
 
     private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
-        String query = buildQuery(p.mailingGroups, p.daySince);
+        String query = buildQuery(false, p.mailingGroups, p.daySince);
         LOGGER.info("SQL query is " + query);
         PreparedStatement ps = conn.prepareStatement(query);
         ResultSet resultSet = ps.executeQuery();
@@ -206,7 +206,7 @@ public class EmailSenderMain {
     }
 
     // 	email_free_users_android, email_free_users_ios, supporters, osm_recipients
-	private static String buildQuery(String mailingGroups, int daysSince) {
+	private static String buildQuery(boolean count, String mailingGroups, int daysSince) {
 		String[] groups = mailingGroups.split(",");
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < groups.length; i++) {
@@ -214,43 +214,46 @@ public class EmailSenderMain {
 				sb.append(" UNION ");
 			}
 			sb.append("SELECT ");
-			String table = groups[i].trim();
-			sb.append((table.equals("supporters") ? "useremail" : "email"));
+			String group = groups[i].trim();
+			if(count) {
+				sb.append(String.format(" '%s', count(*) ", group));
+			} else {
+				sb.append((group.equals("supporters") ? "useremail" : "email"));
+			}
 			sb.append(" FROM ");
-			if (table.startsWith("email_free")) {
+			if (group.startsWith("email_free")) {
 				sb.append(" email_free_users ");
-				if (!table.contains("ios")) {
+				if (!group.contains("ios")) {
 					sb.append(" WHERE (os <> 'ios' or os is null) ");
 				} else {
 					sb.append(" WHERE (os = 'ios') ");
 				}
-				if(daysSince > 0 && !table.equals("supporters")) {
+				if(daysSince > 0 && !group.equals("supporters")) {
 					sb.append(" and updatetime > now() - interval '" + daysSince + "' day ");
 				}
 			} else {
-				sb.append(table);
+				sb.append(group);
 			}
 		}
 		return sb.toString();
 	}
 
     private static void printStats(Connection conn, EmailParams p, Set<String> unsubscribed ) throws SQLException {
-        LOGGER.info("TEST SQL query for the databases: " + buildQuery(p.mailingGroups, p.daySince));
-        String[] groups = p.mailingGroups.split(",");
-        for (String group : groups) {
-            group = group.trim();
-            PreparedStatement prep = conn.prepareStatement("SELECT count(*) FROM " + group);
-            ResultSet rs = prep.executeQuery();
-            int total = 0;
-            while (rs.next()) {
-                total = rs.getInt(1);
-            }
-            LOGGER.info("Total in the group " + group +": " + total);
-            rs.close();
-            prep.close();
-        }
-        PreparedStatement prep = conn.prepareStatement("SELECT count(*) FROM email_unsubscribed");
+    	String query = buildQuery(true, p.mailingGroups, p.daySince);
+        LOGGER.info("TEST SQL query for the databases: " + query);
+        PreparedStatement prep = conn.prepareStatement(query);
         ResultSet rs = prep.executeQuery();
+        int total = 0;
+        while (rs.next()) {
+            total += rs.getInt(2);
+            LOGGER.info("Total in the group '" + rs.getString(1) +"' : " + rs.getInt(2));
+        }
+        rs.close();
+        prep.close();
+        LOGGER.info("Total: " + total);
+        
+        prep = conn.prepareStatement("SELECT count(*) FROM email_unsubscribed");
+        rs = prep.executeQuery();
         int count = 0;
         while (rs.next()) {
             count = rs.getInt(1);
@@ -261,6 +264,7 @@ public class EmailSenderMain {
         prep.close();
         rs.close();
         count = 0;
+        
         prep = conn.prepareStatement("SELECT count(*) FROM email_blocked");
         rs = prep.executeQuery();
         while (rs.next()) {
