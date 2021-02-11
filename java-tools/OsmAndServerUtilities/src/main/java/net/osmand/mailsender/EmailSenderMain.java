@@ -37,6 +37,7 @@ import net.osmand.mailsender.data.BlockedUser;
 public class EmailSenderMain {
 
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
+    private static final String LIMIT_SENDGRID_API = "5000";// probably paging is needed use "offset": ..
     private static SendGrid sendGridClient;
     
     private static class EmailParams {
@@ -120,6 +121,7 @@ public class EmailSenderMain {
         Request request = new Request();
         request.setMethod(Method.GET);
         request.setEndpoint("suppression/unsubscribes");
+        request.addQueryParam("limit", LIMIT_SENDGRID_API);
         try {
             updateUnsubscribeDbFromResponse(sendGridClient.api(request), conn);
         } catch (Exception e) {
@@ -129,14 +131,13 @@ public class EmailSenderMain {
 
     private static void updateUnsubscribeDbFromResponse(Response queryResponse, Connection conn) throws SQLException {
         String response = queryResponse.getBody();
-        System.out.println(response);
         PreparedStatement ps = conn.prepareStatement("INSERT INTO email_unsubscribed(email, channel, timestamp) " +
                 "SELECT ?, ?, ? " +
                 "WHERE NOT EXISTS (SELECT email FROM email_unsubscribed WHERE email=? AND channel=?)");
         Gson gson = new Gson();
-        System.out.println(response);
         BlockedUser[] users = gson.fromJson(response, BlockedUser[].class);
         int batchSize = 0;
+        int updated = 0;
         for (BlockedUser user : users) {
             ps.setString(1, user.getEmail());
             ps.setString(2, "all");
@@ -145,22 +146,26 @@ public class EmailSenderMain {
             ps.setString(5, "all");
             ps.addBatch();
             if (++batchSize > 500) {
-                ps.executeBatch();
+                int[] batch = ps.executeBatch();
+                updated += sumBatch(batch);
             }
         }
-        ps.executeBatch();
+        int[] batch = ps.executeBatch();
+        updated += sumBatch(batch);
         ps.close();
+        LOGGER.info(String.format("Updated unsubscribed from sendgrid: %d unsubscribed sendgrid, %d updated in db.", users.length, updated));
     }
 
     private static void updateBlockList(Connection conn)  {
         String[] blockList = new String[] {"suppression/blocks", "suppression/bounces",
                 "suppression/spam_reports", "suppression/invalid_emails"};
-        for (String blocked : blockList) {
+        for (String blockGroup : blockList) {
             Request request = new Request();
             request.setMethod(Method.GET);
-            request.setEndpoint(blocked);
+			request.addQueryParam("limit", LIMIT_SENDGRID_API);
+            request.setEndpoint(blockGroup);
             try {
-                updateBlockDbFromResponse(sendGridClient.api(request), conn);
+                updateBlockDbFromResponse(sendGridClient.api(request), conn, blockGroup);
             } catch (Exception e) {
                 LOGGER.info(e.getMessage());
             }
@@ -168,7 +173,7 @@ public class EmailSenderMain {
 
     }
 
-    private static void updateBlockDbFromResponse(Response queryResponse, Connection conn) throws SQLException {
+    private static void updateBlockDbFromResponse(Response queryResponse, Connection conn, String blockGroup) throws SQLException {
         String response = queryResponse.getBody();
         PreparedStatement ps = conn.prepareStatement("INSERT INTO email_blocked(email, reason, timestamp) " +
                 "SELECT ?, ?, ? " +
@@ -191,7 +196,7 @@ public class EmailSenderMain {
         int[] batch = ps.executeBatch();
         updated += sumBatch(batch);
         ps.close();
-        LOGGER.info(String.format("Updated blocked from sendgrid: %d blocked sendgrid, %d updated in db.", users.length, updated));
+        LOGGER.info(String.format("Updated blocked %s from sendgrid: %d blocked sendgrid, %d updated in db.", blockGroup, users.length, updated));
         
     }
 
