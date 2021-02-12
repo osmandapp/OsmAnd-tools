@@ -494,8 +494,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String subtype = poi.subtype;
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
+
+					// calc diff between 26 and 24 zooms
+					int x24 = (x24shift + (x31 << (24 - z))) << 7;
+					int y24 = (y24shift + (y31 << (24 - z))) << 7;
+					int x26shift = (x31 >> 5) - (x << (26 - z));
+					int y26shift = (y31 >> 5) - (y << (26 - z));
+					int x26 = (x26shift + (x31 << (26 - z))) << 5;
+					int y26 = (y26shift + (y31 << (26 - z))) << 5;
+					int diffX = x26 - x24;
+					int diffY = y26 - y24;
+
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
-							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1);
+							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, diffX, diffY);
 				}
 
 			} else {
@@ -511,11 +522,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int y31 = rset.getInt(3);
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
+
+					// calc diff between 26 and 24 zooms
+					int x24 = (x24shift + (x31 << (24 - z))) << 7;
+					int y24 = (y24shift + (y31 << (24 - z))) << 7;
+					int x26shift = (x31 >> 5) - (x << (26 - z));
+					int y26shift = (y31 >> 5) - (y << (26 - z));
+					int x26 = (x26shift + (x31 << (26 - z))) << 5;
+					int y26 = (y26shift + (y31 << (26 - z))) << 5;
+					int diffX = x26 - x24;
+					int diffY = y26 - y24;
+
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
-							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1);
+							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, diffX, diffY);
 				}
 				rset.close();
 			}
