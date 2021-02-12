@@ -500,14 +500,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					// calc diff between 26 and 24 zooms
 					int x24 = (x24shift + (x31 << (24 - z))) << 7;
 					int y24 = (y24shift + (y31 << (24 - z))) << 7;
-
 					int x26shift = (x31 >> 5) - (x << (26 - z));
 					int y26shift = (y31 >> 5) - (y << (26 - z));
 					int x26 = (x26shift + (x31 << (26 - z))) << 5;
 					int y26 = (y26shift + (y31 << (26 - z))) << 5;
+					int diffX = x26 - x24;
+					int diffY = y26 - y24;
 
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
-							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, x26 - x24, y26 - y24);
+							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, diffX, diffY);
 				}
 
 			} else {
