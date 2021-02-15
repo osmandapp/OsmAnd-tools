@@ -494,8 +494,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String subtype = poi.subtype;
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
+					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
-							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1);
+							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
 				}
 
 			} else {
@@ -511,11 +512,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int y31 = rset.getInt(3);
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
+					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
-							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1);
+							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
 				}
 				rset.close();
 			}
