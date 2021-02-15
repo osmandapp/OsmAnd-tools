@@ -28,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -60,6 +61,10 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+
+import gnu.trove.list.array.TIntArrayList;
 import net.osmand.MapCreatorVersion;
 import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.PlatformUtil;
@@ -81,11 +86,6 @@ import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParser;
-
-import gnu.trove.list.array.TIntArrayList;
-
 
 public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
@@ -93,7 +93,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	private static final int EXPAND_X = 16;
 	private static final int EXPAND_Y = 16;
-    private static final int PIXEL_FRAME = 16;
 
 	protected static final Log log = PlatformUtil.getLog(MapPanel.class);
 	public static final int divNonLoadedImage = 16;
@@ -219,6 +218,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		kfm.addKeyEventDispatcher(new KeyEventDispatcher() {
 
 			@Override
+			@SuppressWarnings("deprecation")
 			public boolean dispatchKeyEvent(KeyEvent e) {
 				KeyStroke key2 = KeyStroke.getKeyStroke(KeyEvent.VK_L, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
 				KeyStroke key1 = KeyStroke.getKeyStroke(KeyEvent.VK_P, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
@@ -565,8 +565,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 
 	protected void downloadDiffs(Graphics2D g, MapDiff md) {
-		String url = "http://download.osmand.net/check_live.php?aosmc=true&timestamp=" + md.timestamp +
-				"&file=" + URLEncoder.encode(md.baseName);
+		String url = "https://download.osmand.net/check_live?aosmc=true&self=true&timestamp=" + md.timestamp +
+				"&file=" + URLEncoder.encode(md.baseName, StandardCharsets.UTF_8);
 		System.out.println("Loading " + url);
 		try {
 			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
@@ -589,8 +589,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				long time = updateFiles.get(file);
 				File targetFile = new File(dir, file.substring(0, file.length() - 3));
 				if(!targetFile.exists() || targetFile.lastModified() != time) {
-					String nurl = "http://download.osmand.net/download.php?aosmc=true&" + md.timestamp +
-							"&file=" + URLEncoder.encode(file);
+					String nurl = "https://download.osmand.net/download?aosmc=true&self=true&" + md.timestamp + "&file=" + URLEncoder.encode(file, StandardCharsets.UTF_8);
 					System.out.println("Loading " + nurl);
 					HttpURLConnection c = NetworkUtils.getHttpURLConnection(nurl);
 					GZIPInputStream gzip = new GZIPInputStream(c.getInputStream());

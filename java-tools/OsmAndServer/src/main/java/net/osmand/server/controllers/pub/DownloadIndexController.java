@@ -266,7 +266,7 @@ public class DownloadIndexController {
 				}
 			}
 			String host = null;
-			if(isSrtm(params)) {
+			if (isSrtm(params)) {
 				host = servers.getServer(DownloadServerSpecialty.SRTM);
 			} else if(isSlope(params)) {
 				host = servers.getServer(DownloadServerSpecialty.SLOPE);
