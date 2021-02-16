@@ -19,7 +19,7 @@ function usage {
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
-	echo "-f: make contours in feets"
+	echo "-f: make contours in feet"
 	echo "-d: slightly simplify with Douglas-Pecker algorithm to reduce file size in half"
 	echo "-t: threads number"
 }
@@ -34,7 +34,7 @@ while getopts ":i:o:spfdt:" opt; do
     ;;
     p) split_lines=true
     ;;
-    f) make_feets=true
+    f) make_feet=true
     ;;
     d) simplify=true
     ;;
@@ -49,11 +49,11 @@ while getopts ":i:o:spfdt:" opt; do
   esac
 done
 
-if [[ $make_feets == "true" ]] ; then
+if [[ $make_feet == "true" ]] ; then
 	isolines_step=40
-	translation_script=contours_feets.py
+	translation_script=contours_feet.py
 else
-	make_feets=false
+	make_feet=false
 fi
 if [[ $split_lines != "true" ]] ; then
 	split_lines=false
@@ -88,7 +88,7 @@ echo -e "\e[104moutput dir: $outdir\e[49m"
 echo -e "\e[104msmooth: $smooth\e[49m"
 echo -e "\e[104msimplify: $simplify\e[49m"
 echo -e "\e[104msplit_lines: $split_lines\e[49m"
-echo -e "\e[104mmake_feets: $make_feets\e[49m"
+echo -e "\e[104mmake_feet: $make_feet\e[49m"
 echo -e "\e[104misolines_step: $isolines_step\e[49m"
 if [[ $threads_number_is_set ]]; then
 	echo -e "\e[104mthreads number: $threads_number_1\e[49m"
@@ -103,7 +103,7 @@ export working_dir
 export smooth
 export simplify
 export split_lines
-export make_feets
+export make_feet
 export isolines_step
 export translation_script
 
@@ -116,7 +116,7 @@ process_tiff ()
 		echo "Processing "$1
 		echo "----------------------------------------------"
 		src_tiff=$1
-		if [[ $make_feets == "true" ]] ; then
+		if [[ $make_feet == "true" ]] ; then
 			gdal_calc.py -A $1 --outfile=${TMP_DIR}/$filename.tif --calc="A/0.3048"
 			src_tiff=${TMP_DIR}/$filename.tif
 		fi
