@@ -15,16 +15,16 @@ isolines_step=10
 translation_script=contours.py
 
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s -p -f -d -t}"
-	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s -p -d -f -t [threads number]}"
+	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
-	echo "-f: make contours in feet"
-	echo "-d: slightly simplify with Douglas-Pecker algorithm to reduce file size in half"
+	echo "-d: slightly simplify contours with Douglas-Pecker algorithm to reduce file size in half"
 	echo "-t: threads number"
+	echo "-f: make contours in feet"
 }
 
-while getopts ":i:o:spfdt:" opt; do
+while getopts ":i:o:spdt:f" opt; do
   case $opt in
     i) indir="$OPTARG"
     ;;
