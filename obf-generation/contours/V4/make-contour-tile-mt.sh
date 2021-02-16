@@ -15,15 +15,16 @@ isolines_step=10
 translation_script=contours.py
 
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s -p -f -d}"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s -p -f -d -t}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
 	echo "-f: make contours in feet"
 	echo "-d: slightly simplify with Douglas-Pecker algorithm to reduce file size in half"
+	echo "-t: threads number"
 }
 
-while getopts ":i:o:spfd" opt; do
+while getopts ":i:o:spfdt:" opt; do
   case $opt in
     i) indir="$OPTARG"
     ;;
@@ -36,6 +37,11 @@ while getopts ":i:o:spfd" opt; do
     f) make_feet=true
     ;;
     d) simplify=true
+    ;;
+    t) threads_number_1="$OPTARG"
+       threads_number_2="$OPTARG"
+       threads_number_3="$OPTARG"
+       threads_number_is_set=true
     ;;
     \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
 	usage
@@ -84,9 +90,11 @@ echo -e "\e[104msimplify: $simplify\e[49m"
 echo -e "\e[104msplit_lines: $split_lines\e[49m"
 echo -e "\e[104mmake_feet: $make_feet\e[49m"
 echo -e "\e[104misolines_step: $isolines_step\e[49m"
+if [[ $threads_number_is_set ]]; then
+	echo -e "\e[104mthreads number: $threads_number_1\e[49m"
+fi
 
 working_dir=$(pwd)
-# thread_number=$3
 cd $outdir
 
 export outdir
