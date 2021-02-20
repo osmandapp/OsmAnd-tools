@@ -27,6 +27,7 @@ import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.OceanTilesCreator;
+import net.osmand.osm.FilterOsmByTags;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
@@ -195,6 +196,8 @@ public class MainUtilities {
 				IndexCreator ic = new IndexCreator(new File("."), settings);
 				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
 				generateObf(toArray(subArgs), ic);
+			} else if (utl.equals("filter-osm-by-tag")) {
+				FilterOsmByTags.main(subArgsArray);
 			} else if (utl.contentEquals("generate-osmlive-tests")) {
 				if (subArgsArray.length < 1) {
 					System.out.println("Usage: <path_to_directory_with_resources_project> <optional_path_to_unpack_files>");
