@@ -100,6 +100,7 @@ public class CustomWikiModel extends WikiModel {
 		}
 		
 		String type = imageFormat.getType();
+		String caption = imageFormat.getCaption();
 		TagToken tag = null;
 		if ("thumb".equals(type) || "frame".equals(type)) {
 			if (fTagStack.size() > 0) {
@@ -107,7 +108,11 @@ public class CustomWikiModel extends WikiModel {
 			}
 			reduceTokenStack(Configuration.HTML_DIV_OPEN);
 		}
-		imageFormat.setType("thumbnail");
+		if ("frameless".equals(caption)) {
+			imageFormat.setCaption(null);
+		} else {
+			imageFormat.setType("thumbnail");
+		}
 		
 		String[] parts = rawImageLink.split("\\|");
 
