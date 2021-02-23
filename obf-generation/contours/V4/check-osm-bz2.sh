@@ -26,9 +26,9 @@ check ()
 	if [[ $? -eq 1 ]]; then
 		echo Error! $filename is incomplete. Removing.
 		rm -f $indir/$filename.osm.bz2
-	fi
 #	mv $outdir/$filename.tmp $outdir/$filename.tif
-	else echo "Skipping "$1 "(already processed)"
+	else
+		echo "Skipping "$1 "(already processed)"
 	fi
 }
 export -f check
