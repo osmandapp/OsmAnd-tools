@@ -84,7 +84,8 @@ public class WikivoyageGenOSM {
 		List<String> jsonContents = new ArrayList<>();
 
 		public void addArticle(String lang, String title, GPXFile gpxFile, double lat, double lon, String content,
-							   String imageTitle, String partOf, String isParentOf, String aggrPartOf, String jsonContent) {
+							   String imageTitle, String bannerTitle, String partOf, String isParentOf,
+							   String aggrPartOf, String jsonContent) {
 			int ind = size();
 			if (lang.equals("en")) {
 				ind = 0;
@@ -98,7 +99,7 @@ public class WikivoyageGenOSM {
 			}
 			latlons.add(ind, ll);
 			contents.add(ind, content);
-			imageTitles.add(ind, imageTitle);
+			imageTitles.add(ind, bannerTitle);
 			partsOf.add(ind, partOf);
 			parentOf.add(ind, isParentOf);
 			aggrPartsOf.add(ind, aggrPartOf);
@@ -153,7 +154,7 @@ public class WikivoyageGenOSM {
 		// travel_articles: 	
 		// 						population, country, region, city_type, osm_i,
 		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, "
-				+ "gpx_gz, image_title, is_part_of, is_parent_of, aggregated_part_of, contents_json from travel_articles order by trip_id asc");
+				+ "gpx_gz, image_title, banner_title, is_part_of, is_parent_of, aggregated_part_of, contents_json from travel_articles order by trip_id asc");
 		int count = 0, totalArticles = 0, emptyLocation = 0, emptyContent = 0;
 		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
 		XmlSerializer serializer = null;
@@ -191,12 +192,13 @@ public class WikivoyageGenOSM {
 			GZIPInputStream bytesStream = new GZIPInputStream(new ByteArrayInputStream(rs.getBytes(rind++)));
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(bytesStream);
 			String imageTitle = rs.getString(rind++);
+			String bannerTitle = rs.getString(rind++);
 			String isPartOf = rs.getString(rind++);
 			String isParentOf = rs.getString(rind++);
 			String isAggrPartOf = rs.getString(rind++);
 			String contentJson = rs.getString(rind);
-			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle, isPartOf, isParentOf,
-					isAggrPartOf, contentJson);
+			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle, bannerTitle, isPartOf,
+					isParentOf, isAggrPartOf, contentJson);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
 				if (lat == 0 && lon == 0) {
 					emptyLocation++;
