@@ -8,16 +8,20 @@ import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
+import java.awt.BasicStroke;
+import java.awt.GradientPaint;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.osmand.GPXUtilities;
 import net.osmand.data.DataTileManager;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
+import net.osmand.router.RouteColorize;
 import net.osmand.util.MapUtils;
 
 
@@ -37,6 +41,8 @@ public class MapPointsLayer implements MapPanelLayer {
 	private List<LineObject> linesToDraw = new ArrayList<LineObject>();
 
 	private Font whiteFont;
+	List<GPXUtilities.WptPt> wayPoints;
+	public RouteColorize.ValueType colorizationType = RouteColorize.ValueType.NONE;
 
 	private static class LineObject {
 		Way w;
@@ -76,6 +82,12 @@ public class MapPointsLayer implements MapPanelLayer {
 
 	@Override
 	public void paintLayer(Graphics2D g) {
+
+		if (colorizationType != RouteColorize.ValueType.NONE) {
+			colorizeRoute(g);
+			return;
+		}
+
 		Map<Point, String> pointsToDraw = this.pointsToDraw;
 		List<LineObject> linesToDraw = this.linesToDraw;
 		g.setColor(color);
@@ -230,6 +242,35 @@ public class MapPointsLayer implements MapPanelLayer {
 
 	public void setPoints(DataTileManager<? extends Entity> points) {
 		this.points = points;
+	}
+
+	public void setWayPoints(List<GPXUtilities.WptPt> wayPoints) {
+		this.wayPoints = wayPoints;
+	}
+
+	public void setColorizationType(RouteColorize.ValueType colorizationType) {
+		this.colorizationType = colorizationType;
+	}
+
+	private void colorizeRoute(Graphics2D g) {
+		if (this.wayPoints == null || colorizationType == RouteColorize.ValueType.NONE)
+			return;
+
+		double[][] palette = new double[0][0];//will use default palette
+		RouteColorize routeColorize = new RouteColorize(map.getZoom(), palette, wayPoints, colorizationType);
+		List<RouteColorize.Data> dataList = routeColorize.getResult(true);
+
+		for (int i = 1; i < dataList.size(); i++) {
+			int pixX1 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i - 1).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
+			int pixY1 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i - 1).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
+			int pixX2 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
+			int pixY2 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
+			GradientPaint gp = new GradientPaint(pixX1, pixY1, dataList.get(i - 1).color, pixX2, pixY2,
+					dataList.get(i).color, false);
+			g.setPaint(gp);
+			g.setStroke(new BasicStroke(10));
+			g.draw(new Line2D.Float(pixX1, pixY1, pixX2, pixY2));
+		}
 	}
 
 	@Override
