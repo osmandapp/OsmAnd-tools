@@ -141,7 +141,7 @@ public class WikivoyageDataGenerator {
 		}
 		rs1.close();
 		updateImagesToSource(conn, imagesConn, existingImagesMapping, sourceImages, "banner_title");
-		//updateImagesToSource(conn, imagesConn, existingImagesMapping, sourceImages, "image_title");
+//		updateImagesToSource(conn, imagesConn, existingImagesMapping, sourceImages, "image_title");
 		
 		imagesConn.close();
 		
