@@ -262,15 +262,15 @@ public class MapPointsLayer implements MapPanelLayer {
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		routeColorize.setPalette(palette);
-		List<RouteColorize.Data> dataList = routeColorize.getResult(true);
+		List<RouteColorize.RouteColorizationPoint> dataList = routeColorize.getResult(true);
 
 		for (int i = 1; i < dataList.size(); i++) {
 			int pixX1 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i - 1).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
 			int pixY1 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i - 1).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
 			int pixX2 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
 			int pixY2 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
-			GradientPaint gp = new GradientPaint(pixX1, pixY1, dataList.get(i - 1).color, pixX2, pixY2,
-					dataList.get(i).color, false);
+			GradientPaint gp = new GradientPaint(pixX1, pixY1, new Color(dataList.get(i - 1).color), pixX2, pixY2,
+					new Color(dataList.get(i).color), false);
 			g.setPaint(gp);
 			g.setStroke(new BasicStroke(10));
 			g.draw(new Line2D.Float(pixX1, pixY1, pixX2, pixY2));
