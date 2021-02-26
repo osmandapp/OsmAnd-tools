@@ -989,8 +989,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		prepareImage();
 	}
 
-	public void setWayPoints(List<GPXUtilities.WptPt> wayPoints) {
-		getLayer(MapPointsLayer.class).setWayPoints(wayPoints);
+	public void setGpxFile(GPXUtilities.GPXFile gpxFile) {
+		getLayer(MapPointsLayer.class).setGpxFile(gpxFile);
 	}
 
 	public void setColorizationType(RouteColorize.ValueType colorizationType) {

@@ -491,17 +491,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	private void colorizeGpxFile(RouteColorize.ValueType colorizationType) {
-		List<WptPt> wayPoints = new ArrayList<>();
-		if (selectedGPXFile != null) {
-			for (Track t : selectedGPXFile.tracks) {
-				for (TrkSegment ts : t.segments) {
-					for (WptPt p : ts.points) {
-						wayPoints.add(p);
-					}
-				}
-			}
-		}
-		map.setWayPoints(wayPoints);
+		map.setGpxFile(selectedGPXFile);
 		map.setColorizationType(colorizationType);
 	}
 

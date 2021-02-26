@@ -41,7 +41,7 @@ public class MapPointsLayer implements MapPanelLayer {
 	private List<LineObject> linesToDraw = new ArrayList<LineObject>();
 
 	private Font whiteFont;
-	List<GPXUtilities.WptPt> wayPoints;
+	GPXUtilities.GPXFile gpxFile;
 	public RouteColorize.ValueType colorizationType = RouteColorize.ValueType.NONE;
 
 	private static class LineObject {
@@ -244,8 +244,8 @@ public class MapPointsLayer implements MapPanelLayer {
 		this.points = points;
 	}
 
-	public void setWayPoints(List<GPXUtilities.WptPt> wayPoints) {
-		this.wayPoints = wayPoints;
+	public void setGpxFile(GPXUtilities.GPXFile wayPoints) {
+		this.gpxFile = wayPoints;
 	}
 
 	public void setColorizationType(RouteColorize.ValueType colorizationType) {
@@ -253,11 +253,15 @@ public class MapPointsLayer implements MapPanelLayer {
 	}
 
 	private void colorizeRoute(Graphics2D g) {
-		if (this.wayPoints == null || colorizationType == RouteColorize.ValueType.NONE)
+		if (this.gpxFile == null || colorizationType == RouteColorize.ValueType.NONE)
 			return;
 
-		double[][] palette = new double[0][0];//will use default palette
-		RouteColorize routeColorize = new RouteColorize(map.getZoom(), palette, wayPoints, colorizationType);
+		RouteColorize routeColorize = new RouteColorize(map.getZoom(), gpxFile, colorizationType);
+		double[][] palette = {{routeColorize.minValue, RouteColorize.LIGHT_GREY}, {routeColorize.maxValue, RouteColorize.DARK_GREY}};
+		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
+		//double[][] palette = {{routeColorize.minValue, RouteColorize.GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
+		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
+		routeColorize.setPalette(palette);
 		List<RouteColorize.Data> dataList = routeColorize.getResult(true);
 
 		for (int i = 1; i < dataList.size(); i++) {
