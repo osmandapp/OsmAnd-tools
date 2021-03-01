@@ -43,6 +43,7 @@ public class MapPointsLayer implements MapPanelLayer {
 	private Font whiteFont;
 	GPXUtilities.GPXFile gpxFile;
 	public RouteColorize.ValueType colorizationType = RouteColorize.ValueType.NONE;
+	private boolean isGrey = true;
 
 	private static class LineObject {
 		Way w;
@@ -252,14 +253,22 @@ public class MapPointsLayer implements MapPanelLayer {
 		this.colorizationType = colorizationType;
 	}
 
+	public void setGrey(boolean isGrey) {
+		this.isGrey = isGrey;
+	}
+
 	private void colorizeRoute(Graphics2D g) {
 		if (this.gpxFile == null || colorizationType == RouteColorize.ValueType.NONE)
 			return;
 
 		RouteColorize routeColorize = new RouteColorize(map.getZoom(), gpxFile, colorizationType);
-		double[][] palette = {{routeColorize.minValue, RouteColorize.LIGHT_GREY}, {routeColorize.maxValue, RouteColorize.DARK_GREY}};
+		double[][] palette;
+		if (isGrey) {
+			palette = new double[][]{{routeColorize.minValue, RouteColorize.LIGHT_GREY}, {routeColorize.maxValue, RouteColorize.DARK_GREY}};
+		} else {
+			palette = new double[][]{{routeColorize.minValue, RouteColorize.GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
+		}
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
-		//double[][] palette = {{routeColorize.minValue, RouteColorize.GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		routeColorize.setPalette(palette);
 		List<RouteColorize.RouteColorizationPoint> dataList = routeColorize.getResult(true);

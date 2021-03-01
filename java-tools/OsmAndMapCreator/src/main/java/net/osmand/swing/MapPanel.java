@@ -993,8 +993,9 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		getLayer(MapPointsLayer.class).setGpxFile(gpxFile);
 	}
 
-	public void setColorizationType(RouteColorize.ValueType colorizationType) {
+	public void setColorizationType(RouteColorize.ValueType colorizationType, boolean grey) {
 		getLayer(MapPointsLayer.class).setColorizationType(colorizationType);
+		getLayer(MapPointsLayer.class).setGrey(grey);
 		repaint();
 	}
 
