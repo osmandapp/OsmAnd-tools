@@ -61,6 +61,8 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
+import net.osmand.GPXUtilities;
+import net.osmand.router.RouteColorize;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -565,10 +567,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 
 	protected void downloadDiffs(Graphics2D g, MapDiff md) {
-		String url = "https://download.osmand.net/check_live?aosmc=true&self=true&timestamp=" + md.timestamp +
-				"&file=" + URLEncoder.encode(md.baseName, StandardCharsets.UTF_8);
-		System.out.println("Loading " + url);
 		try {
+			String url = "https://download.osmand.net/check_live?aosmc=true&self=true&timestamp=" + md.timestamp +
+					"&file=" + URLEncoder.encode(md.baseName, StandardCharsets.UTF_8.toString());
+			System.out.println("Loading " + url);
 			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(conn.getInputStream(), "UTF-8");
@@ -589,7 +591,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				long time = updateFiles.get(file);
 				File targetFile = new File(dir, file.substring(0, file.length() - 3));
 				if(!targetFile.exists() || targetFile.lastModified() != time) {
-					String nurl = "https://download.osmand.net/download?aosmc=true&self=true&" + md.timestamp + "&file=" + URLEncoder.encode(file, StandardCharsets.UTF_8);
+					String nurl = "https://download.osmand.net/download?aosmc=true&self=true&" + md.timestamp + "&file=" + URLEncoder.encode(file, StandardCharsets.UTF_8.toString());
 					System.out.println("Loading " + nurl);
 					HttpURLConnection c = NetworkUtils.getHttpURLConnection(nurl);
 					GZIPInputStream gzip = new GZIPInputStream(c.getInputStream());
@@ -985,6 +987,15 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	public void setPoints(DataTileManager<? extends Entity> points) {
 		getLayer(MapPointsLayer.class).setPoints(points);
 		prepareImage();
+	}
+
+	public void setGpxFile(GPXUtilities.GPXFile gpxFile) {
+		getLayer(MapPointsLayer.class).setGpxFile(gpxFile);
+	}
+
+	public void setColorizationType(RouteColorize.ValueType colorizationType) {
+		getLayer(MapPointsLayer.class).setColorizationType(colorizationType);
+		repaint();
 	}
 
 	public Point getPopupMenuPoint(){

@@ -39,6 +39,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import net.osmand.router.*;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -67,15 +68,9 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
-import net.osmand.router.PrecalculatedRouteDirection;
-import net.osmand.router.RouteExporter;
-import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
-import net.osmand.router.RouteSegmentResult;
-import net.osmand.router.RoutingConfiguration;
-import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -436,10 +431,45 @@ public class MapRouterLayer implements MapPanelLayer {
 					DataTileManager<Way> points = new DataTileManager<Way>(11);
 					map.setPoints(points);
 					selectedGPXFile = null;
+					colorizeGpxFile(RouteColorize.ValueType.NONE);
 					map.fillPopupActions();
 				}
 			};
 			menu.add(unselectGPXFile);
+
+			final JMenu colorize = new JMenu("Colorize GPX file ");
+			Action altitude = new AbstractAction("Altitude") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					colorizeGpxFile(RouteColorize.ValueType.ELEVATION);
+					map.fillPopupActions();
+				}
+			};
+			colorize.add(altitude);
+			Action speed = new AbstractAction("Speed") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					colorizeGpxFile(RouteColorize.ValueType.SPEED);
+					map.fillPopupActions();
+				}
+			};
+			colorize.add(speed);
+			Action slope = new AbstractAction("Slope") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					colorizeGpxFile(RouteColorize.ValueType.SLOPE);
+					map.fillPopupActions();
+				}
+			};
+			colorize.add(slope);
+			menu.add(colorize);
+
 		}
 		
 	}
@@ -460,6 +490,10 @@ public class MapRouterLayer implements MapPanelLayer {
 		map.setPoints(points);
 	}
 
+	private void colorizeGpxFile(RouteColorize.ValueType colorizationType) {
+		map.setGpxFile(selectedGPXFile);
+		map.setColorizationType(colorizationType);
+	}
 
 	private void calcStraightRoute(LatLon currentLatLon) {
 		System.out.println("Distance: " + MapUtils.getDistance(startRoute, endRoute));
