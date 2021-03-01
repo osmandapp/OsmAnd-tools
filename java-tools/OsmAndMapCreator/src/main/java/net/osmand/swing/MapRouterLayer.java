@@ -431,7 +431,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					DataTileManager<Way> points = new DataTileManager<Way>(11);
 					map.setPoints(points);
 					selectedGPXFile = null;
-					colorizeGpxFile(RouteColorize.ValueType.NONE);
+					colorizeGpxFile(RouteColorize.ValueType.NONE, true);
 					map.fillPopupActions();
 				}
 			};
@@ -443,7 +443,12 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					colorizeGpxFile(RouteColorize.ValueType.ELEVATION);
+					int result = showOptionColorSchemeDialog(colorize);
+					if (result == JOptionPane.YES_OPTION) {
+						colorizeGpxFile(RouteColorize.ValueType.ELEVATION, true);
+					} else {
+						colorizeGpxFile(RouteColorize.ValueType.ELEVATION, false);
+					}
 					map.fillPopupActions();
 				}
 			};
@@ -453,7 +458,12 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					colorizeGpxFile(RouteColorize.ValueType.SPEED);
+					int result = showOptionColorSchemeDialog(colorize);
+					if (result == JOptionPane.YES_OPTION) {
+						colorizeGpxFile(RouteColorize.ValueType.SPEED, true);
+					} else {
+						colorizeGpxFile(RouteColorize.ValueType.SPEED, false);
+					}
 					map.fillPopupActions();
 				}
 			};
@@ -463,7 +473,12 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					colorizeGpxFile(RouteColorize.ValueType.SLOPE);
+					int result = showOptionColorSchemeDialog(colorize);
+					if (result == JOptionPane.YES_OPTION) {
+						colorizeGpxFile(RouteColorize.ValueType.SLOPE, true);
+					} else {
+						colorizeGpxFile(RouteColorize.ValueType.SLOPE, false);
+					}
 					map.fillPopupActions();
 				}
 			};
@@ -472,6 +487,13 @@ public class MapRouterLayer implements MapPanelLayer {
 
 		}
 		
+	}
+
+	private int showOptionColorSchemeDialog(JMenu frame) {
+		String[] options = new String[2];
+		options[0] = "Grey";
+		options[1] = "Red, yellow, green";
+		return JOptionPane.showOptionDialog(frame, "What color scheme to use?", "Color scheme", 0, JOptionPane.INFORMATION_MESSAGE, null, options, null);
 	}
 	
 	private void displayGpxFile() {
@@ -490,9 +512,9 @@ public class MapRouterLayer implements MapPanelLayer {
 		map.setPoints(points);
 	}
 
-	private void colorizeGpxFile(RouteColorize.ValueType colorizationType) {
+	private void colorizeGpxFile(RouteColorize.ValueType colorizationType, boolean grey) {
 		map.setGpxFile(selectedGPXFile);
-		map.setColorizationType(colorizationType);
+		map.setColorizationType(colorizationType, grey);
 	}
 
 	private void calcStraightRoute(LatLon currentLatLon) {
