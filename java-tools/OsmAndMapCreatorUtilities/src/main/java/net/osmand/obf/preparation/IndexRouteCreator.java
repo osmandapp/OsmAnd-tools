@@ -207,10 +207,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		if (n == null) {
 			return;
 		}
-		QuadRect latLonBBox = e.getLatLonBBox();
-		if (latLonBBox == null) {
-			return;
-		}
 		List<Multipolygon> results = lowEmissionZones.queryInBox(
 				new QuadRect(n.getLongitude(), n.getLatitude(), n.getLongitude(), n.getLatitude()), new ArrayList<>(0));
 		for (Multipolygon m : results) {
@@ -219,7 +215,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				break;
 			}
 		}
-
 	}
 
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
