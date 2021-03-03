@@ -353,7 +353,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private MultipolygonBuilder createMultipolygonBuilder(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+	public static MultipolygonBuilder createMultipolygonBuilder(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		ctx.loadEntityRelation((Relation) e);
 
 		// create a multipolygon object for this

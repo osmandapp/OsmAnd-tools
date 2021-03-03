@@ -1154,15 +1154,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String postcode = e.getKey().getTag(OSMTagKey.POSTAL_CODE);
 			Multipolygon mp = e.getValue().getMultipolygon();
 			QuadRect bbox = mp.getLatLonBbox();
-			if(bbox.width() > 0) {
+			if (bbox.width() > 0) {
 				ps.setDouble(1, bbox.top);
 				ps.setDouble(2, bbox.bottom);
 				ps.setDouble(3, bbox.left);
 				ps.setDouble(4, bbox.right);
 				ResultSet rs = ps.executeQuery();
-				while(rs.next()) {
+				while (rs.next()) {
 					String pst = rs.getString(1);
-					if(Algorithms.isEmpty(pst)) {
+					if (Algorithms.isEmpty(pst)) {
 						if (mp.containsPoint(rs.getDouble(2), rs.getDouble(3))) {
 							assignPostcodes.put(rs.getLong(4), postcode);
 						}
