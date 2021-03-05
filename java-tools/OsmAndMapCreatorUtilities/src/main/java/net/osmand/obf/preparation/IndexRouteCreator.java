@@ -67,6 +67,7 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -160,10 +161,18 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}
 	
+	public void indexExtraRelations(OsmBaseStorage reader) {
+		for (Entity e : reader.getRegisteredEntities().values()) {
+			if (e instanceof Relation && "low_emission_zone".equals(e.getTags().get("boundary"))) {
+				e.initializeLinks(reader.getRegisteredEntities());
+				addLowEmissonZoneRelation((Relation) e);
+			}
+		}
+	}
+	
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
 		if (e instanceof Relation) {
-			indexLowEmissonZoneRelation(e, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.ROUTING);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
@@ -178,22 +187,21 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						pt.putThroughTags.put("highway", "speed_camera");
 					}
 				}
-
+			}
+			if ("low_emission_zone".equals(e.getTags().get("boundary"))) {
+				ctx.loadEntityRelation((Relation) e);
+				addLowEmissonZoneRelation((Relation) e);
 			}
 		}
 	}
 
-	private void indexLowEmissonZoneRelation(Entity e, OsmDbAccessorContext ctx)
-			throws SQLException {
-		if ("low_emission_zone".equals(e.getTags().get("boundary"))) {
-			MultipolygonBuilder multipolygonBuilder = IndexVectorMapCreator.createMultipolygonBuilder(e, ctx);
-			Multipolygon lowEmissionZone = multipolygonBuilder.build();
-			if (lowEmissionZone != null) {
-				QuadRect bbox = lowEmissionZone.getLatLonBbox();
-				QuadRect flippedBbox = flipBbox(bbox);
-				lowEmissionZones.insert(lowEmissionZone, flippedBbox);
-			}
-			
+	private void addLowEmissonZoneRelation(Relation e) {
+		MultipolygonBuilder multipolygonBuilder = IndexVectorMapCreator.createMultipolygonBuilder(e);
+		Multipolygon lowEmissionZone = multipolygonBuilder.build();
+		if (lowEmissionZone != null) {
+			QuadRect bbox = lowEmissionZone.getLatLonBbox();
+			QuadRect flippedBbox = flipBbox(bbox);
+			lowEmissionZones.insert(lowEmissionZone, flippedBbox);
 		}
 	}
 

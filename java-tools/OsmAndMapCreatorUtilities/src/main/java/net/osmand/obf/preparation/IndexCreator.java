@@ -571,11 +571,7 @@ public class IndexCreator {
 			or = prepareRegions();
 		}
 		
-		if (!settings.extraRelations.isEmpty()) {
-//			List<File> list = new ArrayList<File>(Arrays.asList(readFile));
-//			list.addAll(0, settings.extraRelations);
-//			readFile = list.toArray(new File[list.size()]);
-		}
+		
 		
 		boolean translitJapaneseNames = false;
 		if (regionName.startsWith("Japan")) {
@@ -589,6 +585,21 @@ public class IndexCreator {
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes,
 				settings);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
+		
+		if (!settings.extraRelations.isEmpty()) {
+			for(File inputFile : settings.extraRelations) {
+				OsmBaseStorage reader = new OsmBaseStorage();
+				InputStream fis = new FileInputStream(inputFile);
+				if (inputFile.getName().endsWith(".gz")) {
+					fis = new GZIPInputStream(fis);
+				} else if (inputFile.getName().endsWith(".bz2")) {
+					fis = new BZip2CompressorInputStream(fis);
+				}
+				reader.parseOSM(null, progress);
+				fis.close();
+				indexRouteCreator.indexExtraRelations(reader);
+			}
+		}
 
 		// Main generation method
 		try {

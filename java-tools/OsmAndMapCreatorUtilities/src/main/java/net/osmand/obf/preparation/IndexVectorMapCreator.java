@@ -260,7 +260,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 		}
 		
-		MultipolygonBuilder original = createMultipolygonBuilder(e, ctx);
+		ctx.loadEntityRelation((Relation) e);
+		MultipolygonBuilder original = createMultipolygonBuilder(e);
 		try {
 			renderingTypes.encodeEntityWithType(false, tags, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
 		} catch (RuntimeException es) {
@@ -353,8 +354,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public static MultipolygonBuilder createMultipolygonBuilder(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		ctx.loadEntityRelation((Relation) e);
+	public static MultipolygonBuilder createMultipolygonBuilder(Entity e) {
 
 		// create a multipolygon object for this
 		MultipolygonBuilder original = new MultipolygonBuilder();
