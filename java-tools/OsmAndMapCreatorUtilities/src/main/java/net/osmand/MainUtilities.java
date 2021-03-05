@@ -252,7 +252,7 @@ public class MainUtilities {
 			} else if (s.equals("--keep-only-sea-objects")) {
 				settings.keepOnlySeaObjects = true;
 				it.remove();
-			} else if (s.equals("--extra-relations=")) {
+			} else if (s.startsWith("--extra-relations=")) {
 				String[] files = s.substring("--extra-relations=".length()).split(",");
 				for (String f : files) {
 					settings.extraRelations.add(new File(f));
