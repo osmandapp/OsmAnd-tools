@@ -572,9 +572,9 @@ public class IndexCreator {
 		}
 		
 		if (!settings.extraRelations.isEmpty()) {
-			List<File> list = new ArrayList<File>(Arrays.asList(readFile));
-			list.addAll(0, settings.extraRelations);
-			readFile = list.toArray(new File[list.size()]);
+//			List<File> list = new ArrayList<File>(Arrays.asList(readFile));
+//			list.addAll(0, settings.extraRelations);
+//			readFile = list.toArray(new File[list.size()]);
 		}
 		
 		boolean translitJapaneseNames = false;
