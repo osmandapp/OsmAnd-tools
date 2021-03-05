@@ -1,6 +1,8 @@
 package net.osmand.obf.preparation;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import net.osmand.data.Multipolygon;
 
@@ -25,9 +27,11 @@ public class IndexCreatorSettings {
 	// gtfs data for public transport
 	public File gtfsData;
 	
+	// for example file with low emissions polygons 
+	public List<File> extraRelations = new ArrayList<>();
+	
 	// for seamarks generation
 	public boolean keepOnlySeaObjects;
-	
 	
 	// limit entities by multipolygon (used by srtm)  
 	public Multipolygon boundary;

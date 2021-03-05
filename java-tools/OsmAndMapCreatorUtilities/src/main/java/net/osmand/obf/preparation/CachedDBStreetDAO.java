@@ -10,7 +10,6 @@ import java.util.Set;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
-import net.osmand.obf.preparation.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;

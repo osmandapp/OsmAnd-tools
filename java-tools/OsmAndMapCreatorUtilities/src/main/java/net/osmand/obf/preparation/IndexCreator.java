@@ -571,6 +571,12 @@ public class IndexCreator {
 			or = prepareRegions();
 		}
 		
+		if (!settings.extraRelations.isEmpty()) {
+			List<File> list = new ArrayList<File>(Arrays.asList(readFile));
+			list.addAll(0, settings.extraRelations);
+			readFile = list.toArray(new File[list.size()]);
+		}
+		
 		boolean translitJapaneseNames = false;
 		if (regionName.startsWith("Japan")) {
 			translitJapaneseNames = true;

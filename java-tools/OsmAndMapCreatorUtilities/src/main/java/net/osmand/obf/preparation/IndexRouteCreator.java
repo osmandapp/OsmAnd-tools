@@ -163,6 +163,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
 		if (e instanceof Relation) {
+			indexLowEmissonZoneRelation(e, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.ROUTING);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
@@ -179,18 +180,20 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 
 			}
-			
-			if ("low_emission_zone".equals(tags.get("boundary"))) {
-				MultipolygonBuilder multipolygonBuilder = IndexVectorMapCreator.createMultipolygonBuilder(e, ctx);
-				Multipolygon lowEmissionZone = multipolygonBuilder.build();
-				if (lowEmissionZone != null) {
-					QuadRect bbox = lowEmissionZone.getLatLonBbox();
-					QuadRect flippedBbox = flipBbox(bbox);
-					lowEmissionZones.insert(lowEmissionZone, flippedBbox);
-				}
-				
-			}
+		}
+	}
 
+	private void indexLowEmissonZoneRelation(Entity e, OsmDbAccessorContext ctx)
+			throws SQLException {
+		if ("low_emission_zone".equals(e.getTags().get("boundary"))) {
+			MultipolygonBuilder multipolygonBuilder = IndexVectorMapCreator.createMultipolygonBuilder(e, ctx);
+			Multipolygon lowEmissionZone = multipolygonBuilder.build();
+			if (lowEmissionZone != null) {
+				QuadRect bbox = lowEmissionZone.getLatLonBbox();
+				QuadRect flippedBbox = flipBbox(bbox);
+				lowEmissionZones.insert(lowEmissionZone, flippedBbox);
+			}
+			
 		}
 	}
 

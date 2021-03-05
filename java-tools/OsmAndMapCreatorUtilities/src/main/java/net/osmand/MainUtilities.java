@@ -252,6 +252,11 @@ public class MainUtilities {
 			} else if (s.equals("--keep-only-sea-objects")) {
 				settings.keepOnlySeaObjects = true;
 				it.remove();
+			} else if (s.equals("--extra-relations=")) {
+				String[] files = s.substring("--extra-relations=".length()).split(",");
+				for (String f : files) {
+					settings.extraRelations.add(new File(f));
+				}
 			} else if (s.startsWith("--chars-build-poi-nameindex=")) {
 				settings.charsToBuildPoiNameIndex = Integer.parseInt(s.substring("--chars-build-poi-nameindex=".length()));
 				it.remove();
