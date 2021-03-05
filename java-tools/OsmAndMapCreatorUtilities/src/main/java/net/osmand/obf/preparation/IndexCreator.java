@@ -595,7 +595,7 @@ public class IndexCreator {
 				} else if (inputFile.getName().endsWith(".bz2")) {
 					fis = new BZip2CompressorInputStream(fis);
 				}
-				reader.parseOSM(null, progress);
+				reader.parseOSM(fis, progress);
 				fis.close();
 				indexRouteCreator.indexExtraRelations(reader);
 			}
