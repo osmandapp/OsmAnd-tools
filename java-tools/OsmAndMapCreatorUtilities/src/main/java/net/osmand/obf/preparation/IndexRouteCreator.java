@@ -44,6 +44,10 @@ import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.RouteDataObject.RestrictionInfo;
 import net.osmand.data.LatLon;
+import net.osmand.data.Multipolygon;
+import net.osmand.data.MultipolygonBuilder;
+import net.osmand.data.QuadRect;
+import net.osmand.data.QuadTree;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
@@ -88,6 +92,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
+	
+	// flipped quad tree cause bottom > top
+	private QuadTree<Multipolygon> lowEmissionZones = new QuadTree<Multipolygon>(new QuadRect(-180, -90, 90, 180), 8, 0.55f);
 
 
 	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
@@ -152,12 +159,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		this.settings = settings;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}
+	
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
-		if(e instanceof Relation) {
+		if (e instanceof Relation) {
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.ROUTING);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
-			if("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
+			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
 				ctx.loadEntityRelation((Relation) e);
 				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
 				// mark as speed cameras
@@ -171,7 +179,41 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 
 			}
+			
+			if ("low_emission_zone".equals(tags.get("boundary"))) {
+				MultipolygonBuilder multipolygonBuilder = IndexVectorMapCreator.createMultipolygonBuilder(e, ctx);
+				Multipolygon lowEmissionZone = multipolygonBuilder.build();
+				if (lowEmissionZone != null) {
+					QuadRect bbox = lowEmissionZone.getLatLonBbox();
+					QuadRect flippedBbox = flipBbox(bbox);
+					lowEmissionZones.insert(lowEmissionZone, flippedBbox);
+				}
+				
+			}
 
+		}
+	}
+
+	private QuadRect flipBbox(QuadRect bbox) {
+		return new QuadRect(bbox.left, bbox.bottom, bbox.right, bbox.top);
+	}
+	
+	private void addLowEmissionZoneTag(Way e) {
+		Node n = null;
+		// get first not null node
+		for (int i = 0; i < e.getNodes().size() && n == null; i++) {
+			n = e.getNodes().get(i);
+		}
+		if (n == null) {
+			return;
+		}
+		List<Multipolygon> results = lowEmissionZones.queryInBox(
+				new QuadRect(n.getLongitude(), n.getLatitude(), n.getLongitude(), n.getLatitude()), new ArrayList<>(0));
+		for (Multipolygon m : results) {
+			if (m.containsPoint(n.getLatitude(), n.getLongitude())) {
+				e.putTag("low_emission_zone", "true");
+				break;
+			}
 		}
 	}
 
@@ -189,6 +231,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					ex.printStackTrace();
 				}
 			}
+			addLowEmissionZoneTag(e);
 			tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.ROUTING, e);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.WAY, EntityConvertApplyType.ROUTING);
 			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names)
@@ -222,8 +265,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-
 	}
+
+
 	private List<Node> simplifyRouteForBaseSection(List<Node> source, long id) {
 		ArrayList<Node> result = new ArrayList<Node>();
 		boolean[] kept = OsmMapUtils.simplifyDouglasPeucker(source, 11 /*zoom*/+ 8 + 1 /*smoothness*/, 3, result, false);
