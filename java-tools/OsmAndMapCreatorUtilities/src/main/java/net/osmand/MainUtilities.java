@@ -257,6 +257,7 @@ public class MainUtilities {
 				for (String f : files) {
 					settings.extraRelations.add(new File(f));
 				}
+				it.remove();
 			} else if (s.startsWith("--chars-build-poi-nameindex=")) {
 				settings.charsToBuildPoiNameIndex = Integer.parseInt(s.substring("--chars-build-poi-nameindex=".length()));
 				it.remove();
