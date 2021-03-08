@@ -172,7 +172,7 @@ public class GenerateDailyObf {
 	}
 
 	public static void generateCountry(String name, File targetObfZip, File[] array, long targetTimestamp, File nodesFile) 
- throws IOException, SQLException, InterruptedException, XmlPullParserException {
+			throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		boolean exception = true;
 		try {
 			RTree.clearCache();

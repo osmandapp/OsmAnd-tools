@@ -1,10 +1,5 @@
 package net.osmand.obf.preparation;
 
-import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.TLongSet;
-import gnu.trove.set.hash.TLongHashSet;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
@@ -12,12 +7,15 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.TLongSet;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.data.City.CityType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -30,9 +28,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 public class OsmDbCreator implements IOsmStorageFilter {
 
@@ -75,7 +70,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private long generatedId = -100;
 
 	private static boolean VALIDATE_DUPLICATES = false;
-	private boolean backwardComptibleIds;
 	private TLongObjectHashMap<Long> generatedIds = new TLongObjectHashMap<Long>();
 	private TLongObjectHashMap<Long> hashes = new TLongObjectHashMap<Long>();
 	private TLongSet idSet = new TLongHashSet();
@@ -96,9 +90,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	
 	private long convertId(Entity e) {
 		long id = e.getId();
-		if (backwardComptibleIds) {
-			return id;
-		}
 		boolean simpleConvertId = !ovewriteIds && shiftId > 0;
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
@@ -468,10 +459,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		return allWays;
 	}
 
-	public void setBackwardCompatibleIds(boolean backwardComptibleIds) {
-		this.backwardComptibleIds = backwardComptibleIds;
-		
-	}
 	
 
 }

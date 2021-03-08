@@ -14,6 +14,9 @@ public class IndexCreatorSettings {
 	public boolean indexAddress;
 	public boolean indexRouting;
 	public boolean addRegionTag = false;
+	
+	// use Sqlite in RAM instead of normal Sqlite (speeds up process but takes a lot of RAM)  
+	public boolean processInRam;
 
 	// generate low level roads and maps
 	public boolean generateLowLevel = true;
@@ -30,6 +33,9 @@ public class IndexCreatorSettings {
 	// for example file with low emissions polygons 
 	public List<File> extraRelations = new ArrayList<>();
 	
+	// path to rendering_types.xml
+	public String renderingTypesFile;
+	
 	// for seamarks generation
 	public boolean keepOnlySeaObjects;
 	
@@ -42,8 +48,6 @@ public class IndexCreatorSettings {
 	public boolean houseNumberPreferredOverName = true;
 
 	// should be documented
-	public boolean backwardCompatibleIds = false;
-	
 	public boolean suppressWarningsForDuplicateIds = true;
 
 	// make by default
@@ -54,6 +58,7 @@ public class IndexCreatorSettings {
 	public int charsToBuildPoiNameIndex = 4;
 	
 	public int charsToBuildAddressNameIndex = 4;
+	
 	
 
 	public String getString(String key) {

@@ -97,13 +97,13 @@ public class IndexCreator {
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
 		this.settings = settings;
-		if(settings.srtmDataFolder == null && new File(workingDir, "srtm").exists()) {
+		if (settings.srtmDataFolder == null && new File(workingDir, "srtm").exists()) {
 			settings.srtmDataFolder = new File(workingDir, "srtm");
 		}
-		if(settings.srtmDataFolder != null) {
+		if (settings.srtmDataFolder != null) {
 			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("TIFF");
 			while (readers.hasNext()) {
-			    System.out.println("Tiff reader: " + readers.next());
+				System.out.println("Tiff reader: " + readers.next());
 			}
 			heightData = new IndexHeightData();
 			heightData.setSrtmData(settings.srtmDataFolder);
@@ -298,7 +298,6 @@ public class IndexCreator {
 			dbCreator.setWayIds(previous.getWayIds());
 			dbCreator.setRelationIds(previous.getRelationIds());
 		}
-		dbCreator.setBackwardCompatibleIds(settings.backwardCompatibleIds);
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(settings.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$

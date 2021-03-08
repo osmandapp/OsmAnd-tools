@@ -30,6 +30,13 @@ import java.util.logging.SimpleFormatter;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.impl.Jdk14Logger;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
 import net.osmand.IndexConstants;
 import net.osmand.MapCreatorVersion;
 import net.osmand.PlatformUtil;
@@ -40,14 +47,6 @@ import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.impl.Jdk14Logger;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
-
 import rtree.RTree;
 
 
@@ -68,7 +67,6 @@ public class IndexBatchCreator {
 	}
 
 	private static class RegionSpecificData {
-		public String cityAdminLevel;
 		public String downloadName;
 		public boolean indexSRTM = true;
 		public boolean indexPOI = true;
@@ -98,16 +96,16 @@ public class IndexBatchCreator {
 	private String wget;
 
 	private DBDialect osmDbDialect;
-	private DBDialect mapDBDialect;
-
 	private String renderingTypesFile;
 
-
+	@SuppressWarnings("resource")
 	public static void main(String[] args) {
 		IndexBatchCreator creator = new IndexBatchCreator();
-		if(args == null || args.length == 0){
-			System.out.println("Please specify -local parameter or path to batch.xml configuration file as 1 argument.");
-			throw new IllegalArgumentException("Please specify -local parameter or path to batch.xml configuration file as 1 argument.");
+		if (args == null || args.length == 0) {
+			System.out
+					.println("Please specify -local parameter or path to batch.xml configuration file as 1 argument.");
+			throw new IllegalArgumentException(
+					"Please specify -local parameter or path to batch.xml configuration file as 1 argument.");
 		}
 		String name = args[0];
 		InputStream stream;
@@ -134,21 +132,21 @@ public class IndexBatchCreator {
 		try {
 			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(stream);
 			Document regions = null;
-			if(regionsStream != null) {
+			if (regionsStream != null) {
 				name = args[1];
 				regions = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(regionsStream);
 			}
 			List<RegionCountries> countriesToDownload = creator.setupProcess(doc, regions);
-			if(internalRegionsList != null) {
+			if (internalRegionsList != null) {
 				RegionCountries rc = new RegionCountries();
-				//rc.siteToDownload = "http://builder.osmand.net/osm-extract/{0}/{0}.pbf";
+				// rc.siteToDownload = "http://builder.osmand.net/osm-extract/{0}/{0}.pbf";
 				rc.siteToDownload = "/home/osm-planet/osm-extract/{0}/{0}.pbf";
 				CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 				CountryRegion regionStructure = ocbfGeneration.parseDefaultOsmAndRegionStructure();
 				Iterator<CountryRegion> it = regionStructure.iterator();
-				while(it.hasNext()) {
+				while (it.hasNext()) {
 					CountryRegion cr = it.next();
-					if(cr.map && !cr.jointMap) {
+					if (cr.map && !cr.jointMap) {
 						RegionSpecificData dt = new RegionSpecificData();
 						dt.downloadName = cr.getDownloadName();
 						rc.regionNames.put(cr.getDownloadName(), dt);
@@ -166,10 +164,11 @@ public class IndexBatchCreator {
 		}
 	}
 
-	public List<RegionCountries> setupProcess(Document doc, Document regions) throws SAXException, IOException, ParserConfigurationException{
+	public List<RegionCountries> setupProcess(Document doc, Document regions)
+			throws SAXException, IOException, ParserConfigurationException {
 		NodeList list = doc.getElementsByTagName("process");
-		if(list.getLength() != 1){
-			 throw new IllegalArgumentException("You should specify exactly 1 process element!");
+		if (list.getLength() != 1) {
+			throw new IllegalArgumentException("You should specify exactly 1 process element!");
 		}
 		Element process = (Element) list.item(0);
 		IndexCreator.REMOVE_POI_DB = true;
@@ -181,36 +180,39 @@ public class IndexBatchCreator {
 
 		indexPOI = Boolean.parseBoolean(process.getAttribute("indexPOI"));
 		indexMap = Boolean.parseBoolean(process.getAttribute("indexMap"));
-		indexRouting = process.getAttribute("indexRouting") == null ||
-				process.getAttribute("indexRouting").equalsIgnoreCase("true");
+		indexRouting = process.getAttribute("indexRouting") == null
+				|| process.getAttribute("indexRouting").equalsIgnoreCase("true");
 		indexTransport = Boolean.parseBoolean(process.getAttribute("indexTransport"));
 		indexAddress = Boolean.parseBoolean(process.getAttribute("indexAddress"));
 		parseProcessAttributes(process);
 
 		list = doc.getElementsByTagName("process_attributes");
-		if(list.getLength() == 1){
+		if (list.getLength() == 1) {
 			parseProcessAttributes((Element) list.item(0));
 		}
 
 		String dir = process.getAttribute("directory_for_osm_files");
-		if(dir == null || !new File(dir).exists()) {
-			throw new IllegalArgumentException("Please specify directory with .osm or .osm.bz2 files as directory_for_osm_files (attribute)" + dir); //$NON-NLS-1$
+		if (dir == null || !new File(dir).exists()) {
+			throw new IllegalArgumentException(
+					"Please specify directory with .osm or .osm.bz2 files as directory_for_osm_files (attribute)" //$NON-NLS-1$
+							+ dir);
 		}
 		osmDirFiles = new File(dir);
-		
+
 		dir = process.getAttribute("directory_for_srtm_files");
-		if(dir != null && new File(dir).exists()) {
+		if (dir != null && new File(dir).exists()) {
 			srtmDir = new File(dir);
 		}
-		
+
 		dir = process.getAttribute("directory_for_index_files");
-		if(dir == null || !new File(dir).exists()) {
-			throw new IllegalArgumentException("Please specify directory with generated index files  as directory_for_index_files (attribute)"); //$NON-NLS-1$
+		if (dir == null || !new File(dir).exists()) {
+			throw new IllegalArgumentException(
+					"Please specify directory with generated index files  as directory_for_index_files (attribute)"); //$NON-NLS-1$
 		}
 		indexDirFiles = new File(dir);
 		workDir = indexDirFiles;
 		dir = process.getAttribute("directory_for_generation");
-		if(dir != null && new File(dir).exists()) {
+		if (dir != null && new File(dir).exists()) {
 			workDir = new File(dir);
 		}
 
@@ -247,7 +249,6 @@ public class IndexBatchCreator {
 					Element ncountry = (Element) ncountries.item(j);
 					String name = ncountry.getAttribute("name");
 					RegionSpecificData data = new RegionSpecificData();
-					data.cityAdminLevel = ncountry.getAttribute("cityAdminLevel");
 					data.indexSRTM = ncountry.getAttribute("indexSRTM") == null || 
 							ncountry.getAttribute("indexSRTM").equalsIgnoreCase("true");
 					String index = ncountry.getAttribute("index");
@@ -288,14 +289,6 @@ public class IndexBatchCreator {
 		if(osmDbDialect != null && osmDbDialect.length() > 0){
 			try {
 				this.osmDbDialect = DBDialect.valueOf(osmDbDialect.toUpperCase());
-			} catch (RuntimeException e) {
-			}
-		}
-
-		String mapDbDialect = process.getAttribute("mapDbDialect");
-		if (mapDbDialect != null && mapDbDialect.length() > 0) {
-			try {
-				this.mapDBDialect = DBDialect.valueOf(mapDbDialect.toUpperCase());
 			} catch (RuntimeException e) {
 			}
 		}
@@ -516,11 +509,11 @@ public class IndexBatchCreator {
 				settings.zoomWaySmoothness = zoomWaySmoothness;
 			}
 			boolean worldMaps = rName.toLowerCase().contains("world") ;
-			if(worldMaps) {
-				if(rName.toLowerCase().contains("basemap")) {
+			if (worldMaps) {
+				if (rName.toLowerCase().contains("basemap")) {
 					return;
 				}
-				if(rName.toLowerCase().contains("seamarks")) {
+				if (rName.toLowerCase().contains("seamarks")) {
 					settings.keepOnlySeaObjects = true;
 					settings.indexTransport = false;
 					settings.indexAddress = false;

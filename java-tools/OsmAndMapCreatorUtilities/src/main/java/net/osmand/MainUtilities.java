@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.BinaryComparator;
@@ -24,10 +27,12 @@ import net.osmand.obf.diff.ObfDiffGenerator;
 import net.osmand.obf.diff.ObfDiffMerger;
 import net.osmand.obf.diff.ObfRegionSplitter;
 import net.osmand.obf.preparation.BasemapProcessor;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.OceanTilesCreator;
 import net.osmand.osm.FilterOsmByTags;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
@@ -46,9 +51,6 @@ import net.osmand.util.ResourceDeleter;
 import net.osmand.util.SplitHillshadeIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
@@ -112,11 +114,8 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
-				scanSrtmFolder(subArgs, settings);
 				parseIndexCreatorArgs(subArgs, settings);
-				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
-				generateObf(toArray(subArgs), ic);
+				generateObf(subArgs, settings);
 			} else if (utl.equals("generate-obf-no-address")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
@@ -125,18 +124,12 @@ public class MainUtilities {
 				settings.indexTransport = true;
 				settings.indexRouting = true;
 				parseIndexCreatorArgs(subArgs, settings);
-				scanSrtmFolder(subArgs, settings);
-				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
-				generateObf(toArray(subArgs), ic);
+				generateObf(subArgs, settings);
 			} else if (utl.equals("generate-map")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
-				IndexCreator ic = new IndexCreator(new File("."), settings);
-				scanSrtmFolder(subArgs, settings);
 				parseIndexCreatorArgs(subArgs, settings);
-				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
-				generateObf(toArray(subArgs), ic);
+				generateObf(subArgs, settings);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
 			} else if (utl.equals("merge-bulk-osmlive-day")) {
@@ -160,10 +153,8 @@ public class MainUtilities {
 			} else if (utl.equals("generate-address")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexAddress = true;
-				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgsArray[0]).lastModified());
 				parseIndexCreatorArgs(subArgs, settings);
-				generateObf(subArgsArray, ic);
+				generateObf(subArgs, settings);
 			} else if (utl.equals("extract-roads-only")) {
 				File mainFile = new File(subArgsArray[0]);
 				IndexUploader.extractRoadOnlyFile(
@@ -173,10 +164,8 @@ public class MainUtilities {
 			} else if (utl.equals("generate-poi")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexPOI = true;
-				IndexCreator ic = new IndexCreator(new File("."), settings);
 				parseIndexCreatorArgs(subArgs, settings);
-				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
-				generateObf(toArray(subArgs), ic);
+				generateObf(subArgs, settings);
 			} else if (utl.equals("delete-unused-strings")) {
 				ResourceDeleter.main(subArgsArray);
 			} else if (utl.equals("index-uploader-std")) {
@@ -192,10 +181,7 @@ public class MainUtilities {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexRouting = true;
 				parseIndexCreatorArgs(subArgs, settings);
-				scanSrtmFolder(subArgs, settings);
-				IndexCreator ic = new IndexCreator(new File("."), settings);
-				ic.setLastModifiedDate(new File(subArgs.get(0)).lastModified());
-				generateObf(toArray(subArgs), ic);
+				generateObf(subArgs, settings);
 			} else if (utl.equals("filter-osm-by-tag")) {
 				FilterOsmByTags.main(subArgsArray);
 			} else if (utl.contentEquals("generate-osmlive-tests")) {
@@ -227,30 +213,28 @@ public class MainUtilities {
 		}
 	}
 
-	private static String[] toArray(List<String> subArgs) {
-		return subArgs.toArray(new String[subArgs.size()]);
-	}
-
-	private static void scanSrtmFolder(List<String> subArgs, IndexCreatorSettings settings) {
-		Iterator<String> it = subArgs.iterator();
-		while(it.hasNext()) {
-			String s = it.next();
-			if(s.startsWith("--srtm=")) {
-				settings.srtmDataFolder = new File(s.substring(s.indexOf('=') + 1));
-				it.remove();
-			}
-		}
-	}
-		
 	private static void parseIndexCreatorArgs(List<String> subArgs, IndexCreatorSettings settings) {
 		Iterator<String> it = subArgs.iterator();
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			String s = it.next();
 			if (s.equals("--add-region-tags")) {
 				settings.addRegionTag = true;
 				it.remove();
 			} else if (s.equals("--keep-only-sea-objects")) {
 				settings.keepOnlySeaObjects = true;
+				it.remove();
+			} else if (s.equals("--ram-process")) {
+				settings.processInRam = true;
+				it.remove();
+			} else if (s.startsWith("--srtm=")) {
+				settings.srtmDataFolder = new File(s.substring(s.indexOf('=') + 1));
+				it.remove();
+			} else if (s.startsWith("--rendering-types=")) {
+				settings.renderingTypesFile = s.substring(s.indexOf('=') + 1);
+				it.remove();
+			} else if (s.startsWith("--poi-types=")) {
+				MapPoiTypes poiTypes = new MapPoiTypes(s.substring(s.indexOf('=') + 1));
+				MapPoiTypes.setDefault(poiTypes);
 				it.remove();
 			} else if (s.startsWith("--extra-relations=")) {
 				String[] files = s.substring("--extra-relations=".length()).split(",");
@@ -306,15 +290,17 @@ public class MainUtilities {
 		}
 	}
 
-	private static void generateObf(String[] subArgsArray, IndexCreator ic) throws IOException, SQLException,
+	private static void generateObf(List<String> subArgs, IndexCreatorSettings settings) throws IOException, SQLException,
 			InterruptedException, XmlPullParserException {
-		String regionName = subArgsArray[0];
-		String renderingTypesFile = "";
-		if (subArgsArray.length > 1) {
-			renderingTypesFile = subArgsArray[1];
-		}
-		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(renderingTypesFile, regionName);
-		ic.generateIndexes(new File(subArgsArray[0]), new ConsoleProgressImplementation(), null, MapZooms.getDefault(),
+		File fileToGen = new File(subArgs.get(0));
+		IndexCreator ic = new IndexCreator(new File("."), settings);
+		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE, 
+				settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE);
+		ic.setLastModifiedDate(fileToGen.lastModified());
+		String regionName = fileToGen.getName();
+		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(settings.renderingTypesFile, regionName);
+		ic.setMapFileName(regionName);
+		ic.generateIndexes(fileToGen, new ConsoleProgressImplementation(), null, MapZooms.getDefault(),
 				types, log);
 	}
 

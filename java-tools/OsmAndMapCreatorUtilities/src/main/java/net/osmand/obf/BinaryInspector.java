@@ -79,10 +79,10 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
+//					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-//					"-vrouting",
+					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities","-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
@@ -90,10 +90,8 @@ public class BinaryInspector {
 //					"-zoom=6",
 					// road
 //					"-latlon=48.8416,17.4115",
+					System.getProperty("maps.dir")+"/21_03_05_17_05.obf"
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
-//					System.getProperty("maps.dir")+"/Map.obf"
-//					System.getProperty("maps.dir")+"Germany_saarland_europe_2.srtm.obf"
-					System.getProperty("maps.dir")+"/Wikivoyage.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
