@@ -299,7 +299,6 @@ public class MainUtilities {
 		ic.setLastModifiedDate(fileToGen.lastModified());
 		String regionName = fileToGen.getName();
 		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(settings.renderingTypesFile, regionName);
-		ic.setMapFileName(regionName);
 		ic.generateIndexes(fileToGen, new ConsoleProgressImplementation(), null, MapZooms.getDefault(),
 				types, log);
 	}
