@@ -163,7 +163,7 @@ public class CalculateOsmChangesets {
 							p.bot = 0;
 							p.user = parser.getAttributeValue("", "user");
 							p.uid = parser.getAttributeValue("", "uid");
-							p.id = parser.getAttributeValue("", "id");
+							p.id = Long.parseLong(parser.getAttributeValue("", "id"));
 							p.createdAt = parser.getAttributeValue("", "created_at");
 						} else if (parser.getName().equals("tag") && p != null) {
 							String k = parser.getAttributeValue("", "k");
@@ -176,9 +176,9 @@ public class CalculateOsmChangesets {
 					} else if (tok == XmlPullParser.END_TAG) {
 						if (parser.getName().equals("changeset")) {
 							if (!isEmpty(p.closedAt)) {
-								selChangeset.setString(1, p.id);
+								selChangeset.setLong(1, p.id);
 								if (!selChangeset.executeQuery().next()) {
-									insChangeset.setString(1, p.id);
+									insChangeset.setLong(1, p.id);
 									insChangeset.setInt(2, p.bot);
 									insChangeset.setTimestamp(3, parseTimestamp(p.createdAt));
 									insChangeset.setTimestamp(4, parseTimestamp(p.closedAt));
@@ -197,16 +197,16 @@ public class CalculateOsmChangesets {
 									insChangesets++;
 								}
 
-								delPrepare.setString(1, p.id);
+								delPrepare.setLong(1, p.id);
 								int upd = delPrepare.executeUpdate();
 								if (upd > 0) {
 									delPChangesets++;
 								}
 							} else {
-								selPrepare.setString(1, p.id);
+								selPrepare.setLong(1, p.id);
 
 								if (!selPrepare.executeQuery().next()) {
-									insPrepare.setString(1, p.id);
+									insPrepare.setLong(1, p.id);
 									insPrepare.setString(2, p.createdAt.replace('T', ' '));
 									insPrepare.execute();
 									insPChangesets++;
@@ -283,7 +283,7 @@ public class CalculateOsmChangesets {
 				double minlon = rs.getDouble(3);
 				double maxlat = rs.getDouble(4);
 				double maxlon = rs.getDouble(5);
-				String changesetId = rs.getString(1);
+				long changesetId = rs.getLong(1);
 				int lx = MapUtils.get31TileNumberX(minlon);
 				int rx = MapUtils.get31TileNumberX(maxlon);
 				int ty = MapUtils.get31TileNumberY(maxlat);
@@ -316,7 +316,7 @@ public class CalculateOsmChangesets {
 								}
 							}
 						}
-						ps.setString(1, changesetId);
+						ps.setLong(1, changesetId);
 						ps.setInt(2, map.get(reg));
 						ps.setInt(3, small ? 1 : 0);
 						ps.addBatch();
@@ -503,7 +503,7 @@ public class CalculateOsmChangesets {
 		public Map<String, String> tags = new TreeMap<String, String>();
 		public String createdBy;
 		public String createdAt;
-		public String id;
+		public long id;
 		public int bot;
 		public int changesCount;
 		public String closedAt;
