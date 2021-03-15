@@ -373,13 +373,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				ct = CityType.SUBURB;
 			}
 		}
-		if (ct == null && e instanceof Relation) {
-			ctx.loadEntityRelation((Relation) e);
-			List<Entity> adminCentres = ((Relation) e).getMemberEntities("admin_centre");
-			if (adminCentres.size() > 0) {
-				ct = CityType.valueFromString(adminCentres.get(0).getTag(OSMTagKey.PLACE));
-			}
-		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
 		boolean postalCode = "postal_code".equals(e.getTag(OSMTagKey.BOUNDARY));
 		if (administrative || postalCode || ct != null) {
@@ -387,6 +380,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				return null;
 			}
 
+			Entity centre = null;
 			String bname = e.getTag(OSMTagKey.NAME);
 			MultipolygonBuilder m = new MultipolygonBuilder();
 			if (e instanceof Relation) {
@@ -407,9 +401,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 					} else if (es.getEntity() instanceof Node && 
 							("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
-						centerId = es.getEntity().getId();
+						centre = es.getEntity();
 					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()) && centerId == 0)) {
-						centerId = es.getEntity().getId();
+						centre = es.getEntity();
 					}
 				}
 			} else if (e instanceof Way) {
@@ -420,10 +414,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setAltName(e.getTag("short_name")); // Goteborg
 			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
 			boundary.setBoundaryId(e.getId());
-			boundary.setCityType(ct);
-			if (centerId != 0) {
+			if (centre != null) {
+				boundary.setAdminCenterId(centre.getId());
+				if (ct == null) {
+					ct = CityType.valueFromString(centre.getTag(OSMTagKey.PLACE));
+				}
+			} else if(centerId != 0) {
 				boundary.setAdminCenterId(centerId);
 			}
+			boundary.setCityType(ct);
 			return boundary;
 		} else {
 			return null;
