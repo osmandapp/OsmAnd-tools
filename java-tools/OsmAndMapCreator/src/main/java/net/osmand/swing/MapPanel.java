@@ -63,6 +63,7 @@ import javax.swing.UIManager;
 
 import net.osmand.GPXUtilities;
 import net.osmand.router.RouteColorize;
+import net.osmand.router.RouteColorize.ColorizationType;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -993,13 +994,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		getLayer(MapPointsLayer.class).setGpxFile(gpxFile);
 	}
 
-	public void setColorizationType(RouteColorize.ValueType colorizationType, boolean grey) {
+	public void setColorizationType(ColorizationType colorizationType, boolean grey) {
 		getLayer(MapPointsLayer.class).setColorizationType(colorizationType);
 		getLayer(MapPointsLayer.class).setGrey(grey);
 		repaint();
 	}
 
-	public Point getPopupMenuPoint(){
+	public Point getPopupMenuPoint() {
 		return popupMenuPoint;
 	}
 
