@@ -74,6 +74,7 @@ import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.router.RouteColorize.*;
 
 
 public class MapRouterLayer implements MapPanelLayer {
@@ -431,7 +432,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					DataTileManager<Way> points = new DataTileManager<Way>(11);
 					map.setPoints(points);
 					selectedGPXFile = null;
-					colorizeGpxFile(RouteColorize.ValueType.NONE, true);
+					colorizeGpxFile(ColorizationType.NONE, true);
 					map.fillPopupActions();
 				}
 			};
@@ -445,9 +446,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				public void actionPerformed(ActionEvent e) {
 					int result = showOptionColorSchemeDialog(colorize);
 					if (result == JOptionPane.YES_OPTION) {
-						colorizeGpxFile(RouteColorize.ValueType.ELEVATION, true);
+						colorizeGpxFile(ColorizationType.ELEVATION, true);
 					} else {
-						colorizeGpxFile(RouteColorize.ValueType.ELEVATION, false);
+						colorizeGpxFile(ColorizationType.ELEVATION, false);
 					}
 					map.fillPopupActions();
 				}
@@ -460,9 +461,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				public void actionPerformed(ActionEvent e) {
 					int result = showOptionColorSchemeDialog(colorize);
 					if (result == JOptionPane.YES_OPTION) {
-						colorizeGpxFile(RouteColorize.ValueType.SPEED, true);
+						colorizeGpxFile(ColorizationType.SPEED, true);
 					} else {
-						colorizeGpxFile(RouteColorize.ValueType.SPEED, false);
+						colorizeGpxFile(ColorizationType.SPEED, false);
 					}
 					map.fillPopupActions();
 				}
@@ -475,9 +476,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				public void actionPerformed(ActionEvent e) {
 					int result = showOptionColorSchemeDialog(colorize);
 					if (result == JOptionPane.YES_OPTION) {
-						colorizeGpxFile(RouteColorize.ValueType.SLOPE, true);
+						colorizeGpxFile(ColorizationType.SLOPE, true);
 					} else {
-						colorizeGpxFile(RouteColorize.ValueType.SLOPE, false);
+						colorizeGpxFile(ColorizationType.SLOPE, false);
 					}
 					map.fillPopupActions();
 				}
@@ -512,7 +513,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		map.setPoints(points);
 	}
 
-	private void colorizeGpxFile(RouteColorize.ValueType colorizationType, boolean grey) {
+	private void colorizeGpxFile(ColorizationType colorizationType, boolean grey) {
 		map.setGpxFile(selectedGPXFile);
 		map.setColorizationType(colorizationType, grey);
 	}
