@@ -24,6 +24,8 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.RouteColorize;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.router.RouteColorize.*;
+
 
 public class MapPointsLayer implements MapPanelLayer {
 
@@ -42,13 +44,14 @@ public class MapPointsLayer implements MapPanelLayer {
 
 	private Font whiteFont;
 	GPXUtilities.GPXFile gpxFile;
-	public RouteColorize.ValueType colorizationType = RouteColorize.ValueType.NONE;
+	public ColorizationType colorizationType = ColorizationType.NONE;
 	private boolean isGrey = true;
 
 	private static class LineObject {
 		Way w;
 		Line2D line;
 		boolean nameDraw;
+
 		public LineObject(Way w, Line2D line, boolean nameDraw) {
 			super();
 			this.w = w;
@@ -84,7 +87,7 @@ public class MapPointsLayer implements MapPanelLayer {
 	@Override
 	public void paintLayer(Graphics2D g) {
 
-		if (colorizationType != RouteColorize.ValueType.NONE) {
+		if (colorizationType != ColorizationType.NONE) {
 			colorizeRoute(g);
 			return;
 		}
@@ -249,7 +252,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		this.gpxFile = wayPoints;
 	}
 
-	public void setColorizationType(RouteColorize.ValueType colorizationType) {
+	public void setColorizationType(ColorizationType colorizationType) {
 		this.colorizationType = colorizationType;
 	}
 
@@ -258,20 +261,20 @@ public class MapPointsLayer implements MapPanelLayer {
 	}
 
 	private void colorizeRoute(Graphics2D g) {
-		if (this.gpxFile == null || colorizationType == RouteColorize.ValueType.NONE)
+		if (this.gpxFile == null || colorizationType == ColorizationType.NONE)
 			return;
 
 		RouteColorize routeColorize = new RouteColorize(map.getZoom(), gpxFile, colorizationType);
 		double[][] palette;
 		if (isGrey) {
-			palette = new double[][]{{routeColorize.minValue, RouteColorize.LIGHT_GREY}, {routeColorize.maxValue, RouteColorize.DARK_GREY}};
+			palette = new double[][]{{routeColorize.minValue, LIGHT_GREY}, {routeColorize.maxValue, DARK_GREY}};
 		} else {
-			palette = new double[][]{{routeColorize.minValue, RouteColorize.GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
+			palette = new double[][]{{routeColorize.minValue, GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, YELLOW}, {routeColorize.maxValue, RED}};
 		}
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		routeColorize.setPalette(palette);
-		List<RouteColorize.RouteColorizationPoint> dataList = routeColorize.getResult(true);
+		List<RouteColorizationPoint> dataList = routeColorize.getResult(true);
 
 		for (int i = 1; i < dataList.size(); i++) {
 			int pixX1 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i - 1).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
