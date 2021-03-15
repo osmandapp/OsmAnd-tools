@@ -137,10 +137,10 @@ public class IndexController {
 	@RequestMapping(path = { "indexes.xml"}, produces = {"application/xml"})
 	@ResponseBody
     public FileSystemResource indexesXml(@RequestParam(required=false) boolean update, 
-    		@RequestParam(required=false) boolean refresh) throws IOException {
-    	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
-        return new FileSystemResource(fl); 
-    }
+			@RequestParam(required = false) boolean refresh) throws IOException {
+		File fl = downloadIndexes.getIndexesXml(refresh || update, false);
+		return new FileSystemResource(fl);
+	}
 	
 	@RequestMapping(path = { "get_indexes.php", "get_indexes"})
 	@ResponseBody
@@ -174,17 +174,10 @@ public class IndexController {
     }
 
     @RequestMapping(value = {"list", "list.php"})
-    public String listPhp(@RequestParam(required = false) String sortby,
+    public String list(@RequestParam(required = false) String sortby,
                           @RequestParam(required = false) boolean asc,
                           Model model) throws IOException {
-        File fl = null;
-        if (sortby == null || sortby.isEmpty()) {
-            // Update at first load
-            fl = downloadIndexes.getIndexesXml(true, false);
-        } else {
-            // Do not update when filtering
-            fl = downloadIndexes.getIndexesXml(false, false);
-        }
+		File fl = downloadIndexes.getIndexesXml(false, false);
         DownloadIndexDocument doc = unmarshallIndexes(fl);
         List<DownloadIndex> regions = doc.getMaps();
         if (sortby != null && sortby.equals("name")) {

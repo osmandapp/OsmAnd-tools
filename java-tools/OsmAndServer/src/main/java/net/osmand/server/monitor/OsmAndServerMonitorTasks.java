@@ -137,7 +137,7 @@ public class OsmAndServerMonitorTasks {
 
 	@Scheduled(fixedRate = MINUTE)
 	public void checkOsmAndBuildServer() {
-		if(!enabled) {
+		if (!enabled) {
 			return;
 		}
 		try {

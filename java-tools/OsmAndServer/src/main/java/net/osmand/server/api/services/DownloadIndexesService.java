@@ -111,7 +111,7 @@ public class DownloadIndexesService  {
 	
 	public File getIndexesXml(boolean upd, boolean gzip) {
 		File target = getStandardFilePath(gzip);
-		if(!target.exists() || upd) {
+		if (!target.exists() || upd) {
 			generateStandardIndexFile();
 		}
 		return target;
