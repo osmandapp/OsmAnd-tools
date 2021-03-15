@@ -373,6 +373,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				ct = CityType.SUBURB;
 			}
 		}
+		if (ct == null && e instanceof Relation) {
+			ctx.loadEntityRelation((Relation) e);
+			List<Entity> adminCentres = ((Relation) e).getMemberEntities("admin_centre");
+			if (adminCentres.size() > 0) {
+				ct = CityType.valueFromString(adminCentres.get(0).getTag(OSMTagKey.PLACE));
+			}
+		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
 		boolean postalCode = "postal_code".equals(e.getTag(OSMTagKey.BOUNDARY));
 		if (administrative || postalCode || ct != null) {
