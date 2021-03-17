@@ -11,6 +11,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
@@ -30,10 +33,6 @@ import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
-
 import rtree.RTree;
 
 public class CombineSRTMIntoFile {
@@ -45,11 +44,14 @@ public class CombineSRTMIntoFile {
 		File directoryWithSRTMFiles = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = false;
+		boolean feet = false;
 		String filter = null; // mauritius
 		int limit = 1000;
 		for(int i = 2; i < args.length; i++ ){
 			if("--dry-run".equals(args[i])) {
 				dryRun = true;
+			} else if("--feet".equals(args[i])) {
+				feet = true;
 			} else if(args[i].startsWith("--filter=")) {
 				filter = args[i].substring("--filter=".length());
 				if(filter.length() == 0) {
@@ -80,12 +82,12 @@ public class CombineSRTMIntoFile {
 					break;
 				}
 			}
-			System.out.println(fullName );
+			System.out.println(fullName);
 			if(rc != null && rc.containsAdditionalType(srtm)) {
 				String dw = rc.getNameByType(downloadName);
 				System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 				try {
-					process(rc, lst, dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun, limit);
+					process(rc, lst, dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun, limit, feet);
 				} catch(Exception e) {
 					failedCountries.add(fullName);
 					e.printStackTrace();
@@ -98,8 +100,9 @@ public class CombineSRTMIntoFile {
 	}
 
 	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
-			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles, boolean dryRun, int limit) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
-		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_SRTM_MAP_INDEX_EXT;
+			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles, boolean dryRun, int limit, boolean feet) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
+		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + 
+				(feet ? IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT : IndexConstants.BINARY_SRTM_MAP_INDEX_EXT);
 		String name = country.getName();
 		String dwName = Algorithms.capitalizeFirstLetterAndLowercase(downloadName + suffix);
 		final File targetFile = new File(directoryWithTargetFiles, dwName);
