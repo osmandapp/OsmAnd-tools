@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
@@ -159,14 +160,17 @@ public class IndexController {
 	}
     
     @RequestMapping(value = {"indexes.php", "indexes"})
-    public String indexesPhp(@RequestParam(required=false) boolean update,
+    public String indexes(@RequestParam(required=false) boolean update,
     		@RequestParam(required=false)  boolean refresh, Model model) throws IOException {
     	// keep this step
     	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
 		DownloadIndexDocument doc = unmarshallIndexes(fl);
 		model.addAttribute("region", doc.getMaps());
 		model.addAttribute("road_region", doc.getRoadMaps());
-		model.addAttribute("srtmcountry", doc.getSrtmMaps());
+		List<DownloadIndex> srtms = new ArrayList<>(doc.getSrtmMaps());
+		srtms.addAll(doc.getSrtmFeetMaps());
+		doc.sortMaps(srtms);
+		model.addAttribute("srtmcountry", srtms);
 		model.addAttribute("wiki", doc.getWikimaps());
 		model.addAttribute("wikivoyage", doc.getWikivoyages());
 		model.addAttribute("travel", doc.getTravelGuides());

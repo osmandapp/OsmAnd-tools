@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 
 import com.google.gson.Gson;
 
+import net.osmand.IndexConstants;
 import net.osmand.util.Algorithms;
 
 @Service
@@ -103,7 +104,8 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getTravelGuides(), rootFolder, "travel", DownloadType.TRAVEL);
 		loadIndexesFromDir(doc.getWikivoyages(), rootFolder, "wikivoyage", DownloadType.WIKIVOYAGE);
 		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, "road-indexes", DownloadType.ROAD_MAP);
-		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP);
+		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_MAP_INDEX_EXT);
+		loadIndexesFromDir(doc.getSrtmFeetMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
 		loadIndexesFromDir(doc.getHillshade(), rootFolder, "hillshade", DownloadType.HILLSHADE);
 		loadIndexesFromDir(doc.getSlope(), rootFolder, "slope", DownloadType.SLOPE);
 		return doc;
@@ -145,16 +147,24 @@ public class DownloadIndexesService  {
 		}
 	}
 
-	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType tp) {
+	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType type) {
+		loadIndexesFromDir(list, rootFolder, subPath, type, null);
+	}
+	
+	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType type, String filterFiles) {
 		File subFolder = new File(rootFolder, subPath);
 		File[] files = subFolder.listFiles();
 		if(files == null || files.length == 0) {
 			return;
 		}
-		for(File lf : files) {
-			if(tp.acceptFile(lf)) {
+		for (File lf : files) {
+			if (filterFiles != null && !filterFiles.contains(lf.getName())) {
+				continue;
+			} else if (type.acceptFile(lf)) {
 				String name = lf.getName();
-				name = name.substring(0, name.indexOf('.'));
+				int extInd = name.indexOf('.');
+				String ext = name.substring(extInd + 1);
+				name = name.substring(0, extInd);
 				if (name.endsWith("_ext_2")) {
 					name = name.replace("_ext_2", "");
 				}
@@ -163,7 +173,7 @@ public class DownloadIndexesService  {
 				}
 				name = name.replace('_', ' ');
 				DownloadIndex di = new DownloadIndex();
-				di.setType(tp);
+				di.setType(type);
 				di.setName(lf.getName());
 				di.setSize(lf.length());
 				di.setContainerSize(lf.length());
@@ -183,7 +193,7 @@ public class DownloadIndexesService  {
 							if (description != null) {
 								di.setDescription(description);
 							} else {
-								di.setDescription(tp.getDefaultTitle(name));
+								di.setDescription(type.getDefaultTitle(name, ext));
 							}
 						}
 						list.add(di);
@@ -197,7 +207,7 @@ public class DownloadIndexesService  {
 					di.setDate(lf.lastModified());
 					di.setContentSize(lf.length());
 					di.setTargetsize(lf.length());
-					di.setDescription(tp.getDefaultTitle(name));
+					di.setDescription(type.getDefaultTitle(name, ext));
 					list.add(di);
 				}
 			}
@@ -238,27 +248,19 @@ public class DownloadIndexesService  {
 	}
 	
 	public enum DownloadType {
-	    MAP ("region"),
-	    VOICE ("region"),
-	    DEPTH ("inapp"),
-	    FONTS ("fonts"),
-	    WIKIMAP ("wiki"),
-	    WIKIVOYAGE ("wikivoyage"),
-	    TRAVEL ("travel"),
-	    ROAD_MAP ("road_region"),
-	    HILLSHADE ("hillshade"),
-	    SLOPE ("slope"),
-	    SRTM_MAP ("srtmcountry");
+	    MAP,
+	    VOICE ,
+	    DEPTH ,
+	    FONTS ,
+	    WIKIMAP ,
+	    WIKIVOYAGE ,
+	    TRAVEL ,
+	    ROAD_MAP ,
+	    HILLSHADE ,
+	    SLOPE ,
+	    SRTM_MAP ;
 
-	    private final String xmlTag;
 
-		private DownloadType(String xmlTag) {
-			this.xmlTag = xmlTag;
-	    }
-		
-		public String getXmlTag() {
-			return xmlTag;
-		}
 
 		public boolean acceptFile(File f) {
 			switch (this) {
@@ -285,7 +287,7 @@ public class DownloadIndexesService  {
 		}
 	    
 		
-		public String getDefaultTitle(String regionName) {
+		public String getDefaultTitle(String regionName, String ext) {
 			switch (this) {
 			case MAP:
 				return String.format("Map, Roads, POI, Transport, Address data for %s", regionName);
@@ -296,7 +298,8 @@ public class DownloadIndexesService  {
 			case DEPTH:
 				return String.format("Depth contours for %s", regionName);
 			case SRTM_MAP:
-				return String.format("Contour lines for %s", regionName);
+				String suf = ext.contains("srtmf") ? "feet" : "meters";
+				return String.format("Contour lines (%s) for %s", suf, regionName);
 			case TRAVEL:
 				return String.format("Travel for %s", regionName);
 			case WIKIVOYAGE:

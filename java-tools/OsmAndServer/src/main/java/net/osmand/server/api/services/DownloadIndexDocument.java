@@ -52,6 +52,9 @@ public class DownloadIndexDocument {
 
 	@XmlElement(name = "srtmcountry")
 	private List<DownloadIndex> srtmMaps = new ArrayList<>();
+	
+	@XmlElement(name = "srtmfeetcountry")
+	private List<DownloadIndex> srtmFeetMaps = new ArrayList<>();
 
 	@XmlElement(name = "hillshade")
 	private List<DownloadIndex> hillshade = new ArrayList<>();
@@ -60,6 +63,22 @@ public class DownloadIndexDocument {
 	private List<DownloadIndex> slope = new ArrayList<>();
 	
 	public void prepareMaps() {
+		sortMaps(maps);
+		sortMaps(roadMaps);
+		sortMaps(srtmMaps);
+		sortMaps(srtmFeetMaps);
+		sortMaps(slope);
+		sortMaps(hillshade);
+		sortMaps(inapps);
+		sortMaps(voices);
+		sortMaps(fonts);
+		sortMaps(depths);
+		sortMaps(wikimaps);
+		sortMaps(wikivoyages);
+		sortMaps(travel);
+	}
+
+	public void sortMaps(List<DownloadIndex> l) {
 		Comparator<DownloadIndex> cmp = new Comparator<DownloadIndex>() {
 
 			@Override
@@ -67,18 +86,7 @@ public class DownloadIndexDocument {
 				return o1.getName().compareTo(o2.getName());
 			}
 		};
-		Collections.sort(maps, cmp);
-		Collections.sort(roadMaps, cmp);
-		Collections.sort(srtmMaps, cmp);
-		Collections.sort(slope, cmp);
-		Collections.sort(hillshade, cmp);
-		Collections.sort(inapps, cmp);
-		Collections.sort(voices, cmp);
-		Collections.sort(fonts, cmp);
-		Collections.sort(depths, cmp);
-		Collections.sort(wikimaps, cmp);
-		Collections.sort(wikivoyages, cmp);
-		Collections.sort(travel, cmp);
+		Collections.sort(l, cmp);
 	}
 
 	public List<DownloadIndex> getMaps() {
@@ -119,6 +127,10 @@ public class DownloadIndexDocument {
 
 	public List<DownloadIndex> getSrtmMaps() {
 		return srtmMaps;
+	}
+	
+	public List<DownloadIndex> getSrtmFeetMaps() {
+		return srtmFeetMaps;
 	}
 
 	public List<DownloadIndex> getHillshade() {

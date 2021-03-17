@@ -408,7 +408,7 @@ public class IndexUploader {
 
 	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException, RTreeException {
 		String fileName = mainFile.getName();
-		boolean srtmFile = mainFile.getName().contains(".srtm");
+		boolean srtmFile = mainFile.getName().contains(".srtm") || mainFile.getName().contains(".srtmf");
 		boolean roadFile = mainFile.getName().contains(".road");
 		boolean wikiFile = mainFile.getName().contains(".wiki");
 		boolean travelFile = mainFile.getName().contains(".travel");
@@ -663,18 +663,11 @@ public class IndexUploader {
 		return false;
 	}
 
-	
-
-	
-
-
-
 	private String getDescription(BinaryMapIndexReader reader, String fileName) {
-		String summary;
-		summary = " data for ";
+		String summary = " data for ";
 		boolean fir = true;
 		if (fileName.contains(".srtm")) {
-			summary = "SRTM" + summary;
+			summary = "Contour lines " + (fileName.contains(".srtmf") ? "feet " : "meters ");
 		} else if (fileName.contains(".travel")){
 			summary = "Travel guide" + summary;
 		} else if (fileName.contains("_wiki.")) {
