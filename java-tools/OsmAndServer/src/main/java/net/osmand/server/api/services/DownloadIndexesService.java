@@ -158,7 +158,7 @@ public class DownloadIndexesService  {
 			return;
 		}
 		for (File lf : files) {
-			if (filterFiles != null && !filterFiles.contains(lf.getName())) {
+			if (filterFiles != null && !lf.getName().contains(filterFiles)) {
 				continue;
 			} else if (type.acceptFile(lf)) {
 				String name = lf.getName();
