@@ -1037,8 +1037,8 @@ public class BinaryMapIndexWriter {
 
 		int sx = MapUtils.get31TileNumberX(street.getLocation().getLongitude());
 		int sy = MapUtils.get31TileNumberY(street.getLocation().getLatitude());
-		streetBuilder.setX((sx - cx) >> 7);
-		streetBuilder.setY((sy - cy) >> 7);
+		streetBuilder.setX((sx >> 7) - (cx >> 7));
+		streetBuilder.setY((sy >> 7) - (cy >> 7));
 
 		street.sortBuildings();
 		for (Building b : street.getBuildings()) {
