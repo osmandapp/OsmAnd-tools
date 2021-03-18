@@ -95,7 +95,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
 	
 	// flipped quad tree cause bottom > top
-	private QuadTree<Multipolygon> lowEmissionZones = new QuadTree<Multipolygon>(new QuadRect(-180, -90, 90, 180), 8, 0.55f);
+	private QuadTree<Multipolygon> lowEmissionZones = new QuadTree<Multipolygon>(new QuadRect(-180, 90, 180, -90), 8, 0.55f);
 
 
 	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
