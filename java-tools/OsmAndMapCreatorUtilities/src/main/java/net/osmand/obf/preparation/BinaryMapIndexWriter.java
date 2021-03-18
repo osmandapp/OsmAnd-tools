@@ -1048,20 +1048,20 @@ public class BinaryMapIndexWriter {
 			OsmandOdb.BuildingIndex.Builder bbuilder = OsmandOdb.BuildingIndex.newBuilder();
 			int bx = MapUtils.get31TileNumberX(b.getLocation().getLongitude());
 			int by = MapUtils.get31TileNumberY(b.getLocation().getLatitude());
-			bbuilder.setX((bx - sx) >> 7);
-			bbuilder.setY((by - sy) >> 7);
+			bbuilder.setX((bx >> 7) - (sx >> 7));
+			bbuilder.setY((by >> 7) - (sy >> 7));
 
 			String number2 = b.getName2();
 			if (!Algorithms.isEmpty(number2)) {
 				LatLon loc = b.getLatLon2();
 				if (loc == null) {
-					bbuilder.setX((bx - sx) >> 7);
-					bbuilder.setY((by - sy) >> 7);
+					bbuilder.setX((bx >> 7) - (sx >> 7));
+					bbuilder.setY((by >> 7) - (sy >> 7));
 				} else {
 					int bcx = MapUtils.get31TileNumberX(loc.getLongitude());
 					int bcy = MapUtils.get31TileNumberY(loc.getLatitude());
-					bbuilder.setX2((bcx - sx) >> 7);
-					bbuilder.setY2((bcy - sy) >> 7);
+					bbuilder.setX2((bcx >> 7) - (sx >> 7));
+					bbuilder.setY2((bcy >> 7) - (sy >> 7));
 				}
 				bbuilder.setName2(number2);
 				if (b.getInterpolationType() != null) {
