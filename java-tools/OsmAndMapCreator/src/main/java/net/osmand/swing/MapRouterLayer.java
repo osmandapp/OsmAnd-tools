@@ -40,6 +40,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import net.osmand.router.*;
+import net.osmand.util.GeoJsonParser;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -1009,8 +1010,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				config.routeCalculationTime = System.currentTimeMillis();
 				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
-					null, rs, rm);
-				
+						null, rs, rm);
+				GeoJsonParser geoJsonParser = new GeoJsonParser(ctx);
+				((GeneralRouter) ctx.getRouter()).setAvoidRoad(geoJsonParser.getGeoJsonQuadTree());
+
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + " mode for routing");
