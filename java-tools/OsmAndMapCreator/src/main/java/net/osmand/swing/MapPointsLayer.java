@@ -22,6 +22,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RouteColorize;
+import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.util.MapUtils;
 
 import static net.osmand.router.RouteColorize.*;
@@ -86,14 +87,7 @@ public class MapPointsLayer implements MapPanelLayer {
 
 	@Override
 	public void paintLayer(Graphics2D g) {
-
-		if (colorizationType != ColorizationType.NONE) {
-			colorizeRoute(g);
-			return;
-		}
-
 		Map<Point, String> pointsToDraw = this.pointsToDraw;
-		List<LineObject> linesToDraw = this.linesToDraw;
 		g.setColor(color);
 		if (whiteFont == null) {
 			whiteFont = g.getFont().deriveFont(15).deriveFont(Font.BOLD);
@@ -115,7 +109,14 @@ public class MapPointsLayer implements MapPanelLayer {
 				g.drawString(s, p.x, (p.y + i++ * 15));
 			}
 		}
+		if (colorizationType != ColorizationType.NONE) {
+			colorizeRoute(g);
+			return;
+		}
 
+		
+
+		List<LineObject> linesToDraw = this.linesToDraw;
 		// draw user points
 		int[] xPoints = new int[4];
 		int[] yPoints = new int[4];
@@ -248,21 +249,17 @@ public class MapPointsLayer implements MapPanelLayer {
 		this.points = points;
 	}
 
-	public void setGpxFile(GPXUtilities.GPXFile wayPoints) {
-		this.gpxFile = wayPoints;
-	}
-
-	public void setColorizationType(ColorizationType colorizationType) {
+	public void setColorizationType(GPXUtilities.GPXFile gpxFile, ColorizationType colorizationType, boolean grey) {
+		this.gpxFile = gpxFile;
 		this.colorizationType = colorizationType;
-	}
-
-	public void setGrey(boolean isGrey) {
-		this.isGrey = isGrey;
+		this.isGrey = grey;
+		
 	}
 
 	private void colorizeRoute(Graphics2D g) {
-		if (this.gpxFile == null || colorizationType == ColorizationType.NONE)
+		if (this.gpxFile == null || colorizationType == ColorizationType.NONE) {
 			return;
+		}
 
 		RouteColorize routeColorize = new RouteColorize(map.getZoom(), gpxFile, colorizationType);
 		double[][] palette;
