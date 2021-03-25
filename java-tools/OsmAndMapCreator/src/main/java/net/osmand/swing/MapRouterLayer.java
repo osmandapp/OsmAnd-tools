@@ -1,5 +1,6 @@
 package net.osmand.swing;
 
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics2D;
@@ -112,7 +113,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton playPauseButton;
 	private JButton stopButton;
 	private GPXFile selectedGPXFile;
-	private QuadTree<WptPt> directionPointsFile;
+	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
 
 	private List<RouteSegmentResult> previousRoute;
 	public ActionListener setStartActionListener = new ActionListener(){
@@ -387,7 +388,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
 						Gson gson = new Gson();
-						directionPointsFile = new QuadTree<WptPt>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), 15, 0.5f);
+						directionPointsFile = new QuadTree<net.osmand.osm.edit.Node>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), 15, 0.5f);
 						try {
 							com.google.gson.JsonObject mp = gson.fromJson(new JsonReader(new FileReader(file)), com.google.gson.JsonObject.class);
 							JsonElement features = mp.get("features");
@@ -401,15 +402,13 @@ public class MapRouterLayer implements MapPanelLayer {
 								double lon = ar.get(0).getAsDouble();
 								double lat = ar.get(1).getAsDouble();
 								JsonObject props = obj.get("properties").getAsJsonObject();
-								WptPt pt = new WptPt();
-								pt.lat = lat;
-								pt.lon = lon;
+								net.osmand.osm.edit.Node pt = new net.osmand.osm.edit.Node(lat, lon, -1);
 								int x = MapUtils.get31TileNumberX(lon);
 								int y = MapUtils.get31TileNumberY(lat);
 								Iterator<Entry<String, JsonElement>> keyIt = props.entrySet().iterator();
 								while (keyIt.hasNext()) {
 									Entry<String, JsonElement> el = keyIt.next();
-									pt.getExtensionsToWrite().put(el.getKey(), el.getValue().getAsString());
+									pt.putTag(el.getKey(), el.getValue().getAsString());
 								}
 								directionPointsFile.insert(pt, new QuadRect(x, y, x, y));
 							}
@@ -576,9 +575,9 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		}
 		if (directionPointsFile != null) {
-			List<WptPt> pnts = directionPointsFile.queryInBox(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), new ArrayList<WptPt>());
-			for (WptPt p : pnts) {
-				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(p.lat, p.lon, -1);
+			List<net.osmand.osm.edit.Node> pnts = 
+					directionPointsFile.queryInBox(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), new ArrayList<net.osmand.osm.edit.Node>());
+			for (net.osmand.osm.edit.Node n : pnts) {
 				points.registerObject(n.getLatitude(), n.getLongitude(), n);
 			}
 		}
