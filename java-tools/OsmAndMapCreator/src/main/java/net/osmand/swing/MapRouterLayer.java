@@ -387,7 +387,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
 						Gson gson = new Gson();
-						directionPointsFile = new QuadTree<WptPt>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), 15, 0.55f);
+						directionPointsFile = new QuadTree<WptPt>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), 15, 0.5f);
 						try {
 							com.google.gson.JsonObject mp = gson.fromJson(new JsonReader(new FileReader(file)), com.google.gson.JsonObject.class);
 							JsonElement features = mp.get("features");
