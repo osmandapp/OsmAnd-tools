@@ -1053,11 +1053,9 @@ public class MapRouterLayer implements MapPanelLayer {
 						paramsR.put(p, "true");
 					}
 				}
-				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().build(props[0],
+				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
+						setDirectionPoints(directionPointsFile).build(props[0],
 						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
-				if (directionPointsFile != null) {
-					config.directionPoints = directionPointsFile;
-				}
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 //				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
