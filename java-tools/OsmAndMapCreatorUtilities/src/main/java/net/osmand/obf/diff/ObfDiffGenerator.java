@@ -1,7 +1,10 @@
 package net.osmand.obf.diff;
 
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.MapZooms.MapZoomPair;
@@ -11,6 +14,8 @@ import net.osmand.data.MapObject;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
 import net.osmand.obf.BinaryInspector;
+import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import org.xmlpull.v1.XmlPullParser;
@@ -30,6 +35,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
+import java.util.List;
+import java.util.ArrayList;
 
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -43,15 +50,16 @@ public class ObfDiffGenerator {
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
+	private static final int SHIFT_MAP_INDEX_ID = 7;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[4];
-			args[0] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_before.obf.gz";
-			args[1] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_after.obf.gz";
+			args[0] = "/Users/macmini/OsmAnd/maps/Frankfurt/Frankfurt_start.obf";
+			args[1] = "/Users/macmini/OsmAnd/maps/Frankfurt/Frankfurt_end.obf";
 //			args[2] = "stdout";
-			args[2] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.obf";
-			args[3] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.osm.gz";
+			args[2] = "/Users/macmini/OsmAnd/maps/Frankfurt_diff.obf";
+			args[3] = "/Users/macmini/OsmAnd/maps/Frankfurt/frankfurt_diff.osm";
 		}
 		if (args.length < 3) {
 			System.out.println("Usage: <path to old obf> <path to new obf> <[result file name] or [stdout]> <path to diff file (optional)>");
@@ -401,6 +409,47 @@ public class ObfDiffGenerator {
 						endData.remove(idx);
 					}
 				}
+
+				//removed relations section
+				long osmId = (objS.getId() >> SHIFT_MAP_INDEX_ID);
+				if (DiffParser.modifiedRelationMembersOsmIds.contains(osmId)) {
+					int relationId = DiffParser.mapOsmIdRelationId.get(osmId);
+					Map<String, String> relationTags = DiffParser.removedRelationTags.get(relationId);
+					int[] types = objS.getTypes();
+					List<Integer> newTypes = new ArrayList<>();
+					for (int type : types) {
+						BinaryMapIndexReader.TagValuePair pair = objS.getMapIndex().decodeType(type);
+						if (!pair.tag.equals(relationTags.get(DiffParser.ROUTE_TYPE))) {
+							newTypes.add(type);
+						}
+					}
+					objS.setTypes(newTypes.stream().mapToInt(i -> i).toArray());
+
+
+					TIntObjectHashMap<String> names = objS.getObjectNames();
+					TIntArrayList order = objS.getNamesOrder();
+					TIntObjectHashMap<String> newNames = new TIntObjectHashMap<>();
+					TIntArrayList newOrder = new TIntArrayList();
+					if (names != null && !names.isEmpty()) {
+						for (int j = 0; j < order.size(); j++) {
+							int index = order.get(j);
+							BinaryMapIndexReader.TagValuePair pair = objS.getMapIndex().decodeType(index);
+							if (pair != null && !relationTags.containsKey(pair.tag)) {
+								newNames.put(index, names.get(index));
+								newOrder.add(index);
+							}
+						}
+					}
+					objS.getNamesOrder().clear();
+					objS.getObjectNames().clear();
+					if (newNames.size() > 0) {
+						objS.getNamesOrder().addAll(newOrder);
+						objS.getObjectNames().putAll(newNames);
+					}
+
+					mi.decodingRules = objS.getMapIndex().decodingRules;
+					endData.put(idx, objS);
+				}
 			}
 			if(print) {
 				for (BinaryMapDataObject e : endData.valueCollection()) {
@@ -513,6 +562,25 @@ public class ObfDiffGenerator {
 		private static final String TYPE_WAY = "way";
 		private static final String TYPE_NODE = "node";
 
+		private static final String ROUTE_TAG = "route";
+		private static final String TYPE_ACTION = "action";
+		private static final String TYPE_MEMBER = "member";
+		private static final String TYPE_TAG = "tag";
+		private static final String ATTR_REF = "ref";
+		private static final String ATTR_KEY = "k";
+		private static final String ATTR_VALUE = "v";
+		private static final String ATTR_TYPE = "type";
+
+		public static HashSet<Long> modifiedRelationMembersOsmIds = new HashSet<>();
+		public static Map<Long, Integer> mapOsmIdRelationId = new HashMap<>();
+		public static Map<Integer, Map<String, String>> removedRelationTags = new HashMap<>();
+		public static String ROUTE_TYPE = "route_type";
+		private static boolean startActionDelete;
+		private static boolean startTypeRelation;
+		private static HashSet<Long> temporaryModifiedRelationMembersOsmIds = new HashSet<>();
+		private static Map<String, String> temporaryRemovedRelationTags = new HashMap<>();
+		private static List<MapRenderingTypes.MapRulType> routeRules = getRouteRules();
+
 		public static Set<EntityId> fetchModifiedIds(File diff) throws IOException, XmlPullParserException {
 			Set<EntityId> result = new HashSet<>();
 			InputStream fis ;
@@ -535,8 +603,104 @@ public class ObfDiffGenerator {
 						result.add(new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1)));
 					}	
 				}
+				fetchRemovedRelations(tok, parser);
 			}
 			return result;
+		}
+
+		private static void fetchRemovedRelations(int tok, XmlPullParser parser) {
+			if (parser.getName() == null) {
+				return;
+			}
+			if (tok == XmlPullParser.START_TAG) {
+				if (parser.getName().equals(TYPE_ACTION)) {
+					String type = parser.getAttributeValue(null, ATTR_TYPE);
+					if (type != null && type.equals("delete")) {
+						startActionDelete = true;
+					}
+				}
+				if (parser.getName().equals(TYPE_RELATION)) {
+					startTypeRelation = true;
+				}
+			}
+			if (tok == XmlPullParser.END_TAG) {
+				if (parser.getName().equals(TYPE_ACTION)) {
+					startActionDelete = false;
+				}
+				if (parser.getName().equals(TYPE_RELATION)) {
+					startTypeRelation = false;
+				}
+			}
+			if (startActionDelete && startTypeRelation) {
+				if (parser.getName().equals(TYPE_TAG)) {
+					String key = parser.getAttributeValue(null, ATTR_KEY);
+					String value = parser.getAttributeValue(null, ATTR_VALUE);
+					if (key != null && value != null) {
+						temporaryRemovedRelationTags.put(key, value);
+					}
+				}
+				if (parser.getName().equals(TYPE_MEMBER)) {
+					String osmId = parser.getAttributeValue(null, ATTR_REF);
+					if (osmId != null) {
+						temporaryModifiedRelationMembersOsmIds.add(Long.parseLong(osmId));
+					}
+				}
+			}
+			if (!startActionDelete && !startTypeRelation && temporaryModifiedRelationMembersOsmIds.size() > 0) {
+				boolean isRouteRelation = false;
+				String entryValue = "";
+				for (Map.Entry<String, String> entry : temporaryRemovedRelationTags.entrySet()) {
+					if (entry.getKey().equals(ROUTE_TAG)) {
+						isRouteRelation = true;
+						entryValue = entry.getValue();
+						break;
+					}
+				}
+				if (!isRouteRelation) {
+					temporaryRemovedRelationTags.clear();
+					temporaryModifiedRelationMembersOsmIds.clear();
+					return;
+				}
+				int relationIndex = removedRelationTags.size() + 1;
+				for (MapRenderingTypes.MapRulType rule : routeRules) {
+					if (entryValue.equals(rule.getValue())) {
+						String additionalOsmAndTag = ROUTE_TAG + "_" + entryValue;
+						Map<String, String> routeTagMap = new HashMap<>();
+						routeTagMap.put(ROUTE_TYPE, additionalOsmAndTag);
+						Map<String, String> relationNames = rule.getRelationNames();
+						for (Map.Entry<String, String> entry : temporaryRemovedRelationTags.entrySet()) {
+							if (relationNames.containsKey(entry.getKey())) {
+								routeTagMap.put(relationNames.get(entry.getKey()), entry.getValue());
+							} else {
+								routeTagMap.put(entry.getKey(), entry.getValue());
+							}
+						}
+						removedRelationTags.put(relationIndex, routeTagMap);
+						modifiedRelationMembersOsmIds.addAll(temporaryModifiedRelationMembersOsmIds);
+						for (Long id : temporaryModifiedRelationMembersOsmIds) {
+							mapOsmIdRelationId.put(id, relationIndex);
+						}
+						temporaryModifiedRelationMembersOsmIds.clear();
+						temporaryRemovedRelationTags.clear();
+						break;
+					}
+				}
+			}
+		}
+
+		private static List<MapRenderingTypes.MapRulType> getRouteRules() {
+			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
+			Map<String, MapRenderingTypes.MapRulType> allRules = rt.getEncodingRuleTypes();
+			Iterator<Map.Entry<String, MapRenderingTypes.MapRulType>> iterator = allRules.entrySet().iterator();
+			List<MapRenderingTypes.MapRulType> rules = new ArrayList<>();
+			while (iterator.hasNext()) {
+				Map.Entry<String, MapRenderingTypes.MapRulType> entry = iterator.next();
+				if (entry.getValue().getTag().equals(ROUTE_TAG)) {
+					MapRenderingTypes.MapRulType rule = entry.getValue();
+					rules.add(rule);
+				}
+			}
+			return rules;
 		}
 		
 		protected static long parseLong(XmlPullParser parser, String name, long defVal){
