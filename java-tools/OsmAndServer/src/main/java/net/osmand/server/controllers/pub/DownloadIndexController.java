@@ -295,7 +295,7 @@ public class DownloadIndexController {
 
 	}
 
-	@RequestMapping(value = "/download.php", method = RequestMethod.HEAD)
+	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.HEAD)
 	public void checkRangeRequests(@RequestParam MultiValueMap<String, String> params, HttpServletResponse resp)
 			throws IOException {
 		try {
