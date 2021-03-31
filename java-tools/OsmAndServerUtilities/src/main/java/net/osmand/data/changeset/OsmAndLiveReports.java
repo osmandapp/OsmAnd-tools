@@ -688,7 +688,8 @@ public class OsmAndLiveReports {
 		
 		report.regionPercentage = 0;
 		SupportersRegion sr = supporters.regions.get(isEmpty(region) ? "" : region);
-		if (sr != null) {
+		// since 2021-03 don't calculate region percentage
+		if (sr != null && (month != null && month.compareTo("2021-03") < 0)) {
 			report.regionPercentage = sr.percent;
 		}
 		report.regionCount = 0;
@@ -761,23 +762,23 @@ public class OsmAndLiveReports {
 		report.rate = getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE).doubleValue();
 		
 		report.payoutBTCCollected = getBtcCollected();
-		for(int i = 0; i < countries.rows.size(); i++) {
+		for (int i = 0; i < countries.rows.size(); i++) {
 			Country c = countries.rows.get(i);
 			String reg = null;
-			if(!"World".equals(c.name)) {
-				if("0".equals(c.map)) {
+			if (!"World".equals(c.name)) {
+				if ("0".equals(c.map)) {
 					continue;
 				}
 				reg = c.downloadname;
 			}
 			RecipientsReport recipients = getReport(OsmAndLiveReportType.RECIPIENTS, reg, RecipientsReport.class);
-			for(int j = 0; j < recipients.rows.size(); j++) {
+			for (int j = 0; j < recipients.rows.size(); j++) {
 				Recipient recipient = recipients.rows.get(j);
 				Payout p = new Payout();
 				p.btc = recipient.btc;
 				p.osmid = recipient.osmid;
 				p.btcaddress = recipient.btcaddress;
-				if(p.btc > 0) {
+				if (p.btc > 0) {
 					report.payoutTotal += p.btc;
 					report.payments.add(p);
 				}

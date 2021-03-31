@@ -33,8 +33,8 @@ public enum OsmAndLiveReportType {
 	}
 	
 	public static OsmAndLiveReportType fromSqlName(String sql) {
-		for(OsmAndLiveReportType t : values()) {
-			if(t.getSqlName().equals(sql)) {
+		for (OsmAndLiveReportType t : values()) {
+			if (t.getSqlName().equals(sql)) {
 				return t;
 			}
 		}
