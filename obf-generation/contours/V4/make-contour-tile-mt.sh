@@ -2,6 +2,7 @@
 # Multithreaded tiff tile to contour (osm) converter for OsmAnd
 # requires "gdal", "parallel", "lbzip2" and a lot of RAM
 # optional: -p and -d options requires qgis
+# no_smoothing.ini file contains array of tile names to which smoothing will not be applied
 
 # Load balancing depending on tiff size
 # For 128Gb RAM and 32 threads machine:
@@ -13,7 +14,6 @@ export QT_LOGGING_RULES="qt5ct.debug=false"
 TMP_DIR="/var/tmp"
 isolines_step=10
 translation_script=contours.py
-
 function usage {
         echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s -p -d -f -t [threads number]}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
@@ -24,6 +24,7 @@ function usage {
 	echo "-f: make contours in feet"
 }
 
+date
 while getopts ":i:o:spdt:f" opt; do
   case $opt in
     i) indir="$OPTARG"
@@ -109,8 +110,10 @@ export translation_script
 
 process_tiff ()
 {
+	. $working_dir/no_smoothing.ini
 	filenamefull=$(basename $1)
 	filename=${filenamefull%%.*}
+	no_smooth=false
 	if [ ! -f $outdir/$filename.osm.bz2 ]; then
 		echo "----------------------------------------------"
 		echo "Processing "$1
@@ -123,22 +126,30 @@ process_tiff ()
 		lat=${filename:1:2}
 		smoothed_path=${TMP_DIR}/${filename}_smooth.tif
 		if [[ $smooth == "true" ]] ; then
-			echo "Smoothing raster…"
-			if [[ $((10#$lat)) -ge 65 ]] ; then
-				size_str=$(gdalinfo $1 | grep "Size is" | sed 's/Size is //g')
-				width=$(echo $size_str | sed 's/,.*//')
-				height=$(echo $size_str | sed 's/.*,//')
-				width_mod=$(( $width / 2))
-				height_mod=$(( $height / 2))
-				width_mod_2=$(( $width ))
-				height_mod_2=$(( $height ))
-				gdalwarp -overwrite -ts $width_mod $height_mod -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
-				gdalwarp -overwrite -ts $width_mod_2 $height_mod_2 -of GTiff -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $smoothed_path ${smoothed_path}_2
-				rm -f $smoothed_path && mv ${smoothed_path}_2 $smoothed_path
-			else
-				gdalwarp -overwrite -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
+			for i in ${no_smoothing_array[@]}; do
+				if [[ $i == $filename ]] ; then
+					echo "No smoothing was applied"
+					no_smooth=true
+				fi
+			done
+			if [[ $no_smooth == "false" ]] ; then
+				echo "Smoothing raster…"
+				if [[ $((10#$lat)) -ge 65 ]] ; then
+					size_str=$(gdalinfo $1 | grep "Size is" | sed 's/Size is //g')
+					width=$(echo $size_str | sed 's/,.*//')
+					height=$(echo $size_str | sed 's/.*,//')
+					width_mod=$(( $width / 2))
+					height_mod=$(( $height / 2))
+					width_mod_2=$(( $width ))
+					height_mod_2=$(( $height ))
+					gdalwarp -overwrite -ts $width_mod $height_mod -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
+					gdalwarp -overwrite -ts $width_mod_2 $height_mod_2 -of GTiff -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $smoothed_path ${smoothed_path}_2
+					rm -f $smoothed_path && mv ${smoothed_path}_2 $smoothed_path
+				else
+					gdalwarp -overwrite -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
+				fi
+				src_tiff=$smoothed_path
 			fi
-			src_tiff=$smoothed_path
 		fi
 		echo "Extracting shapefile …"
 		if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
@@ -188,3 +199,4 @@ find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel 
 find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel -P $threads_number_2 --no-notice --bar time process_tiff '{}'
 find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel -P $threads_number_3 --no-notice --bar time process_tiff '{}'
 rm -rf $outdir/processing
+date
