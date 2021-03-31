@@ -480,7 +480,8 @@ public class OsmAndLiveReports {
 		}
 		for (String s : supportersReport.regions.keySet()) {
 			SupportersRegion r = supportersReport.regions.get(s);
-			if (supportersReport.activeCount > 0) {
+			// since 2021-03 don't calculate region percentage
+			if (supportersReport.activeCount > 0 && (month != null && month.compareTo("2021-03") < 0)) {
 				r.percent = ((float) r.count) / (2 * supportersReport.activeCount);
 			} else {
 				r.percent = 0;
@@ -688,8 +689,7 @@ public class OsmAndLiveReports {
 		
 		report.regionPercentage = 0;
 		SupportersRegion sr = supporters.regions.get(isEmpty(region) ? "" : region);
-		// since 2021-03 don't calculate region percentage
-		if (sr != null && (month != null && month.compareTo("2021-03") < 0)) {
+		if (sr != null) {
 			report.regionPercentage = sr.percent;
 		}
 		report.regionCount = 0;
