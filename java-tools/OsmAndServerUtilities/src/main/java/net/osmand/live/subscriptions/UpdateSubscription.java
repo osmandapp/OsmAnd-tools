@@ -261,7 +261,7 @@ public class UpdateSubscription {
 							if (!Algorithms.objectEquals(appstoreOrderId, orderId) && orderId != null) {
 								throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, appstoreOrderId));
 							}
-							updateSubscriptionDb(purchaseToken, sku, orderId, startTime, expireTime, tm, subscription);
+							updateSubscriptionDb(purchaseToken, sku, appstoreOrderId, startTime, expireTime, tm, subscription);
 							if (tm - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
 								kind = "gone";
 								reasonToDelete = String.format("subscription expired more than %.1f days ago",
