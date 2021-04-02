@@ -272,7 +272,7 @@ public class ApiController {
 			@RequestParam() String userId,
 			@RequestParam() String userToken,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request) throws IOException, ParseException {
-	MessageParams params = new MessageParams();
+		MessageParams params = new MessageParams();
 		params.hostAddress = request.getRemoteAddr();
 		if (headers.getFirst("X-Forwarded-For") != null) {
 			params.hostAddress = headers.getFirst("X-Forwarded-For");

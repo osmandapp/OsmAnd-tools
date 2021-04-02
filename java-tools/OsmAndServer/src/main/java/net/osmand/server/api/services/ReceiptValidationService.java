@@ -5,6 +5,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import net.osmand.live.subscriptions.ReceiptValidationHelper;
+import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.http.HttpEntity;
@@ -27,31 +30,18 @@ public class ReceiptValidationService {
 
 	private final static String SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
-	private final static String BUNDLE_ID = "net.osmand.maps";
 
 	public final static int CANNOT_LOAD_RECEIPT_STATUS = 50000;
 	public final static int ALL_SUBSCRIPTIONS_EXPIRED_STATUS = 100;
 	public final static int NO_SUBSCRIPTIONS_FOUND_STATUS = 110;
 	public final static int INCONSISTENT_RECEIPT_STATUS = 200;
 	public final static int USER_NOT_FOUND_STATUS = 300;
-
-	public static class InAppReceipt {
-		public Map<String, String> fields = new HashMap<>();
-
-		public String getProductId() {
-			return fields.get("product_id");
-		}
-
-		public boolean isSubscription() {
-			String productId = getProductId();
-			return productId != null && productId.contains("subscription");
-		}
-	}
+	
 
 	@NonNull
 	public Map<String, Object> validateReceipt(@NonNull JsonObject receiptObj, @NonNull List<Map<String, String>> activeSubscriptions) {
 		try {
-			int status = receiptObj.get("status").getAsInt();
+			int status = receiptObj.get(ReceiptValidationHelper.FIELD_STATUS).getAsInt();
 			if (status != 0) {
 				return mapStatus(status);
 			}
@@ -65,17 +55,17 @@ public class ReceiptValidationService {
 	@Nullable
 	public Map<String, InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
 		Map<String, InAppReceipt> result = null;
-		int status = receiptObj.get("status").getAsInt();
+		int status = receiptObj.get(ReceiptValidationHelper.FIELD_STATUS).getAsInt();
 		if (status == 0) {
-			String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
-			if (bundleId.equals(BUNDLE_ID)) {
+			String bundleId = receiptObj.get(ReceiptValidationHelper.FIELD_RECEIPT).getAsJsonObject().get(ReceiptValidationHelper.FIELD_BUNDLE_ID).getAsString();
+			if (bundleId.equals(ReceiptValidationHelper.IOS_MAPS_BUNDLE_ID)) {
 				result = new HashMap<>();
-				JsonElement receiptInfo = receiptObj.get("latest_receipt_info");
+				JsonElement receiptInfo = receiptObj.get(ReceiptValidationHelper.FIELD_LATEST_RECEIPT_INFO);
 				if (receiptInfo != null) {
 					JsonArray receiptArray = receiptInfo.getAsJsonArray();
 					for (JsonElement elem : receiptArray) {
 						JsonObject recObj = elem.getAsJsonObject();
-						String transactionId = recObj.get("original_transaction_id").getAsString();
+						String transactionId = recObj.get(ReceiptValidationHelper.FIELD_ORIGINAL_TRANSACTION_ID).getAsString();
 						InAppReceipt receipt = new InAppReceipt();
 						for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
 							receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
@@ -105,9 +95,9 @@ public class ReceiptValidationService {
 
 		if (jsonAnswer != null) {
 			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
-			JsonElement statusElement = responseObj.get("status");
+			JsonElement statusElement = responseObj.get(ReceiptValidationHelper.FIELD_STATUS);
 			int status = statusElement != null ? statusElement.getAsInt() : 0;
-			if (status == 21007 && !sandbox) {
+			if (status == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST && !sandbox) {
 				return loadReceiptJsonObject(receipt, true);
 			}
 			return responseObj;
@@ -120,17 +110,17 @@ public class ReceiptValidationService {
 	private HashMap<String, Object> checkValidation(@NonNull JsonObject receiptObj, @NonNull List<Map<String, String>> activeSubscriptions) {
 		HashMap<String, Object> result = new HashMap<>();
 		//To be determined with which field to compare
-		String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
-		JsonArray latestReceiptInfoArray = receiptObj.get("latest_receipt_info").getAsJsonArray();
-		if (bundleId.equals(BUNDLE_ID)) {
+		String bundleId = receiptObj.get(ReceiptValidationHelper.FIELD_RECEIPT).getAsJsonObject().get(ReceiptValidationHelper.FIELD_BUNDLE_ID).getAsString();
+		JsonArray latestReceiptInfoArray = receiptObj.get(ReceiptValidationHelper.FIELD_LATEST_RECEIPT_INFO).getAsJsonArray();
+		if (bundleId.equals(ReceiptValidationHelper.IOS_MAPS_BUNDLE_ID)) {
 			if (latestReceiptInfoArray.size() > 0) {
 				result.put("result", true);
 				List<String> inAppArray = new ArrayList<>();
 				for (JsonElement jsonElement : latestReceiptInfoArray) {
 					Map<String, String> subscriptionObj = new HashMap<>();
 					JsonObject receipt = jsonElement.getAsJsonObject();
-					String productId = receipt.get("product_id").getAsString();
-					subscriptionObj.put("product_id", productId);
+					String productId = receipt.get(ReceiptValidationHelper.FIELD_PRODUCT_ID).getAsString();
+					subscriptionObj.put(ReceiptValidationHelper.FIELD_PRODUCT_ID, productId);
 					JsonElement expiresDateElement = receipt.get("expires_date_ms");
 					if (expiresDateElement != null) {
 						long expiresDateMs = expiresDateElement.getAsLong();

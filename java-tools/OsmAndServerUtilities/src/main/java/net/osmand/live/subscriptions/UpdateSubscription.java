@@ -147,9 +147,8 @@ public class UpdateSubscription {
 		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
 		while (rs.next()) {
 			long userid = rs.getLong("userid");
-			String pt = rs.getString("purchaseToken");
+			String purchaseToken = rs.getString("purchaseToken");
 			String sku = rs.getString("sku");
-			String payload = this.ios ? rs.getString("payload") : null;
 			Timestamp checkTime = rs.getTimestamp("checktime");
 			Timestamp startTime = rs.getTimestamp("starttime");
 			Timestamp expireTime = rs.getTimestamp("expiretime");
@@ -180,9 +179,9 @@ public class UpdateSubscription {
 					expireTime == null ? "" : new Date(expireTime.getTime()),
 							activeNow+""));
 			if (this.ios) {
-				processIosSubscription(receiptValidationHelper, userid, pt, sku, payload, startTime, expireTime, tm, introcycles, pms.verbose);
+				processIosSubscription(receiptValidationHelper, userid, purchaseToken, sku, startTime, expireTime, tm, introcycles, pms.verbose);
 			} else {
-				processAndroidSubscription(purchases, userid, pt, sku, startTime, expireTime, tm, pms.verbose);
+				processAndroidSubscription(purchases, userid, purchaseToken, sku, startTime, expireTime, tm, pms.verbose);
 			}
 		}
 		if (deletions > 0) {
@@ -199,12 +198,12 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, long userid, String pt, String sku, String payload, Timestamp startTime, Timestamp expireTime, long tm, 
+	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, long userid, String purchaseToken, String sku, Timestamp startTime, Timestamp expireTime, long tm, 
 			int prevIntroCycles, boolean verbose) throws SQLException {
 		try {
 			String reasonToDelete = null;
 			String kind = "";
-			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(payload);
+			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken);
 			if (loadReceipt.result) {
 				JsonObject receiptObj = loadReceipt.response;
 				if (verbose) {
@@ -248,7 +247,7 @@ public class UpdateSubscription {
 									.setStartTimeMillis(startDate).setExpiryTimeMillis(expiresDate)
 									.setAutoRenewing(autoRenewing);
 
-							updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
+							updateSubscriptionDb(userid, purchaseToken, sku, startTime, expireTime, tm, subscription);
 							if (tm - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
 								kind = "gone";
 								reasonToDelete = String.format("subscription expired more than %.1f days ago",
@@ -278,25 +277,25 @@ public class UpdateSubscription {
 				reasonToDelete = "user gone";
 			}
 			if (reasonToDelete != null) {
-				deleteSubscription(userid, pt, sku, tm, reasonToDelete, kind);
+				deleteSubscription(userid, purchaseToken, sku, tm, reasonToDelete, kind);
 			}
 		} catch (Exception e) {
 			System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
 		}
 	}
 
-	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, long userid, String pt, String sku, Timestamp startTime, Timestamp expireTime, long tm, boolean verbose) throws SQLException {
+	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, long userid, String purchaseToken, String sku, Timestamp startTime, Timestamp expireTime, long tm, boolean verbose) throws SQLException {
 		SubscriptionPurchase subscription;
 		try {
 			if (sku.startsWith("osm_free") || sku.contains("_free_")) {
-				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, pt).execute();
+				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, purchaseToken).execute();
 			} else {
-				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, pt).execute();
+				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, purchaseToken).execute();
 			}
 			if (verbose) {
 				System.out.println("Result: " + subscription.toPrettyString());
 			}
-			updateSubscriptionDb(userid, pt, sku, startTime, expireTime, tm, subscription);
+			updateSubscriptionDb(userid, purchaseToken, sku, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
 			boolean gone = false;
 			if (e instanceof GoogleJsonResponseException) {
@@ -305,7 +304,7 @@ public class UpdateSubscription {
 
 			String reason = null;
 			String kind = "";
-			if (!pt.contains(".AO")) {
+			if (!purchaseToken.contains(".AO")) {
 				reason = "invalid purchase token " + e.getMessage();
 				kind = "invalid";
 			} else if (gone) {
@@ -321,13 +320,13 @@ public class UpdateSubscription {
 
 			}
 			if (reason != null) {
-				deleteSubscription(userid, pt, sku, tm, reason, kind);
+				deleteSubscription(userid, purchaseToken, sku, tm, reason, kind);
 			} else {
-				System.err.println(String.format("?? Error updating userid %s and sku %s pt '%s': %s", userid, sku, pt, e.getMessage()));
+				System.err.println(String.format("?? Error updating userid %s and sku %s pt '%s': %s", userid, sku, purchaseToken, e.getMessage()));
 				int ind = 1;
 				updCheckStat.setTimestamp(ind++, new Timestamp(tm));
 				updCheckStat.setLong(ind++, userid);
-				updCheckStat.setString(ind++, pt);
+				updCheckStat.setString(ind++, purchaseToken);
 				updCheckStat.setString(ind++, sku);
 				updCheckStat.addBatch();
 				checkChanges++;
@@ -355,7 +354,7 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void updateSubscriptionDb(long userid, String pt, String sku, Timestamp startTime, Timestamp expireTime,
+	private void updateSubscriptionDb(long userid, String purchaseToken, String sku, Timestamp startTime, Timestamp expireTime,
 									  long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
 		int ind = 1;
@@ -422,7 +421,7 @@ public class UpdateSubscription {
 		boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
 		updStat.setBoolean(ind++, !expired);
 		updStat.setLong(ind++, userid);
-		updStat.setString(ind++, pt);
+		updStat.setString(ind++, purchaseToken);
 		updStat.setString(ind, sku);
 		System.out.println(String.format("%s for %s %s start %s expire %s",
 				updated ? "Updates " : "No changes ",

@@ -21,30 +21,33 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-	// AS OF JANUARY 2019
-	// userId + sku is a key by design and by new data (due to historical mistake, currently key is userId + sku + purchaseToken)
-	Optional<SupporterDeviceSubscription> findTopByUserIdAndSkuOrderByTimestampDesc(Long userId, String sku);
-
+	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku 
+	Optional<SupporterDeviceSubscription> findTopByOrderIdAndSkuOrderByTimestampDesc(String orderId, String sku);
+	
+	// TODO this method retrieves userid should be refactored
 	List<SupporterDeviceSubscription> findByPayload(String payload);
-
-	Optional<SupporterDeviceSubscription> findTopByPurchaseTokenIn(Collection<String> purchaseTokens);
+	Optional<SupporterDeviceSubscription> findTopByOrderIdIn(Collection<String> orderIds);
 
 	@Entity
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
 	public class SupporterDeviceSubscription {
 
-		@Id
+		
+		// TODO 
 		@Column(name = "userid")
 		public Long userId;
-
+		
 		@Id
 		@Column(name = "sku")
 		public String sku;
 
-		@Id
 		@Column(name = "purchasetoken")
 		public String purchaseToken;
+		
+		@Id
+		@Column(name = "orderid")
+		public String orderId;
 
 		@Column(name = "payload")
 		public String payload;
@@ -70,27 +73,24 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
 		private static final long serialVersionUID = 7941117922381685104L;
 
-		public Long userId;
 		public String sku;
-		public String purchaseToken;
+		public String orderId;
 
 		public SupporterDeviceSubscriptionPrimaryKey() {
 		}
 
-		public SupporterDeviceSubscriptionPrimaryKey(Long userId, String sku, String purchaseToken) {
+		public SupporterDeviceSubscriptionPrimaryKey(String sku, String orderId) {
 			super();
-			this.userId = userId;
 			this.sku = sku;
-			this.purchaseToken = purchaseToken;
+			this.orderId = orderId;
 		}
 
 		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
-			result = prime * result + ((purchaseToken == null) ? 0 : purchaseToken.hashCode());
+			result = prime * result + ((orderId == null) ? 0 : orderId.hashCode());
 			result = prime * result + ((sku == null) ? 0 : sku.hashCode());
-			result = prime * result + ((userId == null) ? 0 : userId.hashCode());
 			return result;
 		}
 
@@ -106,11 +106,11 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 				return false;
 			}
 			SupporterDeviceSubscriptionPrimaryKey other = (SupporterDeviceSubscriptionPrimaryKey) obj;
-			if (purchaseToken == null) {
-				if (other.purchaseToken != null) {
+			if (orderId == null) {
+				if (other.orderId != null) {
 					return false;
 				}
-			} else if (!purchaseToken.equals(other.purchaseToken)) {
+			} else if (!orderId.equals(other.orderId)) {
 				return false;
 			}
 			if (sku == null) {
@@ -118,13 +118,6 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 					return false;
 				}
 			} else if (!sku.equals(other.sku)) {
-				return false;
-			}
-			if (userId == null) {
-				if (other.userId != null) {
-					return false;
-				}
-			} else if (!userId.equals(other.userId)) {
 				return false;
 			}
 			return true;

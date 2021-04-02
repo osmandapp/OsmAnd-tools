@@ -1,39 +1,7 @@
 package net.osmand.server.controllers.pub;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.JsonObject;
-
-import net.osmand.server.api.repo.MapUserRepository;
-import net.osmand.server.api.repo.MapUserRepository.MapUser;
-import net.osmand.server.api.repo.OsmRecipientsRepository;
-import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
-import net.osmand.server.api.repo.SupportersRepository;
-import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.services.ReceiptValidationService;
-import net.osmand.server.api.services.ReceiptValidationService.InAppReceipt;
-import net.osmand.server.utils.BTCAddrValidator;
-import net.osmand.util.Algorithms;
-
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
+import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
+import static net.osmand.server.api.services.ReceiptValidationService.USER_NOT_FOUND_STATUS;
 
 import java.net.URLEncoder;
 import java.security.KeyFactory;
@@ -52,13 +20,46 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import javax.servlet.http.HttpServletRequest;
 
-import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
-import static net.osmand.server.api.services.ReceiptValidationService.USER_NOT_FOUND_STATUS;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonObject;
+
+import net.osmand.live.subscriptions.ReceiptValidationHelper;
+import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.server.api.repo.MapUserRepository;
+import net.osmand.server.api.repo.MapUserRepository.MapUser;
+import net.osmand.server.api.repo.OsmRecipientsRepository;
+import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
+import net.osmand.server.api.repo.SupportersRepository;
+import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.ReceiptValidationService;
+import net.osmand.server.utils.BTCAddrValidator;
+import net.osmand.util.Algorithms;
 
 @RestController
 @RequestMapping("/subscription")
@@ -83,9 +84,6 @@ public class SubscriptionController {
     
     @Autowired
     private ReceiptValidationService validationService;
-    
-    @Autowired
-    private StringRedisTemplate redisTemplate;
     
     private ObjectMapper jsonMapper = new ObjectMapper();
 
@@ -317,8 +315,6 @@ public class SubscriptionController {
 		String receipt = request.getParameter("receipt");
 		JsonObject receiptObj = validationService.loadReceiptJsonObject(receipt, false);
 		if (receiptObj != null) {
-			String userId = request.getParameter("userid");
-			long uId = -1;
 			Map<String, Object> result = new HashMap<>();
 			Map<String, InAppReceipt> inAppReceipts = validationService.loadInAppReceipts(receiptObj);
 			if (inAppReceipts != null) {
@@ -329,30 +325,17 @@ public class SubscriptionController {
 					result.put("status", NO_SUBSCRIPTIONS_FOUND_STATUS);
 					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 				} else {
-					if (Algorithms.isEmpty(userId)) {
-						Supporter s = restoreUserIdByPurchaseToken(result, inAppReceipts);
-						if (s != null) {
-							uId = s.userId;
-						}
-					} else {
-						uId = Long.valueOf(userId);
-					}
 					result.put("eligible_for_introductory_price",
 							isEligibleForIntroductoryPrice(inAppReceipts.values()) ? "true" : "false");
-					if (uId == -1) {
-						result.put("eligible_for_subscription_offer", "false");
-						result.put("result", false);
-						result.put("status", USER_NOT_FOUND_STATUS);
-						return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
-					} else {
-						// update existing subscription payload
-						for (InAppReceipt r : inAppReceipts.values()) {
-							if (r.isSubscription()) {
-								Optional<SupporterDeviceSubscription> subscription =
-										subscriptionsRepository.findTopByUserIdAndSkuOrderByTimestampDesc(uId, r.getProductId());
-								if (subscription.isPresent()) {
-									SupporterDeviceSubscription s = subscription.get();
-									s.payload = receipt;
+
+					// update existing subscription purchaseToken
+					for (InAppReceipt r : inAppReceipts.values()) {
+						if (r.isSubscription()) {
+							Optional<SupporterDeviceSubscription> subscription = subscriptionsRepository.findTopByOrderIdAndSkuOrderByTimestampDesc(r.getOrderId(), r.getProductId());
+							if (subscription.isPresent()) {
+								SupporterDeviceSubscription s = subscription.get();
+								if (!Algorithms.objectEquals(s.purchaseToken, receipt)) {
+									s.purchaseToken = receipt;
 									subscriptionsRepository.saveAndFlush(s);
 								}
 							}
@@ -372,9 +355,9 @@ public class SubscriptionController {
 		return error("Cannot load receipt.");
 	}
 
-	private Supporter restoreUserIdByPurchaseToken(Map<String, Object> result, Map<String, InAppReceipt> inAppReceipts) {
-		Optional<SupporterDeviceSubscription> subscriptionOpt = subscriptionsRepository
-				.findTopByPurchaseTokenIn(inAppReceipts.keySet());
+	// TODO 
+	private Supporter restoreUserIdByOrderId(Map<String, Object> result, Set<String> orderIds) {
+		Optional<SupporterDeviceSubscription> subscriptionOpt = subscriptionsRepository.findTopByOrderIdIn(orderIds);
 		if (subscriptionOpt.isPresent()) {
 			SupporterDeviceSubscription subscription = subscriptionOpt.get();
 			Optional<Supporter> supporter = supportersRepository.findById(subscription.userId);
@@ -438,7 +421,7 @@ public class SubscriptionController {
 
 	@Nullable
 	private Map<String, String> generateOfferSignature(String productIdentifier, String offerIdentifier, String userId) {
-    	String appBundleId = "net.osmand.maps";
+    	String appBundleId = ReceiptValidationHelper.IOS_MAPS_BUNDLE_ID;
 		String keyIdentifier = System.getenv().get("IOS_SUBSCRIPTION_KEY_ID");
 		String nonce = UUID.randomUUID().toString().toLowerCase();
 		String timestamp = "" + System.currentTimeMillis() / 1000L;
@@ -482,42 +465,72 @@ public class SubscriptionController {
 		return null;
 	}
 
+	
+	// Android sends
+	//	parameters.put("userid", userId);
+	//	parameters.put("sku", info.getSku());
+	//	parameters.put("orderId", info.getOrderId());
+	//	parameters.put("purchaseToken", info.getPurchaseToken());
+	//	parameters.put("email", email);
+	//	parameters.put("token", token);
+	//	parameters.put("version", Version.getFullVersion(ctx));
+	//	parameters.put("lang", ctx.getLanguage() + "");
+	//	parameters.put("nd", ctx.getAppInitializer().getFirstInstalledDays() + "");
+	//	parameters.put("ns", ctx.getAppInitializer().getNumberOfStarts() + "");
+	//	parameters.put("aid", ctx.getUserAndroidId());
+	// iOS sends
+    // [params setObject:@"ios" forKey:@"os"];
+    // [params setObject:userId forKey:@"userid"];
+    // [params setObject:token forKey:@"token"];
+    // [params setObject:sku forKey:@"sku"];
+    // [params setObject:transactionId forKey:@"purchaseToken"];
+    // [params setObject:receiptStr forKey:@"payload"];
+    // [params setObject:email forKey:@"email"];
 	@PostMapping(path = {"/purchased", "/purchased.php"})
 	public ResponseEntity<String> purchased(HttpServletRequest request) {
-		SupporterUser suser = new SupporterUser();
-		ResponseEntity<String> error = validateUserId(request, suser);
-		if (error != null) {
-			return error;
-		}
+//		// TODO store in supporters table order id, userid, email 
+//		SupporterUser suser = new SupporterUser();
+//		ResponseEntity<String> error = validateUserId(request, suser);
+//		if (error != null) {
+//			return error;
+//		}
+//		// 
 		SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
-		subscr.userId = suser.supporter.userId;
-		subscr.sku = request.getParameter("sku");
-		String payload = request.getParameter("payload");
-		if (payload != null) {
-			subscr.payload = payload;
+		String userId = request.getParameter("userid");
+		if (isEmpty(userId)) {
+			return error("Please validate user id.");
 		}
-		subscr.purchaseToken = request.getParameter("purchaseToken");
+		subscr.userId = Long.parseLong(userId);
+		subscr.sku = request.getParameter("sku");
+		// it was mixed in early ios versions, so orderid was passed as purchaseToken and payload as purchaseToken;
+		// "ios".equals(request.getParameter("purchaseToken")) || 
+		boolean ios = Algorithms.isEmpty(request.getParameter("orderId"));
+		subscr.purchaseToken = ios ? request.getParameter("payload") : request.getParameter("purchaseToken");
+		subscr.orderId = ios ? request.getParameter("purchaseToken") : request.getParameter("orderId");
 		subscr.timestamp = new Date();
 		Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
-						new SupporterDeviceSubscriptionPrimaryKey(subscr.userId, subscr.sku, subscr.purchaseToken));
+						new SupporterDeviceSubscriptionPrimaryKey(subscr.sku, subscr.orderId));
 		if (subscrOpt.isPresent()) {
-			if (subscr.payload != null) {
+			if (subscr.purchaseToken != null) {
 				SupporterDeviceSubscription deviceSubscription = subscrOpt.get();
-				deviceSubscription.payload = subscr.payload;
+				deviceSubscription.purchaseToken = subscr.purchaseToken;
 				subscriptionsRepository.save(deviceSubscription);
 			}
 			return ResponseEntity.ok("{ \"res\" : \"OK\" }");
 		}
 		subscriptionsRepository.save(subscr);
-		return ResponseEntity.ok(!suser.tokenValid ? userShortInfoAsJson(suser.supporter)
-				: userInfoAsJson(suser.supporter));
+		return ResponseEntity.ok("{ \"res\" : \"OK\" }");
+//		return ResponseEntity.ok(!suser.tokenValid ? userShortInfoAsJson(suser.supporter)
+//				: userInfoAsJson(suser.supporter));
 	}
 	
+	// TODO 
 	private class SupporterUser {
 		Supporter supporter = null;
 		boolean tokenValid = true;
 	}
 
+	// TODO 
 	private ResponseEntity<String> validateUserId(HttpServletRequest request, SupporterUser suser) {
 		String userId = request.getParameter("userid");
 

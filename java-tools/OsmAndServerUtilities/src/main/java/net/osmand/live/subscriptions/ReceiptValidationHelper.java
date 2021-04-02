@@ -25,8 +25,15 @@ import java.util.TreeMap;
 
 public class ReceiptValidationHelper {
 
+	public static final String FIELD_BUNDLE_ID = "bundle_id";
+	public static final String FIELD_PRODUCT_ID = "product_id";
+	public static final String FIELD_ORIGINAL_TRANSACTION_ID = "original_transaction_id";
+	public static final String FIELD_STATUS = "status";
+	public static final String FIELD_RECEIPT = "receipt";
+	public static final String FIELD_LATEST_RECEIPT_INFO = "latest_receipt_info";
+	
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
-	private final static String BUNDLE_ID = "net.osmand.maps";
+	public final static String IOS_MAPS_BUNDLE_ID = "net.osmand.maps";
 
 	public final static int NO_RESPONSE_ERROR_CODE = 1100;
 	// https://developer.apple.com/documentation/appstorereceipts/status
@@ -35,9 +42,6 @@ public class ReceiptValidationHelper {
 	
 	// This receipt is from the test environment, but it was sent to the production environment for verification.
 	public static final int SANDBOX_ERROR_CODE_TEST = 21007;
-	
-	
-	
 	
 	
 	public static class ReceiptResult {
@@ -56,7 +60,7 @@ public class ReceiptValidationHelper {
 		String jsonAnswer = postReceiptJson(receiptObj);
 		if (jsonAnswer != null) {
 			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
-			JsonElement statusElement = responseObj.get("status");
+			JsonElement statusElement = responseObj.get(FIELD_STATUS);
 			int status = statusElement != null ? statusElement.getAsInt() : 0;
 			if (status > 0) {
 				result.error = status;
@@ -80,20 +84,20 @@ public class ReceiptValidationHelper {
 				JsonObject o = ar.get(i).getAsJsonObject();
 				// "auto_renew_product_id", "original_transaction_id", "product_id", "auto_renew_status"
 				JsonElement renewStatus = o.get("auto_renew_status");
-				JsonElement txId = o.get("original_transaction_id");
+				JsonElement txId = o.get(FIELD_ORIGINAL_TRANSACTION_ID);
 				if (renewStatus != null && txId != null) {
 					autoRenewStatus.put(txId.getAsString(), renewStatus.getAsString().equals("1"));
 				}
 			}
 		}
-		String bundleId = receiptObj.get("receipt").getAsJsonObject().get("bundle_id").getAsString();
-		if (bundleId.equals(BUNDLE_ID)) {
-			JsonElement receiptInfo = receiptObj.get("latest_receipt_info");
+		String bundleId = receiptObj.get(FIELD_RECEIPT).getAsJsonObject().get(FIELD_BUNDLE_ID).getAsString();
+		if (bundleId.equals(IOS_MAPS_BUNDLE_ID)) {
+			JsonElement receiptInfo = receiptObj.get(FIELD_LATEST_RECEIPT_INFO);
 			if (receiptInfo != null) {
 				JsonArray receiptArray = receiptInfo.getAsJsonArray();
 				for (JsonElement elem : receiptArray) {
 					JsonObject recObj = elem.getAsJsonObject();
-					String transactionId = recObj.get("original_transaction_id").getAsString();
+					String transactionId = recObj.get(FIELD_ORIGINAL_TRANSACTION_ID).getAsString();
 					InAppReceipt receipt = new InAppReceipt();
 					if (autoRenewStatus.containsKey(transactionId)) {
 						receipt.autoRenew = autoRenewStatus.get(transactionId);
@@ -172,12 +176,17 @@ public class ReceiptValidationHelper {
 		return null;
 	}
 
+	
 	public static class InAppReceipt {
-		public Boolean autoRenew;
 		public Map<String, String> fields = new HashMap<>();
-
+		public Boolean autoRenew;
+		
 		public String getProductId() {
-			return fields.get("product_id");
+			return fields.get(FIELD_PRODUCT_ID);
+		}
+		
+		public String getOrderId() {
+			return fields.get(FIELD_ORIGINAL_TRANSACTION_ID);
 		}
 
 		public boolean isSubscription() {

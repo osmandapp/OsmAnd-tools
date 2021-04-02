@@ -9,7 +9,27 @@ CREATE TABLE pending_changesets (id bigint, created_at text) ;
 CREATE TABLE changesets (id bigint, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, created_by text, minlat float, minlon float, maxlat float, maxlon float, changes_count int, PRIMARY KEY(id));
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));
 CREATE TABLE changeset_country(changesetid bigint, countryid int, small int);
+
 CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text);
+CREATE SEQUENCE supporters_seq START 1000;
+ALTER TABLE supporters ADD PRIMARY KEY (userid);
+-- 	AS OF JANUARY 2019: userId + sku is a key by design and by new data (due to historical mistake, currently key is userId + sku + purchaseToken)
+-- AS OF MARCH 2021: duplicate purchaseToken are present for different userId (purchaseToken is unique for android, payload for iOS)
+--- IOS: purchaseToken -> orderId, payload -> purchaseToken
+
+
+CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, timestamp timestamp,
+        autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
+        price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
+        paymentstate int, valid boolean, checktime timestamp);
+CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);
+CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);
+
+-- ACCOUNT (id, email, token, subuserid, purchasetoken)
+-- FILES (accountid, type, createdate, lastupdate, name, data bytea)
+-- CREATE TABLE (id bigint primary key, data bytea);
+--- CREATE TABLE GPX_METADATA_TABLE_NAME(id bigint primary key, \"user\" text, \"date\" timestamp, name text, lat float, )
+
 
 -- mail group
 CREATE TABLE email_free_users(aid text, email text, os text, updatetime timestamp);
@@ -20,14 +40,6 @@ CREATE TABLE email_support_survey(ip text, response text, timestamp timestamp);
 CREATE TABLE data_missing_search(ip text, search text, location text, timestamp timestamp);
 
 CREATE TABLE osm_recipients(osmid text, email text, btcaddr text, updatetime timestamp);
-CREATE SEQUENCE supporters_seq START 1000;
-ALTER TABLE supporters ADD PRIMARY KEY (userid);
-CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, timestamp timestamp,
-        autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
-        price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
-        paymentstate int, valid boolean, checktime timestamp);
-CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);
-CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);
 
 CREATE TABLE exchange_rates(currency text, month date, eurrate double precision	);
 
