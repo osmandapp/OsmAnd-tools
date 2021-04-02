@@ -10,14 +10,12 @@ CREATE TABLE changesets (id bigint, bot int, created_at timestamp, closed_at tim
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));
 CREATE TABLE changeset_country(changesetid bigint, countryid int, small int);
 
-CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text);
+CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text, orderid text);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
--- 	AS OF JANUARY 2019: userId + sku is a key by design and by new data (due to historical mistake, currently key is userId + sku + purchaseToken)
--- AS OF MARCH 2021: duplicate purchaseToken are present for different userId (purchaseToken is unique for android, payload for iOS)
---- IOS: purchaseToken -> orderId, payload -> purchaseToken
 
 
+--- PRIMARY KEY - purchasetoken + sku, alternative primary key (once it's loaded) orderid + sku
 CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,

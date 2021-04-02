@@ -45,8 +45,8 @@ public class UpdateSubscription {
 
 
 	// init one time
-	private static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
-	private static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
+	protected static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
+	protected static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
 
 	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
@@ -280,7 +280,7 @@ public class UpdateSubscription {
 				deleteSubscription(userid, purchaseToken, sku, tm, reasonToDelete, kind);
 			}
 		} catch (Exception e) {
-			System.err.println(String.format("?? Error updating userid %s and sku %s: %s", userid, sku, e.getMessage()));
+			System.err.println(String.format("?? Error updating userid %s, sku %s and purchaseToken: %s", userid, sku, purchaseToken, e.getMessage()));
 		}
 	}
 
@@ -394,6 +394,7 @@ public class UpdateSubscription {
 			} else {
 				updStat.setNull(ind++, Types.INTEGER);
 			}
+			updStat.setString(ind++, subscription.getOrderId());
 		} else {
 			if (subscription.getPaymentState() == null) {
 				updStat.setNull(ind++, Types.INTEGER);

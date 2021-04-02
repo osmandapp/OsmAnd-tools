@@ -1,7 +1,6 @@
 package net.osmand.server.api.repo;
 
 import java.io.Serializable;
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -14,10 +13,10 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
-
-import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
@@ -26,17 +25,11 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 	
 	// TODO this method retrieves userid should be refactored
 	List<SupporterDeviceSubscription> findByPayload(String payload);
-	Optional<SupporterDeviceSubscription> findTopByOrderIdIn(Collection<String> orderIds);
 
 	@Entity
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
 	public class SupporterDeviceSubscription {
-
-		
-		// TODO 
-		@Column(name = "userid")
-		public Long userId;
 		
 		@Id
 		@Column(name = "sku")

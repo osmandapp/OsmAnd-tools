@@ -1,7 +1,6 @@
 package net.osmand.server.controllers.pub;
 
 import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
-import static net.osmand.server.api.services.ReceiptValidationService.USER_NOT_FOUND_STATUS;
 
 import java.net.URLEncoder;
 import java.security.KeyFactory;
@@ -200,14 +199,6 @@ public class SubscriptionController {
 		return res;
 	}
 
-	private String userShortInfoAsJson(Supporter s) {
-		String response = String.format(
-				"{\"userid\": \"%d\", \"visibleName\": \"%s\",\"preferredCountry\": \"%s\"}", 
-				s.userId, s.visibleName, s.preferredRegion);
-		return response;
-	}
-
-    
 
 	@PostMapping(path = {"/register", "/register.php"},
         consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -355,17 +346,12 @@ public class SubscriptionController {
 		return error("Cannot load receipt.");
 	}
 
-	// TODO 
 	private Supporter restoreUserIdByOrderId(Map<String, Object> result, Set<String> orderIds) {
-		Optional<SupporterDeviceSubscription> subscriptionOpt = subscriptionsRepository.findTopByOrderIdIn(orderIds);
-		if (subscriptionOpt.isPresent()) {
-			SupporterDeviceSubscription subscription = subscriptionOpt.get();
-			Optional<Supporter> supporter = supportersRepository.findById(subscription.userId);
-			if (supporter.isPresent()) {
-				Supporter s = supporter.get();
-				result.put("user", userInfoAsMap(s));
-				return s;
-			}
+		Optional<Supporter> supporter = supportersRepository.findTopByOrderIdIn(orderIds);
+		if (supporter.isPresent()) {
+			Supporter s = supporter.get();
+			result.put("user", userInfoAsMap(s));
+			return s;
 		}
 		return null;
 	}
@@ -488,31 +474,27 @@ public class SubscriptionController {
     // [params setObject:email forKey:@"email"];
 	@PostMapping(path = {"/purchased", "/purchased.php"})
 	public ResponseEntity<String> purchased(HttpServletRequest request) {
-//		// TODO store in supporters table order id, userid, email 
-//		SupporterUser suser = new SupporterUser();
-//		ResponseEntity<String> error = validateUserId(request, suser);
-//		if (error != null) {
-//			return error;
-//		}
-//		// 
 		SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
-		String userId = request.getParameter("userid");
-		if (isEmpty(userId)) {
-			return error("Please validate user id.");
-		}
-		subscr.userId = Long.parseLong(userId);
-		subscr.sku = request.getParameter("sku");
 		// it was mixed in early ios versions, so orderid was passed as purchaseToken and payload as purchaseToken;
-		// "ios".equals(request.getParameter("purchaseToken")) || 
+		// "ios".equals(request.getParameter("purchaseToken")) ||
 		boolean ios = Algorithms.isEmpty(request.getParameter("orderId"));
 		subscr.purchaseToken = ios ? request.getParameter("payload") : request.getParameter("purchaseToken");
 		subscr.orderId = ios ? request.getParameter("purchaseToken") : request.getParameter("orderId");
+		subscr.sku = request.getParameter("sku");
 		subscr.timestamp = new Date();
+		if (isEmpty(subscr.orderId)) {
+			return error("Please validate the purchase (orderid is empty).");
+		}
+		String userId = request.getParameter("userid");
+		if (!isEmpty(userId)) {
+			connectUserWithOrderId(userId, subscr.orderId, request);
+		}
+		
 		Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
 						new SupporterDeviceSubscriptionPrimaryKey(subscr.sku, subscr.orderId));
-		if (subscrOpt.isPresent()) {
-			if (subscr.purchaseToken != null) {
-				SupporterDeviceSubscription deviceSubscription = subscrOpt.get();
+		if (subscrOpt.isPresent() && !Algorithms.isEmpty(subscr.purchaseToken)) {
+			SupporterDeviceSubscription deviceSubscription = subscrOpt.get();
+			if (!Algorithms.isEmpty(deviceSubscription.purchaseToken) && !Algorithms.objectEquals(subscr.purchaseToken, subscrOpt)) {
 				deviceSubscription.purchaseToken = subscr.purchaseToken;
 				subscriptionsRepository.save(deviceSubscription);
 			}
@@ -520,42 +502,28 @@ public class SubscriptionController {
 		}
 		subscriptionsRepository.save(subscr);
 		return ResponseEntity.ok("{ \"res\" : \"OK\" }");
-//		return ResponseEntity.ok(!suser.tokenValid ? userShortInfoAsJson(suser.supporter)
-//				: userInfoAsJson(suser.supporter));
+
 	}
 	
-	// TODO 
-	private class SupporterUser {
-		Supporter supporter = null;
-		boolean tokenValid = true;
-	}
-
-	// TODO 
-	private ResponseEntity<String> validateUserId(HttpServletRequest request, SupporterUser suser) {
-		String userId = request.getParameter("userid");
-
-		if (isEmpty(userId)) {
-			return error("Please validate user id.");
-		}
+	private boolean connectUserWithOrderId(String userId, String orderId, HttpServletRequest request) {
 		String token = request.getParameter("token");
 		if (isEmpty(token)) {
-			suser.tokenValid = false;
-			LOG.warn("Token was not provided: " + toString(request.getParameterMap()));
-			// return error("Token is not present: fix will be in OsmAnd 3.2");
+			LOG.warn("USER: Token was not provided: " + toString(request.getParameterMap()));
+			return false;
 		}
 		Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
 		if (!sup.isPresent()) {
-			return error("Couldn't find your user id: " + userId);
+			LOG.warn("USER: Couldn't find your user id: " + toString(request.getParameterMap()));
+			return false;
 		}
 		Supporter supporter = sup.get();
-
 		if (token != null && !token.equals(supporter.token)) {
-			suser.tokenValid = false;
-			LOG.warn("Token failed validation: " + toString(request.getParameterMap()));
-			// return error("Couldn't validate the token: " + token);
+			LOG.warn("USER: Token failed validation: " + toString(request.getParameterMap()));
+			return false;
 		}
-		suser.supporter = supporter;
-		return null;
+		supporter.orderId = orderId;
+		supportersRepository.saveAndFlush(supporter);
+		return true;
 	}
 
 	private String toString(Map<String, String[]> parameterMap) {

@@ -1,5 +1,6 @@
 package net.osmand.server.api.repo;
 
+import java.util.Collection;
 import java.util.Optional;
 
 import javax.persistence.Column;
@@ -15,6 +16,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface SupportersRepository extends JpaRepository<SupportersRepository.Supporter, Long> {
 
     Optional<Supporter> findByUserEmail(String userEmail);
+    
+    Optional<Supporter> findTopByOrderIdIn(Collection<String> orderIds);
 
     @Entity
     @Table(name = "supporters")
@@ -40,6 +43,9 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
         
         @Column(name = "os")
         public String os;
+        
+        @Column(name = "orderid")
+        public String orderId;
 
     }
 }
