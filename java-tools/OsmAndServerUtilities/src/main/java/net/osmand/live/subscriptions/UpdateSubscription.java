@@ -51,9 +51,7 @@ public class UpdateSubscription {
 
 	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
-//	private static final int BATCH_SIZE = 200;
-	// TODO
-	private static final int BATCH_SIZE = 50;
+	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
 	private static final long HOUR = 1000l * 60 * 60;
 
