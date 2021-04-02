@@ -94,11 +94,11 @@ public class UpdateSubscription {
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
 		if (ios) {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, introcycles = ? , "
+					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, introcycles = ? , "
 					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, paymentstate = ?, "
+					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, paymentstate = ?, "
 					+ " kind = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
 					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
@@ -218,7 +218,7 @@ public class UpdateSubscription {
 					System.out.println("Result: " + receiptObj.toString());
 				}
 				try {
-					List<InAppReceipt> inAppReceipts = receiptValidationHelper.parseInAppReceipts(receiptObj);
+					List<InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
 					if (inAppReceipts.isEmpty()) {
 						kind = "empty";
 						reasonToDelete = "empty in apps.";
@@ -227,12 +227,12 @@ public class UpdateSubscription {
 						int introCycles = 0;
 						long startDate = 0;
 						long expiresDate = 0;
-						String pOrderId = null;
+						String appstoreOrderId = null;
 						for (InAppReceipt receipt : inAppReceipts) {
 							// there could be multiple subscriptions for same purchaseToken !
 							// i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
-							if (sku.equals(receipt.getProductId()) && orderId.equals(receipt.getOrderId())) {
-								pOrderId = receipt.getOrderId();
+							if (sku.equals(receipt.getProductId()) && (orderId == null || orderId.equals(receipt.getOrderId())) {
+								appstoreOrderId = receipt.getOrderId();
 								Map<String, String> fields = receipt.fields;
 								// purchase_date_ms is purchase date of prolongation
 								boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
@@ -258,8 +258,8 @@ public class UpdateSubscription {
 							SubscriptionPurchase subscription = new SubscriptionPurchase().setIntroductoryPriceInfo(ipo)
 									.setStartTimeMillis(startDate).setExpiryTimeMillis(expiresDate)
 									.setAutoRenewing(autoRenewing);
-							if (!Algorithms.objectEquals(pOrderId, orderId)) {
-								throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, pOrderId));
+							if (!Algorithms.objectEquals(appstoreOrderId, orderId) && orderId != null) {
+								throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, appstoreOrderId));
 							}
 							updateSubscriptionDb(purchaseToken, sku, orderId, startTime, expireTime, tm, subscription);
 							if (tm - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
@@ -385,6 +385,8 @@ public class UpdateSubscription {
 		boolean updated = false;
 		int ind = 1;
 		updStat.setTimestamp(ind++, new Timestamp(tm));
+		// TODO Delete
+		updStat.setString(ind++, orderId);
 		if (subscription.getStartTimeMillis() != null) {
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 14 * DAY && startTime.getTime() > 100000 * 1000L) {
 				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
@@ -419,7 +421,6 @@ public class UpdateSubscription {
 			} else {
 				updStat.setNull(ind++, Types.INTEGER);
 			}
-			//updStat.setString(ind++, subscription.getOrderId());
 		} else {
 			if (subscription.getPaymentState() == null) {
 				updStat.setNull(ind++, Types.INTEGER);
@@ -427,7 +428,6 @@ public class UpdateSubscription {
 				updStat.setInt(ind++, subscription.getPaymentState());
 			}
 			updStat.setString(ind++, subscription.getKind());
-			// updStat.setString(ind++, subscription.getOrderId());
 			updStat.setString(ind++, subscription.getDeveloperPayload());
 			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
 			updStat.setString(ind++, subscription.getPriceCurrencyCode());

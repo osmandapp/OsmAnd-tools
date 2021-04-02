@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -189,7 +188,7 @@ public class SubscriptionController {
 		return response;
 	}
 
-	private Map<String, String> userInfoAsMap(Supporter s) {
+	protected Map<String, String> userInfoAsMap(Supporter s) {
     	Map<String, String> res = new HashMap<>();
     	res.put("userid", "" + s.userId);
 		res.put("token", s.token);
@@ -200,9 +199,7 @@ public class SubscriptionController {
 	}
 
 
-	@PostMapping(path = {"/register", "/register.php"},
-        consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE,
-        produces =  MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(path = {"/register", "/register.php"}, consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces =  MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> register(HttpServletRequest request) {
         String email = request.getParameter("email");
         String visibleName = request.getParameter("visibleName");
@@ -210,13 +207,13 @@ public class SubscriptionController {
         // no email validation cause client doesn't provide it 99%
         // avoid all nulls, empty, none
         boolean emailValid = email != null && email.contains("@");
-        if(emailValid) {
-        	Optional<Supporter> optionalSupporter = supportersRepository.findByUserEmail(email);
-        	if (optionalSupporter.isPresent()) {
-        		Supporter supporter = optionalSupporter.get();
-        		return ResponseEntity.ok(userInfoAsJson(supporter));
-        	}
-        }
+		if (emailValid) {
+			Optional<Supporter> optionalSupporter = supportersRepository.findByUserEmail(email);
+			if (optionalSupporter.isPresent()) {
+				Supporter supporter = optionalSupporter.get();
+				return ResponseEntity.ok(userInfoAsJson(supporter));
+			}
+		}
         ThreadLocalRandom tlr = ThreadLocalRandom.current();
         int token = tlr.nextInt(100000, 1000000);
         Supporter supporter = new Supporter();
@@ -302,12 +299,12 @@ public class SubscriptionController {
 	}
     
 	@PostMapping(path = { "/ios-receipt-validate" })
-	public ResponseEntity<String> validateIos(HttpServletRequest request) throws Exception {
+	public ResponseEntity<String> validateReceiptIos(HttpServletRequest request) throws Exception {
 		String receipt = request.getParameter("receipt");
 		JsonObject receiptObj = validationService.loadReceiptJsonObject(receipt, false);
 		if (receiptObj != null) {
 			Map<String, Object> result = new HashMap<>();
-			Map<String, InAppReceipt> inAppReceipts = validationService.loadInAppReceipts(receiptObj);
+			List<InAppReceipt> inAppReceipts = validationService.loadInAppReceipts(receiptObj);
 			if (inAppReceipts != null) {
 				if (inAppReceipts.size() == 0) {
 					result.put("eligible_for_introductory_price", "true");
@@ -317,10 +314,10 @@ public class SubscriptionController {
 					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 				} else {
 					result.put("eligible_for_introductory_price",
-							isEligibleForIntroductoryPrice(inAppReceipts.values()) ? "true" : "false");
+							isEligibleForIntroductoryPrice(inAppReceipts) ? "true" : "false");
 
 					// update existing subscription purchaseToken
-					for (InAppReceipt r : inAppReceipts.values()) {
+					for (InAppReceipt r : inAppReceipts) {
 						if (r.isSubscription()) {
 							Optional<SupporterDeviceSubscription> subscription = subscriptionsRepository.findTopByOrderIdAndSkuOrderByTimestampDesc(r.getOrderId(), r.getProductId());
 							if (subscription.isPresent()) {
@@ -337,7 +334,7 @@ public class SubscriptionController {
 					Map<String, Object> validationResult = validationService.validateReceipt(receiptObj, activeSubscriptions);
 					result.putAll(validationResult);
 					result.put("eligible_for_subscription_offer",
-							isEligibleForSubscriptionOffer(inAppReceipts.values(), activeSubscriptions) ? "true" : "false");
+							isEligibleForSubscriptionOffer(inAppReceipts, activeSubscriptions) ? "true" : "false");
 
 					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
 				}
@@ -346,15 +343,6 @@ public class SubscriptionController {
 		return error("Cannot load receipt.");
 	}
 
-	private Supporter restoreUserIdByOrderId(Map<String, Object> result, Set<String> orderIds) {
-		Optional<Supporter> supporter = supportersRepository.findTopByOrderIdIn(orderIds);
-		if (supporter.isPresent()) {
-			Supporter s = supporter.get();
-			result.put("user", userInfoAsMap(s));
-			return s;
-		}
-		return null;
-	}
 
 	private boolean isEligibleForIntroductoryPrice(@NonNull Collection<InAppReceipt> inAppReceipts) {
 		for (InAppReceipt receipt : inAppReceipts) {
@@ -496,10 +484,14 @@ public class SubscriptionController {
 		Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
 						new SupporterDeviceSubscriptionPrimaryKey(subscr.sku, subscr.orderId));
 		if (subscrOpt.isPresent() && !Algorithms.isEmpty(subscr.purchaseToken)) {
-			SupporterDeviceSubscription deviceSubscription = subscrOpt.get();
-			if (!Algorithms.isEmpty(deviceSubscription.purchaseToken) && !Algorithms.objectEquals(subscr.purchaseToken, subscrOpt)) {
-				deviceSubscription.purchaseToken = subscr.purchaseToken;
-				subscriptionsRepository.save(deviceSubscription);
+			SupporterDeviceSubscription dbSubscription = subscrOpt.get();
+			if (!Algorithms.isEmpty(dbSubscription.purchaseToken) && !Algorithms.objectEquals(subscr.purchaseToken, dbSubscription.purchaseToken)) {
+				if (dbSubscription.valid != null && dbSubscription.valid.booleanValue()) {
+					dbSubscription.prevvalidpurchasetoken = dbSubscription.purchaseToken;
+				}
+				dbSubscription.valid = null;
+				dbSubscription.purchaseToken = subscr.purchaseToken;
+				subscriptionsRepository.save(dbSubscription);
 			}
 			return ResponseEntity.ok("{ \"res\" : \"OK\" }");
 		}

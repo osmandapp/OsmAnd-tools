@@ -1,12 +1,9 @@
 package net.osmand.server.api.services;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
-import net.osmand.live.subscriptions.ReceiptValidationHelper;
-import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -18,10 +15,13 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import net.osmand.live.subscriptions.ReceiptValidationHelper;
+import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 
 @Service
 public class ReceiptValidationService {
@@ -53,26 +53,13 @@ public class ReceiptValidationService {
 	}
 
 	@Nullable
-	public Map<String, InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
-		Map<String, InAppReceipt> result = null;
+	public List<InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
+		List<InAppReceipt> result = null;
 		int status = receiptObj.get(ReceiptValidationHelper.FIELD_STATUS).getAsInt();
 		if (status == 0) {
 			String bundleId = receiptObj.get(ReceiptValidationHelper.FIELD_RECEIPT).getAsJsonObject().get(ReceiptValidationHelper.FIELD_BUNDLE_ID).getAsString();
 			if (bundleId.equals(ReceiptValidationHelper.IOS_MAPS_BUNDLE_ID)) {
-				result = new HashMap<>();
-				JsonElement receiptInfo = receiptObj.get(ReceiptValidationHelper.FIELD_LATEST_RECEIPT_INFO);
-				if (receiptInfo != null) {
-					JsonArray receiptArray = receiptInfo.getAsJsonArray();
-					for (JsonElement elem : receiptArray) {
-						JsonObject recObj = elem.getAsJsonObject();
-						String transactionId = recObj.get(ReceiptValidationHelper.FIELD_ORIGINAL_TRANSACTION_ID).getAsString();
-						InAppReceipt receipt = new InAppReceipt();
-						for (Map.Entry<String, JsonElement> entry : recObj.entrySet()) {
-							receipt.fields.put(entry.getKey(), entry.getValue().getAsString());
-						}
-						result.put(transactionId, receipt);
-					}
-				}
+				return ReceiptValidationHelper.parseInAppReceipts(receiptObj);
 			}
 		}
 		return result;

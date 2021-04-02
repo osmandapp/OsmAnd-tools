@@ -74,7 +74,7 @@ public class ReceiptValidationHelper {
 		return result;
 	}
 
-	public List<InAppReceipt> parseInAppReceipts(JsonObject receiptObj) {
+	public static List<InAppReceipt> parseInAppReceipts(JsonObject receiptObj) {
 		List<InAppReceipt> result = new ArrayList<ReceiptValidationHelper.InAppReceipt>();
 		JsonElement pendingInfo = receiptObj.get("pending_renewal_info");
 		Map<String, Boolean> autoRenewStatus = new TreeMap<String, Boolean>();

@@ -20,7 +20,8 @@ import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.Support
 
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku 
+	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
+	// TODO this find by id
 	Optional<SupporterDeviceSubscription> findTopByOrderIdAndSkuOrderByTimestampDesc(String orderId, String sku);
 	
 	List<SupporterDeviceSubscription> findByPayload(String payload);
@@ -60,6 +61,9 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 
 		@Column(name = "valid")
 		public Boolean valid;
+		
+		@Column(name = "prevvalidpurchasetoken")
+		public String prevvalidpurchasetoken;
 	}
 
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
