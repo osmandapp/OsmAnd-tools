@@ -1,26 +1,17 @@
 package net.osmand;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.obf.*;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.BinaryComparator;
-import net.osmand.obf.BinaryInspector;
-import net.osmand.obf.BinaryMerger;
-import net.osmand.obf.GenerateRegionTags;
 import net.osmand.obf.diff.AugmentedDiffsInspector;
 import net.osmand.obf.diff.GenerateDailyObf;
 import net.osmand.obf.diff.ObfDiffGenerator;
@@ -51,6 +42,8 @@ import net.osmand.util.ResourceDeleter;
 import net.osmand.util.SplitHillshadeIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
+
+import static net.osmand.IndexConstants.*;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
@@ -125,6 +118,8 @@ public class MainUtilities {
 				settings.indexRouting = true;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
+			} else if (utl.equals("convert-gpx-to-obf")) {
+				generateObfFromGpx(subArgs);
 			} else if (utl.equals("generate-map")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
@@ -210,6 +205,33 @@ public class MainUtilities {
 			} else {
 				printSynopsys();
 			}
+		}
+	}
+
+	private static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
+			XmlPullParserException, InterruptedException {
+		if (subArgs.size() != 0) {
+			File file = new File(subArgs.get(0));
+			if (file.isDirectory() || file.getName().endsWith(GPX_FILE_EXT) || file.getName().endsWith(".gpx.gz")) {
+				OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
+				qp.osmFile = File.createTempFile(Algorithms.getFileNameWithoutExtension(file), ".osm");
+				OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
+				File tmpFolder = new File(file.getParentFile(), String.valueOf(System.currentTimeMillis()));
+				String path = file.isDirectory() ? file.getAbsolutePath() : file.getParentFile().getPath();
+				File targetObf = new File(path, Algorithms.getFileNameWithoutExtension(file) + BINARY_MAP_INDEX_EXT);
+				List<File> files = new ArrayList<>();
+				if (file.isDirectory()) {
+					files = Arrays.asList(Objects.requireNonNull(file.listFiles()));
+				} else {
+					files.add(file);
+				}
+				if (!files.isEmpty()) {
+					ctx.writeObf(files, tmpFolder, Algorithms.getFileNameWithoutExtension(file), targetObf);
+				}
+				qp.osmFile.deleteOnExit();
+			}
+		} else {
+			System.out.println("Usage: <path_to_directory_with_gpx_files> or <path_to_gpx_file_with_file_name>");
 		}
 	}
 

@@ -1,6 +1,7 @@
 package net.osmand.server.osmgpx;
 
 
+import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.util.Algorithms.readFromInputStream;
 
 import java.io.ByteArrayInputStream;
@@ -43,6 +44,7 @@ import javax.net.ssl.X509TrustManager;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import net.osmand.obf.OsmGpxWriteContext;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
@@ -754,49 +756,6 @@ public class DownloadOsmGPX {
 			}
 		}
 		return text == null ? null : text.toString();
-	}
-
-	public static class OsmGpxFile {
-		
-		public static final double ERROR_NUMBER = -1000;
-		long id;
-		String name;
-		Date timestamp;
-		boolean pending;
-		String user;
-		String visibility;
-		double lat;
-		double lon;
-		String description;
-		
-		double minlat = ERROR_NUMBER;
-		double minlon = ERROR_NUMBER;
-		double maxlat = ERROR_NUMBER;
-		double maxlon = ERROR_NUMBER;
-		
-		String[] tags;
-		String gpx;
-		byte[] gpxGzip;
-	}
-
-	public static class QueryParams {
-		public static final int DETAILS_POINTS = 0;
-		public static final int DETAILS_TRACKS = 1;
-		public static final int DETAILS_ELE_SPEED = 2;
-		
-		public int details = DETAILS_ELE_SPEED;
-		public File osmFile;
-		public File obfFile;
-		public String tag;
-		public int limit = -1;
-		public String user;
-		public String datestart;
-		public String dateend;
-		public Set<RouteActivityType> activityTypes = null;
-		public double minlat = OsmGpxFile.ERROR_NUMBER;
-		public double maxlat = OsmGpxFile.ERROR_NUMBER;
-		public double maxlon = OsmGpxFile.ERROR_NUMBER;
-		public double minlon = OsmGpxFile.ERROR_NUMBER;
 	}
 
 	private static class PreparedStatementWrapper {

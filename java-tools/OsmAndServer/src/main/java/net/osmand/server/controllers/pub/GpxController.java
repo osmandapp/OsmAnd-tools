@@ -5,6 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
+import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -31,17 +32,12 @@ import com.google.gson.Gson;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.IProgress;
 import net.osmand.IndexConstants;
-import net.osmand.binary.MapZooms;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
-import net.osmand.server.osmgpx.DownloadOsmGPX.QueryParams;
-import net.osmand.server.osmgpx.OsmGpxWriteContext;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.util.Algorithms;
-import rtree.RTree;
+
+import static net.osmand.obf.OsmGpxWriteContext.*;
 
 
 @RestController
@@ -126,53 +122,23 @@ public class GpxController {
 			XMLStreamException, SQLException, InterruptedException, XmlPullParserException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm.gz");
+		ctx.tempFiles.add(tmpOsm);
+		List<File> files = ctx.files;
+		String sessionId = httpSession.getId();
+		File tmpFolder = new File(tmpOsm.getParentFile(), sessionId);
+		String fileName = "gpx_" + sessionId;
 		QueryParams qp = new QueryParams();
 		qp.osmFile = tmpOsm;
 		qp.details = QueryParams.DETAILS_ELE_SPEED;
-		ctx.tempFiles.add(tmpOsm);
 		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
-		writeCtx.startDocument();
-		for (File gf : ctx.files) {
-			GPXFile f = GPXUtilities.loadGPXFile(gf);
-			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
-			writeCtx.writeTrack(null, null, f, analysis, "GPX");
-		}
-		writeCtx.endDocument();
-
-		IndexCreatorSettings settings = new IndexCreatorSettings();
-		settings.indexMap = true;
-		settings.indexAddress = false;
-		settings.indexPOI = true;
-		settings.indexTransport = false;
-		settings.indexRouting = false;
-		String sessionId = httpSession.getId();
-		RTree.clearCache();
-		File folder = new File(tmpOsm.getParentFile(), sessionId);
-		String fileName = "gpx_" + sessionId;
-		File targetObf = new File(folder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
-		try {
-			folder.mkdirs();
-			IndexCreator ic = new IndexCreator(folder, settings);
-			MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(null, fileName);
-			ic.setMapFileName(fileName);
-			// IProgress.EMPTY_PROGRESS
-			IProgress prog = IProgress.EMPTY_PROGRESS;
-			// prog = new ConsoleProgressImplementation();
-			ic.generateIndexes(tmpOsm, prog, null, MapZooms.getDefault(), types, null);
-			new File(folder, ic.getMapFileName()).renameTo(targetObf);
-			ctx.tempFiles.add(targetObf);
-		} finally {
-			Algorithms.removeAllFiles(folder);
-		}
+		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
+		writeCtx.writeObf(files, tmpFolder, fileName, targetObf);
+		ctx.tempFiles.add(targetObf);
 		HttpHeaders headers = new HttpHeaders();
 		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
 		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
 		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 	}
 
-	
-
-	
-	
 
 }
