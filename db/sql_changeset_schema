@@ -14,14 +14,14 @@ CREATE TABLE supporters(userid text, token text, visiblename text, useremail tex
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
 
-
---- PRIMARY KEY - purchasetoken + sku (not null and unique!), alternative primary key (once it's loaded) orderid + sku
+--- Main primary key orderid + sku (alternative purchasetoken + sku  but there could be multiple orderid for same purchaseToken)
 CREATE TABLE supporters_device_sub(userid bigint, sku text, purchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
         paymentstate int, valid boolean, checktime timestamp);
 CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);
 CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);
+CREATE INDEX supporters_device_sub_orderid_idx on supporters_device_sub(orderid);
 
 -- ACCOUNT (id, email, token, subuserid, purchasetoken)
 -- FILES (accountid, type, createdate, lastupdate, name, data bytea)
