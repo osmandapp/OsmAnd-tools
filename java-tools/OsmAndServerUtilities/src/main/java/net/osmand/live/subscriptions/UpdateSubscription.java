@@ -231,7 +231,7 @@ public class UpdateSubscription {
 						for (InAppReceipt receipt : inAppReceipts) {
 							// there could be multiple subscriptions for same purchaseToken !
 							// i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
-							if (sku.equals(receipt.getProductId()) && (orderId == null || orderId.equals(receipt.getOrderId())) {
+							if (sku.equals(receipt.getProductId()) && (orderId == null || orderId.equals(receipt.getOrderId()))) {
 								appstoreOrderId = receipt.getOrderId();
 								Map<String, String> fields = receipt.fields;
 								// purchase_date_ms is purchase date of prolongation
