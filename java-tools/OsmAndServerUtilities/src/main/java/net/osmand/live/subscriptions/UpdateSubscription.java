@@ -178,8 +178,7 @@ public class UpdateSubscription {
 			}
 			System.out.println(String.format("Validate sku=%s - subscription %s %s (active=%s)", sku,
 					startTime == null ? "" : new Date(startTime.getTime()),
-					expireTime == null ? "" : new Date(expireTime.getTime()),
-							activeNow+""));
+					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId, startTime, expireTime, tm, introcycles, pms.verbose);
 			} else {
@@ -378,9 +377,8 @@ public class UpdateSubscription {
 		int ind = 1;
 		updStat.setTimestamp(ind++, new Timestamp(tm));
 		if (subscription.getStartTimeMillis() != null) {
-			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 5 * 60 * 60 * 1000 &&
-					startTime.getTime() > 100000 * 1000L) {
-				throw new IllegalArgumentException(String.format("Start timestamp changed %s != %s '%s' %s",
+			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 14 * DAY && startTime.getTime() > 100000 * 1000L) {
+				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days %s != %s '%s' %s",
 						new Date(startTime.getTime()),
 						new Date(subscription.getStartTimeMillis()), purchaseToken, sku));
 			}
