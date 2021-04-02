@@ -23,7 +23,6 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku 
 	Optional<SupporterDeviceSubscription> findTopByOrderIdAndSkuOrderByTimestampDesc(String orderId, String sku);
 	
-	// TODO this method retrieves userid should be refactored
 	List<SupporterDeviceSubscription> findByPayload(String payload);
 
 	@Entity
