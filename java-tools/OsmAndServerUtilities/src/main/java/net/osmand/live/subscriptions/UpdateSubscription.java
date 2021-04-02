@@ -310,11 +310,11 @@ public class UpdateSubscription {
 			if (verbose) {
 				System.out.println("Result: " + subscription.toPrettyString());
 			}
-			String pOrderId = simplifyOrderId(subscription.getOrderId());
-			if (!Algorithms.objectEquals(pOrderId, orderId)) {
-				throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, pOrderId));
+			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
+			if (!Algorithms.objectEquals(appStoreOrderId, orderId) && orderId != null) {
+				throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 			}
-			updateSubscriptionDb(purchaseToken, sku, orderId, startTime, expireTime, tm, subscription);
+			updateSubscriptionDb(purchaseToken, sku, appStoreOrderId, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
 			boolean gone = false;
 			if (e instanceof GoogleJsonResponseException) {
