@@ -90,12 +90,12 @@ public class UpdateSubscription {
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
 		if (ios) {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, " + "introcycles = ? , "
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, introcycles = ? , "
 					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, paymentstate = ?, "
-					+ " kind = ?, orderid = ?, payload = ?, "
+					+ " kind = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
 					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
 		}
@@ -278,8 +278,9 @@ public class UpdateSubscription {
 			if (reasonToDelete != null) {
 				deleteSubscription(purchaseToken, sku, tm, reasonToDelete, kind);
 			}
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			System.err.println(String.format("?? Error updating  sku %s and purchaseToken: %s", sku, purchaseToken, e.getMessage()));
+			throw e;
 		}
 	}
 
@@ -391,7 +392,7 @@ public class UpdateSubscription {
 			} else {
 				updStat.setNull(ind++, Types.INTEGER);
 			}
-			updStat.setString(ind++, subscription.getOrderId());
+			//updStat.setString(ind++, subscription.getOrderId());
 		} else {
 			if (subscription.getPaymentState() == null) {
 				updStat.setNull(ind++, Types.INTEGER);
@@ -399,7 +400,7 @@ public class UpdateSubscription {
 				updStat.setInt(ind++, subscription.getPaymentState());
 			}
 			updStat.setString(ind++, subscription.getKind());
-			updStat.setString(ind++, subscription.getOrderId());
+			// updStat.setString(ind++, subscription.getOrderId());
 			updStat.setString(ind++, subscription.getDeveloperPayload());
 			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
 			updStat.setString(ind++, subscription.getPriceCurrencyCode());
