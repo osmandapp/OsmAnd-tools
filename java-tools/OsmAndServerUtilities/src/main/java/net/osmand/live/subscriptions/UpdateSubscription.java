@@ -39,6 +39,7 @@ import com.google.gson.JsonObject;
 
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
+import net.osmand.util.Algorithms;
 
 
 public class UpdateSubscription {
@@ -78,6 +79,7 @@ public class UpdateSubscription {
 	public UpdateSubscription(AndroidPublisher publisher, boolean ios, boolean revalidateInvalid) {
 		this.ios = ios;
 		this.publisher = publisher;
+		// TODO use orderId and not purchaseToken
 		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? "
 				+ "WHERE purchaseToken = ? and sku = ?";
 		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? "
@@ -86,7 +88,7 @@ public class UpdateSubscription {
 		if (revalidateInvalid) {
 			requestValid = "(valid=false)";
 		}
-		selQuery = "SELECT sku, purchaseToken, payload, checktime, starttime, expiretime, valid, introcycles "
+		selQuery = "SELECT sku, purchaseToken, orderid, payload, checktime, starttime, expiretime, valid, introcycles "
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
 		if (ios) {
 			updQuery = "UPDATE supporters_device_sub SET "
@@ -148,6 +150,7 @@ public class UpdateSubscription {
 		while (rs.next()) {
 			String purchaseToken = rs.getString("purchaseToken");
 			String sku = rs.getString("sku");
+			String orderId = rs.getString("orderid");
 			Timestamp checkTime = rs.getTimestamp("checktime");
 			Timestamp startTime = rs.getTimestamp("starttime");
 			Timestamp expireTime = rs.getTimestamp("expiretime");
@@ -178,9 +181,9 @@ public class UpdateSubscription {
 					expireTime == null ? "" : new Date(expireTime.getTime()),
 							activeNow+""));
 			if (this.ios) {
-				processIosSubscription(receiptValidationHelper, purchaseToken, sku, startTime, expireTime, tm, introcycles, pms.verbose);
+				processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId, startTime, expireTime, tm, introcycles, pms.verbose);
 			} else {
-				processAndroidSubscription(purchases, purchaseToken, sku, startTime, expireTime, tm, pms.verbose);
+				processAndroidSubscription(purchases, purchaseToken, sku, orderId, startTime, expireTime, tm, pms.verbose);
 			}
 		}
 		if (deletions > 0) {
@@ -197,7 +200,7 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, String purchaseToken, String sku, Timestamp startTime, Timestamp expireTime, long tm, 
+	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, String purchaseToken, String sku, String orderId, Timestamp startTime, Timestamp expireTime, long tm, 
 			int prevIntroCycles, boolean verbose) throws SQLException {
 		try {
 			String reasonToDelete = null;
@@ -218,8 +221,10 @@ public class UpdateSubscription {
 						int introCycles = 0;
 						long startDate = 0;
 						long expiresDate = 0;
+						String pOrderId = null;
 						for (InAppReceipt receipt : inAppReceipts) {
 							if (sku.equals(receipt.getProductId())) {
+								pOrderId = receipt.getOrderId();
 								Map<String, String> fields = receipt.fields;
 								// purchase_date_ms is purchase date of prolongation
 								boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
@@ -245,7 +250,9 @@ public class UpdateSubscription {
 							SubscriptionPurchase subscription = new SubscriptionPurchase().setIntroductoryPriceInfo(ipo)
 									.setStartTimeMillis(startDate).setExpiryTimeMillis(expiresDate)
 									.setAutoRenewing(autoRenewing);
-
+							if (!Algorithms.objectEquals(pOrderId, orderId)) {
+								throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, pOrderId));
+							}
 							updateSubscriptionDb(purchaseToken, sku, startTime, expireTime, tm, subscription);
 							if (tm - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
 								kind = "gone";
@@ -284,7 +291,7 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, Timestamp startTime, Timestamp expireTime, long tm, boolean verbose) throws SQLException {
+	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, Timestamp startTime, Timestamp expireTime, long tm, boolean verbose) throws SQLException {
 		SubscriptionPurchase subscription;
 		try {
 			if (sku.startsWith("osm_free") || sku.contains("_free_")) {
@@ -294,6 +301,10 @@ public class UpdateSubscription {
 			}
 			if (verbose) {
 				System.out.println("Result: " + subscription.toPrettyString());
+			}
+			String pOrderId = simplifyOrderId(subscription.getOrderId());
+			if (!Algorithms.objectEquals(pOrderId, orderId)) {
+				throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, pOrderId));
 			}
 			updateSubscriptionDb(purchaseToken, sku, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
@@ -322,7 +333,7 @@ public class UpdateSubscription {
 			if (reason != null) {
 				deleteSubscription(purchaseToken, sku, tm, reason, kind);
 			} else {
-				System.err.println(String.format("?? Error updating sku %s pt '%s': %s", sku, purchaseToken, e.getMessage()));
+				System.err.println(String.format("?? Error updating sku %s orderId '%s': %s", sku, orderId, e.getMessage()));
 				int ind = 1;
 				updCheckStat.setTimestamp(ind++, new Timestamp(tm));
 				updCheckStat.setString(ind++, purchaseToken);
@@ -335,6 +346,14 @@ public class UpdateSubscription {
 				}
 			}
 		}
+	}
+
+	private String simplifyOrderId(String orderId) {
+		int i = orderId.indexOf("..");
+		if (i >= 0) {
+			return orderId.substring(0, i);
+		}
+		return orderId;
 	}
 
 	private void deleteSubscription(String pt, String sku, long tm, String reason, String kind) throws SQLException {
@@ -352,6 +371,7 @@ public class UpdateSubscription {
 		}
 	}
 
+	// TODO don't use purchaseToken !!!
 	private void updateSubscriptionDb(String purchaseToken, String sku, Timestamp startTime, Timestamp expireTime,
 									  long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
