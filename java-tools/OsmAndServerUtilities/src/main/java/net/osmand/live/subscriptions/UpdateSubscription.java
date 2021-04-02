@@ -51,9 +51,7 @@ public class UpdateSubscription {
 
 	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
-	// TODO 
-	// private static final int BATCH_SIZE = 200;
-	private static final int BATCH_SIZE = 10;
+	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
 	private static final long HOUR = 1000l * 60 * 60;
 
@@ -300,7 +298,7 @@ public class UpdateSubscription {
 	}
 
 	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, Timestamp startTime, Timestamp expireTime, long tm, boolean verbose) throws SQLException {
-		SubscriptionPurchase subscription;
+		SubscriptionPurchase subscription = null;
 		try {
 			if (sku.startsWith("osm_free") || sku.contains("_free_")) {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, purchaseToken).execute();
@@ -310,38 +308,28 @@ public class UpdateSubscription {
 			if (verbose) {
 				System.out.println("Result: " + subscription.toPrettyString());
 			}
-			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
-			if (!Algorithms.objectEquals(appStoreOrderId, orderId) && orderId != null) {
-				throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
-			}
-			updateSubscriptionDb(purchaseToken, sku, appStoreOrderId, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
 			boolean gone = false;
 			if (e instanceof GoogleJsonResponseException) {
 				gone = ((GoogleJsonResponseException) e).getStatusCode() == 410;
 			}
-
 			String reason = null;
 			String kind = "";
-			if (!purchaseToken.contains(".AO")) {
+			if (expireTime != null && tm - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+				reason = String.format("subscription expired more than %.1f days ago",
+						(tm - expireTime.getTime()) / (DAY * 1.0d));
+				kind = "expired";
+			} else if (!purchaseToken.contains(".AO")) {
 				reason = "invalid purchase token " + e.getMessage();
 				kind = "invalid";
 			} else if (gone) {
 				kind = "gone";
-				if (expireTime == null) {
-					reason = "subscription expired.";
-				} else {
-					if (tm - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
-						reason = String.format("subscription expired more than %.1f days ago",
-								(tm - expireTime.getTime()) / (DAY * 1.0d));
-					}
-				}
-
+				reason = "doesn't exist";
 			}
 			if (reason != null) {
 				deleteSubscription(purchaseToken, sku, tm, reason, kind);
 			} else {
-				System.err.println(String.format("?? Error updating sku %s orderId '%s': %s", sku, orderId, e.getMessage()));
+				System.err.println(String.format("?? Error updating sku '%s' orderId '%s': %s", sku, orderId, e.getMessage()));
 				int ind = 1;
 				updCheckStat.setTimestamp(ind++, new Timestamp(tm));
 				updCheckStat.setString(ind++, purchaseToken);
@@ -353,6 +341,14 @@ public class UpdateSubscription {
 					checkChanges = 0;
 				}
 			}
+		}
+		if (subscription != null) {
+			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
+			if (!Algorithms.objectEquals(appStoreOrderId, orderId) && orderId != null) {
+				throw new IllegalStateException(
+						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
+			}
+			updateSubscriptionDb(purchaseToken, sku, appStoreOrderId, startTime, expireTime, tm, subscription);
 		}
 	}
 
