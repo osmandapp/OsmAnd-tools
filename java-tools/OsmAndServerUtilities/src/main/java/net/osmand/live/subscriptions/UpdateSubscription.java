@@ -181,7 +181,7 @@ public class UpdateSubscription {
 			if (activeNow && valid && checkDiff < MINIMUM_WAIT_TO_REVALIDATE_VALID) {
 				continue;
 			}
-			System.out.println(String.format("Validate sku=%s - subscription %s %s (active=%s)", sku,
+			System.out.println(String.format("Validate subscriptin (%s, %s): %s - %s (active=%s)", sku, orderId,
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			if (this.ios) {
