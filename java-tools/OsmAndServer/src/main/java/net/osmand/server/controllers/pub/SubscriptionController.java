@@ -485,6 +485,9 @@ public class SubscriptionController {
 		if (isEmpty(subscr.orderId)) {
 			return error("Please validate the purchase (orderid is empty).");
 		}
+		if (isEmpty(subscr.purchaseToken)) {
+			return error("Please validate the purchase (purchase token is empty).");
+		}
 		String userId = request.getParameter("userid");
 		if (!isEmpty(userId)) {
 			connectUserWithOrderId(userId, subscr.orderId, request);
@@ -521,8 +524,10 @@ public class SubscriptionController {
 			LOG.warn("USER: Token failed validation: " + toString(request.getParameterMap()));
 			return false;
 		}
-		supporter.orderId = orderId;
-		supportersRepository.saveAndFlush(supporter);
+		if (!Algorithms.objectEquals(supporter.orderId, orderId)) {
+			supporter.orderId = orderId;
+			supportersRepository.saveAndFlush(supporter);
+		}
 		return true;
 	}
 
