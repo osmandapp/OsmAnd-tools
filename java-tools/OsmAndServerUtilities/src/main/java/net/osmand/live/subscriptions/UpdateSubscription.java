@@ -158,6 +158,11 @@ public class UpdateSubscription {
 			boolean valid = rs.getBoolean("valid");
 			long tm = System.currentTimeMillis();
 			boolean ios = sku.startsWith("net.osmand.maps.subscription.");
+			boolean huawei = sku.contains("huawei");
+			if (huawei) {
+				// TODO not implemented yet (requires reports update etc)
+				continue;
+			}
 			if (this.ios != ios) {
 				continue;
 			}
@@ -252,7 +257,7 @@ public class UpdateSubscription {
 							if (!Algorithms.objectEquals(pOrderId, orderId)) {
 								throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, pOrderId));
 							}
-							updateSubscriptionDb(purchaseToken, sku, startTime, expireTime, tm, subscription);
+							updateSubscriptionDb(purchaseToken, sku, orderId, startTime, expireTime, tm, subscription);
 							if (tm - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
 								kind = "gone";
 								reasonToDelete = String.format("subscription expired more than %.1f days ago",
@@ -285,7 +290,7 @@ public class UpdateSubscription {
 				deleteSubscription(purchaseToken, sku, tm, reasonToDelete, kind);
 			}
 		} catch (RuntimeException e) {
-			System.err.println(String.format("?? Error updating  sku %s and purchaseToken: %s", sku, purchaseToken, e.getMessage()));
+			System.err.println(String.format("?? Error updating  sku %s and orderid %s", sku, orderId, e.getMessage()));
 			throw e;
 		}
 	}
@@ -305,7 +310,7 @@ public class UpdateSubscription {
 			if (!Algorithms.objectEquals(pOrderId, orderId)) {
 				throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, pOrderId));
 			}
-			updateSubscriptionDb(purchaseToken, sku, startTime, expireTime, tm, subscription);
+			updateSubscriptionDb(purchaseToken, sku, orderId, startTime, expireTime, tm, subscription);
 		} catch (IOException e) {
 			boolean gone = false;
 			if (e instanceof GoogleJsonResponseException) {
@@ -371,7 +376,7 @@ public class UpdateSubscription {
 	}
 
 	// TODO don't use purchaseToken !!!
-	private void updateSubscriptionDb(String purchaseToken, String sku, Timestamp startTime, Timestamp expireTime,
+	private void updateSubscriptionDb(String purchaseToken, String sku, String orderId, Timestamp startTime, Timestamp expireTime,
 									  long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
 		int ind = 1;
@@ -380,7 +385,7 @@ public class UpdateSubscription {
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 14 * DAY && startTime.getTime() > 100000 * 1000L) {
 				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days %s != %s '%s' %s",
 						new Date(startTime.getTime()),
-						new Date(subscription.getStartTimeMillis()), purchaseToken, sku));
+						new Date(subscription.getStartTimeMillis()), orderId, sku));
 			}
 			updStat.setTimestamp(ind++, new Timestamp(subscription.getStartTimeMillis()));
 			updated = true;
@@ -391,7 +396,7 @@ public class UpdateSubscription {
 			if (expireTime == null || Math.abs(expireTime.getTime() - subscription.getExpiryTimeMillis()) > 10 * 1000) {
 				System.out.println(String.format("Expire timestamp changed %s != %s for '%s' %s",
 						expireTime == null ? "" : new Date(expireTime.getTime()),
-						new Date(subscription.getExpiryTimeMillis()), purchaseToken, sku));
+						new Date(subscription.getExpiryTimeMillis()), orderId, sku));
 			}
 			updStat.setTimestamp(ind++, new Timestamp(subscription.getExpiryTimeMillis()));
 			updated = true;
