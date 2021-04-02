@@ -264,7 +264,7 @@ public class UpdateSubscription {
 							}
 							updateSubscriptionDb(purchaseToken, sku, appstoreOrderId, startTime, expireTime, tm, subscription);
 							if (tm - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
-								kind = "gone";
+								kind = "expired";
 								reasonToDelete = String.format("subscription expired more than %.1f days ago",
 										(tm - expiresDate) / (DAY * 1.0d));
 
