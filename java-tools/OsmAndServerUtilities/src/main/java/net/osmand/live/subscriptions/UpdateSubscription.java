@@ -231,7 +231,7 @@ public class UpdateSubscription {
 						for (InAppReceipt receipt : inAppReceipts) {
 							// there could be multiple subscriptions for same purchaseToken !
 							// i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
-							if (sku.equals(receipt.getProductId()) && (pOrderId == null || orderId.equals(receipt.getOrderId()))) {
+							if (sku.equals(receipt.getProductId()) && orderId.equals(receipt.getOrderId())) {
 								pOrderId = receipt.getOrderId();
 								Map<String, String> fields = receipt.fields;
 								// purchase_date_ms is purchase date of prolongation
@@ -387,7 +387,7 @@ public class UpdateSubscription {
 		updStat.setTimestamp(ind++, new Timestamp(tm));
 		if (subscription.getStartTimeMillis() != null) {
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 14 * DAY && startTime.getTime() > 100000 * 1000L) {
-				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days %s != %s '%s' %s",
+				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
 						new Date(startTime.getTime()),
 						new Date(subscription.getStartTimeMillis()), orderId, sku));
 			}
