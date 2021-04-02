@@ -183,7 +183,8 @@ public class UpdateSubscription {
 			if (activeNow && valid && checkDiff < MINIMUM_WAIT_TO_REVALIDATE_VALID) {
 				continue;
 			}
-			String hiddenOrderId = orderId != null ? orderId.substring(0, Math.min(orderId.length(), 8)) : orderId;
+			String hiddenOrderId = orderId != null ? (orderId.substring(0, Math.min(orderId.length(), 18)) + "...")
+					: orderId;
 			System.out.println(String.format("Validate subscription (%s, %s): %s - %s (active=%s)", sku, hiddenOrderId,
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
