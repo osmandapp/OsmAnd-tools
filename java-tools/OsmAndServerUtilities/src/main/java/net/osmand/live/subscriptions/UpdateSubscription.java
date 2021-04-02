@@ -316,15 +316,15 @@ public class UpdateSubscription {
 			String reason = null;
 			String kind = "";
 			if (expireTime != null && tm - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
-				reason = String.format("subscription expired more than %.1f days ago",
-						(tm - expireTime.getTime()) / (DAY * 1.0d));
+				reason = String.format(" subscription expired more than %.1f days ago (%s)",
+						(tm - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = "expired";
 			} else if (!purchaseToken.contains(".AO")) {
-				reason = "invalid purchase token " + e.getMessage();
+				reason = "invalid purchase token (" + e.getMessage() + ") ";
 				kind = "invalid";
 			} else if (gone) {
 				kind = "gone";
-				reason = "doesn't exist";
+				reason = " user doesn't exist (" + e.getMessage() + ") ";
 			}
 			if (reason != null) {
 				deleteSubscription(purchaseToken, sku, tm, reason, kind);
