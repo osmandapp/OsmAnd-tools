@@ -51,7 +51,9 @@ public class UpdateSubscription {
 
 	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
-	private static final int BATCH_SIZE = 200;
+//	private static final int BATCH_SIZE = 200;
+	// TODO
+	private static final int BATCH_SIZE = 50;
 	private static final long DAY = 1000l * 60 * 60 * 24;
 	private static final long HOUR = 1000l * 60 * 60;
 
@@ -182,7 +184,7 @@ public class UpdateSubscription {
 				continue;
 			}
 			String hiddenOrderId = orderId != null ? orderId.substring(0, Math.min(orderId.length(), 8)) : orderId;
-			System.out.println(String.format("Validate subscriptin (%s, %s): %s - %s (active=%s)", sku, hiddenOrderId,
+			System.out.println(String.format("Validate subscription (%s, %s): %s - %s (active=%s)", sku, hiddenOrderId,
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			if (this.ios) {
@@ -371,7 +373,7 @@ public class UpdateSubscription {
 		System.out.println(String.format(
 				"!! Clearing possible invalid subscription: sku=%s. Reason: %s ", sku, reason));
 		if (deletions > BATCH_SIZE) {
-			delStat.executeUpdate();
+			delStat.executeBatch();
 			deletions = 0;
 		}
 	}
