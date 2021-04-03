@@ -91,12 +91,12 @@ public class UpdateSubscription {
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
 		if (ios) {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " introcycles = ? , "
 					+ " valid = ? " + " WHERE orderid = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " paymentstate = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
 					+ " valid = ? " + " WHERE orderid = ? and sku = ?";
