@@ -446,7 +446,6 @@ public class OsmAndLiveReports {
 			String dt = this.month +"-01";
 			cond = String.format("starttime < '%s' and expiretime >= '%s' ", dt, dt);
 		}
-		System.out.println("!! TODO " + supportersQuery(cond));
 		PreparedStatement q = conn.prepareStatement(supportersQuery(cond));
 		Set<String> orderIds = new TreeSet<>();
 		ResultSet rs = q.executeQuery();
