@@ -319,7 +319,8 @@ public class SubscriptionController {
 					// update existing subscription purchaseToken
 					for (InAppReceipt r : inAppReceipts) {
 						if (r.isSubscription()) {
-							Optional<SupporterDeviceSubscription> subscription = subscriptionsRepository.findTopByOrderIdAndSkuOrderByTimestampDesc(r.getOrderId(), r.getProductId());
+							Optional<SupporterDeviceSubscription> subscription = subscriptionsRepository.findById(
+									new SupporterDeviceSubscriptionPrimaryKey(r.getProductId(), r.getOrderId()));
 							if (subscription.isPresent()) {
 								SupporterDeviceSubscription s = subscription.get();
 								if (!Algorithms.objectEquals(s.purchaseToken, receipt)) {

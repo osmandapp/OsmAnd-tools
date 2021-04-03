@@ -79,11 +79,10 @@ public class UpdateSubscription {
 	public UpdateSubscription(AndroidPublisher publisher, boolean ios, boolean revalidateInvalid) {
 		this.ios = ios;
 		this.publisher = publisher;
-		// TODO use orderId and not purchaseToken
 		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? "
-				+ "WHERE purchaseToken = ? and sku = ?";
+				+ "WHERE orderid = ? and sku = ?";
 		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? "
-				+ "WHERE purchaseToken = ? and sku = ?";
+				+ "WHERE orderid = ? and sku = ?";
 		String requestValid = "(valid is null or valid=true)";
 		if (revalidateInvalid) {
 			requestValid = "(valid=false)";
@@ -94,13 +93,13 @@ public class UpdateSubscription {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " introcycles = ? , "
-					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
+					+ " valid = ? " + " WHERE orderid = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " paymentstate = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
-					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
+					+ " valid = ? " + " WHERE orderid = ? and sku = ?";
 		}
 	}
 
@@ -259,10 +258,10 @@ public class UpdateSubscription {
 							SubscriptionPurchase subscription = new SubscriptionPurchase().setIntroductoryPriceInfo(ipo)
 									.setStartTimeMillis(startDate).setExpiryTimeMillis(expiresDate)
 									.setAutoRenewing(autoRenewing);
-							if (!Algorithms.objectEquals(appstoreOrderId, orderId) && orderId != null) {
+							if (!Algorithms.objectEquals(appstoreOrderId, orderId) ) {
 								throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, appstoreOrderId));
 							}
-							updateSubscriptionDb(purchaseToken, sku, appstoreOrderId, startTime, expireTime, tm, subscription);
+							updateSubscriptionDb(orderId, sku, startTime, expireTime, tm, subscription);
 							if (tm - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
 								kind = "expired";
 								reasonToDelete = String.format("subscription expired more than %.1f days ago",
@@ -292,7 +291,7 @@ public class UpdateSubscription {
 				reasonToDelete = "user gone";
 			}
 			if (reasonToDelete != null) {
-				deleteSubscription(purchaseToken, sku, tm, reasonToDelete, kind);
+				deleteSubscription(orderId, sku, tm, reasonToDelete, kind);
 			}
 		} catch (RuntimeException e) {
 			System.err.println(String.format("?? Error updating  sku %s and orderid %s", sku, orderId, e.getMessage()));
@@ -330,12 +329,12 @@ public class UpdateSubscription {
 				reason = " user doesn't exist (" + e.getMessage() + ") ";
 			}
 			if (reason != null) {
-				deleteSubscription(purchaseToken, sku, tm, reason, kind);
+				deleteSubscription(orderId, sku, tm, reason, kind);
 			} else {
 				System.err.println(String.format("?? Error updating sku '%s' orderId '%s': %s", sku, orderId, e.getMessage()));
 				int ind = 1;
 				updCheckStat.setTimestamp(ind++, new Timestamp(tm));
-				updCheckStat.setString(ind++, purchaseToken);
+				updCheckStat.setString(ind++, orderId);
 				updCheckStat.setString(ind++, sku);
 				updCheckStat.addBatch();
 				checkChanges++;
@@ -347,11 +346,11 @@ public class UpdateSubscription {
 		}
 		if (subscription != null) {
 			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
-			if (!Algorithms.objectEquals(appStoreOrderId, orderId) && orderId != null) {
+			if (!Algorithms.objectEquals(appStoreOrderId, orderId)) {
 				throw new IllegalStateException(
 						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 			}
-			updateSubscriptionDb(purchaseToken, sku, appStoreOrderId, startTime, expireTime, tm, subscription);
+			updateSubscriptionDb(orderId, sku, startTime, expireTime, tm, subscription);
 		}
 	}
 
@@ -363,10 +362,10 @@ public class UpdateSubscription {
 		return orderId;
 	}
 
-	private void deleteSubscription(String pt, String sku, long tm, String reason, String kind) throws SQLException {
+	private void deleteSubscription(String orderId, String sku, long tm, String reason, String kind) throws SQLException {
 		delStat.setString(1, kind);
 		delStat.setTimestamp(2, new Timestamp(tm));
-		delStat.setString(3, pt);
+		delStat.setString(3, orderId);
 		delStat.setString(4, sku);
 		delStat.addBatch();
 		deletions++;
@@ -378,14 +377,11 @@ public class UpdateSubscription {
 		}
 	}
 
-	// TODO don't use purchaseToken !!!
-	private void updateSubscriptionDb(String purchaseToken, String sku, String orderId, Timestamp startTime, Timestamp expireTime,
+	private void updateSubscriptionDb(String orderId, String sku, Timestamp startTime, Timestamp expireTime,
 									  long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
 		int ind = 1;
 		updStat.setTimestamp(ind++, new Timestamp(tm));
-		// TODO Delete
-		updStat.setString(ind++, orderId);
 		if (subscription.getStartTimeMillis() != null) {
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 14 * DAY && startTime.getTime() > 100000 * 1000L) {
 				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
@@ -444,7 +440,7 @@ public class UpdateSubscription {
 		}
 		boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
 		updStat.setBoolean(ind++, !expired);
-		updStat.setString(ind++, purchaseToken);
+		updStat.setString(ind++, orderId);
 		updStat.setString(ind, sku);
 		System.out.println(String.format("%s %s start %s expire %s",
 				updated ? "Updates " : "No changes ", sku,

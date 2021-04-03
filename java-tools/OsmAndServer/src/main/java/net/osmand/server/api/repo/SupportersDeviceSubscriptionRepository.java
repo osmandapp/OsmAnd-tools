@@ -20,12 +20,9 @@ import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.Support
 
 public interface SupportersDeviceSubscriptionRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
-	// TODO this find by id
-	Optional<SupporterDeviceSubscription> findTopByOrderIdAndSkuOrderByTimestampDesc(String orderId, String sku);
-	
 	List<SupporterDeviceSubscription> findByPayload(String payload);
 
+	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
 	@Entity
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
@@ -35,12 +32,13 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 		@Column(name = "sku")
 		public String sku;
 
-		@Column(name = "purchasetoken")
-		public String purchaseToken;
-		
 		@Id
 		@Column(name = "orderid")
 		public String orderId;
+		
+		@Column(name = "purchasetoken")
+		public String purchaseToken;
+		
 
 		@Column(name = "payload")
 		public String payload;
