@@ -92,12 +92,13 @@ public class UpdateSubscription {
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
 		if (ios) {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, introcycles = ? , "
+					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " introcycles = ? , "
 					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
-					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, paymentstate = ?, "
-					+ " kind = ?, payload = ?, "
+					+ " checktime = ?, orderid = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " paymentstate = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
 					+ " valid = ? " + " WHERE purchaseToken = ? and sku = ?";
 		}
@@ -425,7 +426,6 @@ public class UpdateSubscription {
 			} else {
 				updStat.setInt(ind++, subscription.getPaymentState());
 			}
-			updStat.setString(ind++, subscription.getKind());
 			updStat.setString(ind++, subscription.getDeveloperPayload());
 			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
 			updStat.setString(ind++, subscription.getPriceCurrencyCode());
