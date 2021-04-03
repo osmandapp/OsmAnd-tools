@@ -17,7 +17,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
@@ -424,10 +426,10 @@ public class OsmAndLiveReports {
 
 	private static String supportersQuery(String cond) {
 		return "select s.userid uid, s.visiblename visiblename, s.preferred_region region, s.useremail email, "+
-           " t.sku sku, t.checktime checktime, t.starttime starttime, t.expiretime expiretime from supporters s " +
-           " join (select userid, sku, max(checktime) checktime, max(starttime) starttime, max(expiretime) expiretime " +
-           "  from supporters_device_sub where expiretime is not null and " + cond +" group by userid, sku) t " +  
-           " on s.userid = t.userid where s.preferred_region is not null and s.preferred_region <> 'none' order by s.userid;";
+           " t.sku sku, t.orderid orderid, t.checktime checktime, t.starttime starttime, t.expiretime expiretime from supporters s " +
+           " join (select orderid, sku, checktime, starttime, expiretime " +
+           "  from supporters_device_sub where expiretime is not null and " + cond +" ) t " +  
+           " on s.orderid = t.orderid where s.preferred_region is not null and s.preferred_region <> 'none' order by s.userid;";
 	}
 
 	public SupportersReport getSupporters() throws SQLException, IOException {
@@ -444,14 +446,23 @@ public class OsmAndLiveReports {
 			String dt = this.month +"-01";
 			cond = String.format("starttime < '%s' and expiretime >= '%s' ", dt, dt);
 		}
+		System.out.println("!! TODO " + supportersQuery(cond));
 		PreparedStatement q = conn.prepareStatement(supportersQuery(cond));
+		Set<String> orderIds = new TreeSet<>();
 		ResultSet rs = q.executeQuery();
 		while (rs.next()) {
+			// Don't count same purchase twice
+			String orderId = rs.getString("orderid");
+			if (orderIds.contains(orderId)) {
+				continue;
+			}
+			orderIds.add(orderId);
 			Supporter s = new Supporter();
 			s.user = rs.getString("visiblename");
 			if (isEmpty(s.user)) {
 				s.user = "User " + rs.getString("uid");
 			}
+			
 			s.status = "Active";
 			s.region = rs.getString("region");
 			s.sku = rs.getString("sku");

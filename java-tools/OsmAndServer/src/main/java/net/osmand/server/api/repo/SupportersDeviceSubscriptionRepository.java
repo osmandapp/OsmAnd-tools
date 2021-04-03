@@ -3,7 +3,6 @@ package net.osmand.server.api.repo;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
