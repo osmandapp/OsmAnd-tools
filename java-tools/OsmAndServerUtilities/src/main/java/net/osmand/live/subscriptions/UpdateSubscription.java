@@ -231,17 +231,19 @@ public class UpdateSubscription {
 						for (InAppReceipt receipt : inAppReceipts) {
 							// there could be multiple subscriptions for same purchaseToken !
 							// i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
-							if (sku.equals(receipt.getProductId()) && (orderId == null || orderId.equals(receipt.getOrderId()))) {
+							if (sku.equals(receipt.getProductId()) && orderId.equals(receipt.getOrderId())) {
 								appstoreOrderId = receipt.getOrderId();
 								Map<String, String> fields = receipt.fields;
 								// purchase_date_ms is purchase date of prolongation
 								boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
-								long inAppStartDateMs = Long.parseLong(fields.get("original_purchase_date_ms"));
+								long inAppStartDateMs = Long.parseLong(fields.get("purchase_date_ms"));
 								long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
+								if (startDate == 0 || startDate < inAppStartDateMs) {
+									startDate = inAppStartDateMs;
+								}
 								if (inAppExpiresDateMs > expiresDate) {
 									autoRenewing = receipt.autoRenew;
 									expiresDate = inAppExpiresDateMs;
-									startDate = inAppStartDateMs;
 								}
 								if (introPeriod) {
 									introCycles++;
@@ -384,7 +386,11 @@ public class UpdateSubscription {
 		updStat.setTimestamp(ind++, new Timestamp(tm));
 		if (subscription.getStartTimeMillis() != null) {
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 14 * DAY && startTime.getTime() > 100000 * 1000L) {
-				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
+//				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
+//						new Date(startTime.getTime()),
+//						new Date(subscription.getStartTimeMillis()), orderId, sku));
+				// TODO
+				System.err.println(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
 						new Date(startTime.getTime()),
 						new Date(subscription.getStartTimeMillis()), orderId, sku));
 			}
