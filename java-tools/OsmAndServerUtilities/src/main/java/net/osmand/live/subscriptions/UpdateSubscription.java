@@ -238,7 +238,7 @@ public class UpdateSubscription {
 								boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
 								long inAppStartDateMs = Long.parseLong(fields.get("purchase_date_ms"));
 								long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
-								if (startDate == 0 || startDate < inAppStartDateMs) {
+								if (startDate == 0 || inAppStartDateMs < startDate) {
 									startDate = inAppStartDateMs;
 								}
 								if (inAppExpiresDateMs > expiresDate) {
