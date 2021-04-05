@@ -45,8 +45,6 @@ public class HuaweiIAPHelper {
 			String msgBody = MessageFormat.format("grant_type={0}&client_secret={1}&client_id={2}", grantType,
 					URLEncoder.encode(clientSecret, "UTF-8"), clientID);
 			String response = httpPost(TOKEN_URL, "application/x-www-form-urlencoded; charset=UTF-8", msgBody, 10000, 10000, null);
-			// TODO
-			System.out.println("ACCESS token " + response);
 			JSONObject obj = new JSONObject(response);
 			accessToken = obj.getString("access_token");
 			accessTokenExpireTime = System.currentTimeMillis() + obj.getLong("expires_in") * 1000 - 10000;

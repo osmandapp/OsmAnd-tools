@@ -309,8 +309,9 @@ public class UpdateSubscription {
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException {
 		HuaweiSubscription subscription = null;
 		try {
+			// TODO continue
 			// can't process null huawei
-			if(orderId.startsWith("HW-")) {
+			if (orderId != null) {
 				return;
 			}
 			subscription = huaweiIAPHelper.getHuaweiSubscription(orderId, purchaseToken);
