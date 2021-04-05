@@ -93,13 +93,13 @@ public class UpdateSubscription {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " introcycles = ? , "
-					+ " valid = ? " + " WHERE orderid = ? and sku = ?";
+					+ " valid = ?, kind = ? " + " WHERE orderid = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " paymentstate = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
-					+ " valid = ? " + " WHERE orderid = ? and sku = ?";
+					+ " valid = ?, kind = ? " + " WHERE orderid = ? and sku = ?";
 		}
 	}
 
@@ -445,6 +445,11 @@ public class UpdateSubscription {
 		}
 		boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
 		updStat.setBoolean(ind++, !expired);
+		if (expired) {
+			updStat.setString(ind++, "expired");
+		} else {
+			updStat.setNull(ind++, Types.VARCHAR);
+		}
 		updStat.setString(ind++, orderId);
 		updStat.setString(ind, sku);
 		System.out.println(String.format("%s %s start %s expire %s",
