@@ -89,19 +89,19 @@ public class UpdateSubscription {
 		if (revalidateInvalid) {
 			requestValid = "(valid=false)";
 		}
-		selQuery = "SELECT sku, purchaseToken, orderid, payload, checktime, timestamp, starttime, expiretime, valid, introcycles "
+		selQuery = "SELECT sku, purchaseToken, orderid, prevvalidpurchasetoken, payload, checktime, timestamp, starttime, expiretime, valid, introcycles "
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
 		if (ios) {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " introcycles = ? , "
-					+ " valid = ?, kind = ? " + " WHERE orderid = ? and sku = ?";
+					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " paymentstate = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "
-					+ " valid = ?, kind = ? " + " WHERE orderid = ? and sku = ?";
+					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		}
 	}
 
@@ -152,6 +152,8 @@ public class UpdateSubscription {
 		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
 		while (rs.next()) {
 			String purchaseToken = rs.getString("purchaseToken");
+			String prevpurchaseToken = rs.getString("prevvalidpurchasetoken");
+			
 			String sku = rs.getString("sku");
 			String orderId = rs.getString("orderid");
 			Timestamp checkTime = rs.getTimestamp("checktime");
@@ -186,14 +188,22 @@ public class UpdateSubscription {
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			if (this.ios) {
-				processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, introcycles, pms.verbose);
+				SubscriptionPurchase sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId, 
+						regTime, startTime, expireTime, currentTime, introcycles, pms.verbose);
+				if (sub == null && prevpurchaseToken != null) {
+					throw new IllegalStateException("This situation need to be checked, we have prev valid purchase token but current token is not valid.");
+				}
 			} else if (huawei) {
 				if (huaweiIAPHelper == null) {
 					huaweiIAPHelper = new HuaweiIAPHelper();
 				}
 				processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, pms.verbose);
 			} else {
-				processAndroidSubscription(purchases, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, pms.verbose);
+				SubscriptionPurchase sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId, 
+						regTime, startTime, expireTime, currentTime, pms.verbose);
+				if (sub == null && prevpurchaseToken != null) {
+					throw new IllegalStateException("This situation need to be checked, we have prev valid purchase token but current token is not valid.");
+				}
 			}
 		}
 		if (deletions > 0) {
@@ -210,9 +220,11 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void processIosSubscription(ReceiptValidationHelper receiptValidationHelper, String purchaseToken, String sku, String orderId, 
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, int prevIntroCycles, boolean verbose) throws SQLException {
+	private SubscriptionPurchase processIosSubscription(ReceiptValidationHelper receiptValidationHelper, String purchaseToken, String sku, String orderId, 
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, int prevIntroCycles,
+			boolean verbose) throws SQLException {
 		try {
+			SubscriptionPurchase subscription = null;
 			String reasonToDelete = null;
 			String kind = "";
 			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken);
@@ -221,88 +233,85 @@ public class UpdateSubscription {
 				if (verbose) {
 					System.out.println("Result: " + receiptObj.toString());
 				}
-				try {
-					List<InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
-					if (inAppReceipts.isEmpty()) {
-						kind = "empty";
-						reasonToDelete = "empty in apps.";
-					} else {
-						boolean autoRenewing = false;
-						int introCycles = 0;
-						long startDate = 0;
-						long expiresDate = 0;
-						String appstoreOrderId = null;
-						for (InAppReceipt receipt : inAppReceipts) {
-							// there could be multiple subscriptions for same purchaseToken !
-							// i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
-							if (sku.equals(receipt.getProductId()) && orderId.equals(receipt.getOrderId())) {
-								appstoreOrderId = receipt.getOrderId();
-								Map<String, String> fields = receipt.fields;
-								// purchase_date_ms is purchase date of prolongation
-								boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
-								long inAppStartDateMs = Long.parseLong(fields.get("purchase_date_ms"));
-								long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
-								if (startDate == 0 || inAppStartDateMs < startDate) {
-									startDate = inAppStartDateMs;
-								}
-								if (inAppExpiresDateMs > expiresDate) {
-									autoRenewing = receipt.autoRenew;
-									expiresDate = inAppExpiresDateMs;
-								}
-								if (introPeriod) {
-									introCycles++;
-								}
-							}
-						}
-						if (expiresDate > 0) {
-							IntroductoryPriceInfo ipo = null;
-							introCycles = Math.max(prevIntroCycles, introCycles);
-							if (introCycles > 0) {
-								ipo = new IntroductoryPriceInfo();
-								ipo.setIntroductoryPriceCycles(introCycles);
-							}
-							SubscriptionPurchase subscription = new SubscriptionPurchase().setIntroductoryPriceInfo(ipo)
-									.setStartTimeMillis(startDate).setExpiryTimeMillis(expiresDate)
-									.setAutoRenewing(autoRenewing);
-							if (!Algorithms.objectEquals(appstoreOrderId, orderId) ) {
-								throw new IllegalStateException(String.format("Order id '%s' != '%s' don't match", orderId, appstoreOrderId));
-							}
-							updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
-							if (currentTime - expiresDate > MAX_WAITING_TIME_TO_EXPIRE) {
-								kind = "expired";
-								reasonToDelete = String.format("subscription expired more than %.1f days ago",
-										(currentTime - expiresDate) / (DAY * 1.0d));
-
-							}
-						} else {
-							kind = "empty";
-							reasonToDelete = "no purchases purchase format.";
-						}
-					}
-				} catch (NumberFormatException e) {
-					e.printStackTrace();
-					kind = "invalid";
-					reasonToDelete = "wrong purchase format.";
+				subscription = parseIosSubscription(sku, orderId, prevIntroCycles, receiptObj);
+				if (subscription == null) {
+					kind = "empty";
+					reasonToDelete = "no purchases purchase format.";
 				}
-
-			}
-			if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
+			} else if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
 				// sandbox: do not update anymore
 				kind = "invalid";
 				reasonToDelete = "receipt from sandbox environment";
-			}
-			if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
+			} else if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
 				// sandbox: do not update anymore
 				kind = "invalid";
 				reasonToDelete = "user gone";
 			}
-			if (reasonToDelete != null) {
+			if (subscription != null) {
+				updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
+			} else if (reasonToDelete != null) {
 				deleteSubscription(orderId, sku, currentTime, reasonToDelete, kind);
+			} else {
+				System.err.println(String.format(
+						"?? Error updating  sku %s and orderid %s (should be checked and fixed)!", sku, orderId));
 			}
+			return subscription;
 		} catch (RuntimeException e) {
-			System.err.println(String.format("?? Error updating  sku %s and orderid %s (should be checked and fixed)!", sku, orderId, e.getMessage()));
+			System.err.println(
+					String.format("?? Error updating  sku %s and orderid %s (should be checked and fixed)!!!: %s", sku,
+							orderId, e.getMessage()));
 			throw e;
 		}
+	}
+
+	private SubscriptionPurchase parseIosSubscription(String sku, String orderId, int prevIntroCycles,
+			JsonObject receiptObj) {
+		SubscriptionPurchase subscription = null;
+		List<InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
+		if (!inAppReceipts.isEmpty()) {
+			boolean autoRenewing = false;
+			int introCycles = 0;
+			long startDate = 0;
+			long expiresDate = 0;
+			String appstoreOrderId = null;
+			for (InAppReceipt receipt : inAppReceipts) {
+				// there could be multiple subscriptions for same purchaseToken !
+				// i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
+				if (sku.equals(receipt.getProductId()) && orderId.equals(receipt.getOrderId())) {
+					appstoreOrderId = receipt.getOrderId();
+					Map<String, String> fields = receipt.fields;
+					// purchase_date_ms is purchase date of prolongation
+					boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
+					long inAppStartDateMs = Long.parseLong(fields.get("purchase_date_ms"));
+					long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
+					if (startDate == 0 || inAppStartDateMs < startDate) {
+						startDate = inAppStartDateMs;
+					}
+					if (inAppExpiresDateMs > expiresDate) {
+						autoRenewing = receipt.autoRenew;
+						expiresDate = inAppExpiresDateMs;
+					}
+					if (introPeriod) {
+						introCycles++;
+					}
+				}
+			}
+			if (expiresDate > 0) {
+				IntroductoryPriceInfo ipo = null;
+				introCycles = Math.max(prevIntroCycles, introCycles);
+				if (introCycles > 0) {
+					ipo = new IntroductoryPriceInfo();
+					ipo.setIntroductoryPriceCycles(introCycles);
+				}
+				subscription = new SubscriptionPurchase().setIntroductoryPriceInfo(ipo).setStartTimeMillis(startDate)
+						.setExpiryTimeMillis(expiresDate).setAutoRenewing(autoRenewing).setOrderId(appstoreOrderId);
+				if (!Algorithms.objectEquals(subscription.getOrderId(), orderId)) {
+					throw new IllegalStateException(
+							String.format("Order id '%s' != '%s' don't match", orderId, subscription.getOrderId()));
+				}
+			}
+		}
+		return subscription;
 	}
 	
 	private void processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId, 
@@ -356,9 +365,11 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 
+	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException {
 		SubscriptionPurchase subscription = null;
+		String reason = "";
+		String kind = null;
 		try {
 			if (sku.startsWith("osm_free") || sku.contains("_free_")) {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME_FREE, sku, purchaseToken).execute();
@@ -373,8 +384,6 @@ public class UpdateSubscription {
 			if (e instanceof GoogleJsonResponseException) {
 				errorCode = ((GoogleJsonResponseException) e).getStatusCode();
 			}
-			String reason = "";
-			String kind = null;
 			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
@@ -390,21 +399,6 @@ public class UpdateSubscription {
 			} else {
 				reason = " unknown reason (should be checked and fixed)! " + e.getMessage();
 			}
-			if (kind != null) {
-				deleteSubscription(orderId, sku, currentTime, reason, kind);
-			} else {
-				System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
-				int ind = 1;
-				updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
-				updCheckStat.setString(ind++, orderId);
-				updCheckStat.setString(ind++, sku);
-				updCheckStat.addBatch();
-				checkChanges++;
-				if (checkChanges > BATCH_SIZE) {
-					updCheckStat.executeBatch();
-					checkChanges = 0;
-				}
-			}
 		}
 		if (subscription != null) {
 			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
@@ -413,7 +407,22 @@ public class UpdateSubscription {
 						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 			}
 			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
+		} else if (kind != null) {
+			deleteSubscription(orderId, sku, currentTime, reason, kind);
+		} else {
+			System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
+			int ind = 1;
+			updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
+			updCheckStat.setString(ind++, orderId);
+			updCheckStat.setString(ind++, sku);
+			updCheckStat.addBatch();
+			checkChanges++;
+			if (checkChanges > BATCH_SIZE) {
+				updCheckStat.executeBatch();
+				checkChanges = 0;
+			}
 		}
+		return subscription;
 	}
 
 	private String simplifyOrderId(String orderId) {
@@ -439,7 +448,7 @@ public class UpdateSubscription {
 		}
 	}
 
-	private void updateSubscriptionDb(String orderId, String sku, Timestamp startTime, Timestamp expireTime,
+	private boolean updateSubscriptionDb(String orderId, String sku, Timestamp startTime, Timestamp expireTime,
 									  long tm, SubscriptionPurchase subscription) throws SQLException {
 		boolean updated = false;
 		int ind = 1;
@@ -506,6 +515,7 @@ public class UpdateSubscription {
 		boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
 		updStat.setBoolean(ind++, !expired);
 		if (expired) {
+			updated = true;
 			updStat.setString(ind++, "expired");
 		} else {
 			updStat.setNull(ind++, Types.VARCHAR);
@@ -525,6 +535,7 @@ public class UpdateSubscription {
 				changes = 0;
 			}
 		}
+		return updated;
 	}
 
 
