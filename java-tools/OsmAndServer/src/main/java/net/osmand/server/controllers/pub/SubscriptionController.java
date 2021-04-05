@@ -491,6 +491,7 @@ public class SubscriptionController {
 					dbSubscription.prevvalidpurchasetoken = dbSubscription.purchaseToken;
 				}
 				dbSubscription.valid = null;
+				dbSubscription.kind = null;
 				dbSubscription.purchaseToken = subscr.purchaseToken;
 				subscriptionsRepository.save(dbSubscription);
 			}

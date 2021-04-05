@@ -59,6 +59,9 @@ public interface SupportersDeviceSubscriptionRepository extends JpaRepository<Su
 		@Column(name = "valid")
 		public Boolean valid;
 		
+		@Column(name = "kind")
+		public String kind;
+		
 		@Column(name = "prevvalidpurchasetoken")
 		public String prevvalidpurchasetoken;
 	}
