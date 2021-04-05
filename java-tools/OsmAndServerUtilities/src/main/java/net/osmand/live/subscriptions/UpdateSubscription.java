@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
@@ -58,8 +59,7 @@ public class UpdateSubscription {
 	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 14 * DAY;
 	private static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
 	private static final long MAX_WAITING_TIME_TO_EXPIRE = 15 * DAY;
-	// TODO
-	private static final long MAX_WAITING_TIME_TO_MAKE_INVALID = 12 * HOUR; // 3 * DAY;
+	private static final long MAX_WAITING_TIME_TO_MAKE_INVALID = 3 * DAY;
 	int changes = 0;
 	int checkChanges = 0;
 	int deletions = 0;
@@ -146,7 +146,8 @@ public class UpdateSubscription {
 		updStat = conn.prepareStatement(updQuery);
 		delStat = conn.prepareStatement(delQuery);
 		updCheckStat = conn.prepareStatement(updCheckQuery);
-
+		
+		HuaweiIAPHelper huaweiIAPHelper = null;
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
 		while (rs.next()) {
@@ -160,12 +161,8 @@ public class UpdateSubscription {
 			int introcycles = rs.getInt("introcycles");
 			boolean valid = rs.getBoolean("valid");
 			long currentTime = System.currentTimeMillis();
-			boolean ios = sku.startsWith("net.osmand.maps.subscription.");
 			boolean huawei = sku.contains("huawei");
-			if (huawei) {
-				// TODO not implemented yet (requires reports update etc)
-				continue;
-			}
+			boolean ios = sku.startsWith("net.osmand.maps.subscription.") && !huawei;
 			if (this.ios != ios) {
 				continue;
 			}
@@ -190,6 +187,11 @@ public class UpdateSubscription {
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			if (this.ios) {
 				processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, introcycles, pms.verbose);
+			} else if (huawei) {
+				if (huaweiIAPHelper == null) {
+					huaweiIAPHelper = new HuaweiIAPHelper();
+				}
+				processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, pms.verbose);
 			} else {
 				processAndroidSubscription(purchases, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, pms.verbose);
 			}
@@ -302,6 +304,48 @@ public class UpdateSubscription {
 			throw e;
 		}
 	}
+	
+	private void processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId, 
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException {
+		try {
+			JSONObject huaweiSubscription = huaweiIAPHelper
+					.getHuaweiSubscription(orderId.startsWith("HW-") ? null : orderId, purchaseToken);
+		} catch (IOException e) {
+			//int errorCode = 0;
+			String reason = "";
+			String kind = null;
+			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+				reason = String.format(" subscription expired more than %.1f days ago (%s)",
+						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
+				kind = "expired";
+			} else {
+				reason = " unknown reason (should be checked and fixed)! " + e.getMessage();
+			}
+			if (kind != null) {
+				deleteSubscription(orderId, sku, currentTime, reason, kind);
+			} else {
+				System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
+				int ind = 1;
+				updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
+				updCheckStat.setString(ind++, orderId);
+				updCheckStat.setString(ind++, sku);
+				updCheckStat.addBatch();
+				checkChanges++;
+				if (checkChanges > BATCH_SIZE) {
+					updCheckStat.executeBatch();
+					checkChanges = 0;
+				}
+			}
+		}
+//		if (subscription != null) {
+//			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
+//			if (!Algorithms.objectEquals(appStoreOrderId, orderId)) {
+//				throw new IllegalStateException(
+//						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
+//			}
+//			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
+//		}
+	}
 
 	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException {
@@ -320,24 +364,27 @@ public class UpdateSubscription {
 			if (e instanceof GoogleJsonResponseException) {
 				errorCode = ((GoogleJsonResponseException) e).getStatusCode();
 			}
-			String reason = null;
-			String kind = "";
+			String reason = "";
+			String kind = null;
 			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = "expired";
-			} else if ((!purchaseToken.contains(".AO") || errorCode == 400) && 
-					(currentTime - regTime.getTime()) > MAX_WAITING_TIME_TO_MAKE_INVALID) {
-				reason = String.format(" subscription is invalid - possibly fraud %s, %s (%s)", orderId, purchaseToken, e.getMessage()); 
-				kind = "invalid";
+			} else if (!purchaseToken.contains(".AO") || errorCode == 400) {
+				reason = String.format(" subscription is invalid - possibly fraud %s, %s (%s)", orderId, purchaseToken, e.getMessage());
+				if((currentTime - regTime.getTime()) > MAX_WAITING_TIME_TO_MAKE_INVALID) {
+					kind = "invalid";
+				}
 			} else if (errorCode == 410) {
 				kind = "gone";
 				reason = " user doesn't exist (" + e.getMessage() + ") ";
-			} 
-			if (reason != null) {
+			} else {
+				reason = " unknown reason (should be checked and fixed)! " + e.getMessage();
+			}
+			if (kind != null) {
 				deleteSubscription(orderId, sku, currentTime, reason, kind);
 			} else {
-				System.err.println(String.format("?? Error updating sku '%s' orderId '%s': %s (should be checked and fixed)!", sku, orderId, e.getMessage()));
+				System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
 				int ind = 1;
 				updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
 				updCheckStat.setString(ind++, orderId);
@@ -376,7 +423,7 @@ public class UpdateSubscription {
 		delStat.addBatch();
 		deletions++;
 		System.out.println(String.format(
-				"!! Clearing possible invalid subscription: sku=%s. Reason: %s ", sku, reason));
+				"!! Deleting subscription: sku=%s, orderId=%s. Reason: %s ", sku, orderId, reason));
 		if (deletions > BATCH_SIZE) {
 			delStat.executeBatch();
 			deletions = 0;
