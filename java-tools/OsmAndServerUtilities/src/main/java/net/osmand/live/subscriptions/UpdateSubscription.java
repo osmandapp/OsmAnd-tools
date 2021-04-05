@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.json.JSONException;
-import org.json.JSONObject;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
@@ -38,6 +37,7 @@ import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
+import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
@@ -307,9 +307,16 @@ public class UpdateSubscription {
 	
 	private void processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId, 
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException {
+		HuaweiSubscription subscription = null;
 		try {
-			JSONObject huaweiSubscription = huaweiIAPHelper
-					.getHuaweiSubscription(orderId.startsWith("HW-") ? null : orderId, purchaseToken);
+			// can't process null huawei
+			if(orderId.startsWith("HW-")) {
+				return;
+			}
+			subscription = huaweiIAPHelper.getHuaweiSubscription(orderId, purchaseToken);
+			if (verbose) {
+				System.out.println("Result: " + subscription.toString());
+			}
 		} catch (IOException e) {
 			//int errorCode = 0;
 			String reason = "";
@@ -337,14 +344,15 @@ public class UpdateSubscription {
 				}
 			}
 		}
-//		if (subscription != null) {
+		if (subscription != null) {
+			// TODO
 //			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
 //			if (!Algorithms.objectEquals(appStoreOrderId, orderId)) {
 //				throw new IllegalStateException(
 //						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 //			}
 //			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
-//		}
+		}
 	}
 
 	private void processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 

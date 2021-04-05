@@ -45,6 +45,8 @@ public class HuaweiIAPHelper {
 			String msgBody = MessageFormat.format("grant_type={0}&client_secret={1}&client_id={2}", grantType,
 					URLEncoder.encode(clientSecret, "UTF-8"), clientID);
 			String response = httpPost(TOKEN_URL, "application/x-www-form-urlencoded; charset=UTF-8", msgBody, 10000, 10000, null);
+			// TODO
+			System.out.println("ACCESS token " + response);
 			JSONObject obj = new JSONObject(response);
 			accessToken = obj.getString("access_token");
 			accessTokenExpireTime = System.currentTimeMillis() + obj.getLong("expires_in") * 1000 - 10000;
@@ -62,8 +64,20 @@ public class HuaweiIAPHelper {
 		return headers;
 	}
 	
+	public static class HuaweiSubscription {
+		public final JSONObject response;
+		
+		public HuaweiSubscription(String r) {
+			this.response = new JSONObject(r);
+		}
+		
+		@Override
+		public String toString() {
+			return response.toString();
+		}
+	}
 
-	public JSONObject getHuaweiSubscription(String subscriptionId, String purchaseToken) throws IOException {
+	public HuaweiSubscription getHuaweiSubscription(String subscriptionId, String purchaseToken) throws IOException {
 		// fetch the App Level AccessToken
 		String accessToken = getAccessToken();
 		// construct the Authorization in Header
@@ -81,8 +95,7 @@ public class HuaweiIAPHelper {
 		String response = httpPost("https://subscr-dre.iap.hicloud.com/sub/applications/v2/purchases/get",
 				"application/json; charset=UTF-8", msgBody, 10000, 10000, headers);
 
-		System.out.println(response);
-		return new JSONObject(response);
+		return new HuaweiSubscription(response);
 	}
 	
 	private static String httpPost(String httpUrl, String contentType, String data, int connectTimeout, int readTimeout,
