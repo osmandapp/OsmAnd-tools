@@ -1,19 +1,20 @@
-package net.osmand.server.osmgpx;
+package net.osmand.obf;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.GPXUtilities;
+import net.osmand.IProgress;
+import net.osmand.binary.MapZooms;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
+import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
 import net.osmand.GPXUtilities.GPXFile;
@@ -24,15 +25,17 @@ import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RouteActivityType;
-import net.osmand.server.osmgpx.DownloadOsmGPX.OsmGpxFile;
-import net.osmand.server.osmgpx.DownloadOsmGPX.QueryParams;
 import net.osmand.util.Algorithms;
+import rtree.RTree;
+
+import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
+import static net.osmand.IndexConstants.GPX_FILE_EXT;
 
 public class OsmGpxWriteContext {
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
-	final QueryParams qp;
-	int tracks = 0;
-	int segments = 0;
+	public final QueryParams qp;
+	public int tracks = 0;
+	public int segments = 0;
 	long id = -10;
 
 	XmlSerializer serializer = null;
@@ -41,7 +44,7 @@ public class OsmGpxWriteContext {
 	public OsmGpxWriteContext(QueryParams qp) {
 		this.qp = qp;
 	}
-	
+
 	private boolean validatedTrackSegment(TrkSegment t) {
 		boolean isOnePointIn = false;
 		boolean testPoints = qp.minlat != OsmGpxFile.ERROR_NUMBER || qp.minlon != OsmGpxFile.ERROR_NUMBER
@@ -301,7 +304,108 @@ public class OsmGpxWriteContext {
 		serializer.attribute(null, "v", value);
 		serializer.endTag(null, "tag");
 	}
-	
-	
-	
+
+	public File writeObf(List<File> files, File tmpFolder, String fileName, File targetObf) throws IOException,
+			SQLException, InterruptedException, XmlPullParserException {
+
+		startDocument();
+		for (File gf : files) {
+			GPXFile f = GPXUtilities.loadGPXFile(gf);
+			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
+			writeTrack(null, null, f, analysis, "GPX");
+		}
+		endDocument();
+
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexMap = true;
+		settings.indexAddress = false;
+		settings.indexPOI = true;
+		settings.indexTransport = false;
+		settings.indexRouting = false;
+		RTree.clearCache();
+		try {
+			tmpFolder.mkdirs();
+			IndexCreator ic = new IndexCreator(tmpFolder, settings);
+			MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(null, fileName);
+			ic.setMapFileName(fileName);
+			// IProgress.EMPTY_PROGRESS
+			IProgress prog = IProgress.EMPTY_PROGRESS;
+			// prog = new ConsoleProgressImplementation();
+			ic.generateIndexes(qp.osmFile, prog, null, MapZooms.getDefault(), types, null);
+			new File(tmpFolder, ic.getMapFileName()).renameTo(targetObf);
+		} finally {
+			Algorithms.removeAllFiles(tmpFolder);
+		}
+		return targetObf;
+	}
+
+	public static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
+			XmlPullParserException, InterruptedException {
+		if (subArgs.size() != 0) {
+			File file = new File(subArgs.get(0));
+			if (file.isDirectory() || file.getName().endsWith(GPX_FILE_EXT) || file.getName().endsWith(".gpx.gz")) {
+				OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
+				qp.osmFile = File.createTempFile(Algorithms.getFileNameWithoutExtension(file), ".osm");
+				OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
+				File tmpFolder = new File(file.getParentFile(), String.valueOf(System.currentTimeMillis()));
+				String path = file.isDirectory() ? file.getAbsolutePath() : file.getParentFile().getPath();
+				File targetObf = new File(path, Algorithms.getFileNameWithoutExtension(file) + BINARY_MAP_INDEX_EXT);
+				List<File> files = new ArrayList<>();
+				if (file.isDirectory()) {
+					files = Arrays.asList(Objects.requireNonNull(file.listFiles()));
+				} else {
+					files.add(file);
+				}
+				if (!files.isEmpty()) {
+					ctx.writeObf(files, tmpFolder, Algorithms.getFileNameWithoutExtension(file), targetObf);
+				}
+				if (!qp.osmFile.delete()) {
+					qp.osmFile.deleteOnExit();
+				}
+			}
+		}
+	}
+
+	public static class OsmGpxFile {
+
+		public static final double ERROR_NUMBER = -1000;
+		public long id;
+		public String name;
+		public Date timestamp;
+		public boolean pending;
+		public String user;
+		public String visibility;
+		public double lat;
+		public double lon;
+		public String description;
+
+		public double minlat = ERROR_NUMBER;
+		public double minlon = ERROR_NUMBER;
+		public double maxlat = ERROR_NUMBER;
+		public double maxlon = ERROR_NUMBER;
+
+		public String[] tags;
+		public String gpx;
+		public byte[] gpxGzip;
+	}
+
+	public static class QueryParams {
+		public static final int DETAILS_POINTS = 0;
+		public static final int DETAILS_TRACKS = 1;
+		public static final int DETAILS_ELE_SPEED = 2;
+
+		public int details = DETAILS_ELE_SPEED;
+		public File osmFile;
+		public File obfFile;
+		public String tag;
+		public int limit = -1;
+		public String user;
+		public String datestart;
+		public String dateend;
+		public Set<RouteActivityType> activityTypes = null;
+		public double minlat = OsmGpxFile.ERROR_NUMBER;
+		public double maxlat = OsmGpxFile.ERROR_NUMBER;
+		public double maxlon = OsmGpxFile.ERROR_NUMBER;
+		public double minlon = OsmGpxFile.ERROR_NUMBER;
+	}
 }

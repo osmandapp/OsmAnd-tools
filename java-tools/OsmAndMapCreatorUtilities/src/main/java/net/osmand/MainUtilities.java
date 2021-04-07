@@ -1,26 +1,17 @@
 package net.osmand;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.obf.*;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.BinaryComparator;
-import net.osmand.obf.BinaryInspector;
-import net.osmand.obf.BinaryMerger;
-import net.osmand.obf.GenerateRegionTags;
 import net.osmand.obf.diff.AugmentedDiffsInspector;
 import net.osmand.obf.diff.GenerateDailyObf;
 import net.osmand.obf.diff.ObfDiffGenerator;
@@ -51,6 +42,8 @@ import net.osmand.util.ResourceDeleter;
 import net.osmand.util.SplitHillshadeIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
+
+import static net.osmand.IndexConstants.*;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
@@ -125,6 +118,8 @@ public class MainUtilities {
 				settings.indexRouting = true;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
+			} else if (utl.equals("convert-gpx-to-obf")) {
+				OsmGpxWriteContext.generateObfFromGpx(subArgs);
 			} else if (utl.equals("generate-map")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
@@ -321,6 +316,7 @@ public class MainUtilities {
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
 		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
 		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project> <optional_path_to_unpack_files>: test osmand live functionality");
+		System.out.println("\t\t convert-gpx-to-obf <path_to_folder_with_gpx_files> or <path_to_gpx_file_with_file_name>: convert gpx file/files to obf file");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t generate-obf-files-in-batch <path to batch.xml> <optional path to the file with regions list>: generates multiple obf files with different options");
@@ -328,7 +324,7 @@ public class MainUtilities {
 		System.out.println("\t\t fix-basemap-roads <input-osm-file> <output-osm-file>: merges and simplifies basemap roads");
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t create-sqlitedb <dir-with-tiles> [options] <optional sqlitedbfile>: creates .sqlitedb with tiles from directory. USE 'create-sqlitedb --help' to get all params. ");
-		
+
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
 		System.out.println("\t\t travel-guide-creator: creates custom travel guide from existing resources (.travel.sqlite), --help or -h for more details");
