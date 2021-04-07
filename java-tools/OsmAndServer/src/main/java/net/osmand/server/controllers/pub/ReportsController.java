@@ -71,7 +71,8 @@ public class ReportsController {
 	protected static final Log LOGGER = LogFactory.getLog(ReportsController.class);
 	public static final String REPORTS_FOLDER = "reports";
 	public static final String TRANSACTIONS_FILE = REPORTS_FOLDER + "/transactions_github.json";
-	private static final String REPORT_URL = "https://osmand.net/reports/query_month_report?report=getPayouts&month=";
+	private static final String REPORT_URL ="https://osmbtc.org/reports/query_month_report?report=getPayouts&month="; 
+			// "https://osmand.net/reports/query_month_report?report=getPayouts&month=";
 	private static final String TXS_CACHE = REPORTS_FOLDER + "/txs/btc_";
 	private static final String PAYOUTS_CACHE_ID = REPORTS_FOLDER + "/payouts/payout_";
 	private static final String OSMAND_BTC_DONATION_ADDR = "1GRgEnKujorJJ9VBa76g8cp3sfoWtQqSs4";
@@ -221,7 +222,8 @@ public class ReportsController {
 				getCacheFile(TRANSACTIONS_FILE).delete();
 			}
 			reader = readJsonUrl(
-					"https://osmand.net/reports/transactions.json",
+					// "https://osmand.net/reports/transactions.json",
+					"https://osmbtc.org/reports/transactions.json",
 					TRANSACTIONS_FILE, true);
 			rep.mapTransactions = (Map<String, BtcTransactionsMonth>) formatter.fromJson(reader, tp);
 			
@@ -387,7 +389,8 @@ public class ReportsController {
 			res.txId = (String) btcRpcCall("sendmany", "", // dummy default
 					toPay, // map to pay
 					TARGET_NUMBER_OF_BLOCKS, // dummy wait confirmations
-					"https://osmand.net/osm_live", // comment
+					// "https://osmand.net/osm_live", // comment
+					"https://osmbtc.org",
 					new String[0], // subtractfeefrom - don't substract
 					true, // replaceable
 					TARGET_NUMBER_OF_BLOCKS, // conf_target
@@ -508,7 +511,7 @@ public class ReportsController {
 							+ "download='report-%1$s.json' >Download all json reports for %1$s</a>", month));
 					reportBld.append(".&nbsp;&nbsp;");
 					reportBld.append("<a type='application/json' "
-							+ "href='https://builder.osmand.net/reports/query_btc_balance_report'>"
+							+ "href='https://osmbtc.org/reports/query_btc_balance_report'>"
 							+ "Cumulative underpaid report</a>");
 				}
 				rec.reports = reportBld.toString();
