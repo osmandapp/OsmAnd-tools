@@ -28,6 +28,9 @@ import net.osmand.osm.RouteActivityType;
 import net.osmand.util.Algorithms;
 import rtree.RTree;
 
+import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
+import static net.osmand.IndexConstants.GPX_FILE_EXT;
+
 public class OsmGpxWriteContext {
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	public final QueryParams qp;
@@ -334,6 +337,33 @@ public class OsmGpxWriteContext {
 			Algorithms.removeAllFiles(tmpFolder);
 		}
 		return targetObf;
+	}
+
+	public static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
+			XmlPullParserException, InterruptedException {
+		if (subArgs.size() != 0) {
+			File file = new File(subArgs.get(0));
+			if (file.isDirectory() || file.getName().endsWith(GPX_FILE_EXT) || file.getName().endsWith(".gpx.gz")) {
+				OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
+				qp.osmFile = File.createTempFile(Algorithms.getFileNameWithoutExtension(file), ".osm");
+				OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
+				File tmpFolder = new File(file.getParentFile(), String.valueOf(System.currentTimeMillis()));
+				String path = file.isDirectory() ? file.getAbsolutePath() : file.getParentFile().getPath();
+				File targetObf = new File(path, Algorithms.getFileNameWithoutExtension(file) + BINARY_MAP_INDEX_EXT);
+				List<File> files = new ArrayList<>();
+				if (file.isDirectory()) {
+					files = Arrays.asList(Objects.requireNonNull(file.listFiles()));
+				} else {
+					files.add(file);
+				}
+				if (!files.isEmpty()) {
+					ctx.writeObf(files, tmpFolder, Algorithms.getFileNameWithoutExtension(file), targetObf);
+				}
+				if (!qp.osmFile.delete()) {
+					qp.osmFile.deleteOnExit();
+				}
+			}
+		}
 	}
 
 	public static class OsmGpxFile {

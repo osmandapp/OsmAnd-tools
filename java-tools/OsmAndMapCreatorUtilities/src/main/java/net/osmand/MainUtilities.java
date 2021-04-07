@@ -119,7 +119,7 @@ public class MainUtilities {
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
 			} else if (utl.equals("convert-gpx-to-obf")) {
-				generateObfFromGpx(subArgs);
+				OsmGpxWriteContext.generateObfFromGpx(subArgs);
 			} else if (utl.equals("generate-map")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
@@ -205,33 +205,6 @@ public class MainUtilities {
 			} else {
 				printSynopsys();
 			}
-		}
-	}
-
-	private static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
-			XmlPullParserException, InterruptedException {
-		if (subArgs.size() != 0) {
-			File file = new File(subArgs.get(0));
-			if (file.isDirectory() || file.getName().endsWith(GPX_FILE_EXT) || file.getName().endsWith(".gpx.gz")) {
-				OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
-				qp.osmFile = File.createTempFile(Algorithms.getFileNameWithoutExtension(file), ".osm");
-				OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
-				File tmpFolder = new File(file.getParentFile(), String.valueOf(System.currentTimeMillis()));
-				String path = file.isDirectory() ? file.getAbsolutePath() : file.getParentFile().getPath();
-				File targetObf = new File(path, Algorithms.getFileNameWithoutExtension(file) + BINARY_MAP_INDEX_EXT);
-				List<File> files = new ArrayList<>();
-				if (file.isDirectory()) {
-					files = Arrays.asList(Objects.requireNonNull(file.listFiles()));
-				} else {
-					files.add(file);
-				}
-				if (!files.isEmpty()) {
-					ctx.writeObf(files, tmpFolder, Algorithms.getFileNameWithoutExtension(file), targetObf);
-				}
-				qp.osmFile.deleteOnExit();
-			}
-		} else {
-			System.out.println("Usage: <path_to_directory_with_gpx_files> or <path_to_gpx_file_with_file_name>");
 		}
 	}
 
@@ -343,6 +316,7 @@ public class MainUtilities {
 		System.out.println("\t\t delete-unused-strings <path to repos/android/OsmAnd/res>: deletes unused translation in git repository (transforms all strings.xml)");
 		System.out.println("\t\t extract-roads-only <path to full map obf file> : extracts .road.obf (road-only map) file from full .obf");
 		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project> <optional_path_to_unpack_files>: test osmand live functionality");
+		System.out.println("\t\t convert-gpx-to-obf <path_to_folder_with_gpx_files> or <path_to_gpx_file_with_file_name>: convert gpx file/files to obf file");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file>: process osm file and assign tag osmand_region_name to every entity.");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t generate-obf-files-in-batch <path to batch.xml> <optional path to the file with regions list>: generates multiple obf files with different options");
@@ -350,7 +324,7 @@ public class MainUtilities {
 		System.out.println("\t\t fix-basemap-roads <input-osm-file> <output-osm-file>: merges and simplifies basemap roads");
 		System.out.println("\t\t merge-index " + BinaryMerger.helpMessage);
 		System.out.println("\t\t create-sqlitedb <dir-with-tiles> [options] <optional sqlitedbfile>: creates .sqlitedb with tiles from directory. USE 'create-sqlitedb --help' to get all params. ");
-		
+
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
 		System.out.println("\t\t travel-guide-creator: creates custom travel guide from existing resources (.travel.sqlite), --help or -h for more details");
