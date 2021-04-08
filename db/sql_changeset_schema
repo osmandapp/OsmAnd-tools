@@ -24,11 +24,13 @@ CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expir
 CREATE INDEX supporters_device_sub_orderid_idx on supporters_device_sub(orderid);
 ALTER TABLE supporters_device_sub add primary key (sku, orderid);
 
--- ACCOUNT (id, email, token, subuserid, purchasetoken)
--- FILES (accountid, type, createdate, lastupdate, name, data bytea)
--- CREATE TABLE (id bigint primary key, data bytea);
---- CREATE TABLE GPX_METADATA_TABLE_NAME(id bigint primary key, \"user\" text, \"date\" timestamp, name text, lat float, )
-
+------ PREMIUM accounts ----
+CREATE TABLE user_accounts(id serial primary key, email text not null, token text, tokentime timestamp, regtime timestamp); 
+CREATE TABLE user_account_device(id serial primary key, userid integer, deviceid text, accesstoken text, udpatetime timestamp); 
+CREATE TABLE user_files(id bigserial primary key, type text, name text, userid integer, deviceid integer, updatetime timestamp, data bytea);
+CREATE INDEX user_account_device_userid_idx on user_account_device(userid);
+CREATE INDEX user_files_userid_idx on user_files(userid);
+CREATE INDEX user_files_deviceid_idx on user_files(deviceid);
 
 -- mail group
 CREATE TABLE email_free_users(aid text, email text, os text, updatetime timestamp);
