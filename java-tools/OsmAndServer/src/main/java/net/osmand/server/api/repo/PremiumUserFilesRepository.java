@@ -30,7 +30,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
     	@Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
-        public int id;
+        public long id;
         
         @Column(name = "userid")
         public int userid;
