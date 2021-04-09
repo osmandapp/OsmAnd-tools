@@ -69,14 +69,14 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
 	class UserFileNoData {
 		public int userid;
-		public int id;
+		public long id;
         public int deviceid;
         public int filesize;
         public String type;
         public String name;
         public Date updatetime;
         public long updatetimems;
-		public UserFileNoData(int id, int userid, int deviceid, String type, String name, Date updatetime, int filesize) {
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, int filesize) {
 			this.userid = userid;
 			this.id = id;
 			this.deviceid = deviceid;
