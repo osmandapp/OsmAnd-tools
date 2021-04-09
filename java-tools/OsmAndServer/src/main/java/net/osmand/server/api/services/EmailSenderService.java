@@ -44,12 +44,12 @@ public class EmailSenderService {
 		String topic = newUser? "Welcome to OsmAnd Premium" : "Register new device to OsmAnd Premium";
 		StringBuilder contentStr = new StringBuilder();
 		contentStr.append("Hello OsmAnd User!");
-		contentStr.append("\n\n");
-		contentStr.append("New device has been connected to OsmAnd Premium. You activation code is <b>"+token+"</b>.\n");
+		contentStr.append("<br><br>");
+		contentStr.append("New device has been connected to OsmAnd Premium. You activation code is <b>"+token+"</b>.<br>");
 		contentStr.append("You can also use <a href='https://osmand.net/premium/device-registration?token=" + token
 				+ "'>following link<a> to open it with OsmAnd.");
-		contentStr.append("\n\n");
-		contentStr.append("Best Regards, \nOsmAnd Team");
+		contentStr.append("<br><br>");
+		contentStr.append("Best Regards, <br>OsmAnd Team");
 		
 		
 		Content content = new Content("text/html", contentStr.toString());
