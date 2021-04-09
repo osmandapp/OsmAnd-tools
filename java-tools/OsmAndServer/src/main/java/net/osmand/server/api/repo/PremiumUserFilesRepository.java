@@ -61,7 +61,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
     
     // COALESCE(length(u.data), -1))
-	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData(u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.filesize ) "
+	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData(u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.filesize, length(u.data) ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
 			+ " order by updatetime desc")
@@ -76,7 +76,8 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public String name;
         public Date updatetime;
         public long updatetimems;
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, int filesize) {
+		public int zipSize;
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, int filesize, int zipSize) {
 			this.userid = userid;
 			this.id = id;
 			this.deviceid = deviceid;
@@ -84,6 +85,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.name = name;
 			this.updatetime = updatetime;
 			this.filesize = filesize;
+			this.zipSize = zipSize;
 			this.updatetimems = updatetime == null ? 0 : updatetime.getTime(); 
 		}
 	}

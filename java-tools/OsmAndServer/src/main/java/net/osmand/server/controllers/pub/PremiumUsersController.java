@@ -58,6 +58,7 @@ import net.osmand.util.Algorithms;
 public class PremiumUsersController {
 
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
+	private static final long MB = 1024 * 1024;
 	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
@@ -65,6 +66,7 @@ public class PremiumUsersController {
 	private static final int ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID = 5 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(PremiumUsersController.class);
 
@@ -221,6 +223,11 @@ public class PremiumUsersController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
+		UserFilesResults res = generateFiles(dev, null, null, false);
+		if (res.totalZipSize > 300 * MB) {
+			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
+					"Maximum size of synchronization box exceeds 300 MB. Please contact support in order to investigate possible solutions.");
+		}
 		UserFile usf = new PremiumUserFilesRepository.UserFile();
 		int cnt, sum;
 		try {
@@ -305,29 +312,46 @@ public class PremiumUsersController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
+		UserFilesResults res = generateFiles(dev, name, type, allVersions);
+		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+
+	private UserFilesResults generateFiles(PremiumUserDevice dev, String name, String type, boolean allVersions) {
 		List<UserFileNoData> fl = filesRepository.listFilesByUserid(dev.userid, name, type);
 		UserFilesResults res = new UserFilesResults();
 		res.uniqueFiles = new ArrayList<>();
 		if (allVersions) {
 			res.allFiles = new ArrayList<>();
 		}
-		res.deviceid = deviceId;
+		res.deviceid = dev.id;
 		Set<String> fileIds = new TreeSet<String>();
 		for (UserFileNoData sf : fl) {
 			String fileId = sf.type + "____" + sf.name;
+			if (sf.filesize >= 0) {
+				res.totalFileVersions++;
+				res.totalZipSize += sf.zipSize;
+				res.totalFileSize += sf.filesize;
+			}
 			if (fileIds.add(fileId)) {
 				if (sf.filesize >= 0) {
+					res.totalFiles++;
 					res.uniqueFiles.add(sf);
 				}
 			}
 			if (allVersions) {
 				res.allFiles.add(sf);
+				
 			}
 		}
-		return ResponseEntity.ok(gson.toJson(res));
+		return res;
 	}
 	
 	public static class UserFilesResults {
+		public int totalZipSize;
+		public int totalFileSize;
+		public int totalFiles;
+		public int totalFileVersions;
 		public List<UserFileNoData> allFiles;
 		public List<UserFileNoData> uniqueFiles;
 		public int deviceid;
