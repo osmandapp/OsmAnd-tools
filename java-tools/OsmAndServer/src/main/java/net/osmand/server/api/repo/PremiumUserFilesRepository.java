@@ -22,7 +22,7 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 @Repository
 public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long> {
 	
-	UserFile findTopByDeviceidAndNameAndTypeOrderByUpdatetimeDesc(int deviceid, String name, String type);
+	UserFile findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
 	
     @Entity(name = "UserFile")
     @Table(name = "user_files")
@@ -75,6 +75,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public String type;
         public String name;
         public Date updatetime;
+        public long updatetimems;
 		public UserFileNoData(int id, int userid, int deviceid, String type, String name, Date updatetime, int filesize) {
 			this.userid = userid;
 			this.id = id;
@@ -83,6 +84,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.name = name;
 			this.updatetime = updatetime;
 			this.filesize = filesize;
+			this.updatetimems = updatetime == null ? 0 : updatetime.getTime(); 
 		}
 	}
 	

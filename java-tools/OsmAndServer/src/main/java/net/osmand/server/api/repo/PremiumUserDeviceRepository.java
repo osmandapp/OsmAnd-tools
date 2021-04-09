@@ -14,15 +14,17 @@ import javax.persistence.TemporalType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import net.osmand.server.api.repo.PremiumUserDeviceRepository.PremiumUserDev;
+import net.osmand.server.api.repo.PremiumUserDeviceRepository.PremiumUserDevice;
 
 @Repository
-public interface PremiumUserDeviceRepository extends JpaRepository<PremiumUserDev, Long> {
+public interface PremiumUserDeviceRepository extends JpaRepository<PremiumUserDevice, Long> {
 	
+	
+	PremiumUserDevice findById(int id);
 
     @Entity
     @Table(name = "user_account_devices")
-    class PremiumUserDev {
+    class PremiumUserDevice {
 
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)

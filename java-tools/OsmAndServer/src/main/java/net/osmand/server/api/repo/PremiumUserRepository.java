@@ -20,8 +20,8 @@ import net.osmand.server.api.repo.PremiumUserRepository.PremiumUser;
 public interface PremiumUserRepository extends JpaRepository<PremiumUser, Long> {
 	
 	
-    boolean existsByEmail(String email);
-
+	PremiumUser findByEmail(String email);
+	
     @Entity
     @Table(name = "user_accounts")
     class PremiumUser {
@@ -35,6 +35,9 @@ public interface PremiumUserRepository extends JpaRepository<PremiumUser, Long> 
         
         @Column(name = "token")
         public String token;
+        
+        @Column(name = "tokendevice")
+        public String tokendevice;
 
         @Column(name = "regtime")
         @Temporal(TemporalType.TIMESTAMP)
