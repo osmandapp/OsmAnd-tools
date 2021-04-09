@@ -28,7 +28,7 @@ server:
   tomcat.max-threads: 5
   connection-timeout: 120000
   compression.enabled: true
-  compression.min-response-size: 10
+  compression.min-response-size: 4096
  
   
 files.location: ${user.dir}/../../../help
