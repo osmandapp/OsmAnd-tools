@@ -50,9 +50,9 @@ import net.osmand.server.api.repo.MapUserRepository;
 import net.osmand.server.api.repo.MapUserRepository.MapUser;
 import net.osmand.server.api.repo.OsmRecipientsRepository;
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscriptionPrimaryKey;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
 import net.osmand.server.api.services.ReceiptValidationService;
@@ -78,7 +78,7 @@ public class SubscriptionController {
     private OsmRecipientsRepository osmRecipientsRepository;
     
     @Autowired
-    private SupportersDeviceSubscriptionRepository subscriptionsRepository;
+    private DeviceSubscriptionsRepository subscriptionsRepository;
     
     @Autowired
     private ReceiptValidationService validationService;

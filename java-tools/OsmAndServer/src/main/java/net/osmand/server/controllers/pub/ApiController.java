@@ -11,8 +11,8 @@ import net.osmand.server.api.repo.EmailSupportSurveyRepository;
 import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository;
-import net.osmand.server.api.repo.SupportersDeviceSubscriptionRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
@@ -93,7 +93,7 @@ public class ApiController {
 	private IpLocationService locationService;
 
 	@Autowired
-	private SupportersDeviceSubscriptionRepository subscriptionsRepository;
+	private DeviceSubscriptionsRepository subscriptionsRepository;
 
 	private ObjectMapper jsonMapper;
 

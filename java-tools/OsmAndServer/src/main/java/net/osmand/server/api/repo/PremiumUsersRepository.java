@@ -14,38 +14,38 @@ import javax.persistence.TemporalType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import net.osmand.server.api.repo.PremiumUserDeviceRepository.PremiumUserDevice;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 
 @Repository
-public interface PremiumUserDeviceRepository extends JpaRepository<PremiumUserDevice, Long> {
+public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long> {
 	
 	
-	PremiumUserDevice findById(int id);
-
+	PremiumUser findByEmail(String email);
+	
     @Entity
-    @Table(name = "user_account_devices")
-    class PremiumUserDevice {
+    @Table(name = "user_accounts")
+    class PremiumUser {
 
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         public int id;
 
-        @Column(name = "userid")
-        public int userid;
+        @Column(name = "email")
+        public String email;
         
-        @Column(name = "deviceid")
-        public String deviceid;
+        @Column(name = "token")
+        public String token;
         
-        @Column(name = "orderid")
-        public String orderid;
-        
-        @Column(name = "accesstoken")
-        public String accesstoken;
+        @Column(name = "tokendevice")
+        public String tokendevice;
 
-        @Column(name = "udpatetime")
+        @Column(name = "regtime")
         @Temporal(TemporalType.TIMESTAMP)
-        public Date udpatetime;
+        public Date regTime;
         
+        @Column(name = "tokentime")
+        @Temporal(TemporalType.TIMESTAMP)
+        public Date tokenTime;
     }
 
     

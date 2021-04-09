@@ -41,13 +41,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
-import net.osmand.server.api.repo.PremiumUserDeviceRepository;
-import net.osmand.server.api.repo.PremiumUserDeviceRepository.PremiumUserDevice;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.api.repo.PremiumUserRepository;
-import net.osmand.server.api.repo.PremiumUserRepository.PremiumUser;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.util.Algorithms;
 
 @RestController
@@ -67,20 +70,25 @@ public class PremiumUsersController {
 
 	Gson gson = new Gson();
 	
+	@Autowired
+    protected DeviceSubscriptionsRepository subscriptionsRepo;
+	
     @Autowired
-    protected PremiumUserRepository usersRepository;
+    protected PremiumUsersRepository usersRepository;
     
     @Autowired
     protected PremiumUserFilesRepository filesRepository;
     
     @Autowired
-    protected PremiumUserDeviceRepository deviceRepository;
+    protected PremiumUserDevicesRepository devicesRepository;
+    
+    @Autowired
+	EmailSenderService emailSender;
     
 //    @PersistenceContext 
 //    protected EntityManager entityManager;
     
 
-    
     protected ResponseEntity<String> error(int errorCode, String message) {
     	Map<String, Object> mp = new TreeMap<String, Object>();
     	mp.put("errorCode", errorCode);
@@ -93,8 +101,25 @@ public class PremiumUsersController {
     	return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
     }
     
+	private boolean checkOrderIdPremium(String orderid) {
+		if (Algorithms.isEmpty(orderid)) {
+			return false;
+		}
+		boolean premiumPresent = false;
+		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
+		for (SupporterDeviceSubscription s : lst) {
+			// s.sku could be checked for premium
+			if (s.valid != null && s.valid.booleanValue()) {
+				premiumPresent = true;
+				break;
+			}
+		}
+		return premiumPresent;
+	}
+	
+    
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
-		PremiumUserDevice d = deviceRepository.findById(deviceId);
+		PremiumUserDevice d = devicesRepository.findById(deviceId);
 		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
 			return d;
 		}
@@ -109,14 +134,18 @@ public class PremiumUsersController {
 			@RequestParam(name = "orderid", required = false) String orderid)
 			throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
+		if (!email.contains("@")) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+		}
+		boolean newUser = false; 
 		if (pu == null) {
-			if (!email.contains("@")) {
-				return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
-			}
-			if (Algorithms.isEmpty(orderid)) {
+			newUser = false;
+			boolean premiumPresent = checkOrderIdPremium(orderid);
+			if (!premiumPresent) {
 				return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, "no valid subscription is present");
 			}
-			pu = new PremiumUserRepository.PremiumUser();
+
+			pu = new PremiumUsersRepository.PremiumUser();
 			pu.email = email;
 			pu.regTime = new Date();
 		}
@@ -125,10 +154,9 @@ public class PremiumUsersController {
 		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		// TODO send email
+		emailSender.sendRegistrationEmail(pu.email, pu.token, newUser);
 		return ok();
 	}
-	
 
     
 	@PostMapping(value = "/device-register")
@@ -148,14 +176,14 @@ public class PremiumUsersController {
 		}
 		pu.token = null;
 		pu.tokenTime = null;
-		PremiumUserDevice device = new PremiumUserDeviceRepository.PremiumUserDevice();
+		PremiumUserDevice device = new PremiumUserDevice();
 		device.userid = pu.id;
 		device.deviceid = deviceId;
 		device.orderid = orderid;
 		device.udpatetime = new Date();
 		device.accesstoken = UUID.randomUUID().toString();
 		usersRepository.saveAndFlush(pu);
-		deviceRepository.saveAndFlush(device);
+		devicesRepository.saveAndFlush(device);
 		return ResponseEntity.ok(gson.toJson(device));
 	}
     
