@@ -27,6 +27,10 @@ server:
   port: 8080
   tomcat.max-threads: 5
   connection-timeout: 120000
+  compression.enabled: true
+  compression.min-response-size: 10
+ 
+  
 files.location: ${user.dir}/../../../help
 gen.location: ${files.location}/gen
 web.location: ${files.location}/website
@@ -37,6 +41,11 @@ management:
       exposure:
         include: "*"
 spring:
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX-FILE-SIZE:15MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX-REQUEST-SIZE:15MB}
+      enabled: true
   jpa:
     properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
     properties.hibernate.jdbc.lob.non_contextual_creation: true

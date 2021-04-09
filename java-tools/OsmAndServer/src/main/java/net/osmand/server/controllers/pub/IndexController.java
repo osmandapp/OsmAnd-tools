@@ -145,8 +145,8 @@ public class IndexController {
 	
 	@RequestMapping(path = { "get_indexes.php", "get_indexes"})
 	@ResponseBody
-    public ResponseEntity<Resource> indexesPhp(@RequestParam(required=false) String gzip,
-                                               HttpServletResponse resp) throws IOException {
+	public ResponseEntity<Resource> indexesPhp(@RequestParam(required = false) String gzip, HttpServletResponse resp)
+			throws IOException {
 		boolean gz = gzip != null;
 		File fl = downloadIndexes.getIndexesXml(false, gz);
         HttpHeaders headers = new HttpHeaders();

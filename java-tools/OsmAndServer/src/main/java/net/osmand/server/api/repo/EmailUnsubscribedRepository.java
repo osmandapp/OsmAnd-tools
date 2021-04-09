@@ -37,7 +37,7 @@ public interface EmailUnsubscribedRepository extends JpaRepository<EmailUnsubscr
 		@Column(nullable = false, length = 100)
 		public String channel;
 		
-		@Column(nullable = true)
+		@Column(nullable = true, name = "")
 		@Temporal(TemporalType.TIMESTAMP)
 		public Date timestamp;
 		
