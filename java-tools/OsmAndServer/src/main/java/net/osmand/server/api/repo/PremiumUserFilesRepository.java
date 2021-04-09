@@ -77,15 +77,15 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public Date updatetime;
         public long updatetimems;
 		public int zipSize;
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, int filesize, int zipSize) {
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, Integer filesize, Integer zipSize) {
 			this.userid = userid;
 			this.id = id;
 			this.deviceid = deviceid;
 			this.type = type;
 			this.name = name;
 			this.updatetime = updatetime;
-			this.filesize = filesize;
-			this.zipSize = zipSize;
+			this.filesize = filesize == null ? 0 : filesize.intValue();
+			this.zipSize = zipSize == null ? 0 : zipSize.intValue();
 			this.updatetimems = updatetime == null ? 0 : updatetime.getTime(); 
 		}
 	}
