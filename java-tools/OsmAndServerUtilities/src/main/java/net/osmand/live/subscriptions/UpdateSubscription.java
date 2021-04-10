@@ -454,10 +454,11 @@ public class UpdateSubscription {
 		int ind = 1;
 		updStat.setTimestamp(ind++, new Timestamp(tm));
 		if (subscription.getStartTimeMillis() != null) {
-			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > 14 * DAY && startTime.getTime() > 100000 * 1000L) {
-				throw new IllegalArgumentException(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
-						new Date(startTime.getTime()),
-						new Date(subscription.getStartTimeMillis()), orderId, sku));
+			int maxDays = 40;
+			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > maxDays * DAY && startTime.getTime() > 100000 * 1000L) {
+				throw new IllegalArgumentException(String.format(
+						"ERROR: Start timestamp changed more than %d days '%s' (db) != '%s' (appstore) '%s' %s", 
+						maxDays, new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis()), orderId, sku));
 //				System.err.println(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
 //						new Date(startTime.getTime()),
 //						new Date(subscription.getStartTimeMillis()), orderId, sku));
