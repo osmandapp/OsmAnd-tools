@@ -89,7 +89,7 @@ def process_points(cond, filename, array):
 					# tagName = 'name'
 				
 				if len(value) > 0 :
-					if not (tagName == "place" and value == "state" and len(row[5]) > 6) :
+					if not (tagName == "place" and value == "state" and len(str(row[5])) > 6) :
 						xml += '\t<tag k="%s" v="%s" />\n' % (tagName, value)
 			base = base + 1
 		xml += '</node>'
