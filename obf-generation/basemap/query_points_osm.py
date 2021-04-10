@@ -77,8 +77,10 @@ def process_points(cond, filename, array):
 				value = esc(row[base])
 				if tagName == "name" and value in largeStatesList:
 					checkForLargeState = True;
-				if tagName == "place" and value == "state" and checkForLargeState:
-					xml += '\t<tag k="osmand_large_state" v="true" />\n'
+				if tagName == "place" and value == "state":
+					if checkForLargeState:
+						xml += '\t<tag k="osmand_large_state" v="true" />\n'
+					print("3 ", row[3], " 4 ", row[4], " 5 ", row[5], " 6 ", row[6])
 				if tagName == "place" and value == "city" :
 					pop = num(row[2], 0)
 					if pop > 100000	:
