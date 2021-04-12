@@ -194,7 +194,8 @@ public class PremiumUsersController {
 	@ResponseBody
 	public ResponseEntity<String> delete(@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken)
+			@RequestParam(name = "accessToken", required = true) String accessToken, 
+			@RequestParam(name = "clienttime", required = false) Long clienttime)
 			throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
@@ -208,6 +209,9 @@ public class PremiumUsersController {
 		usf.deviceid = deviceId;
 		usf.data = null;
 		usf.filesize = -1;
+		if (clienttime != null) {
+			usf.clienttime = new Date(clienttime.longValue());
+		}
 		filesRepository.saveAndFlush(usf);
 		return ok();
 	}
@@ -217,7 +221,8 @@ public class PremiumUsersController {
 	public ResponseEntity<String> upload(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 			@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken)
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			@RequestParam(name = "clienttime", required = false) Long clienttime)
 			throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
@@ -246,6 +251,9 @@ public class PremiumUsersController {
 		usf.userid = dev.userid;
 		usf.deviceid = deviceId;
 		usf.filesize = sum;
+		if (clienttime != null) {
+			usf.clienttime = new Date(clienttime.longValue());
+		}
 //		Session session = entityManager.unwrap(Session.class);
 //	    Blob blob = session.getLobHelper().createBlob(file.getInputStream(), file.getSize());
 //		usf.data = blob;
