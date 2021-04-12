@@ -132,7 +132,7 @@ public class PremiumUsersController {
 	@PostMapping(value = "/user-register")
 	@ResponseBody
 	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email, 
-			@RequestParam(name = "deviceid", required = true) String deviceId,
+			@RequestParam(name = "deviceid", required = false) String deviceId,
 			@RequestParam(name = "orderid", required = false) String orderid)
 			throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
@@ -165,7 +165,7 @@ public class PremiumUsersController {
 	@ResponseBody
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "token", required = true) String token,
-			@RequestParam(name = "deviceid", required = true) String deviceId,
+			@RequestParam(name = "deviceid", required = false) String deviceId,
 			@RequestParam(name = "orderid", required = false) String orderid)
 			throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
