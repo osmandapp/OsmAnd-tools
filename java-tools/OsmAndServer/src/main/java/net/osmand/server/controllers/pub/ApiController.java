@@ -284,6 +284,15 @@ public class ApiController {
 		if (headers.getFirst("X-Forwarded-For") != null) {
 			params.hostAddress = headers.getFirst("X-Forwarded-For");
 		}
+		if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken) && Algorithms.isEmpty(orderId)) {
+			Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
+			if (sup.isPresent()) {
+				Supporter s = sup.get();
+				if (userToken.equals(s.token)) {
+					orderId = sup.get().orderId;
+				}
+			}
+		}
 		if (!Algorithms.isEmpty(orderId)) {
 			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(orderId);
 			List<Object> res = new ArrayList<>();
