@@ -285,7 +285,7 @@ public class ApiController {
 			params.hostAddress = headers.getFirst("X-Forwarded-For");
 		}
 		if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken) && Algorithms.isEmpty(orderId)) {
-			Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
+			Optional<Supporter> sup = supportersRepository.findByUserId(Long.parseLong(userId));
 			if (sup.isPresent()) {
 				Supporter s = sup.get();
 				if (userToken.equals(s.token)) {
