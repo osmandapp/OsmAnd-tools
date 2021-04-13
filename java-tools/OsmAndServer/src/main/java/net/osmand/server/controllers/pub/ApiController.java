@@ -1,23 +1,25 @@
 package net.osmand.server.controllers.pub;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.io.IOException;
+import java.net.URLDecoder;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
 
-import net.osmand.server.api.repo.DataMissingSearchRepository;
-import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
-import net.osmand.server.api.repo.EmailSupportSurveyRepository;
-import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
-import net.osmand.server.api.repo.EmailUnsubscribedRepository;
-import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.services.IpLocationService;
-import net.osmand.server.api.services.MotdService;
-import net.osmand.server.api.services.MotdService.MessageParams;
-import net.osmand.util.Algorithms;
-import net.osmand.server.api.services.PlacesService;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,25 +40,26 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URLDecoder;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.sql.DataSource;
+import net.osmand.server.api.repo.DataMissingSearchRepository;
+import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.EmailSupportSurveyRepository;
+import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
+import net.osmand.server.api.repo.EmailUnsubscribedRepository;
+import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
+import net.osmand.server.api.repo.SupportersRepository;
+import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.IpLocationService;
+import net.osmand.server.api.services.MotdService;
+import net.osmand.server.api.services.MotdService.MessageParams;
+import net.osmand.server.api.services.PlacesService;
+import net.osmand.util.Algorithms;
 
 @Controller
 @RequestMapping("/api")
@@ -90,10 +93,13 @@ public class ApiController {
     DataMissingSearchRepository dataMissingSearch;
     
     @Autowired
-	private IpLocationService locationService;
+	IpLocationService locationService;
 
 	@Autowired
-	private DeviceSubscriptionsRepository subscriptionsRepository;
+	DeviceSubscriptionsRepository subscriptionsRepository;
+	
+	@Autowired
+	SupportersRepository supportersRepository;
 
 	private ObjectMapper jsonMapper;
 
@@ -269,17 +275,17 @@ public class ApiController {
 	@GetMapping(path = { "/subscriptions/get" })
 	@ResponseBody
 	public String getSubscriptions(
-			@RequestParam() String userId,
-			@RequestParam() String userToken,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userToken,
+			@RequestParam(required = false) String orderId,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request) throws IOException, ParseException {
 		MessageParams params = new MessageParams();
 		params.hostAddress = request.getRemoteAddr();
 		if (headers.getFirst("X-Forwarded-For") != null) {
 			params.hostAddress = headers.getFirst("X-Forwarded-For");
 		}
-
-		if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
-			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByPayload(userId + " " + userToken);
+		if (!Algorithms.isEmpty(orderId)) {
+			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(orderId);
 			List<Object> res = new ArrayList<>();
 			for (SupporterDeviceSubscription sub : subscriptions) {
 				Map<String, String> subMap = new HashMap<>();

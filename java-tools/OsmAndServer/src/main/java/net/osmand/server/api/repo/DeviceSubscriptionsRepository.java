@@ -19,7 +19,6 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceS
 
 public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-	List<SupporterDeviceSubscription> findByPayload(String payload);
 	
 	List<SupporterDeviceSubscription> findByOrderId(String orderId);
 
