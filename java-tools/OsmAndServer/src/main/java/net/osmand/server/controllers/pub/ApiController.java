@@ -304,10 +304,10 @@ public class ApiController {
 				}
 				String state = "undefined";
 				if (sub.expiretime != null && sub.paymentstate != null && sub.autorenewing != null) {
-					long expiryTimeMillis = sub.expiretime.getTime();
+					long expireTimeMs = sub.expiretime.getTime();
 					int paymentState = sub.paymentstate;
 					boolean autoRenewing = sub.autorenewing;
-					if (expiryTimeMillis > System.currentTimeMillis()) {
+					if (expireTimeMs > System.currentTimeMillis()) {
 						if (paymentState == 1 && autoRenewing) {
 							state = "active";
 						} else if (paymentState == 1 && !autoRenewing) {
@@ -324,6 +324,7 @@ public class ApiController {
 							state = "expired";
 						}
 					}
+					subMap.put("expire_time", String.valueOf(expireTimeMs));
 				}
 				subMap.put("state", state);
 				res.add(subMap);
