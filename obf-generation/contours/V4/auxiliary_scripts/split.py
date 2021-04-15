@@ -34,8 +34,8 @@ def main():
 	print ("iterationsY " + str(iterationsY))
 	print ("iterationsX " + str(iterationsX))
 
-	bufferX = 0.000416
-	bufferY = 0.000416
+	bufferX = 0.000139
+	bufferY = 0.000139
 
 	j = 0
 	i = 0
