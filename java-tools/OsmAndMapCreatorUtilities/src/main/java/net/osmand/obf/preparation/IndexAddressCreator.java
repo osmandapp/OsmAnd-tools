@@ -25,6 +25,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
@@ -765,7 +767,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// index not only buildings but also nodes that belongs to addr:interpolation ways
 		// currently not supported because nodes are indexed first with buildings
 		String interpolation = e.getTag(OSMTagKey.ADDR_INTERPOLATION);
-		if (e instanceof Way && interpolation != null) {
+		String interpolationByHouseNumber = null;
+		if (interpolation == null) {
+			interpolationByHouseNumber = getInterpolationByHouseNumber(e);
+		}
+		if (e instanceof Way && (interpolation != null || interpolationByHouseNumber != null)) {
 			BuildingInterpolation type = null;
 			int interpolationInterval = 0;
 			try {
@@ -933,6 +939,25 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				postalCodeRelations.add((Relation) e);
 			}
 		}
+	}
+
+	private String getInterpolationByHouseNumber(Entity e) {
+		String number = e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER);
+		if (number != null) {
+			Matcher houseNumberWithDash = Pattern.compile("(\\d+)-(\\d+)").matcher(number);
+			if (houseNumberWithDash.matches()) {
+				long firstNumber = Long.parseLong(houseNumberWithDash.group(1));
+				long secondNumber = Long.parseLong(houseNumberWithDash.group(2));
+				if (firstNumber % 2 == 0 && secondNumber % 2 == 0) {
+					return "even";
+				}
+				if (firstNumber % 2 != 0 && secondNumber % 2 != 0) {
+					return "odd";
+				}
+				return "all";
+			}
+		}
+		return null;
 	}
 
 	private String normalizeHousenumber(String hno) {
