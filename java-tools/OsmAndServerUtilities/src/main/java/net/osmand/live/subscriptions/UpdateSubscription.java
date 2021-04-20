@@ -376,7 +376,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException {
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
 		SubscriptionPurchase subscription = null;
 		String reason = "";
 		String kind = null;
