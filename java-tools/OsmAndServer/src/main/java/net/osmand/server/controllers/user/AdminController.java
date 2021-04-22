@@ -613,6 +613,11 @@ public class AdminController {
 		public long valueEnd;
 		public long valueNewLTV;
 		public long valuePaidLTV;
+		public boolean generic;
+		
+		public AdminGenericSubReportColumnValue(boolean generic) {
+			this.generic = generic;
+		}
 		
 		@Override
 		public String toString() {
@@ -636,7 +641,12 @@ public class AdminController {
 				row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
 			}
 			if ((formatVersion & (1 << 3)) > 0) {
-				row.append(String.format("<br>€ %d", valueNewLTV / 1000));
+				if (generic) {
+					row.append(String.format("<br>€ %d (%d%%)", valueNewLTV / 1000, 
+							(valuePaidLTV * 100) / (valueNewLTV)));
+				} else {
+					row.append(String.format("<br>€ %d", valueNewLTV / 1000));
+				}
 			}
 			if ((formatVersion & (1 << 4)) > 0 && valueNewLTV > 0) {
 				row.append(String.format("<br>€ %d %d%%", valuePaidLTV / 1000, 
@@ -656,6 +666,10 @@ public class AdminController {
 		
 		public AdminGenericSubReportColumn(String name) {
 			this.name = name;
+		}
+		
+		public boolean isGenericColumn() {
+			return filterDuration == -1 && discount == null;
 		}
 		
 		public AdminGenericSubReportColumn app(SubAppType... vls) {
@@ -707,10 +721,6 @@ public class AdminController {
 			return true;
 		}
 
-		public AdminGenericSubReportColumnValue initValue() {
-			return new AdminGenericSubReportColumnValue();
-		}
-
 		
 	}
 	
@@ -754,7 +764,8 @@ public class AdminController {
 		private List<AdminGenericSubReportColumnValue> initColumns() {
 			List<AdminGenericSubReportColumnValue> lst = new ArrayList<>();
 			for (AdminGenericSubReportColumn col : columns) {
-				lst.add(col.initValue());
+				AdminGenericSubReportColumnValue vl = new AdminGenericSubReportColumnValue(col.isGenericColumn());
+				lst.add(vl);
 			}
 			return lst;
 		}
