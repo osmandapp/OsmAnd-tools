@@ -645,7 +645,7 @@ public class AdminController {
 				row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
 			}
 			if (lvl3 || lvl4) {
-				if ((generic || lvl4)) {
+				if ((generic || lvl4) && valueNewLTV > 0) {
 					row.append(
 							String.format("<br>€ %d (%d%%)", valueNewLTV / 1000, (valuePaidLTV * 100) / (valueNewLTV)));
 				} else {
