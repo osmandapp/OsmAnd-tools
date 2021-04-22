@@ -632,27 +632,26 @@ public class AdminController {
 			if(active > 0) {
 				row.append(active).append("<br>");
 			}
+			boolean lvl1 = (formatVersion & (1 << 1)) > 0;
+			boolean lvl2 = (formatVersion & (1 << 2)) > 0;
+			boolean lvl3 = (formatVersion & (1 << 3)) > 0;
+			boolean lvl4 = (formatVersion & (1 << 4)) > 0;
 			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
-			if ((formatVersion & (1 << 1)) > 0 && (totalEnd + totalOld) > 0) {
+			if (lvl1 && (totalEnd + totalOld) > 0) {
 				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
 						(totalEnd * 100) / (totalEnd + totalOld)));
 			}
-			if ((formatVersion & (1 << 2)) > 0) {
+			if (lvl2) {
 				row.append(String.format("<br><b>€ %d</b>", (valueNew + valueOld) / 1000));
 			}
-			if ((formatVersion & (1 << 3)) > 0) {
-				if (generic) {
-					row.append(String.format("<br>€ %d (%d%%)", valueNewLTV / 1000, 
-							(valuePaidLTV * 100) / (valueNewLTV)));
+			if (lvl3 || lvl4) {
+				if ((generic || lvl4)) {
+					row.append(
+							String.format("<br>€ %d (%d%%)", valueNewLTV / 1000, (valuePaidLTV * 100) / (valueNewLTV)));
 				} else {
 					row.append(String.format("<br>€ %d", valueNewLTV / 1000));
 				}
 			}
-			if ((formatVersion & (1 << 4)) > 0 && valueNewLTV > 0) {
-				row.append(String.format("<br>€ %d %d%%", valuePaidLTV / 1000, 
-						(valuePaidLTV * 100) / (valueNewLTV)));
-			}
-			
 			return row.toString();
 		}
 		
