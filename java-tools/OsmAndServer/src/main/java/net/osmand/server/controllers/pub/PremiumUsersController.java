@@ -59,6 +59,7 @@ public class PremiumUsersController {
 
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
 	private static final long MB = 1024 * 1024;
+	private static final long MAXIMUM_ACCOUNT_SIZE = 200 * MB;
 	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
@@ -229,7 +230,7 @@ public class PremiumUsersController {
 			return tokenNotValid();
 		}
 		UserFilesResults res = generateFiles(dev, null, null, false);
-		if (res.totalZipSize > 300 * MB) {
+		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
 			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
 					"Maximum size of synchronization box exceeds 300 MB. Please contact support in order to investigate possible solutions.");
 		}
@@ -328,6 +329,7 @@ public class PremiumUsersController {
 	private UserFilesResults generateFiles(PremiumUserDevice dev, String name, String type, boolean allVersions) {
 		List<UserFileNoData> fl = filesRepository.listFilesByUserid(dev.userid, name, type);
 		UserFilesResults res = new UserFilesResults();
+		res.maximumAccountSize = MAXIMUM_ACCOUNT_SIZE;
 		res.uniqueFiles = new ArrayList<>();
 		if (allVersions) {
 			res.allFiles = new ArrayList<>();
@@ -363,6 +365,7 @@ public class PremiumUsersController {
 		public List<UserFileNoData> allFiles;
 		public List<UserFileNoData> uniqueFiles;
 		public int deviceid;
+		public long maximumAccountSize;
 		
 	}
 }
