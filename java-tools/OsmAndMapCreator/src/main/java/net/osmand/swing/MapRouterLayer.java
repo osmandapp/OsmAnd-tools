@@ -69,6 +69,7 @@ import net.osmand.Location;
 import net.osmand.LocationsHolder;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -1200,16 +1201,38 @@ public class MapRouterLayer implements MapPanelLayer {
 			int i = s.getStartPointIndex();
 			while (true) {
 				LatLon l = s.getPoint(i);
-				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
+				double lat = l.getLatitude();
+				double lon = l.getLongitude();
+				int[] npt = s.getObject().getPointNameTypes(i);
+				for (int k = 0; npt != null && k < npt.length; k++) {
+					RouteTypeRule rtr = s.getObject().region.quickGetEncodingRule(npt[k]);
+					if (rtr != null && rtr.getTag().equals("osmand_pnt_y")) {
+						lat = MapUtils.get31LatitudeY(Integer.parseInt(s.getObject().getPointNames(i)[k]));
+					} else if (rtr != null && rtr.getTag().equals("osmand_pnt_x")) {
+						lon = MapUtils.get31LongitudeX(Integer.parseInt(s.getObject().getPointNames(i)[k]));
+					}
+				}
+				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(lat, lon, -1);
 				if (prevWayNode != null) {
 					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
-						System.out.println(
-								String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s" ,
-										OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i, s.getObject()));
+						System.out.println(String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s", OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i,
+								s.getObject()));
 					}
 					prevWayNode = null;
 				}
-				way.addNode(n);
+				int[] pointTypes = s.getObject().getPointTypes(i);
+				if (pointTypes != null && pointTypes.length == 1) {
+					RouteTypeRule rtr = s.getObject().region.quickGetEncodingRule(pointTypes[0]);
+					if (rtr != null && rtr.getTag().equals("osmand_dp")) {
+						// TODO VISUAL #2 comment to skip all intermediate added points (should no be visual difference)
+						way.addNode(n);
+					} else {
+						way.addNode(n);
+					}
+
+				} else {
+					way.addNode(n);
+				}
 				if (i == s.getEndPointIndex()) {
 					break;
 				}
@@ -1221,8 +1244,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 			if (way.getNodes().size() > 0) {
 				prevWayNode = way.getNodes().get(way.getNodes().size() - 1);
+				res.add(way);
 			}
-			res.add(way);
 
 		}
 	}
