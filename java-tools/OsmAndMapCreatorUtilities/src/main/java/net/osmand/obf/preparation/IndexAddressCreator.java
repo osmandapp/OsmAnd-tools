@@ -1222,7 +1222,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset, 
 			IndexCreatorSettings settings) {
 		String name = o.getName();
-		name = Abbreviations.replaceAll(name);
 		parsePrefix(name, o, namesIndex, settings);
 		for (String nm : o.getAllNames()) {
 			if (!nm.equals(name)) {
@@ -1254,7 +1253,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<String> namesToAdd = new ArrayList<>();
 		name = Algorithms.normalizeSearchText(name);
 		name = stripBraces(name);
-
 		for (int i = 0; i <= name.length(); i++) {
 			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) && 
 					name.charAt(i) != '\'' && name.charAt(i) != '-')) {
