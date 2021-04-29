@@ -1253,6 +1253,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<String> namesToAdd = new ArrayList<>();
 		name = Algorithms.normalizeSearchText(name);
 		name = stripBraces(name);
+
 		for (int i = 0; i <= name.length(); i++) {
 			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) && 
 					name.charAt(i) != '\'' && name.charAt(i) != '-')) {
