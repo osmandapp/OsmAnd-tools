@@ -217,11 +217,11 @@ public class UserdataController {
 		return ok();
 	}
 	
-	@GetMapping(value = "/delete-file-version")
+	@PostMapping(value = "/delete-file-version")
 	@ResponseBody
 	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
 			@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = false) Long updatetime,
+			@RequestParam(name = "updatetime", required = true) Long updatetime,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
 		UserFile fl = null;
@@ -230,7 +230,7 @@ public class UserdataController {
 			return tokenNotValid();
 		} else {
 			if (updatetime != null) {
-				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,new Date(updatetime));
+				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type, new Date(updatetime));
 			}
 			if (fl == null) {
 				return error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
