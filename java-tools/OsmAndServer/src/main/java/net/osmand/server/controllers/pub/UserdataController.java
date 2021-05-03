@@ -55,7 +55,7 @@ import net.osmand.util.Algorithms;
 
 @RestController
 @RequestMapping("/userdata")
-public class PremiumUsersController {
+public class UserdataController {
 
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
 	private static final long MB = 1024 * 1024;
@@ -69,7 +69,7 @@ public class PremiumUsersController {
 	private static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
 
-	protected static final Log LOG = LogFactory.getLog(PremiumUsersController.class);
+	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
 	Gson gson = new Gson();
 	
@@ -217,6 +217,29 @@ public class PremiumUsersController {
 		return ok();
 	}
 	
+	@GetMapping(value = "/delete-file-version")
+	@ResponseBody
+	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
+			@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "updatetime", required = false) Long updatetime,
+			@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
+		UserFile fl = null;
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return tokenNotValid();
+		} else {
+			if (updatetime != null) {
+				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,new Date(updatetime));
+			}
+			if (fl == null) {
+				return error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+			}
+			filesRepository.delete(fl);
+			return ok();
+		}
+	}
+	
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	@ResponseBody
 	public ResponseEntity<String> upload(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
@@ -270,6 +293,7 @@ public class PremiumUsersController {
 	@ResponseBody
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
 			@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "updatetime", required = false) Long updatetime,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
 		ResponseEntity<String> error = null;
@@ -278,7 +302,11 @@ public class PremiumUsersController {
 		if (dev == null) {
 			error = tokenNotValid();
 		} else {
-			fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+			if (updatetime != null) {
+				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type, new Date(updatetime));
+			} else {
+				fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+			}
 			if (fl == null || fl.data == null) {
 				error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 			}

@@ -24,6 +24,8 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
 	UserFile findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
 	
+	UserFile findTopByUseridAndNameAndTypeAndUpdatetime(int userid, String name, String type, Date updatetime);
+	
     @Entity(name = "UserFile")
     @Table(name = "user_files")
     class UserFile {
