@@ -41,11 +41,11 @@ public class EmailSenderService {
 		Email from = new Email(NOREPLY_MAIL_FROM);
 		from.setName("OsmAnd");
 		Email to = new Email(email);
-		String topic = newUser? "Welcome to OsmAnd Premium" : "Register new device to OsmAnd Premium";
+		String topic = newUser? "Welcome to OsmAnd Cloud" : "Register new device to OsmAnd Cloud";
 		StringBuilder contentStr = new StringBuilder();
 		contentStr.append("Hello OsmAnd User!");
 		contentStr.append("<br><br>");
-		contentStr.append("New device has been connected to OsmAnd Premium. You activation code is <b>"+token+"</b>.<br>");
+		contentStr.append("New device has been connected to OsmAnd Cloud. You activation code is <b>"+token+"</b>.<br>");
 		contentStr.append("You can also use <a href='https://osmand.net/premium/device-registration?token=" + token
 				+ "'>following link<a> to open it with OsmAnd.");
 		contentStr.append("<br><br>");
