@@ -358,7 +358,7 @@ public class ReportsController {
 					rep.balance.defaultFee);
 			return res;
 		}
-		if (rep.walletEstFee > rep.balance.defaultFee) {
+		if (rep.walletEstFee > rep.balance.defaultFee + 2) {
 			res.validationError = String.format(
 					"Wallet estimated fee %d is too high (comparing with set %d), try to put increase max waiting blocks or wait some time",
 					rep.walletEstFee, rep.balance.defaultFee);
