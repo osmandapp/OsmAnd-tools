@@ -1201,18 +1201,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			int i = s.getStartPointIndex();
 			while (true) {
 				LatLon l = s.getPoint(i);
-				double lat = l.getLatitude();
-				double lon = l.getLongitude();
-				int[] npt = s.getObject().getPointNameTypes(i);
-				for (int k = 0; npt != null && k < npt.length; k++) {
-					RouteTypeRule rtr = s.getObject().region.quickGetEncodingRule(npt[k]);
-					if (rtr != null && rtr.getTag().equals("osmand_pnt_y")) {
-						lat = MapUtils.get31LatitudeY(Integer.parseInt(s.getObject().getPointNames(i)[k]));
-					} else if (rtr != null && rtr.getTag().equals("osmand_pnt_x")) {
-						lon = MapUtils.get31LongitudeX(Integer.parseInt(s.getObject().getPointNames(i)[k]));
-					}
-				}
-				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(lat, lon, -1);
+				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				if (prevWayNode != null) {
 					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
 						System.out.println(String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s", OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i,
@@ -1223,13 +1212,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				int[] pointTypes = s.getObject().getPointTypes(i);
 				if (pointTypes != null && pointTypes.length == 1) {
 					RouteTypeRule rtr = s.getObject().region.quickGetEncodingRule(pointTypes[0]);
-					if (rtr != null && rtr.getTag().equals("osmand_dp")) {
-						// TODO VISUAL #2 comment to skip all intermediate added points (should no be visual difference)
-						way.addNode(n);
-					} else {
+					if (rtr == null || !rtr.getTag().equals("osmand_dp")) {
+						// skip all intermediate added points (should no be visual difference)
 						way.addNode(n);
 					}
-
 				} else {
 					way.addNode(n);
 				}
