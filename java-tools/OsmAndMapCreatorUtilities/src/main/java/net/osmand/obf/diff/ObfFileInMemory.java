@@ -266,7 +266,7 @@ public class ObfFileInMemory {
 					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
 							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),
 							route.getColor(), route.getForwardStops(), directGeometry,
-							stringTable, newRoutesIds, route.getSchedule());
+							stringTable, newRoutesIds, route.getSchedule(), route.getTags());
 				}
 				writer.endWriteTransportRoutes();
 			}

@@ -1309,11 +1309,18 @@ public class BinaryInspector {
 		println("\nRoutes:");
 		for(TransportRoute st : rs.values()) {
 			List<String> stopsString = new ArrayList<>();
-			for(TransportStop stop : st.getForwardStops()) {
+			for (TransportStop stop : st.getForwardStops()) {
 				stopsString.add(stop.getName(verbose.lang));
 			}
-			println("  " + st.getRef() + " " + st.getType() + " " + st.getName(verbose.lang) + ": " + stopsString);
-			if(verbose.vtransportschedule) {
+			Map<String, String> tags = st.getTags();
+			StringBuilder tagString = new StringBuilder();
+			if (tags != null) {
+				for (Map.Entry<String, String> tag : tags.entrySet()) {
+					tagString.append(tag.getKey()).append(":").append(tag.getValue()).append(" ");
+				}
+			}
+			println("  " + st.getRef() + " " + st.getType() + " " + st.getName(verbose.lang) + ": " + stopsString + " " + tagString);
+			if (verbose.vtransportschedule) {
 				TransportSchedule sc = st.getSchedule();
 				if (sc != null) {
 					StringBuilder bld = new StringBuilder();
