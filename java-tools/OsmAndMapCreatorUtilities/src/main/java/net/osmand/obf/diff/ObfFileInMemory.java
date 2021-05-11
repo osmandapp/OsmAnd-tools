@@ -23,16 +23,8 @@ import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
-import net.osmand.obf.preparation.AbstractIndexPartCreator;
-import net.osmand.obf.preparation.BinaryFileReference;
-import net.osmand.obf.preparation.BinaryMapIndexWriter;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.obf.preparation.IndexPoiCreator;
-import net.osmand.obf.preparation.IndexRouteCreator;
+import net.osmand.obf.preparation.*;
 import net.osmand.obf.preparation.IndexRouteCreator.RouteWriteContext;
-import net.osmand.obf.preparation.IndexTransportCreator;
-import net.osmand.obf.preparation.IndexVectorMapCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
@@ -266,7 +258,8 @@ public class ObfFileInMemory {
 					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
 							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),
 							route.getColor(), route.getForwardStops(), directGeometry,
-							stringTable, newRoutesIds, route.getSchedule(), route.getTags());
+							stringTable, newRoutesIds, route.getSchedule(),
+							new TransportTags(route.getId(), route.getTags()));
 				}
 				writer.endWriteTransportRoutes();
 			}

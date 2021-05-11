@@ -12,6 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1173,9 +1174,10 @@ public class BinaryMapIndexWriter {
 		log.info("TRANSPORT INDEX SIZE : " + len);
 	}
 
-	public long writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist, String color,
-	                                List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry,
-	                                TransportSchedule schedule, Map<String, String> tags) throws IOException {
+	public long writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator,
+	                                String type, int dist, String color, List<TransportStop> directStops, List<byte[]>
+	                                directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry,
+	                                TransportSchedule schedule, TransportTags tags) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
 		tRoute.setRef(ref);
@@ -1185,9 +1187,20 @@ public class BinaryMapIndexWriter {
 		tRoute.setName(registerString(stringTable, routeName));
 		tRoute.setDistance(dist);
 		tRoute.setColor(registerString(stringTable, color));
-		if (tags != null) {
-			for (Map.Entry<String, String> tag : tags.entrySet()) {
-				tRoute.addAttributeTagIds(registerString(stringTable, tag.getKey() + "~" + tag.getValue()));
+		if (tags != null && tags.get(idRoute) != null) {
+			TByteArrayList buf = new TByteArrayList();
+			for (Map.Entry<String, String> tag : tags.get(idRoute).entrySet()) {
+				if (tags.getCount(tag.getKey()) > 3) {
+					tRoute.addAttributeTagIds(registerString(stringTable, tag.getKey() + "/" + tag.getValue()));
+				} else {
+					buf.clear();
+					int keyId = registerString(stringTable, tag.getKey());
+					writeRawVarint32(buf, keyId);
+					for (byte rawByte : tag.getValue().getBytes(StandardCharsets.UTF_8)) {
+						writeRawVarint32(buf, rawByte);
+					}
+					tRoute.addAttributeTextTagValues(ByteString.copyFrom(buf.toArray()));
+				}
 			}
 		}
 		if (routeEnName != null) {
