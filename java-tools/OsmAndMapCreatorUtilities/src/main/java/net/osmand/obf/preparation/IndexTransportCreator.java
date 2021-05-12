@@ -84,7 +84,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	// now we need only specific names of stops and platforms
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
 	private Map<EntityId, List<TransportStopExit>> exits = new HashMap<EntityId, List<TransportStopExit>>();
-	private final TransportTags tags = new TransportTags();
+	private final TransportTags filteredTags = new TransportTags();
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
@@ -621,7 +621,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 				TransportSchedule schedule = readSchedule(ref, directStops);
 				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
-						directGeometry, stringTable, transportRoutes, schedule, tags);
+						directGeometry, stringTable, transportRoutes, schedule, filteredTags);
 				if (isRouteIncomplete(idRoute)) {
 					incompleteRoutesMap.get(idRoute).setFileOffset((int) ptr);
 				}
@@ -770,7 +770,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
-		tags.putFilteredTags(rel,directRoute.getId());
+		filteredTags.putFilteredTags(rel, directRoute.getId());
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
@@ -807,7 +807,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
-				tags.putFilteredTags(rel,backwardRoute.getId());
+				filteredTags.putFilteredTags(rel, backwardRoute.getId());
 			}
 		}
 	}

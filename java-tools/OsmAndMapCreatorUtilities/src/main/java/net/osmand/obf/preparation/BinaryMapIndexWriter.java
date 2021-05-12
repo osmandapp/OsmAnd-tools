@@ -1197,7 +1197,7 @@ public class BinaryMapIndexWriter {
 					int keyId = registerString(stringTable, tag.getKey());
 					writeRawVarint32(buf, keyId);
 					for (byte rawByte : tag.getValue().getBytes(StandardCharsets.UTF_8)) {
-						writeRawVarint32(buf, rawByte);
+						writeRawByte(buf, rawByte);
 					}
 					tRoute.addAttributeTextTagValues(ByteString.copyFrom(buf.toArray()));
 				}
