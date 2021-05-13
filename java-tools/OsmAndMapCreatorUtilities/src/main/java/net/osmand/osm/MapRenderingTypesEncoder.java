@@ -321,6 +321,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformChargingTags(tags, entity);
 		tags = transformOsmcAndColorTags(tags);
 		tags = transformAddMultipleNetwoksTag(tags);
+        tags = transformRouteLimitationTags(tags);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if (listToConvert == null) {
@@ -574,6 +575,35 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformRouteRoadTags(tags);
 		return tags;
 	}
+
+    public Map<String, String> transformRouteLimitationTags(Map<String, String> tags) {
+        String[] validatedTags = {"length", "maxspeed", "weight", "speed"};
+        for (Entry<String, String> e : tags.entrySet()) {
+            String val = e.getValue();
+            String key = e.getKey();
+
+            for (String valTag : validatedTags) {
+                if (key.startsWith(valTag)) {
+                    int i = Algorithms.findFirstNumberEndIndexLegacy(val);
+                    if (i > 0) {
+                        try {
+                            Float.parseFloat(val.substring(0, i));
+                        } catch (Exception es) {
+                            tags = new LinkedHashMap<>(tags);
+                            int ik = Algorithms.findFirstNumberEndIndex(val);
+                            String ending = "";
+                            if (val.indexOf(' ') != -1) {
+                                ending = val.substring(val.indexOf(' '));
+                            }
+                            float f = Float.parseFloat(val.substring(0, ik));
+                            tags.put(key, f + ending);
+                        }
+                    }
+                }
+            }
+        }
+        return tags;
+    }
 
 	protected MapRulType getRuleType(String tag, String val, EntityConvertApplyType appType) {
 		return getRuleType(tag, val, appType == EntityConvertApplyType.POI, appType != EntityConvertApplyType.POI);
