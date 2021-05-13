@@ -321,7 +321,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformChargingTags(tags, entity);
 		tags = transformOsmcAndColorTags(tags);
 		tags = transformAddMultipleNetwoksTag(tags);
-        tags = transformRouteLimitationTags(tags);
+		tags = transformRouteLimitationTags(tags);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if (listToConvert == null) {
