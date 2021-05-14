@@ -588,16 +588,21 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
                     if (i > 0) {
                         try {
                             Float.parseFloat(val.substring(0, i));
-                        } catch (Exception es) {
-                            tags = new LinkedHashMap<>(tags);
-                            int ik = Algorithms.findFirstNumberEndIndex(val);
-                            String ending = "";
-                            if (val.indexOf(' ') != -1) {
-                                ending = val.substring(val.indexOf(' '));
-                            }
-                            float f = Float.parseFloat(val.substring(0, ik));
-                            tags.put(key, f + ending);
-                        }
+						} catch (Exception es) {
+							System.err.println(String.format("! Error parsing float number %s", val));
+							tags = new LinkedHashMap<>(tags);
+							int ik = Algorithms.findFirstNumberEndIndex(val);
+							String ending = "";
+							if (val.indexOf(' ') != -1) {
+								ending = val.substring(val.indexOf(' '));
+							}
+							float f = 0;
+							if (ik >= 0) {
+								f = Float.parseFloat(val.substring(0, ik));
+							}
+							System.err.println(String.format("! Parsed number -> '%s' ", f + ending));
+							tags.put(key, f + ending);
+						}
                     }
                 }
             }
