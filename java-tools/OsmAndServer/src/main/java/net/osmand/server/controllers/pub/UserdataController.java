@@ -216,7 +216,8 @@ public class UserdataController {
 		usf.userid = dev.userid;
 		usf.deviceid = deviceId;
 		usf.data = null;
-		usf.filesize = -1;
+		usf.filesize = -1l;
+		usf.zipfilesize = -1l;
 		if (clienttime != null) {
 			usf.clienttime = new Date(clienttime.longValue());
 		}
@@ -242,6 +243,7 @@ public class UserdataController {
 			if (fl == null) {
 				return error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 			}
+			storageService.deleteFile(fl.storage, userFolder(fl), storageFileName(fl));
 			filesRepository.delete(fl);
 			return ok();
 		}
@@ -265,7 +267,8 @@ public class UserdataController {
 					"Maximum size of synchronization box exceeds 300 MB. Please contact support in order to investigate possible solutions.");
 		}
 		UserFile usf = new PremiumUserFilesRepository.UserFile();
-		int cnt, sum;
+		long cnt, sum;
+		long zipsize = file.getSize();
 		try {
 			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
 			byte[] buf = new byte[1024];
@@ -282,19 +285,31 @@ public class UserdataController {
 		usf.userid = dev.userid;
 		usf.deviceid = deviceId;
 		usf.filesize = sum;
+		usf.zipfilesize = zipsize;
 		if (clienttime != null) {
 			usf.clienttime = new Date(clienttime.longValue());
 		}
 //		Session session = entityManager.unwrap(Session.class);
 //	    Blob blob = session.getLobHelper().createBlob(file.getInputStream(), file.getSize());
 //		usf.data = blob;
-		usf.storage = storageService.save(USER_FOLDER_PREFIX + usf.userid, usf.name + FILE_NAME_SUFFIX, file);
+		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
 		if (storageService.storeLocally()) {
 			usf.data = file.getBytes();
 		}
 		filesRepository.saveAndFlush(usf);
 		
 		return ok();
+	}
+
+
+	private String storageFileName(UserFile usf) {
+		return usf.type + "/" + usf.updatetime.getTime() + "-" + usf.name + FILE_NAME_SUFFIX;
+//		return usf.name + FILE_NAME_SUFFIX;
+	}
+
+
+	private String userFolder(UserFile usf) {
+		return USER_FOLDER_PREFIX + usf.userid;
 	}
 	
 
@@ -321,7 +336,7 @@ public class UserdataController {
 			if (fl == null) {
 				error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 			} else if (fl.data == null) {
-				bin = storageService.getFileInputStream(fl.storage, USER_FOLDER_PREFIX + fl.userid, fl.name + FILE_NAME_SUFFIX);
+				bin = storageService.getFileInputStream(fl.storage, userFolder(fl), storageFileName(fl));
 				if (bin == null) {
 					error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 				}

@@ -132,7 +132,7 @@ public class StorageService {
 	}
 	
 	public InputStream getFileInputStream(String storage, String fld, String filename) {
-		if (storage != null) {
+		if (!Algorithms.isEmpty(storage)) {
 			for (String id : storage.split(",")) {
 				StorageType st = getStorageProviderById(id);
 				if (st != null && !st.local) {
@@ -142,6 +142,17 @@ public class StorageService {
 			}
 		}
 		return null;
+	}
+	
+	public void deleteFile(String storage, String fld, String filename) {
+		if (!Algorithms.isEmpty(storage)) {
+			for (String id : storage.split(",")) {
+				StorageType st = getStorageProviderById(id);
+				if (st != null && !st.local) {
+					st.s3Conn.deleteObject(st.bucket, fld + FILE_SEPARATOR + filename);
+				}
+			}
+		}
 	}
 
 	static class StorageType {

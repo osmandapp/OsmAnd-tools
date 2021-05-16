@@ -47,7 +47,10 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public String name;
 
         @Column(name = "filesize")
-        public int filesize;
+        public Long filesize;
+        
+        @Column(name = "zipfilesize")
+        public Long zipfilesize;
         
         @Column(name = "updatetime")
         @Temporal(TemporalType.TIMESTAMP)
@@ -70,7 +73,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
     
     // COALESCE(length(u.data), -1))
-	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData(u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, length(u.data) ) "
+	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData(u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
 			+ " order by updatetime desc")
@@ -81,14 +84,14 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 		public int userid;
 		public long id;
         public int deviceid;
-        public int filesize;
+        public long filesize;
         public String type;
         public String name;
         public Date updatetime;
         public long updatetimems;
         public Date clienttime;
         public long clienttimems;
-		public int zipSize;
+		public long zipSize;
 		
 		public UserFileNoData(UserFile c) {
 			this.userid = c.userid;
@@ -97,7 +100,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.type = c.type;
 			this.name = c.name;
 			this.filesize = c.filesize ;
-			this.zipSize = c.data == null ? 0 : c.data.length;
+			this.zipSize = c.zipfilesize;
 			this.updatetime = c.updatetime;
 			this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
 			this.clienttime = c.clienttime;
@@ -105,14 +108,14 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 		}
 		
 		
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, Date clienttime, Integer filesize, Integer zipSize) {
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, Date clienttime, Long filesize, Long zipSize) {
 			this.userid = userid;
 			this.id = id;
 			this.deviceid = deviceid;
 			this.type = type;
 			this.name = name;
-			this.filesize = filesize == null ? 0 : filesize.intValue();
-			this.zipSize = zipSize == null ? 0 : zipSize.intValue();
+			this.filesize = filesize == null ? 0 : filesize.longValue();
+			this.zipSize = zipSize == null ? 0 : zipSize.longValue();
 			this.updatetime = updatetime;
 			this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
 			this.clienttime = clienttime;
