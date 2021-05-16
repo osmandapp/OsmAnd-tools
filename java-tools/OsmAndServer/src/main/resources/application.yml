@@ -15,13 +15,24 @@ google:
 
 
 admin.emails: ${ADMIN_EMAILS:victor.shcherb@gmail.com}
-      
+
+
+# local storage to store files in db
+storage:
+  default: ${STORAGE_DEFAULT:local} 
+  datasource.s3:
+      type: s3
+      endpoint: ${STORAGE_S3_ENDPOINT_URL}
+      region: ${STORAGE_S3_REGION}
+      bucket: ${STORAGE_S3_BUCKET}
+      accesskey: ${STORAGE_S3_ACCESS_KEY:}
+      secretkey: ${STORAGE_S3_SECRET_KEY:}
 
 logging:
   file: logs/server.log
   config: classpath:logback-spring.xml
   pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{4}"
-  
+
 
 server:
   port: 8080

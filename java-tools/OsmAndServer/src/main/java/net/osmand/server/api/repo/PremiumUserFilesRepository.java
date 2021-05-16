@@ -57,6 +57,9 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Temporal(TemporalType.TIMESTAMP)
         public Date clienttime;
         
+        @Column(name = "storage")
+        public String storage;
+        
 //      @Fetch(FetchMode.JOIN)
         @Column(name = "data", columnDefinition="bytea")
         public byte[] data;

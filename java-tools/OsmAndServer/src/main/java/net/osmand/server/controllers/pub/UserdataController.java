@@ -51,13 +51,17 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.EmailSenderService;
+import net.osmand.server.api.services.StorageService;
 import net.osmand.util.Algorithms;
 
 @RestController
 @RequestMapping("/userdata")
 public class UserdataController {
 
+	private static final String USER_FOLDER_PREFIX = "user-";
+	private static final String FILE_NAME_SUFFIX = ".gz";
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
+	private static final int BUFFER_SIZE = 1024 * 512;
 	private static final long MB = 1024 * 1024;
 	private static final long MAXIMUM_ACCOUNT_SIZE = 200 * MB;
 	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
@@ -84,6 +88,9 @@ public class UserdataController {
     
     @Autowired
     protected PremiumUserDevicesRepository devicesRepository;
+    
+    @Autowired
+    protected StorageService storageService;
     
     @Autowired
 	EmailSenderService emailSender;
@@ -263,7 +270,7 @@ public class UserdataController {
 			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
 			byte[] buf = new byte[1024];
 			sum = 0;
-			while((cnt =gzis.read(buf)) >= 0 ) {
+			while ((cnt = gzis.read(buf)) >= 0) {
 				sum += cnt;
 			}
 		} catch (IOException e) {
@@ -281,9 +288,12 @@ public class UserdataController {
 //		Session session = entityManager.unwrap(Session.class);
 //	    Blob blob = session.getLobHelper().createBlob(file.getInputStream(), file.getSize());
 //		usf.data = blob;
-		 
-		usf.data = file.getBytes();
+		usf.storage = storageService.save(USER_FOLDER_PREFIX + usf.userid, usf.name + FILE_NAME_SUFFIX, file);
+		if (storageService.storeLocally()) {
+			usf.data = file.getBytes();
+		}
 		filesRepository.saveAndFlush(usf);
+		
 		return ok();
 	}
 	
@@ -299,6 +309,7 @@ public class UserdataController {
 		ResponseEntity<String> error = null;
 		UserFile fl = null;
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		InputStream bin = null; 
 		if (dev == null) {
 			error = tokenNotValid();
 		} else {
@@ -307,10 +318,18 @@ public class UserdataController {
 			} else {
 				fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
 			}
-			if (fl == null || fl.data == null) {
+			if (fl == null) {
 				error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+			} else if (fl.data == null) {
+				bin = storageService.getFileInputStream(fl.storage, USER_FOLDER_PREFIX + fl.userid, fl.name + FILE_NAME_SUFFIX);
+				if (bin == null) {
+					error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				}
+			} else {
+				bin = new ByteArrayInputStream(fl.data);	
 			}
 		}
+		
 		if (error != null) {
 			response.setStatus(error.getStatusCodeValue());
 			response.getWriter().write(error.getBody());
@@ -318,7 +337,7 @@ public class UserdataController {
 		}
 		response.setHeader("Content-Disposition", "attachment; filename=" + fl.name);
 		// InputStream bin = fl.data.getBinaryStream();
-		InputStream bin = new ByteArrayInputStream(fl.data);
+		
 		String acceptEncoding = request.getHeader("Accept-Encoding");
 		if (acceptEncoding != null && acceptEncoding.contains("gzip")) {
 			response.setHeader("Content-Encoding", "gzip");
@@ -326,7 +345,7 @@ public class UserdataController {
 			bin = new GZIPInputStream(bin);
 		}
 		response.setContentType(APPLICATION_OCTET_STREAM.getType());
-		byte[] buf = new byte[1024];
+		byte[] buf = new byte[BUFFER_SIZE];
 		int r;
 		while ((r = bin.read(buf)) != -1) {
 			response.getOutputStream().write(buf, 0, r);

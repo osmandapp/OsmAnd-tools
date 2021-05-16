@@ -1,53 +1,53 @@
 buildscript {
 
-    repositories {
-        mavenCentral()
-        jcenter()
-    }
+	repositories {
+		mavenCentral()
+		jcenter()
+	}
 }
 
 subprojects {
-	
+
 	apply plugin: 'java'
-    apply plugin: 'eclipse'
-    apply plugin: 'idea'
+	apply plugin: 'eclipse'
+	apply plugin: 'idea'
 
 
 	group 'net.osmand'
 	version '1.0'
 	sourceCompatibility = 1.8
-    
-    test {
-        reports {
-            junitXml.enabled = true
-            html.enabled = false
-        }               
-    }
 
-    task fatJar(type: Jar) {
-        
-        manifest.from jar.manifest
-        dependsOn configurations.runtimeClasspath
-        if(project.hasProperty('mainClassAttribute')) {
-            manifest.attributes 'Main-Class': project.getProperty('mainClassAttribute');
-        }
-        archiveName "${project.name}.jar"
-        from {
-            configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-        } 
-        {
-            exclude "META-INF/*.SF"
-            exclude "META-INF/*.DSA"
-            exclude "META-INF/*.RSA"
-        }
-        with jar
-    }
+	test {
+		reports {
+			junitXml.enabled = true
+			html.enabled = false
+		}
+	}
 
-	
-    repositories {
-        mavenCentral()
-        jcenter()
-        google()
-        
-    }
+	task fatJar(type: Jar) {
+		
+		manifest.from jar.manifest
+		dependsOn configurations.runtimeClasspath
+		if(project.hasProperty('mainClassAttribute')) {
+			manifest.attributes 'Main-Class': project.getProperty('mainClassAttribute');
+		}
+		archiveName "${project.name}.jar"
+		from {
+			configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+		} 
+		{
+			exclude "META-INF/*.SF"
+			exclude "META-INF/*.DSA"
+			exclude "META-INF/*.RSA"
+		}
+		with jar
+	}
+
+
+	repositories {
+		mavenCentral()
+		jcenter()
+		google()
+		
+	}
 }

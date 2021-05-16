@@ -10,7 +10,6 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.gmail.GmailScopes;
 import com.google.api.services.gmail.model.*;
@@ -260,8 +259,7 @@ public class ExceptionAnalyzerMain {
 								String attId = part.getBody().getAttachmentId();
 								MessagePartBody attachPart = service.users().messages().attachments()
 										.get(userId, messageId, attId).execute();
-								Base64 base64Url = new Base64(true);
-								byte[] fileByteArray = base64Url.decodeBase64(attachPart.getData());
+								byte[] fileByteArray = Base64.getDecoder().decode(attachPart.getData());
 								if (!FOLDER_WITH_LOGS.exists()) {
 									FOLDER_WITH_LOGS.mkdirs();
 								}

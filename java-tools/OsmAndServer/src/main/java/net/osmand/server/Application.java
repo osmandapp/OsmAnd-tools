@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.telegram.telegrambots.ApiContextInitializer;
 
+import net.osmand.server.api.services.StorageService;
+
 @SpringBootApplication
 @EnableScheduling
 @EnableJpaAuditing
@@ -20,6 +22,8 @@ public class Application  {
 	@Autowired
 	TelegramBotManager telegram;
 	
+	@Autowired 
+	StorageService storageService;
 	
 	public static void main(String[] args) {
 		System.setProperty("spring.devtools.restart.enabled", "false");
