@@ -332,6 +332,7 @@ public class UserdataController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
+		// remap needs to happen to all users & temporarily service should find files by both names (download)
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
 			if (fl != null && fl.filesize > 0) {
