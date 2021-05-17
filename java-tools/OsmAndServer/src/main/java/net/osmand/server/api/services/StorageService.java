@@ -131,14 +131,14 @@ public class StorageService {
 	
 	public void remapFileNames(String storage, String userFolder, String oldStorageFileName, String newStorageFileName) {
 		if (!Algorithms.isEmpty(storage) && !newStorageFileName.trim().equals(oldStorageFileName.trim())) {
+			String oldKey = userFolder + FILE_SEPARATOR + oldStorageFileName;
+			String newKey = userFolder + FILE_SEPARATOR + newStorageFileName;
 			for (String id : storage.split(",")) {
 				StorageType toStore = getStorageProviderById(id);
-				if (toStore != null && !toStore.local) {
-					CopyObjectResult res = toStore.s3Conn.copyObject(toStore.bucket,
-							userFolder + FILE_SEPARATOR + oldStorageFileName, toStore.bucket,
-							userFolder + FILE_SEPARATOR + newStorageFileName);
+				if (toStore != null && !toStore.local && toStore.s3Conn.doesObjectExist(toStore.bucket, oldKey)) {
+					CopyObjectResult res = toStore.s3Conn.copyObject(toStore.bucket, oldKey, toStore.bucket, newKey);
 					if (res.getLastModifiedDate() != null) {
-						toStore.s3Conn.deleteObject(toStore.bucket, userFolder + FILE_SEPARATOR + oldStorageFileName);
+						toStore.s3Conn.deleteObject(toStore.bucket, oldKey);
 					}
 				}
 			}
