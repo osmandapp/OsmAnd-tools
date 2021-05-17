@@ -72,6 +72,7 @@ public class StorageService {
 	}
 
 	public boolean hasStorageProviderById(String id) {
+		getAndInitDefaultStorageProviders();
 		return getStorageProviderById(id) != null;
 	}
 	

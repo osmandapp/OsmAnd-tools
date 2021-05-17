@@ -317,7 +317,7 @@ public class UserdataController {
 	public ResponseEntity<String> migrateData(@RequestParam(name = "storageid", required = true) String storageId,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
-		if (storageService.hasStorageProviderById(storageId)) {
+		if (!storageService.hasStorageProviderById(storageId)) {
 			return error(400, "Storage id is not configured");
 		}
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
