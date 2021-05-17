@@ -25,6 +25,7 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
@@ -128,6 +129,22 @@ public class StorageService {
 		return false;
 	}
 	
+	public void remapFileNames(String storage, String userFolder, String oldStorageFileName, String newStorageFileName) {
+		if (!Algorithms.isEmpty(storage) && !newStorageFileName.trim().equals(oldStorageFileName.trim())) {
+			for (String id : storage.split(",")) {
+				StorageType toStore = getStorageProviderById(id);
+				if (toStore != null && !toStore.local) {
+					CopyObjectResult res = toStore.s3Conn.copyObject(toStore.bucket,
+							userFolder + FILE_SEPARATOR + oldStorageFileName, toStore.bucket,
+							userFolder + FILE_SEPARATOR + newStorageFileName);
+					if (res.getLastModifiedDate() != null) {
+						toStore.s3Conn.deleteObject(toStore.bucket, userFolder + FILE_SEPARATOR + oldStorageFileName);
+					}
+				}
+			}
+		}
+	}
+	
 	public String backupData(String storageId, String fld, String storageFileName, String storage, byte[] data) throws IOException {
 		if (!Algorithms.isEmpty(storage)) {
 			for (String id : storage.split(",")) {
@@ -208,6 +225,7 @@ public class StorageService {
 		String bucket;
 		boolean local;
 	}
+
 
 
 

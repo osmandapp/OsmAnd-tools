@@ -301,15 +301,44 @@ public class UserdataController {
 		return ok();
 	}
 
+	private String oldStorageFileName(UserFile usf) {
+		String fldName = usf.type;
+		String name = usf.name;
+		return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
+	}
 
 	private String storageFileName(UserFile usf) {
-		return usf.type + "/" + usf.updatetime.getTime() + "-" + usf.name + FILE_NAME_SUFFIX;
+		String fldName = usf.type;
+		String name = usf.name;
+		if (name.indexOf('/') != -1) {
+			int nt = name.lastIndexOf('/');
+			fldName += "/" + name.substring(0, nt);
+			name = name.substring(nt + 1);
+		}
+		return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
 //		return usf.name + FILE_NAME_SUFFIX;
 	}
 
 
 	private String userFolder(UserFile usf) {
 		return USER_FOLDER_PREFIX + usf.userid;
+	}
+	
+	@PostMapping(value = "/remap-filenames")
+	@ResponseBody
+	public ResponseEntity<String> remapFilenames(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
+		for (UserFile fl : lst) {
+			if (fl != null && fl.filesize > 0) {
+				storageService.remapFileNames(fl.storage, userFolder(fl), oldStorageFileName(fl), storageFileName(fl));
+			}
+		}
+		return ok();
 	}
 	
 	@PostMapping(value = "/backup-storage")
