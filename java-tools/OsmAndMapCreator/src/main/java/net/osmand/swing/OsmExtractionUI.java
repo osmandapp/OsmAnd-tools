@@ -112,7 +112,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		// first of all config log
 		//System.out.println(System.getProperty("sun.arch.data.model"));
 		configLogFile();
-
+		SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES = true;
 		final UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
 		Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler(){
 			@Override
