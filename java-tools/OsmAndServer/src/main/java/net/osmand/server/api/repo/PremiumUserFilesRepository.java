@@ -26,6 +26,8 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
 	UserFile findTopByUseridAndNameAndTypeAndUpdatetime(int userid, String name, String type, Date updatetime);
 	
+	Iterable<UserFile> findAllByUserid(int userid);
+	
     @Entity(name = "UserFile")
     @Table(name = "user_files")
     class UserFile {

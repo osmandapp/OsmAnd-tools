@@ -312,7 +312,31 @@ public class UserdataController {
 		return USER_FOLDER_PREFIX + usf.userid;
 	}
 	
-
+	@PostMapping(value = "/backup-storage")
+	@ResponseBody
+	public ResponseEntity<String> migrateData(@RequestParam(name = "storageid", required = true) String storageId,
+			@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
+		if (storageService.hasStorageProviderById(storageId)) {
+			return error(400, "Storage id is not configured");
+		}
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
+		for (UserFile fl : lst) {
+			if (fl != null && fl.filesize > 0) {
+				String newStorage = storageService.backupData(storageId, userFolder(fl), storageFileName(fl), fl.storage, fl.data);
+				if (newStorage != null) {
+					fl.storage = newStorage;
+					filesRepository.save(fl);
+				}
+			}
+		}
+		return ok();
+	}
+	
 	
 	@GetMapping(value = "/download-file")
 	@ResponseBody
@@ -324,46 +348,53 @@ public class UserdataController {
 		ResponseEntity<String> error = null;
 		UserFile fl = null;
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
-		InputStream bin = null; 
-		if (dev == null) {
-			error = tokenNotValid();
-		} else {
-			if (updatetime != null) {
-				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type, new Date(updatetime));
+		InputStream bin = null;
+		try {
+			if (dev == null) {
+				error = tokenNotValid();
 			} else {
-				fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
-			}
-			if (fl == null) {
-				error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-			} else if (fl.data == null) {
-				bin = storageService.getFileInputStream(fl.storage, userFolder(fl), storageFileName(fl));
-				if (bin == null) {
-					error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				if (updatetime != null) {
+					fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
+							new Date(updatetime));
+				} else {
+					fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
 				}
-			} else {
-				bin = new ByteArrayInputStream(fl.data);	
+				if (fl == null) {
+					error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				} else if (fl.data == null) {
+					bin = storageService.getFileInputStream(fl.storage, userFolder(fl), storageFileName(fl));
+					if (bin == null) {
+						error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+					}
+				} else {
+					bin = new ByteArrayInputStream(fl.data);
+				}
 			}
-		}
-		
-		if (error != null) {
-			response.setStatus(error.getStatusCodeValue());
-			response.getWriter().write(error.getBody());
-			return;
-		}
-		response.setHeader("Content-Disposition", "attachment; filename=" + fl.name);
-		// InputStream bin = fl.data.getBinaryStream();
-		
-		String acceptEncoding = request.getHeader("Accept-Encoding");
-		if (acceptEncoding != null && acceptEncoding.contains("gzip")) {
-			response.setHeader("Content-Encoding", "gzip");
-		} else {
-			bin = new GZIPInputStream(bin);
-		}
-		response.setContentType(APPLICATION_OCTET_STREAM.getType());
-		byte[] buf = new byte[BUFFER_SIZE];
-		int r;
-		while ((r = bin.read(buf)) != -1) {
-			response.getOutputStream().write(buf, 0, r);
+
+			if (error != null) {
+				response.setStatus(error.getStatusCodeValue());
+				response.getWriter().write(error.getBody());
+				return;
+			}
+			response.setHeader("Content-Disposition", "attachment; filename=" + fl.name);
+			// InputStream bin = fl.data.getBinaryStream();
+
+			String acceptEncoding = request.getHeader("Accept-Encoding");
+			if (acceptEncoding != null && acceptEncoding.contains("gzip")) {
+				response.setHeader("Content-Encoding", "gzip");
+			} else {
+				bin = new GZIPInputStream(bin);
+			}
+			response.setContentType(APPLICATION_OCTET_STREAM.getType());
+			byte[] buf = new byte[BUFFER_SIZE];
+			int r;
+			while ((r = bin.read(buf)) != -1) {
+				response.getOutputStream().write(buf, 0, r);
+			}
+		} finally {
+			if (bin != null) {
+				bin.close();
+			}
 		}
 	}
 

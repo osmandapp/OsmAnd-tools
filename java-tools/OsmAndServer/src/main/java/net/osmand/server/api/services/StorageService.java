@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -70,6 +71,10 @@ public class StorageService {
 		return defaultStorageProviders;
 	}
 
+	public boolean hasStorageProviderById(String id) {
+		return getStorageProviderById(id) != null;
+	}
+	
 	private StorageType getStorageProviderById(String id) {
 		id = id.trim();
 		StorageType st = storageProviders.get(id);
@@ -105,8 +110,9 @@ public class StorageService {
 	}
 
 	private void checkNotNull(String vl, String name, String id) {
-		if(Algorithms.isEmpty(vl)) {
-			String msg = String.format("For storage configuration '%s' %s was not specified in application properties", id, name);
+		if (Algorithms.isEmpty(vl)) {
+			String msg = String.format("For storage configuration '%s' %s was not specified in application properties",
+					id, name);
 			LOGGER.warn(msg);
 			throw new IllegalArgumentException(msg);
 		}
@@ -120,15 +126,56 @@ public class StorageService {
 		}
 		return false;
 	}
+	
+	public String backupData(String storageId, String fld, String storageFileName, String storage, byte[] data) throws IOException {
+		if (!Algorithms.isEmpty(storage)) {
+			for (String id : storage.split(",")) {
+				if (storageId.equals(id)) {
+					// already stored
+					return null;
+				}
+			}
+		}
+		StorageType toStore = getStorageProviderById(storageId);
+		InputStream is = null;
+		if (data != null && data.length > 0) {
+			is = new ByteArrayInputStream(data);
+		}
+		if (!Algorithms.isEmpty(storage) && is == null) {
+			for (String id : storage.split(",")) {
+				if (!storageId.equals(id)) {
+					is = getFileInputStream(id, fld, storageFileName);
+					if (is != null) {
+						break;
+					}
+				}
+			}
+		}
+		if(is == null) {
+			throw new IllegalStateException(String.format("Impossible to retrieve file %s/%s", fld, storageFileName));
+		}
+		saveFile(fld, storageFileName, toStore, is);
+		is.close();
+		String nstorage = storage == null ? LOCAL_STORAGE : storage;
+		nstorage += "," + storageId;
+		return nstorage; 
+	}
+
 
 	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
 		for (StorageType s : getAndInitDefaultStorageProviders()) {
-			if (!s.local) {
-				ObjectMetadata om = new ObjectMetadata();
-				s.s3Conn.putObject(s.bucket, fld + FILE_SEPARATOR + fileName, file.getInputStream(), om);
-			}
+			InputStream is = file.getInputStream();
+			saveFile(fld, fileName, s, is);
+			is.close();
 		}		
 		return defaultStorage;
+	}
+
+	private void saveFile(String fld, String fileName, StorageType s, InputStream is) {
+		if (!s.local) {
+			ObjectMetadata om = new ObjectMetadata();
+			s.s3Conn.putObject(s.bucket, fld + FILE_SEPARATOR + fileName, is, om);
+		}
 	}
 	
 	public InputStream getFileInputStream(String storage, String fld, String filename) {
@@ -161,6 +208,6 @@ public class StorageService {
 		boolean local;
 	}
 
-	
+
 
 }
