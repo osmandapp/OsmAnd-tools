@@ -1189,12 +1189,12 @@ public class BinaryMapIndexWriter {
 		tRoute.setColor(registerString(stringTable, color));
 		if (tags != null && tags.get(idRoute) != null) {
 			TByteArrayList buf = new TByteArrayList();
-			for (Map.Entry<String, String> tag : tags.get(idRoute).entrySet()) {
-				if (tags.getCount(tag.getKey()) > 3) {
-					tRoute.addAttributeTagIds(registerString(stringTable, tag.getKey() + "/" + tag.getValue()));
+			for (TransportTags.TransportTagValue tag : tags.get(idRoute)) {
+				if (tag.isPopular()) {
+					tRoute.addAttributeTagIds(registerString(stringTable, tag.getKey()));
 				} else {
 					buf.clear();
-					int keyId = registerString(stringTable, tag.getKey());
+					int keyId = registerString(stringTable, tag.getTag());
 					writeRawVarint32(buf, keyId);
 					for (byte rawByte : tag.getValue().getBytes(StandardCharsets.UTF_8)) {
 						writeRawByte(buf, rawByte);

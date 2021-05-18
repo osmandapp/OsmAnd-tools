@@ -2,15 +2,13 @@ package net.osmand.obf.preparation;
 
 import net.osmand.osm.edit.Relation;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class TransportTags {
-	private final Map<Long, Map<String, String>> tags = new HashMap<>();
+	public static final int POPULARITY_THRESHOLD = 3;
+	private final Map<Long, List<TransportTagValue>> tags = new HashMap<>();
+	List<TransportTagValue> allTags = new ArrayList<>();
 	private static final Set<String> tagsFilter = new HashSet<>();
-	private static final Map<String, Integer> tagsCount = new HashMap<>();
 
 	static {
 		tagsFilter.add("interval");
@@ -18,25 +16,31 @@ public class TransportTags {
 		tagsFilter.add("duration");
 	}
 
-	public TransportTags() {
-	}
-
-	public TransportTags(Long routeId, Map<String, String> transportTags) {
+	public void add(Long routeId, List<TransportTagValue> transportTags) {
 		tags.put(routeId, transportTags);
 	}
 
-	public Map<String, String> get(long idRoute) {
+	public List<TransportTagValue> get(long idRoute) {
 		return tags.get(idRoute);
 	}
 
 	public void putFilteredTags(Relation rel, long routeId) {
-		Map<String, String> filteredTags = new HashMap<>();
 		Map<String, String> relTags = rel.getTags();
+		putFilteredTags(routeId, relTags);
+	}
+
+	public void putFilteredTags(long routeId, Map<String, String> relTags) {
+		List<TransportTagValue> filteredTags = new ArrayList<>();
 		for (String tagKey : relTags.keySet()) {
 			for (String neededTag : tagsFilter) {
 				if (tagKey.startsWith(neededTag)) {
-					filteredTags.put(tagKey, relTags.get(tagKey));
-					tagsCount.put(tagKey, tagsCount.getOrDefault(tagKey, 0) + 1);
+					TransportTagValue tagValue = new TransportTagValue(tagKey, relTags.get(tagKey));
+					if (allTags.contains(tagValue)) {
+						allTags.get(allTags.indexOf(tagValue)).count++;
+					} else {
+						allTags.add(tagValue);
+					}
+					filteredTags.add(allTags.get(allTags.indexOf(tagValue)));
 					break;
 				}
 			}
@@ -46,7 +50,62 @@ public class TransportTags {
 		}
 	}
 
-	int getCount(String tag) {
-		return tagsCount.get(tag);
+
+	public static class TransportTagValue {
+		int id;
+		String tag;
+		String value;
+		String key; // tag+'/'+value
+		int count;
+
+		public TransportTagValue(String tag, String value) {
+			this.tag = tag;
+			this.value = value;
+			key = tag + "/" + value;
+		}
+
+		public boolean isPopular() {
+			return count > POPULARITY_THRESHOLD;
+		}
+
+		public String getTag() {
+			return tag;
+		}
+
+		public String getKey() {
+			return key;
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((tag == null) ? 0 : tag.hashCode());
+			result = prime * result + ((value == null) ? 0 : value.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null || getClass() != obj.getClass())
+				return false;
+			TransportTagValue other = (TransportTagValue) obj;
+			if (tag == null) {
+				if (other.tag != null)
+					return false;
+			} else if (!tag.equals(other.tag))
+				return false;
+			if (value == null) {
+				return other.value == null;
+			} else {
+				return value.equals(other.value);
+			}
+		}
 	}
 }

@@ -255,11 +255,13 @@ public class ObfFileInMemory {
 							}
 						}
 					}
+					TransportTags transportTags = new TransportTags();
+					transportTags.putFilteredTags(route.getId(), route.getTags());
 					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
 							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),
 							route.getColor(), route.getForwardStops(), directGeometry,
 							stringTable, newRoutesIds, route.getSchedule(),
-							new TransportTags(route.getId(), route.getTags()));
+							transportTags);
 				}
 				writer.endWriteTransportRoutes();
 			}
