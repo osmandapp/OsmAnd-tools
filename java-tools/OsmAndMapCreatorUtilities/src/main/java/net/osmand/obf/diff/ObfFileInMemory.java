@@ -41,7 +41,6 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -256,7 +255,7 @@ public class ObfFileInMemory {
 							}
 						}
 					}
-					transportTags.putFilteredTags(route.getId(), route.getTags());
+					transportTags.registerTagValues(route.getId(), route.getTags());
 					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
 							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),
 							route.getColor(), route.getForwardStops(), directGeometry,

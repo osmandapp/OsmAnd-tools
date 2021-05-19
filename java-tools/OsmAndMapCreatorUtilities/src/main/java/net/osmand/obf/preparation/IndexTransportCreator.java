@@ -770,7 +770,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
-		transportRouteTagValues.putFilteredTags(rel, directRoute.getId());
+		transportRouteTagValues.registerTagValues(rel, directRoute.getId());
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
@@ -807,7 +807,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
-				transportRouteTagValues.putFilteredTags(rel, backwardRoute.getId());
+				transportRouteTagValues.registerTagValues(rel, backwardRoute.getId());
 			}
 		}
 	}

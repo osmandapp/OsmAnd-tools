@@ -29,12 +29,12 @@ public class TransportTags {
 		}
 	}
 
-	public void putFilteredTags(Relation rel, long routeId) {
+	public void registerTagValues(Relation rel, long routeId) {
 		Map<String, String> relTags = rel.getTags();
-		putFilteredTags(routeId, relTags);
+		registerTagValues(routeId, relTags);
 	}
 
-	public void putFilteredTags(long routeId, Map<String, String> relTags) {
+	public void registerTagValues(long routeId, Map<String, String> relTags) {
 		List<TransportTagValue> filteredTags = new ArrayList<>();
 		for (String tagKey : relTags.keySet()) {
 			for (String neededTag : tagsFilter) {
