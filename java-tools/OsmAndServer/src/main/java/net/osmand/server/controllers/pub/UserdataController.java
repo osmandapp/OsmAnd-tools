@@ -63,7 +63,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
 	private static final int BUFFER_SIZE = 1024 * 512;
 	private static final long MB = 1024 * 1024;
-	private static final long MAXIMUM_ACCOUNT_SIZE = 200 * MB;
+	private static final long MAXIMUM_ACCOUNT_SIZE = 1000 * MB;
 	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
