@@ -23,16 +23,8 @@ import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
-import net.osmand.obf.preparation.AbstractIndexPartCreator;
-import net.osmand.obf.preparation.BinaryFileReference;
-import net.osmand.obf.preparation.BinaryMapIndexWriter;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.obf.preparation.IndexPoiCreator;
-import net.osmand.obf.preparation.IndexRouteCreator;
+import net.osmand.obf.preparation.*;
 import net.osmand.obf.preparation.IndexRouteCreator.RouteWriteContext;
-import net.osmand.obf.preparation.IndexTransportCreator;
-import net.osmand.obf.preparation.IndexVectorMapCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
@@ -49,7 +41,6 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -252,6 +243,7 @@ public class ObfFileInMemory {
 				writer.startWriteTransportRoutes();
 				ByteArrayOutputStream ows = new ByteArrayOutputStream();
 				List<byte[]> directGeometry = new ArrayList<>();
+				TransportTags transportTags = new TransportTags();
 				for (TransportRoute route : transportRoutes.valueCollection()) {
 					directGeometry.clear();
 					List<Way> ways = route.getForwardWays();
@@ -263,10 +255,12 @@ public class ObfFileInMemory {
 							}
 						}
 					}
+					transportTags.registerTagValues(route.getId(), route.getTags());
 					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
 							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),
 							route.getColor(), route.getForwardStops(), directGeometry,
-							stringTable, newRoutesIds, route.getSchedule());
+							stringTable, newRoutesIds, route.getSchedule(),
+							transportTags);
 				}
 				writer.endWriteTransportRoutes();
 			}

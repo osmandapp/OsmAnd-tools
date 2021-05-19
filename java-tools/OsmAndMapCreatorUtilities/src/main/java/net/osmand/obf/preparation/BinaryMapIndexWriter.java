@@ -12,6 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1173,9 +1174,10 @@ public class BinaryMapIndexWriter {
 		log.info("TRANSPORT INDEX SIZE : " + len);
 	}
 
-	public long writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator, String type, int dist, String color,
-			List<TransportStop> directStops, List<byte[]> directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry,
-			TransportSchedule schedule) throws IOException {
+	public long writeTransportRoute(long idRoute, String routeName, String routeEnName, String ref, String operator,
+	                                String type, int dist, String color, List<TransportStop> directStops, List<byte[]>
+	                                directRoute, Map<String, Integer> stringTable, Map<Long, Long> transportRoutesRegistry,
+	                                TransportSchedule schedule, TransportTags tags) throws IOException {
 		checkPeekState(TRANSPORT_ROUTES);
 		TransportRoute.Builder tRoute = OsmandOdb.TransportRoute.newBuilder();
 		tRoute.setRef(ref);
@@ -1185,6 +1187,22 @@ public class BinaryMapIndexWriter {
 		tRoute.setName(registerString(stringTable, routeName));
 		tRoute.setDistance(dist);
 		tRoute.setColor(registerString(stringTable, color));
+		if (tags != null && tags.get(idRoute) != null) {
+			TByteArrayList buf = new TByteArrayList();
+			for (TransportTags.TransportTagValue tag : tags.get(idRoute)) {
+				if (tag.isPopular()) {
+					tRoute.addAttributeTagIds(registerString(stringTable, tag.getKey()));
+				} else {
+					buf.clear();
+					int keyId = registerString(stringTable, tag.getTag());
+					writeRawVarint32(buf, keyId);
+					for (byte rawByte : tag.getValue().getBytes(StandardCharsets.UTF_8)) {
+						writeRawByte(buf, rawByte);
+					}
+					tRoute.addAttributeTextTagValues(ByteString.copyFrom(buf.toArray()));
+				}
+			}
+		}
 		if (routeEnName != null) {
 			tRoute.setNameEn(registerString(stringTable, routeEnName));
 		}

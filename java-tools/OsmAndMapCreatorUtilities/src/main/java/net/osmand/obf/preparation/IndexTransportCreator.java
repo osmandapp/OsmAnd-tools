@@ -84,6 +84,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	// now we need only specific names of stops and platforms
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
 	private Map<EntityId, List<TransportStopExit>> exits = new HashMap<EntityId, List<TransportStopExit>>();
+	private final TransportTags transportRouteTagValues = new TransportTags();
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
@@ -92,14 +93,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement gtfsSelectRoute;
 	private PreparedStatement gtfsSelectStopTimes;
 	
-	private GtfsInfoStats gtfsStats = new GtfsInfoStats(); 
-	
+	private GtfsInfoStats gtfsStats = new GtfsInfoStats();
+
 	static {
 		acceptedRoutes.add("bus"); //$NON-NLS-1$
 		acceptedRoutes.add("trolleybus"); //$NON-NLS-1$
 		acceptedRoutes.add("share_taxi"); //$NON-NLS-1$
 		acceptedRoutes.add("funicular"); //$NON-NLS-1$
-		
+
 		acceptedRoutes.add("subway"); //$NON-NLS-1$
 		acceptedRoutes.add("light_rail"); //$NON-NLS-1$
 		acceptedRoutes.add("monorail"); //$NON-NLS-1$
@@ -619,8 +620,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					directGeometry.add(bytes);
 				}
 				TransportSchedule schedule = readSchedule(ref, directStops);
-				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
-						directGeometry, stringTable, transportRoutes, schedule);
+				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops,
+						directGeometry, stringTable, transportRoutes, schedule, transportRouteTagValues);
 				if (isRouteIncomplete(idRoute)) {
 					incompleteRoutesMap.get(idRoute).setFileOffset((int) ptr);
 				}
@@ -769,6 +770,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
+		transportRouteTagValues.registerTagValues(rel, directRoute.getId());
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
@@ -805,13 +807,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
+				transportRouteTagValues.registerTagValues(rel, backwardRoute.getId());
 			}
 		}
-
 	}
 
-
-	private void insertMissingStop(TransportRoute directRoute, List<Entity> incompleteStops, 
+	private void insertMissingStop(TransportRoute directRoute, List<Entity> incompleteStops,
 			Node node, long wayId, boolean before) {
 		Entity insertNode = null;
 		LatLon loc = node.getLatLon();
