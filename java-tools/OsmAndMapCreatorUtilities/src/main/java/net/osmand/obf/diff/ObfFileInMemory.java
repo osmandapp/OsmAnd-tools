@@ -244,6 +244,7 @@ public class ObfFileInMemory {
 				writer.startWriteTransportRoutes();
 				ByteArrayOutputStream ows = new ByteArrayOutputStream();
 				List<byte[]> directGeometry = new ArrayList<>();
+				TransportTags transportTags = new TransportTags();
 				for (TransportRoute route : transportRoutes.valueCollection()) {
 					directGeometry.clear();
 					List<Way> ways = route.getForwardWays();
@@ -255,7 +256,6 @@ public class ObfFileInMemory {
 							}
 						}
 					}
-					TransportTags transportTags = new TransportTags();
 					transportTags.putFilteredTags(route.getId(), route.getTags());
 					writer.writeTransportRoute(route.getId(), route.getName(), route.getEnName(false),
 							route.getRef(), route.getOperator(), route.getType(), route.getDistance(),

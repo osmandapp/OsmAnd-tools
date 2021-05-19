@@ -84,7 +84,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	// now we need only specific names of stops and platforms
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
 	private Map<EntityId, List<TransportStopExit>> exits = new HashMap<EntityId, List<TransportStopExit>>();
-	private final TransportTags filteredTags = new TransportTags();
+	private final TransportTags transportRouteTagValues = new TransportTags();
 
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
@@ -620,8 +620,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					directGeometry.add(bytes);
 				}
 				TransportSchedule schedule = readSchedule(ref, directStops);
-				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops, 
-						directGeometry, stringTable, transportRoutes, schedule, filteredTags);
+				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops,
+						directGeometry, stringTable, transportRoutes, schedule, transportRouteTagValues);
 				if (isRouteIncomplete(idRoute)) {
 					incompleteRoutesMap.get(idRoute).setFileOffset((int) ptr);
 				}
@@ -770,7 +770,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
-		filteredTags.putFilteredTags(rel, directRoute.getId());
+		transportRouteTagValues.putFilteredTags(rel, directRoute.getId());
 		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
@@ -807,7 +807,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
-				filteredTags.putFilteredTags(rel, backwardRoute.getId());
+				transportRouteTagValues.putFilteredTags(rel, backwardRoute.getId());
 			}
 		}
 	}

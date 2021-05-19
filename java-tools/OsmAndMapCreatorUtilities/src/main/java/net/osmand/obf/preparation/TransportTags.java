@@ -7,7 +7,7 @@ import java.util.*;
 public class TransportTags {
 	public static final int POPULARITY_THRESHOLD = 3;
 	private final Map<Long, List<TransportTagValue>> tags = new HashMap<>();
-	List<TransportTagValue> allTags = new ArrayList<>();
+	Map<String, TransportTagValue> allTags = new HashMap<>();
 	private static final Set<String> tagsFilter = new HashSet<>();
 
 	static {
@@ -21,7 +21,12 @@ public class TransportTags {
 	}
 
 	public List<TransportTagValue> get(long idRoute) {
-		return tags.get(idRoute);
+		List<TransportTagValue> res = tags.get(idRoute);
+		if (res != null) {
+			return res;
+		} else {
+			return Collections.emptyList();
+		}
 	}
 
 	public void putFilteredTags(Relation rel, long routeId) {
@@ -34,13 +39,14 @@ public class TransportTags {
 		for (String tagKey : relTags.keySet()) {
 			for (String neededTag : tagsFilter) {
 				if (tagKey.startsWith(neededTag)) {
-					TransportTagValue tagValue = new TransportTagValue(tagKey, relTags.get(tagKey));
-					if (allTags.contains(tagValue)) {
-						allTags.get(allTags.indexOf(tagValue)).count++;
+					TransportTagValue tagValue = allTags.get(TransportTagValue.createKey(tagKey, relTags.get(tagKey)));
+					if (tagValue != null) {
+						tagValue.count++;
 					} else {
-						allTags.add(tagValue);
+						tagValue = new TransportTagValue(tagKey, relTags.get(tagKey));
+						allTags.put(tagValue.getKey(), tagValue);
 					}
-					filteredTags.add(allTags.get(allTags.indexOf(tagValue)));
+					filteredTags.add(tagValue);
 					break;
 				}
 			}
@@ -49,7 +55,6 @@ public class TransportTags {
 			tags.put(routeId, filteredTags);
 		}
 	}
-
 
 	public static class TransportTagValue {
 		int id;
@@ -61,7 +66,11 @@ public class TransportTags {
 		public TransportTagValue(String tag, String value) {
 			this.tag = tag;
 			this.value = value;
-			key = tag + "/" + value;
+			key = createKey(tag, value);
+		}
+
+		private static String createKey(String tag, String value) {
+			return tag + "/" + value;
 		}
 
 		public boolean isPopular() {
