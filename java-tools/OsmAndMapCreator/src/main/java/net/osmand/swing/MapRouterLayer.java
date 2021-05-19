@@ -1,5 +1,6 @@
 package net.osmand.swing;
 
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics2D;
@@ -10,6 +11,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -22,10 +24,12 @@ import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -39,7 +43,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import net.osmand.router.*;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -51,6 +54,12 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.stream.JsonReader;
+
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.Track;
@@ -60,21 +69,29 @@ import net.osmand.Location;
 import net.osmand.LocationsHolder;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
+import net.osmand.data.QuadTree;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
+import net.osmand.router.PrecalculatedRouteDirection;
+import net.osmand.router.RouteColorize.ColorizationType;
+import net.osmand.router.RouteExporter;
+import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.router.RouteColorize.*;
 
 
 public class MapRouterLayer implements MapPanelLayer {
@@ -97,6 +114,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton playPauseButton;
 	private JButton stopButton;
 	private GPXFile selectedGPXFile;
+	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
 
 	private List<RouteSegmentResult> previousRoute;
 	public ActionListener setStartActionListener = new ActionListener(){
@@ -355,6 +373,73 @@ public class MapRouterLayer implements MapPanelLayer {
 				map.fillPopupActions();
 			}
 		};
+		directions.add(straightRoute);
+		
+		if (directionPointsFile == null) {
+			Action loadGeoJSON = new AbstractAction("Load Direction Points (GeoJSON)...") {
+				private static final long serialVersionUID = 507356107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					// new Thread() {
+					// @Override
+					// public void run() {
+					JFileChooser fileChooser = new JFileChooser(
+							DataExtractionSettings.getSettings().getDefaultWorkingDir());
+					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
+						File file = fileChooser.getSelectedFile();
+						Gson gson = new Gson();
+						directionPointsFile = new QuadTree<net.osmand.osm.edit.Node>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), 15, 0.5f);
+						try {
+							com.google.gson.JsonObject mp = gson.fromJson(new JsonReader(new FileReader(file)), com.google.gson.JsonObject.class);
+							JsonElement features = mp.get("features");
+							if(features == null) {
+								return;
+							}
+							Iterator<JsonElement> jsonE = features.getAsJsonArray().iterator();
+							while(jsonE.hasNext()) {
+								JsonObject obj = jsonE.next().getAsJsonObject();
+								JsonArray ar = obj.get("geometry").getAsJsonObject().get("coordinates").getAsJsonArray();
+								double lon = ar.get(0).getAsDouble();
+								double lat = ar.get(1).getAsDouble();
+								JsonObject props = obj.get("properties").getAsJsonObject();
+								net.osmand.osm.edit.Node pt = new net.osmand.osm.edit.Node(lat, lon, -1);
+								int x = MapUtils.get31TileNumberX(lon);
+								int y = MapUtils.get31TileNumberY(lat);
+								Iterator<Entry<String, JsonElement>> keyIt = props.entrySet().iterator();
+								while (keyIt.hasNext()) {
+									Entry<String, JsonElement> el = keyIt.next();
+									pt.putTag(el.getKey(), el.getValue().getAsString());
+								}
+								directionPointsFile.insert(pt, new QuadRect(x, y, x, y));
+							}
+						} catch (Exception e1) {
+							log.info("Error loading directions point (geojson): " + e1.getMessage(), e1);
+						}
+						displayGpxFiles();
+						map.fillPopupActions();
+					}
+					// }
+					// }.start();
+				}
+
+			};
+			directions.add(loadGeoJSON);
+		} else {
+			Action loadGeoJSON = new AbstractAction("Unload Direction Points") {
+				private static final long serialVersionUID = 507356107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					directionPointsFile = null;
+					displayGpxFiles();
+					map.fillPopupActions();
+				}
+			};
+			directions.add(loadGeoJSON);
+
+		}
+		
 		
 		if (previousRoute != null) {
 			Action saveGPX = new AbstractAction("Save GPX...") {
@@ -389,9 +474,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			directions.add(saveGPX);
 		}
 		
-		directions.add(straightRoute);
 		
-		if(selectedGPXFile == null) {
+		if (selectedGPXFile == null) {
 			Action loadGPXFile = new AbstractAction("Load GPX file...") {
 				private static final long serialVersionUID = 507156107455281238L;
 
@@ -400,30 +484,21 @@ public class MapRouterLayer implements MapPanelLayer {
 					// new Thread() {
 					// @Override
 					// public void run() {
-					JFileChooser fileChooser = new JFileChooser(DataExtractionSettings.getSettings().getDefaultWorkingDir());
+					JFileChooser fileChooser = new JFileChooser(
+							DataExtractionSettings.getSettings().getDefaultWorkingDir());
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
 						selectedGPXFile = GPXUtilities.loadGPXFile(file);
-						displayGpxFile();
+						displayGpxFiles();
 						map.fillPopupActions();
 					}
 					// }
 					// }.start();
 				}
-				
-			};
-			menu.add(loadGPXFile);			
-		} else {
-			AbstractAction redisplayGPXFile = new AbstractAction("Redisplay GPX file") {
-				private static final long serialVersionUID = 507156107455281238L;
 
-				@Override
-				public void actionPerformed(ActionEvent e) {
-					displayGpxFile();
-				}
 			};
-			menu.add(redisplayGPXFile);
-			
+			menu.add(loadGPXFile);
+		} else {
 			AbstractAction unselectGPXFile = new AbstractAction("Unselect GPX file") {
 				private static final long serialVersionUID = 507156107455281238L;
 
@@ -432,24 +507,21 @@ public class MapRouterLayer implements MapPanelLayer {
 					DataTileManager<Way> points = new DataTileManager<Way>(11);
 					map.setPoints(points);
 					selectedGPXFile = null;
-					colorizeGpxFile(ColorizationType.NONE, true);
+					displayGpxFiles();
+					map.setColorizationType(selectedGPXFile, ColorizationType.NONE, true);
 					map.fillPopupActions();
 				}
 			};
 			menu.add(unselectGPXFile);
 
-			final JMenu colorize = new JMenu("Colorize GPX file ");
+			final JMenu colorize = new JMenu("Colorize GPX file");
 			Action altitude = new AbstractAction("Altitude") {
-				private static final long serialVersionUID = 507156107455281238L;
+				private static final long serialVersionUID = 507156107355281238L;
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					int result = showOptionColorSchemeDialog(colorize);
-					if (result == JOptionPane.YES_OPTION) {
-						colorizeGpxFile(ColorizationType.ELEVATION, true);
-					} else {
-						colorizeGpxFile(ColorizationType.ELEVATION, false);
-					}
+					map.setColorizationType(selectedGPXFile, ColorizationType.ELEVATION, result == JOptionPane.YES_OPTION);
 					map.fillPopupActions();
 				}
 			};
@@ -460,26 +532,18 @@ public class MapRouterLayer implements MapPanelLayer {
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					int result = showOptionColorSchemeDialog(colorize);
-					if (result == JOptionPane.YES_OPTION) {
-						colorizeGpxFile(ColorizationType.SPEED, true);
-					} else {
-						colorizeGpxFile(ColorizationType.SPEED, false);
-					}
+					map.setColorizationType(selectedGPXFile, ColorizationType.SPEED, result == JOptionPane.YES_OPTION);
 					map.fillPopupActions();
 				}
 			};
 			colorize.add(speed);
 			Action slope = new AbstractAction("Slope") {
-				private static final long serialVersionUID = 507156107455281238L;
+				private static final long serialVersionUID = 50715610765281238L;
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					int result = showOptionColorSchemeDialog(colorize);
-					if (result == JOptionPane.YES_OPTION) {
-						colorizeGpxFile(ColorizationType.SLOPE, true);
-					} else {
-						colorizeGpxFile(ColorizationType.SLOPE, false);
-					}
+					map.setColorizationType(selectedGPXFile, ColorizationType.SLOPE, result == JOptionPane.YES_OPTION);
 					map.fillPopupActions();
 				}
 			};
@@ -497,26 +561,31 @@ public class MapRouterLayer implements MapPanelLayer {
 		return JOptionPane.showOptionDialog(frame, "What color scheme to use?", "Color scheme", 0, JOptionPane.INFORMATION_MESSAGE, null, options, null);
 	}
 	
-	private void displayGpxFile() {
-		DataTileManager<Way> points = new DataTileManager<Way>(9);
-		for (Track t : selectedGPXFile.tracks) {
-			for (TrkSegment ts : t.segments) {
-				Way w = new Way(-1);
-				for (WptPt p : ts.points) {
-					w.addNode(new net.osmand.osm.edit.Node(p.lat, p.lon, -1));
+	private void displayGpxFiles() {
+		DataTileManager<Entity> points = new DataTileManager<Entity>(9);
+		if (selectedGPXFile != null) {
+			for (Track t : selectedGPXFile.tracks) {
+				for (TrkSegment ts : t.segments) {
+					Way w = new Way(-1);
+					for (WptPt p : ts.points) {
+						w.addNode(new net.osmand.osm.edit.Node(p.lat, p.lon, -1));
+					}
+					LatLon n = w.getLatLon();
+					points.registerObject(n.getLatitude(), n.getLongitude(), w);
 				}
-				LatLon n = w.getLatLon();
-				points.registerObject(n.getLatitude(), n.getLongitude(), w);
+			}
+		}
+		if (directionPointsFile != null) {
+			List<net.osmand.osm.edit.Node> pnts = 
+					directionPointsFile.queryInBox(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), new ArrayList<net.osmand.osm.edit.Node>());
+			for (net.osmand.osm.edit.Node n : pnts) {
+				points.registerObject(n.getLatitude(), n.getLongitude(), n);
 			}
 		}
 		// load from file
 		map.setPoints(points);
 	}
 
-	private void colorizeGpxFile(ColorizationType colorizationType, boolean grey) {
-		map.setGpxFile(selectedGPXFile);
-		map.setColorizationType(colorizationType, grey);
-	}
 
 	private void calcStraightRoute(LatLon currentLatLon) {
 		System.out.println("Distance: " + MapUtils.getDistance(startRoute, endRoute));
@@ -984,7 +1053,8 @@ public class MapRouterLayer implements MapPanelLayer {
 						paramsR.put(p, "true");
 					}
 				}
-				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().build(props[0],
+				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
+						setDirectionPoints(directionPointsFile).build(props[0],
 						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
@@ -1134,13 +1204,21 @@ public class MapRouterLayer implements MapPanelLayer {
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				if (prevWayNode != null) {
 					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
-						System.out.println(
-								String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s" ,
-										OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i, s.getObject()));
+						System.out.println(String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s", OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i,
+								s.getObject()));
 					}
 					prevWayNode = null;
 				}
-				way.addNode(n);
+				int[] pointTypes = s.getObject().getPointTypes(i);
+				if (pointTypes != null && pointTypes.length == 1) {
+					RouteTypeRule rtr = s.getObject().region.quickGetEncodingRule(pointTypes[0]);
+					if (rtr == null || !rtr.getTag().equals("osmand_dp")) {
+						// skip all intermediate added points (should no be visual difference)
+						way.addNode(n);
+					}
+				} else {
+					way.addNode(n);
+				}
 				if (i == s.getEndPointIndex()) {
 					break;
 				}
@@ -1152,8 +1230,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 			if (way.getNodes().size() > 0) {
 				prevWayNode = way.getNodes().get(way.getNodes().size() - 1);
+				res.add(way);
 			}
-			res.add(way);
 
 		}
 	}

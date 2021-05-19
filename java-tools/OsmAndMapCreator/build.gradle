@@ -89,6 +89,7 @@ dependencies {
 
 	   implementation "org.jogamp.gluegen:gluegen-rt:2.3.1"
 	implementation "org.jogamp.jogl:jogl-all:2.3.1"
+	implementation 'com.google.code.gson:gson:2.8.6'
 
 	// runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-aarch64"
 	// runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-armv6"
