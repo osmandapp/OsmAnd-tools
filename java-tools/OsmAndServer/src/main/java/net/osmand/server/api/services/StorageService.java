@@ -172,7 +172,7 @@ public class StorageService {
 		if(is == null) {
 			throw new IllegalStateException(String.format("Impossible to retrieve file %s/%s", fld, storageFileName));
 		}
-		saveFile(fld, storageFileName, toStore, is);
+		saveFile(fld, storageFileName, toStore, is, data.length);
 		is.close();
 		String nstorage = storage == null ? LOCAL_STORAGE : storage;
 		nstorage += "," + storageId;
@@ -183,15 +183,16 @@ public class StorageService {
 	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
 		for (StorageType s : getAndInitDefaultStorageProviders()) {
 			InputStream is = file.getInputStream();
-			saveFile(fld, fileName, s, is);
+			saveFile(fld, fileName, s, is, file.getSize());
 			is.close();
 		}		
 		return defaultStorage;
 	}
 
-	private void saveFile(String fld, String fileName, StorageType s, InputStream is) {
+	private void saveFile(String fld, String fileName, StorageType s, InputStream is, long fileSize) {
 		if (!s.local) {
 			ObjectMetadata om = new ObjectMetadata();
+			om.setContentLength(fileSize);
 			s.s3Conn.putObject(s.bucket, fld + FILE_SEPARATOR + fileName, is, om);
 		}
 	}
