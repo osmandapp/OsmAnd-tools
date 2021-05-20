@@ -266,7 +266,11 @@ public class MapPointsLayer implements MapPanelLayer {
 		if (isGrey) {
 			palette = new double[][]{{routeColorize.minValue, LIGHT_GREY}, {routeColorize.maxValue, DARK_GREY}};
 		} else {
-			palette = new double[][]{{routeColorize.minValue, GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, YELLOW}, {routeColorize.maxValue, RED}};
+			if (colorizationType == ColorizationType.SLOPE) {
+				palette = SLOPE_PALETTE;
+			} else {
+				palette = new double[][]{{routeColorize.minValue, GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, YELLOW}, {routeColorize.maxValue, RED}};
+			}
 		}
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
