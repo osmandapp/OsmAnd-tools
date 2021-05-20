@@ -44,6 +44,8 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -439,7 +441,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return c;
 	}
 
-	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx) throws SQLException {
+	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx, String regionName, OsmandRegions or) throws SQLException {
 		if ("street".equals(i.getTag(OSMTagKey.TYPE)) || "associatedStreet".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
 
 			LatLon l = null;
@@ -469,7 +471,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 			
 			if (streetName != null) {
-				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l);
+				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l, regionName, or);
 				if (!idsOfStreet.isEmpty()) {
 					Collection<Entity> houses = i.getMemberEntities("house"); // both house and address roles can have address
 					houses.addAll(i.getMemberEntities("address"));
@@ -516,13 +518,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public String normalizeStreetName(String name) {
+	public String normalizeStreetName(String name, String regionName, OsmandRegions or) {
 		if (name == null) {
 			return null;
 		}
 		name = name.trim();
 		name = name.replace("’", "'");
-		name = Abbreviations.replaceAll(name);
+		WorldRegion wr = or.getRegionDataByDownloadName(regionName);
+		if (wr.getParams().getRegionLang().equals("en")) {
+			name = Abbreviations.replaceAll(name);
+		}
 
 		if (normalizeStreets) {
 			String newName = name;
@@ -594,12 +599,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return newName.trim();
 	}
 
-	public Set<Long> getStreetInCity(Set<String> isInNames, String name, Map<String, String> names, final LatLon location) throws SQLException {
+	public Set<Long> getStreetInCity(Set<String> isInNames, String name, Map<String, String> names, final LatLon location, String regionName, OsmandRegions or) throws SQLException {
 		if (location == null) {
 			return Collections.emptySet();
 
 		}
-		name = normalizeStreetName(name);
+		name = normalizeStreetName(name, regionName, or);
 		Set<City> result = new LinkedHashSet<City>();
 		List<City> nearestObjects = new ArrayList<City>();
 		nearestObjects.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
@@ -766,7 +771,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return MapUtils.getDistance(c.getLocation(), point) / c.getType().getRadius();
 	}
 
-	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, String regionName, OsmandRegions or) throws SQLException {
 		// index not only buildings but also nodes that belongs to addr:interpolation ways
 		// currently not supported because nodes are indexed first with buildings
 		String interpolation = e.getTag(OSMTagKey.ADDR_INTERPOLATION);
@@ -811,7 +816,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						if (strt == null) {
 							strt = first.getTag(OSMTagKey.ADDR_PLACE);
 						}
-						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, null, l);
+						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, null, l, regionName, or);
 						if (!idsOfStreet.isEmpty()) {
 							Building building = EntityParser.parseBuilding(first);
 							building.setInterpolationInterval(interpolationInterval);
@@ -851,7 +856,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boolean exist = e instanceof Relation || streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l, regionName, or);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
 					String hname = null;
@@ -901,7 +906,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						if (secondHno != null) {
 							Building building2 = EntityParser.parseBuilding(e);
 							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
-							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
+							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l, regionName, or);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
@@ -925,7 +930,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			// check that street way is not registered already
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.NAME), getOtherNames(e), l);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.NAME), getOtherNames(e), l, regionName, or);
 				if (!idsOfStreet.isEmpty()) {
 					streetDAO.writeStreetWayNodes(idsOfStreet, (Way) e);
 				}

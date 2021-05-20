@@ -93,7 +93,16 @@ public class IndexCreator {
 	private boolean deleteDatabaseIndexes = true;
 	
 	OsmandRegions or = null;
-		
+	OsmandRegions orForAddress;
+
+	{
+		try {
+			orForAddress = prepareRegions();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
 		this.settings = settings;
@@ -234,7 +243,7 @@ public class IndexCreator {
 			}
 		}
 		if (settings.indexAddress) {
-			indexAddressCreator.iterateMainEntity(e, ctx);
+			indexAddressCreator.iterateMainEntity(e, ctx, regionName, orForAddress);
 		}
 		if (settings.indexRouting) {
 			indexRouteCreator.iterateMainEntity(e, ctx, or);
@@ -842,7 +851,7 @@ public class IndexCreator {
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						indexAddressCreator.indexAddressRelation((Relation) e, ctx);
+						indexAddressCreator.indexAddressRelation((Relation) e, ctx, regionName, orForAddress);
 					}
 				});
 
