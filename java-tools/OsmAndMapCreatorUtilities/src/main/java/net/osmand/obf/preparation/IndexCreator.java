@@ -24,6 +24,7 @@ import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -93,6 +94,7 @@ public class IndexCreator {
 	private boolean deleteDatabaseIndexes = true;
 	
 	OsmandRegions or = null;
+	OsmandRegions osmandRegions = prepareRegions();
 		
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
@@ -123,6 +125,11 @@ public class IndexCreator {
 
 	public void setRegionName(String regionName) {
 		this.regionName = regionName;
+	}
+
+	public String getRegionLang(OsmandRegions orForAddress) {
+		WorldRegion wr = orForAddress.getRegionDataByDownloadName(regionName);
+		return wr.getParams().getRegionLang();
 	}
 
 	private Object getDatabaseConnection(String fileName, DBDialect dialect) throws SQLException {
@@ -211,10 +218,15 @@ public class IndexCreator {
 
 	/* ***** END OF GETTERS/SETTERS ***** */
 
-	private OsmandRegions prepareRegions() throws IOException {
+	private OsmandRegions prepareRegions() {
 		OsmandRegions or = new OsmandRegions();
-		or.prepareFile();
-		or.cacheAllCountries();
+		try {
+			or.prepareFile();
+			or.cacheAllCountries();
+		} catch (IOException e) {
+			log.error("Error preparing regions", e);
+			return null;
+		}
 		return or;
 	}
 
@@ -234,7 +246,7 @@ public class IndexCreator {
 			}
 		}
 		if (settings.indexAddress) {
-			indexAddressCreator.iterateMainEntity(e, ctx);
+			indexAddressCreator.iterateMainEntity(e, ctx, getRegionLang(osmandRegions));
 		}
 		if (settings.indexRouting) {
 			indexRouteCreator.iterateMainEntity(e, ctx, or);
@@ -842,7 +854,7 @@ public class IndexCreator {
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						indexAddressCreator.indexAddressRelation((Relation) e, ctx);
+						indexAddressCreator.indexAddressRelation((Relation) e, ctx, getRegionLang(osmandRegions));
 					}
 				});
 
