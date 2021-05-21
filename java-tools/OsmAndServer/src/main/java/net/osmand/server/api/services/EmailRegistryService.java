@@ -33,7 +33,7 @@ public class EmailRegistryService {
 			String category) {
 		List<EmailId> emails = jdbcTemplate.query("select " + emailCol + (dateCol != null ? ", " + dateCol : "")
 				+ (channelCol != null ? ", " + channelCol : "")
-				+ " from " + table + " where email like ?", new String[] { "%" + emailPart + "%" },
+				+ " from " + table + " where " + emailCol + " like ?", new String[] { "%" + emailPart + "%" },
 				new RowMapper<EmailId>() {
 
 					@Override
