@@ -621,7 +621,7 @@ public class IndexCreator {
 				// 3.1 write all cities
 				writeAllCities(accessor, progress);
 				// 3.2 index address relations
-				indexRelations(accessor, progress);
+				indexRelations(accessor, progress, icc);
 				// 3.3 MAIN iterate over all entities
 				iterateMainEntities(accessor, progress, icc);
 				accessor.closeReadingConnection();
@@ -781,7 +781,7 @@ public class IndexCreator {
 		});
 	}
 
-	private void indexRelations(OsmDbAccessor accessor, IProgress progress) throws SQLException, InterruptedException {
+	private void indexRelations(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc) throws SQLException, InterruptedException {
 		if (settings.indexAddress || settings.indexMap || settings.indexRouting || settings.indexPOI || settings.indexTransport) {
 			setGeneralProgress(progress, "[30 / 100]"); //$NON-NLS-1$
 			progress.startTask(settings.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), accessor.getAllRelations()); //$NON-NLS-1$
@@ -829,7 +829,7 @@ public class IndexCreator {
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						indexAddressCreator.indexAddressRelation((Relation) e, ctx, new IndexCreationContext(regionName));
+						indexAddressCreator.indexAddressRelation((Relation) e, ctx, icc);
 					}
 				});
 
