@@ -20,7 +20,7 @@ public class EmailRegistryService {
 
 	public List<EmailId> searchEmails(String emailPart) {
 		List<EmailId> searchEmails = new ArrayList<EmailId>();
-		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", null, "email_free_users", "Free users (extra maps)"));
+		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", "os", "email_free_users", "Free users (extra maps)"));
 		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", null, "osm_recipients", "OSM editors (OsmAnd Live)"));
 		searchEmails.addAll(parseEmails(emailPart, "useremail", null, null, "supporters", "OsmAnd Live subscriptions (Supporters)"));
 		searchEmails.addAll(parseEmails(emailPart, "email", "timestamp", null, "email_blocked", "Blocked (No emails sent!)"));
