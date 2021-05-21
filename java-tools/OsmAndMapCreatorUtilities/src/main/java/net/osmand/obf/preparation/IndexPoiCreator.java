@@ -98,15 +98,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		generatedIds.add(gen);
 		return gen;
 	}
-
-	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap) throws SQLException {
-		iterateEntity(e, ctx, basemap, false);
-	}
 	
-	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, boolean basemap, boolean translitJapaneseNames) throws SQLException {
+	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
 		tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e);
-		if (translitJapaneseNames && e.getTag(OSMTagKey.NAME_EN.getValue()) == null 
+		if (icc.translitJapaneseNames && e.getTag(OSMTagKey.NAME_EN.getValue()) == null
 				&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
 			e.putTag(OSMTagKey.NAME_EN.getValue(), 
 					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
@@ -121,7 +117,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			boolean first = true;
 			long id = e.getId();
-			if (basemap) { 
+			if (icc.basemap) {
 				id = GENERATE_OBJ_ID--;
 			} else if(e instanceof Relation) {
 //				id = GENERATE_OBJ_ID--;
@@ -138,7 +134,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					// don't index private swimming pools
 					continue;
 				}
-				if (basemap) {
+				if (icc.basemap) {
 					PoiType st = a.getType().getPoiTypeByKeyName(a.getSubType());
 					if (st == null || !a.getType().containsBasemapPoi(st)) {
 						continue;

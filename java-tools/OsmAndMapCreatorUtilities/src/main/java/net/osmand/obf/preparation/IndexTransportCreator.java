@@ -542,7 +542,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	public void writeBinaryTransportIndex(BinaryMapIndexWriter writer, String regionName,
-			Connection mapConnection, boolean translitFromJapan) throws IOException, SQLException {
+			Connection mapConnection, IndexCreationContext icc) throws IOException, SQLException {
 		try {
 			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat, transRouteGeometryStat);
 			mapConnection.commit();
@@ -575,7 +575,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				String routeName = rs.getString(3);
 				String routeEnName = rs.getString(4);
 				if (routeEnName != null && routeEnName.equals(Junidecode.unidecode(routeName))) {
-					if (translitFromJapan) {
+					if (icc.translitJapaneseNames) {
 						routeEnName = JapaneseTranslitHelper.getEnglishTransliteration(routeName);
 					} else {
 						routeEnName = null;	
@@ -641,7 +641,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (rootBounds != null) {
 				writer.startTransportTreeElement(rootBounds.getMinX(), rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 				writeBinaryTransportTree(root, transportStopsTree, writer, selectTransportStop, selectTransportRouteStop,
-						transportRoutes, stringTable, translitFromJapan);
+						transportRoutes, stringTable, icc.translitJapaneseNames);
 				writer.endWriteTransportTreeElement();
 			}
 			selectTransportStop.close();

@@ -23,7 +23,6 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -91,8 +90,6 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
-	
-	OsmandRegions or = null;
 		
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
@@ -211,33 +208,26 @@ public class IndexCreator {
 
 	/* ***** END OF GETTERS/SETTERS ***** */
 
-	private OsmandRegions prepareRegions() throws IOException {
-		OsmandRegions or = new OsmandRegions();
-		or.prepareFile();
-		or.cacheAllCountries();
-		return or;
-	}
-
-	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, boolean translitJapaneseNames) throws SQLException {
+	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (heightData != null && e instanceof Way) {
 			heightData.proccess((Way) e);
 		}
 		if (settings.indexPOI) {
-			indexPoiCreator.iterateEntity(e, ctx, false, translitJapaneseNames);
+			indexPoiCreator.iterateEntity(e, ctx, icc);
 		}
 		if (settings.indexTransport) {
 			indexTransportCreator.iterateMainEntity(e, ctx);
 		}
 		if (settings.indexMap) {
 			if (settings.boundary == null || checkBoundary(e)) {
-				indexMapCreator.iterateMainEntity(e, ctx, or, translitJapaneseNames);
+				indexMapCreator.iterateMainEntity(e, ctx, icc);
 			}
 		}
 		if (settings.indexAddress) {
-			indexAddressCreator.iterateMainEntity(e, ctx);
+			indexAddressCreator.iterateMainEntity(e, ctx, icc);
 		}
 		if (settings.indexRouting) {
-			indexRouteCreator.iterateMainEntity(e, ctx, or);
+			indexRouteCreator.iterateMainEntity(e, ctx);
 		}
 	}
 
@@ -467,6 +457,8 @@ public class IndexCreator {
 			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, false, true);
 			// 2. Create index connections and index structure
 
+			IndexCreationContext icc = new IndexCreationContext(regionName, true);
+
 			setGeneralProgress(progress, "[50 / 100]");
 			progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
 			accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
@@ -474,7 +466,7 @@ public class IndexCreator {
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
-						poiCreator.iterateEntity(e, ctx, true);
+						poiCreator.iterateEntity(e, ctx, icc);
 					}
 				}
 			});
@@ -485,7 +477,7 @@ public class IndexCreator {
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
-						poiCreator.iterateEntity(e, ctx, true);
+						poiCreator.iterateEntity(e, ctx, icc);
 					}
 				}
 			});
@@ -544,9 +536,7 @@ public class IndexCreator {
 	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn,
 			boolean generateUniqueIds, boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-//		if(LevelDBAccess.load()){
-//			dialect = DBDialect.NOSQL;
-//		}
+
  		if (logMapDataWarn == null) {
 			logMapDataWarn = log;
 		}
@@ -562,21 +552,12 @@ public class IndexCreator {
 				regionName = Algorithms.capitalizeFirstLetterAndLowercase(readFile[0].getName().substring(0, i));
 			}
 		}
+
+		IndexCreationContext icc = new IndexCreationContext(regionName, false);
+
 		if (renderingTypes == null) {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
-
-		if (settings.addRegionTag) {
-			or = prepareRegions();
-		}
-		
-		
-		
-		boolean translitJapaneseNames = false;
-		if (regionName.startsWith("Japan")) {
-			translitJapaneseNames = true;
-			//System.out.println("region: " + regionName);
-		} 
 
 		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
@@ -634,9 +615,9 @@ public class IndexCreator {
 				// 3.1 write all cities
 				writeAllCities(accessor, progress);
 				// 3.2 index address relations
-				indexRelations(accessor, progress);
+				indexRelations(accessor, progress, icc);
 				// 3.3 MAIN iterate over all entities
-				iterateMainEntities(accessor, progress, translitJapaneseNames);
+				iterateMainEntities(accessor, progress, icc);
 				accessor.closeReadingConnection();
 				// do not delete first db connection
 				if (accessor.getDbConn() != null) {
@@ -713,7 +694,7 @@ public class IndexCreator {
 				if (settings.indexTransport) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing transport index to binary file...", -1);
-					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection, translitJapaneseNames);
+					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection, icc);
 				}
 				progress.finishTask();
 				writer.close();
@@ -767,13 +748,13 @@ public class IndexCreator {
 	}
 
 
-	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress, boolean translitJapaneseNames) throws SQLException, InterruptedException {
+	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc) throws SQLException, InterruptedException {
 		setGeneralProgress(progress, "[50 / 100]");
 		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
 		accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-				iterateMainEntity(e, ctx, translitJapaneseNames);
+				iterateMainEntity(e, ctx, icc);
 			}
 		});
 		setGeneralProgress(progress, "[70 / 100]");
@@ -781,7 +762,7 @@ public class IndexCreator {
 		accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-				iterateMainEntity(e, ctx, translitJapaneseNames);
+				iterateMainEntity(e, ctx, icc);
 			}
 		});
 		setGeneralProgress(progress, "[85 / 100]");
@@ -789,12 +770,12 @@ public class IndexCreator {
 		accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-				iterateMainEntity(e, ctx, translitJapaneseNames);
+				iterateMainEntity(e, ctx, icc);
 			}
 		});
 	}
 
-	private void indexRelations(OsmDbAccessor accessor, IProgress progress) throws SQLException, InterruptedException {
+	private void indexRelations(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc) throws SQLException, InterruptedException {
 		if (settings.indexAddress || settings.indexMap || settings.indexRouting || settings.indexPOI || settings.indexTransport) {
 			setGeneralProgress(progress, "[30 / 100]"); //$NON-NLS-1$
 			progress.startTask(settings.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), accessor.getAllRelations()); //$NON-NLS-1$
@@ -842,7 +823,7 @@ public class IndexCreator {
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						indexAddressCreator.indexAddressRelation((Relation) e, ctx);
+						indexAddressCreator.indexAddressRelation((Relation) e, ctx, icc);
 					}
 				});
 
