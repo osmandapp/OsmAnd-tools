@@ -21,11 +21,11 @@ public class EmailRegistryService {
 	
 	public List<EmailId> searchEmails(String emailPart) {
 		List<EmailId> searchEmails = new ArrayList<EmailId>();
-		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", "email_free_users", null, "Free users (extra maps)"));
-		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", "osm_recipients", null, "OSM editors (OsmAnd Live)"));
-		searchEmails.addAll(parseEmails(emailPart, "useremail", null, "supporters", null, "OsmAnd Live subscriptions (Supporters)"));
-		searchEmails.addAll(parseEmails(emailPart, "email", "timestamp", "email_blocked", null, "Blocked (No emails sent!)"));
-		searchEmails.addAll(parseEmails(emailPart, "email", "timestamp", "email_unsubscribed", "channel", "Unsubscribed (No emails sent by channel!)"));
+		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", null, "email_free_users", "Free users (extra maps)"));
+		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", null, "osm_recipients", "OSM editors (OsmAnd Live)"));
+		searchEmails.addAll(parseEmails(emailPart, "useremail", null, null, "supporters", "OsmAnd Live subscriptions (Supporters)"));
+		searchEmails.addAll(parseEmails(emailPart, "email", "timestamp", null, "email_blocked", "Blocked (No emails sent!)"));
+		searchEmails.addAll(parseEmails(emailPart, "email", "timestamp", "channel", "email_unsubscribed", "Unsubscribed (No emails sent by channel!)"));
 		return searchEmails;
 	}
 
