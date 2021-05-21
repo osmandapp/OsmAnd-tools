@@ -57,6 +57,7 @@ import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import net.osmand.server.api.services.EmailRegistryService;
 import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.LogsAccessService;
@@ -91,6 +92,9 @@ public class AdminController {
 	
 	@Autowired
 	private PollsService pollsService;
+	
+	@Autowired
+	private EmailRegistryService emailService;
 	
 	@Autowired
 	private ApplicationContext appContext;
@@ -150,6 +154,8 @@ public class AdminController {
         return "redirect:info#bitcoin";
 	}
 	
+	
+	
 	@RequestMapping(path = { "/make-btc-payout" }, method = RequestMethod.POST)
 	public String publish(Model model, 
 			@RequestParam(required = true) int batchSize, final RedirectAttributes redirectAttrs) throws IOException {
@@ -165,6 +171,13 @@ public class AdminController {
 	}
 
 	
+	
+	@RequestMapping(path = { "/search-emails" }, method = RequestMethod.POST)
+	public String searchEmail(Model model, 
+			@RequestParam(required = true) String emailPart, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+		redirectAttrs.addFlashAttribute("emailSearch", emailService.searchEmails(emailPart));
+        return "redirect:info#audience";
+	}
 	
 	private String err(RedirectAttributes redirectAttrs, String string) {
 		redirectAttrs.addFlashAttribute("update_status", "ERROR");
@@ -339,7 +352,7 @@ public class AdminController {
 		
 		
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
-		model.addAttribute("emailsReport", getEmailsDBReport());
+		model.addAttribute("emailsReport", emailService.getEmailsDBReport());
 		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
 		return "admin/info";
@@ -348,75 +361,12 @@ public class AdminController {
 
 
 
-	public static class EmailReport {
-		public String category;
-		public String categoryId;
-		public int totalCount;
-		public int activeMarketing;
-		public int activeOsmAndLive;
-		public int activeNews;
-		
-		public int filterMarketing;
-		public int filterOsmAndLive;
-		public int filterNews;
-		public int filterAll;
-		
-		public void addChannel(String channel, int total) {
-			totalCount += total;
-			if(channel == null || channel.isEmpty()) {
-				// skip
-			} else if("marketing".equals(channel)) {
-				filterMarketing += total;
-			} else if("all".equals(channel)) {
-				filterAll += total;
-			} else if("osmand_live".equals(channel)) {
-				filterOsmAndLive += total;
-			} else if("news".equals(channel)) {
-				filterNews += total;
-			} else {
-				filterNews += total;
-			}
-		}
-		
-		public EmailReport calculateActive() {
-			activeMarketing = totalCount - filterAll - filterMarketing;
-			activeOsmAndLive = totalCount - filterAll - filterOsmAndLive;
-			activeNews = totalCount - filterAll - filterNews;
-			return this;
-		}
-	}
-	
-	private void addEmailReport(List<EmailReport> er, String category, String categoryId, String table, String mailCol) {
-		final EmailReport re = new EmailReport();
-		re.category = category;
-		re.categoryId = categoryId;
-		jdbcTemplate.query("select count(distinct A."+mailCol+"), U.channel from "+table+ " A "
-				+ " left join email_unsubscribed U on A."+mailCol+" = U.email "
-				+ " where A."+mailCol+" not in (select email from email_blocked ) group by U.channel",
-				new RowCallbackHandler() {
-					
-					@Override
-					public void processRow(ResultSet rs) throws SQLException {
-						re.addChannel(rs.getString(2), rs.getInt(1));
-					}
-				});
-		
-		er.add(re.calculateActive());
-	}
 	
 	
 	private BtcTransactionReport getBitcoinReport() {
 //		new File(websiteLocation, BTC_REPORT);
 		return reports.getBitcoinTransactionReport();
 	}
-	private List<EmailReport> getEmailsDBReport() {
-		List<EmailReport> er = new ArrayList<EmailReport>();
-		addEmailReport(er, "Free users with 3 maps", "email_free_users", "email_free_users", "email");
-		addEmailReport(er, "OSM editors (OsmAnd Live)", "osm_recipients", "osm_recipients", "email");
-		addEmailReport(er, "OsmAnd Live subscriptions", "supporters", "supporters", "useremail");
-		return er;
-	}
-	
 	
 	
 	public static class YearSubRetentionGroup {
