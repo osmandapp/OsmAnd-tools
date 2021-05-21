@@ -45,7 +45,11 @@ public class IndexCreationContext {
 
     private String getRegionLang(OsmandRegions osmandRegions) {
         WorldRegion wr = osmandRegions.getRegionDataByDownloadName(regionName);
-        return wr.getParams().getRegionLang();
+        if (wr != null) {
+            return wr.getParams().getRegionLang();
+        } else {
+            return null;
+        }
     }
 
     private boolean needDecryptAbbreviations() {
