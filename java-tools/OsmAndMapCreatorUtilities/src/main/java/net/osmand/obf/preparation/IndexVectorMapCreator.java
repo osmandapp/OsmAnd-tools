@@ -713,8 +713,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
-			if (settings.addRegionTag) {
-				addRegionTag(icc.allRegions, e);
+			OsmandRegions os = icc.allRegions;
+			if (settings.addRegionTag && os != null) {
+				addRegionTag(os, e);
 			}
 			if (icc.translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
 					&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
