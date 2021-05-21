@@ -24,7 +24,6 @@ import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
-import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
