@@ -16,9 +16,10 @@ public class IndexCreationContext {
     public boolean translitJapaneseNames = false;
     public String regionLang = null;
     public boolean decryptAbbreviations = false;
+    public boolean basemap;
 
 
-    IndexCreationContext(String regionName) {
+    IndexCreationContext(String regionName, boolean basemap) {
         this.regionName = regionName;
         this.allRegions = prepareRegions();
         if (regionName != null) {
@@ -26,6 +27,7 @@ public class IndexCreationContext {
             this.regionLang = allRegions != null ? getRegionLang(allRegions) : null;
             this.decryptAbbreviations = needDecryptAbbreviations();
         }
+        this.basemap = basemap;
     }
 
     @Nullable

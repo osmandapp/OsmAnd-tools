@@ -710,21 +710,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		return true;
 	}
-	
-	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		iterateMainEntity(e, ctx, null);
-	}
-	
-	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or) throws SQLException {
-		iterateMainEntity(e, ctx, or, false);
-	}
-	
-	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, OsmandRegions or, boolean translitJapaneseNames) throws SQLException {
+
+	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
-			if (or != null) {
-				addRegionTag(or, e);
+			if (settings.addRegionTag) {
+				addRegionTag(icc.allRegions, e);
 			}
-			if (translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue())) 
+			if (icc.translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
 					&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
 				e.putTag(OSMTagKey.NAME_EN.getValue(), 
 						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
