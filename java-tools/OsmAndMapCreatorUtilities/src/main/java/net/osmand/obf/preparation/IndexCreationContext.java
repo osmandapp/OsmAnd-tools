@@ -5,6 +5,7 @@ import net.osmand.map.WorldRegion;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 public class IndexCreationContext {
@@ -14,6 +15,7 @@ public class IndexCreationContext {
     public OsmandRegions allRegions;
     public boolean translitJapaneseNames = false;
     public String regionLang = null;
+    public boolean decryptAbbreviations = false;
 
 
     IndexCreationContext(String regionName) {
@@ -22,9 +24,11 @@ public class IndexCreationContext {
         if (regionName != null) {
             this.translitJapaneseNames = regionName.startsWith("Japan");
             this.regionLang = allRegions != null ? getRegionLang(allRegions) : null;
+            this.decryptAbbreviations = needDecryptAbbreviations();
         }
     }
 
+    @Nullable
     private OsmandRegions prepareRegions() {
         OsmandRegions or = new OsmandRegions();
         try {
@@ -40,5 +44,17 @@ public class IndexCreationContext {
     private String getRegionLang(OsmandRegions osmandRegions) {
         WorldRegion wr = osmandRegions.getRegionDataByDownloadName(regionName);
         return wr.getParams().getRegionLang();
+    }
+
+    private boolean needDecryptAbbreviations() {
+        if (regionLang != null) {
+            String[] langArr = regionLang.split(",");
+            for (String lang : langArr) {
+                if (lang.equals("en")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

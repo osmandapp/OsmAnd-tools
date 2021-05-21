@@ -522,7 +522,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		name = name.trim();
 		name = name.replace("’", "'");
-		if (icc.regionLang.equals("en")) {
+		if (icc.decryptAbbreviations) {
 			name = Abbreviations.replaceAll(name);
 		}
 
