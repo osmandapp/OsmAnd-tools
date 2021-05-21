@@ -126,11 +126,6 @@ public class IndexCreator {
 		this.regionName = regionName;
 	}
 
-	public String getRegionLang(OsmandRegions orForAddress) {
-		WorldRegion wr = orForAddress.getRegionDataByDownloadName(regionName);
-		return wr.getParams().getRegionLang();
-	}
-
 	private Object getDatabaseConnection(String fileName, DBDialect dialect) throws SQLException {
 		return dialect.getDatabaseConnection(fileName, log);
 	}
