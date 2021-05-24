@@ -578,7 +578,8 @@ public class WikivoyageDataGenerator {
 		List<Amenity> results = reader.searchPoi(req);
 		System.out.println("Getting cities list took: " + (System.currentTimeMillis() - startTime) + " ms");
 		for (Amenity am : results) {
-			for (String name : am.getAllNames()) {
+			// should we include std name as well?
+			for (String name : am.getOtherNames()) {
 				if (!res.containsKey(name)) {
 					List<Amenity> list = new ArrayList<>();
 					list.add(am);

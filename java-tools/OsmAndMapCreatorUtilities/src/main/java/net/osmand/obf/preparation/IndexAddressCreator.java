@@ -1225,7 +1225,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			IndexCreatorSettings settings) {
 		String name = o.getName();
 		parsePrefix(name, o, namesIndex, settings);
-		for (String nm : o.getAllNames()) {
+		for (String nm : o.getOtherNames()) {
 			if (!nm.equals(name)) {
 				parsePrefix(nm, o, namesIndex, settings);
 			}
