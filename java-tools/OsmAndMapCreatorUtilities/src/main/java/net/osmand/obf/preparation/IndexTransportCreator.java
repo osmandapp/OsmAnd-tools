@@ -95,6 +95,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	
 	private GtfsInfoStats gtfsStats = new GtfsInfoStats();
 
+	private IndexCreatorSettings settings;
+
 	static {
 		acceptedRoutes.add("bus"); //$NON-NLS-1$
 		acceptedRoutes.add("trolleybus"); //$NON-NLS-1$
@@ -113,6 +115,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	public IndexTransportCreator(IndexCreatorSettings settings) throws SQLException {
 		File gtfs = settings.gtfsData;
+		this.settings = settings;
 		if(gtfs != null && gtfs.exists()) {
 			DBDialect dialect = DBDialect.SQLITE;
 			gtfsConnection = dialect.getDatabaseConnection(gtfs.getAbsolutePath(), log);
@@ -126,7 +129,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	public void writeBinaryTransportTree(rtree.Node parent, RTree r, BinaryMapIndexWriter writer,
 			PreparedStatement selectTransportStop, PreparedStatement selectTransportRouteStop,
-			Map<Long, Long> transportRoutes, Map<String, Integer> stringTable, boolean translitFromJapan) throws IOException, RTreeException, SQLException {
+			Map<Long, Long> transportRoutes, Map<String, Integer> stringTable) throws IOException, RTreeException, SQLException {
 		Element[] e = parent.getAllElements();
 		TLongArrayList routesOffsets = null;
 		TLongArrayList routesIds = null;
@@ -147,11 +150,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					String nameEn = rs.getString(5);
 					Map<String, String> names = gson.fromJson(rs.getString(6),t);
 					if (nameEn != null && nameEn.equals(Junidecode.unidecode(name))) {
-						if (translitFromJapan) {
-							nameEn = JapaneseTranslitHelper.getEnglishTransliteration(name);
-						} else {
-							nameEn = null;	
-						}
+						nameEn = null;	
 					}
 					String deletedRoutesStr = rs.getString(7);
 					if (deletedRoutes == null) {
@@ -202,7 +201,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				rtree.Node ns = r.getReadNode(ptr);
 
 				writer.startTransportTreeElement(re.getMinX(), re.getMaxX(), re.getMinY(), re.getMaxY());
-				writeBinaryTransportTree(ns, r, writer, selectTransportStop, selectTransportRouteStop, transportRoutes, stringTable, translitFromJapan);
+				writeBinaryTransportTree(ns, r, writer, selectTransportStop, selectTransportRouteStop, transportRoutes, stringTable);
 				writer.endWriteTransportTreeElement();
 			}
 		}
@@ -306,11 +305,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null) {
 			ctx.loadEntityRelation((Relation) e);
 			List<TransportRoute> troutes = new ArrayList<>();
-			indexTransportRoute((Relation) e, troutes);
+			indexTransportRoute((Relation) e, troutes, icc);
 			for(TransportRoute route : troutes) {
 				insertTransportIntoIndex(route);
 			}
@@ -542,7 +541,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	public void writeBinaryTransportIndex(BinaryMapIndexWriter writer, String regionName,
-			Connection mapConnection, IndexCreationContext icc) throws IOException, SQLException {
+			Connection mapConnection) throws IOException, SQLException {
 		try {
 			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat, transRouteGeometryStat);
 			mapConnection.commit();
@@ -575,12 +574,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				String routeName = rs.getString(3);
 				String routeEnName = rs.getString(4);
 				if (routeEnName != null && routeEnName.equals(Junidecode.unidecode(routeName))) {
-					if (icc.translitJapaneseNames) {
-						routeEnName = JapaneseTranslitHelper.getEnglishTransliteration(routeName);
-					} else {
-						routeEnName = null;	
-					}
-					
+					routeEnName = null;	
 				}
 				String ref = rs.getString(5);
 				String operator = rs.getString(6);
@@ -641,7 +635,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (rootBounds != null) {
 				writer.startTransportTreeElement(rootBounds.getMinX(), rootBounds.getMaxX(), rootBounds.getMinY(), rootBounds.getMaxY());
 				writeBinaryTransportTree(root, transportStopsTree, writer, selectTransportStop, selectTransportRouteStop,
-						transportRoutes, stringTable, icc.translitJapaneseNames);
+						transportRoutes, stringTable);
 				writer.endWriteTransportTreeElement();
 			}
 			selectTransportStop.close();
@@ -716,7 +710,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void indexTransportRoute(Relation rel, List<TransportRoute> troutes) throws SQLException {
+	private void indexTransportRoute(Relation rel, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
+		icc.translitJapaneseNames(rel, settings.addRegionTag);
 		String ref = rel.getTag(OSMTagKey.REF);
 		String route = rel.getTag(OSMTagKey.ROUTE);
 		String operator = rel.getTag(OSMTagKey.OPERATOR);
@@ -771,7 +766,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
 		transportRouteTagValues.registerTagValues(rel, directRoute.getId());
-		if (processTransportRelationV2(rel, directRoute)) { // try new transport relations first
+		if (processTransportRelationV2(rel, directRoute, icc)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
 			if (directRoute.getId().longValue() / 2  == TEST_ROUTE_ID_MISSING_STOPS) {
@@ -1068,7 +1063,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private Pattern platforms = Pattern.compile("^(stop|platform)_(entry|exit)_only$");
 	private Matcher stopPlatformMatcher = platforms.matcher("");
 
-	private boolean processTransportRelationV2(Relation rel, TransportRoute route) {
+	private boolean processTransportRelationV2(Relation rel, TransportRoute route, IndexCreationContext icc) {
 		// first, verify we can accept this relation as new transport relation
 		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
 		String version = rel.getTag("public_transport:version");
@@ -1103,15 +1098,17 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if (entry.getEntity() == null || entry.getEntity().getLatLon() == null) {
 				continue;
 			}
+			Entity e = entry.getEntity();
+			icc.translitJapaneseNames(e, settings.addRegionTag);
 			if (role.startsWith("platform")) {
-				platformsAndStops.add(entry.getEntity());
-				platforms.add(entry.getEntity());
+				platformsAndStops.add(e);
+				platforms.add(e);
 			} else if (role.startsWith("stop")) {
-				platformsAndStops.add(entry.getEntity());
-				stops.add(entry.getEntity());
+				platformsAndStops.add(e);
+				stops.add(e);
 			} else {
-				if (entry.getEntity() instanceof Way && !"backward".equals(entry.getRole())) {
-					route.addWay((Way) entry.getEntity());
+				if (e instanceof Way && !"backward".equals(entry.getRole())) {
+					route.addWay((Way) e);
 				}
 			}
 		}

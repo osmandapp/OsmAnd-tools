@@ -1,15 +1,5 @@
 package net.osmand.obf.preparation;
 
-import gnu.trove.TIntCollection;
-import gnu.trove.iterator.TIntIterator;
-import gnu.trove.iterator.TIntObjectIterator;
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TIntHashSet;
-import gnu.trove.set.hash.TLongHashSet;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +23,17 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.apache.commons.logging.Log;
+
+import gnu.trove.TIntCollection;
+import gnu.trove.iterator.TIntIterator;
+import gnu.trove.iterator.TIntObjectIterator;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TIntHashSet;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
@@ -48,16 +49,15 @@ import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
 import net.osmand.data.QuadTree;
-import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.MapRoutingTypes;
-import net.osmand.osm.RelationTagsPropagation;
-import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
+import net.osmand.osm.RelationTagsPropagation;
+import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -70,9 +70,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
-
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
@@ -232,15 +229,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		iterateMainEntity(es, ctx, null);
 	}
 
-	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx, OsmandRegions or) throws SQLException {
+	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (es instanceof Way) {
 			Way e = (Way) es;
-			if (or != null) {
-				try {
-					addRegionTag(or, e);
-				} catch (Exception ex) {
-					ex.printStackTrace();
-				}
+			if (settings.addRegionTag) {
+				icc.calcRegionTag(e, true);
 			}
 			addLowEmissionZoneTag(e);
 			tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.ROUTING, e);
@@ -269,7 +262,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 				}
 			}
-			if (or != null) {
+			if (icc != null) {
 				Map<String, String> ntags = renderingTypes.transformTags(e.getModifiableTags(), EntityType.WAY, EntityConvertApplyType.MAP);
 				if (e.getModifiableTags() != ntags) {
 					e.getModifiableTags().putAll(ntags);

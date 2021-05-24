@@ -216,7 +216,7 @@ public class IndexCreator {
 			indexPoiCreator.iterateEntity(e, ctx, icc);
 		}
 		if (settings.indexTransport) {
-			indexTransportCreator.iterateMainEntity(e, ctx);
+			indexTransportCreator.iterateMainEntity(e, ctx, icc);
 		}
 		if (settings.indexMap) {
 			if (settings.boundary == null || checkBoundary(e)) {
@@ -227,7 +227,7 @@ public class IndexCreator {
 			indexAddressCreator.iterateMainEntity(e, ctx, icc);
 		}
 		if (settings.indexRouting) {
-			indexRouteCreator.iterateMainEntity(e, ctx);
+			indexRouteCreator.iterateMainEntity(e, ctx, icc);
 		}
 	}
 
@@ -694,7 +694,7 @@ public class IndexCreator {
 				if (settings.indexTransport) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing transport index to binary file...", -1);
-					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection, icc);
+					indexTransportCreator.writeBinaryTransportIndex(writer, regionName, mapConnection);
 				}
 				progress.finishTask();
 				writer.close();

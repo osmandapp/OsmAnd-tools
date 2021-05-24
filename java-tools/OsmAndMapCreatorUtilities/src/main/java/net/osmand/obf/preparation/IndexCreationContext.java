@@ -1,33 +1,49 @@
 package net.osmand.obf.preparation;
 
+import net.osmand.binary.Abbreviations;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Relation;
+import net.osmand.util.Algorithms;
+import net.osmand.util.JapaneseTranslitHelper;
+import net.osmand.util.MapUtils;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class IndexCreationContext {
     private static final Log log = LogFactory.getLog(IndexCreationContext.class);
 
-    public String regionName;
     public OsmandRegions allRegions;
-    public boolean translitJapaneseNames = false;
-    public String regionLang = null;
-    public boolean decryptAbbreviations = false;
     public boolean basemap;
 
+    private boolean decryptAbbreviations = false;
+    private boolean translitJapaneseNames = false;
 
     IndexCreationContext(String regionName, boolean basemap) {
-        this.regionName = regionName;
         this.allRegions = prepareRegions();
-        if (regionName != null) {
-            this.translitJapaneseNames = regionName.startsWith("Japan");
-            this.regionLang = allRegions != null ? getRegionLang(allRegions) : null;
-            this.decryptAbbreviations = needDecryptAbbreviations();
-        }
         this.basemap = basemap;
+        if (regionName != null) {
+        	// Doesn't work incorrect for OsmAnd Live updates
+            this.translitJapaneseNames = regionName.toLowerCase().startsWith("japan");
+            this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
+        }
     }
 
     @Nullable
@@ -43,7 +59,10 @@ public class IndexCreationContext {
         return or;
     }
 
-    private String getRegionLang(OsmandRegions osmandRegions) {
+    private static String getRegionLang(OsmandRegions osmandRegions, String regionName) {
+		if (osmandRegions == null) {
+			return null;
+		}
         WorldRegion wr = osmandRegions.getRegionDataByDownloadName(regionName);
         if (wr != null) {
             return wr.getParams().getRegionLang();
@@ -52,7 +71,7 @@ public class IndexCreationContext {
         }
     }
 
-    private boolean needDecryptAbbreviations() {
+    private static boolean needDecryptAbbreviations(String regionLang) {
         if (regionLang != null) {
             String[] langArr = regionLang.split(",");
             for (String lang : langArr) {
@@ -63,4 +82,109 @@ public class IndexCreationContext {
         }
         return false;
     }
+
+	public boolean translitJapaneseNames(Entity e, boolean addRegionTag) {
+		if (!Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
+				|| Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
+			return false;
+		}
+		boolean u = false;
+		if (translitJapaneseNames) {
+			u = true;
+		} else if (addRegionTag) {
+			Set<String> nms = calcRegionTag(e, false);
+			for (String s : nms) {
+				if (s.toLowerCase().startsWith("japan")) {
+					u = true;
+					break;
+				}
+			}
+		}
+		if (u) {
+			e.putTag(OSMTagKey.NAME_EN.getValue(),
+					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+		}
+		return u;
+	}
+	
+	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
+		boolean upd = false;
+		if (decryptAbbreviations) {
+			upd = true;
+		} else if (addRegionTag && loc != null) {
+			Set<String> dwNames = calcDownloadNames(null, false, allRegions,
+					new QuadRect(loc.getLongitude(), loc.getLatitude(), loc.getLongitude(), loc.getLatitude()));
+			for (String dwName : dwNames) {
+				if (needDecryptAbbreviations(getRegionLang(allRegions, dwName))) {
+					upd = true;
+					break;
+				}
+			}
+		}
+		if(upd) {
+			name = Abbreviations.replaceAll(name);
+		}
+		return name;
+	}
+	
+	public Set<String> calcRegionTag(Entity entity, boolean add) {
+		OsmandRegions or = allRegions;
+		QuadRect qr = null;
+		if (entity instanceof Relation) {
+			LatLon l = ((Relation) entity).getLatLon();
+			if (l != null) {
+				double lat = l.getLatitude();
+				double lon = l.getLongitude();
+				qr = new QuadRect(lon, lat, lon, lat);
+			}
+		} else if (entity instanceof Way) {
+			qr = ((Way) entity).getLatLonBBox();
+		} else if (entity instanceof Node) {
+			double lat = ((Node) entity).getLatitude();
+			double lon = ((Node) entity).getLongitude();
+			qr = new QuadRect(lon, lat, lon, lat);
+		}
+		return calcDownloadNames(entity, add, or, qr);
+	}
+
+	private Set<String> calcDownloadNames(Entity entity, boolean add, OsmandRegions or, QuadRect qr) {
+		if (qr != null && or != null) {
+			try {
+				int lx = MapUtils.get31TileNumberX(qr.left);
+				int rx = MapUtils.get31TileNumberX(qr.right);
+				int by = MapUtils.get31TileNumberY(qr.bottom);
+				int ty = MapUtils.get31TileNumberY(qr.top);
+				List<BinaryMapDataObject> bbox = or.query(lx, rx, ty, by);
+				TreeSet<String> lst = new TreeSet<String>();
+				for (BinaryMapDataObject bo : bbox) {
+					String dw = or.getDownloadName(bo);
+					if (!Algorithms.isEmpty(dw) && or.isDownloadOfType(bo, OsmandRegions.MAP_TYPE)) {
+						lst.add(dw);
+					}
+				}
+				if (add && entity != null) {
+					entity.putTag(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG, serialize(lst));
+				}
+				return lst;
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		} 
+		return Collections.emptySet();
+	}
+	
+	private static String serialize(TreeSet<String> lst) {
+		StringBuilder bld = new StringBuilder();
+		Iterator<String> it = lst.iterator();
+		while(it.hasNext()) {
+			String next = it.next();
+			if(bld.length() > 0) {
+				bld.append(",");
+			}
+			bld.append(next);
+		}
+		return bld.toString();
+	}
+
+	
 }

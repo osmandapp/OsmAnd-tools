@@ -38,10 +38,8 @@ import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
-import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
@@ -102,11 +100,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
 		tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e);
-		if (icc.translitJapaneseNames && e.getTag(OSMTagKey.NAME_EN.getValue()) == null
-				&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
-			e.putTag(OSMTagKey.NAME_EN.getValue(), 
-					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
-		}
+		icc.translitJapaneseNames(e, settings.addRegionTag);
 		Map<String, String> tags = e.getTags();
 		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access"));
