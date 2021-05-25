@@ -83,13 +83,10 @@ public class IndexCreationContext {
         return false;
     }
 
-	public boolean translitJapaneseNames(Entity e, boolean addRegionTag) {
-		if (!Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
-				|| Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
-			return false;
-		}
+	public void translitJapaneseNames(Entity e, boolean addRegionTag) {
 		boolean u = false;
-		if (translitJapaneseNames) {
+		if (translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
+				&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
 			u = true;
 		} else if (addRegionTag) {
 			Set<String> nms = calcRegionTag(e, false);
@@ -104,7 +101,6 @@ public class IndexCreationContext {
 			e.putTag(OSMTagKey.NAME_EN.getValue(),
 					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 		}
-		return u;
 	}
 	
 	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
