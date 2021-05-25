@@ -250,7 +250,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		if (region != null) {
 			String regionLang = region.getParams().getRegionLang();
 			if (regionLang != null) {
-				searchUICore.getPhrase().getSettings().setRegionLang(regionLang);
+				searchUICore.getSearchSettings().setRegionLang(regionLang);
 			}
 		}
 
