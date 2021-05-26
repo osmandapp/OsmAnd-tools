@@ -239,21 +239,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    }
 
 		searchUICore = new SearchUICore(MapPoiTypes.getDefault(), loc, false);
-
-		WorldRegion region = null;
-		try {
-			region = osmandRegions.getSmallestBinaryMapDataObjectAt(new LatLon(mapPanel.getLatitude(),
-					mapPanel.getLongitude())).getKey();
-		} catch (IOException e) {
-			log.error(e.getMessage(), e);
-		}
-		if (region != null) {
-			String regionLang = region.getParams().getRegionLang();
-			if (regionLang != null) {
-				searchUICore.getSearchSettings().setRegionLang(regionLang);
-			}
-		}
-
+		searchUICore.getSearchSettings().setRegions(osmandRegions);
 	    searchUICore.getSearchSettings().setOfflineIndexes(files);
 	    searchUICore.init();
 	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
