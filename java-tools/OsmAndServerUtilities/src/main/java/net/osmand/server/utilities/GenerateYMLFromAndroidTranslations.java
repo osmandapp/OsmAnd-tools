@@ -79,9 +79,10 @@ public class GenerateYMLFromAndroidTranslations {
 			String line = "";
 			String oline = "";
 			Set<String> uniqueKeys = new TreeSet<>();
+			int ln = 0;
 			while ((line = br.readLine()) != null) {
 				oline += line.trim();
-
+				ln ++;
 				if (oline.endsWith(";")) {
 					try {
 						int eq = oline.indexOf('=');
@@ -95,7 +96,7 @@ public class GenerateYMLFromAndroidTranslations {
 							out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
 						}
 					} catch (RuntimeException e) {
-						throw new IllegalArgumentException(String.format("Parsing line '%s' crashed.", oline), e);
+						throw new IllegalArgumentException(String.format("Parsing line '%s' of %s:%d crashed.", oline, f.getName(), ln), e);
 					}
 					oline = "";
 				} else {
