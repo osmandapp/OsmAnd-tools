@@ -36,14 +36,14 @@ public class IndexCreationContext {
     private boolean decryptAbbreviations = false;
     private boolean translitJapaneseNames = false;
 
-    IndexCreationContext(String regionName, boolean basemap) {
-        this.allRegions = prepareRegions();
-        this.basemap = basemap;
-        if (regionName != null) {
-		this.translitJapaneseNames = regionName.toLowerCase().startsWith("japan");
-		this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
-        }
-    }
+	IndexCreationContext(String regionName, boolean basemap) {
+		this.allRegions = prepareRegions();
+		this.basemap = basemap;
+		if (regionName != null) {
+			this.translitJapaneseNames = regionName.toLowerCase().startsWith("japan");
+			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
+		}
+	}
 
     @Nullable
     private OsmandRegions prepareRegions() {
@@ -84,8 +84,11 @@ public class IndexCreationContext {
 
 	public void translitJapaneseNames(Entity e, boolean addRegionTag) {
 		boolean u = false;
-		if (translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
-				&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
+		if (!Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
+				|| Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
+			return;
+		}
+		if (translitJapaneseNames) {
 			u = true;
 		} else if (addRegionTag) {
 			Set<String> nms = calcRegionTag(e, false);
