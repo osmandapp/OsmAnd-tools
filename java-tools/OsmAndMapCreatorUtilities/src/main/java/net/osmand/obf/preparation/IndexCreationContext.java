@@ -40,9 +40,8 @@ public class IndexCreationContext {
         this.allRegions = prepareRegions();
         this.basemap = basemap;
         if (regionName != null) {
-        	// Doesn't work incorrect for OsmAnd Live updates
-            this.translitJapaneseNames = regionName.toLowerCase().startsWith("japan");
-            this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
+		this.translitJapaneseNames = regionName.toLowerCase().startsWith("japan");
+		this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
         }
     }
 
