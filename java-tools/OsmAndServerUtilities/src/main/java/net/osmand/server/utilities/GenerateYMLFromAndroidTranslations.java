@@ -82,21 +82,24 @@ public class GenerateYMLFromAndroidTranslations {
 			int ln = 0;
 			while ((line = br.readLine()) != null) {
 				oline += line.trim();
-				ln ++;
+				ln++;
 				if (oline.endsWith(";")) {
-					try {
-						int eq = oline.indexOf('=');
-						String keyRaw = oline.substring(0, eq);
-						String valueRaw = oline.substring(eq + 1);
-						String key = keyRaw.substring(keyRaw.indexOf('\"') + 1, keyRaw.lastIndexOf('\"'));
-						if (!uniqueKeys.contains(key)) {
-							uniqueKeys.add(key);
-							StringBuilder vl = new StringBuilder(
-									valueRaw.substring(valueRaw.indexOf('\"') + 1, valueRaw.lastIndexOf('\"')));
-							out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
+					if (!oline.equals(";")) {
+						try {
+							int eq = oline.indexOf('=');
+							String keyRaw = oline.substring(0, eq);
+							String valueRaw = oline.substring(eq + 1);
+							String key = keyRaw.substring(keyRaw.indexOf('\"') + 1, keyRaw.lastIndexOf('\"'));
+							if (!uniqueKeys.contains(key)) {
+								uniqueKeys.add(key);
+								StringBuilder vl = new StringBuilder(
+										valueRaw.substring(valueRaw.indexOf('\"') + 1, valueRaw.lastIndexOf('\"')));
+								out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
+							}
+						} catch (RuntimeException e) {
+							throw new IllegalArgumentException(String.format("Parsing line '%s' of %s:%d crashed.", 
+									oline, loc + "-" + f.getName(), ln), e);
 						}
-					} catch (RuntimeException e) {
-						throw new IllegalArgumentException(String.format("Parsing line '%s' of %s:%d crashed.", oline, loc + "-" + f.getName(), ln), e);
 					}
 					oline = "";
 				} else {
