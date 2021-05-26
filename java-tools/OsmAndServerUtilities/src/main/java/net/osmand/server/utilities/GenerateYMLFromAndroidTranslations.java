@@ -66,14 +66,14 @@ public class GenerateYMLFromAndroidTranslations {
 					loc = "-" + loc;
 				}
 				FileOutputStream output = new FileOutputStream(new File(outDir, "ios-values" + loc + ".yml"));
-				parseText(str, output);
+				parseText(str, output, loc);
 				output.close();
 			}
 		}
 	}
 	
 
-	private static void parseText(File f, OutputStream out) throws XmlPullParserException, IOException {
+	private static void parseText(File f, OutputStream out, String loc) throws XmlPullParserException, IOException {
 		BufferedReader br = new BufferedReader(new FileReader(f, StandardCharsets.UTF_8));
 		try {
 			String line = "";
@@ -96,7 +96,7 @@ public class GenerateYMLFromAndroidTranslations {
 							out.write((key + ": \"" + processLine(vl) + "\"\n").getBytes());
 						}
 					} catch (RuntimeException e) {
-						throw new IllegalArgumentException(String.format("Parsing line '%s' of %s:%d crashed.", oline, f.getName(), ln), e);
+						throw new IllegalArgumentException(String.format("Parsing line '%s' of %s:%d crashed.", oline, loc + "-" + f.getName(), ln), e);
 					}
 					oline = "";
 				} else {
