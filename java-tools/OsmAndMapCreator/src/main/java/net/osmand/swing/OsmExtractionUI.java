@@ -58,6 +58,7 @@ import net.osmand.data.Street;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapPoiTypes;
@@ -236,8 +237,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    if(loc.isEmpty()) {
 	    	loc = null;
 	    }
-	    searchUICore = new SearchUICore(MapPoiTypes.getDefault(),
-	    		loc, false);
+
+		searchUICore = new SearchUICore(MapPoiTypes.getDefault(), loc, false);
+		searchUICore.getSearchSettings().setRegions(osmandRegions);
 	    searchUICore.getSearchSettings().setOfflineIndexes(files);
 	    searchUICore.init();
 	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());

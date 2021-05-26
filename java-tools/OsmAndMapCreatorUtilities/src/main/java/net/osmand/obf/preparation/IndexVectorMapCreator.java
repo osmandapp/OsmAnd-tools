@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
@@ -713,15 +714,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Way || e instanceof Node) {
-			OsmandRegions os = icc.allRegions;
-			if (settings.addRegionTag && os != null) {
-				addRegionTag(os, e);
+			if (settings.addRegionTag) {
+				icc.calcRegionTag(e, true);
 			}
-			if (icc.translitJapaneseNames && Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
-					&& !Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
-				e.putTag(OSMTagKey.NAME_EN.getValue(), 
-						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
-			}
+			icc.translitJapaneseNames(e, settings.addRegionTag);
 			tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e);
 			// manipulate what kind of way to load
 			long originalId = e.getId();

@@ -516,15 +516,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public String normalizeStreetName(String name, IndexCreationContext icc) {
+	public String normalizeStreetName(String name, LatLon location, IndexCreationContext icc) {
 		if (name == null) {
 			return null;
 		}
 		name = name.trim();
 		name = name.replace("’", "'");
-		if (icc.decryptAbbreviations) {
-			name = Abbreviations.replaceAll(name);
-		}
+		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
 		if (normalizeStreets) {
 			String newName = name;
@@ -601,7 +599,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			return Collections.emptySet();
 
 		}
-		name = normalizeStreetName(name, icc);
+		name = normalizeStreetName(name, location, icc);
 		Set<City> result = new LinkedHashSet<City>();
 		List<City> nearestObjects = new ArrayList<City>();
 		nearestObjects.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
