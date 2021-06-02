@@ -742,6 +742,7 @@ public class OsmAndLiveReports {
 				} else {
 					rt.put("report", gson.fromJson(rs.getString("report"), rt.getClass()));
 				}
+				System.out.println("TODO REPORT " + rt);
 				reports.add(rt);
 			} catch(IllegalArgumentException e) {
 				// don't add report if it is too unknown type
@@ -769,7 +770,6 @@ public class OsmAndLiveReports {
 		p.setString(1, month);
 		p.setString(2, r);
 		p.setString(3, type.getSqlName());
-		System.out.println("TODO TEST " + report);
 		p.setString(4, report);			
 		Timestamp time = new Timestamp(System.currentTimeMillis());
 		if(!thisMonth) {
