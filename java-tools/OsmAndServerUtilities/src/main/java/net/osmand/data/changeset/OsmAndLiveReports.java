@@ -682,8 +682,8 @@ public class OsmAndLiveReports {
 			}
 			report.rows.add(recipient);
 		}
-		report.btc = (float) btcValue;
-		report.btcPayoutComission = (float) (btcValue * PAYOUT_PERCENT);
+		report.btc = btcValue;
+		report.btcPayoutComission = (btcValue * PAYOUT_PERCENT);
 		report.regionBtc = report.btc - report.btcPayoutComission;
 		report.notReadyToPay = Double.isNaN(loadNumberReport(OsmAndLiveReportType.BTC_VALUE));
 		for (int i = 0; i < report.rows.size(); i++) {
