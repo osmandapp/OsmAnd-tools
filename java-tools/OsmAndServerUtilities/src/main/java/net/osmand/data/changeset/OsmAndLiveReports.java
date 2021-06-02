@@ -160,15 +160,15 @@ public class OsmAndLiveReports {
 		reports.getJsonReport(OsmAndLiveReportType.RECIPIENTS, null, false, true);
 		reports.getJsonReport(OsmAndLiveReportType.PAYOUTS, null, false, true);
 		
-		// calculate other reports later
-		CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
-		for (Country reg : cntrs.rows) {
-			if (reg.map.equals("1")) {
-				reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, false, true);
-				reports.getJsonReport(OsmAndLiveReportType.RANKING, reg.downloadname, false, true);
-				reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, reg.downloadname, false, true);
-			}
-		}
+		// TODO calculate other reports later
+//		CountriesReport cntrs = reports.getReport(OsmAndLiveReportType.COUNTRIES, null, CountriesReport.class);
+//		for (Country reg : cntrs.rows) {
+//			if (reg.map.equals("1")) {
+//				reports.getJsonReport(OsmAndLiveReportType.TOTAL_CHANGES, reg.downloadname, false, true);
+//				reports.getJsonReport(OsmAndLiveReportType.RANKING, reg.downloadname, false, true);
+//				reports.getJsonReport(OsmAndLiveReportType.USERS_RANKING, reg.downloadname, false, true);
+//			}
+//		}
 		
 		reports.getJsonReport(OsmAndLiveReportType.TOTAL, null, false, true);
 		
