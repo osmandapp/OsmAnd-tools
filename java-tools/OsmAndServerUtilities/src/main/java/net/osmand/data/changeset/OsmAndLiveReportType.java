@@ -1,17 +1,19 @@
 package net.osmand.data.changeset;
 
 public enum OsmAndLiveReportType {
+	// DEPRECATED
+	SUPPORTERS("getSupporters"),
 	REGION_RANKING_RANGE("getRegionRankingRange", true),
+	EUR_VALUE("getEurValue", true),
+	
+	// Current
 	RANKING_RANGE("getRankingRange", true),
 	MIN_CHANGES("getMinChanges", true),
 	EUR_BTC_RATE("getBTCEurRate", true),
 	EUR_BTC_ACTUAL_RATE("getBTCEurActualRate", true),
-	BTC_VALUE("getBTCValue", true),
 	BTC_DONATION_VALUE("getBTCDonationValue", true),
-	EUR_VALUE("getEurValue", true),
-	//BTC_DONATION_VALUE("getBTCDonationValue", true),
+	BTC_VALUE("getBTCValue", true),
 	
-	SUPPORTERS("getSupporters"),
 	COUNTRIES("getCountries"),
 	TOTAL_CHANGES("getTotalChanges"),
 	RANKING("calculateRanking"),

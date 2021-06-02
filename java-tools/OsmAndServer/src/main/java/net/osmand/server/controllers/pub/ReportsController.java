@@ -490,16 +490,9 @@ public class ReportsController {
 				}
 
 				if (rec.notReadyToPay) {
-					rec.btcCollected = rec.btc;
-					rec.worldCollectedMessage = String
-							.format("<p>%.3f mBTC</p><span>total collected (estimation)</span>", rec.btc * 1000);
+					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total payout (estimation)</span>", rec.btc * 1000);
 				} else {
-					double collected = reports.getNumberReport(OsmAndLiveReportType.BTC_DONATION_VALUE).doubleValue() + 
-							reports.getBtcCollected();
-					rec.btcCollected = (float) (collected * 1000);
-					rec.worldCollectedMessage = String.format(
-							"<p>%.3f mBTC</p><span>total payout (%.1f mBTC collected)</span>", rec.btc * 1000,
-							collected * 1000);
+					rec.worldCollectedMessage = String.format("<p>%.3f mBTC</p><span>total payout</span>", rec.btc * 1000);
 				}
 				rec.regionCollectedMessage = String.format("<p>%.3f mBTC</p><span>collected for</span>",
 						rec.regionBtc * 1000);
