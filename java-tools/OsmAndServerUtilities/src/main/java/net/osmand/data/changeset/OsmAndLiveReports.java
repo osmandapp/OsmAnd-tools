@@ -146,13 +146,13 @@ public class OsmAndLiveReports {
 
 		reports.saveReport(btc +"", OsmAndLiveReportType.BTC_VALUE, null, null);
 		reports.saveReport(eur +"", OsmAndLiveReportType.EUR_VALUE, null, null);
-		Number btcRate = reports.getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE);
-		if (btcRate == null || Double.isNaN(btcRate.doubleValue())) {
+		if (btc > 0) {
+			reports.saveReport(((float) eur / btc) + "", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
+		} else {
 			reports.saveReport(actualRate + "", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
 		}
 		reports.saveReport(actualRate + "", OsmAndLiveReportType.EUR_BTC_ACTUAL_RATE, null, null);
 		reports.saveReport(btcDonation + "", OsmAndLiveReportType.BTC_DONATION_VALUE, null, null);
-		reports.saveReport(((float)eur / btc)+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
 		reports.saveReport(reports.getRankingRange() + "", OsmAndLiveReportType.RANKING_RANGE, null, null);
 		reports.saveReport(reports.getMinChanges() + "", OsmAndLiveReportType.MIN_CHANGES, null, null);
 		
@@ -742,7 +742,6 @@ public class OsmAndLiveReports {
 				} else {
 					rt.put("report", gson.fromJson(rs.getString("report"), rt.getClass()));
 				}
-				System.out.println("TODO REPORT " + rt);
 				reports.add(rt);
 			} catch(IllegalArgumentException e) {
 				// don't add report if it is too unknown type
