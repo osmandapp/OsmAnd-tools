@@ -146,6 +146,10 @@ public class OsmAndLiveReports {
 
 		reports.saveReport(btc +"", OsmAndLiveReportType.BTC_VALUE, null, null);
 		reports.saveReport(eur +"", OsmAndLiveReportType.EUR_VALUE, null, null);
+		Number btcRate = reports.getNumberReport(OsmAndLiveReportType.EUR_BTC_RATE);
+		if (btcRate == null || Double.isNaN(btcRate.doubleValue())) {
+			reports.saveReport(actualRate + "", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
+		}
 		reports.saveReport(actualRate +"", OsmAndLiveReportType.EUR_BTC_ACTUAL_RATE, null, null);
 		reports.saveReport(btcDonation +"", OsmAndLiveReportType.BTC_DONATION_VALUE, null, null);
 		reports.saveReport(((float)eur / btc)+"", OsmAndLiveReportType.EUR_BTC_RATE, null, null);
