@@ -365,7 +365,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			for (Entry<String, String> e : tags.entrySet()) {
 				if (e.getKey().startsWith("opening_hours:")) {
 					String subkey = e.getKey().substring("opening_hours:".length());
-					if (!subkey.equals("lastcheck") && !subkey.equals("last_check")) {
+					if (!subkey.equals("lastcheck") && !subkey.equals("last_check") && !subkey.equals("signed")) {
 						oh += " || " + e.getValue() + " \"" + Algorithms.capitalizeFirstLetter(subkey) + "\"";
 					}
 				}
