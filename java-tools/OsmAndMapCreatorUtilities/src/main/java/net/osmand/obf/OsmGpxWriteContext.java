@@ -107,6 +107,7 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().lon));
 				tagValue(serializer, "route", "segment");
 				tagValue(serializer, "route_type", "track");
+				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 				addAnalysisTags(gpxTrackTags, analysis);
@@ -141,6 +142,7 @@ public class OsmGpxWriteContext {
 					}
 					tagValue(serializer, "route", "segment");
 					tagValue(serializer, "route_type", "track");
+					tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 					addAnalysisTags(gpxTrackTags, analysis);
