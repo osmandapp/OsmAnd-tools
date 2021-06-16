@@ -176,7 +176,6 @@ public class MapRoutingTypes {
 
 	public boolean encodeEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names){
 		boolean init = false;
-		processBothWaysTag(tags);
 		for(Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = es.getValue();
@@ -340,26 +339,6 @@ public class MapRoutingTypes {
 		MapRouteType type = types.get(id);
 		type.freq ++;
 		return type;
-	}
-
-	private void processBothWaysTag(Map<String, String> tags) {
-		if (tags.containsKey("turn:lanes:both_ways")) {
-			String value = tags.get("turn:lanes:both_ways");
-			if (tags.containsKey("turn:lanes:forward")) {
-				addBothWayValue(tags, "turn:lanes:forward", value);
-			}
-			if (tags.containsKey("turn:lanes:backward")) {
-				addBothWayValue(tags, "turn:lanes:backward", value);
-			}
-		}
-	}
-
-	private void addBothWayValue(Map<String, String> tags, String tag, String bothWayValue) {
-		if (bothWayValue.equals("left")) {
-			tags.put(tag, bothWayValue + "|" + tags.get(tag));
-		} else if (bothWayValue.equals("right")) {
-			tags.put(tag, tags.get(tag) + "|" + bothWayValue);
-		}
 	}
 
 	public static class MapRouteType {
