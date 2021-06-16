@@ -322,6 +322,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformOsmcAndColorTags(tags);
 		tags = transformAddMultipleNetwoksTag(tags);
 		tags = transformRouteLimitationTags(tags);
+		tags = transformTurnLanesTags(tags);
 		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
 		if (listToConvert == null) {
@@ -609,6 +610,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
         }
         return tags;
     }
+
+    public Map<String, String> transformTurnLanesTags(Map<String, String> tags) {
+		if (tags.containsKey("turn:lanes:both_ways")) {
+			String value = tags.get("turn:lanes:both_ways");
+			if (tags.containsKey("turn:lanes:forward")) {
+				addBothWayValue(tags, "turn:lanes:forward", value);
+			}
+			if (tags.containsKey("turn:lanes:backward")) {
+				addBothWayValue(tags, "turn:lanes:backward", value);
+			}
+		}
+		return tags;
+	}
+
+	private void addBothWayValue(Map<String, String> tags, String tag, String bothWayValue) {
+		if (bothWayValue.equals("left")) {
+			tags.put(tag, bothWayValue + "|" + tags.get(tag));
+		} else if (bothWayValue.equals("right")) {
+			tags.put(tag, tags.get(tag) + "|" + bothWayValue);
+		}
+	}
 
 	protected MapRulType getRuleType(String tag, String val, EntityConvertApplyType appType) {
 		return getRuleType(tag, val, appType == EntityConvertApplyType.POI, appType != EntityConvertApplyType.POI);
