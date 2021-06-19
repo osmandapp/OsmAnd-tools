@@ -6,6 +6,7 @@
 
 # Load balancing depending on tiff size
 # For 128Gb RAM and 32 threads machine:
+threads_number_0=1 # >100M
 threads_number_1=17 # >19M  Max RAM per process without simplifying: ~30 Gb
 threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
 threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
@@ -113,16 +114,34 @@ process_tiff ()
 	. $working_dir/no_smoothing.ini
 	filenamefull=$(basename $1)
 	filename=${filenamefull%%.*}
+	indir=${1%/*}
+	highres_dir=${indir%/*}/$(basename $indir)_highres
+	filepath=$1
+	if [ -f $highres_dir/$filenamefull ] ; then
+		filepath=$highres_dir/$filenamefull
+		echo "Highres tile is found"
+		echo Using $filepath
+	fi
 	no_smooth=false
 	if [ ! -f $outdir/$filename.osm.bz2 ]; then
 		echo "----------------------------------------------"
-		echo "Processing "$1
+		echo "Processing "$filename
 		echo "----------------------------------------------"
-		src_tiff=$1
+		size_str=$(gdalinfo $filepath | grep "Size is" | sed 's/Size is //g')
+		width=$(echo $size_str | sed 's/,.*//')
+		height=$(echo $size_str | sed 's/.*,//')
+		src_tiff=$filepath
+		if [[ $width -ge 30000 ]] ; then
+			isolines_step=5
+		fi
 		if [[ $make_feet == "true" ]] ; then
-			gdal_calc.py -A $1 --outfile=${TMP_DIR}/$filename.tif --calc="A/0.3048"
+			if [[ $width -ge 30000 ]] ; then
+				isolines_step=20
+			fi
+			gdal_calc.py -A $filepath --outfile=${TMP_DIR}/$filename.tif --calc="A/0.3048"
 			src_tiff=${TMP_DIR}/$filename.tif
 		fi
+		echo "Using isolines_step="$isolines_step
 		lat=${filename:1:2}
 		smoothed_path=${TMP_DIR}/${filename}_smooth.tif
 		if [[ $smooth == "true" ]] ; then
@@ -135,9 +154,6 @@ process_tiff ()
 			if [[ $no_smooth == "false" ]] ; then
 				echo "Smoothing raster…"
 				if [[ $((10#$lat)) -ge 65 ]] ; then
-					size_str=$(gdalinfo $1 | grep "Size is" | sed 's/Size is //g')
-					width=$(echo $size_str | sed 's/,.*//')
-					height=$(echo $size_str | sed 's/.*,//')
 					width_mod=$(( $width / 2))
 					height_mod=$(( $height / 2))
 					width_mod_2=$(( $width ))
@@ -195,6 +211,7 @@ process_tiff ()
 }
 export -f process_tiff
 #find "$indir" -maxdepth 1 -type f -name "*.tif" | sort -R | parallel -P 5 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel -P $threads_number_0 --no-notice --bar time process_tiff '{}'
 find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel -P $threads_number_1 --no-notice --bar time process_tiff '{}'
 find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel -P $threads_number_2 --no-notice --bar time process_tiff '{}'
 find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel -P $threads_number_3 --no-notice --bar time process_tiff '{}'

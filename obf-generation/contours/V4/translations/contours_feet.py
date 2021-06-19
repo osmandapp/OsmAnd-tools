@@ -17,4 +17,6 @@ def filterTags(attrs):
 			tags.update({'contourtype':'200f'})
 		elif int(height) % 40 == 0:
 			tags.update({'contourtype':'40f'})
+		elif int(height) % 20 == 0:
+			tags.update({'contourtype':'20f'})
 	return tags
