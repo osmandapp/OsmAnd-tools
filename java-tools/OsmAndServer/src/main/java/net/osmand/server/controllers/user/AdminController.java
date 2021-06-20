@@ -194,7 +194,7 @@ public class AdminController {
 		c.add(Calendar.YEAR, 1);
 		deviceSub.expiretime = c.getTime(); 
 		subscriptionsRepository.save(deviceSub);
-		redirectAttrs.addFlashAttribute("subscription", new Gson().toJson(deviceSub));
+		redirectAttrs.addFlashAttribute("subscription", deviceSub);
         return "redirect:info#audience";
 	}
 
