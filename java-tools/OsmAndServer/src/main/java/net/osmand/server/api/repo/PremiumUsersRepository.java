@@ -24,6 +24,8 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
 	
 	PremiumUser findByOrderid(String orderid);
 	
+	PremiumUser findById(int id);
+	
     @Entity
     @Table(name = "user_accounts")
     class PremiumUser {

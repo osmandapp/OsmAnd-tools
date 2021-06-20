@@ -72,7 +72,8 @@ public class UserdataController {
 	private static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
-	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 10 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
@@ -120,14 +121,16 @@ public class UserdataController {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
-			if (s.valid != null && s.valid.booleanValue() && s.sku.contains("_pro_")) {
-				premiumPresent = true;
-				break;
+			if (s.valid != null && s.valid.booleanValue()
+					&& (s.sku.startsWith("osmand_pro_") || s.sku.startsWith("promo_"))) {
+				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
+					premiumPresent = true;
+					break;
+				}
 			}
 		}
 		return premiumPresent;
 	}
-	
     
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
 		PremiumUserDevice d = devicesRepository.findById(deviceId);
@@ -282,14 +285,25 @@ public class UserdataController {
 			@RequestParam(name = "accessToken", required = true) String accessToken,
 			@RequestParam(name = "clienttime", required = false) Long clienttime)
 			throws IOException {
+		// This could be slow series of checks (token, user, subscription, amount of space):
+		// 		probably it's better to support multiple file upload without these checks
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return tokenNotValid();
 		}
+		PremiumUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
+		}
+		if (!checkOrderIdPremium(pu.orderid)) {
+			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT, "Subscription is not valid any more: please prolongue your subscription. "
+					+ " Any data will be accessible for 1 year since expiration.");
+		}
 		UserFilesResults res = generateFiles(dev, null, null, false);
 		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
 			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
-					"Maximum size of synchronization box exceeds 300 MB. Please contact support in order to investigate possible solutions.");
+					"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
+							+ " MB. Please contact support in order to investigate possible solutions.");
 		}
 		UserFile usf = new PremiumUserFilesRepository.UserFile();
 		long cnt, sum;
