@@ -70,7 +70,7 @@ public class UpdateSubscription {
 	protected PreparedStatement updStat;
 	protected PreparedStatement delStat;
 	protected PreparedStatement updCheckStat;
-	protected boolean ios;
+	protected SubscriptionType subType;
 	private AndroidPublisher publisher;
 	
 	private static class UpdateParams {
@@ -78,8 +78,43 @@ public class UpdateSubscription {
 		public boolean verbose;
 	}
 	
-	public UpdateSubscription(AndroidPublisher publisher, boolean ios, boolean revalidateInvalid) {
-		this.ios = ios;
+	public enum SubscriptionType {
+		HUAWEI,
+		IOS,
+		ANDROID,
+//		ANDROID_LEGACY,
+		PROMO,
+		UNKNOWN;
+		
+		public static SubscriptionType fromSku(String sku) {
+			if (sku.contains(".huawei.")) {
+				// net.osmand.huawei.annual_v1
+				return HUAWEI;
+			} else if (sku.startsWith("net.osmand.maps.subscription.")) {
+				return IOS;
+			} else if (sku.startsWith("osm_live_subscription_") || sku.startsWith("osm_free_live_subscription_")) {
+				// 1st gen:
+				// 		osm_live_subscription_2 
+				// 		osm_free_live_subscription_2
+				// 2nd gen:
+				// 		osm_live_subscription_annual_ full_v1 / full_v2 / free_v1 / ...
+				// legacy
+				return ANDROID;
+				
+			} else if (sku.startsWith("osmand_pro_") || sku.startsWith("osmand_maps_")) {
+				// osmand_pro_annual_full_v1
+				// osmand_maps_annual_free_v1
+				return ANDROID;
+			} else if (sku.startsWith("promo_")) {
+				return PROMO;
+			}
+			return UNKNOWN;
+		}
+		
+	}
+	
+	public UpdateSubscription(AndroidPublisher publisher, SubscriptionType subType, boolean revalidateInvalid) {
+		this.subType = subType;
 		this.publisher = publisher;
 		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? "
 				+ "WHERE orderid = ? and sku = ?";
@@ -91,7 +126,7 @@ public class UpdateSubscription {
 		}
 		selQuery = "SELECT sku, purchaseToken, orderid, prevvalidpurchasetoken, payload, checktime, timestamp, starttime, expiretime, valid, introcycles "
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
-		if (ios) {
+		if (subType == SubscriptionType.IOS) {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " introcycles = ? , "
@@ -133,10 +168,10 @@ public class UpdateSubscription {
 			}
 		}
 		if (android) {
-			new UpdateSubscription(publisher, false, revalidateinvalid).queryPurchases(conn, up);
+			new UpdateSubscription(publisher, SubscriptionType.ANDROID, revalidateinvalid).queryPurchases(conn, up);
 		}
 		if (ios) {
-			new UpdateSubscription(null, true, revalidateinvalid).queryPurchases(conn, up);
+			new UpdateSubscription(null, SubscriptionType.IOS, revalidateinvalid).queryPurchases(conn, up);
 		}
 	}
 
@@ -149,7 +184,7 @@ public class UpdateSubscription {
 		
 		HuaweiIAPHelper huaweiIAPHelper = null;
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
-		ReceiptValidationHelper receiptValidationHelper = this.ios ? new ReceiptValidationHelper() : null;
+		ReceiptValidationHelper receiptValidationHelper = SubscriptionType.IOS == subType ? new ReceiptValidationHelper() : null;
 		List<SubscriptionUpdateException> exceptionsUpdates = new ArrayList<UpdateSubscription.SubscriptionUpdateException>();
 		while (rs.next()) {
 			String purchaseToken = rs.getString("purchaseToken");
@@ -164,9 +199,8 @@ public class UpdateSubscription {
 			int introcycles = rs.getInt("introcycles");
 			boolean valid = rs.getBoolean("valid");
 			long currentTime = System.currentTimeMillis();
-			boolean huawei = sku.contains("huawei");
-			boolean ios = sku.startsWith("net.osmand.maps.subscription.") && !huawei;
-			if (this.ios != ios) {
+			SubscriptionType fromSku = SubscriptionType.fromSku(sku);
+			if (this.subType != fromSku) {
 				continue;
 			}
 			long delayBetweenChecks = checkTime == null ? currentTime : (currentTime - checkTime.getTime());
@@ -189,18 +223,18 @@ public class UpdateSubscription {
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			try {
-				if (this.ios) {
+				if (subType == SubscriptionType.IOS) {
 					SubscriptionPurchase sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId, 
 							regTime, startTime, expireTime, currentTime, introcycles, pms.verbose);
 					if (sub == null && prevpurchaseToken != null) {
 						throw new IllegalStateException("This situation need to be checked, we have prev valid purchase token but current token is not valid.");
 					}
-				} else if (huawei) {
+				} else if (subType == SubscriptionType.HUAWEI) {
 					if (huaweiIAPHelper == null) {
 						huaweiIAPHelper = new HuaweiIAPHelper();
 					}
 					processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, pms.verbose);
-				} else {
+				} else if (subType == SubscriptionType.ANDROID) {
 					SubscriptionPurchase sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId, 
 							regTime, startTime, expireTime, currentTime, pms.verbose);
 					if (sub == null && prevpurchaseToken != null) {
@@ -494,7 +528,7 @@ public class UpdateSubscription {
 		} else {
 			updStat.setBoolean(ind++, subscription.getAutoRenewing());
 		}
-		if (ios) {
+		if (subType == SubscriptionType.IOS) {
 			IntroductoryPriceInfo info = subscription.getIntroductoryPriceInfo();
 			if (info != null) {
 				updStat.setInt(ind++, (int) info.getIntroductoryPriceCycles());
@@ -604,6 +638,7 @@ public class UpdateSubscription {
 	
 	protected static class SubscriptionUpdateException extends Exception {
 		
+		private static final long serialVersionUID = -7058574093912760811L;
 		private String orderid;
 
 		public SubscriptionUpdateException(String orderid, String message) {
