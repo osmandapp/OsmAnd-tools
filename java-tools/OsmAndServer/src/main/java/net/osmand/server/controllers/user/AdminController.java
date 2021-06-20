@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.EnumSet;
@@ -51,7 +52,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.gson.Gson;
 
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -194,7 +194,7 @@ public class AdminController {
 		c.add(Calendar.YEAR, 1);
 		deviceSub.expiretime = c.getTime(); 
 		subscriptionsRepository.save(deviceSub);
-		redirectAttrs.addFlashAttribute("subscription", deviceSub);
+		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
         return "redirect:info#audience";
 	}
 
@@ -870,7 +870,7 @@ public class AdminController {
 							return;
 						}
 						Subscription main = createSub(rs);
-						if (main.totalPeriods <= 0) {
+						if (main == null || main.totalPeriods <= 0) {
 							return;
 						}
 						c.setTimeInMillis(main.startTime);
@@ -890,6 +890,9 @@ public class AdminController {
 					private Subscription createSub(ResultSet rs) throws SQLException {
 						Subscription s = new Subscription();
 						s.sku = rs.getString(1);
+						if (s.sku.startsWith("promo_")) {
+							return null;
+						}
 						s.priceMillis = rs.getInt(2);
 						s.pricecurrency = rs.getString(3);
 						s.introPriceMillis = rs.getInt(4);
@@ -900,12 +903,12 @@ public class AdminController {
 						s.introCycles = rs.getInt(9);
 						setDefaultSkuValues(s);
 						c.setTimeInMillis(s.startTime);
-						while(c.getTimeInMillis() < s.endTime) {
+						while (c.getTimeInMillis() < s.endTime) {
 							c.add(Calendar.MONTH, 1);
 							s.totalMonths++;
 						}
-						// we rolled up more than 14 days in future 
-						if(c.getTimeInMillis() - s.endTime > 1000 * 60 * 60 * 24 * 14) {
+						// we rolled up more than 14 days in future
+						if (c.getTimeInMillis() - s.endTime > 1000 * 60 * 60 * 24 * 14) {
 							s.totalMonths--;
 						}
 						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
@@ -1027,6 +1030,7 @@ public class AdminController {
 		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
 		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
 	}
