@@ -22,6 +22,8 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
 	
 	PremiumUser findByEmail(String email);
 	
+	PremiumUser findByOrderid(String orderid);
+	
     @Entity
     @Table(name = "user_accounts")
     class PremiumUser {
@@ -38,6 +40,9 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
         
         @Column(name = "tokendevice")
         public String tokendevice;
+        
+        @Column(name = "orderid")
+        public String orderid;
 
         @Column(name = "regtime")
         @Temporal(TemporalType.TIMESTAMP)
@@ -46,6 +51,7 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
         @Column(name = "tokentime")
         @Temporal(TemporalType.TIMESTAMP)
         public Date tokenTime;
+        
     }
 
     

@@ -36,8 +36,6 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
         @Column(name = "deviceid")
         public String deviceid;
         
-        @Column(name = "orderid")
-        public String orderid;
         
         @Column(name = "accesstoken")
         public String accesstoken;

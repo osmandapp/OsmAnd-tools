@@ -63,7 +63,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
 	private static final int BUFFER_SIZE = 1024 * 512;
 	private static final long MB = 1024 * 1024;
-	private static final long MAXIMUM_ACCOUNT_SIZE = 1000 * MB;
+	private static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium) 
 	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
@@ -72,6 +72,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 10 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
@@ -119,7 +120,7 @@ public class UserdataController {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
-			if (s.valid != null && s.valid.booleanValue()) {
+			if (s.valid != null && s.valid.booleanValue() && s.sku.contains("_pro_")) {
 				premiumPresent = true;
 				break;
 			}
@@ -154,12 +155,17 @@ public class UserdataController {
 			if (!premiumPresent) {
 				return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, "no valid subscription is present");
 			}
+			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+			if (otherUser != null) {
+				String hideEmail = hideEmail(otherUser.email);
+				return error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
+			}
 
 			pu = new PremiumUsersRepository.PremiumUser();
 			pu.email = email;
 			pu.regTime = new Date();
 		}
-		
+		pu.orderid = orderid;
 		pu.tokendevice = deviceId;
 		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
@@ -169,12 +175,32 @@ public class UserdataController {
 	}
 
     
+	private String hideEmail(String email) {
+		if (email == null) {
+			return "***";
+		}
+		int at = email.indexOf("@");
+		if (at == -1) {
+			return email;
+		}
+		String name = email.substring(0, at);
+		StringBuilder hdName = new StringBuilder();
+		for (int i = 0; i < name.length(); i++) {
+			char c = name.charAt(i);
+			if (i > 0 && i < name.length() - 1) {
+				c = '*';
+			}
+			hdName.append(c);
+		}
+		return hdName.toString() + email.substring(at);
+	}
+
+
 	@PostMapping(value = "/device-register")
 	@ResponseBody
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "token", required = true) String token,
-			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid)
+			@RequestParam(name = "deviceid", required = false) String deviceId)
 			throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
@@ -189,7 +215,6 @@ public class UserdataController {
 		PremiumUserDevice device = new PremiumUserDevice();
 		device.userid = pu.id;
 		device.deviceid = deviceId;
-		device.orderid = orderid;
 		device.udpatetime = new Date();
 		device.accesstoken = UUID.randomUUID().toString();
 		usersRepository.saveAndFlush(pu);
