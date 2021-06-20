@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
@@ -42,6 +43,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -49,8 +51,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.gson.Gson;
 
 import gnu.trove.list.array.TIntArrayList;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.LotterySeriesRepository;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
@@ -75,48 +80,51 @@ import net.osmand.server.controllers.pub.WebController;
 @PropertySource("classpath:git.properties")
 public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
-	
+
 	private static final String ACCESS_LOG_REPORTS_FOLDER = "reports";
 
 	@Autowired
 	private MotdService motdService;
-	
+
 	@Autowired
 	private DownloadIndexesService downloadService;
-	
+
 	@Autowired
 	private WebController web;
-	
+
 	@Autowired
 	private ReportsController reports;
-	
+
 	@Autowired
 	private PollsService pollsService;
-	
+
+	@Autowired
+	private DeviceSubscriptionsRepository subscriptionsRepository;
+
 	@Autowired
 	private EmailRegistryService emailService;
-	
+
 	@Autowired
 	private ApplicationContext appContext;
-	
+
 	@Value("${git.commit.format}")
 	private String serverCommit;
-	
+
 	@Value("${web.location}")
 	private String websiteLocation;
-	
+
 	@Value("${files.location}")
-    private String filesLocation;
-	
+	private String filesLocation;
+
 	@Autowired
-    private JdbcTemplate jdbcTemplate;
-	
+	private JdbcTemplate jdbcTemplate;
+
 	@Autowired
 	protected IpLocationService locationService;
-	
+
 	@Autowired
 	private LotterySeriesRepository seriesRepo;
-	
+
 	@Autowired
 	private EmailSenderService emailSender;
 
@@ -156,7 +164,7 @@ public class AdminController {
 	
 	
 	
-	@RequestMapping(path = { "/make-btc-payout" }, method = RequestMethod.POST)
+	@PostMapping(path = { "/make-btc-payout" })
 	public String publish(Model model, 
 			@RequestParam(required = true) int batchSize, final RedirectAttributes redirectAttrs) throws IOException {
 		BtcTransactionReport rep = reports.getBitcoinTransactionReport();
@@ -169,12 +177,32 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_message", "Payment successful! Bitcoin transaction id is: " + res.txId);
         return "redirect:info";
 	}
+	
+	@PostMapping(path = { "/register-promo" })
+	public String registerPromo(Model model, 
+			@RequestParam(required = true) String comment, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
+		deviceSub.sku = "promo_website";
+		deviceSub.orderId = UUID.randomUUID().toString();
+		deviceSub.kind = "promo";
+		Calendar c = Calendar.getInstance();
+		c.setTimeInMillis(System.currentTimeMillis());
+		deviceSub.timestamp = c.getTime();
+		deviceSub.starttime = c.getTime();
+		deviceSub.valid = true;
+		deviceSub.purchaseToken = comment;
+		c.add(Calendar.YEAR, 1);
+		deviceSub.expiretime = c.getTime(); 
+		subscriptionsRepository.save(deviceSub);
+		redirectAttrs.addFlashAttribute("subscription", new Gson().toJson(deviceSub));
+        return "redirect:info#audience";
+	}
 
 	
 	
-	@RequestMapping(path = { "/search-emails" }, method = RequestMethod.POST)
+	@PostMapping(path = { "/search-emails" })
 	public String searchEmail(Model model, 
-			@RequestParam(required = true) String emailPart, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+			@RequestParam(required = true) String emailPart, final RedirectAttributes redirectAttrs) {
 		redirectAttrs.addFlashAttribute("emailSearch", emailService.searchEmails(emailPart));
         return "redirect:info#audience";
 	}
@@ -187,14 +215,14 @@ public class AdminController {
 	}
 
 
-	@RequestMapping(path = { "/register-giveaway" }, method = RequestMethod.POST)
+	@PostMapping(path = { "/register-giveaway" })
 	public String registerGiveaway(Model model,
 			@RequestParam(required = true) String name, 
 			@RequestParam(required = true) String type, 
 			@RequestParam(name="public", required = false) String asPublic,
 			@RequestParam(required = true) String emailTemplate,
 			@RequestParam(required = true) String promocodes, 
-			final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+			final RedirectAttributes redirectAttrs) {
 		// seriesRepo
 		LotterySeries lotterySeries = new LotterySeries();
 		lotterySeries.name = String.format("%1$tY-%1$tm", new Date()) + "-" + name.trim();
