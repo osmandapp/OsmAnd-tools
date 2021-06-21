@@ -167,8 +167,9 @@ public class UserdataController {
 			pu = new PremiumUsersRepository.PremiumUser();
 			pu.email = email;
 			pu.regTime = new Date();
+			pu.orderid = orderid;
 		}
-		pu.orderid = orderid;
+		// keep old order id
 		pu.tokendevice = deviceId;
 		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
