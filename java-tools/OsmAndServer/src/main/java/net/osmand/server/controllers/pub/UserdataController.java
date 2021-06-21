@@ -140,6 +140,30 @@ public class UserdataController {
 		return null;
 	}
 	
+
+	@PostMapping(value = "/user-update-orderid")
+	@ResponseBody
+	public ResponseEntity<String> userUpdateOrderid(@RequestParam(name = "email", required = true) String email,
+			@RequestParam(name = "deviceid", required = false) String deviceId,
+			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
+		PremiumUser pu = usersRepository.findByEmail(email);
+		if (pu == null) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+		}
+		boolean premiumPresent = checkOrderIdPremium(orderid);
+		if (!premiumPresent) {
+			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, "no valid subscription is present");
+		}
+		PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+		if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
+			String hideEmail = hideEmail(otherUser.email);
+			return error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+					"user was already signed up as " + hideEmail);
+		}
+		pu.orderid = orderid;
+		usersRepository.saveAndFlush(pu);
+		return ok();
+	}
 	
 	@PostMapping(value = "/user-register")
 	@ResponseBody
