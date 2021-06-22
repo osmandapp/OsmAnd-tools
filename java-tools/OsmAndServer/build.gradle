@@ -99,12 +99,14 @@ dependencies {
 
     implementation project(':OsmAnd-java')
     implementation project(':OsmAndMapCreatorUtilities')
-    implementation (project(':OsmAndServerUtilities')) {
-    	exclude group: 'com.google.oauth-client', module:'google-oauth-client-jetty'
-    }
+    implementation (project(':OsmAndServerUtilities'))
 
     testImplementation "junit:junit"
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
     testCompile "com.github.tomakehurst:wiremock-standalone:2.18.0"
+
+    implementation(group: 'com.google.apis', name: 'google-api-services-androidpublisher', version: 'v3-rev103-1.25.0') {
+        transitive = true
+    }
 }

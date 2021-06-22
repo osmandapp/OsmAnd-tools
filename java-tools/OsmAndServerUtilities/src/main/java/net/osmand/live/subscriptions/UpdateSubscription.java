@@ -42,6 +42,8 @@ import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
 
+import javax.sql.DataSource;
+
 
 public class UpdateSubscription {
 
@@ -67,6 +69,7 @@ public class UpdateSubscription {
 	protected String updQuery;
 	protected String delQuery;
 	protected String updCheckQuery;
+	private Map subscriptionInfo;
 	protected PreparedStatement updStat;
 	protected PreparedStatement delStat;
 	protected PreparedStatement updCheckStat;
@@ -77,8 +80,31 @@ public class UpdateSubscription {
 		public boolean verifyAll;
 		public boolean verbose;
 	}
-	
+
 	public UpdateSubscription(AndroidPublisher publisher, boolean ios, boolean revalidateInvalid) {
+		init(publisher, ios, revalidateInvalid);
+	}
+
+	// use for single query
+	public UpdateSubscription(String pathToSecretKey, String orderId, String sku) {
+		AndroidPublisher publisher = null;
+		try {
+			publisher = getPublisherApi(pathToSecretKey);
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (GeneralSecurityException e) {
+			e.printStackTrace();
+		}
+		if (publisher == null) {
+			return;
+		}
+		init(publisher, false, false);
+		// "supporters_device_sub_pkey" PRIMARY KEY (sku, orderid)
+		selQuery = "SELECT sku, purchaseToken, orderid, prevvalidpurchasetoken, payload, checktime, timestamp, starttime, expiretime, valid, introcycles "
+				+ "FROM supporters_device_sub S where orderId='" + orderId + "' and sku='" + sku + "' limit 1";
+	}
+
+	private void init(AndroidPublisher publisher, boolean ios, boolean revalidateInvalid) {
 		this.ios = ios;
 		this.publisher = publisher;
 		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? "
@@ -140,7 +166,17 @@ public class UpdateSubscription {
 		}
 	}
 
-	
+	public ResultSet querySinglePurchase(DataSource dataSource) throws SQLException {
+		if (publisher == null) {
+			return null;
+		}
+		Connection conn = dataSource.getConnection();
+		UpdateParams up = new UpdateParams();
+		queryPurchases(conn, up);
+		ResultSet rs = conn.createStatement().executeQuery(selQuery);
+		return rs;
+	}
+
 	void queryPurchases(Connection conn, UpdateParams pms) throws SQLException {
 		ResultSet rs = conn.createStatement().executeQuery(selQuery);
 		updStat = conn.prepareStatement(updQuery);
