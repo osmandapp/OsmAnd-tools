@@ -63,7 +63,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
 	private static final int BUFFER_SIZE = 1024 * 512;
 	private static final long MB = 1024 * 1024;
-	private static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium) 
+	private static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
 	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
@@ -79,41 +79,39 @@ public class UserdataController {
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
 	Gson gson = new Gson();
-	
-	@Autowired
-    protected DeviceSubscriptionsRepository subscriptionsRepo;
-	
-    @Autowired
-    protected PremiumUsersRepository usersRepository;
-    
-    @Autowired
-    protected PremiumUserFilesRepository filesRepository;
-    
-    @Autowired
-    protected PremiumUserDevicesRepository devicesRepository;
-    
-    @Autowired
-    protected StorageService storageService;
-    
-    @Autowired
-	EmailSenderService emailSender;
-    
-//    @PersistenceContext 
-//    protected EntityManager entityManager;
-    
 
-    protected ResponseEntity<String> error(int errorCode, String message) {
-    	Map<String, Object> mp = new TreeMap<String, Object>();
-    	mp.put("errorCode", errorCode);
-    	mp.put("message", message);
-    	return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
-    }
-    
-    
-    private ResponseEntity<String> ok() {
-    	return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
-    }
-    
+	@Autowired
+	protected DeviceSubscriptionsRepository subscriptionsRepo;
+
+	@Autowired
+	protected PremiumUsersRepository usersRepository;
+
+	@Autowired
+	protected PremiumUserFilesRepository filesRepository;
+
+	@Autowired
+	protected PremiumUserDevicesRepository devicesRepository;
+
+	@Autowired
+	protected StorageService storageService;
+
+	@Autowired
+	EmailSenderService emailSender;
+
+	// @PersistenceContext
+	// protected EntityManager entityManager;
+
+	protected ResponseEntity<String> error(int errorCode, String message) {
+		Map<String, Object> mp = new TreeMap<String, Object>();
+		mp.put("errorCode", errorCode);
+		mp.put("message", message);
+		return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
+	}
+
+	private ResponseEntity<String> ok() {
+		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
+	}
+
 	private String checkOrderIdPremium(String orderid) {
 		if (Algorithms.isEmpty(orderid)) {
 			return "no subscription provided";
@@ -124,7 +122,7 @@ public class UserdataController {
 			// s.sku could be checked for premium
 			if (s.valid == null || s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
-			} else if(!s.sku.startsWith("osmand_pro_") && !s.sku.startsWith("promo_")) {
+			} else if (!s.sku.startsWith("osmand_pro_") && !s.sku.startsWith("promo_")) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
@@ -136,7 +134,7 @@ public class UserdataController {
 		}
 		return errorMsg;
 	}
-    
+
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
 		PremiumUserDevice d = devicesRepository.findById(deviceId);
 		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
@@ -144,7 +142,6 @@ public class UserdataController {
 		}
 		return null;
 	}
-	
 
 	@PostMapping(value = "/user-update-orderid")
 	@ResponseBody
@@ -169,19 +166,18 @@ public class UserdataController {
 		usersRepository.saveAndFlush(pu);
 		return ok();
 	}
-	
+
 	@PostMapping(value = "/user-register")
 	@ResponseBody
-	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email, 
+	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid)
-			throws IOException {
+			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
 			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
-		if( pu != null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "user was already registered with such email");
+		if (pu != null) {
+			return error(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 		} else {
 			String error = checkOrderIdPremium(orderid);
 			if (error != null) {
@@ -190,7 +186,8 @@ public class UserdataController {
 			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 			if (otherUser != null) {
 				String hideEmail = hideEmail(otherUser.email);
-				return error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
+				return error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+						"user was already signed up as " + hideEmail);
 			}
 
 			pu = new PremiumUsersRepository.PremiumUser();
@@ -207,7 +204,6 @@ public class UserdataController {
 		return ok();
 	}
 
-    
 	private String hideEmail(String email) {
 		if (email == null) {
 			return "***";
@@ -228,13 +224,11 @@ public class UserdataController {
 		return hdName.toString() + email.substring(at);
 	}
 
-
 	@PostMapping(value = "/device-register")
 	@ResponseBody
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "token", required = true) String token,
-			@RequestParam(name = "deviceid", required = false) String deviceId)
-			throws IOException {
+			@RequestParam(name = "deviceid", required = false) String deviceId) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
 			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
@@ -254,15 +248,14 @@ public class UserdataController {
 		devicesRepository.saveAndFlush(device);
 		return ResponseEntity.ok(gson.toJson(device));
 	}
-    
-	
+
 	@PostMapping(value = "/delete-file")
 	@ResponseBody
-	public ResponseEntity<String> delete(@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
+	public ResponseEntity<String> delete(@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken, 
-			@RequestParam(name = "clienttime", required = false) Long clienttime)
-			throws IOException {
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return tokenNotValid();
@@ -282,11 +275,12 @@ public class UserdataController {
 		filesRepository.saveAndFlush(usf);
 		return ok();
 	}
-	
+
 	@PostMapping(value = "/delete-file-version")
 	@ResponseBody
 	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = true) Long updatetime,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
@@ -296,7 +290,8 @@ public class UserdataController {
 			return tokenNotValid();
 		} else {
 			if (updatetime != null) {
-				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type, new Date(updatetime));
+				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
+						new Date(updatetime));
 			}
 			if (fl == null) {
 				return error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
@@ -306,17 +301,17 @@ public class UserdataController {
 			return ok();
 		}
 	}
-	
+
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	@ResponseBody
 	public ResponseEntity<String> upload(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
-			@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken,
-			@RequestParam(name = "clienttime", required = false) Long clienttime)
-			throws IOException {
+			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
-		// 		probably it's better to support multiple file upload without these checks
+		// probably it's better to support multiple file upload without these checks
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return tokenNotValid();
@@ -327,7 +322,8 @@ public class UserdataController {
 		}
 		String errorMsg = checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
-			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT, "Subscription is not valid any more: " + errorMsg);
+			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
+					"Subscription is not valid any more: " + errorMsg);
 		}
 		UserFilesResults res = generateFiles(dev, null, null, false);
 		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
@@ -358,15 +354,15 @@ public class UserdataController {
 		if (clienttime != null) {
 			usf.clienttime = new Date(clienttime.longValue());
 		}
-//		Session session = entityManager.unwrap(Session.class);
-//	    Blob blob = session.getLobHelper().createBlob(file.getInputStream(), file.getSize());
-//		usf.data = blob;
+		// Session session = entityManager.unwrap(Session.class);
+		// Blob blob = session.getLobHelper().createBlob(file.getInputStream(), file.getSize());
+		// usf.data = blob;
 		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
 		if (storageService.storeLocally()) {
 			usf.data = file.getBytes();
 		}
 		filesRepository.saveAndFlush(usf);
-		
+
 		return ok();
 	}
 
@@ -385,14 +381,13 @@ public class UserdataController {
 			name = name.substring(nt + 1);
 		}
 		return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
-//		return usf.name + FILE_NAME_SUFFIX;
+		// return usf.name + FILE_NAME_SUFFIX;
 	}
-
 
 	private String userFolder(UserFile usf) {
 		return USER_FOLDER_PREFIX + usf.userid;
 	}
-	
+
 	@PostMapping(value = "/remap-filenames")
 	@ResponseBody
 	public ResponseEntity<String> remapFilenames(@RequestParam(name = "deviceid", required = true) int deviceId,
@@ -410,7 +405,7 @@ public class UserdataController {
 		}
 		return ok();
 	}
-	
+
 	@PostMapping(value = "/backup-storage")
 	@ResponseBody
 	public ResponseEntity<String> migrateData(@RequestParam(name = "storageid", required = true) String storageId,
@@ -426,7 +421,8 @@ public class UserdataController {
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
 			if (fl != null && fl.filesize > 0) {
-				String newStorage = storageService.backupData(storageId, userFolder(fl), storageFileName(fl), fl.storage, fl.data);
+				String newStorage = storageService.backupData(storageId, userFolder(fl), storageFileName(fl),
+						fl.storage, fl.data);
 				if (newStorage != null) {
 					fl.storage = newStorage;
 					filesRepository.save(fl);
@@ -435,12 +431,12 @@ public class UserdataController {
 		}
 		return ok();
 	}
-	
-	
+
 	@GetMapping(value = "/download-file")
 	@ResponseBody
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name, @RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = false) Long updatetime,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
@@ -497,18 +493,18 @@ public class UserdataController {
 		}
 	}
 
-
 	private ResponseEntity<String> tokenNotValid() {
 		return error(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
 	}
 
-	
 	@GetMapping(value = "/list-files")
 	@ResponseBody
-	public ResponseEntity<String> listFiles( 
-			@RequestParam(name = "deviceid", required = true) int deviceId, @RequestParam(name = "accessToken", required = true) String accessToken, 
-			@RequestParam(name = "name", required = false) String name, @RequestParam(name = "type", required = false) String type,
-			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions) throws IOException, SQLException {
+	public ResponseEntity<String> listFiles(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			@RequestParam(name = "name", required = false) String name,
+			@RequestParam(name = "type", required = false) String type,
+			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions)
+			throws IOException, SQLException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return tokenNotValid();
@@ -516,7 +512,6 @@ public class UserdataController {
 		UserFilesResults res = generateFiles(dev, name, type, allVersions);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
-
 
 	private UserFilesResults generateFiles(PremiumUserDevice dev, String name, String type, boolean allVersions) {
 		List<UserFileNoData> fl = filesRepository.listFilesByUserid(dev.userid, name, type);
@@ -543,12 +538,12 @@ public class UserdataController {
 			}
 			if (allVersions) {
 				res.allFiles.add(sf);
-				
+
 			}
 		}
 		return res;
 	}
-	
+
 	public static class UserFilesResults {
 		public int totalZipSize;
 		public int totalFileSize;
@@ -558,6 +553,6 @@ public class UserdataController {
 		public List<UserFileNoData> uniqueFiles;
 		public int deviceid;
 		public long maximumAccountSize;
-		
+
 	}
 }
