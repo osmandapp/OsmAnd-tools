@@ -74,6 +74,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
@@ -113,23 +114,27 @@ public class UserdataController {
     	return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
     }
     
-	private boolean checkOrderIdPremium(String orderid) {
+	private String checkOrderIdPremium(String orderid) {
 		if (Algorithms.isEmpty(orderid)) {
-			return false;
+			return "no subscription provided";
 		}
-		boolean premiumPresent = false;
+		String errorMsg = "no subscription present";
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
-			if (s.valid != null && s.valid.booleanValue()
-					&& (s.sku.startsWith("osmand_pro_") || s.sku.startsWith("promo_"))) {
+			if (s.valid == null || s.valid.booleanValue()) {
+				errorMsg = "no valid subscription present";
+			} else if(!s.sku.startsWith("osmand_pro_") && !s.sku.startsWith("promo_")) {
+				errorMsg = "subscription is not eligible for OsmAnd Cloud";
+			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
-					premiumPresent = true;
-					break;
+					return null;
+				} else {
+					errorMsg = "subscription is expired or not validated yet";
 				}
 			}
 		}
-		return premiumPresent;
+		return errorMsg;
 	}
     
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
@@ -150,9 +155,9 @@ public class UserdataController {
 		if (pu == null) {
 			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
 		}
-		boolean premiumPresent = checkOrderIdPremium(orderid);
-		if (!premiumPresent) {
-			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, "no valid subscription is present");
+		String errorMsg = checkOrderIdPremium(orderid);
+		if (errorMsg != null) {
+			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 		if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
@@ -175,12 +180,12 @@ public class UserdataController {
 		if (!email.contains("@")) {
 			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
-		boolean newUser = false; 
-		if (pu == null) {
-			newUser = false;
-			boolean premiumPresent = checkOrderIdPremium(orderid);
-			if (!premiumPresent) {
-				return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, "no valid subscription is present");
+		if( pu != null) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "user was already registered with such email");
+		} else {
+			String error = checkOrderIdPremium(orderid);
+			if (error != null) {
+				return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
 			}
 			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 			if (otherUser != null) {
@@ -198,7 +203,7 @@ public class UserdataController {
 		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendRegistrationEmail(pu.email, pu.token, newUser);
+		emailSender.sendRegistrationEmail(pu.email, pu.token, true);
 		return ok();
 	}
 
@@ -320,9 +325,9 @@ public class UserdataController {
 		if (pu == null) {
 			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
 		}
-		if (!checkOrderIdPremium(pu.orderid)) {
-			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT, "Subscription is not valid any more: please prolongue your subscription. "
-					+ " Any data will be accessible for 1 year since expiration.");
+		String errorMsg = checkOrderIdPremium(pu.orderid);
+		if (errorMsg != null) {
+			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT, "Subscription is not valid any more: " + errorMsg);
 		}
 		UserFilesResults res = generateFiles(dev, null, null, false);
 		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
