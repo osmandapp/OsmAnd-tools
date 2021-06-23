@@ -175,7 +175,7 @@ public class UserdataController {
 					(s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null)) {
 				s = revalidateGoogleSubscription(s);
 			}
-			if (s.valid == null || s.valid.booleanValue()) {
+			if (s.valid == null || !s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && !s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
