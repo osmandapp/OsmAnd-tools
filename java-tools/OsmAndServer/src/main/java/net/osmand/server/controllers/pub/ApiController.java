@@ -308,7 +308,7 @@ public class ApiController {
 					subMap.put("valid", sub.valid.toString());
 				}
 				String state = "undefined";
-				if (sub.expiretime == null || sub.paymentstate == null || sub.autorenewing == null) {
+				if (sub.expiretime == null || sub.paymentstate == null || sub.autorenewing == null || sub.valid == null || !sub.valid) {
 					UpdateSubscription updateSubscription = new UpdateSubscription(googleSecretkeyFilePath, sub.orderId, sub.sku);
 					try {
 						ResultSet rs = updateSubscription.querySinglePurchase(dataSource);
@@ -316,6 +316,11 @@ public class ApiController {
 							sub.expiretime = new Date(rs.getTimestamp("expiretime").getTime());
 							sub.paymentstate = rs.getInt("paymentstate");
 							sub.autorenewing = rs.getBoolean("autorenewing");
+							sub.valid = rs.getBoolean("valid");
+							if (subMap.containsKey("valid")) {
+								subMap.remove("valid");
+							}
+							subMap.put("valid", sub.valid.toString());
 						}
 					} catch (SQLException throwables) {
 						throwables.printStackTrace();
