@@ -150,7 +150,7 @@ public class UserdataController {
 				if (subscription != null) {
 					if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
 						s.expiretime = new Date(subscription.getExpiryTimeMillis());
-						s.checktime = new Date();
+						// s.checktime = new Date(); // don't set checktime let jenkins do its job
 						s.valid = System.currentTimeMillis() < subscription.getExpiryTimeMillis();
 						subscriptionsRepo.save(s);
 					}
@@ -171,14 +171,14 @@ public class UserdataController {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
+			if ((s.expiretime == null || s.expiretime.getTime() > System.currentTimeMillis() || s.checktime == null) && s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
+				s = revalidateGoogleSubscription(s);
+			}
 			if (s.valid == null || s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && !s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
-				if ((s.expiretime == null || s.checktime == null) && s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
-					s = revalidateGoogleSubscription(s);
-				}
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
 					return null;
 				} else {
