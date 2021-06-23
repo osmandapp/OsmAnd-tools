@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.ResultSet;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -21,6 +22,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import net.osmand.live.subscriptions.UpdateSubscription;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +75,9 @@ public class ApiController {
     
     @Value("${web.location}")
     private String websiteLocation;
+
+	@Value("${subscription.google.secretkey}")
+	private String googleSecretkeyFilePath;
 
 	@Autowired
 	private DataSource dataSource;
@@ -303,6 +308,19 @@ public class ApiController {
 					subMap.put("valid", sub.valid.toString());
 				}
 				String state = "undefined";
+				if (sub.expiretime == null || sub.paymentstate == null || sub.autorenewing == null) {
+					UpdateSubscription updateSubscription = new UpdateSubscription(googleSecretkeyFilePath, sub.orderId, sub.sku);
+					try {
+						ResultSet rs = updateSubscription.querySinglePurchase(dataSource);
+						if (rs != null && rs.next()) {
+							sub.expiretime = new Date(rs.getTimestamp("expiretime").getTime());
+							sub.paymentstate = rs.getInt("paymentstate");
+							sub.autorenewing = rs.getBoolean("autorenewing");
+						}
+					} catch (SQLException throwables) {
+						throwables.printStackTrace();
+					}
+				}
 				if (sub.expiretime != null && sub.paymentstate != null && sub.autorenewing != null) {
 					long expireTimeMs = sub.expiretime.getTime();
 					int paymentState = sub.paymentstate;

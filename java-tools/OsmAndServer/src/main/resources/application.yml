@@ -45,6 +45,7 @@ server:
 files.location: ${user.dir}/../../../help
 gen.location: ${files.location}/gen
 web.location: ${files.location}/website
+subscription.google.secretkey: "/Users/macmini/Temp/token/client_secret_publisher.json"
 
 management:
   endpoints:
