@@ -171,7 +171,8 @@ public class UserdataController {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
-			if ((s.expiretime == null || s.expiretime.getTime() > System.currentTimeMillis() || s.checktime == null) && s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
+			if (s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && 
+					(s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null)) {
 				s = revalidateGoogleSubscription(s);
 			}
 			if (s.valid == null || s.valid.booleanValue()) {
