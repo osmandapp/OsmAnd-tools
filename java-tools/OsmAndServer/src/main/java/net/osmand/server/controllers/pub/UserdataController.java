@@ -226,13 +226,17 @@ public class UserdataController {
 	@ResponseBody
 	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
+			@RequestParam(name = "orderid", required = false) String orderid,
+			@RequestParam(name = "login", required = false) boolean login) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
 			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
 		if (pu != null) {
-			return error(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
+			if (!login) {
+				return error(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
+			}
+			// don't check order id validity for login
 		} else {
 			String error = checkOrderIdPremium(orderid);
 			if (error != null) {
