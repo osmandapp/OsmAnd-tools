@@ -188,6 +188,10 @@ public class UserdataController {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
+			// test code
+			if ((s.expiretime == null || s.checktime == null) && s.sku.startsWith("osm_free_live_")) {
+				s = revalidateGoogleSubscription(s);
+			}
 			if (s.valid == null || s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && !s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
