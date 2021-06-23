@@ -99,10 +99,15 @@ dependencies {
 
     implementation project(':OsmAnd-java')
     implementation project(':OsmAndMapCreatorUtilities')
-    implementation (project(':OsmAndServerUtilities')) {
-    	exclude group: 'com.google.oauth-client', module:'google-oauth-client-jetty'
-    }
+    
+    // potential conflict google oauth jetty & spring boot jetty / tomcat libs
+    implementation (project(':OsmAndServerUtilities'));
+//    implementation (project(':OsmAndServerUtilities')) {
+//    	exclude group: 'com.google.oauth-client', module:'google-oauth-client-jetty'
+//    }
 
+	
+	 
     implementation(group: 'com.google.apis', name: 'google-api-services-androidpublisher', version: 'v3-rev103-1.25.0') { 
         transitive = true 
     }
