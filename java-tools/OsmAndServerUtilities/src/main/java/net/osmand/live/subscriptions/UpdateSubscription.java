@@ -158,7 +158,7 @@ public class UpdateSubscription {
 			} else if (args[i].startsWith("-host=")) {
 				host = args[i].substring("-host=".length());
 			} else if (args[i].startsWith("-androidclientsecret=")) {
-				host = args[i].substring("-androidclientsecret=".length());
+				androidClientSecretFile = args[i].substring("-androidclientsecret=".length());
 			} else if ("-onlyandroid".equals(args[i])) {
 				ios = false;
 			} else if ("-revalidateinvalid".equals(args[i])) {
