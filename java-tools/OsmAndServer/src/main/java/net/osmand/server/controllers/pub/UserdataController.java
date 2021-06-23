@@ -143,8 +143,10 @@ public class UserdataController {
 		if (!Algorithms.isEmpty(clientSecretFile) ) {
 			if (androidPublisher == null) {
 				try {
+					LOG.info("Init android publisher ");
 					// watch first time you need to open special url on web server
 					this.androidPublisher = UpdateSubscription.getPublisherApi(clientSecretFile);
+					LOG.info("Init android publisher ok");
 				} catch (Exception e) {
 					LOG.error("Error configuring android publisher api: " + e.getMessage(), e);
 				}
@@ -154,13 +156,16 @@ public class UserdataController {
 			try {
 				Subscriptions subs = androidPublisher.purchases().subscriptions();
 				SubscriptionPurchase subscription;
+				LOG.info("Ask android sub");
 				if (s.sku.contains("_free_")) {
 					subscription = subs.get(GOOGLE_PACKAGE_NAME_FREE, s.sku, s.purchaseToken).execute();
 				} else {
 					subscription = subs.get(GOOGLE_PACKAGE_NAME, s.sku, s.purchaseToken).execute();
 				}
 				if (subscription != null) {
+					LOG.info("Sub found");
 					if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
+						LOG.info("Resave android sub");
 						s.expiretime = new Date(subscription.getExpiryTimeMillis());
 						s.checktime = new Date();
 						s.valid = System.currentTimeMillis() < subscription.getExpiryTimeMillis();
@@ -184,6 +189,7 @@ public class UserdataController {
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
 			// test code
+			LOG.info("Validate " + s.sku);
 			if ((s.expiretime == null || s.checktime == null) && s.sku.startsWith("osm_free_live_")) {
 				s = revalidateGoogleSubscription(s);
 			}
