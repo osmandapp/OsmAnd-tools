@@ -4,8 +4,10 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +31,7 @@ import javax.validation.constraints.NotNull;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,8 +42,18 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.androidpublisher.AndroidPublisher;
+import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subscriptions;
+import com.google.api.services.androidpublisher.AndroidPublisherScopes;
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
 
+import net.osmand.live.subscriptions.UpdateSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
@@ -77,7 +90,13 @@ public class UserdataController {
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
-
+	
+	private static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
+	private static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
+	private static final String GOOGLE_PRODUCT_NAME = UpdateSubscription.GOOGLE_PRODUCT_NAME;
+	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PRODUCT_NAME;
+	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PRODUCT_NAME_FREE;
+	
 	Gson gson = new Gson();
 
 	@Autowired
@@ -94,9 +113,14 @@ public class UserdataController {
 
 	@Autowired
 	protected StorageService storageService;
-
+	
 	@Autowired
 	EmailSenderService emailSender;
+	
+	@Value("${google.androidPublisher.clientSecret}")
+	protected String clientSecretFile; 
+	
+	private AndroidPublisher androidPublisher;
 
 	// @PersistenceContext
 	// protected EntityManager entityManager;
@@ -111,6 +135,50 @@ public class UserdataController {
 	private ResponseEntity<String> ok() {
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
 	}
+	
+	private SupporterDeviceSubscription revalidateGoogleSubscription(SupporterDeviceSubscription s) {
+		if (!Algorithms.isEmpty(clientSecretFile) ) {
+			if (androidPublisher == null) {
+				try {
+					JacksonFactory jsonFactory = new com.google.api.client.json.jackson2.JacksonFactory();
+					GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jsonFactory,
+							new InputStreamReader(new FileInputStream(clientSecretFile)));
+					NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+					GoogleCredential credential = new GoogleCredential.Builder().setTransport(httpTransport)
+							.setJsonFactory(jsonFactory).setServiceAccountId("user") // user constant?
+							.setServiceAccountScopes(Collections.singleton(AndroidPublisherScopes.ANDROIDPUBLISHER))
+							.setClientSecrets(clientSecrets).build();
+					this.androidPublisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
+							.setApplicationName(GOOGLE_PRODUCT_NAME).build();
+				} catch (Exception e) {
+					LOG.error("Error configuring android publisher api: " + e.getMessage(), e);
+				}
+			}
+			if (androidPublisher != null) {
+				try {
+					Subscriptions subs = androidPublisher.purchases().subscriptions();
+					SubscriptionPurchase subscription;
+					if (s.sku.contains("_free_")) {
+						subscription = subs.get(GOOGLE_PACKAGE_NAME_FREE, s.sku, s.purchaseToken).execute();
+					} else {
+						subscription = subs.get(GOOGLE_PACKAGE_NAME, s.sku, s.purchaseToken).execute();
+					}
+					if (subscription != null) {
+						if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
+							s.expiretime = new Date(subscription.getExpiryTimeMillis());
+							s.checktime = new Date();
+							s.valid = System.currentTimeMillis() < subscription.getExpiryTimeMillis();
+							subscriptionsRepo.save(s);
+						}
+					}
+				} catch (IOException e) {
+					LOG.error(String.format("Error retrieving android publisher subscription %s - %s: %s", s.sku,
+							s.orderId, e.getMessage()), e);
+				}
+			}
+		}
+		return s;
+	}
 
 	private String checkOrderIdPremium(String orderid) {
 		if (Algorithms.isEmpty(orderid)) {
@@ -122,9 +190,12 @@ public class UserdataController {
 			// s.sku could be checked for premium
 			if (s.valid == null || s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
-			} else if (!s.sku.startsWith("osmand_pro_") && !s.sku.startsWith("promo_")) {
+			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && !s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
+				if ((s.expiretime == null || s.checktime == null) && s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
+					s = revalidateGoogleSubscription(s);
+				}
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
 					return null;
 				} else {
@@ -134,6 +205,8 @@ public class UserdataController {
 		}
 		return errorMsg;
 	}
+
+	
 
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
 		PremiumUserDevice d = devicesRepository.findById(deviceId);

@@ -47,11 +47,13 @@ public class UpdateSubscription {
 
 
 	// init one time
-	protected static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
-	protected static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
+	public static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
+	public static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
 
-	private static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
-	private static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
+	public static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
+	public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
+	public static final String OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX = "osmand_pro_";
+	
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
 	private static final long HOUR = 1000l * 60 * 60;
@@ -585,7 +587,7 @@ public class UpdateSubscription {
 
 
 	
-	private static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
+	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
 	    File dataStoreDir = new File(new File(file).getParentFile(), ".credentials");

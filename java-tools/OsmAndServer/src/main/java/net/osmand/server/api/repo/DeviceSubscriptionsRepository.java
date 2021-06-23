@@ -54,6 +54,10 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 		@Column(name = "expiretime")
 		@Temporal(TemporalType.TIMESTAMP)
 		public Date expiretime;
+		
+		@Column(name = "checktime")
+		@Temporal(TemporalType.TIMESTAMP)
+		public Date checktime;
 
 		@Column(name = "autorenewing")
 		public Boolean autorenewing;

@@ -8,6 +8,8 @@ google:
     scope:
       - openid
       - email
+  androidPublisher:
+  	clientSecret: ${ANDROID_PUBLISHER_CLIENT_SECRET_JSON:}
   resource:
     userInfoUri: https://www.googleapis.com/oauth2/v3/userinfo
     tokenInfoUri:
