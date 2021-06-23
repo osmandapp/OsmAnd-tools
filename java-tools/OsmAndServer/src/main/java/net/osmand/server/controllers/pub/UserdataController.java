@@ -4,6 +4,7 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,6 +33,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,11 +44,13 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subscriptions;
 import com.google.api.services.androidpublisher.AndroidPublisherScopes;
@@ -93,9 +97,8 @@ public class UserdataController {
 	
 	private static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
 	private static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
-	private static final String GOOGLE_PRODUCT_NAME = UpdateSubscription.GOOGLE_PRODUCT_NAME;
-	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PRODUCT_NAME;
-	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PRODUCT_NAME_FREE;
+	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
+	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
 	
 	Gson gson = new Gson();
 
@@ -140,41 +143,33 @@ public class UserdataController {
 		if (!Algorithms.isEmpty(clientSecretFile) ) {
 			if (androidPublisher == null) {
 				try {
-					JacksonFactory jsonFactory = new com.google.api.client.json.jackson2.JacksonFactory();
-					GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jsonFactory,
-							new InputStreamReader(new FileInputStream(clientSecretFile)));
-					NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-					GoogleCredential credential = new GoogleCredential.Builder().setTransport(httpTransport)
-							.setJsonFactory(jsonFactory).setServiceAccountId("user") // user constant?
-							.setServiceAccountScopes(Collections.singleton(AndroidPublisherScopes.ANDROIDPUBLISHER))
-							.setClientSecrets(clientSecrets).build();
-					this.androidPublisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
-							.setApplicationName(GOOGLE_PRODUCT_NAME).build();
+					// watch first time you need to open special url on web server
+					this.androidPublisher = UpdateSubscription.getPublisherApi(clientSecretFile);
 				} catch (Exception e) {
 					LOG.error("Error configuring android publisher api: " + e.getMessage(), e);
 				}
 			}
-			if (androidPublisher != null) {
-				try {
-					Subscriptions subs = androidPublisher.purchases().subscriptions();
-					SubscriptionPurchase subscription;
-					if (s.sku.contains("_free_")) {
-						subscription = subs.get(GOOGLE_PACKAGE_NAME_FREE, s.sku, s.purchaseToken).execute();
-					} else {
-						subscription = subs.get(GOOGLE_PACKAGE_NAME, s.sku, s.purchaseToken).execute();
-					}
-					if (subscription != null) {
-						if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
-							s.expiretime = new Date(subscription.getExpiryTimeMillis());
-							s.checktime = new Date();
-							s.valid = System.currentTimeMillis() < subscription.getExpiryTimeMillis();
-							subscriptionsRepo.save(s);
-						}
-					}
-				} catch (IOException e) {
-					LOG.error(String.format("Error retrieving android publisher subscription %s - %s: %s", s.sku,
-							s.orderId, e.getMessage()), e);
+		}
+		if (androidPublisher != null) {
+			try {
+				Subscriptions subs = androidPublisher.purchases().subscriptions();
+				SubscriptionPurchase subscription;
+				if (s.sku.contains("_free_")) {
+					subscription = subs.get(GOOGLE_PACKAGE_NAME_FREE, s.sku, s.purchaseToken).execute();
+				} else {
+					subscription = subs.get(GOOGLE_PACKAGE_NAME, s.sku, s.purchaseToken).execute();
 				}
+				if (subscription != null) {
+					if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
+						s.expiretime = new Date(subscription.getExpiryTimeMillis());
+						s.checktime = new Date();
+						s.valid = System.currentTimeMillis() < subscription.getExpiryTimeMillis();
+						subscriptionsRepo.save(s);
+					}
+				}
+			} catch (IOException e) {
+				LOG.error(String.format("Error retrieving android publisher subscription %s - %s: %s", s.sku, s.orderId,
+						e.getMessage()), e);
 			}
 		}
 		return s;
@@ -249,6 +244,7 @@ public class UserdataController {
 	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
 			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
+		initAndroidPublisher();
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
 			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
