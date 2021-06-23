@@ -4,11 +4,8 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,7 +30,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,16 +40,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subscriptions;
-import com.google.api.services.androidpublisher.AndroidPublisherScopes;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
 
@@ -123,9 +111,6 @@ public class UserdataController {
 	@Value("${google.androidPublisher.clientSecret}")
 	protected String clientSecretFile;
 
-	@Value("${server.weburl}")
-	protected String serverWebUrl;
-	
 	private AndroidPublisher androidPublisher;
 
 	// @PersistenceContext
@@ -146,10 +131,8 @@ public class UserdataController {
 		if (!Algorithms.isEmpty(clientSecretFile) ) {
 			if (androidPublisher == null) {
 				try {
-					LOG.info("Init android publisher ");
 					// watch first time you need to open special url on web server
-					this.androidPublisher = UpdateSubscription.getPublisherApi(clientSecretFile, serverWebUrl);
-					LOG.info("Init android publisher ok");
+					this.androidPublisher = UpdateSubscription.getPublisherApi(clientSecretFile);
 				} catch (Exception e) {
 					LOG.error("Error configuring android publisher api: " + e.getMessage(), e);
 				}
@@ -159,16 +142,13 @@ public class UserdataController {
 			try {
 				Subscriptions subs = androidPublisher.purchases().subscriptions();
 				SubscriptionPurchase subscription;
-				LOG.info("Ask android sub");
 				if (s.sku.contains("_free_")) {
 					subscription = subs.get(GOOGLE_PACKAGE_NAME_FREE, s.sku, s.purchaseToken).execute();
 				} else {
 					subscription = subs.get(GOOGLE_PACKAGE_NAME, s.sku, s.purchaseToken).execute();
 				}
 				if (subscription != null) {
-					LOG.info("Sub found");
 					if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
-						LOG.info("Resave android sub");
 						s.expiretime = new Date(subscription.getExpiryTimeMillis());
 						s.checktime = new Date();
 						s.valid = System.currentTimeMillis() < subscription.getExpiryTimeMillis();
@@ -191,11 +171,6 @@ public class UserdataController {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
-			// test code
-			LOG.info("Validate " + s.sku);
-			if ((s.expiretime == null || s.checktime == null) && s.sku.startsWith("osm_free_live_")) {
-				s = revalidateGoogleSubscription(s);
-			}
 			if (s.valid == null || s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && !s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
@@ -213,8 +188,6 @@ public class UserdataController {
 		}
 		return errorMsg;
 	}
-
-	
 
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
 		PremiumUserDevice d = devicesRepository.findById(deviceId);

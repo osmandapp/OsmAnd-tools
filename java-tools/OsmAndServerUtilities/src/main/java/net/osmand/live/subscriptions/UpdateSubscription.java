@@ -148,15 +148,12 @@ public class UpdateSubscription {
 		boolean ios = true;
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
-		String host = "localhost";
 		String androidClientSecretFile = "";
 		for (int i = 0; i < args.length; i++) {
 			if ("-verifyall".equals(args[i])) {
 				up.verifyAll = true;
 			} else if ("-verbose".equals(args[i])) {
 				up.verbose = true;
-			} else if (args[i].startsWith("-host=")) {
-				host = args[i].substring("-host=".length());
 			} else if (args[i].startsWith("-androidclientsecret=")) {
 				androidClientSecretFile = args[i].substring("-androidclientsecret=".length());
 			} else if ("-onlyandroid".equals(args[i])) {
@@ -167,7 +164,7 @@ public class UpdateSubscription {
 				android = false;
 			}
 		}
-		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile, host);
+		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile);
 //		if (true) {
 //			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
 //			return;
@@ -593,7 +590,7 @@ public class UpdateSubscription {
 
 
 	
-	public static AndroidPublisher getPublisherApi(String file, String serverPublicUrl) throws JSONException, IOException, GeneralSecurityException {
+	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
 	    File dataStoreDir = new File(new File(file).getParentFile(), ".credentials");
@@ -610,7 +607,8 @@ public class UpdateSubscription {
 						.build();
 		Builder bld = new LocalServerReceiver.Builder();
 		bld.setPort(5000);
-		bld.setHost(serverPublicUrl);
+		// it only works with localhost ! with other hosts gives incorrect redirect uri (looks like it's not supported for service accounts)
+		// bld.setHost(serverPublicUrl);
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
 		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());		
 		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)

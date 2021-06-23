@@ -37,7 +37,6 @@ logging:
 
 
 server:
-  weburl: ${WEBURL:localhost}
   port: 8080
   tomcat.max-threads: 5
   connection-timeout: 120000
