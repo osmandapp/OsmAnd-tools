@@ -143,24 +143,22 @@ public class UpdateSubscription {
 	}
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
-		AndroidPublisher publisher = getPublisherApi(args[0]);
-//		if (true) {
-//			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
-//			return;
-//		}
-
-		Class.forName("org.postgresql.Driver");
-		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
-				System.getenv("DB_USER"), System.getenv("DB_PWD"));
+		
 		boolean android = true;
 		boolean ios = true;
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
-		for (int i = 1; i < args.length; i++) {
+		String host = "localhost";
+		String androidClientSecretFile = "";
+		for (int i = 0; i < args.length; i++) {
 			if ("-verifyall".equals(args[i])) {
 				up.verifyAll = true;
 			} else if ("-verbose".equals(args[i])) {
 				up.verbose = true;
+			} else if (args[i].startsWith("-host=")) {
+				host = args[i].substring("-host=".length());
+			} else if (args[i].startsWith("-androidclientsecret=")) {
+				host = args[i].substring("-androidclientsecret=".length());
 			} else if ("-onlyandroid".equals(args[i])) {
 				ios = false;
 			} else if ("-revalidateinvalid".equals(args[i])) {
@@ -169,6 +167,14 @@ public class UpdateSubscription {
 				android = false;
 			}
 		}
+		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile, host);
+//		if (true) {
+//			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
+//			return;
+//		}
+		Class.forName("org.postgresql.Driver");
+		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
+				System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		if (android) {
 			new UpdateSubscription(publisher, SubscriptionType.ANDROID, revalidateinvalid).queryPurchases(conn, up);
 		}
@@ -587,7 +593,7 @@ public class UpdateSubscription {
 
 
 	
-	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
+	public static AndroidPublisher getPublisherApi(String file, String serverPublicUrl) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
 	    File dataStoreDir = new File(new File(file).getParentFile(), ".credentials");
@@ -604,6 +610,7 @@ public class UpdateSubscription {
 						.build();
 		Builder bld = new LocalServerReceiver.Builder();
 		bld.setPort(5000);
+		bld.setHost(serverPublicUrl);
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
 		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());		
 		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)

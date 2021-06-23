@@ -119,9 +119,12 @@ public class UserdataController {
 	
 	@Autowired
 	EmailSenderService emailSender;
-	
+
 	@Value("${google.androidPublisher.clientSecret}")
-	protected String clientSecretFile; 
+	protected String clientSecretFile;
+
+	@Value("${server.weburl}")
+	protected String serverWebUrl;
 	
 	private AndroidPublisher androidPublisher;
 
@@ -145,7 +148,7 @@ public class UserdataController {
 				try {
 					LOG.info("Init android publisher ");
 					// watch first time you need to open special url on web server
-					this.androidPublisher = UpdateSubscription.getPublisherApi(clientSecretFile);
+					this.androidPublisher = UpdateSubscription.getPublisherApi(clientSecretFile, serverWebUrl);
 					LOG.info("Init android publisher ok");
 				} catch (Exception e) {
 					LOG.error("Error configuring android publisher api: " + e.getMessage(), e);
