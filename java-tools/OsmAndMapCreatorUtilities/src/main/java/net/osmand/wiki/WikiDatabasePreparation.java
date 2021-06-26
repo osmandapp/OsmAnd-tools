@@ -376,8 +376,10 @@ public class WikiDatabasePreparation {
 	
 	private static void parseAndAppendStation(String ref, StringBuilder bld) {
 		String[] parts = ref.split("\\|");
+		if (parts.length <= 2) {
+			return;
+		}
 		String[] stations = Arrays.copyOfRange(parts, 2, parts.length);
-
 		if (stations.length > 0) {
 			String st = "|";
 			for (String station : stations) {
