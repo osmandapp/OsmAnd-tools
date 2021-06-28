@@ -956,14 +956,24 @@ public class WikiDatabasePreparation {
 						cid = Long.parseLong(pageId.toString());
 					} else if (name.equals("text")) {
 						boolean isJunk = false;
+						long wikiId = 0;
+						String plainStr = null;
 						for (String wikiJunk : wikiJunkArray) {
 							if (title.toString().contains(wikiJunk)) {
 								isJunk = true;
 								break;
 							}
 						}
-						String plainStr = null;
 						if (!isJunk) {
+							selectPrep.setString(1, title.toString());
+							selectPrep.setString(2, lang);
+							ResultSet rs = selectPrep.executeQuery();
+							if (rs.next()) {
+								wikiId = rs.getLong(1);
+							}
+							selectPrep.clearParameters();
+						}
+						if (wikiId != 0) {
 							try {
 								plainStr = generateHtmlArticle(ctext.toString(), lang);
 							} catch (RuntimeException e) {
@@ -971,32 +981,22 @@ public class WikiDatabasePreparation {
 							}
 						}
 						if (plainStr != null) {
-							selectPrep.setString(1, title.toString());
-							selectPrep.setString(2, lang);
-							ResultSet rs = selectPrep.executeQuery();
-							long wikiId = 0;
-							if (rs.next()) {
-								wikiId = rs.getLong(1);
+							if (++counter % ARTICLES_BATCH == 0) {
+								log.info("Article accepted " + cid + " " + title.toString());
 							}
-							selectPrep.clearParameters();
-							if (wikiId != 0) {
-								if (++counter % ARTICLES_BATCH == 0) {
-									log.info("Article accepted " + cid + " " + title.toString());
-								}
-								try {
-									insertPrep.setLong(1, wikiId);
-									insertPrep.setString(2, title.toString());
-									insertPrep.setString(3, lang);
-									bous.reset();
-									GZIPOutputStream gzout = new GZIPOutputStream(bous);
-									gzout.write(plainStr.getBytes("UTF-8"));
-									gzout.close();
-									final byte[] byteArray = bous.toByteArray();
-									insertPrep.setBytes(4, byteArray);
-									addBatch();
-								} catch (SQLException e) {
-									throw new SAXException(e);
-								}
+							try {
+								insertPrep.setLong(1, wikiId);
+								insertPrep.setString(2, title.toString());
+								insertPrep.setString(3, lang);
+								bous.reset();
+								GZIPOutputStream gzout = new GZIPOutputStream(bous);
+								gzout.write(plainStr.getBytes("UTF-8"));
+								gzout.close();
+								final byte[] byteArray = bous.toByteArray();
+								insertPrep.setBytes(4, byteArray);
+								addBatch();
+							} catch (SQLException e) {
+								throw new SAXException(e);
 							}
 						}
 						ctext = null;

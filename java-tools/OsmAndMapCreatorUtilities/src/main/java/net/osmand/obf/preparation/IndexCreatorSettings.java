@@ -59,6 +59,8 @@ public class IndexCreatorSettings {
 	
 	public int charsToBuildAddressNameIndex = 4;
 	
+	public boolean keepOnlyRouteRelationObjects;
+	
 	
 
 	public String getString(String key) {

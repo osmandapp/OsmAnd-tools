@@ -103,6 +103,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private int lowLevelWays = -1;
 	private RTree[] mapTree = null;
 	private Connection mapConnection;
+	private Map<String, Integer> indexRouteRelationTypes = new TreeMap<String, Integer>();
 	
 
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
@@ -114,7 +115,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
 	private BasemapProcessor checkSeaTile;
 	
-	private Map<String, Integer> indexRouteRelations = null; //new TreeMap<String, Integer>();
 	
 	private long assignIdForMultipolygon(Relation orig) {
 		long ll = orig.getId();
@@ -164,7 +164,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.MAP);
 			indexMultiPolygon((Relation) e, tags, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
-			indexRouteRelation((Relation) e, tags, ctx, icc);
+			if (settings.keepOnlyRouteRelationObjects) {
+				indexRouteRelation((Relation) e, tags, ctx, icc);
+			}
 			long tm = (System.currentTimeMillis() - ts) / 1000;
 			if (tm > 15) {
 				log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm));
@@ -173,13 +175,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	// TODO wrap up method
 	private void indexRouteRelation(Relation e, Map<String, String> tags, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		String rt = e.getTag(OSMTagKey.ROUTE);
 		boolean publicTransport = IndexTransportCreator.acceptedPublicTransportRoute(rt);
 		boolean road = "road".equals(rt);
 		boolean railway = "railway".equals(rt);
-		if (rt != null && !publicTransport && !road && !railway && indexRouteRelations != null) {
+		boolean power = "power".equals(rt);
+		if (rt != null && !publicTransport && !road && !railway && !power) {
 			ctx.loadEntityRelation(e);
 			List<Way> ways = new ArrayList<Way>();
 			List<RelationMember> ms = e.getMembers();
@@ -187,7 +189,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			RouteActivityType activityType = RouteActivityType.getTypeFromOSMTags(tags);
 			// TODO better parsing activity type
 			// TODO distance & elevation
-			// TODO better tags & id
+			// TODO better tags & id osmc:symbol
 			if (activityType != null) {
 				String ref = tags.get("ref");
 				if (ref == null) {
@@ -195,8 +197,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				}
 				tags.put("ref", ref);
 				// red, blue, green, orange, yellow
-				// gpxTrackTags.put("gpx_icon", "");
-				tags.put("gpx_bg", activityType.getColor() + "_hexagon_3_road_shield");
+				int l = Math.max(1, Math.min(6, ref.length()));
+				tags.put("gpx_bg", activityType.getColor() + "_hexagon_" + l + "_road_shield");
 				if (tags.get("color") == null && tags.get("colour") == null) {
 					tags.put("color", activityType.getColor());
 				}
@@ -204,10 +206,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			tags.put("route", "segment");
 			tags.put("route_type", "track");
+			tags.put("route_id", "O-" + e.getId() );
 			for (RelationMember rm : ms) {
 				if (rm.getEntity() instanceof Way) {
 					Way w = (Way) rm.getEntity();
-					Way newWay = new Way(-e.getId(), w.getNodes());
+//					Way newWay = new Way(-e.getId(), w.getNodes());
+					Way newWay = new Way(GENERATE_OBJ_ID--, w.getNodes());
 					newWay.replaceTags(tags);
 					ways.add(newWay);
 				}
@@ -222,11 +226,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					nw.replaceTags(tags);
 					w = nw;
 				}
-				iterateMainEntity(w, ctx, icc);
+				if (settings.addRegionTag) {
+					icc.calcRegionTag(e, true);
+				}
+				icc.translitJapaneseNames(e, settings.addRegionTag);
+				tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e);
+				for (int level = 0; level < mapZooms.size(); level++) {
+					processMainEntity(w, w.getId(), w.getId(), level, tags);
+				}
 			}
 			String routeKey = activityType == null ? rt : activityType.getName();
-			Integer c = indexRouteRelations.get(routeKey);
-			indexRouteRelations.put(rt, (c == null ? 0 : c) + 1);
+			Integer c = indexRouteRelationTypes.get(routeKey);
+			indexRouteRelationTypes.put(rt, (c == null ? 0 : c) + 1);
 		}
 	}
 
@@ -767,7 +778,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
-		if (e instanceof Way || e instanceof Node) {
+		if ((e instanceof Way || e instanceof Node) && !settings.keepOnlyRouteRelationObjects) {
 			if (settings.addRegionTag) {
 				icc.calcRegionTag(e, true);
 			}
@@ -797,7 +808,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
 			throws SQLException {
-		if(settings.keepOnlySeaObjects) {
+		if (settings.keepOnlySeaObjects) {
 			// fix issue with duplicate coastlines from seamarks
 			if("coastline".equals(tags.get("natural"))) {
 				tags.remove("natural", "coastline");
@@ -1343,14 +1354,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void commitAndCloseFiles(String rTreeMapIndexNonPackFileName, String rTreeMapIndexPackFileName, boolean deleteDatabaseIndexes)
 			throws IOException, SQLException {
-		if (indexRouteRelations != null) {
-			List<String> lst = new ArrayList<>(indexRouteRelations.keySet());
+		if (indexRouteRelationTypes != null) {
+			List<String> lst = new ArrayList<>(indexRouteRelationTypes.keySet());
 			Collections.sort(lst, new Comparator<String>() {
 
 				@Override
 				public int compare(String o1, String o2) {
-					Integer i1 = indexRouteRelations.get(o1);
-					Integer i2 = indexRouteRelations.get(o2);
+					Integer i1 = indexRouteRelationTypes.get(o1);
+					Integer i2 = indexRouteRelationTypes.get(o2);
 					if (i1 == null) {
 						return -1;
 					}
@@ -1362,7 +1373,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			});
 			log.info("Indexed route relation types: ");
 			for (String tp : lst) {
-				log.info(String.format("%s - %d", tp, indexRouteRelations.get(tp)));
+				log.info(String.format("%s - %d", tp, indexRouteRelationTypes.get(tp)));
 			}
 		}
 		// delete map rtree files

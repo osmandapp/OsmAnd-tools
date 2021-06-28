@@ -855,13 +855,13 @@ public class IndexCreator {
 //		settings.poiZipLongStrings = true;
 		settings.indexMap = true;
 //		settings.indexAddress = true;
-		settings.indexPOI = true;
+//		settings.indexPOI = true;
 //		settings.indexTransport = true;
 //		settings.indexRouting = true;
 //		settings.keepOnlySeaObjects = true;
 //		settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 //		settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
-		
+		settings.keepOnlyRouteRelationObjects = true;
 //		settings.zoomWaySmoothness = 2;
 		
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/"), settings); //$NON-NLS-1$
@@ -873,7 +873,8 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 //		String file = rootFolder + "/maps/wikivoyage/wikivoyage.osm.gz";
 //		String file = rootFolder + "/temp/map.osm";
-		String file = rootFolder + "/maps/routes/Sweden_routes.osm.gz";
+		String file = rootFolder + "/maps/routes/benelux_routes.osm.gz";
+//		String file = rootFolder + "/maps/routes/Sweden_routes.osm.gz";
 		
 //		String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 //		String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
