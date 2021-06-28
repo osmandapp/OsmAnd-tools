@@ -1,9 +1,5 @@
 package net.osmand.wiki;
 
-import gnu.trove.map.hash.TIntObjectHashMap;
-import info.bliki.wiki.filter.HTMLConverter;
-import info.bliki.wiki.model.WikiModel;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
@@ -24,20 +20,21 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
-
-import net.osmand.PlatformUtil;
-import net.osmand.impl.FileProgressImplementation;
-import net.osmand.map.OsmandRegions;
-import net.osmand.obf.preparation.DBDialect;
-import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
-import net.osmand.wiki.wikidata.WikiDataHandler;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -61,8 +58,15 @@ import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
 import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import gnu.trove.map.hash.TIntObjectHashMap;
+import info.bliki.wiki.filter.HTMLConverter;
+import info.bliki.wiki.model.WikiModel;
+import net.osmand.PlatformUtil;
+import net.osmand.impl.FileProgressImplementation;
+import net.osmand.map.OsmandRegions;
+import net.osmand.obf.preparation.DBDialect;
+import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
+import net.osmand.wiki.wikidata.WikiDataHandler;
 
 public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
@@ -844,9 +848,25 @@ public class WikiDatabasePreparation {
 		
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
-		final String[] wikiJunkArray = new String[]{
-				".jpg",".JPG",".jpeg",".png",".gif",".svg","/doc","틀:","위키프로젝트:","แม่แบบ:","위키백과:","แม่แบบ:","Àdàkọ:","Aide:","Aiuto:","Andoza:","Anexo:","Bản:","mẫu:","Batakan:","Categoría:","Categoria:","Catégorie:","Category:","Cithakan:","Datei:","Draft:","Endrika:","Fájl:","Fichier:","File:","Format:","Formula:","Help:","Hjælp:","Kategori:","Kategoria:","Kategorie:","Kigezo:","モジュール:","Mal:","Mall:","Malline:","Modèle:","Modèl:","Modello:","Modelo:","Modèl:","Moduł:","Module:","Modulis:","Modul:","Mô:","đun:","Nodyn:","Padron:","Patrom:","Pilt:","Plantía:","Plantilla:","Plantilya:","Portaal:","Portail:","Portal:","Portál:","Predefinição:","Predloga:","Predložak:","Progetto:","Proiect:","Projet:","Sablon:","Šablon:","Şablon:","Šablona:","Šablóna:","Šablonas:","Ŝablono:","Sjabloon:","Schabloun:","Skabelon:","Snið:","Stampa:","Szablon:","Templat:","Txantiloi:","Veidne:","Vikipedio:","Vikipediya:","Vikipeedia:","Viquipèdia:","Viquiprojecte:","Viquiprojecte:","Vörlaag:","Vorlage:","Vorlog:","วิกิพีเดีย:","Wikipedia:","Wikipedie:","Wikipedija:","Wîkîpediya:","Wikipédia:","Wikiproiektu:","Wikiprojekt:","Wikiproyecto:","الگو:","سانچ:","قالب:","وکیپیڈیا:","ויקיפדיה:","תבנית","Βικιπαίδεια:","Πρότυπο:","Википедиа:","Википедија:","Википедия:","Вікіпедія:","Довідка:","Загвар:","Инкубатор:","Калып:","Ҡалып:","Кеп:","Категорія:","Портал:","Проект:","Уикипедия:","Үлгі:","Файл:","Хуызæг:","Шаблон:","Կաղապար:","Մոդուլ:","Վիքիպեդիա:","ვიკიპედია:","თარგი:","ढाँचा:","विकिपीडिया:","साचा:","साँचा:","ઢાંચો:","વિકિપીડિયા:","మూస:","வார்ப்புரு:","ഫലകം:","വിക്കിപീഡിയ:","টেমপ্লেট:","プロジェクト:","উইকিপিডিয়া:","মডেল:","پرونده:","模块:","ماڈیول:"
-				};
+		final String[] wikiJunkArray = new String[] { ".jpg", ".JPG", ".jpeg", ".png", ".gif", ".svg", "/doc", "틀:",
+				"위키프로젝트:", "แม่แบบ:", "위키백과:", "แม่แบบ:", "Àdàkọ:", "Aide:", "Aiuto:", "Andoza:", "Anexo:", "Bản:",
+				"mẫu:", "Batakan:", "Categoría:", "Categoria:", "Catégorie:", "Category:", "Cithakan:", "Datei:",
+				"Draft:", "Endrika:", "Fájl:", "Fichier:", "File:", "Format:", "Formula:", "Help:", "Hjælp:",
+				"Kategori:", "Kategoria:", "Kategorie:", "Kigezo:", "モジュール:", "Mal:", "Mall:", "Malline:", "Modèle:",
+				"Modèl:", "Modello:", "Modelo:", "Modèl:", "Moduł:", "Module:", "Modulis:", "Modul:", "Mô:", "đun:",
+				"Nodyn:", "Padron:", "Patrom:", "Pilt:", "Plantía:", "Plantilla:", "Plantilya:", "Portaal:", "Portail:",
+				"Portal:", "Portál:", "Predefinição:", "Predloga:", "Predložak:", "Progetto:", "Proiect:", "Projet:",
+				"Sablon:", "Šablon:", "Şablon:", "Šablona:", "Šablóna:", "Šablonas:", "Ŝablono:", "Sjabloon:",
+				"Schabloun:", "Skabelon:", "Snið:", "Stampa:", "Szablon:", "Templat:", "Txantiloi:", "Veidne:",
+				"Vikipedio:", "Vikipediya:", "Vikipeedia:", "Viquipèdia:", "Viquiprojecte:", "Viquiprojecte:",
+				"Vörlaag:", "Vorlage:", "Vorlog:", "วิกิพีเดีย:", "Wikipedia:", "Wikipedie:", "Wikipedija:",
+				"Wîkîpediya:", "Wikipédia:", "Wikiproiektu:", "Wikiprojekt:", "Wikiproyecto:", "الگو:", "سانچ:",
+				"قالب:", "وکیپیڈیا:", "ויקיפדיה:", "תבנית", "Βικιπαίδεια:", "Πρότυπο:", "Википедиа:", "Википедија:",
+				"Википедия:", "Вікіпедія:", "Довідка:", "Загвар:", "Инкубатор:", "Калып:", "Ҡалып:", "Кеп:",
+				"Категорія:", "Портал:", "Проект:", "Уикипедия:", "Үлгі:", "Файл:", "Хуызæг:", "Шаблон:", "Կաղապար:",
+				"Մոդուլ:", "Վիքիպեդիա:", "ვიკიპედია:", "თარგი:", "ढाँचा:", "विकिपीडिया:", "साचा:", "साँचा:", "ઢાંચો:",
+				"વિકિપીડિયા:", "మూస:", "வார்ப்புரு:", "ഫലകം:", "വിക്കിപീഡിയ:", "টেমপ্লেট:", "プロジェクト:", "উইকিপিডিয়া:",
+				"মডেল:", "پرونده:", "模块:", "ماڈیول:" };
 		private FileProgressImplementation progIS;
 		private long cid;
 
@@ -936,13 +956,21 @@ public class WikiDatabasePreparation {
 						cid = Long.parseLong(pageId.toString());
 					} else if (name.equals("text")) {
 						boolean isJunk = false;
-						for(String wikiJunk : wikiJunkArray) {
-							if(title.toString().contains(wikiJunk)) {
+						for (String wikiJunk : wikiJunkArray) {
+							if (title.toString().contains(wikiJunk)) {
 								isJunk = true;
 								break;
 							}
 						}
+						String plainStr = null;
 						if (!isJunk) {
+							try {
+								plainStr = generateHtmlArticle(ctext.toString(), lang);
+							} catch (RuntimeException e) {
+								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
+							}
+						}
+						if (plainStr != null) {
 							selectPrep.setString(1, title.toString());
 							selectPrep.setString(2, lang);
 							ResultSet rs = selectPrep.executeQuery();
@@ -951,9 +979,7 @@ public class WikiDatabasePreparation {
 								wikiId = rs.getLong(1);
 							}
 							selectPrep.clearParameters();
-							if (wikiId != 0 ) {
-								String contentText = ctext.toString();
-								String plainStr = generateHtmlArticle(contentText, lang);
+							if (wikiId != 0) {
 								if (++counter % ARTICLES_BATCH == 0) {
 									log.info("Article accepted " + cid + " " + title.toString());
 								}
