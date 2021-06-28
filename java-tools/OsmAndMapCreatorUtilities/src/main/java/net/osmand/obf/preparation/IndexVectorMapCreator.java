@@ -18,7 +18,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
@@ -37,12 +36,13 @@ import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
-import net.osmand.map.OsmandRegions;
+import net.osmand.data.TransportRoute;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.RelationTagsPropagation;
-import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
+import net.osmand.osm.RelationTagsPropagation;
+import net.osmand.osm.RouteActivityType;
+import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -53,7 +53,6 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
-import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 import rtree.Element;
 import rtree.IllegalValueException;
@@ -72,16 +71,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
 	private static final int LOW_LEVEL_ZOOM_COASTLINE = 1; // Don't simplify coastlines except basemap, this constant is not used by basemap
+	
+	private final Log logMapDataWarn;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
-
+	private IndexCreatorSettings settings;
 
 	Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
 
 	// local purpose to speed up processing cache allocation
 	TIntArrayList typeUse = new TIntArrayList(8);
 	List<MapRulType> tempNameUse = new ArrayList<MapRulType>();
-	Comparator<MapRulType> comparator = new Comparator<MapRulType>() {
+	TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(new Comparator<MapRulType>() {
 
 		@Override
 		public int compare(MapRulType o1, MapRulType o2) {
@@ -93,8 +94,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 			return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
 		}
-	};
-	TreeMap<MapRulType, String> namesUse = new TreeMap<MapRulType, String>(comparator);
+	});
 	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
 
@@ -103,20 +103,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private int lowLevelWays = -1;
 	private RTree[] mapTree = null;
 	private Connection mapConnection;
+	
 
-	private int zoomWaySmoothness = 0;
-	private IndexCreatorSettings settings;
-	private final Log logMapDataWarn;
-
-	public TLongHashSet generatedIds = new TLongHashSet();
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
 	private static int DUPLICATE_SPLIT = 5;
+	public TLongHashSet generatedIds = new TLongHashSet();
 	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
 	private BasemapProcessor checkSeaTile;
 	
+	private Map<String, Integer> indexRouteRelations = null; //new TreeMap<String, Integer>();
 	
 	private long assignIdForMultipolygon(Relation orig) {
 		long ll = orig.getId();
@@ -156,22 +154,79 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		this.logMapDataWarn = logMapDataWarn;
 		this.mapZooms = mapZooms;
 		this.settings = settings;
-		this.zoomWaySmoothness = settings.zoomWaySmoothness;
 		this.renderingTypes = renderingTypes;
 		lowLevelWays = -1;
 	}
 
-	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+	public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Relation) {
 			long ts = System.currentTimeMillis();
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.MAP);
 			indexMultiPolygon((Relation) e, tags, ctx);
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
+			indexRouteRelation((Relation) e, tags, ctx, icc);
 			long tm = (System.currentTimeMillis() - ts) / 1000;
 			if (tm > 15) {
 				log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm));
 			}
 			handlePublicTransportStopExits(e, ctx);
+		}
+	}
+
+	// TODO wrap up method
+	private void indexRouteRelation(Relation e, Map<String, String> tags, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
+		String rt = e.getTag(OSMTagKey.ROUTE);
+		boolean publicTransport = IndexTransportCreator.acceptedPublicTransportRoute(rt);
+		boolean road = "road".equals(rt);
+		boolean railway = "railway".equals(rt);
+		if (rt != null && !publicTransport && !road && !railway && indexRouteRelations != null) {
+			ctx.loadEntityRelation(e);
+			List<Way> ways = new ArrayList<Way>();
+			List<RelationMember> ms = e.getMembers();
+			tags = new LinkedHashMap<>(tags);
+			RouteActivityType activityType = RouteActivityType.getTypeFromOSMTags(tags);
+			// TODO better parsing activity type
+			// TODO distance & elevation
+			// TODO better tags & id
+			if (activityType != null) {
+				String ref = tags.get("ref");
+				if (ref == null) {
+					ref = String.valueOf(e.getId() % 1000);
+				}
+				tags.put("ref", ref);
+				// red, blue, green, orange, yellow
+				// gpxTrackTags.put("gpx_icon", "");
+				tags.put("gpx_bg", activityType.getColor() + "_hexagon_3_road_shield");
+				if (tags.get("color") == null && tags.get("colour") == null) {
+					tags.put("color", activityType.getColor());
+				}
+				tags.put("route_activity_type", activityType.getName().toLowerCase());
+			}
+			tags.put("route", "segment");
+			tags.put("route_type", "track");
+			for (RelationMember rm : ms) {
+				if (rm.getEntity() instanceof Way) {
+					Way w = (Way) rm.getEntity();
+					Way newWay = new Way(-e.getId(), w.getNodes());
+					newWay.replaceTags(tags);
+					ways.add(newWay);
+				}
+			}
+			TransportRoute.mergeRouteWays(ways);
+			boolean f = true;
+			for (Way w : ways) {
+				if (f) {
+					f = false;
+				} else {
+					Way nw = new Way(GENERATE_OBJ_ID--, w.getNodes());
+					nw.replaceTags(tags);
+					w = nw;
+				}
+				iterateMainEntity(w, ctx, icc);
+			}
+			String routeKey = activityType == null ? rt : activityType.getName();
+			Integer c = indexRouteRelations.get(routeKey);
+			indexRouteRelations.put(rt, (c == null ? 0 : c) + 1);
 		}
 	}
 
@@ -196,7 +251,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-
 
 
 	/**
@@ -337,13 +391,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			List<Node> outerWay = out.getBorder();
 			int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
 			if (zoomToSimplify < 15) {
-				outerWay = simplifyCycleWay(outerWay, zoomToSimplify, zoomWaySmoothness);
+				outerWay = simplifyCycleWay(outerWay, zoomToSimplify, settings.zoomWaySmoothness);
 				if (outerWay == null) {
 					continue nextZoom;
 				}
 				List<List<Node>> newinnerWays = new ArrayList<List<Node>>();
 				for (List<Node> ls : innerWays) {
-					ls = simplifyCycleWay(ls, zoomToSimplify, zoomWaySmoothness);
+					ls = simplifyCycleWay(ls, zoomToSimplify, settings.zoomWaySmoothness);
 					if (ls != null) {
 						newinnerWays.add(ls);
 					}
@@ -583,16 +637,16 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			boolean skip = false;
 			boolean cycle = startNode == endNode;
 			if (cycle) {
-				skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmoothness / 2, 3), 3, 4);
+				skip = checkForSmallAreas(wNodes, zoom  + Math.min(settings.zoomWaySmoothness / 2, 3), 3, 4);
 			} else {
 				// coastline
 				if(!typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
-					skip = checkForSmallAreas(wNodes, zoom  + Math.min(zoomWaySmoothness / 2, 3), 2, 8);
+					skip = checkForSmallAreas(wNodes, zoom  + Math.min(settings.zoomWaySmoothness / 2, 3), 2, 8);
 				}
 			}
 			if (!skip) {
 				List<Node> res = new ArrayList<Node>();
-				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + zoomWaySmoothness, 3, res, false);
+				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + settings.zoomWaySmoothness, 3, res, false);
 				if (res.size() > 0) {
 					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false, cycle);
 				}
@@ -783,7 +837,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
 				
 				if (cycle) {
-					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, zoomWaySmoothness);
+					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, settings.zoomWaySmoothness);
 				} else {
 					validateDuplicate(originalId, id);
 					insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(), namesUse);
@@ -1136,7 +1190,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		lowLevelWays++;
 		List<Node> nodes = new ArrayList<Node>();
-		OsmMapUtils.simplifyDouglasPeucker(in, zoom + 8 + zoomWaySmoothness, 3, nodes, false);
+		OsmMapUtils.simplifyDouglasPeucker(in, zoom + 8 + settings.zoomWaySmoothness, 3, nodes, false);
 		boolean first = true;
 		long firstId = -1;
 		long lastId = -1;
@@ -1289,7 +1343,28 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void commitAndCloseFiles(String rTreeMapIndexNonPackFileName, String rTreeMapIndexPackFileName, boolean deleteDatabaseIndexes)
 			throws IOException, SQLException {
+		if (indexRouteRelations != null) {
+			List<String> lst = new ArrayList<>(indexRouteRelations.keySet());
+			Collections.sort(lst, new Comparator<String>() {
 
+				@Override
+				public int compare(String o1, String o2) {
+					Integer i1 = indexRouteRelations.get(o1);
+					Integer i2 = indexRouteRelations.get(o2);
+					if (i1 == null) {
+						return -1;
+					}
+					if (i2 == null) {
+						return -1;
+					}
+					return -Integer.compare(i1, i2);
+				}
+			});
+			log.info("Indexed route relation types: ");
+			for (String tp : lst) {
+				log.info(String.format("%s - %d", tp, indexRouteRelations.get(tp)));
+			}
+		}
 		// delete map rtree files
 		if (mapTree != null) {
 			for (int i = 0; i < mapTree.length; i++) {
@@ -1314,11 +1389,4 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	}
 
-	public void setZoomWaySmoothness(int zoomWaySmoothness) {
-		this.zoomWaySmoothness = zoomWaySmoothness;
-	}
-
-	public int getZoomWaySmoothness() {
-		return zoomWaySmoothness;
-	}
 }

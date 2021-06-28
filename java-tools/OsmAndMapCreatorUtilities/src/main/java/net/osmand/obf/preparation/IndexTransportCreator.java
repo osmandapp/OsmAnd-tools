@@ -1,32 +1,6 @@
 package net.osmand.obf.preparation;
 
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
-import net.osmand.data.TransportRoute;
-import net.osmand.data.TransportSchedule;
-import net.osmand.data.TransportStop;
-import net.osmand.data.TransportStopExit;
-import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.EntityParser;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Relation.RelationMember;
-import net.osmand.osm.edit.Way;
-import net.osmand.util.Algorithms;
-import net.osmand.util.JapaneseTranslitHelper;
-import net.osmand.util.MapUtils;
-import net.sf.junidecode.Junidecode;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -49,9 +23,33 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
+import net.osmand.data.TransportRoute;
+import net.osmand.data.TransportSchedule;
+import net.osmand.data.TransportStop;
+import net.osmand.data.TransportStopExit;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.EntityParser;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
+import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
+import net.sf.junidecode.Junidecode;
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
@@ -111,6 +109,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		acceptedRoutes.add("tram"); //$NON-NLS-1$
 
 		acceptedRoutes.add("ferry"); //$NON-NLS-1$
+	}
+	
+	public static boolean acceptedPublicTransportRoute(String rt) {
+		return acceptedRoutes.contains(rt);
 	}
 
 	public IndexTransportCreator(IndexCreatorSettings settings) throws SQLException {
