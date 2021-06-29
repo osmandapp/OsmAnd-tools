@@ -35,14 +35,24 @@ public class IndexCreationContext {
 
     private boolean decryptAbbreviations = false;
     private boolean translitJapaneseNames = false;
+	private IndexCreator indexCreator;
 
-	IndexCreationContext(String regionName, boolean basemap) {
+	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
+		this.indexCreator = indexCreator;
 		this.allRegions = prepareRegions();
 		this.basemap = basemap;
 		if (regionName != null) {
 			this.translitJapaneseNames = regionName.toLowerCase().startsWith("japan");
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
 		}
+	}
+	
+	IndexPoiCreator getIndexPoiCreator() {
+		return indexCreator.indexPoiCreator;
+	}
+	
+	IndexHeightData getIndexHeightData() {
+		return indexCreator.heightData;
 	}
 
     @Nullable

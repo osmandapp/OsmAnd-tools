@@ -96,8 +96,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		generatedIds.add(gen);
 		return gen;
 	}
-	
+
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
+		if (!settings.keepOnlyRouteRelationObjects) {
+			iterateEntityInternal(e, ctx, icc);
+		}
+	}
+	
+	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
 		tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e);
 		icc.translitJapaneseNames(e, settings.addRegionTag);

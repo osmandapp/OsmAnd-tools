@@ -39,7 +39,7 @@ public class IndexHeightData {
 	private String ELE_DECLINE_MAX = "osmand_ele_decline_max";
 	private String ELE_ASC_TAG = "osmand_ele_asc";
 	private String ELE_DESC_TAG = "osmand_ele_desc";
-	private static double INEXISTENT_HEIGHT = Double.MIN_VALUE;
+	public static final double INEXISTENT_HEIGHT = Double.MIN_VALUE;
 	private Map<Integer, TileData> map = new HashMap<Integer, TileData>();
 
 	private Log log = PlatformUtil.getLog(IndexHeightData.class);

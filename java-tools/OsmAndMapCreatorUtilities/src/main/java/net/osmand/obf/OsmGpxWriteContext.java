@@ -238,7 +238,6 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("avg_speed", latLonFormat.format(analysis.avgSpeed));
 			gpxTrackTags.put("max_speed", latLonFormat.format(analysis.maxSpeed));
 			gpxTrackTags.put("min_speed", latLonFormat.format(analysis.minSpeed));
-			
 		}
 	}
 	
