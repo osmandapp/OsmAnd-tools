@@ -529,7 +529,7 @@ public class DownloadOsmGPX {
 	private GPXFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
 		if (gpxFile.error == null) {
-			QuadRect rect = gpxFile.getRectAroundPoint(r.lat, r.lon);
+			QuadRect rect = gpxFile.getBounds(r.lat, r.lon);
 			r.minlon = rect.left;
 			r.minlat = rect.bottom;
 			r.maxlon = rect.right;
