@@ -25,12 +25,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -44,6 +39,7 @@ import javax.net.ssl.X509TrustManager;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import net.osmand.data.QuadRect;
 import net.osmand.obf.OsmGpxWriteContext;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
@@ -53,9 +49,6 @@ import org.xmlpull.v1.XmlPullParserException;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.GPXUtilities.Track;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
@@ -136,7 +129,7 @@ public class DownloadOsmGPX {
 				switch (s[0]) {
 				case "--acitivity-type":
 					if (val.trim().length() > 0) {
-						qp.activityTypes = new TreeSet<RouteActivityType>();
+						qp.activityTypes = new HashSet<>();
 						String[] avls = val.split(",");
 						for (String av : avls) {
 							if (av.trim().length() == 0) {
@@ -198,10 +191,7 @@ public class DownloadOsmGPX {
 		}
 		utility.commitAllStatements();
 	}
-	
-	
-	
-	
+
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
 		String conditions = "";
 		if (!Algorithms.isEmpty(qp.user)) {
@@ -251,7 +241,7 @@ public class DownloadOsmGPX {
 		while (rs.next()) {
 			if ((ctx.tracks + 1) % 1000 == 0) {
 				System.out.println(
-						String.format("Fetched %d tracks %d segments - last %s (now %s)", ctx.tracks + 1, ctx.segments, lastTimestamp, 
+						String.format("Fetched %d tracks %d segments - last %s (now %s)", ctx.tracks + 1, ctx.segments, lastTimestamp,
 								new Date()));
 			}
 			OsmGpxFile gpxInfo = new OsmGpxFile();
@@ -266,22 +256,23 @@ public class DownloadOsmGPX {
 			gpxInfo.timestamp = new Date(rs.getDate(6).getTime());
 			lastTimestamp = gpxInfo.timestamp;
 			Array tags = rs.getArray(7);
-			List<String> trackTags = new ArrayList<>(); 
+			List<String> trackTags = new ArrayList<>();
 			if (tags != null) {
 				ResultSet rsar = tags.getResultSet();
 				while (rsar.next()) {
 					String tg = rsar.getString(2);
-					trackTags.add(tg.toLowerCase());
+					if (tg != null) {
+						trackTags.add(tg.toLowerCase());
+					}
 				}
 			}
-			gpxInfo.tags = trackTags.toArray(new String[trackTags.size()]);
+			gpxInfo.tags = trackTags.toArray(new String[0]);
 			if (qp.activityTypes != null) {
 				RouteActivityType rat = RouteActivityType.getTypeFromTags(gpxInfo.tags);
 				if (rat == null || !qp.activityTypes.contains(rat)) {
 					continue;
 				}
 			}
-				
 
 			ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
@@ -537,19 +528,12 @@ public class DownloadOsmGPX {
 
 	private GPXFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
-		if (gpxFile != null && gpxFile.error == null) {
-			r.minlat = r.maxlat = r.lat;
-			r.minlon = r.maxlon = r.lon;
-			for (Track t : gpxFile.tracks) {
-				for (TrkSegment s : t.segments) {
-					for (WptPt p : s.points) {
-						r.minlat = Math.min(r.minlat, p.lat);
-						r.maxlat = Math.max(r.maxlat, p.lat);
-						r.minlon = Math.min(r.minlon, p.lon);
-						r.maxlon = Math.max(r.maxlon, p.lon);
-					}
-				}
-			}
+		if (gpxFile.error == null) {
+			QuadRect rect = gpxFile.getBounds(r.lat, r.lon);
+			r.minlon = rect.left;
+			r.minlat = rect.bottom;
+			r.maxlon = rect.right;
+			r.maxlat = rect.top;
 			return gpxFile;
 		} else {
 			errorReadingGpx(r, gpxFile.error);
