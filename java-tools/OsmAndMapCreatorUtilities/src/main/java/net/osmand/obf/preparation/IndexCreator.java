@@ -78,6 +78,7 @@ public class IndexCreator {
 	IndexPoiCreator indexPoiCreator;
 	IndexAddressCreator indexAddressCreator;
 	IndexVectorMapCreator indexMapCreator;
+	IndexRouteRelationCreator indexRouteRelationCreator;
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
 
@@ -219,6 +220,7 @@ public class IndexCreator {
 		if (settings.indexMap) {
 			if (settings.boundary == null || checkBoundary(e)) {
 				indexMapCreator.iterateMainEntity(e, ctx, icc);
+				indexRouteRelationCreator.iterateMainEntity(e, ctx, icc);
 			}
 		}
 		if (settings.indexAddress) {
@@ -568,6 +570,7 @@ public class IndexCreator {
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
+		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 
 		if (!settings.extraRelations.isEmpty()) {
 			for (File inputFile : settings.extraRelations) {
@@ -726,6 +729,7 @@ public class IndexCreator {
 				if (REMOVE_POI_DB) {
 					indexPoiCreator.removePoiFile();
 				}
+				indexRouteRelationCreator.closeAllStatements();
 				indexAddressCreator.closeAllPreparedStatements();
 				indexTransportCreator.commitAndCloseFiles(getRTreeTransportStopsFileName(),
 						getRTreeTransportStopsPackFileName(), deleteDatabaseIndexes);
@@ -797,7 +801,12 @@ public class IndexCreator {
 						indexAddressCreator.indexBoundariesRelation(e, ctx);
 					}
 					if (settings.indexMap) {
-						indexMapCreator.indexMapRelationsAndMultiPolygons(e, ctx, icc);
+						if (!settings.keepOnlyRouteRelationObjects) {
+							indexMapCreator.indexMapRelationsAndMultiPolygons(e, ctx, icc);
+						} else {
+							indexRouteRelationCreator.iterateRelation(e, ctx, icc);
+						}
+						
 					}
 					if (settings.indexRouting) {
 						indexRouteCreator.indexRelations(e, ctx);
@@ -888,7 +897,9 @@ public class IndexCreator {
 		// String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
-		creator.setNodesDBFile(new File(rootFolder + "/maps/" + file.substring(st, e) + ".tmp.odb"));
+		String name = file.substring(st, e);
+		creator.setNodesDBFile(new File(rootFolder + "/maps/" + name + ".tmp.odb"));
+		creator.setMapFileName(name + ".travel.obf");
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos/resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder(
 				rootFolder + "/repos/resources/obf_creation/rendering_types.xml", new File(file).getName());

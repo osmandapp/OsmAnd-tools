@@ -51,6 +51,10 @@ public class IndexCreationContext {
 		return indexCreator.indexPoiCreator;
 	}
 	
+	IndexVectorMapCreator getIndexMapCreator() {
+		return indexCreator.indexMapCreator;
+	}
+	
 	IndexHeightData getIndexHeightData() {
 		return indexCreator.heightData;
 	}

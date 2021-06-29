@@ -26,10 +26,6 @@ import org.apache.commons.logging.LogFactory;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IProgress;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms;
@@ -40,13 +36,11 @@ import net.osmand.data.LatLon;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.Ring;
-import net.osmand.data.TransportRoute;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
-import net.osmand.osm.RouteActivityType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -107,10 +101,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private int lowLevelWays = -1;
 	private RTree[] mapTree = null;
 	private Connection mapConnection;
-	private Map<String, Integer> indexRouteRelationTypes = new TreeMap<String, Integer>();
 	
-
-	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
+	
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
 	private static int DUPLICATE_SPLIT = 5;
@@ -172,9 +164,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				indexMultiPolygon((Relation) e, tags, ctx);
 			}
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
-			if (settings.keepOnlyRouteRelationObjects) {
-				indexRouteRelation((Relation) e, tags, ctx, icc);
-			}
 			long tm = (System.currentTimeMillis() - ts) / 1000;
 			if (tm > 15) {
 				log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm));
@@ -183,97 +172,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void indexRouteRelation(Relation e, Map<String, String> tags, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
-		String rt = e.getTag(OSMTagKey.ROUTE);
-		boolean publicTransport = IndexTransportCreator.acceptedPublicTransportRoute(rt);
-		boolean road = "road".equals(rt);
-		boolean railway = "railway".equals(rt);
-		boolean infra = "power".equals(rt) || "pipeline".equals(rt);
-		if (rt != null && !publicTransport && !road && !railway && !infra) {
-			ctx.loadEntityRelation(e);
-			List<Way> ways = new ArrayList<Way>();
-			List<RelationMember> ms = e.getMembers();
-			tags = new LinkedHashMap<>(tags);
-			RouteActivityType activityType = RouteActivityType.getTypeFromOSMTags(tags);
-			for (RelationMember rm : ms) {
-				if (rm.getEntity() instanceof Way) {
-					Way w = (Way) rm.getEntity();
-//					Way newWay = new Way(-e.getId(), w.getNodes()); // duplicates
-					Way newWay = new Way(GENERATE_OBJ_ID--, w.getNodes());
-					newWay.replaceTags(tags);
-					ways.add(newWay);
-				}
-			}
-			TransportRoute.mergeRouteWays(ways);
-			for (Way w : ways) {
-				addRouteRelationTags(e, w, tags, activityType, icc);
-				if (settings.addRegionTag) {
-					icc.calcRegionTag(e, true);
-				}
-				w.replaceTags(tags);
-				icc.translitJapaneseNames(e, settings.addRegionTag);
-				for (int level = 0; level < mapZooms.size(); level++) {
-					processMainEntity(w, w.getId(), w.getId(), level, tags);
-				}
-				if (settings.indexPOI) {
-					icc.getIndexPoiCreator().iterateEntityInternal(w, ctx, icc);
-				}
-			}
-			String routeKey = activityType == null ? rt : activityType.getName();
-			Integer c = indexRouteRelationTypes.get(routeKey);
-			indexRouteRelationTypes.put(rt, (c == null ? 0 : c) + 1);
-		}
-	}
-
-
-	private void addRouteRelationTags(Relation e, Way w, Map<String, String> tags, RouteActivityType activityType, IndexCreationContext icc) {
-		// TODO better tags & id osmc:symbol
-		if (tags.get("color") != null) {
-			tags.put("colour", tags.get("color"));
-		}
-		if (activityType != null) {
-			String ref = tags.get("ref");
-			if (ref == null) {
-				ref = String.valueOf(e.getId() % 1000);
-			}
-			tags.put("ref", ref);
-			// red, blue, green, orange, yellow
-			int l = Math.max(1, Math.min(6, ref.length()));
-			
-			tags.put("gpx_bg", activityType.getColor() + "_hexagon_" + l + "_road_shield");
-			if (tags.get("colour") == null) {
-				tags.put("colour", activityType.getColor());
-			}
-			tags.put("route_activity_type", activityType.getName().toLowerCase());
-		}
-		GPXFile gpxFile = new GPXUtilities.GPXFile("osm");
-		List<WptPt> lst = new ArrayList<GPXUtilities.WptPt>();
-		for (Node n : w.getNodes()) {
-			WptPt wptT = new WptPt(n.getLatitude(), n.getLongitude(), 0, Double.NaN, Double.NaN, Double.NaN);
-			double h = icc.getIndexHeightData().getPointHeight(wptT.lat, wptT.lon);
-			if (h != IndexHeightData.INEXISTENT_HEIGHT) {
-				wptT.ele = h;
-			}
-			lst.add(wptT);
-		}
-		gpxFile.addTrkSegment(lst);
-		if (lst.size() > 0) {
-			GPXTrackAnalysis analysis = gpxFile.getAnalysis(0);
-			if (tags.get("distance") == null && analysis.totalDistance > 0) {
-				tags.put("distance", String.valueOf((int) analysis.totalDistance));
-			}
-			if (analysis.hasElevationData) {
-				tags.put("avg_ele", String.valueOf((int) analysis.avgElevation));
-				tags.put("min_ele", String.valueOf((int) analysis.minElevation));
-				tags.put("max_ele", String.valueOf((int) analysis.maxElevation));
-				tags.put("diff_ele_up", String.valueOf((int) analysis.diffElevationUp));
-				tags.put("diff_ele_down", String.valueOf((int) analysis.diffElevationDown));
-			}
-		}
-		tags.put("route", "segment");
-		tags.put("route_type", "track");
-		tags.put("route_id", "O-" + e.getId() );
-	}
 
 	private void handlePublicTransportStopExits(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if ("public_transport".equals(e.getTag("type")) && ctx != null) {
@@ -1388,28 +1286,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
 	public void commitAndCloseFiles(String rTreeMapIndexNonPackFileName, String rTreeMapIndexPackFileName, boolean deleteDatabaseIndexes)
 			throws IOException, SQLException {
-		if (indexRouteRelationTypes != null) {
-			List<String> lst = new ArrayList<>(indexRouteRelationTypes.keySet());
-			Collections.sort(lst, new Comparator<String>() {
-
-				@Override
-				public int compare(String o1, String o2) {
-					Integer i1 = indexRouteRelationTypes.get(o1);
-					Integer i2 = indexRouteRelationTypes.get(o2);
-					if (i1 == null) {
-						return -1;
-					}
-					if (i2 == null) {
-						return -1;
-					}
-					return -Integer.compare(i1, i2);
-				}
-			});
-			log.info("Indexed route relation types: ");
-			for (String tp : lst) {
-				log.info(String.format("%s - %d", tp, indexRouteRelationTypes.get(tp)));
-			}
-		}
 		// delete map rtree files
 		if (mapTree != null) {
 			for (int i = 0; i < mapTree.length; i++) {
