@@ -14,17 +14,16 @@ import org.apache.commons.logging.LogFactory;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.data.TransportRoute;
+import net.osmand.obf.preparation.IndexHeightData.WayGeneralStats;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RouteActivityType;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
-import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation.RelationMember;
-import net.osmand.util.MapUtils;
 
 public class IndexRouteRelationCreator {
 	private final static Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
@@ -105,7 +104,6 @@ public class IndexRouteRelationCreator {
 	}
 
 	private void addRouteRelationTags(Relation e, Way w, Map<String, String> tags, RouteActivityType activityType, IndexCreationContext icc) {
-		// TODO better tags & id osmc:symbol
 		if (tags.get("color") != null) {
 			tags.put("colour", tags.get("color"));
 		}
@@ -124,82 +122,23 @@ public class IndexRouteRelationCreator {
 			}
 			tags.put("route_activity_type", activityType.getName().toLowerCase());
 		}
-		calculateHeightTags(w, tags, icc, DIST_STEP);
+		icc.getIndexHeightData().proccessWithoutChecks(w);
+		WayGeneralStats wg = icc.getIndexHeightData().calculateWayGeneralStats(w, DIST_STEP);
+		if (tags.get("distance") == null && wg.dist > 0) {
+			tags.put("distance", String.valueOf((int) wg.dist));
+		}
+		if (wg.eleCount > 0) {
+			tags.put("avg_ele", String.valueOf((int) (wg.sumEle / wg.eleCount)));
+			tags.put("min_ele", String.valueOf((int) wg.minEle));
+			tags.put("max_ele", String.valueOf((int) wg.maxEle));
+			tags.put("diff_ele_up", String.valueOf((int) wg.up));
+			tags.put("diff_ele_down", String.valueOf((int) wg.down));
+		}
 		tags.put("route", "segment");
 		tags.put("route_type", "track");
 		tags.put("route_id", "O-" + e.getId() );
 	}
-
-	private void calculateHeightTags(Way w, Map<String, String> tags, IndexCreationContext icc, double DIST_STEP) {
-		double minEle = 0, maxEle = 0, avgEle = 0, up = 0, down = 0, dist = 0, ph = 0;
-		int hcnt = 0;
-		double step = 0;
-		Node pnode = null; 
-		for (int i = 0; i < w.getNodes().size(); i++) {
-			Node node = w.getNodes().get(i);
-			if(i > 0) {
-				double segment = MapUtils.getDistance(pnode.getLatitude(), pnode.getLongitude(), node.getLatitude(), node.getLongitude());
-				dist += segment;
-				step += segment;
-			}
-			double h = icc.getIndexHeightData().getPointHeight(node.getLatitude(), node.getLongitude());
-			if (h != IndexHeightData.INEXISTENT_HEIGHT) {
-				if (hcnt == 0) {
-					ph = minEle = maxEle = avgEle = h;
-					hcnt = 1;
-				} else {
-					minEle = Math.min(h, minEle);
-					maxEle = Math.max(h, maxEle);
-					avgEle += h;
-					hcnt++;
-					if (step > DIST_STEP) {
-						int extraFragments = (int) (step / DIST_STEP);
-						// in case way is very long calculate alt each DIST_STEP
-						for (int st = 1; st < extraFragments; st++) {
-							double midlat = pnode.getLatitude() + (node.getLatitude()  - pnode.getLatitude()) * st  / ((double) extraFragments);
-							double midlon = pnode.getLongitude() + (node.getLongitude()  - pnode.getLongitude()) * st  / ((double) extraFragments);
-							double midh = icc.getIndexHeightData().getPointHeight(midlat, midlon);
-							if (midh != IndexHeightData.INEXISTENT_HEIGHT) {
-								minEle = Math.min(midh, minEle);
-								maxEle = Math.max(midh, maxEle);
-								avgEle += midh;
-								hcnt++;
-								if (midh > ph) {
-									up += (midh - ph);
-								} else {
-									down += (ph - midh);
-								}
-								ph = midh;
-							}
-						}
-						
-						if (h > ph) {
-							up += (h - ph);
-						} else {
-							down += (ph - h);
-						}
-						ph = h;
-						step = 0;
-					}
-					
-				}
-			} else {
-				step = 0;
-			}
-			pnode = node;
-		}
-		if (tags.get("distance") == null && dist > 0) {
-			tags.put("distance", String.valueOf((int) dist));
-		}
-		if (hcnt > 0) {
-			tags.put("avg_ele", String.valueOf((int) (avgEle / hcnt)));
-			tags.put("min_ele", String.valueOf((int) minEle));
-			tags.put("max_ele", String.valueOf((int) maxEle));
-			tags.put("diff_ele_up", String.valueOf((int) up));
-			tags.put("diff_ele_down", String.valueOf((int) down));
-		}
-	}
-
+	
 	public void closeAllStatements() {
 		if (indexRouteRelationTypes.size() > 0) {
 			List<String> lst = new ArrayList<>(indexRouteRelationTypes.keySet());

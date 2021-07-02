@@ -285,6 +285,82 @@ public class IndexHeightData {
 		if(e.getTag("tunnel") != null || e.getTag("bridge") != null) {
 			return;
 		}
+		proccessWithoutChecks(e);
+	}
+	
+	
+	public static class WayGeneralStats {
+		double minEle = 0;
+		double maxEle = 0;
+		double sumEle = 0;
+		int eleCount = 0;
+		double up = 0;
+		double down = 0;
+		double dist = 0;
+	}
+	
+	public WayGeneralStats calculateWayGeneralStats(Way w, double DIST_STEP) {
+		double step = 0;
+		double ph = 0;
+		Node pnode = null; 
+		WayGeneralStats wg = new WayGeneralStats();
+		for (int i = 0; i < w.getNodes().size(); i++) {
+			Node node = w.getNodes().get(i);
+			if(i > 0) {
+				double segment = MapUtils.getDistance(pnode.getLatitude(), pnode.getLongitude(), node.getLatitude(), node.getLongitude());
+				wg.dist += segment;
+				step += segment;
+			}
+			double h = getPointHeight(node.getLatitude(), node.getLongitude());
+			if (h != IndexHeightData.INEXISTENT_HEIGHT) {
+				if (wg.eleCount == 0) {
+					ph = wg.minEle = wg.maxEle = wg.sumEle = h;
+					wg.eleCount = 1;
+				} else {
+					wg.minEle = Math.min(h, wg.minEle);
+					wg.maxEle = Math.max(h, wg.maxEle);
+					wg.sumEle += h;
+					wg.eleCount++;
+					if (step > DIST_STEP) {
+						int extraFragments = (int) (step / DIST_STEP);
+						// in case way is very long calculate alt each DIST_STEP
+						for (int st = 1; st < extraFragments; st++) {
+							double midlat = pnode.getLatitude() + (node.getLatitude()  - pnode.getLatitude()) * st  / ((double) extraFragments);
+							double midlon = pnode.getLongitude() + (node.getLongitude()  - pnode.getLongitude()) * st  / ((double) extraFragments);
+							double midh = getPointHeight(midlat, midlon);
+							if (midh != IndexHeightData.INEXISTENT_HEIGHT) {
+								wg.minEle = Math.min(midh, wg.minEle);
+								wg.maxEle = Math.max(midh, wg.maxEle);
+								wg.sumEle += midh;
+								wg.eleCount++;
+								if (midh > ph) {
+									wg.up += (midh - ph);
+								} else {
+									wg.down += (ph - midh);
+								}
+								ph = midh;
+							}
+						}
+						
+						if (h > ph) {
+							wg.up += (h - ph);
+						} else {
+							wg.down += (ph - h);
+						}
+						ph = h;
+						step = 0;
+					}
+					
+				}
+			} else {
+				step = 0;
+			}
+			pnode = node;
+		}
+		return wg;
+	}
+	
+	public void proccessWithoutChecks(Way e) {
 		WayHeightStats wh = new WayHeightStats();
 		
 		List<Node> ns = e.getNodes();
@@ -310,11 +386,11 @@ public class IndexHeightData {
 				}
 			}
 		}
-		if(wh.firstHeight != INEXISTENT_HEIGHT && wh.lastHeight != INEXISTENT_HEIGHT) {
-			e.putTag(ELE_ASC_START, ((int)wh.firstHeight)+"");
+		if (wh.firstHeight != INEXISTENT_HEIGHT && wh.lastHeight != INEXISTENT_HEIGHT) {
+			e.putTag(ELE_ASC_START, ((int) wh.firstHeight) + "");
 		}
-		if(wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
-			e.putTag(ELE_ASC_END, ((int)wh.lastHeight)+"");
+		if (wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
+			e.putTag(ELE_ASC_END, ((int) wh.lastHeight) + "");
 		}
 //		for(int k = 0; k < wh.SIZE; k++) {
 //			int deg = wh.DEGREE_START + k * wh.DEGREE_PRECISION;
