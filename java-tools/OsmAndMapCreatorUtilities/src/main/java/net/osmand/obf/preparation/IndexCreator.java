@@ -875,7 +875,7 @@ public class IndexCreator {
 		// settings.indexAddress = true;
 		settings.indexPOI = true;
 		// settings.indexTransport = true;
-		// settings.indexRouting = true;
+//		 settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
@@ -890,7 +890,7 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 		// String file = rootFolder + "/maps/wikivoyage/wikivoyage.osm.gz";
-		// String file = rootFolder + "/temp/map.osm";
+//		 String file = rootFolder + "/temp/map.osm";
 		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 
 		// String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";

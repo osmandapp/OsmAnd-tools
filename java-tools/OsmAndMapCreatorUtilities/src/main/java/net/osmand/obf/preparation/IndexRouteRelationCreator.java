@@ -20,6 +20,7 @@ import net.osmand.osm.RouteActivityType;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.MapAlgorithms;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -29,6 +30,9 @@ public class IndexRouteRelationCreator {
 	private final static Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
 	private static final double DIST_STEP = 25;  
+	
+	public static final int MAX_GRAPH_SKIP_POINTS_BITS = 3;
+	
 	
 	protected final Log logMapDataWarn;
 	private final Map<String, Integer> indexRouteRelationTypes = new TreeMap<String, Integer>();
@@ -115,24 +119,26 @@ public class IndexRouteRelationCreator {
 			tags.put("ref", ref);
 			// red, blue, green, orange, yellow
 			int l = Math.max(1, Math.min(6, ref.length()));
-			
 			tags.put("gpx_bg", activityType.getColor() + "_hexagon_" + l + "_road_shield");
 			if (tags.get("colour") == null) {
 				tags.put("colour", activityType.getColor());
 			}
 			tags.put("route_activity_type", activityType.getName().toLowerCase());
 		}
-		icc.getIndexHeightData().proccessWithoutChecks(w);
 		WayGeneralStats wg = icc.getIndexHeightData().calculateWayGeneralStats(w, DIST_STEP);
 		if (tags.get("distance") == null && wg.dist > 0) {
 			tags.put("distance", String.valueOf((int) wg.dist));
 		}
 		if (wg.eleCount > 0) {
-			tags.put("avg_ele", String.valueOf((int) (wg.sumEle / wg.eleCount)));
-			tags.put("min_ele", String.valueOf((int) wg.minEle));
-			tags.put("max_ele", String.valueOf((int) wg.maxEle));
+			int st = (int) wg.startEle;
+			tags.put("start_ele", String.valueOf((int) wg.startEle));
+			tags.put("end_ele__start", String.valueOf((int) wg.endEle - st));
+			tags.put("avg_ele__start", String.valueOf((int) (wg.sumEle / wg.eleCount) - st));
+			tags.put("min_ele__start", String.valueOf((int) wg.minEle - st));
+			tags.put("max_ele__start", String.valueOf((int) wg.maxEle - st));
 			tags.put("diff_ele_up", String.valueOf((int) wg.up));
 			tags.put("diff_ele_down", String.valueOf((int) wg.down));
+			tags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wg.step, wg.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
 		}
 		tags.put("route", "segment");
 		tags.put("route_type", "track");
