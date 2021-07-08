@@ -355,7 +355,8 @@ public class IndexHeightData {
 	public WayGeneralStats calculateWayGeneralStats(Way w, double DIST_STEP) {
 		Node pnode = null; 
 		WayGeneralStats wg = new WayGeneralStats();
-		wg.step = (int) DIST_STEP;
+		int I_DIST_STEP = (int) DIST_STEP;
+		double dist = 0;
 		for (int i = 0; i < w.getNodes().size(); i++) {
 			Node node = w.getNodes().get(i);
 			double step = 0;
@@ -363,7 +364,7 @@ public class IndexHeightData {
 				step = MapUtils.getDistance(pnode.getLatitude(), pnode.getLongitude(), node.getLatitude(), node.getLongitude());
 			}
 			double h = getPointHeight(node.getLatitude(), node.getLongitude());
-			if (step > DIST_STEP) {
+			if (step > I_DIST_STEP) {
 				int extraFragments = (int) (step / DIST_STEP);
 				// in case way is very long calculate alt each DIST_STEP
 				for (int st = 1; st < extraFragments; st++) {
@@ -373,16 +374,24 @@ public class IndexHeightData {
 							+ (node.getLongitude() - pnode.getLongitude()) * st / ((double) extraFragments);
 					double midh = getPointHeight(midlat, midlon);
 					double d = MapUtils.getDistance(pnode.getLatitude(), pnode.getLongitude(), midlat, midlon);
-					wg.dists.add(wg.dist + d);
+					wg.dists.add(dist + d);
 					wg.altitudes.add(midh);
 				}
 			}
-			wg.dist += step;
-			wg.dists.add(wg.dist);
+			dist += step;
+			wg.dists.add(dist);
 			wg.altitudes.add(h);
 			pnode = node;
 		}
-		
+		calculateEleStats(wg, I_DIST_STEP);
+		return wg;
+	}
+
+
+
+	public static void calculateEleStats(WayGeneralStats wg, int DIST_STEP) {
+		wg.step = DIST_STEP;
+		wg.dist = wg.dists.get(wg.dists.size() - 1);
 		double prevUpDownDist = 0;
 		double prevUpDownH = 0;
 		
@@ -412,14 +421,13 @@ public class IndexHeightData {
 				}
 				
 				while (sumdist >= prevGraphDist + DIST_STEP) {
+					// here could be interpolation but probably it's not needed in most of the cases
 					wg.altIncs.add((int) (h - prevGraphH));
 					prevGraphH = h;
 					prevGraphDist += DIST_STEP;
 				}
 			}
 		}
-			
-		return wg;
 	}
 	
 	

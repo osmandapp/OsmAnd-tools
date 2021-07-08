@@ -866,7 +866,7 @@ public class IndexCreator {
 	public static void main(String[] args)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		long time = System.currentTimeMillis();
-
+		
 		// if(true){ generateRegionsFile(); return;}
 		String rootFolder = "/Users/victorshcherb/osmand/";
 		IndexCreatorSettings settings = new IndexCreatorSettings();
@@ -875,11 +875,11 @@ public class IndexCreator {
 		// settings.indexAddress = true;
 		settings.indexPOI = true;
 		// settings.indexTransport = true;
-//		 settings.indexRouting = true;
+		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
-		settings.keepOnlyRouteRelationObjects = true;
+
 		// settings.zoomWaySmoothness = 2;
 
 		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/"), settings); //$NON-NLS-1$
@@ -889,17 +889,21 @@ public class IndexCreator {
 		// creator.deleteOsmDB = false;
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
-		// String file = rootFolder + "/maps/wikivoyage/wikivoyage.osm.gz";
-//		 String file = rootFolder + "/temp/map.osm";
-		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 
+		// String file = rootFolder + "/maps/wikivoyage/wikivoyage.osm.gz";
+		String file = rootFolder + "/temp/map.osm";
 		// String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
+
+		// String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
+		// settings.keepOnlyRouteRelationObjects = true;
+		// creator.setMapFileName(name + ".travel.obf");
+
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		String name = file.substring(st, e);
 		creator.setNodesDBFile(new File(rootFolder + "/maps/" + name + ".tmp.odb"));
-		creator.setMapFileName(name + ".travel.obf");
+
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos/resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder(
 				rootFolder + "/repos/resources/obf_creation/rendering_types.xml", new File(file).getName());
