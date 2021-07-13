@@ -29,7 +29,7 @@ import net.osmand.osm.edit.Relation.RelationMember;
 public class IndexRouteRelationCreator {
 	private final static Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
-	private static final double DIST_STEP = 25;  
+	public static final double DIST_STEP = 25;
 	
 	public static final int MAX_GRAPH_SKIP_POINTS_BITS = 3;
 	

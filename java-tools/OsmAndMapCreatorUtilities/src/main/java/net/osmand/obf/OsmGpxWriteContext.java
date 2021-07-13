@@ -14,6 +14,8 @@ import net.osmand.IProgress;
 import net.osmand.binary.MapZooms;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.obf.preparation.IndexHeightData;
+import net.osmand.util.MapAlgorithms;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -30,6 +32,8 @@ import rtree.RTree;
 
 import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
+import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
+import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
 
 public class OsmGpxWriteContext {
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
@@ -146,12 +150,12 @@ public class OsmGpxWriteContext {
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 					addAnalysisTags(gpxTrackTags, analysis);
-					
+					addElevationTags(gpxTrackTags, s);
 					seraizeTags(extraTrackTags, gpxTrackTags);
 					serializer.endTag(null, "way");
 				}
 			}
-			
+
 			for (WptPt p : gpxFile.getPoints()) {
 				long nid = id--;
 				writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
@@ -160,8 +164,28 @@ public class OsmGpxWriteContext {
 		tracks++;
 	}
 
+	private void addElevationTags(Map<String, String> gpxTrackTags, TrkSegment s) {
+		IndexHeightData.WayGeneralStats wgs = new IndexHeightData.WayGeneralStats();
+		for (WptPt p : s.points) {
+			wgs.altitudes.add(p.ele);
+			wgs.dists.add(p.distance);
+		}
+		IndexHeightData.calculateEleStats(wgs, (int) DIST_STEP);
+		if (wgs.eleCount > 0) {
+			int st = (int) wgs.startEle;
+			gpxTrackTags.put("start_ele", String.valueOf((int) wgs.startEle));
+			gpxTrackTags.put("end_ele__start", String.valueOf((int) wgs.endEle - st));
+			gpxTrackTags.put("avg_ele__start", String.valueOf((int) (wgs.sumEle / wgs.eleCount) - st));
+			gpxTrackTags.put("min_ele__start", String.valueOf((int) wgs.minEle - st));
+			gpxTrackTags.put("max_ele__start", String.valueOf((int) wgs.maxEle - st));
+			gpxTrackTags.put("diff_ele_up", String.valueOf((int) wgs.up));
+			gpxTrackTags.put("diff_ele_down", String.valueOf((int) wgs.down));
+			gpxTrackTags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wgs.step, wgs.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
+		}
+	}
+
 	private void seraizeTags(Map<String, String> extraTrackTags, Map<String, String> gpxTrackTags) throws IOException {
-		if(extraTrackTags != null) {
+		if (extraTrackTags != null) {
 			gpxTrackTags.putAll(extraTrackTags);
 		}
 		Iterator<Entry<String, String>> it = gpxTrackTags.entrySet().iterator();
