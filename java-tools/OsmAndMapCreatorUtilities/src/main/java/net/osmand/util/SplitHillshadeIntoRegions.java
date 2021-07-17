@@ -34,7 +34,7 @@ import net.osmand.osm.edit.Way;
 public class SplitHillshadeIntoRegions {
 	private static final Log LOG = PlatformUtil.getLog(SplitHillshadeIntoRegions.class);
 	private static int MIN_ZOOM = 1;
-	private static int MAX_ZOOM = 11;
+	private static int MAX_ZOOM = 12;
 	private static final int BATCH_SIZE = 100;
 
 	public static void main(String[] args) throws IOException {
