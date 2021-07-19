@@ -197,6 +197,25 @@ public class UserdataController {
 		}
 		return null;
 	}
+	
+	@GetMapping(value = "/user-validate-sub")
+	@ResponseBody
+	public ResponseEntity<String> check(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException {
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+		}
+		String errorMsg = checkOrderIdPremium(pu.orderid);
+		if (errorMsg != null) {
+			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+		}
+		return ResponseEntity.ok(gson.toJson(dev));
+	}
 
 	@PostMapping(value = "/user-update-orderid")
 	@ResponseBody
