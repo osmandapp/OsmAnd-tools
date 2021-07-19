@@ -336,19 +336,19 @@ public class IndexHeightData {
 	
 	
 	public static class WayGeneralStats {
-		double startEle = 0;
-		double endEle = 0;
-		double minEle = 0;
-		double maxEle = 0;
-		double sumEle = 0;
-		int eleCount = 0;
-		double up = 0;
-		double down = 0;
-		double dist = 0;
-		int step = 10;
-		TDoubleArrayList altitudes = new TDoubleArrayList();
-		TDoubleArrayList dists = new TDoubleArrayList();
-		TIntArrayList altIncs = new TIntArrayList(); 
+		public double startEle = 0;
+		public double endEle = 0;
+		public double minEle = 0;
+		public double maxEle = 0;
+		public double sumEle = 0;
+		public int eleCount = 0;
+		public double up = 0;
+		public double down = 0;
+		public double dist = 0;
+		public int step = 10;
+		public TDoubleArrayList altitudes = new TDoubleArrayList();
+		public TDoubleArrayList dists = new TDoubleArrayList();
+		public TIntArrayList altIncs = new TIntArrayList();
 		
 	}
 	
