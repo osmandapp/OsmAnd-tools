@@ -464,7 +464,7 @@ public class NativeSwingRendering extends NativeLibrary {
 		if (loaded) {
 			defaultLoadedLibrary = new NativeSwingRendering();
 			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
-			defaultLoadedLibrary.loadFontData(new File("fonts"));
+			defaultLoadedLibrary.loadFontData(new File("OsmAndMapCreator/fonts"));
 		}
 		return defaultLoadedLibrary;
 	}

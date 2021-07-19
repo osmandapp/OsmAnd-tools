@@ -35,7 +35,6 @@ task collectFonts(type: Copy) {
 		include "65_NotoSansNastaliqUrdu-Regular.ttf"
 
 		include "DroidSansFallback.ttf"
-		include "MTLmr3m.ttf"
 	}
 
 	into "fonts"	
