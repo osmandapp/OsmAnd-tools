@@ -36,7 +36,39 @@ public class EmailSenderService {
     }
     
     
-    public void sendRegistrationEmail(String email, String token, boolean newUser) {
+    public void sendOsmAndCloudPromoEmail(String email, String promo) {
+		LOGGER.info("Sending mail to: " + email);
+		Email from = new Email(NOREPLY_MAIL_FROM);
+		from.setName("OsmAnd");
+		Email to = new Email(email);
+		String topic = "Congratulations and welcome to OsmAnd Cloud!";
+		StringBuilder contentStr = new StringBuilder();
+		contentStr.append("Hello OsmAnd User!");
+		contentStr.append("<br><br>");
+		contentStr.append("You have been selected for OsmAnd Cloud promo subscription. You promo OsmAnd Pro is <b>"+promo+"</b>.<br>");
+		contentStr.append("Now you can open OsmAnd Settings -> Backup and Restore and Login with this email to OsmAnd Cloud and get all features enabled.<br>."); 
+		contentStr.append("<br><br>");
+		contentStr.append("Best Regards, <br>OsmAnd Team");
+		
+		
+		Content content = new Content("text/html", contentStr.toString());
+		Mail mail = new Mail(from, topic, to, content);
+		mail.from = from;
+		Request request = new Request();
+		try {
+			request.setMethod(Method.POST);
+			request.setEndpoint("mail/send");
+			String body = mail.build();
+			request.setBody(body);
+			Response response = sendGridClient.api(request);
+			LOGGER.info("Response code: " + response.getStatusCode());
+		} catch (Exception e) {
+			LOGGER.warn(e.getMessage(), e);
+		}
+		
+	}
+    
+    public void sendOsmAndCloudRegistrationEmail(String email, String token, boolean newUser) {
 		LOGGER.info("Sending mail to: " + email);
 		Email from = new Email(NOREPLY_MAIL_FROM);
 		from.setName("OsmAnd");
@@ -106,6 +138,29 @@ public class EmailSenderService {
         	return false;
 		}
     }
+
+
+	public boolean isEmail(String comment) {
+		if (comment.contains(" ")) {
+			return false;
+		}
+		if (!comment.contains("@")) {
+			return false;
+		}
+		String[] twoParts = comment.split("@");
+		if(twoParts.length != 2) {
+			return false;
+		}
+		if (twoParts[0].trim().isEmpty()) {
+			return false;
+		}
+		// validate domain
+		if (!twoParts[1].contains(".") || twoParts[1].trim().isEmpty()) {
+			return false;
+		}
+		return true;
+
+	}
 
 
  }

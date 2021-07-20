@@ -278,7 +278,7 @@ public class UserdataController {
 		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendRegistrationEmail(pu.email, pu.token, true);
+		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
 		return ok();
 	}
 

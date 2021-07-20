@@ -57,6 +57,8 @@ import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.LotterySeriesRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.services.DownloadIndexesService;
@@ -100,6 +102,9 @@ public class AdminController {
 
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
+	
+	@Autowired
+	private PremiumUsersRepository usersRepository;
 
 	@Autowired
 	private EmailRegistryService emailService;
@@ -194,11 +199,20 @@ public class AdminController {
 		c.add(Calendar.YEAR, 1);
 		deviceSub.expiretime = c.getTime(); 
 		subscriptionsRepository.save(deviceSub);
+		if (emailSender.isEmail(comment)) {
+			String email = comment;
+			PremiumUser pu = new PremiumUsersRepository.PremiumUser();
+			pu.email = email;
+			pu.regTime = new Date();
+			pu.orderid = deviceSub.orderId;
+			usersRepository.saveAndFlush(pu);
+			deviceSub.purchaseToken += " (email sent & registered)";
+			emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
+		}
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
         return "redirect:info#audience";
 	}
 
-	
 	
 	@PostMapping(path = { "/search-emails" })
 	public String searchEmail(Model model, 
