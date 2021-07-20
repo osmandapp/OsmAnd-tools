@@ -52,6 +52,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.gson.Gson;
 
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -75,6 +76,8 @@ import net.osmand.server.api.services.PollsService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
+import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import net.osmand.server.controllers.pub.WebController;
 
 @Controller
@@ -107,6 +110,9 @@ public class AdminController {
 	private PremiumUsersRepository usersRepository;
 
 	@Autowired
+	private UserdataController userDataController;
+
+	@Autowired
 	private EmailRegistryService emailService;
 
 	@Autowired
@@ -135,6 +141,8 @@ public class AdminController {
 
 	@Autowired
 	private LogsAccessService logsAccessService;
+	
+	private Gson gson = new Gson();
 	
 	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
 	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
@@ -208,6 +216,38 @@ public class AdminController {
 			usersRepository.saveAndFlush(pu);
 			deviceSub.purchaseToken += " (email sent & registered)";
 			emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
+		}
+		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
+        return "redirect:info#audience";
+	}
+	
+	@PostMapping(path = { "/search-subscription" })
+	public String searchSubscription(Model model, 
+			@RequestParam(required = true) String orderId, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
+		deviceSub.sku = "not found";
+		deviceSub.orderId = "none";
+		deviceSub.valid = false;
+		if (emailSender.isEmail(orderId)) {
+			PremiumUser pu = usersRepository.findByEmail(orderId);
+			if (pu != null) {
+				deviceSub.sku = orderId + " (pro email)";
+				List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(pu.orderid);
+				if (ls != null && ls.size() > 0) {
+					deviceSub = ls.get(0);
+				}
+				if (deviceSub != null) {
+					UserFilesResults ufs = userDataController.generateFiles(pu.id, null, null, true);
+					ufs.allFiles.clear();
+					ufs.uniqueFiles.clear();
+					deviceSub.payload = gson.toJson(ufs);
+				}
+			}
+		} else {
+			List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(orderId);
+			if (ls != null && ls.size() > 0) {
+				deviceSub = ls.get(0);
+			}
 		}
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
         return "redirect:info#audience";
