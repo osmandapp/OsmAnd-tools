@@ -303,10 +303,10 @@ public class ApiController {
 					subMap.put("valid", sub.valid.toString());
 				}
 				String state = "undefined";
-				if (sub.expiretime != null && sub.paymentstate != null && sub.autorenewing != null) {
+				if (sub.expiretime != null) {
 					long expireTimeMs = sub.expiretime.getTime();
-					int paymentState = sub.paymentstate;
-					boolean autoRenewing = sub.autorenewing;
+					int paymentState = sub.paymentstate == null ? 1 : sub.paymentstate.intValue();
+					boolean autoRenewing = sub.autorenewing == null ? false : sub.autorenewing.booleanValue();
 					if (expireTimeMs > System.currentTimeMillis()) {
 						if (paymentState == 1 && autoRenewing) {
 							state = "active";
