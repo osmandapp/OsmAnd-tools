@@ -303,6 +303,9 @@ public class ApiController {
 					subMap.put("valid", sub.valid.toString());
 				}
 				String state = "undefined";
+				if (sub.starttime != null) {
+					subMap.put("start_time", String.valueOf(sub.starttime.getTime()));
+				}
 				if (sub.expiretime != null) {
 					long expireTimeMs = sub.expiretime.getTime();
 					int paymentState = sub.paymentstate == null ? 1 : sub.paymentstate.intValue();
