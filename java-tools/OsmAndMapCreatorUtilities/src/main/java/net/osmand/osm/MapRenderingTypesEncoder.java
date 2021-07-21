@@ -315,6 +315,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public Map<String, String> transformTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
+		checkIfInitNeeded();
 		tags = transformShieldTags(tags, entity, appType);
 		tags = transformIntegrityTags(tags, entity, appType);
 		tags = transformOpeningHoursTags(tags, appType);
