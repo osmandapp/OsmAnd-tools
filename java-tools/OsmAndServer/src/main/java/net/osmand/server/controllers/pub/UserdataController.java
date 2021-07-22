@@ -214,7 +214,7 @@ public class UserdataController {
 		if (errorMsg != null) {
 			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
-		return ResponseEntity.ok(gson.toJson(dev));
+		return ResponseEntity.ok(gson.toJson(pu));
 	}
 
 	@PostMapping(value = "/user-update-orderid")
