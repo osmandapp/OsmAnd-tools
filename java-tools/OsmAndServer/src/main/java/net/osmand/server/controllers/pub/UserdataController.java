@@ -248,7 +248,7 @@ public class UserdataController {
 			@RequestParam(name = "orderid", required = false) String orderid,
 			@RequestParam(name = "login", required = false) boolean login) throws IOException {
 		// allow to register only with small case
-		email = email.toLowerCase();
+		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
 			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
