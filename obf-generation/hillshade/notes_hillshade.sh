@@ -136,7 +136,11 @@ if [ "$START_STAGE" -le 9 ] && [ "$END_STAGE" -ge 9 ]; then
 	echo "9. Split planet to tiles"
 	rm -rf tiles/ || true
 	# -e option to continue
-	gdal2tiles.py --processes 3 -z 4-11 ${OUTPUT_DIR_ALL}WGS84-all-alpha.tif tiles/
+	zoom_range=4-11
+	if [ "$PROCESS" = "composite" ] || [ "$PROCESS" = "hillshade" ]; then
+		zoom_range=4-12
+	fi
+	gdal2tiles.py --processes 3 -z $zoom_range ${OUTPUT_DIR_ALL}WGS84-all-alpha.tif tiles/
 	rm -f WGS84-all-alpha.tif || true
 	
 fi
