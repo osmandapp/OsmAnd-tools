@@ -866,14 +866,14 @@ public class FixBasemapRoads {
 		for (RoadLineConnection r : candidates) {
 			// use angle difference as metric for merging
 			double angle = Math.abs(MapUtils.alignAngleDifference(direction - r.direction));
-			boolean isDiffHighway = !longRoadToKeep.highway.equals(r.rl.highway);
+			boolean isDiffHighway = !Algorithms.stringsEqual(longRoadToKeep.highway, r.rl.highway);
 			boolean straight = angle < ANGLE_TO_ALLOW_DIRECTION;
 			int connectionType = getConnectionType(longRoadToKeep, r.rl);
 			if (!straight || connectionType == CONNECT_NOT_ALLOWED || isDiffHighway) {
 				continue;
 			}
 			double dist = MapUtils.getDistance(longRoadToKeep.getEdgePoint(!attachToEnd), r.getStartPoint());
-			double continuationMetric = metric(connectionType, angle,  dist, longRoadToKeep.distance, r.rl.distance);
+			double continuationMetric = metric(connectionType, angle, dist, longRoadToKeep.distance, r.rl.distance);
 			if (merge == null) {
 				merge = r;
 				bestContinuationMetric = continuationMetric;
@@ -895,7 +895,7 @@ public class FixBasemapRoads {
 		if (merge != null) {
 			for (RoadLineConnection r : candidates) {
 				double angle = Math.abs(MapUtils.alignAngleDifference(merge.direction - r.direction - Math.PI));
-				boolean isDiffHighway = !merge.rl.highway.equals(r.rl.highway);
+				boolean isDiffHighway = !Algorithms.stringsEqual(merge.rl.highway, r.rl.highway);
 				boolean straight = angle < ANGLE_TO_ALLOW_DIRECTION;
 				int connectionType = getConnectionType(merge.rl, r.rl);
 				if (!straight || connectionType == CONNECT_NOT_ALLOWED || isDiffHighway) {
