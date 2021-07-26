@@ -91,7 +91,10 @@ public class FixBasemapRoads {
     private static double BOTTOM_LAT = 45.0;
 
 	public static void main(String[] args) throws Exception {
-		if(args != null && args.length == 1 && args[1].equals("test")) {
+		if(args == null){
+			return;
+		}
+		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[] {
 					"/home/denisxs/osmand-maps/proc/" + "line_motorway_trunk_primary_c.osm",
 					"/home/denisxs/osmand-maps/raw/line_mtp_cut.osm",
@@ -103,7 +106,7 @@ public class FixBasemapRoads {
 		List<File> filesToRead = new ArrayList<>();
 		
 
-		for(int i = 0; i < args.length; i++) {
+		for(int i = 1; i < args.length; i++) {
 			if(args[i].equals("--route-relations")) {
 				i++;
 				relationFiles.add(new File(args[i]));
@@ -863,9 +866,10 @@ public class FixBasemapRoads {
 		for (RoadLineConnection r : candidates) {
 			// use angle difference as metric for merging
 			double angle = Math.abs(MapUtils.alignAngleDifference(direction - r.direction));
+			boolean isDiffHighway = !longRoadToKeep.highway.equals(r.rl.highway);
 			boolean straight = angle < ANGLE_TO_ALLOW_DIRECTION;
 			int connectionType = getConnectionType(longRoadToKeep, r.rl);
-			if (!straight || connectionType == CONNECT_NOT_ALLOWED) {
+			if (!straight || connectionType == CONNECT_NOT_ALLOWED || isDiffHighway) {
 				continue;
 			}
 			double dist = MapUtils.getDistance(longRoadToKeep.getEdgePoint(!attachToEnd), r.getStartPoint());
@@ -891,9 +895,10 @@ public class FixBasemapRoads {
 		if (merge != null) {
 			for (RoadLineConnection r : candidates) {
 				double angle = Math.abs(MapUtils.alignAngleDifference(merge.direction - r.direction - Math.PI));
+				boolean isDiffHighway = !merge.rl.highway.equals(r.rl.highway);
 				boolean straight = angle < ANGLE_TO_ALLOW_DIRECTION;
 				int connectionType = getConnectionType(merge.rl, r.rl);
-				if (!straight || connectionType == CONNECT_NOT_ALLOWED) {
+				if (!straight || connectionType == CONNECT_NOT_ALLOWED || isDiffHighway) {
 					continue;
 				}
 				double dist = MapUtils.getDistance(merge.getStartPoint(), r.getStartPoint());
