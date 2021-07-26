@@ -718,7 +718,7 @@ public class BasemapProcessor {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
 		} else {
 			boolean mini = false;
-			boolean detailed = true;
+			boolean detailed = false;
 			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
 			// BASEMAP generation
 			int zoomSmoothness = 2;
@@ -756,8 +756,8 @@ public class BasemapProcessor {
 			
 			IndexCreator creator = new IndexCreator(folder, settings); //$NON-NLS-1$
 			creator.setDialects(
-					detailed ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY, 
-					detailed ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY);
+					!mini ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY, 
+					!mini ? DBDialect.SQLITE : DBDialect.SQLITE_IN_MEMORY);
 			creator.setMapFileName(fileName);
 			List<File> src = new ArrayList<File>();
 			parseFiles(folder, src);
