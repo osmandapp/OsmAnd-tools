@@ -197,6 +197,25 @@ public class UserdataController {
 		}
 		return null;
 	}
+	
+	@GetMapping(value = "/user-validate-sub")
+	@ResponseBody
+	public ResponseEntity<String> check(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException {
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+		}
+		String errorMsg = checkOrderIdPremium(pu.orderid);
+		if (errorMsg != null) {
+			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+		}
+		return ResponseEntity.ok(gson.toJson(pu));
+	}
 
 	@PostMapping(value = "/user-update-orderid")
 	@ResponseBody
@@ -228,6 +247,8 @@ public class UserdataController {
 			@RequestParam(name = "deviceid", required = false) String deviceId,
 			@RequestParam(name = "orderid", required = false) String orderid,
 			@RequestParam(name = "login", required = false) boolean login) throws IOException {
+		// allow to register only with small case
+		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
 			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
@@ -259,7 +280,7 @@ public class UserdataController {
 		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendRegistrationEmail(pu.email, pu.token, true);
+		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
 		return ok();
 	}
 
@@ -384,7 +405,7 @@ public class UserdataController {
 			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
 					"Subscription is not valid any more: " + errorMsg);
 		}
-		UserFilesResults res = generateFiles(dev, null, null, false);
+		UserFilesResults res = generateFiles(dev.userid, null, null, false);
 		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
 			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
 					"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
@@ -568,19 +589,19 @@ public class UserdataController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		UserFilesResults res = generateFiles(dev, name, type, allVersions);
+		UserFilesResults res = generateFiles(dev.userid, name, type, allVersions);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	private UserFilesResults generateFiles(PremiumUserDevice dev, String name, String type, boolean allVersions) {
-		List<UserFileNoData> fl = filesRepository.listFilesByUserid(dev.userid, name, type);
+	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions) {
+		List<UserFileNoData> fl = filesRepository.listFilesByUserid(userId, name, type);
 		UserFilesResults res = new UserFilesResults();
 		res.maximumAccountSize = MAXIMUM_ACCOUNT_SIZE;
 		res.uniqueFiles = new ArrayList<>();
 		if (allVersions) {
 			res.allFiles = new ArrayList<>();
 		}
-		res.deviceid = dev.id;
+		res.userid = userId;
 		Set<String> fileIds = new TreeSet<String>();
 		for (UserFileNoData sf : fl) {
 			String fileId = sf.type + "____" + sf.name;
@@ -610,7 +631,7 @@ public class UserdataController {
 		public int totalFileVersions;
 		public List<UserFileNoData> allFiles;
 		public List<UserFileNoData> uniqueFiles;
-		public int deviceid;
+		public int userid;
 		public long maximumAccountSize;
 
 	}
