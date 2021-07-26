@@ -718,7 +718,7 @@ public class BasemapProcessor {
 	        System.out.println("Please specify folder with basemap *.osm or *.osm.bz2 files");
 		} else {
 			boolean mini = false;
-			boolean detailed = false;
+			boolean detailed = true;
 			MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder("basemap");
 			// BASEMAP generation
 			int zoomSmoothness = 2;
@@ -729,11 +729,13 @@ public class BasemapProcessor {
 			if (args.length >= 2) { 
 				if (args[1].equals("mini")) {
 					mini = true;
+					detailed = false;
 					zoomSmoothness = 2;
 					zooms =  MapZooms.parseZooms("1-2;3;4-5;6-8;9-");
 					MOST_DETAILED_APPROXIMATION = 9;
 					fileName = "World_basemap_mini_2.obf";
 				} else if(args[1].equals("detailed")) {
+					mini = false;
 					detailed = true;
 					zoomSmoothness = 2;
 					zooms = MapZooms.parseZooms("1-2;3;4-5;6-7;8-9;10-11;12-");
