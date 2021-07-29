@@ -38,12 +38,14 @@ public class ResourceDeleter {
 		if (args.length == 0) {
 			args = new String[] { "../../../android/OsmAnd/res" };
 		}
+		String fileMain = "strings.xml";
+		fileMain = "phrases.xml";
 		File f = new File(args[0]);
 		Set<String> mainkeys = new LinkedHashSet<String>();
-		parseResources(new File(f, "values/strings.xml"), mainkeys);
+		parseResources(new File(f, "values/" + fileMain), mainkeys);
 		File[] lf = f.listFiles();
 		for(int i = 0; i < lf.length; i++) {
-			File file = new File(lf[i], "strings.xml");
+			File file = new File(lf[i], fileMain);
 			if(lf[i].getName().startsWith("values-") && file.exists()) {
 				Set<String> keys = new LinkedHashSet<String>();
 
