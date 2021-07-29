@@ -40,7 +40,7 @@ public class ChangesetsController {
 		UserChangesResult res = new UserChangesResult();
 		res.user = name;
 		jdbcTemplate.query(
-				"select substr(closed_at_day, 0, 8), count(*) from changesets where username = '?' group by substr(closed_at_day, 0, 8) order by 1 desc",
+				"select substr(closed_at_day, 0, 8), count(*) from changesets where username = ? group by substr(closed_at_day, 0, 8) order by 1 desc",
 				new String[] { name }, new RowCallbackHandler() {
 
 					@Override
