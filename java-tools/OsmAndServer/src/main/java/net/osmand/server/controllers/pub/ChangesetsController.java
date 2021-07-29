@@ -30,7 +30,8 @@ public class ChangesetsController {
 
 	protected class UserChangesResult {
 		String user;
-		Map<String, Integer> results = new LinkedHashMap<String, Integer>();
+		Map<String, Integer> changesets = new LinkedHashMap<String, Integer>();
+		Map<String, Integer> objectChanges = new LinkedHashMap<String, Integer>();
 	}
 
 	@GetMapping(value = "/user-changes")
@@ -45,7 +46,8 @@ public class ChangesetsController {
 
 					@Override
 					public void processRow(ResultSet rs) throws SQLException {
-						res.results.put(rs.getString(1), rs.getInt(2));
+						res.changesets.put(rs.getString(1), rs.getInt(2));
+						res.objectChanges.put(rs.getString(1), rs.getInt(3));
 					}
 				});
 
