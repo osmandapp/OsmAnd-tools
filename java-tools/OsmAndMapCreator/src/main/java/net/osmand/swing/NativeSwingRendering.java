@@ -464,11 +464,26 @@ public class NativeSwingRendering extends NativeLibrary {
 		if (loaded) {
 			defaultLoadedLibrary = new NativeSwingRendering();
 			defaultLoadedLibrary.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
-			defaultLoadedLibrary.loadFontData(new File("fonts"));
+			defaultLoadedLibrary.loadFontData(new File(findFontFolder()));
 		}
 		return defaultLoadedLibrary;
 	}
 
-
+	private static String findFontFolder() {
+		// "fonts" for *.zip, "OsmAndMapCreator/fonts" for IDE
+		String[] folders = {"fonts", "OsmAndMapCreator/fonts"};
+		for (String d : folders) {
+			File directory = new File(d);
+			if (directory.isDirectory()) {
+				File[] files = directory.listFiles();
+				for (File f : files) {
+					if (f.getName().contains(".ttf") || f.getName().contains(".otf")) {
+						return d;
+					}
+				}
+			}
+		}
+		return "fonts";
+	}
 
 }
