@@ -37,6 +37,7 @@ import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
+import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiJsonResponseException;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
@@ -133,6 +134,11 @@ public class UpdateSubscription {
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " introcycles = ? , "
 					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
+		} else if (subType == SubscriptionType.HUAWEI) {
+			updQuery = "UPDATE supporters_device_sub SET "
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " payload = ?, price = ?, pricecurrency = ?, "
+					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
@@ -146,6 +152,7 @@ public class UpdateSubscription {
 		
 		boolean android = true;
 		boolean ios = true;
+		boolean huawei = true;
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
 		String androidClientSecretFile = "";
@@ -158,9 +165,14 @@ public class UpdateSubscription {
 				androidClientSecretFile = args[i].substring("-androidclientsecret=".length());
 			} else if ("-onlyandroid".equals(args[i])) {
 				ios = false;
+				huawei = false;
 			} else if ("-revalidateinvalid".equals(args[i])) {
 				revalidateinvalid = true;
 			} else if ("-onlyios".equals(args[i])) {
+				android = false;
+				huawei = false;
+			} else if ("-onlyhuawei".equals(args[i])) {
+				ios = false;
 				android = false;
 			}
 		}
@@ -177,6 +189,9 @@ public class UpdateSubscription {
 		}
 		if (ios) {
 			new UpdateSubscription(null, SubscriptionType.IOS, revalidateinvalid).queryPurchases(conn, up);
+		}
+		if (huawei) {
+			new UpdateSubscription(null, SubscriptionType.HUAWEI, revalidateinvalid).queryPurchases(conn, up);
 		}
 	}
 
@@ -238,7 +253,11 @@ public class UpdateSubscription {
 					if (huaweiIAPHelper == null) {
 						huaweiIAPHelper = new HuaweiIAPHelper();
 					}
-					processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId, regTime, startTime, expireTime, currentTime, pms.verbose);
+					SubscriptionPurchase sub = processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId,
+							regTime, startTime, expireTime, currentTime, pms.verbose);
+					if (sub == null && prevpurchaseToken != null) {
+						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
+					}
 				} else if (subType == SubscriptionType.ANDROID) {
 					SubscriptionPurchase sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId, 
 							regTime, startTime, expireTime, currentTime, pms.verbose);
@@ -352,8 +371,12 @@ public class UpdateSubscription {
 					ipo = new IntroductoryPriceInfo();
 					ipo.setIntroductoryPriceCycles(introCycles);
 				}
-				subscription = new SubscriptionPurchase().setIntroductoryPriceInfo(ipo).setStartTimeMillis(startDate)
-						.setExpiryTimeMillis(expiresDate).setAutoRenewing(autoRenewing).setOrderId(appstoreOrderId);
+				subscription = new SubscriptionPurchase()
+						.setIntroductoryPriceInfo(ipo)
+						.setStartTimeMillis(startDate)
+						.setExpiryTimeMillis(expiresDate)
+						.setAutoRenewing(autoRenewing)
+						.setOrderId(appstoreOrderId);
 				if (!Algorithms.objectEquals(subscription.getOrderId(), orderId)) {
 					throw new IllegalStateException(
 							String.format("Order id '%s' != '%s' don't match", orderId, subscription.getOrderId()));
@@ -363,55 +386,73 @@ public class UpdateSubscription {
 		return subscription;
 	}
 	
-	private void processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId, 
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException {
+	private SubscriptionPurchase processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId,
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
 		HuaweiSubscription subscription = null;
+		String reason = "";
+		String kind = null;
 		try {
 			// TODO continue
 			// can't process null huawei
 			if (orderId != null) {
-				return;
+				return null;
 			}
 			subscription = huaweiIAPHelper.getHuaweiSubscription(orderId, purchaseToken);
 			if (verbose) {
 				System.out.println("Result: " + subscription.toString());
 			}
 		} catch (IOException e) {
-			//int errorCode = 0;
-			String reason = "";
-			String kind = null;
+			int errorCode = 0;
+			if (e instanceof HuaweiJsonResponseException) {
+				errorCode = ((HuaweiJsonResponseException) e).responseCode;
+			}
 			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = "expired";
+			} else if (errorCode == HuaweiIAPHelper.RESPONSE_CODE_USER_ACCOUNT_ERROR) {
+				kind = "gone";
+				reason = " user doesn't exist (" + e.getMessage() + ") ";
 			} else {
 				reason = " unknown reason (should be checked and fixed)! " + e.getMessage();
 			}
-			if (kind != null) {
-				deleteSubscription(orderId, sku, currentTime, reason, kind);
-			} else {
-				System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
-				int ind = 1;
-				updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
-				updCheckStat.setString(ind++, orderId);
-				updCheckStat.setString(ind++, sku);
-				updCheckStat.addBatch();
-				checkChanges++;
-				if (checkChanges > BATCH_SIZE) {
-					updCheckStat.executeBatch();
-					checkChanges = 0;
-				}
+		}
+		SubscriptionPurchase subscriptionPurchase = null;
+		if (subscription != null) {
+			String appStoreOrderId = simplifyOrderId(subscription.orderId);
+			if (!Algorithms.objectEquals(appStoreOrderId, orderId)) {
+				throw new IllegalStateException(
+						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
+			}
+			subscriptionPurchase = new SubscriptionPurchase()
+					.setStartTimeMillis(subscription.purchaseTime)
+					.setExpiryTimeMillis(subscription.expirationDate)
+					.setAutoRenewing(subscription.autoRenewing)
+					.setDeveloperPayload(subscription.developerPayload)
+					.setPriceAmountMicros(subscription.price * 10000)
+					.setPriceCurrencyCode(subscription.currency)
+					.setOrderId(subscription.orderId);
+			if (!Algorithms.objectEquals(subscription.orderId, orderId)) {
+				throw new IllegalStateException(
+						String.format("Order id '%s' != '%s' don't match", orderId, subscription.orderId));
+			}
+			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscriptionPurchase);
+		} else if (kind != null) {
+			deleteSubscription(orderId, sku, currentTime, reason, kind);
+		} else {
+			System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
+			int ind = 1;
+			updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
+			updCheckStat.setString(ind++, orderId);
+			updCheckStat.setString(ind++, sku);
+			updCheckStat.addBatch();
+			checkChanges++;
+			if (checkChanges > BATCH_SIZE) {
+				updCheckStat.executeBatch();
+				checkChanges = 0;
 			}
 		}
-		if (subscription != null) {
-			// TODO
-//			String appStoreOrderId = simplifyOrderId(subscription.getOrderId());
-//			if (!Algorithms.objectEquals(appStoreOrderId, orderId)) {
-//				throw new IllegalStateException(
-//						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
-//			}
-//			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
-		}
+		return subscriptionPurchase;
 	}
 
 	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 
@@ -540,6 +581,10 @@ public class UpdateSubscription {
 			} else {
 				updStat.setNull(ind++, Types.INTEGER);
 			}
+		} if (subType == SubscriptionType.HUAWEI) {
+			updStat.setString(ind++, subscription.getDeveloperPayload());
+			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
+			updStat.setString(ind++, subscription.getPriceCurrencyCode());
 		} else {
 			if (subscription.getPaymentState() == null) {
 				updStat.setNull(ind++, Types.INTEGER);
@@ -587,8 +632,6 @@ public class UpdateSubscription {
 		}
 		return updated;
 	}
-
-
 	
 	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
