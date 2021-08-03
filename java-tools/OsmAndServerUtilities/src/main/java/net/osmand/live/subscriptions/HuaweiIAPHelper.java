@@ -23,6 +23,43 @@ public class HuaweiIAPHelper {
 	private static final String CLIENT_ID = "101486545";
 	private static final String TOKEN_URL = "https://oauth-login.cloud.huawei.com/oauth2/v3/token";
 
+	// Unknown
+	public static final int RESPONSE_CODE_UNKNOWN = -1;
+
+	// Susccess
+	public static final int RESPONSE_CODE_SUCCESS = 0;
+
+	// The parameters passed to the API are invalid. This error may also indicate that an agreement is not signed or
+	// parameters are not set correctly for the in-app purchase billing in HUAWEI IAP, or the required permission is not in the list.
+	// Check whether the request parameters are correctly set.
+	// Check whether other relevant settings are correctly defined.
+	public static final int RESPONSE_CODE_PARAMETERS_ERROR = 5;
+
+	// A critical error occurs during API operations.
+	// Fix the error based on the error information in the response.
+	public static final int RESPONSE_CODE_CRITICAL_ERROR = 6;
+
+	// A user failed to consume or confirm a product because the user does not own the product.
+	// First, make sure that consuming or confirming a product is performed for a user only
+	// when the user has successfully purchased it, that is, already owned the product.
+	// Then, you also need to ensure that the input parameters in the API call request are correct.
+	public static final int RESPONSE_CODE_USER_CONSUME_ERROR = 8;
+
+	// The product cannot be consumed or confirmed because it has been consumed or confirmed.
+	// Check why repeated consumption or confirmation occurs and further optimize the project logic.
+	// If process confirmation and suggestions are required, contact Huawei technical support.
+	public static final int RESPONSE_CODE_ALREADY_CONSUMED_ERROR = 9;
+
+	// The user account is abnormal. For example, the user has been deregistered.
+	// Use another account or register a new account if no other account is available.
+	public static final int RESPONSE_CODE_USER_ACCOUNT_ERROR = 11;
+
+	// The order does not exist. The order in this query may be a historical order.
+	// Token verification is unnecessary for a historical order under normal circumstances,
+	// and HUAWEI IAP only allows for token verification for the latest order of a product.
+	// Check your integration process to make sure it complies with that described in the development guide.
+	public static final int RESPONSE_CODE_ORDER_NOT_EXIST_ERROR = 12;
+
 	/**
 	 * The accessToken.
 	 */
@@ -61,17 +98,100 @@ public class HuaweiIAPHelper {
 		headers.put("Content-Type", "application/json; charset=UTF-8");
 		return headers;
 	}
-	
-	public static class HuaweiSubscription {
-		public final JSONObject response;
-		
-		public HuaweiSubscription(String r) {
-			this.response = new JSONObject(r);
+
+	public static class HuaweiJsonResponseException extends IOException {
+		private static final long serialVersionUID = 5398592754615340627L;
+
+		public final int responseCode;
+		public final String responseMessage;
+
+		public HuaweiJsonResponseException(int responseCode, String responseMessage) {
+			super(responseMessage);
+			this.responseCode = responseCode;
+			this.responseMessage = responseMessage;
 		}
-		
+	}
+
+	public static class HuaweiSubscription {
+
+		public final JSONObject dataJson;
+
+		public final Boolean autoRenewing;
+		public final Boolean subIsvalid;
+		public final String orderId;
+		public final String lastOrderId;
+		public final String packageName;
+		public final String applicationId;
+		public final String productId;
+		public final Integer kind;
+		public final String productName;
+		public final String productGroup;
+		public final Long purchaseTime;
+		public final Long oriPurchaseTime;
+		public final Integer purchaseState;
+		public final String developerPayload;
+		public final String purchaseToken;
+		public final Integer purchaseType;
+		public final String currency;
+		public final Long price;
+		public final String country;
+		public final String subscriptionId;
+		public final Integer quantity;
+		public final Long daysLasted;
+		public final Long numOfPeriods;
+		public final Long numOfDiscount;
+		public final Long expirationDate;
+		public final Integer retryFlag;
+		public final Integer introductoryFlag;
+		public final Integer trialFlag;
+		public final Integer renewStatus;
+		public final Long renewPrice;
+		public final Integer cancelledSubKeepDays;
+		public final String payOrderId;
+		public final String payType;
+		public final Integer confirmed;
+
+		public HuaweiSubscription(String inappPurchaseData) {
+			this.dataJson = new JSONObject(inappPurchaseData);
+			autoRenewing = dataJson.has("autoRenewing") ? dataJson.optBoolean("autoRenewing") : null;
+			subIsvalid = dataJson.has("subIsvalid") ? dataJson.optBoolean("subIsvalid") : null;
+			orderId = dataJson.optString("orderId", null);
+			lastOrderId = dataJson.optString("lastOrderId", null);
+			packageName = dataJson.optString("packageName", null);
+			applicationId = dataJson.optString("applicationId", null);
+			productId = dataJson.optString("productId", null);
+			kind = dataJson.has("kind") ? dataJson.optInt("kind") : null;
+			productName = dataJson.optString("productName", null);
+			productGroup = dataJson.optString("productGroup", null);
+			purchaseTime = dataJson.has("purchaseTime") ? dataJson.optLong("purchaseTime") : null;
+			oriPurchaseTime = dataJson.has("oriPurchaseTime") ? dataJson.optLong("oriPurchaseTime") : null;
+			purchaseState = dataJson.has("purchaseState") ? dataJson.optInt("purchaseState") : null;
+			developerPayload = dataJson.optString("developerPayload", null);
+			purchaseToken = dataJson.optString("purchaseToken", null);
+			purchaseType = dataJson.has("purchaseType") ? dataJson.optInt("purchaseType") : null;
+			currency = dataJson.optString("currency", null);
+			price = dataJson.has("price") ? dataJson.optLong("price") : null;
+			country = dataJson.optString("country", null);
+			subscriptionId = dataJson.optString("subscriptionId", null);
+			quantity = dataJson.has("quantity") ? dataJson.optInt("quantity") : null;
+			daysLasted = dataJson.has("daysLasted") ? dataJson.optLong("daysLasted") : null;
+			numOfPeriods = dataJson.has("numOfPeriods") ? dataJson.optLong("numOfPeriods") : null;
+			numOfDiscount = dataJson.has("numOfDiscount") ? dataJson.optLong("numOfDiscount") : null;
+			expirationDate = dataJson.has("expirationDate") ? dataJson.optLong("expirationDate") : null;
+			retryFlag = dataJson.has("retryFlag") ? dataJson.optInt("retryFlag") : null;
+			introductoryFlag = dataJson.has("introductoryFlag") ? dataJson.optInt("introductoryFlag") : null;
+			trialFlag = dataJson.has("trialFlag") ? dataJson.optInt("trialFlag") : null;
+			renewStatus = dataJson.has("renewStatus") ? dataJson.optInt("renewStatus") : null;
+			renewPrice = dataJson.has("renewPrice") ? dataJson.optLong("renewPrice") : null;
+			cancelledSubKeepDays = dataJson.has("cancelledSubKeepDays") ? dataJson.optInt("cancelledSubKeepDays") : null;
+			payOrderId = dataJson.optString("payOrderId", null);
+			payType = dataJson.optString("payType", null);
+			confirmed = dataJson.has("confirmed") ? dataJson.optInt("confirmed") : null;
+		}
+
 		@Override
 		public String toString() {
-			return response.toString();
+			return dataJson.toString();
 		}
 	}
 
@@ -93,7 +213,22 @@ public class HuaweiIAPHelper {
 		String response = httpPost("https://subscr-dre.iap.hicloud.com/sub/applications/v2/purchases/get",
 				"application/json; charset=UTF-8", msgBody, 10000, 10000, headers);
 
-		return new HuaweiSubscription(response);
+		JSONObject responseJson = new JSONObject(response);
+		int responseCode;
+		try {
+			responseCode = Integer.parseInt(responseJson.optString("responseCode", "" + RESPONSE_CODE_UNKNOWN));
+		} catch (NumberFormatException e) {
+			responseCode = RESPONSE_CODE_UNKNOWN;
+		}
+		String responseMessage = responseJson.optString("responseMessage", null);
+		if (responseCode != RESPONSE_CODE_SUCCESS) {
+			throw new HuaweiJsonResponseException(responseCode, responseMessage);
+		}
+		String inappPurchaseData = responseJson.optString("inappPurchaseData", null);
+		if (Algorithms.isEmpty(inappPurchaseData)) {
+			throw new IOException(String.format("No purchase data returned for subscriptionId: '%s': %s", subscriptionId, purchaseToken));
+		}
+		return new HuaweiSubscription(inappPurchaseData);
 	}
 	
 	private static String httpPost(String httpUrl, String contentType, String data, int connectTimeout, int readTimeout,
@@ -154,7 +289,4 @@ public class HuaweiIAPHelper {
 			}
 		}
 	}
-
-
-
 }
