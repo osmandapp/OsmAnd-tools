@@ -14,6 +14,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
@@ -150,9 +151,9 @@ public class UpdateSubscription {
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		
-		boolean android = true;
-		boolean ios = true;
-		boolean huawei = true;
+		EnumSet<SubscriptionType> set = EnumSet.of(SubscriptionType.ANDROID, SubscriptionType.IOS );
+				// Disable huawei for now
+				// SubscriptionType.HUAWEI);
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
 		String androidClientSecretFile = "";
@@ -164,16 +165,13 @@ public class UpdateSubscription {
 			} else if (args[i].startsWith("-androidclientsecret=")) {
 				androidClientSecretFile = args[i].substring("-androidclientsecret=".length());
 			} else if ("-onlyandroid".equals(args[i])) {
-				ios = false;
-				huawei = false;
+				set = EnumSet.of(SubscriptionType.ANDROID);
 			} else if ("-revalidateinvalid".equals(args[i])) {
 				revalidateinvalid = true;
 			} else if ("-onlyios".equals(args[i])) {
-				android = false;
-				huawei = false;
+				set = EnumSet.of(SubscriptionType.IOS);
 			} else if ("-onlyhuawei".equals(args[i])) {
-				ios = false;
-				android = false;
+				set = EnumSet.of(SubscriptionType.HUAWEI);
 			}
 		}
 		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile);
@@ -184,14 +182,8 @@ public class UpdateSubscription {
 		Class.forName("org.postgresql.Driver");
 		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
-		if (android) {
-			new UpdateSubscription(publisher, SubscriptionType.ANDROID, revalidateinvalid).queryPurchases(conn, up);
-		}
-		if (ios) {
-			new UpdateSubscription(null, SubscriptionType.IOS, revalidateinvalid).queryPurchases(conn, up);
-		}
-		if (huawei) {
-			new UpdateSubscription(null, SubscriptionType.HUAWEI, revalidateinvalid).queryPurchases(conn, up);
+		for (SubscriptionType t : set) {
+			new UpdateSubscription(publisher, t, revalidateinvalid).queryPurchases(conn, up);
 		}
 	}
 
