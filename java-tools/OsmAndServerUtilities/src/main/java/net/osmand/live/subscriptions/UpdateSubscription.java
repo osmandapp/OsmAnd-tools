@@ -573,7 +573,7 @@ public class UpdateSubscription {
 			} else {
 				updStat.setNull(ind++, Types.INTEGER);
 			}
-		} if (subType == SubscriptionType.HUAWEI) {
+		} else if (subType == SubscriptionType.HUAWEI) {
 			updStat.setString(ind++, subscription.getDeveloperPayload());
 			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
 			updStat.setString(ind++, subscription.getPriceCurrencyCode());
