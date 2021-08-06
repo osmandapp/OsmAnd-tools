@@ -402,7 +402,8 @@ public class UpdateSubscription {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = "expired";
-			} else if (errorCode == HuaweiIAPHelper.RESPONSE_CODE_USER_ACCOUNT_ERROR) {
+			} else if (errorCode == HuaweiIAPHelper.RESPONSE_CODE_USER_ACCOUNT_ERROR ||
+					errorCode == HuaweiIAPHelper.RESPONSE_CODE_USER_CONSUME_ERROR) {
 				kind = "gone";
 				reason = " user doesn't exist (" + e.getMessage() + ") ";
 			} else {
