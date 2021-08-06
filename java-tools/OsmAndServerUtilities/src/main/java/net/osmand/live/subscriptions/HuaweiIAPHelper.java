@@ -188,9 +188,10 @@ public class HuaweiIAPHelper {
 			payType = dataJson.optString("payType", null);
 			confirmed = dataJson.has("confirmed") ? dataJson.optInt("confirmed") : null;
 
-			if (subscriptionId.startsWith("1627983682778.7C13")) {
-				System.out.println(toString());
-			}
+
+			System.out.println("---------- BEGIN ----------");
+			System.out.println(toString());
+			System.out.println("----------- END -----------");
 		}
 
 		@Override
