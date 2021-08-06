@@ -386,7 +386,7 @@ public class UpdateSubscription {
 		try {
 			// TODO continue
 			// can't process null huawei
-			if (orderId != null) {
+			if (orderId == null) {
 				return null;
 			}
 			subscription = huaweiIAPHelper.getHuaweiSubscription(orderId, purchaseToken);
