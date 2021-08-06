@@ -1081,10 +1081,18 @@ public class AdminController {
 		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; break;
 		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; break;
 
-		case "net.osmand.maps.subscription.monthly_v1":s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+		case "net.osmand.maps.subscription.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
 		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
-		
+
+		case "net.osmand.huawei.annual_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "net.osmand.huawei.3months_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
+		case "net.osmand.huawei.monthly_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
+
+		case "net.osmand.huawei.monthly.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; break;
+		case "net.osmand.huawei.annual.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; break;
+		case "net.osmand.huawei.annual.maps_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
 	}
@@ -1097,7 +1105,8 @@ public class AdminController {
 	public static enum SubAppType {
 		OSMAND_PLUS,
 		IOS,
-		OSMAND
+		OSMAND,
+		HUAWEI
 	}
 	public static class Subscription {
 		
