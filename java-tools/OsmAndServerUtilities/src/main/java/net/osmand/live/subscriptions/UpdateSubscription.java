@@ -411,7 +411,7 @@ public class UpdateSubscription {
 		}
 		SubscriptionPurchase subscriptionPurchase = null;
 		if (subscription != null) {
-			String appStoreOrderId = simplifyOrderId(subscription.orderId);
+			String appStoreOrderId = simplifyOrderId(subscription.subscriptionId);
 			if (!Algorithms.objectEquals(appStoreOrderId, orderId)) {
 				throw new IllegalStateException(
 						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
@@ -423,10 +423,10 @@ public class UpdateSubscription {
 					.setDeveloperPayload(subscription.developerPayload)
 					.setPriceAmountMicros(subscription.price * 10000)
 					.setPriceCurrencyCode(subscription.currency)
-					.setOrderId(subscription.orderId);
-			if (!Algorithms.objectEquals(subscription.orderId, orderId)) {
+					.setOrderId(subscription.subscriptionId);
+			if (!Algorithms.objectEquals(subscription.subscriptionId, orderId)) {
 				throw new IllegalStateException(
-						String.format("Order id '%s' != '%s' don't match", orderId, subscription.orderId));
+						String.format("Order id '%s' != '%s' don't match", orderId, subscription.subscriptionId));
 			}
 			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscriptionPurchase);
 		} else if (kind != null) {
