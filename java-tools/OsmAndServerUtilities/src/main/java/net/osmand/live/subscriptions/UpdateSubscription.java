@@ -152,7 +152,7 @@ public class UpdateSubscription {
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		
-		EnumSet<SubscriptionType> set = EnumSet.of(SubscriptionType.ANDROID, SubscriptionType.IOS );
+		EnumSet<SubscriptionType> set = EnumSet.of(SubscriptionType.ANDROID, SubscriptionType.IOS, SubscriptionType.HUAWEI);
 				// Disable huawei for now
 				// SubscriptionType.HUAWEI);
 		boolean revalidateinvalid = false;
