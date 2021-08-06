@@ -45,6 +45,8 @@ import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subsc
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
 
+import net.osmand.live.subscriptions.HuaweiIAPHelper;
+import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.UpdateSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
@@ -87,7 +89,9 @@ public class UserdataController {
 	private static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
 	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
 	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
-	
+
+	private static final String OSMAND_HUAWEI_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART;
+
 	Gson gson = new Gson();
 
 	@Autowired
@@ -112,6 +116,7 @@ public class UserdataController {
 	protected String clientSecretFile;
 
 	private AndroidPublisher androidPublisher;
+	private HuaweiIAPHelper huaweiIAPHelper;
 
 	// @PersistenceContext
 	// protected EntityManager entityManager;
@@ -156,9 +161,33 @@ public class UserdataController {
 					}
 				}
 			} catch (IOException e) {
-				LOG.error(String.format("Error retrieving android publisher subscription %s - %s: %s", s.sku, s.orderId,
-						e.getMessage()), e);
+				LOG.error(String.format("Error retrieving android publisher subscription %s - %s: %s",
+						s.sku, s.orderId, e.getMessage()), e);
 			}
+		}
+		return s;
+	}
+
+	private SupporterDeviceSubscription revalidateHuaweiSubscription(SupporterDeviceSubscription s) {
+		if (huaweiIAPHelper == null) {
+			huaweiIAPHelper = new HuaweiIAPHelper();
+		}
+		try {
+			if (s.orderId == null) {
+				return s;
+			}
+			HuaweiSubscription subscription = huaweiIAPHelper.getHuaweiSubscription(s.orderId, s.purchaseToken);
+			if (subscription != null) {
+				if (s.expiretime == null || s.expiretime.getTime() < subscription.expirationDate) {
+					s.expiretime = new Date(subscription.expirationDate);
+					// s.checktime = new Date(); // don't set checktime let jenkins do its job
+					s.valid = System.currentTimeMillis() < subscription.expirationDate;
+					subscriptionsRepo.save(s);
+				}
+			}
+		} catch (IOException e) {
+			LOG.error(String.format("Error retrieving huawei subscription %s - %s: %s",
+					s.sku, s.orderId, e.getMessage()), e);
 		}
 		return s;
 	}
@@ -171,13 +200,18 @@ public class UserdataController {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			// s.sku could be checked for premium
-			if (s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && 
-					(s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null)) {
-				s = revalidateGoogleSubscription(s);
+			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
+				if (s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
+					s = revalidateGoogleSubscription(s);
+				} else if (s.sku.contains(OSMAND_HUAWEI_SUBSCRIPTION)) {
+					s = revalidateHuaweiSubscription(s);
+				}
 			}
 			if (s.valid == null || !s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
-			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) && !s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
+			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) &&
+					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
+					!s.sku.contains(OSMAND_HUAWEI_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
