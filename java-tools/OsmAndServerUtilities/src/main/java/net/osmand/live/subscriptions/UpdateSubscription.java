@@ -227,6 +227,12 @@ public class UpdateSubscription {
 			}
 			// if it is not valid then it was requested to validate all
 			if (activeNow && valid && delayBetweenChecks < MINIMUM_WAIT_TO_REVALIDATE_VALID) {
+				if (pms.verbose) {
+					String hiddenOrderId = orderId != null ? (orderId.substring(0, Math.min(orderId.length(), 18)) + "...")
+							: orderId;
+					System.out.println(String.format("Validate subscription (%s, %s): %s - %s (active=%s)", sku, hiddenOrderId,
+							new Date(startTime.getTime()), new Date(expireTime.getTime()), activeNow + ""));
+				}
 				continue;
 			}
 			String hiddenOrderId = orderId != null ? (orderId.substring(0, Math.min(orderId.length(), 18)) + "...")
