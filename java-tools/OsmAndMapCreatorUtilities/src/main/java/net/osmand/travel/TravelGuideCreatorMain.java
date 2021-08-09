@@ -110,6 +110,7 @@ public class TravelGuideCreatorMain {
             prep.setNull(column++, Types.DOUBLE);
             prep.setNull(column++, Types.DOUBLE);
             prep.setString(column++, "");
+            prep.setString(column++, "");
             // gpx_gz
             prep.setBytes(column++, gpxBytes);
             // skip trip_id column
