@@ -8,26 +8,29 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
 import net.osmand.PlatformUtil;
+import net.osmand.binary.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+
+import static net.osmand.IndexConstants.*;
 
 public class TravelGuideCreatorMain {
 
     private static final int BATCH_SIZE = 30;
     private static final Log LOG = PlatformUtil.getLog(TravelGuideCreatorMain.class);
-    public static final String HTML_EXT = ".html";
-    public static final String GPX_EXT = ".gpx";
+    public static final String TRAVEL_GUIDE_NAME = "travel_guide";
 
-    public static void main(String[] args) throws SQLException, IOException {
+    public static void main(String[] args) throws SQLException, IOException, XmlPullParserException, InterruptedException {
         String dir = "";
         if (args.length < 1) {
 			while (dir.isEmpty()) {
@@ -49,17 +52,17 @@ public class TravelGuideCreatorMain {
     private static void printHelp() {
         System.out.println("Usage: <path to directory with html and gpx files " +
                 "(should contain gpx and html files with identical names)>: " +
-                "The utility creates an sqlite file that contains articles and points from the specified directory.");
+                "The utility creates an .travel.obf file that contains articles and points from the specified directory.");
     }
 
-    private void generateTravelGuide(String dir) throws SQLException, IOException {
+    private void generateTravelGuide(String dir) throws SQLException, IOException, XmlPullParserException, InterruptedException {
         File directory = new File(dir);
         if (!directory.isDirectory()) {
             throw new RuntimeException("Supplied path is not a directory");
         }
         File[] files = directory.listFiles();
-        Connection conn = DBDialect.SQLITE.getDatabaseConnection((dir.endsWith("/") ? dir : dir + "/")
-                + "travel_guide.sqlite", LOG);
+        File sqliteFile = new File(directory, TRAVEL_GUIDE_NAME + BINARY_WIKIVOYAGE_MAP_INDEX_EXT);
+        Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFile.getCanonicalPath(), LOG);
         if (conn == null) {
             LOG.error("Couldn't establish the database connection");
             System.exit(1);
@@ -70,6 +73,17 @@ public class TravelGuideCreatorMain {
         dataGenerator.generateSearchTable(conn);
         createPopularArticlesTable(conn);
         conn.close();
+        File osmFile = new File(directory, TRAVEL_GUIDE_NAME + OSM_GZ_EXT);
+        WikivoyageGenOSM.genWikivoyageOsm(sqliteFile, osmFile, -1);
+        IndexCreatorSettings settings = new IndexCreatorSettings();
+        settings.indexPOI = true;
+        IndexCreator ic = new IndexCreator(directory, settings);
+        ic.setMapFileName(TRAVEL_GUIDE_NAME + BINARY_TRAVEL_GUIDE_MAP_INDEX_EXT);
+        MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(settings.renderingTypesFile, osmFile.getName());
+        ic.generateIndexes(osmFile, new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types, LOG);
+        osmFile.delete();
+        sqliteFile.delete();
+        new File("regions.ocbf").delete();
     }
 
     private void createPopularArticlesTable(Connection conn) throws SQLException {
@@ -81,6 +95,7 @@ public class TravelGuideCreatorMain {
     	WikivoyageLangPreparation.createInitialDbStructure(conn, false);
         try {
             conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
+            conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN is_parent_of");
         } catch (Exception e) {
             System.err.println("Column aggregated_part_of already exists");
         }
@@ -92,9 +107,9 @@ public class TravelGuideCreatorMain {
             File gpx = null;
             File html = null;
             for (File f : files) {
-                if (f.getName().endsWith(GPX_EXT)) {
+                if (f.getName().endsWith(GPX_FILE_EXT)) {
                     gpx = f;
-                } else if (f.getName().endsWith(HTML_EXT)){
+                } else if (f.getName().endsWith(HTML_EXT)) {
                     html = f;
                 }
             }
@@ -148,7 +163,7 @@ public class TravelGuideCreatorMain {
         Map<String, List<File>> result = new HashMap<>();
         for (File f : files) {
             String filename = f.getName();
-            if (!filename.endsWith(HTML_EXT) && !filename.endsWith(GPX_EXT)) {
+            if (!filename.endsWith(HTML_EXT) && !filename.endsWith(GPX_FILE_EXT)) {
                 continue;
             }
             filename = filename.substring(0, filename.lastIndexOf("."));
