@@ -78,7 +78,7 @@ public class TravelGuideCreatorMain {
         IndexCreatorSettings settings = new IndexCreatorSettings();
         settings.indexPOI = true;
         IndexCreator ic = new IndexCreator(directory, settings);
-        ic.setMapFileName(TRAVEL_GUIDE_NAME + BINARY_TRAVEL_GUIDE_MAP_INDEX_EXT);
+        ic.setMapFileName(directory.getName() + BINARY_TRAVEL_GUIDE_MAP_INDEX_EXT);
         MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(settings.renderingTypesFile, osmFile.getName());
         ic.generateIndexes(osmFile, new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types, LOG);
         osmFile.delete();
