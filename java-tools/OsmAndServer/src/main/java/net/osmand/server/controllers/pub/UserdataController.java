@@ -92,8 +92,9 @@ public class UserdataController {
 	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
 	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
 
-	private static final String OSMAND_HUAWEI_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART;
-	private static final String OSMAND_AMAZON_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_AMAZON_SUBSCRIPTION_PART;
+	private static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_1 = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_M;
+	private static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_2 = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y;
+	private static final String OSMAND_PRO_AMAZON_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_AMAZON_SUBSCRIPTION_PART;
 
 	Gson gson = new Gson();
 
@@ -231,9 +232,9 @@ public class UserdataController {
 			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
 				if (s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
 					s = revalidateGoogleSubscription(s);
-				} else if (s.sku.contains(OSMAND_HUAWEI_SUBSCRIPTION)) {
+				} else if (s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) || s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2)) {
 					s = revalidateHuaweiSubscription(s);
-				} else if (s.sku.contains(OSMAND_AMAZON_SUBSCRIPTION)) {
+				} else if (s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION)) {
 					s = revalidateAmazonSubscription(s);
 				}
 			}
@@ -241,8 +242,9 @@ public class UserdataController {
 				errorMsg = "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) &&
 					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
-					!s.sku.contains(OSMAND_HUAWEI_SUBSCRIPTION) &&
-					!s.sku.contains(OSMAND_AMAZON_SUBSCRIPTION)) {
+					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) &&
+					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) &&
+					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
