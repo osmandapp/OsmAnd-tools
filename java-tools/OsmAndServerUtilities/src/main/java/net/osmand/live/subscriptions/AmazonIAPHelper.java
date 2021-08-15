@@ -112,7 +112,7 @@ public class AmazonIAPHelper {
 
 	public AmazonSubscription getAmazonSubscription(String receiptId, String userId) throws IOException {
 		String sharedSecret = System.getenv("AMAZON_SHARED_SECRET");
-		String response = httpGet("https://appstore-sdk.amazon.com/sandbox/version/1.0/verifyReceiptId/developer/"
+		String response = httpGet("https://appstore-sdk.amazon.com/version/1.0/verifyReceiptId/developer/"
 				+ sharedSecret + "/user/" + userId + "/receiptId/" + receiptId);
 		if (Algorithms.isEmpty(response)) {
 			throw new IOException(String.format("No purchase data returned for receiptId: '%s': %s", receiptId, userId));
