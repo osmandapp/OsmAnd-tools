@@ -38,6 +38,8 @@ import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
+import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonIOException;
+import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonSubscription;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiJsonResponseException;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
@@ -56,6 +58,7 @@ public class UpdateSubscription {
 	public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
 	public static final String OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX = "osmand_pro_";
 	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART = ".huawei.";
+	public static final String OSMAND_PRO_AMAZON_SUBSCRIPTION_PART = ".amazon.";
 
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
@@ -85,6 +88,7 @@ public class UpdateSubscription {
 	
 	public enum SubscriptionType {
 		HUAWEI,
+		AMAZON,
 		IOS,
 		ANDROID,
 //		ANDROID_LEGACY,
@@ -93,8 +97,9 @@ public class UpdateSubscription {
 		
 		public static SubscriptionType fromSku(String sku) {
 			if (sku.contains(".huawei.")) {
-				// net.osmand.huawei.annual_v1
 				return HUAWEI;
+			} else if (sku.contains(".amazon.")) {
+				return AMAZON;
 			} else if (sku.startsWith("net.osmand.maps.subscription.")) {
 				return IOS;
 			} else if (sku.startsWith("osm_live_subscription_") || sku.startsWith("osm_free_live_subscription_")) {
@@ -141,6 +146,10 @@ public class UpdateSubscription {
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " payload = ?, price = ?, pricecurrency = ?, "
 					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
+		} else if (subType == SubscriptionType.AMAZON) {
+			updQuery = "UPDATE supporters_device_sub SET "
+					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
@@ -153,8 +162,6 @@ public class UpdateSubscription {
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
 		
 		EnumSet<SubscriptionType> set = EnumSet.of(SubscriptionType.ANDROID, SubscriptionType.IOS, SubscriptionType.HUAWEI);
-				// Disable huawei for now
-				// SubscriptionType.HUAWEI);
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
 		String androidClientSecretFile = "";
@@ -173,6 +180,8 @@ public class UpdateSubscription {
 				set = EnumSet.of(SubscriptionType.IOS);
 			} else if ("-onlyhuawei".equals(args[i])) {
 				set = EnumSet.of(SubscriptionType.HUAWEI);
+			} else if ("-onlyamazon".equals(args[i])) {
+				set = EnumSet.of(SubscriptionType.AMAZON);
 			}
 		}
 		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile);
@@ -188,7 +197,6 @@ public class UpdateSubscription {
 		}
 	}
 
-	
 	void queryPurchases(Connection conn, UpdateParams pms) throws SQLException {
 		ResultSet rs = conn.createStatement().executeQuery(selQuery);
 		updStat = conn.prepareStatement(updQuery);
@@ -196,6 +204,7 @@ public class UpdateSubscription {
 		updCheckStat = conn.prepareStatement(updCheckQuery);
 		
 		HuaweiIAPHelper huaweiIAPHelper = null;
+		AmazonIAPHelper amazonIAPHelper = null;
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = SubscriptionType.IOS == subType ? new ReceiptValidationHelper() : null;
 		List<SubscriptionUpdateException> exceptionsUpdates = new ArrayList<UpdateSubscription.SubscriptionUpdateException>();
@@ -251,8 +260,17 @@ public class UpdateSubscription {
 					if (sub == null && prevpurchaseToken != null) {
 						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
 					}
+				} else if (subType == SubscriptionType.AMAZON) {
+					if (amazonIAPHelper == null) {
+						amazonIAPHelper = new AmazonIAPHelper();
+					}
+					SubscriptionPurchase sub = processAmazonSubscription(amazonIAPHelper, purchaseToken, sku, orderId,
+							regTime, startTime, expireTime, currentTime, pms.verbose);
+					if (sub == null && prevpurchaseToken != null) {
+						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
+					}
 				} else if (subType == SubscriptionType.ANDROID) {
-					SubscriptionPurchase sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId, 
+					SubscriptionPurchase sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId,
 							regTime, startTime, expireTime, currentTime, pms.verbose);
 					if (sub == null && prevpurchaseToken != null) {
 						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
@@ -449,6 +467,71 @@ public class UpdateSubscription {
 		return subscriptionPurchase;
 	}
 
+	private SubscriptionPurchase processAmazonSubscription(AmazonIAPHelper amazonIAPHelper, String purchaseToken, String sku, String orderId,
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
+		AmazonSubscription subscription = null;
+		String reason = "";
+		String kind = null;
+		try {
+			if (orderId == null) {
+				return null;
+			}
+			subscription = amazonIAPHelper.getAmazonSubscription(orderId, purchaseToken);
+			if (verbose) {
+				System.out.println("Result: " + subscription.toString());
+			}
+		} catch (IOException e) {
+			int errorCode = 0;
+			if (e instanceof AmazonIOException) {
+				errorCode = ((AmazonIOException) e).responseCode;
+			}
+			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+				reason = String.format(" subscription expired more than %.1f days ago (%s)",
+						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
+				kind = "expired";
+			} else if (errorCode == AmazonIAPHelper.RESPONSE_CODE_USER_ID_ERROR ||
+					errorCode == AmazonIAPHelper.RESPONSE_CODE_TRANSACTION_ERROR) {
+				kind = "gone";
+				reason = " user doesn't exist (" + e.getMessage() + ") ";
+			} else {
+				reason = " unknown reason (should be checked and fixed)! " + e.getMessage();
+			}
+		}
+		SubscriptionPurchase subscriptionPurchase = null;
+		if (subscription != null) {
+			String appStoreOrderId = simplifyOrderId(subscription.receiptId);
+			if (!Algorithms.objectEquals(appStoreOrderId, orderId)) {
+				throw new IllegalStateException(
+						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
+			}
+			subscriptionPurchase = new SubscriptionPurchase()
+					.setStartTimeMillis(subscription.purchaseDate)
+					.setExpiryTimeMillis(subscription.renewalDate)
+					.setAutoRenewing(subscription.autoRenewing)
+					.setOrderId(subscription.receiptId);
+			if (!Algorithms.objectEquals(subscription.receiptId, orderId)) {
+				throw new IllegalStateException(
+						String.format("Order id '%s' != '%s' don't match", orderId, subscription.receiptId));
+			}
+			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscriptionPurchase);
+		} else if (kind != null) {
+			deleteSubscription(orderId, sku, currentTime, reason, kind);
+		} else {
+			System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
+			int ind = 1;
+			updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
+			updCheckStat.setString(ind++, orderId);
+			updCheckStat.setString(ind++, sku);
+			updCheckStat.addBatch();
+			checkChanges++;
+			if (checkChanges > BATCH_SIZE) {
+				updCheckStat.executeBatch();
+				checkChanges = 0;
+			}
+		}
+		return subscriptionPurchase;
+	}
+
 	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
 		SubscriptionPurchase subscription = null;
@@ -579,6 +662,8 @@ public class UpdateSubscription {
 			updStat.setString(ind++, subscription.getDeveloperPayload());
 			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
 			updStat.setString(ind++, subscription.getPriceCurrencyCode());
+		} else if (subType == SubscriptionType.AMAZON) {
+			// none
 		} else {
 			if (subscription.getPaymentState() == null) {
 				updStat.setNull(ind++, Types.INTEGER);

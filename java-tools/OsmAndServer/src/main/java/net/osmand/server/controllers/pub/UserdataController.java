@@ -45,6 +45,8 @@ import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subsc
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
 
+import net.osmand.live.subscriptions.AmazonIAPHelper;
+import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonSubscription;
 import net.osmand.live.subscriptions.HuaweiIAPHelper;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.UpdateSubscription;
@@ -91,6 +93,7 @@ public class UserdataController {
 	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
 
 	private static final String OSMAND_HUAWEI_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART;
+	private static final String OSMAND_AMAZON_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_AMAZON_SUBSCRIPTION_PART;
 
 	Gson gson = new Gson();
 
@@ -117,6 +120,7 @@ public class UserdataController {
 
 	private AndroidPublisher androidPublisher;
 	private HuaweiIAPHelper huaweiIAPHelper;
+	private AmazonIAPHelper amazonIAPHelper;
 
 	// @PersistenceContext
 	// protected EntityManager entityManager;
@@ -192,6 +196,30 @@ public class UserdataController {
 		return s;
 	}
 
+	private SupporterDeviceSubscription revalidateAmazonSubscription(SupporterDeviceSubscription s) {
+		if (amazonIAPHelper == null) {
+			amazonIAPHelper = new AmazonIAPHelper();
+		}
+		try {
+			if (s.orderId == null) {
+				return s;
+			}
+			AmazonSubscription subscription = amazonIAPHelper.getAmazonSubscription(s.orderId, s.purchaseToken);
+			if (subscription != null) {
+				if (s.expiretime == null || s.expiretime.getTime() < subscription.renewalDate) {
+					s.expiretime = new Date(subscription.renewalDate);
+					// s.checktime = new Date(); // don't set checktime let jenkins do its job
+					s.valid = System.currentTimeMillis() < subscription.renewalDate;
+					subscriptionsRepo.save(s);
+				}
+			}
+		} catch (IOException e) {
+			LOG.error(String.format("Error retrieving amazon subscription %s - %s: %s",
+					s.sku, s.orderId, e.getMessage()), e);
+		}
+		return s;
+	}
+
 	private String checkOrderIdPremium(String orderid) {
 		if (Algorithms.isEmpty(orderid)) {
 			return "no subscription provided";
@@ -205,13 +233,16 @@ public class UserdataController {
 					s = revalidateGoogleSubscription(s);
 				} else if (s.sku.contains(OSMAND_HUAWEI_SUBSCRIPTION)) {
 					s = revalidateHuaweiSubscription(s);
+				} else if (s.sku.contains(OSMAND_AMAZON_SUBSCRIPTION)) {
+					s = revalidateAmazonSubscription(s);
 				}
 			}
 			if (s.valid == null || !s.valid.booleanValue()) {
 				errorMsg = "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) &&
 					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
-					!s.sku.contains(OSMAND_HUAWEI_SUBSCRIPTION)) {
+					!s.sku.contains(OSMAND_HUAWEI_SUBSCRIPTION) &&
+					!s.sku.contains(OSMAND_AMAZON_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
