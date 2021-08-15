@@ -161,8 +161,12 @@ public class UpdateSubscription {
 	}
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
-		
-		EnumSet<SubscriptionType> set = EnumSet.of(SubscriptionType.ANDROID, SubscriptionType.IOS, SubscriptionType.HUAWEI);
+		EnumSet<SubscriptionType> set = EnumSet.of(
+				SubscriptionType.ANDROID,
+				SubscriptionType.IOS,
+				SubscriptionType.HUAWEI,
+				SubscriptionType.AMAZON);
+
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
 		String androidClientSecretFile = "";
