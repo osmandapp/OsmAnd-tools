@@ -57,8 +57,9 @@ public class UpdateSubscription {
 	public static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
 	public static final String OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX = "osmand_pro_";
-	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART = ".huawei.";
-	public static final String OSMAND_PRO_AMAZON_SUBSCRIPTION_PART = ".amazon.";
+	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y = ".huawei.annual.pro";
+	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_M = ".huawei.monthly.pro";
+	public static final String OSMAND_PRO_AMAZON_SUBSCRIPTION_PART = ".amazon.pro";
 
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
@@ -160,8 +161,12 @@ public class UpdateSubscription {
 	}
 
 	public static void main(String[] args) throws JSONException, IOException, SQLException, ClassNotFoundException, GeneralSecurityException {
-		
-		EnumSet<SubscriptionType> set = EnumSet.of(SubscriptionType.ANDROID, SubscriptionType.IOS, SubscriptionType.HUAWEI);
+		EnumSet<SubscriptionType> set = EnumSet.of(
+				SubscriptionType.ANDROID,
+				SubscriptionType.IOS,
+				SubscriptionType.HUAWEI,
+				SubscriptionType.AMAZON);
+
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
 		String androidClientSecretFile = "";
