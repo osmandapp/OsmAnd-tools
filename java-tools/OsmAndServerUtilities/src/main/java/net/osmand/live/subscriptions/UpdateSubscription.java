@@ -701,6 +701,9 @@ public class UpdateSubscription {
 			} else {
 				updStat.setNull(ind++, Types.VARCHAR);
 			}
+		} else {
+			updStat.setBoolean(ind++, true);
+			updStat.setNull(ind++, Types.VARCHAR);
 		}
 
 		updStat.setString(ind++, orderId);
