@@ -509,9 +509,10 @@ public class UpdateSubscription {
 				throw new IllegalStateException(
 						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 			}
+			Long expiryTime = subscription.cancelDate != null ? subscription.cancelDate : subscription.renewalDate;
 			subscriptionPurchase = new SubscriptionPurchase()
 					.setStartTimeMillis(subscription.purchaseDate)
-					.setExpiryTimeMillis(subscription.renewalDate)
+					.setExpiryTimeMillis(expiryTime)
 					.setAutoRenewing(subscription.autoRenewing)
 					.setOrderId(subscription.receiptId);
 			if (!Algorithms.objectEquals(subscription.receiptId, orderId)) {
