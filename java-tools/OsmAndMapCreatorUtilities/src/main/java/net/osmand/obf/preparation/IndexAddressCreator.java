@@ -521,6 +521,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			return null;
 		}
 		name = name.trim();
+		name = name.replace("-", " ");
 		name = name.replace("’", "'");
 		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
