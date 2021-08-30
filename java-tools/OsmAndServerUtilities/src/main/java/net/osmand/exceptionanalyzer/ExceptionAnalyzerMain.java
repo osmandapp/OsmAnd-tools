@@ -24,67 +24,110 @@ import net.osmand.exceptionanalyzer.data.ExceptionText;
 import net.osmand.util.Algorithms;
 
 public class ExceptionAnalyzerMain {
-	private static final String LABEL_DEFAULT = "TRASH";
-//	private static final String LABEL = "OsmAnd Bug";
-	private static final boolean DOWNLOAD_MESSAGES = true;
-    private static final String VERSION_FILTER_DEFAULT = "3.0";
-    private static final File FOLDER_WITH_LOGS =  new File(System.getProperty("user.home") + 
-    		"/"+ "attachments_logs");
-    
-	/** Application name. */
-    private static final String APPLICATION_NAME = "ExceptionAnalyzer";
-    
-    
+	
+	private static final String APPLICATION_NAME = "ExceptionAnalyzer";
+	
+	private static final List<String> SCOPES = Arrays.asList(GmailScopes.GMAIL_READONLY);
+	
+	private static class Variables {
+	
+		private String LABEL= "Crash";
+		private String VERSION = "3.1";
+	    public int LIMIT = 1000;
+		private boolean DOWNLOAD_MESSAGES = true;
+	    private File FOLDER_WITH_LOGS;
+	    private File HOME_FILE;
+	    
+	    private JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+	    
+	    /** Global instance of the scopes required by this quickstart.
+	     *
+	     * If modifying these scopes, delete your previously saved credentials
+	     * at ~/.credentials/gmail-java-quickstart
+	     */
+	    private FileDataStoreFactory DATA_STORE_FACTORY;
+	    /** Directory to store user credentials for this application. */
+	    private File DATA_STORE_DIR;
+	    /** Global instance of the HTTP transport. */
+	    private HttpTransport HTTP_TRANSPORT;
+		
+	    
+	    public Variables(String home) throws Exception {
+	    	HOME_FILE = new File(home);
+			FOLDER_WITH_LOGS = new File(HOME_FILE, "attachments_logs");
+	    	DATA_STORE_DIR = new File(HOME_FILE, ".credentials/gmail-java-quickstart");
+	        HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
+	        DATA_STORE_FACTORY = new FileDataStoreFactory(DATA_STORE_DIR);
+	    }
+	    
+	}
+	
+	public static void main(String[] args) throws Exception {
 
-    /** Directory to store user credentials for this application. */
-    private static final java.io.File DATA_STORE_DIR = new java.io.File(
-            System.getProperty("user.home"), ".credentials/gmail-java-quickstart");
+		String version = null;
+		String label = null;
+		String clientSecretJson = "";
+		String home = System.getProperty("user.home");
+		int limit = -1;
+		for (String s : args) {
+			String[] sk = s.split("=");
+			if (sk[0].equals("--label")) {
+				label = sk[1];
+			} else if (sk[0].equals("--version")) {
+				version = sk[1];
+			} else if (sk[0].equals("--home")) {
+				home = sk[1];
+			} else if (sk[0].equals("--limit")) {
+				limit = Integer.parseInt(sk[1]);
+			} else if (sk[0].equals("--clientSecretJson")) {
+				clientSecretJson = sk[1];
+			}
+		}
+		Variables vars = new Variables(home);
+		vars.FOLDER_WITH_LOGS.mkdirs();
+		vars.DATA_STORE_DIR.mkdirs();
+		if (label != null) {
+			vars.LABEL = label;
+		}
+		if (limit != -1) {
+			vars.LIMIT = limit;
+		}
+		if (version != null) {
+			vars.VERSION = version;
+		}
 
-    /** Global instance of the {@link FileDataStoreFactory}. */
-    private static FileDataStoreFactory DATA_STORE_FACTORY;
-
-    /** Global instance of the JSON factory. */
-    private static final JsonFactory JSON_FACTORY =
-            JacksonFactory.getDefaultInstance();
-
-    /** Global instance of the HTTP transport. */
-    private static HttpTransport HTTP_TRANSPORT;
-
-    /** Global instance of the scopes required by this quickstart.
-     *
-     * If modifying these scopes, delete your previously saved credentials
-     * at ~/.credentials/gmail-java-quickstart
-     */
-    private static final List<String> SCOPES = Arrays.asList(GmailScopes.GMAIL_READONLY);
-
-    static {
-        try {
-            HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
-            DATA_STORE_FACTORY = new FileDataStoreFactory(DATA_STORE_DIR);
-        } catch (Throwable t) {
-            t.printStackTrace();
-            System.exit(1);
-        }
-    }
-
+		System.out.println(String.format(
+				"Utility to download exceptions."
+						+ "\nDownload emails with label='%s' (change with --label=, leave empty to skip) to %s. "
+						+ "\nMake report with version='%s' (change with --version=, leave empty to skip).",
+				label, vars.FOLDER_WITH_LOGS.getAbsolutePath(), version));
+		if (vars.DOWNLOAD_MESSAGES && !Algorithms.isEmpty(vars.LABEL)) {
+			downloadAttachments(clientSecretJson, vars);
+		}
+		if (!Algorithms.isEmpty(vars.VERSION)) {
+			makeReport(vars);
+		}
+	}
+	
     /**
      * Creates an authorized Credential object.
+     * @param vars 
      * @return an authorized Credential object.
      * @throws IOException
      */
-    public static Credential authorize(String clientSecretJson) throws IOException {
+    public static Credential authorize(String clientSecretJson, Variables vars) throws IOException {
         // Load client secrets.
         InputStream in = Algorithms.isEmpty(clientSecretJson)  ?
                 ExceptionAnalyzerMain.class.getResourceAsStream("/client_secret.json") :
                 new FileInputStream(clientSecretJson);
         GoogleClientSecrets clientSecrets =
-                GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
+                GoogleClientSecrets.load(vars.JSON_FACTORY, new InputStreamReader(in));
         in.close();
         // Build flow and trigger user authorization request.
         GoogleAuthorizationCodeFlow flow =
                 new GoogleAuthorizationCodeFlow.Builder(
-                        HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-                        .setDataStoreFactory(DATA_STORE_FACTORY)
+                		vars.HTTP_TRANSPORT, vars.JSON_FACTORY, clientSecrets, SCOPES)
+                        .setDataStoreFactory(vars.DATA_STORE_FACTORY)
                         .setAccessType("offline")
                         .build();
         Builder bld = new LocalServerReceiver.Builder();
@@ -92,59 +135,33 @@ public class ExceptionAnalyzerMain {
         Credential credential = new AuthorizationCodeInstalledApp(
                 flow, bld.build()).authorize("user");
         System.out.println(
-                "Credentials saved to " + DATA_STORE_DIR.getAbsolutePath());
+                "Credentials saved to " + vars.DATA_STORE_DIR.getAbsolutePath());
         return credential;
     }
 
     /**
      * Build and return an authorized Gmail client service.
+     * @param vars 
      * @return an authorized Gmail client service
      * @throws IOException
      */
-    public static Gmail getGmailService(String clientSecretFile) throws IOException {
-        Credential credential = authorize(clientSecretFile);
-        return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential).setApplicationName(APPLICATION_NAME)
+    public static Gmail getGmailService(String clientSecretFile, Variables vars) throws IOException {
+        Credential credential = authorize(clientSecretFile, vars);
+        return new Gmail.Builder(vars.HTTP_TRANSPORT, vars.JSON_FACTORY, credential).setApplicationName(APPLICATION_NAME)
                 .build();
     }
 
-    public static void main(String[] args) throws IOException {
-    	FOLDER_WITH_LOGS.mkdirs();
-    	String version = VERSION_FILTER_DEFAULT;
-    	String label = LABEL_DEFAULT;
-    	String clientSecretJson = "";
-		for (String s : args) {
-			String[] sk = s.split("=");
-			if (sk[0].equals("--label")) {
-				label = sk[1];
-			} else if (sk[0].equals("--version")) {
-				version = sk[1];
-			} else if (sk[0].equals("--clientSecretJson")) {
-				clientSecretJson = sk[1];
-			}
-		}
-    	
-		System.out.println(String.format(
-				"Utility to download exceptions." + 
-		        "\nDownload emails with label='%s' (change with --label=, leave empty to skip) to %s. " + 
-				"\nMake report with version='%s' (change with --version=, leave empty to skip).",
-				label, FOLDER_WITH_LOGS.getAbsolutePath(), version));
-		if (DOWNLOAD_MESSAGES && !Algorithms.isEmpty(label)) {
-			downloadAttachments(clientSecretJson, label);
-		}
-		if (!Algorithms.isEmpty(label)) {
-			makeReport(version);
-		}
-    }
+    
 
-	public static void makeReport(String version) {
+	public static void makeReport(Variables vars) {
 		System.out.println("Analyzing the exceptions...");
-        Map<String, List<ExceptionText>> result = analyzeExceptions(version);
-        writeResultToFile(result);
+        Map<String, List<ExceptionText>> result = analyzeExceptions(vars);
+        writeResultToFile(result, vars);
 	}
 
-	private static void downloadAttachments(String clientSecretFile, String lbl) throws IOException {
+	private static void downloadAttachments(String clientSecretFile, Variables vars) throws IOException {
 		// Build a new authorized API client service.
-        Gmail service = getGmailService(clientSecretFile);
+        Gmail service = getGmailService(clientSecretFile, vars);
 
         // Print the labels in the user's account.
         String user = "me";
@@ -156,12 +173,12 @@ public class ExceptionAnalyzerMain {
         }
         System.out.println("Labels:");
         for (Label label : labels) {
-            if (label.getName().toUpperCase().equals(lbl.toUpperCase())) {
-                List<String> trash = new ArrayList<>();
-                trash.add(label.getId());
-                List<Message> result = listMessagesWithLabels(service, user, trash);
-				System.out.println("Messages in " + lbl + ": " + result.size());
-                getAttachments(result, user, service);
+            if (label.getName().toUpperCase().equals(vars.LABEL.toUpperCase())) {
+                List<String> labelIds = new ArrayList<>();
+                labelIds.add(label.getId());
+                List<Message> result = listMessagesWithLabels(service, user, labelIds, vars.LIMIT);
+				System.out.println("Messages in " + vars.LABEL + ": " + result.size());
+                getAttachments(result, user, service, vars);
             }
         }
 	}
@@ -176,26 +193,25 @@ public class ExceptionAnalyzerMain {
      * @throws IOException
      */
     public static List<Message> listMessagesWithLabels(Gmail service, String userId,
-                                                       List<String> labelIds) throws IOException {
+                                                       List<String> labelIds, int limit) throws IOException {
         ListMessagesResponse response = service.users().messages().list(userId)
                 .setLabelIds(labelIds).execute();
 
         List<Message> messages = new ArrayList<>();
-        while (response.getMessages() != null) {
-            messages.addAll(response.getMessages());
-            if (response.getNextPageToken() != null) {
-                String pageToken = response.getNextPageToken();
-                response = service.users().messages().list(userId).setLabelIds(labelIds)
-                        .setPageToken(pageToken).execute();
-            } else {
-                break;
-            }
-        }
-
+		while (messages.size() < limit && response.getMessages() != null) {
+			messages.addAll(response.getMessages());
+			if (response.getNextPageToken() != null) {
+				String pageToken = response.getNextPageToken();
+				response = service.users().messages().list(userId).setLabelIds(labelIds).setPageToken(pageToken)
+						.execute();
+			} else {
+				break;
+			}
+		}
         return messages;
     }
 
-    public static void getAttachments(List<Message> messages, String userId, Gmail service)
+    public static void getAttachments(List<Message> messages, String userId, Gmail service, Variables vars)
             throws IOException {
         int count = 0;
         SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd");
@@ -203,8 +219,7 @@ public class ExceptionAnalyzerMain {
         Set<String> users = new TreeSet<>();
         Set<String> messageIdsLoaded = new TreeSet<>();
         
-        FOLDER_WITH_LOGS.mkdirs();
-        for(File fld : FOLDER_WITH_LOGS.listFiles()) {
+        for(File fld : vars.FOLDER_WITH_LOGS.listFiles()) {
         	if(fld.getName().endsWith(".exception.log")) {
         		String nm = fld.getName();
         		String mid = nm.substring(0, nm.length() - ".exception.log".length());
@@ -242,8 +257,8 @@ public class ExceptionAnalyzerMain {
                 for (MessagePart part : parts) {
                     if (part.getFilename() != null && part.getFilename().length() > 0) {
                         String filename = part.getFilename();
-                        File exception = new File(FOLDER_WITH_LOGS, msgId + "." + filename);
-                        File uid = new File(FOLDER_WITH_LOGS, msgId + ".uid.txt");
+                        File exception = new File(vars.FOLDER_WITH_LOGS, msgId + "." + filename);
+                        File uid = new File(vars.FOLDER_WITH_LOGS, msgId + ".uid.txt");
                         if(!uid.exists()) {
                         	FileOutputStream fileOutFile = new FileOutputStream(uid);
                             fileOutFile.write(from.getBytes());
@@ -260,9 +275,6 @@ public class ExceptionAnalyzerMain {
 								MessagePartBody attachPart = service.users().messages().attachments()
 										.get(userId, messageId, attId).execute();
 								byte[] fileByteArray = Base64.getDecoder().decode(attachPart.getData());
-								if (!FOLDER_WITH_LOGS.exists()) {
-									FOLDER_WITH_LOGS.mkdirs();
-								}
 								exception.createNewFile();
 								FileOutputStream fileOutFile = new FileOutputStream(exception);
 								fileOutFile.write(fileByteArray);
@@ -281,19 +293,19 @@ public class ExceptionAnalyzerMain {
         System.out.println("Processed emails " + count + " from " + users.size() + " users");
     }
 
-    public static Map<String, List<ExceptionText>> analyzeExceptions(String versionFilter) {
+    public static Map<String, List<ExceptionText>> analyzeExceptions(Variables vars) {
         Map<String, List<ExceptionText>> result = new HashMap<>();
         TreeSet<String> usrs  = new TreeSet<>();
         int count = 0;
         int exceptionCount = 0;
-        if (FOLDER_WITH_LOGS.exists()) {
-            for(File currLog : FOLDER_WITH_LOGS.listFiles()) {
+        if (vars.FOLDER_WITH_LOGS.exists()) {
+            for(File currLog : vars.FOLDER_WITH_LOGS.listFiles()) {
             	if(!currLog.getName().endsWith(".exception.log")) {
             		continue;
             	}
             	count++;
                 try{
-                	File usr = new File(FOLDER_WITH_LOGS, currLog.getName().substring(0, currLog.getName().length() - ".exception.log".length())+".uid.txt");
+                	File usr = new File(vars.FOLDER_WITH_LOGS, currLog.getName().substring(0, currLog.getName().length() - ".exception.log".length())+".uid.txt");
                 	String user = "";
                 	if(usr.exists()) {
                 		BufferedReader br = new BufferedReader(new FileReader(usr));
@@ -315,15 +327,11 @@ public class ExceptionAnalyzerMain {
                         String currText = "";
 
                         if (strLine.matches("[0-9]+.[0-9]+.[0-9]+ [0-9]+:[0-9]+:[0-9]+")) {
-
                             currDate = strLine;
                             while (!strLine.contains("Version  OsmAnd") && (strLine = br.readLine()) != null) {
                                 currText += strLine + "\n";
                             }
-
-
                             String[] lines = currText.split("\n");
-
                             for (String line : lines) {
 
                                 if (line.contains("Apk Version")) {
@@ -340,7 +348,7 @@ public class ExceptionAnalyzerMain {
                             }
                         if (!currName.equals("") && !currBody.equals("") && !currApkVersion.equals("")) {
                             ExceptionText exception = new ExceptionText(currDate, currName, currBody, currApkVersion, user);
-                            if(versionFilter != null && !currApkVersion.contains(versionFilter)) {
+                            if(vars != null && !currApkVersion.contains(vars.VERSION)) {
                                 continue;
                             }
                             exceptionCount ++;
@@ -365,8 +373,8 @@ public class ExceptionAnalyzerMain {
         return result;
     }
 
-    public static void writeResultToFile(Map<String, List<ExceptionText>> mapToAnalyze) {
-        File output = new File(FOLDER_WITH_LOGS, "results.csv");
+    public static void writeResultToFile(Map<String, List<ExceptionText>> mapToAnalyze, Variables vars) {
+		File output = new File(vars.HOME_FILE, "exceptions-" + vars.VERSION + ".csv");
         if (output.exists()) {
             output.delete();
             try {
