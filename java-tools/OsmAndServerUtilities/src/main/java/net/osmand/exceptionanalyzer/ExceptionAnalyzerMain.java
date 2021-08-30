@@ -304,13 +304,22 @@ public class ExceptionAnalyzerMain {
 		Map<String, List<ExceptionText>> result = new HashMap<>();
 		TreeSet<String> usrs = new TreeSet<>();
 		int count = 0;
+		int countTmp = 0;
 		int exceptionCount = 0;
+		long ms = System.currentTimeMillis();
 		if (vars.FOLDER_WITH_LOGS.exists()) {
+			java.util.regex.Pattern pt = java.util.regex.Pattern.compile("^[0-9]{2}\\.[0-9]{2}\\.[0-9]{4} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}");
 			for (File currLog : vars.FOLDER_WITH_LOGS.listFiles()) {
 				if (!currLog.getName().endsWith(".exception.log")) {
 					continue;
 				}
 				count++;
+				countTmp = 0;
+				if (countTmp >= 100 || (System.currentTimeMillis() - ms) > 5000) {
+					System.out.println(String.format("Analyzed %d emails, %d ms.", countTmp, ms));
+					ms = System.currentTimeMillis();
+					countTmp = 0;
+				}
 				try {
 					File usr = new File(vars.FOLDER_WITH_LOGS,
 							currLog.getName().substring(0, currLog.getName().length() - ".exception.log".length())
@@ -335,7 +344,7 @@ public class ExceptionAnalyzerMain {
 						String currName = "";
 						String currText = "";
 
-						if (strLine.matches("[0-9]+.[0-9]+.[0-9]+ [0-9]+:[0-9]+:[0-9]+")) {
+						if (pt.matcher(strLine).matches()) {
 							currDate = strLine;
 							while (!strLine.contains("Version  OsmAnd") && (strLine = br.readLine()) != null) {
 								currText += strLine + "\n";
