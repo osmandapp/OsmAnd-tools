@@ -34,9 +34,10 @@ public class ExceptionAnalyzerMain {
 
 	private static class Variables {
 
+		private boolean VERBOSE = false;
 		private String LABEL = "Crash";
 		private String VERSION = "3.1";
-		public int LIMIT = 1000;
+		private int LIMIT = 1000;
 		private boolean DOWNLOAD_MESSAGES = true;
 		private File FOLDER_WITH_LOGS;
 		private File HOME_FILE;
@@ -71,6 +72,7 @@ public class ExceptionAnalyzerMain {
 		String clientSecretJson = "";
 		String home = System.getProperty("user.home");
 		boolean clean = false;
+		boolean verbose = false;
 		int limit = -1;
 		for (String s : args) {
 			String[] sk = s.split("=");
@@ -80,6 +82,8 @@ public class ExceptionAnalyzerMain {
 				version = sk[1];
 			} else if (sk[0].equals("--clean")) {
 				clean = true;
+			} else if (sk[0].equals("--verbose")) {
+				verbose = true;
 			} else if (sk[0].equals("--home")) {
 				home = sk[1];
 			} else if (sk[0].equals("--limit")) {
@@ -95,6 +99,9 @@ public class ExceptionAnalyzerMain {
 			vars.FOLDER_WITH_LOGS.mkdirs();
 		}
 		vars.DATA_STORE_DIR.mkdirs();
+		if (verbose) {
+			vars.VERBOSE = true;
+		}
 		if (label != null) {
 			vars.LABEL = label;
 		}
@@ -366,6 +373,7 @@ public class ExceptionAnalyzerMain {
 				currDate = strLine;
 				List<String> lines = new ArrayList<String>();
 				while (strLine != null && !strLine.contains("Version  OsmAnd")) {
+					ln++;
 					if (strLine.length() > 0) {
 						lines.add(strLine);
 					}
@@ -403,7 +411,10 @@ public class ExceptionAnalyzerMain {
 			}
 		}
 		br.close();
-		System.out.println(String.format("Read %d lines in %d ms: %s", ln, (int) (System.currentTimeMillis() - ms), currLog.getName()));
+		if (vars.VERBOSE) {
+			System.out.println(String.format("Read %d lines in %d ms: %s", ln, (int) (System.currentTimeMillis() - ms),
+					currLog.getName()));
+		}
 		fstream.close();
 		return exceptionCount;
 	}
