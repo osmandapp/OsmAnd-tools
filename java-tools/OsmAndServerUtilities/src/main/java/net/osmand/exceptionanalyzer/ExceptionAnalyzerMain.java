@@ -30,6 +30,8 @@ public class ExceptionAnalyzerMain {
 
 	private static final List<String> SCOPES = Arrays.asList(GmailScopes.GMAIL_READONLY);
 
+	private static final int LINES_LIMIT = 100;
+
 	private static class Variables {
 
 		private String LABEL = "Crash";
@@ -352,23 +354,26 @@ public class ExceptionAnalyzerMain {
 		int exceptionCount = 0;
 
 		/* read log line by line */
+		int ln = 0;
+		long ms = System.currentTimeMillis();
 		while ((strLine = br.readLine()) != null) {
 			String currDate = "";
 			String currApkVersion = "";
 			String currBody = "";
 			String currName = "";
-			String currText = "";
-			System.out.println("?" + strLine);
+			ln++;
 			if (pt.matcher(strLine).matches()) {
 				currDate = strLine;
+				List<String> lines = new ArrayList<String>();
 				while (strLine != null && !strLine.contains("Version  OsmAnd")) {
 					if (strLine.length() > 0) {
-						currText += strLine + "\n";
+						lines.add(strLine);
 					}
 					strLine = br.readLine();
-					System.out.println(strLine);
 				}
-				String[] lines = currText.split("\n");
+				if (lines.size() > LINES_LIMIT) {
+					lines = lines.subList(0, LINES_LIMIT);
+				}
 				for (String line : lines) {
 					if (line.contains("Apk Version")) {
 						int indexOfColumn = line.indexOf(":");
@@ -398,6 +403,7 @@ public class ExceptionAnalyzerMain {
 			}
 		}
 		br.close();
+		System.out.println(String.format("Read %d lines in %d ms", ln, (int) (System.currentTimeMillis() - ms)));
 		fstream.close();
 		return exceptionCount;
 	}
