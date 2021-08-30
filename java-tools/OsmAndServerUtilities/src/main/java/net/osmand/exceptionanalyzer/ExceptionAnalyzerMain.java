@@ -68,6 +68,7 @@ public class ExceptionAnalyzerMain {
 		String label = null;
 		String clientSecretJson = "";
 		String home = System.getProperty("user.home");
+		boolean clean = false;
 		int limit = -1;
 		for (String s : args) {
 			String[] sk = s.split("=");
@@ -75,6 +76,8 @@ public class ExceptionAnalyzerMain {
 				label = sk[1];
 			} else if (sk[0].equals("--version")) {
 				version = sk[1];
+			} else if (sk[0].equals("--clean")) {
+				clean = true;
 			} else if (sk[0].equals("--home")) {
 				home = sk[1];
 			} else if (sk[0].equals("--limit")) {
@@ -85,6 +88,10 @@ public class ExceptionAnalyzerMain {
 		}
 		Variables vars = new Variables(home);
 		vars.FOLDER_WITH_LOGS.mkdirs();
+		if (clean) {
+			Algorithms.removeAllFiles(vars.FOLDER_WITH_LOGS);
+			vars.FOLDER_WITH_LOGS.mkdirs();
+		}
 		vars.DATA_STORE_DIR.mkdirs();
 		if (label != null) {
 			vars.LABEL = label;
@@ -265,14 +272,15 @@ public class ExceptionAnalyzerMain {
                             fileOutFile.close();
                             uid.setLastModified(message.getInternalDate());
                         }
-                        if(exception.exists()) {
-                        	System.out.println("Attachment already downloaded " + msgId + " " + (System.currentTimeMillis() - lastSaved) + " ms !");
-                        	lastSaved = System.currentTimeMillis();
-                        } else {
+						if (exception.exists()) {
+							System.out.println("Attachment already downloaded " + msgId + " "+ (System.currentTimeMillis() - lastSaved) + " ms !");
+							lastSaved = System.currentTimeMillis();
+						} else {
+                        	MessagePartBody attachPart = null;
                             try {
 								System.out.println("Downloading attachment: " + msgId + "." + filename);
 								String attId = part.getBody().getAttachmentId();
-								MessagePartBody attachPart = service.users().messages().attachments()
+								attachPart = service.users().messages().attachments()
 										.get(userId, messageId, attId).execute();
 								byte[] fileByteArray = Base64.getDecoder().decode(attachPart.getData());
 								exception.createNewFile();
@@ -283,6 +291,9 @@ public class ExceptionAnalyzerMain {
 								lastSaved = System.currentTimeMillis();
 								exception.setLastModified(message.getInternalDate());
 							} catch (Exception e) {
+								if (attachPart != null) {
+									System.out.println("---:" + attachPart.getData() + ":---");
+								}
 								e.printStackTrace();
 							}
                         }
