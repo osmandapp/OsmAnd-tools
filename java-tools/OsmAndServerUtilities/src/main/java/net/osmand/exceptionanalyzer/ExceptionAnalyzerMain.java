@@ -358,7 +358,7 @@ public class ExceptionAnalyzerMain {
 			String currBody = "";
 			String currName = "";
 			String currText = "";
-
+			System.out.println("?" + strLine);
 			if (pt.matcher(strLine).matches()) {
 				currDate = strLine;
 				while (strLine != null && !strLine.contains("Version  OsmAnd")) {
@@ -366,6 +366,7 @@ public class ExceptionAnalyzerMain {
 						currText += strLine + "\n";
 					}
 					strLine = br.readLine();
+					System.out.println(strLine);
 				}
 				String[] lines = currText.split("\n");
 				for (String line : lines) {
