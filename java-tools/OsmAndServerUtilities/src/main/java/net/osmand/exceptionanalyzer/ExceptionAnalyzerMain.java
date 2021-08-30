@@ -403,7 +403,7 @@ public class ExceptionAnalyzerMain {
 			}
 		}
 		br.close();
-		System.out.println(String.format("Read %d lines in %d ms", ln, (int) (System.currentTimeMillis() - ms)));
+		System.out.println(String.format("Read %d lines in %d ms: %s", ln, (int) (System.currentTimeMillis() - ms), currLog.getName()));
 		fstream.close();
 		return exceptionCount;
 	}
