@@ -509,9 +509,10 @@ public class UpdateSubscription {
 				throw new IllegalStateException(
 						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 			}
+			Long expiryTime = subscription.cancelDate != null ? subscription.cancelDate : subscription.renewalDate;
 			subscriptionPurchase = new SubscriptionPurchase()
 					.setStartTimeMillis(subscription.purchaseDate)
-					.setExpiryTimeMillis(subscription.renewalDate)
+					.setExpiryTimeMillis(expiryTime)
 					.setAutoRenewing(subscription.autoRenewing)
 					.setOrderId(subscription.receiptId);
 			if (!Algorithms.objectEquals(subscription.receiptId, orderId)) {
@@ -691,14 +692,21 @@ public class UpdateSubscription {
 				updStat.setNull(ind++, Types.VARCHAR);
 			}
 		}
-		boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
-		updStat.setBoolean(ind++, !expired);
-		if (expired) {
-			updated = true;
-			updStat.setString(ind++, "expired");
+
+		if (subscription.getExpiryTimeMillis() != null) {
+			boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
+			updStat.setBoolean(ind++, !expired);
+			if (expired) {
+				updated = true;
+				updStat.setString(ind++, "expired");
+			} else {
+				updStat.setNull(ind++, Types.VARCHAR);
+			}
 		} else {
+			updStat.setBoolean(ind++, true);
 			updStat.setNull(ind++, Types.VARCHAR);
 		}
+
 		updStat.setString(ind++, orderId);
 		updStat.setString(ind, sku);
 		System.out.println(String.format("%s %s start %s expire %s",
