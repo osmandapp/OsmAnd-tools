@@ -62,7 +62,7 @@ public class ExceptionAnalyzerMain {
 	    
 	}
 	
-	public static void main(String[] args) throws Exception {
+	public static void main2(String[] args) throws Exception {
 
 		String version = null;
 		String label = null;
@@ -282,7 +282,7 @@ public class ExceptionAnalyzerMain {
 								String attId = part.getBody().getAttachmentId();
 								attachPart = service.users().messages().attachments()
 										.get(userId, messageId, attId).execute();
-								byte[] fileByteArray = Base64.getDecoder().decode(attachPart.getData());
+								byte[] fileByteArray = Base64.getUrlDecoder().decode(attachPart.getData());
 								exception.createNewFile();
 								FileOutputStream fileOutFile = new FileOutputStream(exception);
 								fileOutFile.write(fileByteArray);
@@ -471,5 +471,6 @@ public class ExceptionAnalyzerMain {
 
         System.out.println("done!");
     }
+    
 
 }
