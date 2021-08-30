@@ -19,6 +19,7 @@ import java.io.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Pattern;
 
 import net.osmand.exceptionanalyzer.data.ExceptionText;
 import net.osmand.util.Algorithms;
@@ -308,15 +309,15 @@ public class ExceptionAnalyzerMain {
 		int exceptionCount = 0;
 		long ms = System.currentTimeMillis();
 		if (vars.FOLDER_WITH_LOGS.exists()) {
-			java.util.regex.Pattern pt = java.util.regex.Pattern.compile("^[0-9]{2}\\.[0-9]{2}\\.[0-9]{4} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}");
 			for (File currLog : vars.FOLDER_WITH_LOGS.listFiles()) {
 				if (!currLog.getName().endsWith(".exception.log")) {
 					continue;
 				}
 				count++;
 				countTmp = 0;
-				if (countTmp >= 100 || (System.currentTimeMillis() - ms) > 5000) {
-					System.out.println(String.format("Analyzed %d emails, %d ms.", countTmp, ms));
+				long delta = (System.currentTimeMillis() - ms);
+				if (countTmp >= 100 || delta > 5000) {
+					System.out.println(String.format("Analyzed %d emails, %d ms.", countTmp, (int) delta));
 					ms = System.currentTimeMillis();
 					countTmp = 0;
 				}
@@ -332,55 +333,7 @@ public class ExceptionAnalyzerMain {
 					}
 					usrs.add(user);
 
-					FileInputStream fstream = new FileInputStream(currLog);
-					BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
-					String strLine;
-
-					/* read log line by line */
-					while ((strLine = br.readLine()) != null) {
-						String currDate = "";
-						String currApkVersion = "";
-						String currBody = "";
-						String currName = "";
-						String currText = "";
-
-						if (pt.matcher(strLine).matches()) {
-							currDate = strLine;
-							while (!strLine.contains("Version  OsmAnd") && (strLine = br.readLine()) != null) {
-								currText += strLine + "\n";
-							}
-							String[] lines = currText.split("\n");
-							for (String line : lines) {
-
-								if (line.contains("Apk Version")) {
-									int indexOfColumn = line.indexOf(":");
-									currApkVersion = line.substring(indexOfColumn + 1, line.length());
-								} else if ((line.contains("Exception:") || line.contains("Error:"))
-										&& currName.equals("")) {
-									int columnIndex = line.indexOf(":");
-									currName = line.substring(0, columnIndex);
-								} else {
-									currBody += line + "\n";
-								}
-							}
-							if (!currName.equals("") && !currBody.equals("") && !currApkVersion.equals("")) {
-								ExceptionText exception = new ExceptionText(currDate, currName, currBody,
-										currApkVersion, user);
-								if (vars != null && !currApkVersion.contains(vars.VERSION)) {
-									continue;
-								}
-								exceptionCount++;
-								String hsh = exception.getExceptionHash();
-								if (!result.containsKey(hsh)) {
-									List<ExceptionText> exceptions = new ArrayList<>();
-									result.put(hsh, exceptions);
-								}
-								result.get(hsh).add(exception);
-							}
-						}
-					}
-					br.close();
-					fstream.close();
+					exceptionCount += readFile(vars, result, currLog, user);
 				} catch (Exception e) {
 					System.err.println("Error: " + e.getMessage());
 				}
@@ -389,6 +342,63 @@ public class ExceptionAnalyzerMain {
 		System.out.println("Analyzed " + count + " emails from " + usrs.size() + " users, parsed " + exceptionCount
 				+ " (" + result.size() + " different) exceptions ");
 		return result;
+	}
+
+	private static int readFile(Variables vars, Map<String, List<ExceptionText>> result, File currLog, String user) throws FileNotFoundException, IOException {
+		Pattern pt = Pattern.compile("^[0-9]{2}\\.[0-9]{2}\\.[0-9]{4} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}");
+		FileInputStream fstream = new FileInputStream(currLog);
+		BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
+		String strLine;
+		int exceptionCount = 0;
+
+		/* read log line by line */
+		while ((strLine = br.readLine()) != null) {
+			String currDate = "";
+			String currApkVersion = "";
+			String currBody = "";
+			String currName = "";
+			String currText = "";
+
+			if (pt.matcher(strLine).matches()) {
+				currDate = strLine;
+				while (strLine != null && !strLine.contains("Version  OsmAnd")) {
+					if (strLine.length() > 0) {
+						currText += strLine + "\n";
+					}
+					strLine = br.readLine();
+				}
+				String[] lines = currText.split("\n");
+				for (String line : lines) {
+					if (line.contains("Apk Version")) {
+						int indexOfColumn = line.indexOf(":");
+						currApkVersion = line.substring(indexOfColumn + 1, line.length());
+					} else if ((line.contains("Exception:") || line.contains("Error:"))
+							&& currName.equals("")) {
+						int columnIndex = line.indexOf(":");
+						currName = line.substring(0, columnIndex);
+					} else {
+						currBody += line + "\n";
+					}
+				}
+				if (!currName.equals("") && !currBody.equals("") && !currApkVersion.equals("")) {
+					if (currApkVersion.contains(vars.VERSION)) {
+						ExceptionText exception = new ExceptionText(currDate, currName, currBody,
+								currApkVersion, user);
+						exceptionCount++;
+						String hsh = exception.getExceptionHash();
+						if (!result.containsKey(hsh)) {
+							List<ExceptionText> exceptions = new ArrayList<>();
+							result.put(hsh, exceptions);
+						}
+						result.get(hsh).add(exception);
+					}
+					
+				}
+			}
+		}
+		br.close();
+		fstream.close();
+		return exceptionCount;
 	}
 
 	public static void writeResultToFile(Map<String, List<ExceptionText>> mapToAnalyze, Variables vars) {
