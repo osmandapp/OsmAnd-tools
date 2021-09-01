@@ -174,10 +174,13 @@ public class RelationTagsPropagation {
 					}
 					if (p.relationNameTags.size() > 0) {
 						for (Entry<String, String> es : p.relationNameTags.entrySet()) {
-							String key = es.getKey();
-							String oldValue = entityTags.putThroughTags.get(key);
-							String res = sortAndAttachUniqueValue(oldValue, es.getValue());
-							entityTags.putThroughTags.put(key, res);
+							if (!es.getKey().startsWith("name")
+									|| !(ids.hasName() || entityTags.putThroughTags.containsKey(es.getKey()))) {
+								String key = es.getKey();
+								String oldValue = entityTags.putThroughTags.get(key);
+								String res = sortAndAttachUniqueValue(oldValue, es.getValue());
+								entityTags.putThroughTags.put(key, res);
+							}
 						}
 					}
 					for (PropagateTagGroup g : p.relationGroups) {
