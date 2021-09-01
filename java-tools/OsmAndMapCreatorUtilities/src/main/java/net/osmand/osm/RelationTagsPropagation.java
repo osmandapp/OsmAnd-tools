@@ -174,9 +174,8 @@ public class RelationTagsPropagation {
 					}
 					if (p.relationNameTags.size() > 0) {
 						for (Entry<String, String> es : p.relationNameTags.entrySet()) {
-							if (!es.getKey().startsWith("name")
-									|| !(ids.hasName() || entityTags.putThroughTags.containsKey(es.getKey()))) {
-								String key = es.getKey();
+							String key = es.getKey();
+							if (!key.startsWith("name") || !(ids.hasName() || entityTags.putThroughTags.containsKey(key))) {
 								String oldValue = entityTags.putThroughTags.get(key);
 								String res = sortAndAttachUniqueValue(oldValue, es.getValue());
 								entityTags.putThroughTags.put(key, res);
