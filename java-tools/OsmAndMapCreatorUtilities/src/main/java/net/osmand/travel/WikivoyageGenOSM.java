@@ -44,6 +44,7 @@ public class WikivoyageGenOSM {
 	public static final String CAT_SLEEP = "sleep"; // 15%
 	public static final String CAT_EAT = "eat"; // 12%
 	public static final String CAT_DO = "do"; // 10%
+	public static final String CAT_GO = "go";
 	public static final String CAT_DRINK = "drink"; // 5%
 	public static final String CAT_BUY = "buy"; // 4%
 	public static final String CAT_OTHER = "other"; // 10%
@@ -451,9 +452,9 @@ public class WikivoyageGenOSM {
 		categories.put("tourist information", CAT_OTHER);
 		categories.put(CAT_OTHER, CAT_OTHER);
 
+		categories.put(CAT_GO, CAT_GO);
 
 		categories.put("aller", CAT_DO);
-		categories.put("go", CAT_DO);
 		categories.put("around", CAT_DO); // ?
 		categories.put(CAT_DO, CAT_DO);
 			
@@ -474,7 +475,6 @@ public class WikivoyageGenOSM {
 		categories.put("airport", CAT_OTHER);
 		categories.put("surgery", CAT_OTHER);
 		categories.put("clinic", CAT_OTHER);
-		categories.put("other", CAT_OTHER);
 		categories.put("municipality", CAT_OTHER);
 			
 		categories.put("cinema", CAT_DO);
