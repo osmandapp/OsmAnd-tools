@@ -78,7 +78,7 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
    * Use {@link Builder} if you need to specify any of the optional parameters.
    * </p>
    */
-  public public LocalServerReceiverPatched() {
+  public LocalServerReceiverPatched() {
     this("localhost", -1, null);
   }
 
