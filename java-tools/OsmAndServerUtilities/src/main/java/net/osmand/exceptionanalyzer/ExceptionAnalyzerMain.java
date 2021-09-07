@@ -8,6 +8,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
@@ -42,7 +43,7 @@ public class ExceptionAnalyzerMain {
 		private File FOLDER_WITH_LOGS;
 		private File HOME_FILE;
 		private JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
-		private String OAUTH_HOST = "localhost";
+		private String OAUTH_REDIRECT_URI = null; // // http://localhost:5000/Callback
 		private int OAUTH_PORT = 5000;
 
 		/**
@@ -84,8 +85,8 @@ public class ExceptionAnalyzerMain {
 				clean = true;
 			} else if (sk[0].equals("--verbose")) {
 				vars.VERBOSE = true;
-			} else if (sk[0].equals("--oauth-host")) {
-				vars.OAUTH_HOST = sk[1]; // http://localhost:5000/Callback
+			} else if (sk[0].equals("--oauth-redirect-uri")) {
+				vars.OAUTH_REDIRECT_URI = sk[1]; // http://localhost:5000/Callback
 			} else if (sk[0].equals("--oauth-port")) {
 				vars.OAUTH_PORT = Integer.parseInt(sk[1]);
 			} else if (sk[0].equals("--home")) {
@@ -137,12 +138,9 @@ public class ExceptionAnalyzerMain {
 				vars.JSON_FACTORY, clientSecrets, SCOPES).setDataStoreFactory(vars.DATA_STORE_FACTORY)
 						.setAccessType("offline") // offline expires in 7 days
 						.build();
-		Builder bld = new LocalServerReceiver.Builder();
-		if (vars.OAUTH_HOST != null) {
-			bld.setHost(vars.OAUTH_HOST);
-		}
-		bld.setPort(vars.OAUTH_PORT);
-		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
+		
+		LocalServerReceiverPatched rec = new LocalServerReceiverPatched("localhost", vars.OAUTH_PORT, vars.OAUTH_REDIRECT_URI);
+		Credential credential = new AuthorizationCodeInstalledApp(flow, rec).authorize("user");
 		System.out.println("Credentials saved to " + vars.DATA_STORE_DIR.getAbsolutePath());
 		return credential;
 	}
