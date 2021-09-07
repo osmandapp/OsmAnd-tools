@@ -25,6 +25,8 @@ import org.mortbay.jetty.handler.AbstractHandler;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -224,7 +226,7 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
     public void handle(
         String target, HttpServletRequest request, HttpServletResponse response, int dispatch)
         throws IOException {
-      if (!CALLBACK_PATH.equals(target)) {
+      if (!CALLBACK_PATH.equals(target) || !(CALLBACK_PATH+"/").equals(target)) {
     	writeErrorHtml(request, response);
         response.flushBuffer();
         ((Request) request).setHandled(true);
@@ -257,6 +259,7 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
       doc.flush();
     }
     
+    
     private void writeErrorHtml(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         response.setContentType("text/html");
@@ -265,7 +268,11 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
         doc.println("<html>");
         doc.println("<head><title>Incorrect url passed.</title></head>");
         doc.println("<body>");
-        doc.println("Please use " + getDefaultRedirectUri() + " instead of " + request.getRequestURI());
+        Map<String, String[]> mp = request.getParameterMap();
+        doc.println("Please use " + getDefaultRedirectUri() + ".<br>");
+        doc.println("URI: " + request.getRequestURI() + ".<br>");
+        doc.println("URL: " + request.getRequestURL() + ".<br>");
+        doc.println("Params: " + request.getParameterMap() + ".<br>");
         doc.println("</body>");
         doc.println("</HTML>");
         doc.flush();
