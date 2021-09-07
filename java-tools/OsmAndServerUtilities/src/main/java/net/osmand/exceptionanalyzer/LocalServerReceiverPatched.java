@@ -113,7 +113,11 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
 	if (proxyCallbackUrl != null) {
 		return proxyCallbackUrl;
 	}
-    return "http://" + host + ":" + port + CALLBACK_PATH;
+    return getDefaultRedirectUri();
+  }
+
+  private String getDefaultRedirectUri() {
+	return "http://" + host + ":" + port + CALLBACK_PATH;
   }
 
   @Override
@@ -221,6 +225,9 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
         String target, HttpServletRequest request, HttpServletResponse response, int dispatch)
         throws IOException {
       if (!CALLBACK_PATH.equals(target)) {
+    	writeErrorHtml(request, response);
+        response.flushBuffer();
+        ((Request) request).setHandled(true);
         return;
       }
       writeLandingHtml(response);
@@ -249,5 +256,19 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
       doc.println("</HTML>");
       doc.flush();
     }
+    
+    private void writeErrorHtml(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        response.setContentType("text/html");
+
+        PrintWriter doc = response.getWriter();
+        doc.println("<html>");
+        doc.println("<head><title>Incorrect url passed.</title></head>");
+        doc.println("<body>");
+        doc.println("Please use " + getDefaultRedirectUri() + " instead of " + request.getRequestURI());
+        doc.println("</body>");
+        doc.println("</HTML>");
+        doc.flush();
+      }
   }
 }
