@@ -41,8 +41,9 @@ public class ExceptionAnalyzerMain {
 		private boolean DOWNLOAD_MESSAGES = true;
 		private File FOLDER_WITH_LOGS;
 		private File HOME_FILE;
-
 		private JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+		private String OAUTH_HOST = "localhost";
+		private int OAUTH_PORT = 5000;
 
 		/**
 		 * Global instance of the scopes required by this quickstart.
@@ -54,8 +55,9 @@ public class ExceptionAnalyzerMain {
 		private File DATA_STORE_DIR;
 		/** Global instance of the HTTP transport. */
 		private HttpTransport HTTP_TRANSPORT;
+		
 
-		public Variables(String home) throws Exception {
+		public void init(String home) throws Exception {
 			HOME_FILE = new File(home);
 			FOLDER_WITH_LOGS = new File(HOME_FILE, "attachments_logs");
 			DATA_STORE_DIR = new File(HOME_FILE, ".credentials/gmail-java-quickstart");
@@ -65,58 +67,49 @@ public class ExceptionAnalyzerMain {
 
 	}
 
+
 	public static void main(String[] args) throws Exception {
 
-		String version = null;
-		String label = null;
 		String clientSecretJson = "";
 		String home = System.getProperty("user.home");
 		boolean clean = false;
-		boolean verbose = false;
-		int limit = -1;
+		Variables vars = new Variables();
 		for (String s : args) {
 			String[] sk = s.split("=");
 			if (sk[0].equals("--label")) {
-				label = sk[1];
+				vars.LABEL = sk[1];
 			} else if (sk[0].equals("--version")) {
-				version = sk[1];
+				vars.VERSION = sk[1];
 			} else if (sk[0].equals("--clean")) {
 				clean = true;
 			} else if (sk[0].equals("--verbose")) {
-				verbose = true;
+				vars.VERBOSE = true;
+			} else if (sk[0].equals("--oauth-host")) {
+				vars.OAUTH_HOST = sk[1]; // http://localhost:5000/Callback
+			} else if (sk[0].equals("--oauth-port")) {
+				vars.OAUTH_PORT = Integer.parseInt(sk[1]);
 			} else if (sk[0].equals("--home")) {
 				home = sk[1];
 			} else if (sk[0].equals("--limit")) {
-				limit = Integer.parseInt(sk[1]);
+				vars.LIMIT = Integer.parseInt(sk[1]);
 			} else if (sk[0].equals("--clientSecretJson")) {
 				clientSecretJson = sk[1];
 			}
 		}
-		Variables vars = new Variables(home);
+		
+		vars.init(home);
 		vars.FOLDER_WITH_LOGS.mkdirs();
 		if (clean) {
 			Algorithms.removeAllFiles(vars.FOLDER_WITH_LOGS);
 			vars.FOLDER_WITH_LOGS.mkdirs();
 		}
 		vars.DATA_STORE_DIR.mkdirs();
-		if (verbose) {
-			vars.VERBOSE = true;
-		}
-		if (label != null) {
-			vars.LABEL = label;
-		}
-		if (limit != -1) {
-			vars.LIMIT = limit;
-		}
-		if (version != null) {
-			vars.VERSION = version;
-		}
 
 		System.out.println(String.format(
 				"Utility to download exceptions."
 						+ "\nDownload emails with label='%s' (change with --label=, leave empty to skip) to %s. "
 						+ "\nMake report with version='%s' (change with --version=, leave empty to skip).",
-				label, vars.FOLDER_WITH_LOGS.getAbsolutePath(), version));
+				vars.LABEL, vars.FOLDER_WITH_LOGS.getAbsolutePath(), vars.VERSION));
 		if (vars.DOWNLOAD_MESSAGES && !Algorithms.isEmpty(vars.LABEL)) {
 			downloadAttachments(clientSecretJson, vars);
 		}
@@ -142,9 +135,13 @@ public class ExceptionAnalyzerMain {
 		// Build flow and trigger user authorization request.
 		GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(vars.HTTP_TRANSPORT,
 				vars.JSON_FACTORY, clientSecrets, SCOPES).setDataStoreFactory(vars.DATA_STORE_FACTORY)
-						.setAccessType("offline").build();
+						.setAccessType("offline") // offline expires in 7 days
+						.build();
 		Builder bld = new LocalServerReceiver.Builder();
-		bld.setPort(5000);
+		if (vars.OAUTH_HOST != null) {
+			bld.setHost(vars.OAUTH_HOST);
+		}
+		bld.setPort(vars.OAUTH_PORT);
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
 		System.out.println("Credentials saved to " + vars.DATA_STORE_DIR.getAbsolutePath());
 		return credential;
