@@ -226,8 +226,8 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
     public void handle(
         String target, HttpServletRequest request, HttpServletResponse response, int dispatch)
         throws IOException {
-      if (!CALLBACK_PATH.equals(target) || !(CALLBACK_PATH+"/").equals(target)) {
-    	writeErrorHtml(request, response);
+      if (!CALLBACK_PATH.equals(target) && !(CALLBACK_PATH+"/").equals(target)) {
+    	writeErrorHtml(request, response, target);
         response.flushBuffer();
         ((Request) request).setHandled(true);
         return;
@@ -260,7 +260,7 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
     }
     
     
-    private void writeErrorHtml(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void writeErrorHtml(HttpServletRequest request, HttpServletResponse response, String target) throws IOException {
         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         response.setContentType("text/html");
 
@@ -268,11 +268,11 @@ public final class LocalServerReceiverPatched implements VerificationCodeReceive
         doc.println("<html>");
         doc.println("<head><title>Incorrect url passed.</title></head>");
         doc.println("<body>");
-        Map<String, String[]> mp = request.getParameterMap();
-        doc.println("Please use " + getDefaultRedirectUri() + ".<br>");
-        doc.println("URI: " + request.getRequestURI() + ".<br>");
-        doc.println("URL: " + request.getRequestURL() + ".<br>");
-        doc.println("Params: " + request.getParameterMap() + ".<br>");
+        doc.println("Please use " + getDefaultRedirectUri() + "<br>");
+        doc.println("Target (path) '" +CALLBACK_PATH+  "' : " + target + "<br>");
+        doc.println("URI: " + request.getRequestURI() + "<br>");
+        doc.println("URL: " + request.getRequestURL() + "<br>");
+        doc.println("Params: " + request.getParameterMap() + "<br>");
         doc.println("</body>");
         doc.println("</HTML>");
         doc.flush();
