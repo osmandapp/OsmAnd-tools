@@ -39,7 +39,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	public static final int BATCH_SIZE_OSM = 100000;
 
 	// do not store these tags in the database, just ignore them
-	final String[] tagsToIgnore= {"created_by","source","converted_by"};
+	final String[] tagsToIgnore= {"created_by","converted_by"};
 	
 	DBDialect dialect;
 	int currentCountNode = 0;
