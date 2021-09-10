@@ -1,25 +1,26 @@
 package net.osmand.server.api.services;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import net.osmand.Location;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.geojson.Feature;
-import org.geojson.FeatureCollection;
-import org.geojson.LngLatAlt;
-import org.geojson.Point;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -27,12 +28,18 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vividsolutions.jts.geom.Geometry;
+
+import net.osmand.Location;
+import net.osmand.binary.BinaryVectorTileReader;
+import net.osmand.data.GeometryTile;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 @Service
 public class PlacesService {
@@ -42,16 +49,22 @@ public class PlacesService {
 
 	private static final Log LOGGER = LogFactory.getLog(PlacesService.class);
 
-	private static final int SEARCH_RADIUS = 50;
-
 	private static final String WIKIMEDIA = "wikimedia.org";
 	private static final String WIKIPEDIA = "wikipedia.org";
 	private static final String WIKI_FILE_PREFIX = "File:";
-
-	@Value("${mapillary.clientid}")
-	private String mapillaryClientId;
-
+	private static final String TEMP_MAPILLARY_FOLDER = "mapillary_cache";
+	
+	private static final String FILE_MAPILLARY_PREFIX = "mapillary_";
+	private static final long MAPILLARY_CACHE_TIMEOUT = TimeUnit.HOURS.toMillis(6);
+	private static final long MAPILLARY_GC_TIMEOUT = TimeUnit.MINUTES.toMillis(15);
+	
 	private final RestTemplate restTemplate;
+	
+	private long lastMapillaryGCTimestamp = 0; 
+	
+
+	@Value("${mapillary.accesstoken}")
+	private String mapillaryAccessToken;
 
 	private ThreadPoolTaskExecutor executor;
 
@@ -166,33 +179,6 @@ public class PlacesService {
 		return Double.parseDouble(String.valueOf(cameraAngle));
 	}
 
-	private CameraPlace parseFeature(Feature feature, double targetLat, double targetLon, String host, String proto) {
-		LngLatAlt coordinates = ((Point) feature.getGeometry()).getCoordinates();
-		Map<String, Object> properties = feature.getProperties();
-		CameraPlace cameraBuilder = new CameraPlace();
-		cameraBuilder.setType("mapillary-photo");
-		cameraBuilder.setTimestamp((String) properties.get("captured_at"));
-		String key = (String) properties.get("key");
-		cameraBuilder.setKey(key);
-		cameraBuilder.setCa(parseCameraAngle(properties.get("ca")));
-		cameraBuilder.setImageUrl(buildOsmandImageUrl(false, key, host, proto));
-		cameraBuilder.setImageHiresUrl(buildOsmandImageUrl(true, key, host, proto));
-		cameraBuilder.setUrl(buildOsmandPhotoViewerUrl(key, host, proto));
-		cameraBuilder.setExternalLink(false);
-		cameraBuilder.setUsername((String) properties.get("username"));
-		if (properties.get("pano") instanceof Boolean) {
-			cameraBuilder.setIs360((Boolean) properties.get("pano"));
-		}
-		cameraBuilder.setLat(coordinates.getLatitude());
-		cameraBuilder.setLon(coordinates.getLongitude());
-		cameraBuilder.setTopIcon("ic_logo_mapillary");
-		double bearing = computeInitialBearing(coordinates.getLatitude(), coordinates.getLongitude(), targetLat,
-				targetLon);
-		cameraBuilder.setBearing(bearing);
-		cameraBuilder.setDistance(
-				computeDistance(coordinates.getLatitude(), coordinates.getLongitude(), targetLat, targetLon));
-		return cameraBuilder;
-	}
 
 	private String buildUrl(String path, boolean hires, String photoIdKey, String host, String proto) {
 		UriComponentsBuilder uriBuilder = UriComponentsBuilder.newInstance();
@@ -242,39 +228,100 @@ public class PlacesService {
 	}
 
 	private boolean isEmpty(String str) {
-		return str == null || str.isEmpty();
+		return Algorithms.isEmpty(str);
 	}
+	
+	@SuppressWarnings("unchecked")
+	public List<CameraPlace> parseMapillaryPlaces(double lat, double lon, String host, String proto) {
+		List<CameraPlace> lst = new ArrayList<>();
+		String url = "";
+		try {
+			int x = (int) MapUtils.getTileNumberX(MapillaryApiConstants.ZOOM_QUERY, lon);
+			int y = (int) MapUtils.getTileNumberY(MapillaryApiConstants.ZOOM_QUERY, lat);
+			File f = new File(TEMP_MAPILLARY_FOLDER, FILE_MAPILLARY_PREFIX + x + "_" + y + ".mvt");
+			gcMapillaryCache();
+			if (!f.exists() || System.currentTimeMillis() - f.lastModified() > MAPILLARY_CACHE_TIMEOUT) {
+				String accessTokenParam = MapillaryApiConstants.MAPILLARY_PARAM_ACCESS_TOKEN + "="
+						+ URLEncoder.encode(mapillaryAccessToken, "UTF-8");
+				url = MapillaryApiConstants.MAPILLARY_VECTOR_TILE_URL + "/" + MapillaryApiConstants.ZOOM_QUERY + "/" + x
+						+ "/" + y + "?" + accessTokenParam;
+				InputStream is = new URL(url).openConnection().getInputStream();
+				FileOutputStream fous = new FileOutputStream(f);
+				Algorithms.streamCopy(is, fous);
+				fous.close();
+				is.close();
+			}
+			
+			GeometryTile tl = BinaryVectorTileReader.readTile(f);
+			for (Geometry g : tl.getData()) {
+				if (!"Point".equals(g.getGeometryType())) {
+					continue;
+				}
+				// compass_angle, captured_at, is_pano, sequence_id, id (image_id)
+				Map<String, Object> data = (Map<String, Object>) g.getUserData();
+				int cx = (int) g.getCentroid().getX();
+				int cy = (int) g.getCentroid().getY();
+				double clat = MapUtils.getLatitudeFromTile(MapillaryApiConstants.ZOOM_POINT_MAX,
+						cy + (y << MapillaryApiConstants.ZOOM_SHIFT));
+				double clon = MapUtils.getLongitudeFromTile(MapillaryApiConstants.ZOOM_POINT_MAX,
+						cx + (x << MapillaryApiConstants.ZOOM_SHIFT));
+				CameraPlace cameraPlace = new CameraPlace();
+				cameraPlace.setType("mapillary-photo");
+				cameraPlace.setTimestamp((String) data.get("captured_at"));
+				String key = data.get("id").toString();
+				cameraPlace.setKey(key);
+				cameraPlace.setCa(parseCameraAngle(data.get("captured_at")));
+				cameraPlace.setImageUrl(buildOsmandImageUrl(false, key, host, proto));
+				cameraPlace.setImageHiresUrl(buildOsmandImageUrl(true, key, host, proto));
+				cameraPlace.setUrl(buildOsmandPhotoViewerUrl(key, host, proto));
+				cameraPlace.setExternalLink(false);
+				cameraPlace.setUsername((String) data.get("username"));
+				if (data.get("is_pano") instanceof Boolean) {
+					cameraPlace.setIs360((Boolean) data.get("is_pano"));
+				}
+				cameraPlace.setLat(clat);
+				cameraPlace.setLon(clon);
+				cameraPlace.setTopIcon("ic_logo_mapillary");
+				double bearing = computeInitialBearing(clat, clon, lat, lon);
+				cameraPlace.setBearing(bearing);
+				cameraPlace.setDistance(computeDistance(clat, clon, lat, lon));
+				lst.add(cameraPlace);
+			}
+		} catch (IOException ex) {
+			LOGGER.error("Error Mappillary api (" + url + "): " + ex.getMessage());
+		}
+		return lst;
+	}
+	
+	private void gcMapillaryCache() {
+		long tm = System.currentTimeMillis();
+		if (tm - lastMapillaryGCTimestamp > MAPILLARY_GC_TIMEOUT) {
+			lastMapillaryGCTimestamp = tm;
+			File fld = new File(TEMP_MAPILLARY_FOLDER);
+			fld.mkdirs();
+			File[] lf = fld.listFiles();
+			if (lf != null) {
+				for (File f : lf) {
+					if (f.getName().startsWith(FILE_MAPILLARY_PREFIX)
+							&& tm - f.lastModified() > MAPILLARY_CACHE_TIMEOUT) {
+						f.delete();
+					}
+				}
+			}
+		}
+	}
+
 
 	public CameraPlace processMapillaryData(double lat, double lon, String primaryImageKey, List<CameraPlace> main,
 			List<CameraPlace> rest, String host, String proto) {
-		UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
-		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLOSE_TO, lon, lat);
-		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_RADIUS, SEARCH_RADIUS);
-		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLIENT_ID, mapillaryClientId);
 		CameraPlace primaryPlace = null;
-		try {
-			FeatureCollection featureCollection = restTemplate.getForObject(uriBuilder.build().toString(),
-					FeatureCollection.class);
-			if (featureCollection != null) {
-				for (Feature feature : featureCollection.getFeatures()) {
-					CameraPlace cp = parseFeature(feature, lat, lon, host, proto);
-					if (isPrimaryCameraPlace(cp, primaryImageKey)) {
-						primaryPlace = cp;
-						continue;
-					}
-					splitCameraPlaceByAngel(cp, main, rest);
-				}
+		List<CameraPlace> places = parseMapillaryPlaces(lat, lon, host, proto);
+		for (CameraPlace cp : places) {
+			if (isPrimaryCameraPlace(cp, primaryImageKey)) {
+				primaryPlace = cp;
+				continue;
 			}
-			if (primaryPlace == null && !isEmpty(primaryImageKey)) {
-
-				uriBuilder = UriComponentsBuilder.fromHttpUrl(MapillaryApiConstants.MAPILLARY_API_URL);
-				uriBuilder.path(primaryImageKey).queryParam(MapillaryApiConstants.MAPILLARY_PARAM_CLIENT_ID,
-						mapillaryClientId);
-				Feature f = restTemplate.getForObject(uriBuilder.build().toString(), Feature.class);
-				primaryPlace = parseFeature(f, lat, lon, host, proto);
-			}
-		} catch (RestClientException ex) {
-			LOGGER.error("Error Mappillary api " + uriBuilder.build().toString() + ": " + ex.getMessage());
+			splitCameraPlaceByAngel(cp, main, rest);
 		}
 		return primaryPlace;
 	}
@@ -354,10 +401,11 @@ public class PlacesService {
 	}
 
 	private static class MapillaryApiConstants {
-		static final String MAPILLARY_API_URL = "https://a.mapillary.com/v3/images/";
-		static final String MAPILLARY_PARAM_RADIUS = "radius";
-		static final String MAPILLARY_PARAM_CLIENT_ID = "client_id";
-		static final String MAPILLARY_PARAM_CLOSE_TO = "closeto";
+		static final String MAPILLARY_VECTOR_TILE_URL = "https://tiles.mapillary.com/maps/vtp/mly1_public/2";
+		static final String MAPILLARY_PARAM_ACCESS_TOKEN = "access_token";
+		static final int ZOOM_QUERY = 14;
+		static final int ZOOM_SHIFT = 12;
+		static final int ZOOM_POINT_MAX = ZOOM_QUERY + ZOOM_SHIFT; // 4096 max 
 	}
 
 	private static class WikimediaApiConstants {
