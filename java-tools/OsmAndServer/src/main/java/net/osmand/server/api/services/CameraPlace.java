@@ -194,4 +194,10 @@ public class CameraPlace {
     public void setButtonTextColor(String buttonTextColor) {
         this.buttonTextColor = buttonTextColor;
     }
+    
+    @Override
+    public String toString() {
+		return String.format("Place dist=%s is_pano=%s key=%s bearing=%s", distance + "", is360 + "", key,
+				bearing + "");
+    }
 }

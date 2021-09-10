@@ -57,6 +57,7 @@ public class PlacesService {
 	private static final String FILE_MAPILLARY_PREFIX = "mapillary_";
 	private static final long MAPILLARY_CACHE_TIMEOUT = TimeUnit.HOURS.toMillis(6);
 	private static final long MAPILLARY_GC_TIMEOUT = TimeUnit.MINUTES.toMillis(15);
+	private static final double MAPILLARY_RADIUS = 40.0;
 	
 	private final RestTemplate restTemplate;
 	
@@ -231,6 +232,7 @@ public class PlacesService {
 		return Algorithms.isEmpty(str);
 	}
 	
+	
 	@SuppressWarnings("unchecked")
 	public List<CameraPlace> parseMapillaryPlaces(double lat, double lon, String host, String proto) {
 		List<CameraPlace> lst = new ArrayList<>();
@@ -267,7 +269,7 @@ public class PlacesService {
 						cx + (x << MapillaryApiConstants.ZOOM_SHIFT));
 				CameraPlace cameraPlace = new CameraPlace();
 				cameraPlace.setType("mapillary-photo");
-				cameraPlace.setTimestamp((String) data.get("captured_at"));
+				cameraPlace.setTimestamp(String.valueOf(data.get("captured_at")));
 				String key = data.get("id").toString();
 				cameraPlace.setKey(key);
 				cameraPlace.setCa(parseCameraAngle(data.get("captured_at")));
@@ -317,6 +319,9 @@ public class PlacesService {
 		CameraPlace primaryPlace = null;
 		List<CameraPlace> places = parseMapillaryPlaces(lat, lon, host, proto);
 		for (CameraPlace cp : places) {
+			if(cp.getDistance() == null || cp.getDistance() > MAPILLARY_RADIUS) {
+				continue;
+			}
 			if (isPrimaryCameraPlace(cp, primaryImageKey)) {
 				primaryPlace = cp;
 				continue;
