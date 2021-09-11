@@ -345,7 +345,7 @@ public class PlacesService {
 			result.addAll(rest);
 		}
 		result = sortByDistance(result);
-		if(primaryPlace != null) {
+		if (primaryPlace != null) {
 			result.add(0, primaryPlace);
 		}
 		if (result.size() > MAPILLARY_IMAGES_LIMIT) {
@@ -434,7 +434,7 @@ public class PlacesService {
 	}
 
 	private static class MapillaryApiConstants {
-		public static final String GRAPH_URL = "https://graph.mapillary.com/";
+		static final String GRAPH_URL = "https://graph.mapillary.com/";
 		static final String MAPILLARY_VECTOR_TILE_URL = "https://tiles.mapillary.com/maps/vtp/mly1_public/2";
 		static final String MAPILLARY_PARAM_ACCESS_TOKEN = "access_token";
 		static final int ZOOM_QUERY = 14;

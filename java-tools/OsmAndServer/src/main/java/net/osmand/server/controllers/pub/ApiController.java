@@ -220,7 +220,7 @@ public class ApiController {
                          HttpServletResponse resp) throws IOException {
         CameraPlace cp = new CameraPlace();
         cp.setKey(photoId);
-        placesService.initMapillaryImageUrl(null);
+        placesService.initMapillaryImageUrl(cp);
 		if (hires) {
 			if (!Algorithms.isEmpty(cp.getImageHiresUrl())) {
 				resp.sendRedirect(cp.getImageHiresUrl());
