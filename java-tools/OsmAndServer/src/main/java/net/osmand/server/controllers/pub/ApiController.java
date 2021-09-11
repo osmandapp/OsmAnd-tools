@@ -38,7 +38,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -55,6 +54,7 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.CameraPlace;
 import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
@@ -218,16 +218,18 @@ public class ApiController {
     public void getPhoto(@RequestParam("photo_id") String photoId,
                          @RequestParam(value = "hires", required = false) boolean hires,
                          HttpServletResponse resp) throws IOException {
-        String hiresThumb = "thumb-1024.jpg";
-        String thumb = "thumb-640.jpg";
-        String cloudFrontUriTemplate = "https://d1cuyjsrcm0gby.cloudfront.net/{photoId}/{thumb}?origin=osmand";
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(cloudFrontUriTemplate);
-        resp.setContentType("image/jpeg");
-        if (hires) {
-            resp.sendRedirect(uriBuilder.buildAndExpand(photoId, hiresThumb).toString());
-        } else {
-            resp.sendRedirect(uriBuilder.buildAndExpand(photoId, thumb).toString());
-        }
+        CameraPlace cp = new CameraPlace();
+        cp.setKey(photoId);
+        placesService.initMapillaryImageUrl(null);
+		if (hires) {
+			if (!Algorithms.isEmpty(cp.getImageHiresUrl())) {
+				resp.sendRedirect(cp.getImageHiresUrl());
+			}
+		} else {
+			if (!Algorithms.isEmpty(cp.getImageUrl())) {
+				resp.sendRedirect(cp.getImageUrl());
+			}
+		}
     }
 
     @GetMapping(path = {"/mapillary/photo-viewer.php", "/mapillary/photo-viewer"})

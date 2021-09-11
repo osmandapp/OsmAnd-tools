@@ -58,6 +58,7 @@ public class PlacesService {
 	private static final long MAPILLARY_CACHE_TIMEOUT = TimeUnit.HOURS.toMillis(6);
 	private static final long MAPILLARY_GC_TIMEOUT = TimeUnit.MINUTES.toMillis(15);
 	private static final double MAPILLARY_RADIUS = 40.0;
+	private static final int MAPILLARY_IMAGES_LIMIT = 10;
 	
 	private final RestTemplate restTemplate;
 	
@@ -118,27 +119,17 @@ public class PlacesService {
 					asyncCtx.complete();
 					return;
 				}
-				List<CameraPlace> arr = new ArrayList<>();
-				List<CameraPlace> halfvisarr = new ArrayList<>();
 
 				CameraPlace wikimediaPrimaryCameraPlace = processWikimediaData(lat, lon, osmImage);
-				CameraPlace mapillaryPrimaryCameraPlace = processMapillaryData(lat, lon, osmMapillaryKey, arr,
-						halfvisarr, host, proto);
-				if (arr.isEmpty()) {
-					arr.addAll(halfvisarr);
+				List<CameraPlace> visibile = processMapillaryData(lat, lon, osmMapillaryKey, host, proto);
+				if (!visibile.isEmpty()) {
+					visibile.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
 				}
-				arr = sortByDistance(arr);
 				if (wikimediaPrimaryCameraPlace != null) {
-					arr.add(0, wikimediaPrimaryCameraPlace);
-				}
-				if (mapillaryPrimaryCameraPlace != null) {
-					arr.add(0, mapillaryPrimaryCameraPlace);
-				}
-				if (!arr.isEmpty()) {
-					arr.add(createEmptyCameraPlaceWithTypeOnly("mapillary-contribute"));
+					visibile.add(0, wikimediaPrimaryCameraPlace);
 				}
 				response.getWriter().println(String.format("{%s:%s}", jsonMapper.writeValueAsString("features"),
-						jsonMapper.writeValueAsString(arr)));
+						jsonMapper.writeValueAsString(visibile)));
 				asyncCtx.complete();
 			} catch (Exception e) {
 				LOGGER.error("Error processing places: " + e.getMessage());
@@ -211,7 +202,7 @@ public class PlacesService {
 		return Math.abs(angle) < diff;
 	}
 
-	private void splitCameraPlaceByAngel(CameraPlace cp, List<CameraPlace> main, List<CameraPlace> rest) {
+	private void splitCameraPlaceByAngle(CameraPlace cp, List<CameraPlace> main, List<CameraPlace> rest) {
 		double ca = cp.getCa();
 		double bearing = cp.getBearing();
 		if (cp.is360()) {
@@ -236,6 +227,9 @@ public class PlacesService {
 	@SuppressWarnings("unchecked")
 	public List<CameraPlace> parseMapillaryPlaces(double lat, double lon, String host, String proto) {
 		List<CameraPlace> lst = new ArrayList<>();
+		if (Algorithms.isEmpty(mapillaryAccessToken)) {
+			return lst;
+		}
 		String url = "";
 		try {
 			int x = (int) MapUtils.getTileNumberX(MapillaryApiConstants.ZOOM_QUERY, lon);
@@ -313,10 +307,29 @@ public class PlacesService {
 		}
 	}
 
+	public void initMapillaryImageUrl(CameraPlace cp) {
+		// String url = MapillaryApiConstants.GRAPH_URL + cp.getKey() + "?"
+		// + MapillaryApiConstants.MAPILLARY_PARAM_ACCESS_TOKEN + "="
+		// + URLEncoder.encode(mapillaryAccessToken, "UTF-8") + "&fields=id,computed_geometry,thumb_1024_url";
+		if (Algorithms.isEmpty(mapillaryAccessToken)) {
+			return;
+		}
+		UriComponentsBuilder uriBuilder = UriComponentsBuilder
+				.fromHttpUrl(MapillaryApiConstants.GRAPH_URL + cp.getKey());
+		uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_ACCESS_TOKEN, mapillaryAccessToken);
+		uriBuilder.queryParam("fields", "id,computed_geometry,thumb_256_url,thumb_1024_url");
+		MapillaryImage img = restTemplate.getForObject(uriBuilder.build().toString(), MapillaryImage.class);
+		if (img != null) {
+			cp.setImageUrl(img.thumb_256_url);
+			cp.setImageHiresUrl(img.thumb_1024_url);
+		}
+	}
 
-	public CameraPlace processMapillaryData(double lat, double lon, String primaryImageKey, List<CameraPlace> main,
-			List<CameraPlace> rest, String host, String proto) {
+	public List<CameraPlace> processMapillaryData(double lat, double lon, String primaryImageKey, String host, String proto) {
+		
 		CameraPlace primaryPlace = null;
+		List<CameraPlace> result = new ArrayList<CameraPlace>();
+		List<CameraPlace> rest = new ArrayList<CameraPlace>();
 		List<CameraPlace> places = parseMapillaryPlaces(lat, lon, host, proto);
 		for (CameraPlace cp : places) {
 			if(cp.getDistance() == null || cp.getDistance() > MAPILLARY_RADIUS) {
@@ -326,10 +339,25 @@ public class PlacesService {
 				primaryPlace = cp;
 				continue;
 			}
-			splitCameraPlaceByAngel(cp, main, rest);
+			splitCameraPlaceByAngle(cp, result, rest);
 		}
-		return primaryPlace;
+		if (result.isEmpty()) {
+			result.addAll(rest);
+		}
+		result = sortByDistance(result);
+		if(primaryPlace != null) {
+			result.add(0, primaryPlace);
+		}
+		if (result.size() > MAPILLARY_IMAGES_LIMIT) {
+			result = result.subList(0, MAPILLARY_IMAGES_LIMIT);
+		}
+		for(CameraPlace cp : result) {
+			initMapillaryImageUrl(cp);
+		}
+		return result;
 	}
+
+	
 
 	private String getFilename(String osmImage) {
 		if (osmImage.startsWith(WIKI_FILE_PREFIX)) {
@@ -406,6 +434,7 @@ public class PlacesService {
 	}
 
 	private static class MapillaryApiConstants {
+		public static final String GRAPH_URL = "https://graph.mapillary.com/";
 		static final String MAPILLARY_VECTOR_TILE_URL = "https://tiles.mapillary.com/maps/vtp/mly1_public/2";
 		static final String MAPILLARY_PARAM_ACCESS_TOKEN = "access_token";
 		static final int ZOOM_QUERY = 14;
@@ -471,6 +500,35 @@ public class PlacesService {
 		public void setQuery(Query query) {
 			this.query = query;
 		}
+	}
+	
+	
+	@JsonInclude(JsonInclude.Include.NON_EMPTY)
+	public static class MapillaryImage {
+
+		private String id;
+		private String thumb_1024_url;
+		private String thumb_256_url;
+		
+		public String getThumb_256_url() {
+			return thumb_256_url;
+		}
+		public void setThumb_256_url(String thumb_256_url) {
+			this.thumb_256_url = thumb_256_url;
+		}
+		public String getId() {
+			return id;
+		}
+		public void setId(String id) {
+			this.id = id;
+		}
+		public String getThumb_1024_url() {
+			return thumb_1024_url;
+		}
+		public void setThumb_1024_url(String thumb_1024_url) {
+			this.thumb_1024_url = thumb_1024_url;
+		}
+		
 	}
 
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
