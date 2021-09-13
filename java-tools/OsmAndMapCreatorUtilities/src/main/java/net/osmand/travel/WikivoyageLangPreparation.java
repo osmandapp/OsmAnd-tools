@@ -554,6 +554,9 @@ public class WikivoyageLangPreparation {
 							} else if (point.category.equalsIgnoreCase("buy") || point.category.equalsIgnoreCase("listing")) {
 								point.setColor(0xCC8F2BAB);
 								point.setIconName("shop_department_store");
+							} else if (point.category.equalsIgnoreCase("go")) {
+								point.setColor(0xCC0F5FFF);
+								point.setIconName("public_transport_stop_position");
 							}
 						}
 						points.add(point);
