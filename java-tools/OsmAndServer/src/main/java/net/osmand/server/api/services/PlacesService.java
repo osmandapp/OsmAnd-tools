@@ -38,6 +38,7 @@ import com.vividsolutions.jts.geom.Geometry;
 import net.osmand.Location;
 import net.osmand.binary.BinaryVectorTileReader;
 import net.osmand.data.GeometryTile;
+import net.osmand.data.LatLon;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -58,7 +59,7 @@ public class PlacesService {
 	private static final long MAPILLARY_CACHE_TIMEOUT = TimeUnit.HOURS.toMillis(6);
 	private static final long MAPILLARY_GC_TIMEOUT = TimeUnit.MINUTES.toMillis(15);
 	private static final double MAPILLARY_RADIUS = 40.0;
-	private static final int MAPILLARY_IMAGES_LIMIT = 10;
+	private static final int MAPILLARY_IMAGES_LIMIT = 20;
 	
 	private final RestTemplate restTemplate;
 	
@@ -224,8 +225,80 @@ public class PlacesService {
 	}
 	
 	
+	public static void main(String[] args) throws IOException {
+		GeometryTile gt = BinaryVectorTileReader.readTile(new File("/Users/victorshcherb/Desktop/mly1_public-2-14-13304-4104.pbf"));
+		System.out.println(gt);
+	}
+	
+	
+	
+	//https://graph.mapillary.com/images?bbox=4.86933,52.33994,4.87507,52.34188&fields=id,geometry,compass_angle,captured_at,camera_type,creator,thumb_256_url,thumb_1024_url&limit=20&access_token=
+	public List<CameraPlace> parseMapillaryPlacesTiles(double lat, double lon, String host, String proto) {
+			List<CameraPlace> lst = new ArrayList<>();
+			if (Algorithms.isEmpty(mapillaryAccessToken)) {
+				return lst;
+			}
+			String url = "";
+			try {
+				double x = MapUtils.getTileNumberX(MapillaryApiConstants.ZOOM_QUERY, lon);
+				double y = MapUtils.getTileNumberY(MapillaryApiConstants.ZOOM_QUERY, lat);
+				double dist = MapUtils.getTileDistanceWidth(MapillaryApiConstants.ZOOM_QUERY);
+				double cr = MAPILLARY_RADIUS / dist;
+				LatLon topLeft = new LatLon(
+						MapUtils.getLatitudeFromTile(MapillaryApiConstants.ZOOM_QUERY, y - cr),
+						MapUtils.getLongitudeFromTile(MapillaryApiConstants.ZOOM_QUERY, x - cr));
+				LatLon bottomRight = new LatLon(
+						MapUtils.getLatitudeFromTile(MapillaryApiConstants.ZOOM_QUERY, y + cr),
+						MapUtils.getLongitudeFromTile(MapillaryApiConstants.ZOOM_QUERY, x + cr));
+				
+				UriComponentsBuilder uriBuilder = UriComponentsBuilder
+						.fromHttpUrl(MapillaryApiConstants.GRAPH_URL_IMAGES);
+				uriBuilder.queryParam("limit", MAPILLARY_IMAGES_LIMIT);
+				uriBuilder.queryParam("bbox", ((float)topLeft.getLongitude())+","+ 
+						((float)bottomRight.getLatitude()) +","+
+						((float)bottomRight.getLongitude()) +","+
+						((float)topLeft.getLatitude()));
+				uriBuilder.queryParam(MapillaryApiConstants.MAPILLARY_PARAM_ACCESS_TOKEN, mapillaryAccessToken);
+				uriBuilder.queryParam("fields", "id,geometry,compass_angle,captured_at,camera_type,creator,thumb_256_url,thumb_1024_url");
+				url = uriBuilder.build().toString();
+				MapillaryData dt = restTemplate.getForObject(url, MapillaryData.class);
+				System.out.println(url);
+				for (MapillaryImage g : dt.data) {
+					if (g.geometry == null || !"Point".equals(g.geometry.type) || g.geometry.coordinates == null) {
+						continue;
+					}
+					CameraPlace cameraPlace = new CameraPlace();
+					double clat = g.geometry.coordinates[1];
+					double clon = g.geometry.coordinates[0];
+					cameraPlace.setLat(clat);
+					cameraPlace.setLon(clon);
+					cameraPlace.setType("mapillary-photo");
+					cameraPlace.setTimestamp(String.valueOf(g.captured_at));
+					String key = g.id.toString();
+					cameraPlace.setKey(key);
+					cameraPlace.setCa(parseCameraAngle(g.compass_angle));
+					cameraPlace.setImageUrl(g.thumb_256_url);
+					cameraPlace.setImageHiresUrl(g.thumb_1024_url);
+					cameraPlace.setUrl(buildOsmandPhotoViewerUrl(key, host, proto));
+					cameraPlace.setExternalLink(false);
+					// cameraPlace.setUsername((String) data.get("username"));
+					// equirectangular perspective spherical
+					cameraPlace.setIs360("equirectangular".equals(g.camera_type) || 
+								"spherical".equals(g.camera_type));
+					cameraPlace.setTopIcon("ic_logo_mapillary");
+					double bearing = computeInitialBearing(clat, clon, lat, lon);
+					cameraPlace.setBearing(bearing);
+					cameraPlace.setDistance(computeDistance(clat, clon, lat, lon));
+					lst.add(cameraPlace);
+				}
+			} catch (RuntimeException ex) {
+				LOGGER.error("Error Mappillary api (" + url + "): " + ex.getMessage());
+			}
+			return lst;
+		}
+
 	@SuppressWarnings("unchecked")
-	public List<CameraPlace> parseMapillaryPlaces(double lat, double lon, String host, String proto) {
+	public List<CameraPlace> parseMapillaryPlacesApi(double lat, double lon, String host, String proto) {
 		List<CameraPlace> lst = new ArrayList<>();
 		if (Algorithms.isEmpty(mapillaryAccessToken)) {
 			return lst;
@@ -266,7 +339,7 @@ public class PlacesService {
 				cameraPlace.setTimestamp(String.valueOf(data.get("captured_at")));
 				String key = data.get("id").toString();
 				cameraPlace.setKey(key);
-				cameraPlace.setCa(parseCameraAngle(data.get("captured_at")));
+				cameraPlace.setCa(parseCameraAngle(data.get("compass_angle")));
 				cameraPlace.setImageUrl(buildOsmandImageUrl(false, key, host, proto));
 				cameraPlace.setImageHiresUrl(buildOsmandImageUrl(true, key, host, proto));
 				cameraPlace.setUrl(buildOsmandPhotoViewerUrl(key, host, proto));
@@ -330,7 +403,7 @@ public class PlacesService {
 		CameraPlace primaryPlace = null;
 		List<CameraPlace> result = new ArrayList<CameraPlace>();
 		List<CameraPlace> rest = new ArrayList<CameraPlace>();
-		List<CameraPlace> places = parseMapillaryPlaces(lat, lon, host, proto);
+		List<CameraPlace> places = parseMapillaryPlacesTiles(lat, lon, host, proto);
 		for (CameraPlace cp : places) {
 			if(cp.getDistance() == null || cp.getDistance() > MAPILLARY_RADIUS) {
 				continue;
@@ -435,6 +508,7 @@ public class PlacesService {
 
 	private static class MapillaryApiConstants {
 		static final String GRAPH_URL = "https://graph.mapillary.com/";
+		static final String GRAPH_URL_IMAGES = "https://graph.mapillary.com/images";
 		static final String MAPILLARY_VECTOR_TILE_URL = "https://tiles.mapillary.com/maps/vtp/mly1_public/2";
 		static final String MAPILLARY_PARAM_ACCESS_TOKEN = "access_token";
 		static final int ZOOM_QUERY = 14;
@@ -504,12 +578,78 @@ public class PlacesService {
 	
 	
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
+	public static class MapillaryData {
+
+		private List<MapillaryImage> data = new ArrayList<PlacesService.MapillaryImage>();
+
+		public List<MapillaryImage> getData() {
+			return data;
+		}
+
+	}
+	
+	@JsonInclude(JsonInclude.Include.NON_EMPTY)
+	public static class MapillaryGeometry {
+
+		private double[] coordinates;
+		private String type;
+		public double[] getCoordinates() {
+			return coordinates;
+		}
+		public void setCoordinates(double[] coordinates) {
+			this.coordinates = coordinates;
+		}
+		public String getType() {
+			return type;
+		}
+		public void setType(String type) {
+			this.type = type;
+		}
+		
+	}
+	
+	@JsonInclude(JsonInclude.Include.NON_EMPTY)
 	public static class MapillaryImage {
 
 		private String id;
 		private String thumb_1024_url;
 		private String thumb_256_url;
+		private double compass_angle;
+		private String camera_type;
+		private long captured_at;
+		private MapillaryGeometry geometry;
+		private MapillaryGeometry computed_geometry;
 		
+		public double getCompass_angle() {
+			return compass_angle;
+		}
+		public void setCompass_angle(double compass_angle) {
+			this.compass_angle = compass_angle;
+		}
+		public String getCamera_type() {
+			return camera_type;
+		}
+		public void setCamera_type(String camera_type) {
+			this.camera_type = camera_type;
+		}
+		public long getCaptured_at() {
+			return captured_at;
+		}
+		public void setCaptured_at(long captured_at) {
+			this.captured_at = captured_at;
+		}
+		public MapillaryGeometry getGeometry() {
+			return geometry;
+		}
+		public void setGeometry(MapillaryGeometry geometry) {
+			this.geometry = geometry;
+		}
+		public MapillaryGeometry getComputed_geometry() {
+			return computed_geometry;
+		}
+		public void setComputed_geometry(MapillaryGeometry computed_geometry) {
+			this.computed_geometry = computed_geometry;
+		}
 		public String getThumb_256_url() {
 			return thumb_256_url;
 		}
