@@ -648,29 +648,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
-		int prev = -1;
 		name = Algorithms.normalizeSearchText(name);
-		for (int i = 0; i <= name.length(); i++) {
-			if (i == name.length() || 
-					(!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) )) {
-				// && name.charAt(i) != '\''
-				if (prev != -1) {
-					String substr = name.substring(prev, i);
-					if (substr.length() > settings.charsToBuildPoiNameIndex) {
-						substr = substr.substring(0, settings.charsToBuildPoiNameIndex);
-					}
-					String val = substr.toLowerCase();
-					if (!poiData.containsKey(val)) {
-						poiData.put(val, new LinkedHashSet<PoiTileBox>());
-					}
-					poiData.get(val).add(data);
-					prev = -1;
-				}
-			} else {
-				if (prev == -1) {
-					prev = i;
-				}
+		List<String> splitName = Algorithms.splitString(name);
+		for (String str : splitName) {
+			if (str.length() > settings.charsToBuildPoiNameIndex) {
+				str = str.substring(0, settings.charsToBuildPoiNameIndex);
 			}
+			if (!poiData.containsKey(str)) {
+				poiData.put(str, new LinkedHashSet<>());
+			}
+			poiData.get(str).add(data);
 		}
 	}
 
