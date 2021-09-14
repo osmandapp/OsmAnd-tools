@@ -649,7 +649,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
 		name = Algorithms.normalizeSearchText(name);
-		List<String> splitName = Algorithms.splitString(name);
+		List<String> splitName = Algorithms.splitByWordsLowercase(name);
 		for (String str : splitName) {
 			if (str.length() > settings.charsToBuildPoiNameIndex) {
 				str = str.substring(0, settings.charsToBuildPoiNameIndex);
