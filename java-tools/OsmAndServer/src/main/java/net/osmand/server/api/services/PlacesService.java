@@ -262,7 +262,6 @@ public class PlacesService {
 				uriBuilder.queryParam("fields", "id,geometry,compass_angle,captured_at,camera_type,creator,thumb_256_url,thumb_1024_url");
 				url = uriBuilder.build().toString();
 				MapillaryData dt = restTemplate.getForObject(url, MapillaryData.class);
-				System.out.println(url);
 				for (MapillaryImage g : dt.data) {
 					if (g.geometry == null || !"Point".equals(g.geometry.type) || g.geometry.coordinates == null) {
 						continue;
