@@ -27,10 +27,10 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
-import net.osmand.binary.Abbreviations;
 import net.osmand.binary.CommonWords;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
@@ -1411,8 +1411,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private List<Street> readStreetsBuildings(PreparedStatement streetBuildingsStat, City city, PreparedStatement waynodesStat,
 			Map<Street, List<Node>> streetNodes, List<City> citySuburbs) throws SQLException {
-		TLongObjectHashMap<Street> visitedStreets = new TLongObjectHashMap<Street>();
-		Map<String, List<Street>> uniqueNames = new TreeMap<String, List<Street>>(OsmAndCollator.primaryCollator());
+		TLongObjectHashMap<Street> visitedStreets = new TLongObjectHashMap<>();
+		Map<String, List<Street>> uniqueNames = new TreeMap<>(OsmAndCollator.primaryCollator());
 
 		// read streets for city
 		readStreetsAndBuildingsForCity(streetBuildingsStat, city, waynodesStat, streetNodes, visitedStreets, uniqueNames);
@@ -1423,27 +1423,22 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		mergeStreetsWithSameNames(streetNodes, uniqueNames);
-		return new ArrayList<Street>(streetNodes.keySet());
+		return new ArrayList<>(streetNodes.keySet());
 	}
 
 	private void mergeStreetsWithSameNames(Map<Street, List<Node>> streetNodes, Map<String, List<Street>> uniqueNames) {
-		for (String streetName : uniqueNames.keySet()) {
-			List<Street> streets = uniqueNames.get(streetName);
-			if (streets.size() > 1) {
-				mergeStreets(streets, streetNodes);
-			}
-		}
+		uniqueNames.keySet()
+				.stream()
+				.map(uniqueNames::get)
+				.filter(streets -> streets.size() > 1)
+				.forEach(streets -> mergeStreets(streets, streetNodes));
 	}
 
 	private void mergeStreets(List<Street> streets, Map<Street, List<Node>> streetNodes) {
 		// Merge streets to streets with biggest amount of intersections.
 		// Streets, that were extracted from addr:street tag has no intersections at all.
-		Collections.sort(streets, new Comparator<Street>() {
-			@Override
-			public int compare(Street s0, Street s1) {
-				return Algorithms.compare(s0.getIntersectedStreets().size(), s1.getIntersectedStreets().size());
-			}
-		});
+		streets.sort(Collections.reverseOrder((s0, s1) -> Algorithms.compare(s0.getIntersectedStreets().size(), s1.getIntersectedStreets().size())));
+		streets.sort(Collections.reverseOrder((s0, s1) -> Algorithms.compare(s0.getBuildings().size(), s1.getBuildings().size())));
 		for (int i = 0; i < streets.size() - 1; ) {
 			Street s = streets.get(i);
 			boolean merged = false;
@@ -1503,11 +1498,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				double lon = set.getDouble(5);
 				// load the street nodes
 				List<Node> thisWayNodes = loadStreetNodes(streetId, waynodesStat);
-				if (!uniqueNames.containsKey(streetName)) {
-					uniqueNames.put(streetName, new ArrayList<Street>());
-				}
-				Street street = new Street(city);
-				uniqueNames.get(streetName).add(street);
+				Street street = addStreetToUniqueNamesMap(uniqueNames, streetName, names, city);
 				street.setLocation(lat, lon);
 				street.setId(streetId);
 				// If there are more streets with same name in different districts.
@@ -1551,6 +1542,44 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		set.close();
 	}
 
+	private Street addStreetToUniqueNamesMap(Map<String, List<Street>> uniqueNames, String streetName, Map<String, String> names, City city) {
+		Street street = new Street(city);
+		if (!uniqueNames.containsKey(streetName)) {
+			String localeStreetName = uniqueNames.keySet()
+					.stream()
+					.filter(names::containsValue)
+					.findFirst()
+					.orElse(null);
+			if (localeStreetName == null) {
+				for (Map.Entry<String, List<Street>> uniqueName : uniqueNames.entrySet()) {
+					for (Street str : uniqueName.getValue()) {
+						List<String> locNames = str.getNamesMap(true).entrySet()
+								.stream()
+								.filter(name -> !name.getKey().contains("old"))
+								.map(Entry::getValue)
+								.collect(Collectors.toList());
+
+						localeStreetName = locNames
+								.stream()
+								.filter(name -> name.equals(streetName))
+								.findFirst()
+								.orElse(null);
+
+						if (localeStreetName != null) {
+							uniqueNames.get(uniqueName.getKey()).add(street);
+							return street;
+						}
+					}
+				}
+				uniqueNames.put(streetName, new ArrayList<>());
+			} else {
+				uniqueNames.get(localeStreetName).add(street);
+				return street;
+			}
+		}
+		uniqueNames.get(streetName).add(street);
+		return street;
+	}
 
 	private List<Node> loadStreetNodes(long streetId, PreparedStatement waynodesStat) throws SQLException {
 		List<Node> list = new ArrayList<Node>();
