@@ -175,6 +175,7 @@ public class TransactionAnalyzer {
 				res.equals("3d347aae368d426aae104b50d3bdd695")) {
 			return "18btnN8JczdC5QyYfyv5WBksMTWTPAiqor";
 		} else if (res.equals("1AaUeDeLWvya7ZeZfRubeGXwaVB5v7aToK")) {
+			// banned
 			return null;
 		}
 		return res;
