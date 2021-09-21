@@ -81,7 +81,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
 	private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
 	private TLongHashSet visitedBoundaryWays = new TLongHashSet();
-	
+
 	private boolean normalizeStreets;
 	private String[] normalizeDefaultSuffixes;
 	private String[] normalizeSuffixes;
@@ -401,7 +401,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 							}
 							m.addOuterWay((Way) es.getEntity());
 						}
-					} else if (es.getEntity() instanceof Node && 
+					} else if (es.getEntity() instanceof Node &&
 							("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
 						centerId = es.getEntity().getId();
 					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()) && centerId == 0)) {
@@ -446,7 +446,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String streetName = null;
 			Set<String> isInNames = null;
 			ctx.loadEntityRelation(i);
-			
+
 			streetName = i.getTag(OSMTagKey.NAME);
 			Iterator<Entity> it = i.getMemberEntities(null).iterator();
 			while(l == null && it.hasNext()) {
@@ -467,7 +467,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 
-			
+
 			if (streetName != null) {
 				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l, icc);
 				if (!idsOfStreet.isEmpty()) {
@@ -636,7 +636,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				// the final obf
 				continue;
 			}
-			
+
 			if (relativeDistance(location, c) > 0.2) {
 				if (result.isEmpty()) {
 					result.add(c);
@@ -828,7 +828,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
 		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
-		
+
 		String street = null;
 		if (houseNumber != null) {
 			street = e.getTag(OSMTagKey.ADDR_STREET);
@@ -909,7 +909,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 								building.setName(firstNo);
 							}
 						}
-					} 
+					}
 					streetDAO.writeBuilding(idsOfStreet, building);
 				}
 			}
@@ -1081,11 +1081,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		mapConnection.commit();
 		createDatabaseIndexes(mapConnection);
 		mapConnection.commit();
-		
+
 		Map<String, City> postcodes = new TreeMap<String, City>();
 		updatePostcodeBoundaries(progress, postcodes);
 		mapConnection.commit();
-		
+
 		List<String> additionalTags = new ArrayList<String>();
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
 		int ind = 0;
@@ -1127,9 +1127,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
-		
+
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
-		
+
 		writeCityBlockIndex(writer, CITIES_TYPE, streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
 		writeCityBlockIndex(writer, VILLAGES_TYPE, streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
 
@@ -1174,7 +1174,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private void updatePostcodeBoundaries(IProgress progress, Map<String, City> postcodes) throws SQLException {
 		progress.startTask("Process postcode boundaries", postcodeBoundaries.size());
 		Iterator<Entry<Entity, Boundary>> it = postcodeBoundaries.entrySet().iterator();
-		PreparedStatement ps = 
+		PreparedStatement ps =
 				mapConnection.prepareStatement("SELECT postcode, latitude, longitude, id"
 						+ " FROM building where latitude <= ? and latitude >= ? and longitude >= ? and longitude <= ? ");
 		TLongObjectHashMap<String> assignPostcodes = new TLongObjectHashMap<>();
@@ -1220,7 +1220,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset, 
+	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset,
 			IndexCreatorSettings settings) {
 		String name = o.getName();
 		parsePrefix(name, o, namesIndex, settings);
@@ -1234,7 +1234,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		o.setFileOffset((int) fileOffset);
 	}
-	
+
 	private static String stripBraces(String localeName) {
 		int i = localeName.indexOf('(');
 		String retName = localeName;
@@ -1248,7 +1248,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return retName;
 	}
 
-	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex, 
+	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
 			IndexCreatorSettings settings) {
 		int prev = -1;
 		List<String> namesToAdd = new ArrayList<>();
@@ -1256,7 +1256,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		name = stripBraces(name);
 
 		for (int i = 0; i <= name.length(); i++) {
-			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) && 
+			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
 					name.charAt(i) != '\'' && name.charAt(i) != '-')) {
 				if (prev != -1) {
 					String substr = name.substring(prev, i);
@@ -1285,7 +1285,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				namesToAdd.remove(pos);
 			}
 		}
-		
+
 		// add to the map
 		for(String substr : namesToAdd) {
 			if (substr.length() > settings.charsToBuildAddressNameIndex) {
@@ -1342,7 +1342,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs);
 			long f = System.currentTimeMillis() - time;
 			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
-			
+
 			int bCount = 0;
 			// register postcodes and name index
 			for (Street s : streets) {
@@ -1388,14 +1388,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// commit to put all cities
 		streetDAO.commit();
 	}
-	
+
 	public void createDatabaseIndexes(Connection mapConnection) throws SQLException {
 		Statement stat = mapConnection.createStatement();
 		stat.executeUpdate("create index city_ind on city (id, city_type)");
 		stat.close();
 		streetDAO.createIndexes(mapConnection);
 	}
-	
+
 	public void createDatabaseStructure(Connection mapConnection, DBDialect dialect) throws SQLException {
 		this.mapConnection = mapConnection;
 		streetDAO.createDatabaseStructure(mapConnection, dialect);
@@ -1542,43 +1542,58 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		set.close();
 	}
 
-	private Street addStreetToUniqueNamesMap(Map<String, List<Street>> uniqueNames, String streetName, Map<String, String> names, City city) {
-		Street street = new Street(city);
-		if (!uniqueNames.containsKey(streetName)) {
-			String localeStreetName = uniqueNames.keySet()
-					.stream()
-					.filter(names::containsValue)
-					.findFirst()
-					.orElse(null);
-			if (localeStreetName == null) {
-				for (Map.Entry<String, List<Street>> uniqueName : uniqueNames.entrySet()) {
-					for (Street str : uniqueName.getValue()) {
-						List<String> locNames = str.getNamesMap(true).entrySet()
-								.stream()
-								.filter(name -> !name.getKey().contains("old"))
-								.map(Entry::getValue)
-								.collect(Collectors.toList());
-
-						localeStreetName = locNames
-								.stream()
-								.filter(name -> name.equals(streetName))
-								.findFirst()
-								.orElse(null);
-
-						if (localeStreetName != null) {
-							uniqueNames.get(uniqueName.getKey()).add(street);
-							return street;
-						}
-					}
-				}
-				uniqueNames.put(streetName, new ArrayList<>());
+	private Street addStreetToUniqueNamesMap(Map<String, List<Street>> uniqueNames, String currStrName, Map<String, String> names, City city) {
+		String resStrName = currStrName;
+		String foundStrName;
+		if (!uniqueNames.containsKey(currStrName)) {
+			foundStrName = findSameStrNameByUniqueNames(uniqueNames, names);
+			if (foundStrName == null) {
+				foundStrName = findSameStrNameByAllStrNames(uniqueNames, currStrName);
+			}
+			if (foundStrName != null) {
+				resStrName = foundStrName;
 			} else {
-				uniqueNames.get(localeStreetName).add(street);
-				return street;
+				uniqueNames.put(currStrName, new ArrayList<>());
 			}
 		}
-		uniqueNames.get(streetName).add(street);
+		Street street = new Street(city);
+		uniqueNames.get(resStrName).add(street);
 		return street;
+	}
+
+	private String findSameStrNameByAllStrNames(Map<String, List<Street>> uniqueNames, String currentStreetName) {
+		for (Map.Entry<String, List<Street>> uniqueName : uniqueNames.entrySet()) {
+			for (Street uniqueStreet : uniqueName.getValue()) {
+				if (findSameStreetName(uniqueStreet, currentStreetName) != null) {
+					return uniqueName.getKey();
+				}
+			}
+		}
+		return null;
+	}
+
+	private String findSameStreetName(Street uniqueStreet, String currentStreetName) {
+		return getOtherNames(uniqueStreet)
+				.stream()
+				.filter(name -> name.equals(currentStreetName))
+				.findFirst()
+				.orElse(null);
+	}
+
+	private String findSameStrNameByUniqueNames(Map<String, List<Street>> uniqueNames, Map<String, String> names) {
+		return uniqueNames.keySet()
+				.stream()
+				.filter(names::containsValue)
+				.findFirst()
+				.orElse(null);
+	}
+
+	private List<String> getOtherNames(Street str) {
+		return str.getNamesMap(true).entrySet()
+				.stream()
+				.filter(name -> !name.getKey().contains("old"))
+				.map(Entry::getValue)
+				.collect(Collectors.toList());
 	}
 
 	private List<Node> loadStreetNodes(long streetId, PreparedStatement waynodesStat) throws SQLException {
