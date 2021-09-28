@@ -129,31 +129,34 @@ public class ImproveRoadConnectivity {
 		}
 	}
 
-	private void addPoint(TLongObjectHashMap<List<RouteDataObject>> map, RouteDataObject o, long b) {
-		if(!map.containsKey(b)) {
-			map.put(b, new ArrayList<RouteDataObject>());
+	private void addPoint(TLongObjectHashMap<List<RouteDataObject>> map, RouteDataObject routeDataObject, long pointId) {
+		if (!map.containsKey(pointId)) {
+			map.put(pointId, new ArrayList<>());
 		}
-		map.get(b).add(o);
+		map.get(pointId).add(routeDataObject);
 	}
 
-	private TLongObjectHashMap<RouteDataObject> calculateDisconnectedRoadsToAddAndDelete(TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
-			TLongObjectHashMap<List<RouteDataObject>> all, BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
+	private TLongObjectHashMap<RouteDataObject> calculateDisconnectedRoadsToAddAndDelete(
+			TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
+			TLongObjectHashMap<List<RouteDataObject>> all,
+			BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
 
-		long[] keys = mapOfObjectToCheck.keys();
+		long[] pointsToCheck = mapOfObjectToCheck.keys();
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<RouteDataObject>();
 		TLongHashSet beginIsolated = new TLongHashSet();
 		TLongHashSet endIsolated = new TLongHashSet();
-		for(int k = 0; k < keys.length; k++) {
-			long point = keys[k];
+		for(int k = 0; k < pointsToCheck.length; k++) {
+			long point = pointsToCheck[k];
 			if(all.get(point).size() == 1) {
-				RouteDataObject rdo = all.get(keys[k]).get(0);
-				boolean begin = calcPointId(rdo, 0) == point;
-				RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, RouteCalculationMode.NORMAL);
-				List<RouteDataObject> result = findConnectedRoads(ctx, rdo, begin, all);
+				RouteDataObject rdo = all.get(point).get(0);
+				boolean isBeginPoint = calcPointId(rdo, 0) == point;
+				RoutingContext ctx = frontEnd.buildRoutingContext(config, null,
+						new BinaryMapIndexReader[] {reader}, RouteCalculationMode.NORMAL);
+				List<RouteDataObject> result = findConnectedRoads(ctx, rdo, isBeginPoint, all);
 				if(result == null) {
-					if(begin) {
+					if(isBeginPoint) {
 						beginIsolated.add(rdo.getId());
 					} else {
 						endIsolated.add(rdo.getId());
@@ -180,7 +183,7 @@ public class ImproveRoadConnectivity {
 	}
 
 	private List<RouteDataObject> findConnectedRoads(RoutingContext ctx, RouteDataObject initial, boolean begin,
-			TLongObjectHashMap<List<RouteDataObject>> all) {
+	                                                 TLongObjectHashMap<List<RouteDataObject>> all) {
 		PriorityQueue<RouteSegment> queue = new PriorityQueue<RouteSegment>(10, new Comparator<RouteSegment>() {
 
 			@Override
@@ -191,8 +194,8 @@ public class ImproveRoadConnectivity {
 		VehicleRouter router = ctx.getRouter();
 		ArrayList<RouteDataObject> next = new ArrayList<RouteDataObject>();
 		ctx.loadTileData(initial.getPoint31XTile(0), initial.getPoint31YTile(0), 17, next);
-		for(RouteDataObject n : next) {
-			if(n.id == initial.id) {
+		for (RouteDataObject n : next) {
+			if (n.id == initial.id) {
 				initial = n;
 				break;
 			}
@@ -200,36 +203,36 @@ public class ImproveRoadConnectivity {
 		queue.add(new RouteSegment(initial, begin ? 1 : initial.getPointsLength() - 2));
 		TLongHashSet visited = new TLongHashSet();
 		RouteSegment finalSegment = null;
-		while(!queue.isEmpty() && finalSegment == null){
+		while (!queue.isEmpty() && finalSegment == null) {
 			RouteSegment segment = queue.poll();
 			int oneWay = router.isOneWay(segment.getRoad());
-			boolean start = initial.id == segment.getRoad().id;
-			if(start) {
+			boolean startRoad = initial.id == segment.getRoad().id;
+			if (startRoad) {
 				oneWay = begin ? -1 : 1;
 			}
-			if(oneWay >= 0) {
-				finalSegment = processSegment(ctx, segment, queue, visited, all, true, start);
+			if (oneWay >= 0) {
+				finalSegment = processSegment(ctx, segment, queue, visited, all, true, startRoad);
 			}
-			if(oneWay <= 0) {
-				finalSegment = processSegment(ctx, segment, queue, visited, all, false, start);
+			if (oneWay <= 0 && finalSegment != null) {
+				finalSegment = processSegment(ctx, segment, queue, visited, all, false, startRoad);
 			}
 		}
-		if(finalSegment == null) {
-			if(TRACE) {
+		if (finalSegment == null) {
+			if (TRACE) {
 				System.out.println("Isolated " + initial.id);
 			}
 		} else {
 			StringBuilder b = new StringBuilder("Route for " + initial.id + " : ");
 			RouteSegment s = finalSegment;
 			List<RouteDataObject> rdoToAdd = new ArrayList<RouteDataObject>();
-			while(s != null) {
-				if(s.getRoad().id != initial.id) {
+			while (s != null) {
+				if (s.getRoad().id != initial.id) {
 					b.append(s.getRoad().id).append(", ");
 					rdoToAdd.add(s.getRoad());
 				}
 				s = s.getParentRoute();
 			}
-			if(TRACE) {
+			if (TRACE) {
 				System.out.println(b);
 			}
 			return rdoToAdd;
@@ -237,8 +240,9 @@ public class ImproveRoadConnectivity {
 		return null;
 	}
 
-	private RouteSegment processSegment(RoutingContext ctx, RouteSegment segment, PriorityQueue<RouteSegment> queue, TLongHashSet visited,
-			TLongObjectHashMap<List<RouteDataObject>> all, boolean direction, boolean start) {
+	private RouteSegment processSegment(RoutingContext ctx, RouteSegment segment, PriorityQueue<RouteSegment> queue,
+	                                    TLongHashSet visited, TLongObjectHashMap<List<RouteDataObject>> all,
+	                                    boolean direction, boolean start) {
 		int ind = segment.getSegmentStart();
 		RouteDataObject road = segment.getRoad();
 		final long pid = calcPointIdUnique(segment.getRoad(), ind);

@@ -274,7 +274,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		menu.add(points);
 		final JMenu directions = new JMenu("Directions"); //$NON-NLS-1$
 		menu.add(directions);
-		Action complexRoute = new AbstractAction("Build route (OsmAnd standard)") {
+		Action complexRoute = new AbstractAction("Build route (OsmAnd standard|COMPLEX)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
@@ -286,7 +286,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		directions.add(complexRoute);
 
 
-		Action selfRoute = new AbstractAction("Build route (OsmAnd short)") {
+		Action selfRoute = new AbstractAction("Build route (OsmAnd short|NORMAL)") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
@@ -297,7 +297,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		};
 		directions.add(selfRoute);
 
-		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd long)") {
+		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd long|BASE)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
