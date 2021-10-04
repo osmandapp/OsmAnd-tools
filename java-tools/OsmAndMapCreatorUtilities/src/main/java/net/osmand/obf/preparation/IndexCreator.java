@@ -810,6 +810,7 @@ public class IndexCreator {
 					}
 					if (settings.indexRouting) {
 						indexRouteCreator.indexRelations(e, ctx);
+						indexRouteCreator.indexLowEmissionZones(e, ctx);
 					}
 					if (settings.indexPOI) {
 						indexPoiCreator.iterateRelation((Relation) e, ctx);
@@ -822,16 +823,23 @@ public class IndexCreator {
 			if (settings.indexMap) {
 				indexMapCreator.createMapIndexTableIndexes(mapConnection);
 			}
-			if (settings.indexAddress) {
+			if (settings.indexAddress || settings.indexRouting) {
 				setGeneralProgress(progress, "[40 / 100]"); //$NON-NLS-1$
 				progress.startTask(settings.getString("IndexCreator.PREINDEX_BOUNDARIES_WAYS"), accessor.getAllWays()); //$NON-NLS-1$
 				accessor.iterateOverEntities(progress, EntityType.WAY_BOUNDARY, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						indexAddressCreator.indexBoundariesRelation(e, ctx);
+						if (settings.indexAddress) {
+							indexAddressCreator.indexBoundariesRelation(e, ctx);
+						}
+						if (settings.indexRouting) {
+							indexRouteCreator.indexLowEmissionZones(e, ctx);
+						}
 					}
 				});
+			}
 
+			if (settings.indexAddress) {
 				setGeneralProgress(progress, "[42 / 100]"); //$NON-NLS-1$
 				progress.startTask(settings.getString("IndexCreator.BIND_CITIES_AND_BOUNDARIES"), 100); //$NON-NLS-1$
 				// finish up the boundaries and cities
