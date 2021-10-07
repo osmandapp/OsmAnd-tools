@@ -280,7 +280,7 @@ public class BinaryInspector {
 						println("\n" + extracted.size() + " parts were successfully extracted to " + args[1]);
 					}
 				}
-			} else if (f.startsWith("-v") || f.startsWith("-osm")) {
+			} else if (f.startsWith("-v") || f.startsWith("-osm") || f.startsWith("-zoom")) {
 				if (args.length < 2) {
 					printUsage("Missing file parameter");
 				} else {
