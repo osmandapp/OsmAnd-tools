@@ -247,34 +247,35 @@ public class ImproveRoadConnectivity {
 		}
 		visited.add(pid);
 		double distFromStart = segment.getDistanceFromStart();
-		while(true) {
+		while (true) {
 			int py = road.getPoint31YTile(ind);
 			int px = road.getPoint31XTile(ind);
-			if(direction) {
-				ind ++;
-			} else{
-				ind --;
+			if (direction) {
+				ind++;
+			} else {
+				ind--;
 			}
-			if(ind < 0 || ind >= segment.getRoad().getPointsLength()) {
+			if (ind < 0 || ind >= segment.getRoad().getPointsLength()) {
 				break;
 			}
-			if(all.contains(calcPointId(segment.getRoad(), ind)) && !start) {
+			if (all.contains(calcPointId(segment.getRoad(), ind)) && !start) {
 				return segment;
 			}
 			visited.add(calcPointIdUnique(segment.getRoad(), ind));
 			int x = road.getPoint31XTile(ind);
 			int y = road.getPoint31YTile(ind);
 			float spd = ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
-			if(spd > ctx.getRouter().getMaxSpeed()) {
+			if (spd > ctx.getRouter().getMaxSpeed()) {
 				spd = ctx.getRouter().getMaxSpeed();
 			}
 			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) / spd;
 			RouteSegment rs = ctx.loadRouteSegment(x, y, 0);
-			while(rs != null) {
-				if(!visited.contains(calcPointIdUnique(rs.getRoad(), rs.getSegmentStart()))) {
-					if(!queue.contains(rs) || rs.getDistanceFromStart() > distFromStart) {
+			while (rs != null) {
+				if (!visited.contains(calcPointIdUnique(rs.getRoad(), rs.getSegmentStart()))) {
+					if (!queue.contains(rs) || rs.getDistanceFromStart() > distFromStart) {
 						rs.setDistanceFromStart((float) distFromStart);
-						rs.setParentSegmentEnd(ind);
+						// not used in final result an d it would require new variable to be calculated
+						// rs.setParentSegmentEnd(ind);
 						rs.setParentRoute(segment);
 						queue.remove(rs);
 						queue.add(rs);

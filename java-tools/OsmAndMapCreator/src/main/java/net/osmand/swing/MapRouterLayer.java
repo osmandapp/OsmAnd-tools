@@ -1054,6 +1054,8 @@ public class MapRouterLayer implements MapPanelLayer {
 					}
 				}
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
+//						addImpassableRoad(41491863649l).
+//						addImpassableRoad(46859655089l).
 						setDirectionPoints(directionPointsFile).build(props[0],
 						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
@@ -1065,7 +1067,6 @@ public class MapRouterLayer implements MapPanelLayer {
 //				precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
 //				precalculatedRouteDirection.setFollowNext(true);
 //				config.planRoadDirection = 1;
-
 				// Test initial direction
 //				config.initialDirection = 90d / 180d * Math.PI; // EAST
 //				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
@@ -1078,6 +1079,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				} catch (Exception e) {
 				}
 				config.routeCalculationTime = System.currentTimeMillis();
+				
 				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
 					null, rs, rm);
 				
@@ -1121,7 +1123,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					map.getPoints().clear();
 				}
 			}
-			System.out.println("Finding self routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println("!!! Finding self route: " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
 	}
