@@ -107,18 +107,16 @@ public class WikiDatabasePreparation {
 		int beginInd = 0;
 		int endInd = 0;
 		int headerCount = 0;
-		boolean hebrew = false;
 		for (int i = 0; i < text.length(); i++) {
 			int nt = text.length() - i - 1;
-			if ((nt > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{') || (nt > 1 && text.charAt(i) == '[' && text.charAt(i + 1) == '[' && text.charAt(i + 2) == 'ק')
+			if ((nt > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{')
 					|| (nt > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p'
 					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')
 					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-')) {
-				hebrew = nt > 1 && text.charAt(i + 2) == 'ק';
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
-			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}') || (hebrew && text.charAt(i) == ']' && text.charAt(i + 1) == ']')
+			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}')
 					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i'
 					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p')
 					|| (i > 1 && text.charAt(i) == '>' && text.charAt(i - 1) == '-' && text.charAt(i - 2) == '-'))) {
