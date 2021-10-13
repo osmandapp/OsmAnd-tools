@@ -697,6 +697,7 @@ public class WikiDatabasePreparation {
 		String lang = "";
 		String folder = "";
 		String mode = "";
+		long testArticleID = 0;
 
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
@@ -706,9 +707,12 @@ public class WikiDatabasePreparation {
 				folder = val;
 			} else if (arg.startsWith("--mode=")) {
 				mode = val;
+			} else if (arg.startsWith("--testID=")) {
+				testArticleID = Long.parseLong(val);
 			}
 		}
-		if (mode.isEmpty() || folder.isEmpty() || (mode.equals("process-wikipedia") && lang.isEmpty())){
+		if (mode.isEmpty() || folder.isEmpty()
+				|| ((mode.equals("process-wikipedia") || mode.equals("test-wikipedia")) && lang.isEmpty())) {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
@@ -716,22 +720,29 @@ public class WikiDatabasePreparation {
 		final String sqliteFileName = folder + "wiki.sqlite";
 		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.gz";
 
-		if (mode.equals("process-wikidata-regions")) {
-			processWikidataRegions(sqliteFileName);
-		} else if (mode.equals("process-wikidata")) {
-			File wikiDB = new File(sqliteFileName);
-			if (!new File(pathToWikiData).exists()) {
-				throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
-			}
-			if (wikiDB.exists()) {
-				wikiDB.delete();
-			} 
-			log.info("Processing wikidata...");
-			processDump(pathToWikiData, sqliteFileName, null);
-		} else if (mode.equals("process-wikipedia")){
-			processDump(wikiPg, sqliteFileName, lang);
+		switch (mode) {
+			case "process-wikidata-regions":
+				processWikidataRegions(sqliteFileName);
+				break;
+			case "process-wikidata":
+				File wikiDB = new File(sqliteFileName);
+				if (!new File(pathToWikiData).exists()) {
+					throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
+				}
+				if (wikiDB.exists()) {
+					wikiDB.delete();
+				}
+				log.info("Processing wikidata...");
+				processDump(pathToWikiData, sqliteFileName, null);
+				break;
+			case "process-wikipedia":
+				processDump(wikiPg, sqliteFileName, lang);
+				break;
+			case "test-wikipedia":
+				processDump(wikiPg, sqliteFileName, lang, testArticleID);
+				break;
 		}
-    }
+	}
 
 	private static void processWikidataRegions(final String sqliteFileName) throws SQLException, IOException {
 		File wikiDB = new File(sqliteFileName);
@@ -796,15 +807,19 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-
 	private static void processDump(final String wikiPg, String sqliteFileName, String lang)
-			throws ParserConfigurationException, SAXException, IOException, SQLException, ComponentLookupException {
+			throws SQLException, ParserConfigurationException, IOException, SAXException {
+		processDump(wikiPg, sqliteFileName,lang,0);
+	}
+
+	public static void  processDump(final String wikiPg, String sqliteFileName, String lang, long testArticleId)
+			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation prog = new FileProgressImplementation("Read wikidata file", new File(wikiPg));
 		InputStream streamFile = prog.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
 		if (lang != null) {
-			final WikiOsmHandler handler = new WikiOsmHandler(sx, prog, lang, new File(sqliteFileName));
+			final WikiOsmHandler handler = new WikiOsmHandler(sx, prog, lang, new File(sqliteFileName), testArticleId);
 			sx.parse(is, handler);
 			handler.finish();
 		} else {
@@ -843,7 +858,8 @@ public class WikiDatabasePreparation {
 		private int batch = 0;
 		private final static int BATCH_SIZE = 1500;
 		private static final long ARTICLES_BATCH = 1000;
-		
+		private final long testArticleId;
+
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		final String[] wikiJunkArray = new String[] { ".jpg", ".JPG", ".jpeg", ".png", ".gif", ".svg", "/doc", "틀:",
@@ -868,12 +884,12 @@ public class WikiDatabasePreparation {
 		private FileProgressImplementation progIS;
 		private long cid;
 
-		WikiOsmHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, 
-				File sqliteFile)
-				throws IOException, SQLException {
+		WikiOsmHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, File sqliteFile,
+		               long testArticleId) throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
+			this.testArticleId = testArticleId;
 			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipContent blob)");
@@ -881,7 +897,9 @@ public class WikiDatabasePreparation {
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
 			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
 			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, zipContent) VALUES (?, ?, ?, ?)");
-			selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
+			if (this.testArticleId == 0) {
+				selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
+			}
 			log.info("Tables are prepared");
 		}
 
@@ -892,14 +910,16 @@ public class WikiDatabasePreparation {
 				batch = 0;
 			}
 		}
-		
+
 		public void finish() throws SQLException {
 			insertPrep.executeBatch();
-			if(!conn.getAutoCommit()) {
+			if (!conn.getAutoCommit()) {
 				conn.commit();
 			}
 			insertPrep.close();
-			selectPrep.close();
+			if (testArticleId == 0) {
+				selectPrep.close();
+			}
 			conn.close();
 		}
 
@@ -920,7 +940,7 @@ public class WikiDatabasePreparation {
 					text.setLength(0);
 					ctext = text;
 				} else if (name.equals("revision")) {
-					revision  = true;
+					revision = true;
 				} else if (name.equals("id") && !revision) {
 					pageId.setLength(0);
 					ctext = pageId;
@@ -962,14 +982,18 @@ public class WikiDatabasePreparation {
 								break;
 							}
 						}
-						if (!isJunk) {
-							selectPrep.setString(1, title.toString());
-							selectPrep.setString(2, lang);
-							ResultSet rs = selectPrep.executeQuery();
-							if (rs.next()) {
-								wikiId = rs.getLong(1);
+						if (testArticleId == 0) {
+							if (!isJunk) {
+								selectPrep.setString(1, title.toString());
+								selectPrep.setString(2, lang);
+								ResultSet rs = selectPrep.executeQuery();
+								if (rs.next()) {
+									wikiId = rs.getLong(1);
+								}
+								selectPrep.clearParameters();
 							}
-							selectPrep.clearParameters();
+						} else {
+							wikiId = testArticleId;
 						}
 						if (wikiId != 0) {
 							try {
@@ -1005,7 +1029,7 @@ public class WikiDatabasePreparation {
 			}
 		}
 	}
-	
+
 	private static String generateHtmlArticle(String contentText, String lang) throws IOException, SQLException {
 		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
 		final HTMLConverter converter = new HTMLConverter(false);
@@ -1016,7 +1040,6 @@ public class WikiDatabasePreparation {
 				.replaceAll("<p>/div\n</p>", "</div>");
 		return plainStr;
 	}
-
 
 
 	/**
@@ -1034,10 +1057,10 @@ public class WikiDatabasePreparation {
 		// simplyfy haversine:
 		return (2 * R * 1000 * Math.asin(Math.sqrt(a)));
 	}
-	
+
 	private static double toRadians(double angdeg) {
 //		return Math.toRadians(angdeg);
 		return angdeg / 180.0 * Math.PI;
 	}
-		
+
 }

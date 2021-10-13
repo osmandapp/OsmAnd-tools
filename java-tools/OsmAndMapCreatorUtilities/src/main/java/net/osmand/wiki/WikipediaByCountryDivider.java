@@ -19,6 +19,7 @@ import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms;
+import net.osmand.data.QuadRect;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
@@ -44,15 +45,38 @@ public class WikipediaByCountryDivider {
 		if (args.length > 2) {
 			skip = args[2].equals("--skip-existing");
 		}
-		if(cmd.equals("inspect")) {
-			inspectWikiFile(folder);
-		} else if(cmd.equals("generate_country_sqlite")) {
-			generateCountrySqlite(folder, skip);
+		switch (cmd) {
+			case "inspect":
+				inspectWikiFile(folder);
+				break;
+			case "generate_country_sqlite":
+				generateCountrySqlite(folder, skip);
+				break;
+			case "generate_test_obf":
+				String[] latLon = null;
+				if (args.length > 2 && args[2].startsWith("--testLatLon=")) {
+					String val = args[2].substring(args[2].indexOf("=") + 1);
+					latLon = val.split(";");
+				}
+				generateCountrySqlite(folder, skip, latLon);
 		}
 	}
 
+	protected static void generateCountrySqlite(String folder, boolean skip)
+			throws SQLException, IOException, InterruptedException, XmlPullParserException {
+		generateCountrySqlite(folder, skip, null);
+	}
 
-	protected static void generateCountrySqlite(String folder, boolean skip) throws SQLException, IOException, InterruptedException, XmlPullParserException {
+	protected static void generateCountrySqlite(String folder, boolean skip, String[] testLatLon)
+			throws SQLException, IOException, InterruptedException, XmlPullParserException {
+		double lat = 0;
+		double lon = 0;
+		boolean test = testLatLon != null;
+		if (test) {
+			lat = Double.parseDouble(testLatLon[0]);
+			lon = Double.parseDouble(testLatLon[1]);
+		}
+		String testRegionName = "";
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
 		OsmandRegions regs = new OsmandRegions();
 		regs.prepareFile();
@@ -60,20 +84,31 @@ public class WikipediaByCountryDivider {
 		File rgns = new File(folder, "regions");
 		rgns.mkdirs();
 		Map<String, String> preferredRegionLanguages = new LinkedHashMap<>();
-		for(String key : mapObjects.keySet()) {
-			if(key == null) {
+		QuadRect testRect = new QuadRect(lon, lat, lon, lat);
+		for (String key : mapObjects.keySet()) {
+			if (key == null) {
 				continue;
 			}
 			WorldRegion wr = regs.getRegionDataByDownloadName(key);
-			if(wr == null) {
+			if (wr == null) {
 				System.out.println("Missing language for world region '" + key + "'!");
 			} else {
 				String regionLang = wr.getParams().getRegionLang();
 				preferredRegionLanguages.put(key.toLowerCase(), regionLang);
+				if (test) {
+					if (wr.containsBoundingBox(testRect)) {
+						testRegionName = key;
+					}
+				}
 			}
 		}
-		
-		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT regionName FROM wiki_region");
+		String query;
+		if (test) {
+			query = "SELECT '" + Algorithms.capitalizeFirstLetterAndLowercase(testRegionName) + "'";
+		} else {
+			query = "SELECT DISTINCT regionName FROM wiki_region";
+		}
+		ResultSet rs = conn.createStatement().executeQuery(query);
 		while (rs.next()) {
 			String lcRegionName = rs.getString(1);
 			if(lcRegionName == null) {
@@ -109,7 +144,7 @@ public class WikipediaByCountryDivider {
 			}
 			if(!osmGz.exists()) {
 				System.out.println("Generate " + osmGz.getName());
-				generateOsmFile(conn, rs.getString(1), preferredLang, osmGz);
+				generateOsmFile(conn, rs.getString(1), preferredLang, osmGz, testLatLon);
 			}
 			obfFile.delete();
 			generateObf(osmGz, obfFile);
@@ -117,14 +152,19 @@ public class WikipediaByCountryDivider {
 		conn.close();
 	}
 
-	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, File osmGz) throws SQLException, IOException {
-		ResultSet rps = conn.createStatement().executeQuery(
-				"SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent "
-						+ " FROM wiki_region WR"
-						+ " INNER JOIN wiki_coords WO ON WR.id = WO.id "
-						+ " INNER JOIN wiki_content WC ON WC.id = WR.id "
-						+ " WHERE WR.regionName = '" + regionName + "' ORDER BY WC.id");
-
+	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, File osmGz,
+	                                    String[] testLatLon) throws SQLException, IOException {
+		String query;
+		if (testLatLon == null) {
+			query = "SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent FROM wiki_region WR"
+					+ " INNER JOIN wiki_coords WO ON WR.id = WO.id "
+					+ " INNER JOIN wiki_content WC ON WC.id = WR.id "
+					+ " WHERE WR.regionName = '" + regionName + "' ORDER BY WC.id";
+		} else {
+			query = "SELECT WC.id, " + testLatLon[0] + ", " + testLatLon[1] + ", WC.lang, WC.title, WC.zipContent "
+					+ " FROM wiki_content WC";
+		}
+		ResultSet rps = conn.createStatement().executeQuery(query);
 		FileOutputStream out = new FileOutputStream(osmGz);
 		GZIPOutputStream gzStream = new GZIPOutputStream(out);
 		XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
