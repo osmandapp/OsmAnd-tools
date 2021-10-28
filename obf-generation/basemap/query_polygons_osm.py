@@ -40,7 +40,7 @@ def process_polygons(tags, filename):
 		if tag == "natural" :
 			array.append("natural")
 			queryFields += ", \"natural\""
-			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water') and \"natural\" <> 'bare_rock' and \"natural\" <> 'rock' and \"natural\" <> 'stone' and \"natural\" <> 'cave_entrance' and \"natural\" <> 'scree' and \"natural\" <> 'fell' and \"natural\" <> 'scrub' and \"natural\" <> 'heath' and \"natural\" <> 'grassland' and \"natural\" <> 'coastline'"
+			conditions += " or (\"natural\" <> '' and \"natural\" <> 'water') and \"natural\" <> 'bare_rock' and \"natural\" <> 'rock' and \"natural\" <> 'stone' and \"natural\" <> 'sand' and \"natural\" <> 'cave_entrance' and \"natural\" <> 'scree' and \"natural\" <> 'fell' and \"natural\" <> 'scrub' and \"natural\" <> 'heath' and \"natural\" <> 'grassland' and \"natural\" <> 'coastline'"
 		elif tag == "wetland" :
 			array.append("wetland")
 			queryFields += ", tags->'wetland' as \"wetland\""
