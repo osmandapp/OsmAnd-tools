@@ -329,14 +329,21 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformAddMultipleNetwoksTag(tags);
 		tags = transformRouteLimitationTags(tags);
 		tags = transformTurnLanesTags(tags);
-		EntityConvertType filter = EntityConvertType.TAG_TRANSFORM;
-		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter, appType);
-		if (listToConvert == null) {
+		List<EntityConvert> listToTransform = getApplicableConverts(tags, entity, EntityConvertType.TAG_TRANSFORM, appType);
+		List<EntityConvert> listToCombine = getApplicableConverts(tags, entity, EntityConvertType.TAG_COMBINE, appType);
+		if (listToTransform == null && listToCombine == null) {
 			return postTransform(tags);
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
-		for (EntityConvert ec : listToConvert) {
-			applyTagTransforms(rtags, ec, entity, tags);
+		if (listToTransform != null) {
+			for (EntityConvert ec : listToTransform) {
+				applyTagTransforms(rtags, ec, entity, tags);
+			}
+		}
+		if (listToCombine != null) {
+			for (EntityConvert ec : listToCombine) {
+				applyTagCombines(rtags, ec, entity, tags);
+			}
 		}
 		return postTransform(rtags);
 	}
@@ -742,7 +749,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	/*public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
+	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
 		EntityConvertType filter = EntityConvertType.SPLIT;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter,
 				EntityConvertApplyType.MAP);
@@ -767,73 +774,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 			ctags.remove(ec.fromTag.tag);
 			result.add(mp);
-		}
-		return result;
-	}*/
-
-	public List<Map<String, String>> splitAndCombineTags(Map<String, String> tags, EntityType entity) {
-		List<EntityConvertType> filters = new ArrayList<>();
-		filters.add(EntityConvertType.SPLIT);
-		filters.add(EntityConvertType.TAG_COMBINE);
-
-		List<Map<String, String>> result = null;
-		Map<String, String> ctags = new LinkedHashMap<String, String>(tags);
-		List<String> tagsForRemove = new ArrayList<>();
-
-		for (EntityConvertType filter : filters) {
-			List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter,
-					EntityConvertApplyType.MAP);
-			if (listToConvert == null) {
-				continue;
-			}
-			if (result == null) {
-				result = new ArrayList<Map<String, String>>();
-			}
-
-			for (EntityConvert ec : listToConvert) {
-				LinkedHashMap<String, String> mp = new LinkedHashMap<String, String>();
-				for (TagValuePattern ift : ec.toTags) {
-
-					if (filter == EntityConvertType.SPLIT) {
-						String vl = ift.value;
-						if (vl == null) {
-							vl = ctags.get(ift.tag);
-						}
-						vl = processSubstr(ift, vl);
-						if(vl != null) {
-							mp.put(ift.tag, vl);
-						}
-					}
-
-					if (filter == EntityConvertType.TAG_COMBINE) {
-						String fromTagVal = ctags.get(ec.fromTag.tag);
-						String sep = ec.separator.isEmpty() ? " " : ec.separator;
-						for (TagValuePattern ft : ec.fromTagList) {
-							if (ctags.containsKey(ft.tag)) {
-								fromTagVal += sep + ctags.get(ft.tag);
-							}
-						}
-						mp.put(ift.tag, fromTagVal);
-					}
-				}
-				if (!tagsForRemove.contains(ec.fromTag.tag)) {
-					tagsForRemove.add(ec.fromTag.tag);
-				}
-				if (filter == EntityConvertType.TAG_COMBINE) {
-					for (TagValuePattern ft : ec.fromTagList) {
-						if (!tagsForRemove.contains(ft.tag) && ctags.containsKey(ft.tag)) {
-							tagsForRemove.add(ft.tag);
-						}
-					}
-				}
-				result.add(mp);
-			}
-		}
-		if (result != null) {
-			for (String removeTag : tagsForRemove) {
-				ctags.remove(removeTag);
-			}
-			result.add(0, ctags);
 		}
 		return result;
 	}
@@ -931,6 +871,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			} else {
 				tags.put(ift.tag, vl);
 			}
+		}
+	}
+
+	private void applyTagCombines(Map<String, String> tags, EntityConvert ec, EntityType entity,
+								  Map<String, String> originaltags) {
+		String fromValue = originaltags.get(ec.fromTag.tag);
+		tags.remove(ec.fromTag.tag);
+		//remove other from_tag1, from_tag2 ...
+		for (TagValuePattern ft : ec.fromTagList) {
+			if (tags.containsKey(ft.tag)) {
+				tags.remove(ft.tag);
+			}
+		}
+		for (TagValuePattern ift : ec.toTags) {
+			String sep = ec.separator.isEmpty() ? " " : ec.separator;
+			for (TagValuePattern ft : ec.fromTagList) {
+				if (originaltags.containsKey(ft.tag)) {
+					fromValue += sep + originaltags.get(ft.tag);
+				}
+			}
+			tags.put(ift.tag, fromValue);
 		}
 	}
 
