@@ -266,7 +266,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			es.printStackTrace();
 			return;
 		}
-		List<Map<String, String>> splitEntities = renderingTypes.splitTags(tags, EntityType.valueOf(e));
+		List<Map<String, String>> splitEntities = renderingTypes.splitAndCombineTags(tags, EntityType.valueOf(e));
 
 		// Don't add multipolygons with an unknown type
 		if (typeUse.size() == 0) {
@@ -719,7 +719,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			// manipulate what kind of way to load
 			long originalId = e.getId();
 			long assignedId = e.getId();
-			List<Map<String, String>> splitTags = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
+			List<Map<String, String>> splitTags = renderingTypes.splitAndCombineTags(e.getTags(), EntityType.valueOf(e));
 			Map<String, String> tags = splitTags == null ?  e.getModifiableTags() : splitTags.get(0);
 			for (int level = 0; level < mapZooms.size(); level++) {
 				processMainEntity(e, originalId, assignedId, level, tags);

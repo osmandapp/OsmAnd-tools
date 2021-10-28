@@ -152,6 +152,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			String value = mp.get("from_value"); //$NON-NLS-1$
 			if (tg != null) {
 				ec.fromTag = new TagValuePattern(tg, "".equals(value) ? null : value);
+				if (ec.type == EntityConvertType.TAG_COMBINE) {
+					//from_tag1, from_tag2, from_tag3 etc.
+					parseConvertCol(mp, ec.fromTagList, "from_");
+					ec.separator = mp.get("separator") != null ? mp.get("separator") : " ";
+				}
 				if (!convertTags.containsKey(ec.fromTag.tag)) {
 					convertTags.put(ec.fromTag.tag, new ArrayList<MapRenderingTypesEncoder.EntityConvert>());
 				}
@@ -737,7 +742,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
+	/*public List<Map<String, String>> splitTags(Map<String, String> tags, EntityType entity) {
 		EntityConvertType filter = EntityConvertType.SPLIT;
 		List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter,
 				EntityConvertApplyType.MAP);
@@ -764,8 +769,74 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			result.add(mp);
 		}
 		return result;
-	}
+	}*/
 
+	public List<Map<String, String>> splitAndCombineTags(Map<String, String> tags, EntityType entity) {
+		List<EntityConvertType> filters = new ArrayList<>();
+		filters.add(EntityConvertType.SPLIT);
+		filters.add(EntityConvertType.TAG_COMBINE);
+
+		List<Map<String, String>> result = null;
+		Map<String, String> ctags = new LinkedHashMap<String, String>(tags);
+		List<String> tagsForRemove = new ArrayList<>();
+
+		for (EntityConvertType filter : filters) {
+			List<EntityConvert> listToConvert = getApplicableConverts(tags, entity, filter,
+					EntityConvertApplyType.MAP);
+			if (listToConvert == null) {
+				continue;
+			}
+			if (result == null) {
+				result = new ArrayList<Map<String, String>>();
+			}
+
+			for (EntityConvert ec : listToConvert) {
+				LinkedHashMap<String, String> mp = new LinkedHashMap<String, String>();
+				for (TagValuePattern ift : ec.toTags) {
+
+					if (filter == EntityConvertType.SPLIT) {
+						String vl = ift.value;
+						if (vl == null) {
+							vl = ctags.get(ift.tag);
+						}
+						vl = processSubstr(ift, vl);
+						if(vl != null) {
+							mp.put(ift.tag, vl);
+						}
+					}
+
+					if (filter == EntityConvertType.TAG_COMBINE) {
+						String fromTagVal = ctags.get(ec.fromTag.tag);
+						String sep = ec.separator.isEmpty() ? " " : ec.separator;
+						for (TagValuePattern ft : ec.fromTagList) {
+							if (ctags.containsKey(ft.tag)) {
+								fromTagVal += sep + ctags.get(ft.tag);
+							}
+						}
+						mp.put(ift.tag, fromTagVal);
+					}
+				}
+				if (!tagsForRemove.contains(ec.fromTag.tag)) {
+					tagsForRemove.add(ec.fromTag.tag);
+				}
+				if (filter == EntityConvertType.TAG_COMBINE) {
+					for (TagValuePattern ft : ec.fromTagList) {
+						if (!tagsForRemove.contains(ft.tag) && ctags.containsKey(ft.tag)) {
+							tagsForRemove.add(ft.tag);
+						}
+					}
+				}
+				result.add(mp);
+			}
+		}
+		if (result != null) {
+			for (String removeTag : tagsForRemove) {
+				ctags.remove(removeTag);
+			}
+			result.add(0, ctags);
+		}
+		return result;
+	}
 
 
 	protected List<EntityConvert> getApplicableConverts(Map<String, String> tags, EntityType entity,
@@ -780,6 +851,32 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						if(ec.verbose) {
 							verbose = "Apply entity convert from '"+ec.fromTag+"' to " + tags + " in " +
 									appFilter;
+						}
+						if (ec.type == EntityConvertType.TAG_COMBINE) {
+							if (ec.fromTagList.size() > 0) {
+								boolean tagPresent = false;
+								String tagListVerbose = "";
+								for (TagValuePattern ft : ec.fromTagList) {
+									tagListVerbose += ft.tag + " ";
+									if (tags.containsKey(ft.tag)) {
+										tagPresent = true;
+										break;
+									}
+								}
+								if (!tagPresent) {
+									if (verbose != null) {
+										verbose = " - has failed due to tags are not contain any +'"+tagListVerbose+"' for combine";
+										log.info(verbose);
+									}
+									break;
+								}
+							} else {
+								if (verbose != null) {
+									verbose = " - has failed due to additional list of 'from_tag1, from_tag2, ...' for combine is empty";
+									log.info(verbose);
+								}
+								break;
+							}
 						}
 						if (checkConvert(tags, ec, entity) && ec.type == filter &&
 								ec.applyToType.contains(appFilter)) {
@@ -1584,11 +1681,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	private enum EntityConvertType {
 		TAG_TRANSFORM,
-		SPLIT
+		SPLIT,
+		TAG_COMBINE
 	}
 	public static class EntityConvert {
 		public boolean verbose;
 		public TagValuePattern fromTag ;
+		public List<TagValuePattern> fromTagList = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public String separator;
 		public EntityConvertType type;
 		public EnumSet<EntityConvertApplyType> applyToType;
 		public EnumSet<EntityType> applyTo ;
