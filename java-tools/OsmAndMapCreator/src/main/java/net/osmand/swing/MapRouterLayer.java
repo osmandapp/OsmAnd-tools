@@ -1054,7 +1054,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					}
 				}
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
-//						addImpassableRoad(42607388593l).
+//						addImpassableRoad(6859437l).
 //						addImpassableRoad(46859655089l).
 						setDirectionPoints(directionPointsFile).build(props[0],
 						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
