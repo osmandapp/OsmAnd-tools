@@ -60,6 +60,8 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import static net.osmand.obf.preparation.OsmDbCreator.SHIFT_ID;
+
 public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private static final Log log = LogFactory.getLog(IndexAddressCreator.class);
@@ -144,6 +146,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId()) {
+						boundary.setCityType(c.getType());
 						cityFound = c;
 						break;
 					}
@@ -418,7 +421,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setBoundaryId(e.getId());
 			boundary.setCityType(ct);
 			if (centerId != 0) {
-				boundary.setAdminCenterId(centerId);
+				boundary.setAdminCenterId(centerId >> SHIFT_ID);
 			}
 			return boundary;
 		} else {
