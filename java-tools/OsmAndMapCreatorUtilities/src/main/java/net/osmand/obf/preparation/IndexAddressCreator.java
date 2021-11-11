@@ -144,6 +144,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId()) {
+						boundary.setCityType(c.getType());
 						cityFound = c;
 						break;
 					}
@@ -418,7 +419,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setBoundaryId(e.getId());
 			boundary.setCityType(ct);
 			if (centerId != 0) {
-				boundary.setAdminCenterId(centerId);
+				boundary.setAdminCenterId(centerId >> 6);
 			}
 			return boundary;
 		} else {
