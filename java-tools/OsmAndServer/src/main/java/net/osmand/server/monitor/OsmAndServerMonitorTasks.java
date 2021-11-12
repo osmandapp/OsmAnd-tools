@@ -59,18 +59,18 @@ public class OsmAndServerMonitorTasks {
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
-	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net", 
-			 "dl2.osmand.net","dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net"};
+	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
+			 "dl2.osmand.net","dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 
 	private static final double PERC = 95;
 	private static final double PERC_SMALL = 100 - PERC;
-	
-	
+
+
 	private static final String RED_KEY_OSMAND_LIVE = "live_delay_time";
 	private static final String RED_KEY_TILE = "tile_time";
 	private static final String RED_KEY_DOWNLOAD = "download_map.";
-	
+
 	private static final SimpleDateFormat TIME_FORMAT_UTC = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 	static {
 		TIME_FORMAT_UTC.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -79,19 +79,19 @@ public class OsmAndServerMonitorTasks {
 	static {
 		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
-	
+
 
 	@Value("${monitoring.enabled}")
 	private boolean enabled;
-	
+
 	@Autowired
 	private StringRedisTemplate redisTemplate;
-	
+
 	// OsmAnd Live validation
 	LiveCheckInfo live = new LiveCheckInfo();
 	// Build Server
 	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
-	// Tile validation	
+	// Tile validation
 	double lastResponseTime;
 	// Index map validation
 	boolean mapIndexPrevValidation = true;
@@ -100,7 +100,7 @@ public class OsmAndServerMonitorTasks {
 	@Autowired
 	OsmAndServerMonitoringBot telegram;
 
-	
+
 
 	@Scheduled(fixedRate = LIVE_STATUS_MINUTES * MINUTE)
 	public void checkOsmAndLiveStatus() {
@@ -221,7 +221,7 @@ public class OsmAndServerMonitorTasks {
 				if(res.lastSuccess ) {
 					telegram.sendMonitoringAlertMessage(
 							host + " FAILURE: problems downloading maps " + ex.getMessage());
-					LOG.error(ex.getMessage(), ex);	
+					LOG.error(ex.getMessage(), ex);
 				}
 				res.lastSuccess = false;
 			}
@@ -278,7 +278,7 @@ public class OsmAndServerMonitorTasks {
 				telegram.sendMonitoringAlertMessage(
 						String.format("download.osmand.net: Map index is correct and serves %d maps.", mapsInMapIndex));
 			}
-			
+
 			if (mapsInMapIndex < MAPS_COUNT_THRESHOLD) {
 				mapIndexCurrValidation = false;
 				if (mapIndexPrevValidation) {
@@ -292,7 +292,7 @@ public class OsmAndServerMonitorTasks {
 				telegram.sendMonitoringAlertMessage("download.osmand.net: problems with parsing map index.");
 				LOG.error(xmlex.getMessage(), xmlex);
 			}
-			
+
 		}
 		this.mapIndexPrevValidation = mapIndexCurrValidation;
 	}
@@ -305,21 +305,21 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 
-	
+
 
 	@Scheduled(fixedRate = DOWNLOAD_TILE_MINUTES * MINUTE)
 	public void tileDownloadTest() {
 		if(!enabled) {
 			return;
 		}
-		double respTimeSum = 0; 
+		double respTimeSum = 0;
 		int count = 4;
-		int retryCount = 3;		
+		int retryCount = 3;
 		long now = System.currentTimeMillis();
 		long period = (((now / 1000) - INITIAL_TIMESTAMP_S) / 60 ) / DOWNLOAD_TILE_MINUTES;
 		long yShift = period % 14400;
 		long xShift = period / 14400;
-		List<Float> times = new ArrayList<Float>(); 
+		List<Float> times = new ArrayList<Float>();
 		int failed = 0;
 		int retry = retryCount;
 		boolean succeed = false;
@@ -366,19 +366,19 @@ public class OsmAndServerMonitorTasks {
 		try {
 			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
 			res = prepareAccessStats(res);
-			
+
 			StringBuilder rs = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/renderd.stats").openStream());
 			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			long t = TIMESTAMP_FORMAT_OPR.parse(date.toString()).getTime();
-			res += String.format("\n<a href='https://tile.osmand.net:8080/'>Tile Postgis DB</a>: %s", timeAgo(t)); 
+			res += String.format("\n<a href='https://tile.osmand.net:8080/'>Tile Postgis DB</a>: %s", timeAgo(t));
 			return res;
 		} catch (Exception e) {
 			LOG.warn(e.getMessage(), e);
 			return "Error: " + e.getMessage();
 		}
 	}
-	
+
 	private static String prepareAccessStats(String lns) {
 		String[] spl = lns.split("\n");
 		if (spl.length >= 2) {
@@ -412,7 +412,7 @@ public class OsmAndServerMonitorTasks {
 		}
 		return result;
 	}
-	
+
 	private String addToResult(String pr, String result, String suf, String ln) {
 		String vl = ln.substring(suf.length()).trim();
 		if (!vl.equals("0")) {
@@ -433,7 +433,7 @@ public class OsmAndServerMonitorTasks {
 			try {
 				jsonObject = new JSONObject(res);
 				JSONObject tls = jsonObject.getJSONObject("rm");
-				String msg = String.format("(Now: %d tiles, load %s. ", 
+				String msg = String.format("(Now: %d tiles, load %s. ",
 						tls.getInt("num_rendering"), tls.getDouble("load") +"");
 				JSONArray queue = jsonObject.getJSONObject("queue").getJSONArray("prioqueues");
 				for (int i = 0; i < queue.length(); i++) {
@@ -454,7 +454,7 @@ public class OsmAndServerMonitorTasks {
 	private void addStat(String key, double score) {
 		long now = System.currentTimeMillis();
 		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
-		// Long removed = 
+		// Long removed =
 		redisTemplate.opsForZSet().removeRangeByScore(key, 0, now - METRICS_EXPIRE);
 	}
 
@@ -513,7 +513,7 @@ public class OsmAndServerMonitorTasks {
 		checkOsmAndBuildServer();
 		checkIndexesValidity();
 		tileDownloadTest();
-		
+
 		return getStatusMessage();
 	}
 
@@ -534,7 +534,7 @@ public class OsmAndServerMonitorTasks {
 
 	private String getOpenPlaceReviewsMessage() {
 		return String.format("\n<a href='https://r2.openplacereviews.org:890'>OpenPlaceReviews</a>: "
-				+ "<a href='https://openplacereviews.org/api/admin'>%s</a> (test <a href='https://test.openplacereviews.org/api/admin'>%s</a>).", 
+				+ "<a href='https://openplacereviews.org/api/admin'>%s</a> (test <a href='https://test.openplacereviews.org/api/admin'>%s</a>).",
 				getOprSyncStatus("openplacereviews.org"),  getOprSyncStatus("test.openplacereviews.org"));
 	}
 
@@ -584,8 +584,8 @@ public class OsmAndServerMonitorTasks {
 		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 30);
 		return String.format("<a href='osmand.net/osm_live'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
 				+ "Day stats: 3d %s (%s) h  · 7d — %s (%s) h · 30d — %s (%s) h",
-				delay < HOUR ? "OK" : "FAILED", 
-						formatTime(delay), formatTime(live3Hours.getPercentile(PERC)), 
+				delay < HOUR ? "OK" : "FAILED",
+						formatTime(delay), formatTime(live3Hours.getPercentile(PERC)),
 						formatTime(live24Hours.getPercentile(PERC)), formatTime(live24Hours.getMean()),
 						formatTime(live3Days.getPercentile(PERC)), formatTime(live3Days.getMean()),
 						formatTime(live7Days.getPercentile(PERC)), formatTime(live7Days.getMean()),
@@ -634,7 +634,7 @@ public class OsmAndServerMonitorTasks {
 			DownloadTestResult that = (DownloadTestResult) o;
 			return host != null ? host.equals(that.host) : that.host == null;
 		}
-		
+
 		public String fullString() {
 			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 0.5);
 			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
@@ -645,7 +645,7 @@ public class OsmAndServerMonitorTasks {
 					last.getMean(), speed3Hours.getPercentile(PERC_SMALL),
 					speed24Hours.getPercentile(PERC_SMALL));
 		}
-		
+
 		@Override
 		public String toString() {
 			return host + ": <b>" + (lastSuccess ? "OK" : "FAILED") + "</b>. "
@@ -657,7 +657,7 @@ public class OsmAndServerMonitorTasks {
 			return host != null ? host.hashCode() : 0;
 		}
 	}
-	
+
 	private String runCmd(String cmd, File loc, List<String> errors) {
 		try {
 			Process p = Runtime.getRuntime().exec(cmd.split(" "), new String[0], loc);
