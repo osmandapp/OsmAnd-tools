@@ -31,11 +31,14 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
+import static net.osmand.router.RoutingConfiguration.*;
 
 
 public class MapAddressLayer implements MapPanelLayer {
@@ -171,7 +174,8 @@ public class MapAddressLayer implements MapPanelLayer {
 				}
 			}
 		}
-		RoutingConfiguration cfg = DataExtractionSettings.getSettings().getRoutingConfig().build("geocoding", 100,
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT * 3, DEFAULT_NATIVE_MEMORY_LIMIT);
+		RoutingConfiguration cfg = DataExtractionSettings.getSettings().getRoutingConfig().build("geocoding", memoryLimit,
 				new HashMap<String, String>());
 		RoutingContext ctx = new RoutePlannerFrontEnd().buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
 

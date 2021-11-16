@@ -24,6 +24,7 @@ import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
+import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.router.RoutingContext.RoutingSubregionTile;
 import net.osmand.router.VehicleRouter;
@@ -51,7 +52,10 @@ public class ImproveRoadConnectivity {
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
-		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(
+				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
+				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		RoutingConfiguration config = builder.build("car", memoryLimit);
 		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
 				RouteCalculationMode.BASE);
 		if (reader.getRoutingIndexes().size() != 1) {
@@ -87,7 +91,10 @@ public class ImproveRoadConnectivity {
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
-		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(
+				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
+				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		RoutingConfiguration config = builder.build("car", memoryLimit);
 		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
 				RouteCalculationMode.BASE);
 		if (reader.getRoutingIndexes().size() != 1) {
@@ -141,7 +148,8 @@ public class ImproveRoadConnectivity {
 			TLongObjectHashMap<List<RouteDataObject>> all,
 			BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", memoryLimit);
 
 		long[] pointsToCheck = mapOfObjectToCheck.keys();
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<RouteDataObject>();
