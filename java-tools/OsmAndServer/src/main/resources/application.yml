@@ -84,7 +84,6 @@ geoip.url: "http://localhost:8081/json/"
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
-night-builds-json.location: dl2.osmand.net/night-builds/night-builds-json/
 files.location: /var/www-download
 gen.location: ${files.location}/gen
 web.location: ${files.location}/website
