@@ -98,7 +98,11 @@ class OsmAndHeightMapPacker(object):
                 desc TEXT,
                 tilenumbering TEXT,
                 minzoom INTEGER,
-                maxzoom INTEGER
+                maxzoom INTEGER,
+                ellipsoid,
+                inverted_y,
+                timeSupported,
+                tilesize
             )
             """)
         c.execute(
@@ -107,9 +111,22 @@ class OsmAndHeightMapPacker(object):
                 desc,
                 tilenumbering,
                 minzoom,
-                maxzoom
-            ) VALUES (?, ?, ?, ?)
-            """, ("World HeightMap", "OSM", self.minZoom, self.maxZoom))
+                maxzoom,
+                ellipsoid,
+                inverted_y,
+                timeSupported,
+                tilesize
+            ) VALUES (?, ?, ?, ?, ?)
+            """, (
+                "World HeightMap",
+                "OSM",
+                self.minZoom,
+                self.maxZoom,
+                0,
+                0,
+                False,
+                32,
+            ))
 
         # Create tiles table and index
         c.execute(
