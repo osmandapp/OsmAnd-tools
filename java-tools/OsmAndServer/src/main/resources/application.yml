@@ -21,7 +21,7 @@ admin.emails: ${ADMIN_EMAILS:victor.shcherb@gmail.com}
 
 # local storage to store files in db
 storage:
-  default: ${STORAGE_DEFAULT:local} 
+  default: ${STORAGE_DEFAULT:local}
   datasource.s3:
       type: s3
       endpoint: ${STORAGE_S3_ENDPOINT_URL}
@@ -42,8 +42,8 @@ server:
   connection-timeout: 120000
   compression.enabled: true
   compression.min-response-size: 4096
- 
-  
+
+night-builds-json.location: https://dl2.osmand.net/night-builds-json/
 files.location: ${user.dir}/../../../help
 gen.location: ${files.location}/gen
 web.location: ${files.location}/website
@@ -64,7 +64,7 @@ spring:
     properties.hibernate.jdbc.lob.non_contextual_creation: true
     hibernate.ddl-auto: update
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   resources.static-locations: file:${web.location}
@@ -84,6 +84,7 @@ geoip.url: "http://localhost:8081/json/"
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
+night-builds-json.location: dl2.osmand.net/night-builds/night-builds-json/
 files.location: /var/www-download
 gen.location: ${files.location}/gen
 web.location: ${files.location}/website
