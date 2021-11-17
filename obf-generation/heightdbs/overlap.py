@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import sys
 import os
@@ -17,7 +18,7 @@ class OsmAndHeightMapOverlap(object):
 
         self.declareOptions()
         self.options, self.args = self.parser.parse_args(args=arguments)
-        
+
         # Check we have both input and output
         if not self.args or len(self.args) != 2:
             self.error("Input path or output path not specified")
@@ -124,7 +125,7 @@ class OsmAndHeightMapOverlap(object):
             if os.path.exists(outputTileFile):
                 print("Skipping ",tmsTileX,"x",tmsTileY,"@",tileZoom,"...")
                 continue
-            
+
             # Create directories for the tile
             if self.options.verbose:
                 print("Baking ",tmsTileX,"x",tmsTileY,"@",tileZoom,"...")
@@ -157,7 +158,7 @@ class OsmAndHeightMapOverlap(object):
 
                 targetDataset.WriteRaster(targetDataset.RasterXSize - 1, 0, 1, dataset.RasterYSize,
                     dataset.ReadRaster(0, 0, 1, dataset.RasterYSize))
-                
+
                 del dataset
 
             # Bottom tile
@@ -170,7 +171,7 @@ class OsmAndHeightMapOverlap(object):
 
                 targetDataset.WriteRaster(0, targetDataset.RasterYSize - 1, dataset.RasterXSize, 1,
                     dataset.ReadRaster(0, 0, dataset.RasterXSize, 1))
-                
+
                 del dataset
 
             # Bottom-right corner
@@ -183,7 +184,7 @@ class OsmAndHeightMapOverlap(object):
 
                 targetDataset.WriteRaster(targetDataset.RasterXSize - 1, targetDataset.RasterYSize - 1, 1, 1,
                     dataset.ReadRaster(0, 0, 1, 1))
-                
+
                 del dataset
 
             # Write target to file
