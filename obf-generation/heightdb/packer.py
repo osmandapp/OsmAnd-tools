@@ -116,7 +116,7 @@ class OsmAndHeightMapPacker(object):
                 inverted_y,
                 timeSupported,
                 tilesize
-            ) VALUES (?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 "World HeightMap",
                 "OSM",
@@ -136,7 +136,7 @@ class OsmAndHeightMapPacker(object):
                 y INTEGER,
                 z INTEGER,
                 image BLOB,
-                PRIMARY KEY(x, y, zoom)
+                PRIMARY KEY(x, y, z)
             )
             """)
         c.execute(

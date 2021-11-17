@@ -20,12 +20,10 @@ shift
 echo "Output path:          $OUTPUT_PATH"
 
 WORK_PATH="${OUTPUT_PATH}/.tmp"
-shift
 echo "Work directory:       $WORK_PATH"
 
 TILE_SIZE=32
 let "TILE_FULL_SIZE = $TILE_SIZE + 1"
-shift
 echo "Tile size:            $TILE_SIZE"
 echo "Tile size (full):     $TILE_FULL_SIZE"
 
