@@ -1584,9 +1584,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 	private String findSameStrNameByUniqueNames(Map<String, List<Street>> uniqueNames, Map<String, String> names) {
+	    List<String> namesList = names.keySet().stream().filter(name -> !name.startsWith("old")).collect(Collectors.toList());
 		return uniqueNames.keySet()
 				.stream()
-				.filter(names::containsValue)
+				.filter(namesList::contains)
 				.findFirst()
 				.orElse(null);
 	}
@@ -1648,9 +1649,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		return cities;
 	}
-	
-	
+
+
 	static {
-		
+
 	}
 }
