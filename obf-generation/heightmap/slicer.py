@@ -1,8 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import sys
 import os
-from optparse import OptionParser, OptionGroup
+from optparse import OptionParser
 from osgeo import gdal, gdalconst
 from gdal2tiles import GlobalMercator
 
@@ -18,7 +19,7 @@ class OsmAndHeightMapSlicer(object):
 
         self.declareOptions()
         self.options, self.args = self.parser.parse_args(args=arguments)
-        
+
         # Check we have both input and output
         if not self.args or len(self.args) != 2:
             self.error("Input file or output path not specified")
@@ -103,7 +104,7 @@ class OsmAndHeightMapSlicer(object):
         self.minZoom = 0
         self.baseZoom = self.mercator.ZoomForPixelSize(self.inputGeoTransform[1])
         self.zoomTileBounds = list(range(0, self.baseZoom + 1))
-        
+
         if self.options.verbose:
             print("Input raster w=%s, h=%s, min-zoom=%s, base-zoom=%s" %(self.inputDataset.RasterXSize, self.inputDataset.RasterYSize, self.minZoom, self.baseZoom))
 
@@ -200,7 +201,7 @@ class OsmAndHeightMapSlicer(object):
 
     # -------------------------------------------------------------------------
     def bakeDownscaledTiles(self):
-        
+
         for zoom in range(self.baseZoom-1, self.minZoom-1, -1):
             # Max tile index
             maxTileIndex = 2**zoom-1
@@ -212,7 +213,7 @@ class OsmAndHeightMapSlicer(object):
             # Crop tile indices
             tileMinX, tileMinY = max(0, tileMinX), max(0, tileMinY)
             tileMaxX, tileMaxY = min(maxTileIndex, tileMaxX), min(maxTileIndex, tileMaxY)
-            
+
             self.zoomTileBounds[zoom] = (tileMinX, tileMinY, tileMaxX, tileMaxY)
 
             totalTiles = (abs(tileMaxX - tileMinX) + 1) * (abs(tileMaxY - tileMinY) + 1)
@@ -255,7 +256,7 @@ class OsmAndHeightMapSlicer(object):
                             if tileY != 0:
                                 row %= (2*tileY)
                             row = 1 - row
-                            
+
                             sourceDataset.WriteRaster(col * self.options.size, row * self.options.size, self.options.size, self.options.size,
                                 upperTileDataset.ReadRaster(0, 0, self.options.size, self.options.size))
 
