@@ -32,7 +32,7 @@ int main(int argc, char* argv[])
 #if defined(OSMAND_CORE_STATIC)
     coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
 #else
-    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromSharedResourcesBundle();
 #endif // defined(OSMAND_CORE_STATIC)
     OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
 

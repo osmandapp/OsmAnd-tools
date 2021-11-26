@@ -152,7 +152,6 @@ target_compile_definitions(freeglut_static
 		${target_specific_private_definitions}
 	PUBLIC
 		-DFREEGLUT_STATIC
-		${OPENGL_DEFINITIONS}
 		${target_specific_public_definitions}
 )
 target_include_directories(freeglut_static
@@ -160,11 +159,11 @@ target_include_directories(freeglut_static
 		"${CMAKE_CURRENT_BINARY_DIR}"
 	PUBLIC
 		"upstream.patched/include"
-		${OPENGL_INCLUDE_DIRS}
 		${target_specific_public_includes}
 )
 target_link_libraries(freeglut_static
 	LINK_PUBLIC
-		${OPENGL_LIBRARIES}
+		OpenGL::GL
+		OpenGL::GLU
 		${target_specific_public_libraries}
 )

@@ -140,7 +140,6 @@ public class TravelGuideCreatorMain {
             }
         }
         if (batch > 0) {
-            prep.addBatch();
             prep.executeBatch();
         }
         prep.close();

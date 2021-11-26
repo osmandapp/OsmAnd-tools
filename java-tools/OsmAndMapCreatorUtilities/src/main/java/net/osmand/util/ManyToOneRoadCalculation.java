@@ -26,6 +26,7 @@ import net.osmand.router.GeneralRouter;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.router.RoutingContext.RoutingSubregionTile;
 
@@ -63,7 +64,8 @@ public class ManyToOneRoadCalculation {
 
 	private void manyToManyCalculation(BinaryMapIndexReader reader, double top, double bottom) throws IOException {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", memoryLimit);
 		RouteCalculationMode mode = RouteCalculationMode.BASE;
 		RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, mode);
 
@@ -417,7 +419,8 @@ public class ManyToOneRoadCalculation {
 
 	private void cut(BinaryMapIndexReader reader) throws IOException {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", memoryLimit);
 		RouteCalculationMode mode = RouteCalculationMode.BASE;
 		RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, mode);
 

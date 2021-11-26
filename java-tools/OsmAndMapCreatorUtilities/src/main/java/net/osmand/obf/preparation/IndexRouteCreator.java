@@ -185,15 +185,37 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			if ("low_emission_zone".equals(e.getTags().get("boundary"))) {
+		}
+	}
+
+	public void indexLowEmissionZones(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+		if ("low_emission_zone".equals(e.getTags().get("boundary"))) {
+			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 				addLowEmissonZoneRelation((Relation) e);
+			}
+			if (e instanceof Way) {
+				addLowEmissonZoneWay((Way) e);
 			}
 		}
 	}
 
 	private void addLowEmissonZoneRelation(Relation e) {
 		MultipolygonBuilder multipolygonBuilder = IndexVectorMapCreator.createMultipolygonBuilder(e);
+		Multipolygon lowEmissionZone = multipolygonBuilder.build();
+		if (lowEmissionZone != null) {
+			QuadRect bbox = lowEmissionZone.getLatLonBbox();
+			QuadRect flippedBbox = flipBbox(bbox);
+			lowEmissionZones.insert(lowEmissionZone, flippedBbox);
+		}
+	}
+
+	private void addLowEmissonZoneWay(Way e) {
+		List<Way> outer = new ArrayList<>();
+		List<Way> inner = new ArrayList<>();
+		outer.add(e);
+		MultipolygonBuilder multipolygonBuilder = new MultipolygonBuilder(outer, inner);
+		multipolygonBuilder.setId(e.getId());
 		Multipolygon lowEmissionZone = multipolygonBuilder.build();
 		if (lowEmissionZone != null) {
 			QuadRect bbox = lowEmissionZone.getLatLonBbox();

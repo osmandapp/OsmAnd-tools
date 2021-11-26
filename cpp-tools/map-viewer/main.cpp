@@ -9,8 +9,6 @@
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 
-#include <SkImageDecoder.h>
-
 #include <OsmAndCore/QtExtensions.h>
 #include <QString>
 #include <QList>
@@ -164,7 +162,7 @@ int main(int argc, char** argv)
     coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromCurrentExecutable();
 #else
     std::cout << "Loading symbols from 'OsmAndCore_ResourcesBundle_shared'" << std::endl;
-    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromLibrary(QLatin1String("OsmAndCore_ResourcesBundle_shared"));
+    coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromSharedResourcesBundle();
 #endif // defined(OSMAND_CORE_STATIC)
     if (!OsmAnd::InitializeCore(coreResourcesEmbeddedBundle))
     {
@@ -173,9 +171,9 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
     std::cout << "Initialized Core" << std::endl;
-    
+
     //OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
-    
+
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::ValueAnimator valueAnimator;
     valueAnimator.animateValueTo<float>(
@@ -186,8 +184,6 @@ int main(int argc, char** argv)
         nullptr,
         nullptr);
     //////////////////////////////////////////////////////////////////////////
-
-    const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
 
     for (int argIdx = 1; argIdx < argc; argIdx++)
     {
@@ -318,7 +314,7 @@ int main(int argc, char** argv)
     if (QFile::exists(QLatin1String("track.gpx")))
         geoInfoDocs.append(OsmAnd::GpxDocument::loadFrom("track.gpx"));
     gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));
-    
+
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -427,7 +423,7 @@ int main(int argc, char** argv)
     const auto debugSettings = renderer->getDebugSettings();
     debugSettings->debugStageEnabled = true;
     renderer->setDebugSettings(debugSettings);
-    
+
     viewport.top() = 0;
     viewport.left() = 0;
     viewport.bottom() = SCREEN_HEIGHT;
@@ -574,7 +570,7 @@ void mouseHandler(int button, int state, int x, int y)
         if (state == GLUT_DOWN)
         {
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "--------------- click (%d, %d) -------------------", x, y);
-            
+
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
             const auto delta = lastClickedLocation31 - renderer->getState().target31;
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "@ %d %d (offset from target %d %d)", lastClickedLocation31.x, lastClickedLocation31.y, delta.x, delta.y);
@@ -1243,7 +1239,7 @@ void idleHandler(void)
     animator->update(elapsedSeconds.count());
 
     lastTimeStamp = currentTimeStamp;
-     // sleep 10 ms 
+     // sleep 10 ms
      usleep(10 * 1000);
 }
 

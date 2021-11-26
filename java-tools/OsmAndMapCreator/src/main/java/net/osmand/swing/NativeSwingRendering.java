@@ -152,6 +152,7 @@ public class NativeSwingRendering extends NativeLibrary {
 				renderingProps.put(key, value);
 			}
 		}
+		clearRenderingRulesStorage();
 		initRenderingRulesStorage(storage);
 	}
 

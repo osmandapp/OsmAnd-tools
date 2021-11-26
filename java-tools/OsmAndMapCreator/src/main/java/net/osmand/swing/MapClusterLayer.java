@@ -38,6 +38,8 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import static net.osmand.router.RoutingConfiguration.*;
+
 
 public class MapClusterLayer implements MapPanelLayer {
 
@@ -141,8 +143,9 @@ public class MapClusterLayer implements MapPanelLayer {
 			}
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		Builder builder = RoutingConfiguration.getDefault();
-		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
+		Builder builder = getDefault();
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT * 3, DEFAULT_NATIVE_MEMORY_LIMIT);
+		RoutingConfiguration config = builder.build("car", memoryLimit);
 		RoutingContext ctx = router.buildRoutingContext(config, NativeSwingRendering.getDefaultFromSettings(), rs
 				.toArray(new BinaryMapIndexReader[rs.size()]),
 				clusterCtx.BASEMAP_CLUSTERING ? RouteCalculationMode.BASE : RouteCalculationMode.NORMAL);

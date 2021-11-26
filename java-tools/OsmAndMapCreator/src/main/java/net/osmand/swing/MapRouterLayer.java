@@ -93,6 +93,8 @@ import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.router.RoutingConfiguration.*;
+
 
 public class MapRouterLayer implements MapPanelLayer {
 
@@ -206,12 +208,12 @@ public class MapRouterLayer implements MapPanelLayer {
 		double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
 		double latitude = MapUtils.checkLatitude(
 				MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy));
-		double longitude = MapUtils.checkLongitude( 
+		double longitude = MapUtils.checkLongitude(
 				MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx));
 		LatLon l = new LatLon(latitude, longitude);
 		return l;
 	}
-	
+
 	public void fillPopupMenuWithActions(JPopupMenu menu ) {
 		Action start = new AbstractAction("Mark start point") {
 			private static final long serialVersionUID = 507156107455281238L;
@@ -221,7 +223,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				setStart(getPointFromMenu());
 			}
 
-			
+
 		};
 		menu.add(start);
 		Action end= new AbstractAction("Mark end point") {
@@ -274,7 +276,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		menu.add(points);
 		final JMenu directions = new JMenu("Directions"); //$NON-NLS-1$
 		menu.add(directions);
-		Action complexRoute = new AbstractAction("Build route (OsmAnd standard)") {
+		Action complexRoute = new AbstractAction("Build route (OsmAnd standard|COMPLEX)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
@@ -286,7 +288,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		directions.add(complexRoute);
 
 
-		Action selfRoute = new AbstractAction("Build route (OsmAnd short)") {
+		Action selfRoute = new AbstractAction("Build route (OsmAnd short|NORMAL)") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
@@ -297,7 +299,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		};
 		directions.add(selfRoute);
 
-		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd long)") {
+		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd long|BASE)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
@@ -307,7 +309,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(selfBaseRoute);
-		
+
 		if (selectedGPXFile != null) {
 			Action recalculate = new AbstractAction("Calculate GPX route (OsmAnd)") {
 				private static final long serialVersionUID = 507156107455281238L;
@@ -325,7 +327,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						calcRouteGpx(polyline);
 					}
 				}
-				
+
 			};
 			directions.add(recalculate);
 		}
@@ -374,7 +376,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(straightRoute);
-		
+
 		if (directionPointsFile == null) {
 			Action loadGeoJSON = new AbstractAction("Load Direction Points (GeoJSON)...") {
 				private static final long serialVersionUID = 507356107455281238L;
@@ -439,8 +441,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			directions.add(loadGeoJSON);
 
 		}
-		
-		
+
+
 		if (previousRoute != null) {
 			Action saveGPX = new AbstractAction("Save GPX...") {
 				private static final long serialVersionUID = 5757334824774850326L;
@@ -473,8 +475,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			};
 			directions.add(saveGPX);
 		}
-		
-		
+
+
 		if (selectedGPXFile == null) {
 			Action loadGPXFile = new AbstractAction("Load GPX file...") {
 				private static final long serialVersionUID = 507156107455281238L;
@@ -551,7 +553,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			menu.add(colorize);
 
 		}
-		
+
 	}
 
 	private int showOptionColorSchemeDialog(JMenu frame) {
@@ -560,7 +562,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		options[1] = "Red, yellow, green";
 		return JOptionPane.showOptionDialog(frame, "What color scheme to use?", "Color scheme", 0, JOptionPane.INFORMATION_MESSAGE, null, options, null);
 	}
-	
+
 	private void displayGpxFiles() {
 		DataTileManager<Entity> points = new DataTileManager<Entity>(9);
 		if (selectedGPXFile != null) {
@@ -576,7 +578,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		}
 		if (directionPointsFile != null) {
-			List<net.osmand.osm.edit.Node> pnts = 
+			List<net.osmand.osm.edit.Node> pnts =
 					directionPointsFile.queryInBox(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), new ArrayList<net.osmand.osm.edit.Node>());
 			for (net.osmand.osm.edit.Node n : pnts) {
 				points.registerObject(n.getLatitude(), n.getLongitude(), n);
@@ -597,7 +599,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			Location c = new Location("");
 			c.setLatitude(currentLatLon.getLatitude());
 			c.setLongitude(currentLatLon.getLongitude());
-			double minDist = w.getFirstNode().getLocation().distanceTo(c); 
+			double minDist = w.getFirstNode().getLocation().distanceTo(c);
 			int minInd = 0;
 			LatLon prev = null;
 			// search closest point and save prev
@@ -626,7 +628,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					break;
 				}
 			}
-			
+
 			if(prev != null) {
 				LatLon f = w.getFirstNode().getLatLon();
 				float bearingTo = c.bearingTo(w.getFirstNode().getLocation());
@@ -642,9 +644,9 @@ public class MapRouterLayer implements MapPanelLayer {
 						break;
 					}
 					mp = MapUtils.calculateMidPoint(mp, f);
-				} 
+				}
 			}
-			
+
 			Way wr = new Way(2);
 			wr.addNode(new net.osmand.osm.edit.Node(currentLatLon.getLatitude(),currentLatLon.getLongitude(), -1l), 0);
 			addStraightLine(wr, currentLatLon, w.getNodes().get(0).getLatLon());
@@ -670,11 +672,11 @@ public class MapRouterLayer implements MapPanelLayer {
 			w.addNode(new net.osmand.osm.edit.Node(s2.getLatitude(), s2.getLongitude(), -1));
 		}
 	}
-	
+
 	private LatLon toLatLon(WptPt wptPt) {
 		return new LatLon(wptPt.lat, wptPt.lon);
 	}
-	
+
 	private void calcRouteGpx(List<LatLon> polyline) {
 		new Thread() {
 			@Override
@@ -1016,8 +1018,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				files.add(f);
 			}
 		}
-		
-		
+
+
 		final boolean animateRoutingCalculation = DataExtractionSettings.getSettings().isAnimateRouting();
 		if(animateRoutingCalculation) {
 			nextTurn.setVisible(true);
@@ -1053,11 +1055,12 @@ public class MapRouterLayer implements MapPanelLayer {
 						paramsR.put(p, "true");
 					}
 				}
+				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
 //						addImpassableRoad(6859437l).
 //						addImpassableRoad(46859655089l).
 						setDirectionPoints(directionPointsFile).build(props[0],
-						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
+						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ memoryLimit, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 //				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
@@ -1082,7 +1085,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				
 				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
 					null, rs, rm);
-				
+
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + " mode for routing");
@@ -1095,8 +1098,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				try {
 					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
-					List<RouteSegmentResult> searchRoute = gpx ? 
-							getGpxAproximation(router, gctx, gpxPoints) : 
+					List<RouteSegmentResult> searchRoute = gpx ?
+							getGpxAproximation(router, gctx, gpxPoints) :
 							router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);

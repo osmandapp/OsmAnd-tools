@@ -1,20 +1,31 @@
 project(bird)
 
-find_library(FREEGLUT_LIBRARY freeglut)
 set(extra_dependencies "")
 set(extra_libraries "")
-if (FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
-	add_subdirectory("${OSMAND_ROOT}/tools/cpp-tools/map-viewer/externals/freeglut" "externals/freeglut")
+
+find_package(FreeGLUT)
+if (FreeGLUT_FOUND)
 	set(extra_dependencies ${extra_dependencies}
-		freeglut_static
+		FreeGLUT::freeglut
 	)
 	set(extra_libraries ${extra_libraries}
-		freeglut_static
+		FreeGLUT::freeglut
 	)
 else()
-	set(extra_libraries ${extra_libraries}
-		${FREEGLUT_LIBRARY}
-	)
+	find_library(FREEGLUT_LIBRARY freeglut)
+	if (FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
+		add_subdirectory("${OSMAND_ROOT}/tools/cpp-tools/map-viewer/externals/freeglut" "externals/freeglut")
+		set(extra_dependencies ${extra_dependencies}
+			freeglut_static
+		)
+		set(extra_libraries ${extra_libraries}
+			freeglut_static
+		)
+	else()
+		set(extra_libraries ${extra_libraries}
+			${FREEGLUT_LIBRARY}
+		)
+	endif()
 endif()
 
 if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
