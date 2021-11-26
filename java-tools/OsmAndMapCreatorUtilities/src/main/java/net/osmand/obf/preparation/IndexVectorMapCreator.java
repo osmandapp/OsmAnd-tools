@@ -477,6 +477,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				progress.progress(1);
 			}
 			long id = rs.getLong(1);
+			long northId = id;
 			if (visitedWays.contains(id)) {
 				continue;
 			}
@@ -529,7 +530,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					combined = true;
 					startNode = cand.otherNodeId;
 					visitedWays.add(cand.wayId);
-					loadNodes(cand.nodes, list);
+                    ArrayList<Float> candList = new ArrayList<>();
+					loadNodes(cand.nodes, candList);
+					if (isNorthest(candList, list)) {
+					    northId = cand.wayId;
+                    }
+					list.addAll(candList);
 					ArrayList<Float> li = new ArrayList<Float>(list);
 					// remove first lat/lon point
 					wayNodes.remove(0);
@@ -559,7 +565,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					combined = true;
 					endNode = cand.otherNodeId;
 					visitedWays.add(cand.wayId);
-					loadNodes(cand.nodes, list);
+                    ArrayList<Float> candList = new ArrayList<>();
+                    loadNodes(cand.nodes, candList);
+                    if (isNorthest(candList, list)) {
+                        northId = cand.wayId;
+                    }
+                    list.addAll(candList);
 					for (int i = 2; i < list.size(); i++) {
 						wayNodes.add(list.get(i));
 					}
@@ -591,7 +602,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				List<Node> res = new ArrayList<Node>();
 				OsmMapUtils.simplifyDouglasPeucker(wNodes, zoom - 1 + 8 + settings.zoomWaySmoothness, 3, res, false);
 				if (res.size() > 0) {
-					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, id, false, typeUse, addtypeUse, false, cycle);
+					insertBinaryMapRenderObjectIndex(mapTree[level], res, null, namesUse, northId, false, typeUse, addtypeUse, false, cycle);
 				}
 			}
 
@@ -600,6 +611,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 
 	}
+
+	private boolean isNorthest(List<Float> list1, List<Float> list2) {
+	    float maxNorth1 = -90.0f;
+	    float maxNorth2 = -90.0f;
+	    for (int i = 0; i < list1.size(); i=i+2) {
+	        maxNorth1 = maxNorth1 > list1.get(i) ? maxNorth1 : list1.get(i);
+        }
+        for (int i = 0; i < list2.size(); i=i+2) {
+            maxNorth2 = maxNorth2 > list2.get(i) ? maxNorth2 : list2.get(i);
+        }
+	    return maxNorth1 > maxNorth2;
+    }
 
 	private boolean checkOneLocaleHasSameName(TreeMap<MapRulType, String> nu1, Map<MapRulType, String> nu2,
 			MapRulType rt) {
