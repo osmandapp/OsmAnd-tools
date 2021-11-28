@@ -62,12 +62,10 @@ import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
 import net.osmand.GPXUtilities;
-import net.osmand.router.RouteColorize;
 import net.osmand.router.RouteColorize.ColorizationType;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
-import gnu.trove.list.array.TIntArrayList;
 import net.osmand.MapCreatorVersion;
 import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.PlatformUtil;
@@ -179,6 +177,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private int yStartingImage = 0;
 
 	private MapTileDownloader downloader = MapTileDownloader.getInstance(MapCreatorVersion.APP_MAP_CREATOR_VERSION); // FIXME no commit
+	private RouteSelector routeSelector;
 	Map<String, Image> cache = new HashMap<String, Image>();
 
 	private JPopupMenu popupMenu;
@@ -457,6 +456,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	public void setNativeLibrary( NativeSwingRendering nl) {
 		nativeLibRendering = nl;
+		routeSelector = new RouteSelector(nativeLibRendering);
 		fullMapRedraw();
 	}
 	
@@ -1161,20 +1161,18 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 								System.out.println((o.isText() ? o.getName() : "Icon") + " " + o.getId() + " "
 										+ o.getTags() + " (" + o.getBbox() + ") " + " order = " + o.getOrder()
 										+ " visible = " + o.isVisible());
-								Way w = new Way(-1);
-								TIntArrayList x1 = o.getX();
-								TIntArrayList y1 = o.getY();
-								if (x1.size() > 1) {
-									for (int i = 0; i < x1.size(); i++) {
-										Node n = new Node(MapUtils.get31LatitudeY(y1.get(i)),
-												MapUtils.get31LongitudeX(x1.get(i)), -1);
-										w.addNode(n);
+								if (o.getX().size() > 1) {
+									List<Way> wayList = new ArrayList<>();
+									if (routeSelector != null && nativeLibRendering != null) {
+										wayList.addAll(routeSelector.getRoute(o));
 									}
-									LatLon n = w.getLatLon();
-									points.registerObject(n.getLatitude(), n.getLongitude(), w);
+									for (Way way : wayList) {
+										LatLon n = way.getLatLon();
+										points.registerObject(n.getLatitude(), n.getLongitude(), way);
+									}
 								} else {
 									LatLon n = o.getLabelLatLon();
-									if(n == null) {
+									if (n == null) {
 										n = o.getLocation();
 									}
 									if (n != null) {
@@ -1191,7 +1189,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			}
 
 			// possible bug if popup neither button1|| button3
-			if(willBePopupShown && (e.isPopupTrigger() || e.getButton() == MouseEvent.BUTTON3)){
+			if (willBePopupShown && (e.isPopupTrigger() || e.getButton() == MouseEvent.BUTTON3)) {
 				popupMenuPoint = new Point(e.getX(), e.getY());
 				popupMenu.show(MapPanel.this, e.getX(), e.getY());
 				willBePopupShown = false;
@@ -1206,39 +1204,39 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		private int sright;
 		private int stop;
 		private int sbottom;
-        private int oleft;
-        private int oright;
-        private int otop;
-        private int obottom;
+		private int oleft;
+		private int oright;
+		private int otop;
+		private int obottom;
 		private int z;
 		private final int cf;
 
 		public NativeRendererRunnable(int w, int h) {
-            LatLon latLon = new LatLon(latitude, longitude);
+			LatLon latLon = new LatLon(latitude, longitude);
 			this.z = zoom;
 			cf = (int) (MapUtils.getPowZoom(31 - z - 8) / mapDensity);
-            int minTile =  1;//1000;
-            int mxTile = (1 << 31) - 1;// (1<<26);
-            oleft = MapUtils.get31TileNumberX(latLon.getLongitude()) - (w / 2) * cf  ;
-            oright = MapUtils.get31TileNumberX(latLon.getLongitude()) + (w / 2) * cf ;
-            otop = MapUtils.get31TileNumberY(latLon.getLatitude()) - (h / 2) * cf;
-            obottom = MapUtils.get31TileNumberY(latLon.getLatitude()) + (h / 2) * cf ;
+			int minTile = 1;//1000;
+			int mxTile = (1 << 31) - 1;// (1<<26);
+			oleft = MapUtils.get31TileNumberX(latLon.getLongitude()) - (w / 2) * cf;
+			oright = MapUtils.get31TileNumberX(latLon.getLongitude()) + (w / 2) * cf;
+			otop = MapUtils.get31TileNumberY(latLon.getLatitude()) - (h / 2) * cf;
+			obottom = MapUtils.get31TileNumberY(latLon.getLatitude()) + (h / 2) * cf;
 			sleft = oleft - EXPAND_X * cf;
 			sright = oright + EXPAND_X * cf;
 			stop = otop - EXPAND_Y * cf;
 			sbottom = obottom + EXPAND_Y * cf;
-            if(sleft < minTile) {
-                sleft = minTile;
-            }
-            if(sright > mxTile || sright < 0) {
-                sright = mxTile;
-            }
-            if(stop < minTile) {
-                stop = minTile;
-            }
-            if(sbottom > mxTile || sbottom < 0) {
-                sbottom = mxTile;
-            }
+			if (sleft < minTile) {
+				sleft = minTile;
+			}
+			if (sright > mxTile || sright < 0) {
+				sright = mxTile;
+			}
+			if (stop < minTile) {
+				stop = minTile;
+			}
+			if (sbottom > mxTile || sbottom < 0) {
+				sbottom = mxTile;
+			}
 		}
 
 		public boolean contains(NativeRendererRunnable r) {
@@ -1254,19 +1252,17 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			return true;
 		}
 
-
-
 		@Override
 		public void run() {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
 					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom, mapDensity);
 					nativeRenderingImg = nativeLibRendering.renderImage(lastContext);
-                    Rect rect = new Rect();
-                    rect.left31 = sleft;
-                    rect.top31 = stop;
-                    rect.nativeZoom = z;
-                    nativeRect = rect;
+					Rect rect = new Rect();
+					rect.left31 = sleft;
+					rect.top31 = stop;
+					rect.nativeZoom = z;
+					nativeRect = rect;
 				} catch (Exception e) {
 					log.error(e.getMessage(), e);
 					e.printStackTrace();
