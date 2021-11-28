@@ -1,7 +1,6 @@
 package net.osmand.swing;
 
 import gnu.trove.list.array.TIntArrayList;
-import net.osmand.NativeLibrary;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -17,6 +16,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.*;
 
+import static net.osmand.NativeLibrary.*;
 import static net.osmand.binary.BinaryMapIndexReader.buildSearchRequest;
 
 public class RouteSelector {
@@ -26,7 +26,7 @@ public class RouteSelector {
 		this.nativeLibRendering = nativeLibRendering;
 	}
 
-	public List<Way> getRoute(NativeLibrary.RenderedObject renderedObject) {
+	public List<Way> getRoute(RenderedObject renderedObject) {
 		List<Way> wL = new ArrayList<>();
 		String type = "hiking";
 
@@ -48,7 +48,7 @@ public class RouteSelector {
 		return wL;
 	}
 
-	private List<Way> getRoute(NativeLibrary.RenderedObject renderedObject, List<Way> wL, String type) {
+	private List<Way> getRoute(RenderedObject renderedObject, List<Way> wL, String type) {
 		TIntArrayList x1 = renderedObject.getX();
 		TIntArrayList y1 = renderedObject.getY();
 		NativeSwingRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(MapUtils.get31LatitudeY(y1.get(0)),
@@ -69,37 +69,36 @@ public class RouteSelector {
 						@Override
 						public boolean publish(BinaryMapDataObject object) {
 							Map<Integer, List<String>> objectTagMap = new HashMap<>();
-							for (int routeIdx = 1; routeIdx <= tagKeyList.size(); routeIdx++) {
+							for (int routeIdx = 1; routeIdx <= getRouteQuantity(object); routeIdx++) {
+								String prefix = "route_" + type + "_" + routeIdx;
 								for (int i = 0; i < object.getObjectNames().keys().length; i++) {
 									TagValuePair tp = object.getMapIndex().decodeType(object.getObjectNames().keys()[i]);
-									if (tp != null && tp.tag != null && (tp.tag).startsWith("route_" + type + "_" + routeIdx)) {
+									if (tp != null && tp.tag != null && (tp.tag).startsWith(prefix)) {
 										String value = object.getObjectNames().get(object.getObjectNames().keys()[i]);
-										putTag(objectTagMap, routeIdx, tp.tag + value);
+										putTag(objectTagMap, routeIdx, value);
 									}
 								}
 								for (int i = 0; i < object.getTypes().length; i++) {
 									TagValuePair tp = object.getMapIndex().decodeType(object.getTypes()[i]);
-									if (tp != null && tp.tag != null && (tp.tag).startsWith("route_" + type + "_" + routeIdx)) {
+									if (tp != null && tp.tag != null && (tp.tag).startsWith(prefix)) {
 										String value = (tp.value == null) ? "" : tp.value;
-										putTag(objectTagMap, routeIdx, tp.tag + value);
+										putTag(objectTagMap, routeIdx, value);
 									}
 								}
 								for (int i = 0; i < object.getAdditionalTypes().length; i++) {
 									TagValuePair tp = object.getMapIndex().decodeType(object.getAdditionalTypes()[i]);
-									if (tp != null && tp.tag != null && (tp.tag).startsWith("route_" + type + "_" + routeIdx)) {
+									if (tp != null && tp.tag != null && (tp.tag).startsWith(prefix)) {
 										String value = (tp.value == null) ? "" : tp.value;
-										putTag(objectTagMap, routeIdx, tp.tag + value);
+										putTag(objectTagMap, routeIdx, value);
 									}
 								}
 							}
 							if (!objectTagMap.isEmpty()) {
-								for (int routeIdx = 1; routeIdx <= tagKeyList.size(); routeIdx++) {
-									String tagKey = tagKeyList.get(routeIdx - 1);
-									List<String> objectTagList = objectTagMap.get(routeIdx);
-									if (objectTagList != null) {
+								for (String tagKey : tagKeyList) {
+									for (Map.Entry<Integer, List<String>> entry : objectTagMap.entrySet()) {
+										List<String> objectTagList = entry.getValue();
 										Collections.sort(objectTagList);
 										String objectTagKey = String.join("", objectTagList);
-										System.out.println(objectTagKey);
 										if (Algorithms.stringsEqual(tagKey, objectTagKey)) {
 											segmentList.add(object);
 										}
@@ -110,12 +109,30 @@ public class RouteSelector {
 						}
 
 						private void putTag(Map<Integer, List<String>> objectTagMap, int routeIdx, String value) {
-							List<String> currList = objectTagMap.get(routeIdx);
-							if (currList == null) {
-								currList = new ArrayList<>();
+							List<String> tagList = objectTagMap.get(routeIdx);
+							if (tagList == null) {
+								tagList = new ArrayList<>();
 							}
-							currList.add(value);
-							objectTagMap.put(routeIdx, currList);
+							tagList.add(value);
+							objectTagMap.put(routeIdx, tagList);
+						}
+
+						private int getRouteQuantity(BinaryMapDataObject object) {
+							List<String> tagsList = new ArrayList<>();
+							for (int i = 0; i < object.getAdditionalTypes().length; i++) {
+								TagValuePair tp = object.getMapIndex().decodeType(object.getAdditionalTypes()[i]);
+								tagsList.add(tp.tag);
+							}
+							Collections.sort(tagsList);
+							int routeQuantity = 0;
+							for (int i = tagsList.size() - 1; i > 0; i--) {
+								String tag = tagsList.get(i);
+								if (tag.startsWith("route_" + type)) {
+									routeQuantity = Algorithms.extractIntegerNumber(tag);
+									break;
+								}
+							}
+							return routeQuantity;
 						}
 
 						@Override
@@ -124,15 +141,13 @@ public class RouteSelector {
 						}
 					});
 			indexReader.searchMapIndex(req, mapIndex);
-			System.out.println("tagKeyList == " + tagKeyList);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		printSegmentList(segmentList);
 		for (BinaryMapDataObject obj : segmentList) {
 			Way w = new Way(-1);
-			if (obj.getPointsLength() > 2) {
-				for (int i = 1; i < obj.getPointsLength(); i++) {
+			if (obj.getPointsLength() > 1) {
+				for (int i = 0; i < obj.getPointsLength(); i++) {
 					int x = obj.getPoint31XTile(i);
 					int y = obj.getPoint31YTile(i);
 					Node n = new Node(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x), -1);
@@ -142,15 +157,5 @@ public class RouteSelector {
 			}
 		}
 		return null;
-	}
-
-	void printSegmentList(List<BinaryMapDataObject> segmentList) {
-		for (BinaryMapDataObject obj : segmentList) {
-			int[] coords = obj.getCoordinates();
-			if (coords.length > 2) {
-				System.out.printf("%d %d %d %d \n", coords[0], coords[1], coords[coords.length - 2],
-						coords[coords.length - 1]);
-			}
-		}
 	}
 }
