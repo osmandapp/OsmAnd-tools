@@ -1164,7 +1164,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 								if (o.getX().size() > 1) {
 									List<Way> wayList = new ArrayList<>();
 									if (routeSelector != null && nativeLibRendering != null) {
-										wayList.addAll(routeSelector.getRoute(o));
+										wayList.addAll(routeSelector.getRoute(o, "hiking"));
 									}
 									for (Way way : wayList) {
 										LatLon n = way.getLatLon();

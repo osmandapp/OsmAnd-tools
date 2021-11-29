@@ -20,41 +20,39 @@ import static net.osmand.NativeLibrary.*;
 import static net.osmand.binary.BinaryMapIndexReader.buildSearchRequest;
 
 public class RouteSelector {
+	public static final String ROUTE_PREFIX = "route_";
 	private final NativeSwingRendering nativeLibRendering;
 
 	public RouteSelector(NativeSwingRendering nativeLibRendering) {
 		this.nativeLibRendering = nativeLibRendering;
 	}
 
-	public List<Way> getRoute(RenderedObject renderedObject) {
-		List<Way> wL = new ArrayList<>();
-		String type = "hiking";
-
+	public List<Way> getRoute(RenderedObject renderedObject, String type) {
+		List<Way> wayList = new ArrayList<>();
 		if (renderedObject.isRoute(type)) {
-			List<Way> wL1 = getRoute(renderedObject, wL, type);
-			if (wL1 != null) return wL1;
+			wayList.addAll(getAllRoutes(renderedObject, type));
 		} else {
-			Way w = new Way(-1);
+			Way way = new Way(-1);
 			TIntArrayList x1 = renderedObject.getX();
 			TIntArrayList y1 = renderedObject.getY();
 			for (int i = 0; i < x1.size(); i++) {
 				Node n = new Node(MapUtils.get31LatitudeY(y1.get(i)),
 						MapUtils.get31LongitudeX(x1.get(i)), -1);
-				w.addNode(n);
+				way.addNode(n);
 			}
-			wL.add(w);
+			wayList.add(way);
 		}
-
-		return wL;
+		return wayList;
 	}
 
-	private List<Way> getRoute(RenderedObject renderedObject, List<Way> wL, String type) {
+	private List<Way> getAllRoutes(RenderedObject renderedObject, String type) {
+		List<Way> wayList = new ArrayList<>();
 		TIntArrayList x1 = renderedObject.getX();
 		TIntArrayList y1 = renderedObject.getY();
 		NativeSwingRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(MapUtils.get31LatitudeY(y1.get(0)),
 				MapUtils.get31LongitudeX(x1.get(0)));
 		if (mapDiffs == null) {
-			return wL;
+			return wayList;
 		}
 		File mapFile = mapDiffs.baseFile;
 		List<BinaryMapDataObject> segmentList = new ArrayList<>();
@@ -70,7 +68,7 @@ public class RouteSelector {
 						public boolean publish(BinaryMapDataObject object) {
 							Map<Integer, List<String>> objectTagMap = new HashMap<>();
 							for (int routeIdx = 1; routeIdx <= getRouteQuantity(object); routeIdx++) {
-								String prefix = "route_" + type + "_" + routeIdx;
+								String prefix = ROUTE_PREFIX + type + "_" + routeIdx;
 								for (int i = 0; i < object.getObjectNames().keys().length; i++) {
 									TagValuePair tp = object.getMapIndex().decodeType(object.getObjectNames().keys()[i]);
 									if (tp != null && tp.tag != null && (tp.tag).startsWith(prefix)) {
@@ -127,7 +125,7 @@ public class RouteSelector {
 							int routeQuantity = 0;
 							for (int i = tagsList.size() - 1; i > 0; i--) {
 								String tag = tagsList.get(i);
-								if (tag.startsWith("route_" + type)) {
+								if (tag.startsWith(ROUTE_PREFIX + type)) {
 									routeQuantity = Algorithms.extractIntegerNumber(tag);
 									break;
 								}
@@ -144,18 +142,18 @@ public class RouteSelector {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		for (BinaryMapDataObject obj : segmentList) {
+		for (BinaryMapDataObject object : segmentList) {
 			Way w = new Way(-1);
-			if (obj.getPointsLength() > 1) {
-				for (int i = 0; i < obj.getPointsLength(); i++) {
-					int x = obj.getPoint31XTile(i);
-					int y = obj.getPoint31YTile(i);
+			if (object.getPointsLength() > 1) {
+				for (int i = 0; i < object.getPointsLength(); i++) {
+					int x = object.getPoint31XTile(i);
+					int y = object.getPoint31YTile(i);
 					Node n = new Node(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x), -1);
 					w.addNode(n);
 				}
-				wL.add(w);
+				wayList.add(w);
 			}
 		}
-		return null;
+		return wayList;
 	}
 }
