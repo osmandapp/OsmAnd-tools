@@ -6,6 +6,8 @@ import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.data.DataTileManager;
+import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
@@ -25,6 +27,20 @@ public class RouteSelector {
 
 	public RouteSelector(NativeSwingRendering nativeLibRendering) {
 		this.nativeLibRendering = nativeLibRendering;
+	}
+
+	public void getRoute(MapPanel map, RenderedObject renderedObject, String type) {
+		new Thread(() -> {
+			List<Way> ways = getRoute(renderedObject, type);
+			if (ways != null) {
+				DataTileManager<Way> points = new DataTileManager<>(11);
+				for (Way w : ways) {
+					LatLon n = w.getLatLon();
+					points.registerObject(n.getLatitude(), n.getLongitude(), w);
+				}
+				map.setPoints(points);
+			}
+		}).start();
 	}
 
 	public List<Way> getRoute(RenderedObject renderedObject, String type) {
