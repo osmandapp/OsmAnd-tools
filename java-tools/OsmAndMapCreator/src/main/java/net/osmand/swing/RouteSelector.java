@@ -117,7 +117,6 @@ public class RouteSelector {
 			foundSegmentList.clear();
 			indexReader.searchMapIndex(req, mapIndex);
 			exit = true;
-
 			int yTmp = y;
 			int xTmp = x;
 			foundSegmentList.removeIf(s -> finalSegmentList.stream()
@@ -128,8 +127,20 @@ public class RouteSelector {
 			for (BinaryMapDataObject foundSegment : foundSegmentList) {
 				if (isRoundabout(foundSegment)) {
 					finalSegmentList.add(foundSegment);
-					foundSegment = processRoundabout(foundSegment);
-					continue;
+					foundSegment = processRoundabout(foundSegment, finalSegmentList, indexReader, mapIndex);
+					int xb = foundSegment.getPoint31XTile(0);
+					int yb = foundSegment.getPoint31YTile(0);
+					int xe = foundSegment.getPoint31XTile(foundSegment.getPointsLength() - 1);
+					int ye = foundSegment.getPoint31YTile(foundSegment.getPointsLength() - 1);
+					double distBegin = MapUtils.getSqrtDistance(x, y, xb, yb);
+					double distEnd = MapUtils.getSqrtDistance(x, y, xe, ye);
+					if (distBegin < distEnd) {
+						x = xb;
+						y = yb;
+					} else {
+						x = xe;
+						y = ye;
+					}
 				}
 				finalSegmentList.add(foundSegment);
 				int xNext;
@@ -158,11 +169,25 @@ public class RouteSelector {
 		}
 	}
 
-	private BinaryMapDataObject processRoundabout(BinaryMapDataObject foundSegment) {
+	private BinaryMapDataObject processRoundabout(BinaryMapDataObject foundSegment, List<BinaryMapDataObject> finalSegmentList,
+	                                              BinaryMapIndexReader indexReader,
+	                                              BinaryMapIndexReader.MapIndex mapIndex) throws IOException {
 		List<BinaryMapDataObject> foundSegmentList = new ArrayList<>();
-		for(int i= 0; i<foundSegment.getPointsLength();i++){
+		for (int i = 0; i < foundSegment.getPointsLength(); i++) {
 			final SearchRequest<BinaryMapDataObject> req = buildSearchRequest(foundSegmentList,
-					foundSegment.getPoint31XTile(i),foundSegment.getPoint31YTile(i));
+					foundSegment.getPoint31XTile(i), foundSegment.getPoint31YTile(i));
+			foundSegmentList.clear();
+			indexReader.searchMapIndex(req, mapIndex);
+			if (!foundSegmentList.isEmpty()) {
+				foundSegmentList.removeIf(s -> finalSegmentList.stream()
+						.anyMatch(fs -> fs.compareBinary(s, 0)));
+				if (!foundSegmentList.isEmpty()) {
+					break;
+				}
+			}
+		}
+		if (!foundSegmentList.isEmpty()) {
+			return foundSegmentList.get(0);
 		}
 		return foundSegment;
 	}
