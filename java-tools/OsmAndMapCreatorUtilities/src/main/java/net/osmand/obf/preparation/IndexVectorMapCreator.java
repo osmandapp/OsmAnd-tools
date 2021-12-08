@@ -69,7 +69,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static final int LOW_LEVEL_COMBINE_WAY_POINS_LIMIT = 10000;
 	private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
 	private static final int LOW_LEVEL_ZOOM_COASTLINE = 1; // Don't simplify coastlines except basemap, this constant is not used by basemap
-	
+
 	private final Log logMapDataWarn;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapZooms mapZooms;
@@ -95,14 +95,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	});
 	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 	TIntArrayList addtypeUse = new TIntArrayList(8);
+	TIntArrayList specificGlueTags = new TIntArrayList();
 
 	private PreparedStatement mapBinaryStat;
 	private PreparedStatement mapLowLevelBinaryStat;
 	private int lowLevelWays = -1;
 	private RTree[] mapTree = null;
 	private Connection mapConnection;
-	
-	
+
+
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
 	private static int DUPLICATE_SPLIT = 5;
@@ -110,8 +111,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	private static boolean VALIDATE_DUPLICATE = false;
 	private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
 	private BasemapProcessor checkSeaTile;
-	
-	
+
+
 	public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
 	                             IndexCreatorSettings settings) {
 		this.logMapDataWarn = logMapDataWarn;
@@ -120,7 +121,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		this.renderingTypes = renderingTypes;
 		lowLevelWays = -1;
 	}
-	
+
 
 	private long assignIdForMultipolygon(Relation orig) {
 		long ll = orig.getId();
@@ -135,9 +136,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if(l != null) {
 				int y = MapUtils.get31TileNumberY(l.getLatitude());
 				int x = MapUtils.get31TileNumberX(l.getLongitude());
-				sum += (x + y);	
+				sum += (x + y);
 			}
-			
+
 		}
 		return genId(SHIFT_MULTIPOLYGON_IDS, (ll << 6) + (sum % 63));
 	}
@@ -208,7 +209,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 	 */
 	private void indexMultiPolygon(Relation e, Map<String, String> tags, OsmDbAccessorContext ctx) throws SQLException {
 		// Don't handle things that aren't multipolygon, and nothing administrative
-		if (!("multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue())) || 
+		if (!("multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue())) ||
 				"protected_area".equals(tags.get("boundary")) ||
 				"low_emission_zone".equals(tags.get("boundary")) ||
 				"national_park".equals(tags.get("boundary")) ||
@@ -237,7 +238,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						otherWays++;
 					}
 				}
-				
+
 			}
 			if (coastlines > 0) {
 				// don't index all coastlines
@@ -257,11 +258,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				return;
 			}
 		}
-		
+
 		ctx.loadEntityRelation((Relation) e);
 		MultipolygonBuilder original = createMultipolygonBuilder(e);
 		try {
-			renderingTypes.encodeEntityWithType(false, tags, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, tempNameUse);
+			renderingTypes.encodeEntityWithType(false, tags, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse, namesUse, specificGlueTags);
 		} catch (RuntimeException es) {
 			es.printStackTrace();
 			return;
@@ -325,7 +326,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		nextZoom: for (int level = 0; level < mapZooms.size(); level++) {
 			renderingTypes.encodeEntityWithType(false,  tags, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
-					tempNameUse);
+					specificGlueTags);
 			if (typeUse.isEmpty()) {
 				continue;
 			}
@@ -437,7 +438,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if (!visitedWays.contains(fs.getLong(1))) {
 				parseAndSort(temp, fs.getBytes(5));
 				parseAndSort(tempAdd, fs.getBytes(6));
-				if(temp.equals(typeUse) && tempAdd.equals(addtypeUse)){
+				if(temp.equals(typeUse) && equalBySpecificGlueTag(tempAdd, addtypeUse)){
 					LowLevelWayCandidate llwc = new LowLevelWayCandidate();
 					llwc.wayId = fs.getLong(1);
 					llwc.names = decodeNames(fs.getString(4), new HashMap<MapRulType, String>());
@@ -454,6 +455,23 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		return l;
 	}
+
+	private boolean equalBySpecificGlueTag(TIntArrayList list1, TIntArrayList list2) {
+	    if (list1.size() == 0 && list2.size() == 0) {
+	        return true;
+        }
+	    TIntArrayList merged = new TIntArrayList(list1.size() + list2.size());
+	    merged.addAll(list1.toArray());
+	    merged.addAll(list2.toArray());
+	    for (int i : merged.toArray()) {
+            if (specificGlueTags.contains(i)) {
+                if (!list1.contains(i) || !list2.contains(i)) {
+                    return false;
+                }
+            }
+        }
+	    return true;
+    }
 
 	public void processingLowLevelWays(IProgress progress) throws SQLException {
 		mapLowLevelBinaryStat.executeBatch();
@@ -493,7 +511,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			decodeNames(rs.getString(5), namesUse);
 			parseAndSort(typeUse, rs.getBytes(6));
 			parseAndSort(addtypeUse, rs.getBytes(7));
- 
+
 			loadNodes(rs.getBytes(4), list);
 			ArrayList<Float> wayNodes = new ArrayList<Float>(list);
 
@@ -510,13 +528,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				// disable combine
 				dontCombine = true;
 			}
-			if (minZoom >= LOW_LEVEL_ZOOM_COASTLINE && 
+			if (minZoom >= LOW_LEVEL_ZOOM_COASTLINE &&
 					typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
 				// coastline
 				dontCombine = true;
 			}
 			boolean combined = !dontCombine;
-			
+
 			while (combined && wayNodes.size() < LOW_LEVEL_COMBINE_WAY_POINS_LIMIT) {
 				combined = false;
 				endStat.setLong(1, startNode);
@@ -656,7 +674,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		return ((maxX - minX) <= minz && (maxY - minY) <= maxz) || ((maxX - minX) <= maxz && (maxY - minY) <= minz);
 
 	}
-	
+
 	private boolean checkBelongsToSeaWays(List<Way> ways) {
 		List<Node> nodes = new ArrayList<Node>();
 		for(Way w : ways) {
@@ -724,7 +742,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			for (int level = 0; level < mapZooms.size(); level++) {
 				processMainEntity(e, originalId, assignedId, level, tags);
 			}
-			
+
 			if (splitTags != null) {
 				EntityId eid = EntityId.valueOf(e);
 				for (int i = 1; i < splitTags.size(); i++) {
@@ -753,7 +771,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		boolean area = renderingTypes.encodeEntityWithType(e instanceof Node,
 				tags, mapZooms.getLevel(level).getMaxZoom(), typeUse, addtypeUse, namesUse,
-				tempNameUse);
+                specificGlueTags);
 		if (typeUse.isEmpty()) {
 			return;
 		}
@@ -778,7 +796,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			boolean mostDetailedLevel = level == 0 && !mapZooms.isDetailedZoomSimplified();
 			if (!mostDetailedLevel) {
 				int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
-				
+
 				if (cycle) {
 					res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, settings.zoomWaySmoothness);
 				} else {
@@ -795,7 +813,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	
+
 
 	private void validateDuplicate(long originalId, long assignedId) {
 		if(VALIDATE_DUPLICATE) {
@@ -936,8 +954,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							addtypeUse[j / 2] = mapRulType.getTargetId();
 						}
 					}
-					
-					
+
+
 					MapData mapData = writer.writeMapData(cid - baseId, parentBounds.getMinX(), parentBounds.getMinY(), rs.getBoolean(1), rs.getBytes(2), rs.getBytes(3),
 							typeUse, addtypeUse, tempNames,  rs.getBytes(7),  null, tempStringTable, dataBlock, allowWaySimplification);
 					if(mapData != null) {
@@ -981,7 +999,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		writer.endWriteMapTreeElement();
 	}
-	
+
 	public static Rect calcBounds(rtree.Node n) {
 		Rect r = null;
 		rtree.Element[] e = n.getAllElements();
@@ -998,7 +1016,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		}
 		return r;
 	}
-	
+
 	public static void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer,
 			TLongObjectHashMap<BinaryFileReference> bounds, TLongObjectHashMap<BinaryMapDataObject> objects,
 			MapZooms.MapZoomPair pair, boolean doNotSimplify) throws IOException, RTreeException {
@@ -1028,7 +1046,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						Algorithms.putIntToBytes(coordinates, 8 * t, mdo.getPoint31XTile(t));
 						Algorithms.putIntToBytes(coordinates, 8 * t + 4, mdo.getPoint31YTile(t));
 					}
-					
+
 					byte[] labelCoordinates;
 					if (mdo.isLabelSpecified()) {
 						labelCoordinates = new byte[8];
@@ -1037,7 +1055,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					} else {
 						labelCoordinates = new byte[0];
 					}
-					
+
 					byte[] innerPolygonTypes = new byte[0];
 					int[][] pip = mdo.getPolygonInnerCoordinates();
 					if(pip != null && pip.length > 0) {
@@ -1218,13 +1236,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					Algorithms.writeInt(bcoordinates, y);
 				}
 			}
-			
+
 			if (cycle && !Algorithms.isEmpty(nodes)) {
 				LatLon labelll = OsmMapUtils.getComplexPolyCenter(nodes, innerWays);
-				Algorithms.writeInt(blabelCoordinates, MapUtils.get31TileNumberX(labelll.getLongitude()));	
+				Algorithms.writeInt(blabelCoordinates, MapUtils.get31TileNumberX(labelll.getLongitude()));
 				Algorithms.writeInt(blabelCoordinates, MapUtils.get31TileNumberY(labelll.getLatitude()));
 			}
-			
+
 
 			if (innerWays != null) {
 				for (List<Node> ws : innerWays) {
