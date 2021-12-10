@@ -646,10 +646,10 @@ public class OsmAndLiveReports {
 		report.month = month;
 		report.region = null;
 		report.date = reportTime();
-		String q = " SELECT distinct s.osmid osmid, t.size changes," + 
+		String q = " SELECT distinct s.osmid osmid, t.size changes, t.objsize objchanges," + 
 					" first_value(s.btcaddr) over (partition by osmid order by updatetime desc) btcaddr " + 
 					" FROM osm_recipients s left join " + 
-					" 	(SELECT count(*) size, ch.username " +
+					" 	(SELECT count(*) size, sum(changes_count) objsize, ch.username " +
 					" 	 FROM " + CHANGESETS_VIEW + " ch " +
 					"   WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 					"	 GROUP by username) " +
@@ -669,6 +669,7 @@ public class OsmAndLiveReports {
 			Recipient recipient = new Recipient();
 			recipient.osmid = rs.getString("osmid");
 			recipient.changes = rs.getInt("changes");
+			recipient.objchanges = rs.getInt("objchanges");
 			recipient.btcaddress = rs.getString("btcaddr");
 			if (isEmpty(recipient.btcaddress)) {
 				continue;
@@ -1033,6 +1034,7 @@ public class OsmAndLiveReports {
 		public String btcaddress;
 		public String osmid;
 		public int changes;
+		public int objchanges;
 		
 	}
 	
