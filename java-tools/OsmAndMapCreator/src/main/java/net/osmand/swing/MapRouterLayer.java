@@ -62,6 +62,7 @@ import com.google.gson.stream.JsonReader;
 
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
@@ -74,6 +75,7 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.QuadTree;
+import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
@@ -515,6 +517,29 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 			};
 			menu.add(unselectGPXFile);
+			
+			AbstractAction calcAltitude = new AbstractAction("Recalculate altitude ") {
+				private static final long serialVersionUID = 507156107454181238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					File[] missingFile = new File[1];
+					displayTrackInfo(selectedGPXFile, "Unprocessed track info");
+					GPXFile res = calculateAltitude(selectedGPXFile, missingFile);
+					if (res == null) {
+						String msg = missingFile[0] != null ? "Missing in 'srtm' folder: " + missingFile[0].getName()
+								: ("Missing 'srtm' folder: " + DataExtractionSettings.getSettings().getBinaryFilesDir() + "/srtm");
+						JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), msg, "Missing srtm data",
+								JOptionPane.INFORMATION_MESSAGE);
+					} else {
+						selectedGPXFile = res;
+						displayTrackInfo(selectedGPXFile, "Processed track info");
+						displayGpxFiles();
+						map.fillPopupActions();
+					}
+				}
+			};
+			menu.add(calcAltitude);
 
 			final JMenu colorize = new JMenu("Colorize GPX file");
 			Action altitude = new AbstractAction("Altitude") {
@@ -556,11 +581,65 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	}
 
+
+	protected void displayTrackInfo(GPXFile gpxFile, String header) {
+		GPXTrackAnalysis analysis = selectedGPXFile.getAnalysis(gpxFile.modifiedTime);
+		StringBuilder msg = new StringBuilder();
+		
+		msg.append(String.format("Track: distance %.1f, distance no gaps %.1f, tracks %d, points %d\n", analysis.totalDistance,
+				analysis.totalDistanceWithoutGaps, analysis.totalTracks, analysis.wptPoints));
+		
+		if (analysis.hasElevationData) {
+			msg.append(String.format("Ele: min - %.1f, max - %.1f, avg - %.1f, uphill - %.1f, downhill - %.1f\n",
+					analysis.minElevation, analysis.maxElevation, analysis.avgElevation, analysis.diffElevationUp,
+					analysis.diffElevationDown));
+		}
+		if (analysis.hasSpeedData) {
+			msg.append(String.format("Speed: min - %.1f, max - %.1f, avg - %.1f, dist+speed - %.1f, dist+speed no gaps - %.1f\n",
+					analysis.minSpeed, analysis.maxSpeed, analysis.avgSpeed,
+					analysis.totalDistanceMoving,analysis.totalDistanceMovingWithoutGaps));
+		}
+		if (analysis.startTime != analysis.endTime) {
+			msg.append(String.format("Time: start - %s, end - %s, span - %.1f min, span no gaps - %.1f min\n",
+					new Date(analysis.startTime), new Date(analysis.endTime), analysis.timeSpan / 60000.0,
+					analysis.timeSpanWithoutGaps / 60000.0));
+		}
+		log.info(header + " " + msg);
+		JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), msg, header,
+				JOptionPane.INFORMATION_MESSAGE);
+	}
+
+
 	private int showOptionColorSchemeDialog(JMenu frame) {
 		String[] options = new String[2];
 		options[0] = "Grey";
 		options[1] = "Red, yellow, green";
 		return JOptionPane.showOptionDialog(frame, "What color scheme to use?", "Color scheme", 0, JOptionPane.INFORMATION_MESSAGE, null, options, null);
+	}
+	
+	
+	protected GPXFile calculateAltitude(GPXFile gpxFile, File[] missingFile) {
+		File srtmFolder = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "srtm");
+		if (!srtmFolder.exists()) {
+			return null;
+		}
+		IndexHeightData hd = new IndexHeightData();
+		hd.setSrtmData(srtmFolder);
+		for (Track tr : gpxFile.tracks) {
+			for (TrkSegment s : tr.segments) {
+				for (int i = 0; i < s.points.size(); i++) {
+					WptPt wpt = s.points.get(i);
+					double h = hd.getPointHeight(wpt.lat, wpt.lon, missingFile);
+					if (h != IndexHeightData.INEXISTENT_HEIGHT) {
+						wpt.ele = h;
+					} else if (i == 0) {
+						return null;
+					}
+
+				}
+			}
+		}
+		return gpxFile;
 	}
 
 	private void displayGpxFiles() {
