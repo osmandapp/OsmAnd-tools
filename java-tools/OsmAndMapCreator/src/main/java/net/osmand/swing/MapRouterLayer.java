@@ -526,7 +526,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					File[] missingFile = new File[1];
 					displayTrackInfo(selectedGPXFile, "Unprocessed track info");
 					GPXFile res = calculateAltitude(selectedGPXFile, missingFile);
-					if (res == null) {
+					if (res == null || missingFile[0] != null) {
 						String msg = missingFile[0] != null ? "Missing in 'srtm' folder: " + missingFile[0].getName()
 								: ("Missing 'srtm' folder: " + DataExtractionSettings.getSettings().getBinaryFilesDir() + "/srtm");
 						JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), msg, "Missing srtm data",
