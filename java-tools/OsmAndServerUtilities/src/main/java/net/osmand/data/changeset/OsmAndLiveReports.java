@@ -315,7 +315,7 @@ public class OsmAndLiveReports {
 	}
 	
 	public int getMinChanges() {
-		return 7;
+		return 30;
 	}
 	
 	private double getEurBTCRate() throws IOException {
