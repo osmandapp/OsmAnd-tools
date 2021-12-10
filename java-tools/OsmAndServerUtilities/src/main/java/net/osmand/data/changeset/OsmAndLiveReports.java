@@ -317,7 +317,7 @@ public class OsmAndLiveReports {
 	}
 	
 	public int getMinChanges() {
-		return 30;
+		return 300;
 	}
 	
 	private double getEurBTCRate() throws IOException {
@@ -517,11 +517,12 @@ public class OsmAndLiveReports {
 		report.region = region;
 		report.date = reportTime();
 		boolean startCountingChanges = this.month.compareTo(MONTH_START_COUNT_CHANGES) >= 0;
-		int minChanges = getNumberReport(OsmAndLiveReportType.MIN_CHANGES).intValue();
+		int minChanges;
 		int rankingRange;
 		ResultSet rs;
 		String cntChanges = startCountingChanges ? "sum(changes_count)" : "count(*)";
 		if(!isEmpty(region)) {
+			minChanges = getNumberReport(OsmAndLiveReportType.REGION_MIN_CHANGES).intValue();
 			rankingRange = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue();
 		    String r =  " SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges, sum(cnt_changesets) achangesets FROM ("+
 		    			"  		SELECT username, " + cntChanges + " cnt, sum(ch.changes_count) cnt_changes, count(*) cnt_changesets  FROM " +CHANGESETS_VIEW + " ch, " + CHANGESET_COUNTRY_VIEW + " cc " + 
@@ -535,7 +536,7 @@ public class OsmAndLiveReports {
 			ps.setInt(3, minChanges);
 			rs = ps.executeQuery();
 		} else {
-			 
+			minChanges = getNumberReport(OsmAndLiveReportType.MIN_CHANGES).intValue();
 			rankingRange = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
 			String r = "SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges, sum(cnt_changesets) achangesets FROM ( "+
 					   "	SELECT username, " + cntChanges + " cnt, sum(changes_count) cnt_changes, count(*) cnt_changesets FROM " + CHANGESETS_VIEW +" ch " +
@@ -889,6 +890,9 @@ public class OsmAndLiveReports {
 		} else if(type == OsmAndLiveReportType.REGION_RANKING_RANGE) {
 			// deprecated 
 			return 7;
+		} else if(type == OsmAndLiveReportType.REGION_MIN_CHANGES) {
+			// deprecated 
+			return 1;
 		} else if(type == OsmAndLiveReportType.RANKING_RANGE) {
 			return getRankingRange();
 		} else if(type == OsmAndLiveReportType.EUR_BTC_RATE) {
