@@ -619,20 +619,20 @@ public class OsmAndLiveReports {
 			r.user = rs.getString("username");
 			r.changes = rs.getInt("changes");
 			r.globalchanges = rs.getInt("gchanges");
-			r.atomglobalchanges = rs.getInt("achanges");
-			r.atomchanges = rs.getInt("agchanges");
+			r.atomglobalchanges = rs.getInt("achanges"); // SWAP:INCORRECT but already stored in reports
+			r.atomchanges = rs.getInt("agchanges"); // SWAP:INCORRECT but already stored in reports
 			r.rank = 0;
 			r.grank = 0;
 			for (int i = 0; i < granking.rows.size(); i++) {
 				RankingRange range = granking.rows.get(i);
-				int ch = startCountingChanges ? r.atomglobalchanges : r.globalchanges;
+				int ch = startCountingChanges ? r.atomchanges : r.globalchanges;
 				if (range.minChanges <= ch && ch <= range.maxChanges) {
 					r.grank = range.rank;
 				}
 			}
 			for (int i = 0; i < ranking.rows.size(); i++) {
 				RankingRange range = ranking.rows.get(i);
-				int ch = startCountingChanges ? r.atomchanges : r.changes;
+				int ch = startCountingChanges ? r.atomglobalchanges : r.changes;
 				if (range.minChanges <= ch && ch <= range.maxChanges) {
 					r.rank = range.rank;
 				}
