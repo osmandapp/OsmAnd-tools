@@ -107,7 +107,7 @@ public class MapClusterLayer implements MapPanelLayer {
 					for (RouteSegment s : ways) {
 						Way w = new Way(-1);
 						int st = s.getSegmentStart();
-						int end = s.getParentSegmentEnd();
+						int end = s.getSegmentStart();
 						if (st > end) {
 							int t = st;
 							st = end;
@@ -268,7 +268,6 @@ public class MapClusterLayer implements MapPanelLayer {
 
 	private void addSegmentResult(List<RouteSegment> result , RouteSegment sgm, int segmentSt, int segmentEnd) {
 		RouteSegment r = new RouteSegment(sgm.getRoad(), segmentSt);
-		r.setParentSegmentEnd(segmentEnd);
 		result.add(r);
 	}
 

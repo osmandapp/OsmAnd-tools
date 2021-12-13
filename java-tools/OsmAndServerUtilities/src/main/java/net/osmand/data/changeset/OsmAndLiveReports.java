@@ -47,6 +47,8 @@ public class OsmAndLiveReports {
 	
 	public static final long REFRESH_ACCESSTIME = 15 * MINUTE;
 	public static final long REPORTS_DELETE_DEPRECATED = 6 * HOUR;
+	
+	public static final String MONTH_START_COUNT_CHANGES = "2021-12";
 
 	 
 	
@@ -315,7 +317,7 @@ public class OsmAndLiveReports {
 	}
 	
 	public int getMinChanges() {
-		return 7;
+		return 300;
 	}
 	
 	private double getEurBTCRate() throws IOException {
@@ -514,16 +516,19 @@ public class OsmAndLiveReports {
 		report.month = month;
 		report.region = region;
 		report.date = reportTime();
-		int minChanges = getNumberReport(OsmAndLiveReportType.MIN_CHANGES).intValue();
+		boolean startCountingChanges = this.month.compareTo(MONTH_START_COUNT_CHANGES) >= 0;
+		int minChanges;
 		int rankingRange;
 		ResultSet rs;
+		String cntChanges = startCountingChanges ? "sum(changes_count)" : "count(*)";
 		if(!isEmpty(region)) {
+			minChanges = getNumberReport(OsmAndLiveReportType.REGION_MIN_CHANGES).intValue();
 			rankingRange = getNumberReport(OsmAndLiveReportType.REGION_RANKING_RANGE).intValue();
-		    String r =  " SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges FROM ("+
-		    			"  		SELECT username, count(*) cnt, sum(ch.changes_count) cnt_changes  FROM "+CHANGESETS_VIEW+" ch, "+CHANGESET_COUNTRY_VIEW+" cc " + 
+		    String r =  " SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges, sum(cnt_changesets) achangesets FROM ("+
+		    			"  		SELECT username, " + cntChanges + " cnt, sum(ch.changes_count) cnt_changes, count(*) cnt_changesets  FROM " +CHANGESETS_VIEW + " ch, " + CHANGESET_COUNTRY_VIEW + " cc " + 
 		    			"		WHERE substr(ch.closed_at_day, 0, 8) = ? and ch.id = cc.changesetid  "+
 		    			"  			and cc.countryid = (SELECT id from countries where downloadname = ? )" +
-		    			" 		GROUP by ch.username HAVING count(*) >= ? ORDER by count(*) desc )" +
+		    			" 		GROUP by ch.username HAVING " + cntChanges + " >= ? ORDER by " + cntChanges + " desc) " +
 		    			" data GROUP by data.cnt ORDER by changes desc";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
@@ -531,11 +536,12 @@ public class OsmAndLiveReports {
 			ps.setInt(3, minChanges);
 			rs = ps.executeQuery();
 		} else {
+			minChanges = getNumberReport(OsmAndLiveReportType.MIN_CHANGES).intValue();
 			rankingRange = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
-			String r = "SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges FROM ( "+
-					   "	SELECT username, count(*) cnt, sum(changes_count) cnt_changes FROM "+CHANGESETS_VIEW+" ch " +
+			String r = "SELECT data.cnt changes, count(*) group_size, sum(cnt_changes) achanges, sum(cnt_changesets) achangesets FROM ( "+
+					   "	SELECT username, " + cntChanges + " cnt, sum(changes_count) cnt_changes, count(*) cnt_changesets FROM " + CHANGESETS_VIEW +" ch " +
 					   "    WHERE substr(ch.closed_at_day, 0, 8) = ? " +
-					   " 	GROUP by  ch.username HAVING count(*) >= ? ORDER by count(*) desc) " +
+					   " 	GROUP by  ch.username HAVING " + cntChanges + " >= ? ORDER by " + cntChanges + " desc) " +
 					   " data GROUP by data.cnt ORDER by changes desc";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
@@ -543,27 +549,27 @@ public class OsmAndLiveReports {
 			rs = ps.executeQuery();
 		}
 		List<RankingRange> lst = report.rows;
-		while(rs.next()) {
+		while (rs.next()) {
 			RankingRange r = new RankingRange();
 			r.minChanges = rs.getInt(1);
 			r.maxChanges = rs.getInt(1);
 			r.countUsers = rs.getInt(2);
 			r.atomTotalChanges = rs.getInt(3);
-			r.totalChanges = r.minChanges * r.countUsers;
+			r.totalChanges = rs.getInt(4);
 			lst.add(r);
 		}
-		while(lst.size() > rankingRange && lst.size() > 1) {
+		while (lst.size() > rankingRange && lst.size() > 1) {
 			int minind = 0;
 			int minsum = lst.get(0).countUsers + lst.get(1).countUsers;
-			for(int i = 1 ; i < lst.size() - 1; i++){
-				int sum = lst.get(i).countUsers + lst.get(i+1).countUsers;
-				if(sum < minsum) {
+			for (int i = 1; i < lst.size() - 1; i++) {
+				int sum = lst.get(i).countUsers + lst.get(i + 1).countUsers;
+				if (sum < minsum) {
 					minind = i;
 					minsum = sum;
 				}
 			}
-			int min = Math.min(lst.get(minind).minChanges, lst.get(minind+1).minChanges);
-			int max = Math.max(lst.get(minind).maxChanges, lst.get(minind+1).maxChanges);
+			int min = Math.min(lst.get(minind).minChanges, lst.get(minind + 1).minChanges);
+			int max = Math.max(lst.get(minind).maxChanges, lst.get(minind + 1).maxChanges);
 			int changes = lst.get(minind).totalChanges + lst.get(minind + 1).totalChanges;
 			int atomTotalChanges = lst.get(minind).atomTotalChanges + lst.get(minind + 1).atomTotalChanges;
 			lst.remove(minind);
@@ -576,7 +582,7 @@ public class OsmAndLiveReports {
 		for(int i = 0; i < lst.size(); i++) {
 			RankingRange r = lst.get(i);
 			r.rank = i + 1;
-			if(r.countUsers > 0) {
+			if (r.countUsers > 0) {
 				r.avgChanges = r.totalChanges / ((float) r.countUsers);
 			}
 		}
@@ -607,26 +613,28 @@ public class OsmAndLiveReports {
 		ps.setInt(3, minChanges);
 		ps.setString(4, month);
 		ResultSet rs = ps.executeQuery();
-
+		boolean startCountingChanges = this.month.compareTo(MONTH_START_COUNT_CHANGES) >= 0;
 		while(rs.next()) {
 			UserRanking r = new UserRanking();
 			
 			r.user = rs.getString("username");
 			r.changes = rs.getInt("changes");
 			r.globalchanges = rs.getInt("gchanges");
-			r.atomglobalchanges = rs.getInt("achanges");
-			r.atomchanges = rs.getInt("agchanges");
+			r.atomglobalchanges = rs.getInt("achanges"); // SWAP:INCORRECT but already stored in reports
+			r.atomchanges = rs.getInt("agchanges"); // SWAP:INCORRECT but already stored in reports
 			r.rank = 0;
 			r.grank = 0;
 			for (int i = 0; i < granking.rows.size(); i++) {
 				RankingRange range = granking.rows.get(i);
-				if (range.minChanges <= r.globalchanges && r.globalchanges <= range.maxChanges) {
+				int ch = startCountingChanges ? r.atomchanges : r.globalchanges;
+				if (range.minChanges <= ch && ch <= range.maxChanges) {
 					r.grank = range.rank;
 				}
 			}
 			for (int i = 0; i < ranking.rows.size(); i++) {
 				RankingRange range = ranking.rows.get(i);
-				if (range.minChanges <= r.changes && r.changes <= range.maxChanges) {
+				int ch = startCountingChanges ? r.atomglobalchanges : r.changes;
+				if (range.minChanges <= ch && ch <= range.maxChanges) {
 					r.rank = range.rank;
 				}
 			}
@@ -646,10 +654,10 @@ public class OsmAndLiveReports {
 		report.month = month;
 		report.region = null;
 		report.date = reportTime();
-		String q = " SELECT distinct s.osmid osmid, t.size changes," + 
+		String q = " SELECT distinct s.osmid osmid, t.size changes, t.objsize objchanges," + 
 					" first_value(s.btcaddr) over (partition by osmid order by updatetime desc) btcaddr " + 
 					" FROM osm_recipients s left join " + 
-					" 	(SELECT count(*) size, ch.username " +
+					" 	(SELECT count(*) size, sum(changes_count) objsize, ch.username " +
 					" 	 FROM " + CHANGESETS_VIEW + " ch " +
 					"   WHERE substr(ch.closed_at_day, 0, 8) = ? " +
 					"	 GROUP by username) " +
@@ -665,10 +673,12 @@ public class OsmAndLiveReports {
 		ps.setString(1, month);
 		ResultSet rs = ps.executeQuery();
 		int rankingNum = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
+		boolean startCountingChanges = this.month.compareTo(MONTH_START_COUNT_CHANGES) >= 0;
 		while (rs.next()) {
 			Recipient recipient = new Recipient();
 			recipient.osmid = rs.getString("osmid");
 			recipient.changes = rs.getInt("changes");
+			recipient.objchanges = rs.getInt("objchanges");
 			recipient.btcaddress = rs.getString("btcaddr");
 			if (isEmpty(recipient.btcaddress)) {
 				continue;
@@ -676,7 +686,8 @@ public class OsmAndLiveReports {
 			report.regionCount++;
 			for (int i = 0; i < ranking.rows.size(); ++i) {
 				RankingRange range = ranking.rows.get(i);
-				if (recipient.changes >= range.minChanges && recipient.changes <= range.maxChanges) {
+				int ch = startCountingChanges ? recipient.objchanges : recipient.changes; 
+				if (ch >= range.minChanges && ch <= range.maxChanges) {
 					recipient.rank = range.rank;
 					recipient.weight = rankingNum + 1 - recipient.rank;
 					report.regionTotalWeight += recipient.weight;
@@ -879,6 +890,9 @@ public class OsmAndLiveReports {
 		} else if(type == OsmAndLiveReportType.REGION_RANKING_RANGE) {
 			// deprecated 
 			return 7;
+		} else if(type == OsmAndLiveReportType.REGION_MIN_CHANGES) {
+			// deprecated 
+			return 1;
 		} else if(type == OsmAndLiveReportType.RANKING_RANGE) {
 			return getRankingRange();
 		} else if(type == OsmAndLiveReportType.EUR_BTC_RATE) {
@@ -1033,6 +1047,7 @@ public class OsmAndLiveReports {
 		public String btcaddress;
 		public String osmid;
 		public int changes;
+		public int objchanges;
 		
 	}
 	

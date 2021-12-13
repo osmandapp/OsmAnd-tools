@@ -442,7 +442,7 @@ public class UpdateSubscription {
 						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 			}
 			subscriptionPurchase = new SubscriptionPurchase()
-					.setStartTimeMillis(subscription.purchaseTime)
+                    .setStartTimeMillis(startTime != null ? startTime.getTime() : subscription.purchaseTime)
 					.setExpiryTimeMillis(subscription.expirationDate)
 					.setAutoRenewing(subscription.autoRenewing)
 					.setDeveloperPayload(subscription.developerPayload)
