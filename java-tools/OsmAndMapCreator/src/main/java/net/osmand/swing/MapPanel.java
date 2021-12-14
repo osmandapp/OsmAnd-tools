@@ -30,9 +30,7 @@ import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.zip.GZIPInputStream;
 
 import javax.imageio.IIOException;
@@ -42,6 +40,7 @@ import javax.swing.*;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.GPXUtilities;
 import net.osmand.router.RouteColorize.ColorizationType;
+import net.osmand.router.RouteSelector;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -156,7 +155,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private int yStartingImage = 0;
 
 	private MapTileDownloader downloader = MapTileDownloader.getInstance(MapCreatorVersion.APP_MAP_CREATOR_VERSION); // FIXME no commit
-	private RouteSelector routeSelector;
 	Map<String, Image> cache = new HashMap<String, Image>();
 
 	private final JPopupMenu popupMenu;
@@ -435,7 +433,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 	public void setNativeLibrary( NativeSwingRendering nl) {
 		nativeLibRendering = nl;
-		routeSelector = new RouteSelector(nativeLibRendering);
 		fullMapRedraw();
 	}
 
@@ -1146,14 +1143,12 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 								if (o.getX().size() > 1) {
 									String type = "hiking";
 									if (o.isRoute(type)) {
-										if (routeSelector != null && nativeLibRendering != null) {
-
-											Map<String, List<String>> routeStringKeys = o.getRouteStringKeys(type);
-											if (routeStringKeys.size() > 1) {
-												createMenu(o, routeStringKeys, type).show(MapPanel.this, e.getX(), e.getY());
-											} else {
-												routeSelector.getRoute(MapPanel.this, o, routeStringKeys.keySet().iterator().next(), type);
-											}
+										Map<String, List<String>> routeStringKeys = o.getRouteStringKeys(type);
+										if (routeStringKeys.size() > 1) {
+											createMenu(o, routeStringKeys, type)
+													.show(MapPanel.this, e.getX(), e.getY());
+										} else {
+											showRoute(o, routeStringKeys.keySet().iterator().next(), type);
 										}
 									} else {
 										Way way = new Way(-1);
@@ -1201,11 +1196,31 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				menu.add(new AbstractAction(String.join(";", entry.getValue())) {
 					@Override
 					public void actionPerformed(ActionEvent actionEvent) {
-						routeSelector.getRoute(MapPanel.this, o, entry.getKey(), type);
+						showRoute(o, entry.getKey(), type);
 					}
 				});
 			}
 			return menu;
+		}
+
+		void showRoute(RenderedObject o, String tagKey, String routeType) {
+			new Thread(() -> {
+
+				NativeSwingRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
+						MapUtils.get31LatitudeY(o.getY().get(0)),
+						MapUtils.get31LongitudeX(o.getX().get(0)));
+				if (mapDiffs != null) {
+					File mapFile = mapDiffs.baseFile;
+					RouteSelector routeSelector = new RouteSelector();
+					List<Way> ways = routeSelector.getRoute(o, mapFile, tagKey, routeType);
+					DataTileManager<Way> points = new DataTileManager<>();
+					for (Way w : ways) {
+						LatLon n = w.getLatLon();
+						points.registerObject(n.getLatitude(), n.getLongitude(), w);
+					}
+					setPoints(points);
+				}
+			}).start();
 		}
 	}
 
