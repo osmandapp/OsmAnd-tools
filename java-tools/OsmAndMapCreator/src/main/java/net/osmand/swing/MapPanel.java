@@ -26,6 +26,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -38,7 +39,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 
 import gnu.trove.list.array.TIntArrayList;
-import net.osmand.GPXUtilities;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.router.RouteSelector;
 import org.apache.commons.logging.Log;
@@ -65,6 +66,7 @@ import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.GPXUtilities.*;
 
 public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
@@ -966,7 +968,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		prepareImage();
 	}
 
-	public void setColorizationType(GPXUtilities.GPXFile gpxFile, ColorizationType colorizationType, boolean grey) {
+	public void setColorizationType(GPXFile gpxFile, ColorizationType colorizationType, boolean grey) {
 		getLayer(MapPointsLayer.class).setColorizationType(gpxFile, colorizationType, grey);
 		repaint();
 	}
@@ -1141,15 +1143,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 									continue;
 								}
 								if (o.getX().size() > 1) {
-									String type = "hiking";
-									if (o.isRoute(type)) {
-										Map<String, List<String>> routeStringKeys = o.getRouteStringKeys(type);
-										if (routeStringKeys.size() > 1) {
-											createMenu(o, routeStringKeys, type)
-													.show(MapPanel.this, e.getX(), e.getY());
-										} else {
-											showRoute(o, routeStringKeys.keySet().iterator().next(), type);
-										}
+									if (isRoute(o)) {
+										createMenu(o).show(MapPanel.this, e.getX(), e.getY());
 									} else {
 										Way way = new Way(-1);
 										TIntArrayList x1 = o.getX();
@@ -1189,21 +1184,33 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			super.mouseReleased(e);
 		}
 
-		private JPopupMenu createMenu(RenderedObject o, Map<String, List<String>> routeStringKeys, String type) {
+		private JPopupMenu createMenu(RenderedObject o) {
 			JPopupMenu menu = new JPopupMenu();
 			menu.add(new JLabel("Select route"));
-			for (Map.Entry<String, List<String>> entry : routeStringKeys.entrySet()) {
-				menu.add(new AbstractAction(String.join(";", entry.getValue())) {
+			Set<String> keySet = RouteSelector.getRouteStringKeys(o, null);
+			for (String entry : keySet) {
+				menu.add(new AbstractAction(entry) {
 					@Override
 					public void actionPerformed(ActionEvent actionEvent) {
-						showRoute(o, entry.getKey(), type);
+						showRoute(o);
 					}
 				});
 			}
 			return menu;
 		}
 
-		void showRoute(RenderedObject o, String tagKey, String routeType) {
+		public boolean isRoute(RenderedObject o) {
+			boolean isRoute = false;
+			for (String tag : o.getTags().keySet()) {
+				if (RouteSelector.RouteType.isRoute(tag)) {
+					isRoute = true;
+					break;
+				}
+			}
+			return isRoute;
+		}
+
+		void showRoute(RenderedObject o) {
 			new Thread(() -> {
 
 				NativeSwingRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
@@ -1211,14 +1218,32 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 						MapUtils.get31LongitudeX(o.getX().get(0)));
 				if (mapDiffs != null) {
 					File mapFile = mapDiffs.baseFile;
-					RouteSelector routeSelector = new RouteSelector();
-					List<Way> ways = routeSelector.getRoute(o, mapFile, tagKey, routeType);
-					DataTileManager<Way> points = new DataTileManager<>();
-					for (Way w : ways) {
-						LatLon n = w.getLatLon();
-						points.registerObject(n.getLatitude(), n.getLongitude(), w);
+					BinaryMapIndexReader[] reader = new BinaryMapIndexReader[]{null};
+					try {
+						reader[0] = new BinaryMapIndexReader(new RandomAccessFile(mapFile, "r"), mapFile);
+						RouteSelector routeSelector = new RouteSelector(reader);
+						List<GPXFile> files = routeSelector.getRoutes(o);
+						DataTileManager<Way> points = new DataTileManager<>();
+						List<Way> ways = new ArrayList<>();
+						for (GPXFile file : files) {
+							for (Track track : file.tracks) {
+								Way w = new Way(-1);
+								for (TrkSegment segment : track.segments) {
+									for (WptPt point : segment.points) {
+										w.addNode(new Node(point.lat, point.lon, -1));
+									}
+								}
+								ways.add(w);
+							}
+							for (Way w : ways) {
+								LatLon n = w.getLatLon();
+								points.registerObject(n.getLatitude(), n.getLongitude(), w);
+							}
+							setPoints(points);
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
 					}
-					setPoints(points);
 				}
 			}).start();
 		}
