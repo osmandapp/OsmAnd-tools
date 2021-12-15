@@ -48,7 +48,7 @@ get_0_24() {
 
     if [ $last_hour_timestamp -eq 0 ]; then
         echo -en "${RED}FAIL. Unpossible to determine time for download${NC}"
-        exit
+        exit 1
     fi
 
     local diff_time=$(($current_timestamp - $last_hour_timestamp))
@@ -74,7 +74,7 @@ get_0_24() {
         fi
         if [ -z "$file_folder" ]; then
             echo -en "${RED}FAIL. Unpossible to determine folder for timestamp $file_timestamp${NC}"
-            exit
+            exit 1
         fi
         mkdir -p "tmp/$file_folder"
         if [[ $LAST_FORECAST =~ "$file_link" && $LAST_FORECAST =~ "$file_link_id" ]]; then
@@ -93,7 +93,7 @@ get_0_24() {
             fi
         else
             echo -en "${RED}FAIL. Forecast data is not full $LAST_HOURLY_LINK${NC}"
-            exit
+            exit 1
         fi
     done
 }
