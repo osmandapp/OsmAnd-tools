@@ -1,7 +1,12 @@
-BASE_URL="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
-PROVIDER="gfs"
-LAYER="atmos"
-DATE=$(date +"%Y%m%d")
+#!/bin/bash -xe
+BASE_URL=${BASE_URL:-"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"}
+PROVIDER=${PROVIDER:-"gfs"}
+LAYER=${LAYER:-"atmos"}
+BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
+BANDS_DIR="cloud temperature pressure wind precip"
+if [[ -z "${DATE}" ]]; then 
+    DATE=$(date +"%Y%m%d")
+fi
 DOWNLOAD_URL="$BASE_URL$PROVIDER.$DATE"
 FILE_FORECAST_PATTERN="gfs\.t..z\.pgrb2\.0p25\.f..."
 FILE_FORECAST_PATTERN_IDX="gfs\.t..z\.pgrb2\.0p25\.f...\.idx"
@@ -11,9 +16,6 @@ FILE_PART1="gfs.t"
 FILE_PART2="z.pgrb2.0p25.f"
 OS=$(uname -a)
 TIME_ZONE="GMT"
-BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
-BANDS_DIR="cloud temperature pressure wind precip"
-
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
