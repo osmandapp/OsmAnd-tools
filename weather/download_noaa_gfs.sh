@@ -78,4 +78,4 @@ get_bands_tiff() {
 
 get_0_24
 get_bands_tiff
-#rm -rf tmp/
+#rm -rf $DW_FOLDER/
