@@ -52,10 +52,10 @@ get_raw_files() {
         fi
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        ( cd $DATE; wget -c -N $file_link_indx --timeout=900 )
+        ( cd $DATE; wget -N --no-if-modified-since $file_link_indx --timeout=900 )
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
-        ( cd $DATE; wget -c -N $file_link --timeout=900 )
+        ( cd $DATE; wget -N --no-if-modified-since $file_link --timeout=900 )
         rm $filetime.gt || true
         ln -s $DATE/${filename} $filetime.gt
         cd ..;
