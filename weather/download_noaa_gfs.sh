@@ -22,14 +22,6 @@ NC='\033[0m' # No Color
 # band/YYYYmmdd/hh/{z}/{x}/{y}.png
 # GUST:surface/20211206/15/{z}/{x}/{y}.png
 
-DELAY_HOURS
-date -u '+%Y%m%d%H' 
-if [[ -z "${DATE}" ]]; then 
-    DATE=$(date +"%Y%m%d")
-fi
-
-DOWNLOAD_URL=
-
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_0_24() {
     if [[ $OS =~ "Darwin" ]]; then
