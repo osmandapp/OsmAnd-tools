@@ -53,8 +53,8 @@ get_0_24() {
             filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
         mkdir -p "$DW_FOLDER/"
-        ( cd $DW_FOLDER; wget -c -N $file_link_indx --timeout=900 )
-        ( cd $DW_FOLDER; wget -c -N $file_link --timeout=900 )
+        ( cd $DW_FOLDER; wget -N $file_link_indx --timeout=900 )
+        ( cd $DW_FOLDER; wget -N $file_link --timeout=900 )
     done
 }
          
