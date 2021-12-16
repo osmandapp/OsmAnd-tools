@@ -30,7 +30,7 @@ get_0_24() {
     RNDHOURS=$(( $HOURS / 6 * 6 ))
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
-    for (( c=0; c<=2; c++ ))
+    for (( c=0; c<=24; c++ ))
     do
         local h=$c
         if [ $c -lt 10 ]; then
