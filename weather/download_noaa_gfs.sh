@@ -8,7 +8,7 @@ BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "G
 BANDS_DIR="cloud temperature pressure wind precip"
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
 FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
-DW_FOLDER=tmp
+DW_FOLDER=raw
 OS=$(uname -a)
 TIME_ZONE="GMT"
 RED='\033[0;31m'
@@ -53,20 +53,8 @@ get_0_24() {
             filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
         mkdir -p "$DW_FOLDER/"
-        wget -N $file_link_indx --timeout=900 -O $DW_FOLDER/${LAYER}-${filetime}.idx
-        if [[ $? -ne 0 ]]; then
-            echo -en "${RED} $file_link_indx not downloaded${NC}"
-            exit 1;
-        else
-            echo -en "${GREEN} $file_link_indx downloaded${NC}"
-        fi
-        wget -N $file_link --timeout=900 -O $DW_FOLDER/${LAYER}-${filetime}
-        if [[ $? -ne 0 ]]; then
-            echo -en "${RED} $file_link not downloaded${NC}"
-            exit 1;
-        else
-            echo -en "${GREEN} $file_link downloaded${NC}"
-        fi
+        ( cd $DW_FOLDER; wget -c -N $file_link_indx --timeout=900 )
+        ( cd $DW_FOLDER; wget -c -N $file_link --timeout=900 )
     done
 }
          
