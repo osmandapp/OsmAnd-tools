@@ -8,6 +8,7 @@ BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "G
 BANDS_NAMES="cloud temperature pressure wind precip"
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
 FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
+DAYS_TO_DELETE=2
 DW_FOLDER=raw
 TIFF_FOLDER=tiff
 OS=$(uname -a)
@@ -47,14 +48,14 @@ get_0_24() {
         else
             filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
-        mkdir -p "$DW_FOLDER/"
+        mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        wget -N $file_link_indx --timeout=900 
+        (( cd $DATE && wget -N $file_link_indx --timeout=900 ))
         rm $filetime.gt.idx || true
-        ln -s ${filename}.idx $filetime.gt.idx
-        wget -N $file_link --timeout=900 
+        ln -s $DATE/${filename}.idx $filetime.gt.idx
+        (( cd $DATE wget -N $file_link --timeout=900 ))
         rm $filetime.gt || true
-        ln -s ${filename} $filetime.gt
+        ln -s $DATE/${filename} $filetime.gt
         cd ..;
     done
 }
@@ -72,7 +73,13 @@ get_bands_tiff() {
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
     done
 }
+# cleanup 
+rm $DW_FOLDER/*.gt || true
+rm $DW_FOLDER/*.gt.idx || true
+find $DW_FOLDER/ -type f -mtime +${DAYS_TO_DELETE} -delete
 
 get_0_24
 get_bands_tiff
+
+find $TIFF_FOLDER/ -type f -mtime +${DAYS_TO_DELETE} -delete
 #rm -rf $DW_FOLDER/
