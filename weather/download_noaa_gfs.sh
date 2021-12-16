@@ -49,7 +49,7 @@ get_0_24() {
         if [[ $OS =~ "Darwin" ]]; then
             filetime=$(date -ju -v+${c}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${DATE} ${RNDHOURS}00")
         else
-            filetime=$(date -du "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
+            filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
         mkdir -p "tmp/"
         wget $file_link_id --timeout=900 -P tmp/${LAYER}-${filetime}.idx
