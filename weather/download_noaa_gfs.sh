@@ -8,7 +8,9 @@ BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "G
 BANDS_NAMES="cloud temperature pressure wind precip"
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
 FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
-DAYS_TO_DELETE=2
+DAYS_TO_KEEP=${DAYS_TO_KEEP:-2}
+HOURS_TO_DOWNLOAD=${HOURS_TO_DOWNLOAD:-30}
+
 DW_FOLDER=raw
 TIFF_FOLDER=tiff
 OS=$(uname -a)
@@ -19,7 +21,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-get_0_24() {
+get_files() {
     if [[ $OS =~ "Darwin" ]]; then
         HOURS=$(date -u -v-${DELAY_HOURS}H '+%H')]
         DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
@@ -31,7 +33,7 @@ get_0_24() {
     RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
-    for (( c=0; c<=24; c++ ))
+    for (( c=0; c<=${HOURS_TO_DOWNLOAD}; c++ ))
     do
         local h=$c
         if [ $c -lt 10 ]; then
@@ -76,10 +78,10 @@ get_bands_tiff() {
 # cleanup 
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
-find $DW_FOLDER/ -type f -mtime +${DAYS_TO_DELETE} -delete
+find $DW_FOLDER/ -type f -mtime +${DAYS_TO_KEEP} -delete
 
 get_0_24
 get_bands_tiff
 
-find $TIFF_FOLDER/ -type f -mtime +${DAYS_TO_DELETE} -delete
+find $TIFF_FOLDER/ -type f -mtime +${DAYS_TO_KEEP} -delete
 #rm -rf $DW_FOLDER/
