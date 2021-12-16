@@ -50,8 +50,10 @@ get_0_24() {
         mkdir -p "$DW_FOLDER/"
         cd $DW_FOLDER; 
         wget -N $file_link_indx --timeout=900 
+        rm $filetime.gt.idx || true
         ln -s ${filename}.idx $filetime.gt.idx
         wget -N $file_link --timeout=900 
+        rm $filetime.gt || true
         ln -s ${filename} $filetime.gt
         cd ..;
     done
