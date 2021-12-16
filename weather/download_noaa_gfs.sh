@@ -29,7 +29,7 @@ get_0_24() {
     # Round down HOURS to 0/6/12/18
     RNDHOURS=$(( $HOURS / 6 * 6 ))
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
-    local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/${FILE_PREFIX}${RNDHOURS}${FILE_NAME}"
+    local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
     for (( c=0; c<=2; c++ ))
     do
         local h=$c
@@ -38,8 +38,9 @@ get_0_24() {
         elif [ $c -lt 100 ]; then
             h="0$h"
         fi
-        local file_link="${url}${h}"
-        local file_link_indx="${url}${h}.idx"
+        local filename="${FILE_PREFIX}${RNDHOURS}${FILE_NAME}${h}"
+        local file_link="${url}${filename}"
+        local file_link_indx="${url}${filename}.idx"
         local filetime=""
         if [[ $OS =~ "Darwin" ]]; then
             filetime=$(date -ju -v+${c}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${DATE} ${RNDHOURS}00")
@@ -49,9 +50,9 @@ get_0_24() {
         mkdir -p "$DW_FOLDER/"
         cd $DW_FOLDER; 
         wget -N $file_link_indx --timeout=900 
-        ln -s $file_link_indx $filetime.gt.idx
+        ln -s ${filename}.idx $filetime.gt.idx
         wget -N $file_link --timeout=900 
-        ln -s $file_link $filetime.gt
+        ln -s ${filename} $filetime.gt
         cd ..;
     done
 }
