@@ -27,7 +27,7 @@ get_0_24() {
         DATE=$(date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
     fi
     # Round down HOURS to 0/6/12/18
-    RNDHOURS=$(( $HOURS / 6 * 6 ))
+    RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
     for (( c=0; c<=24; c++ ))
