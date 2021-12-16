@@ -35,7 +35,7 @@ get_0_24() {
     RNDHOURS=$(( $HOURS / 6 * 6 ))
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/${FILE_PREFIX}${RNDHOURS}${FILE_NAME}"
-    for (( c=0; c<=3; c++ ))
+    for (( c=0; c<=2; c++ ))
     do
         local h=$c
         if [ $c -lt 10 ]; then
@@ -52,14 +52,14 @@ get_0_24() {
             filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
         mkdir -p "tmp/"
-        wget $file_link_indx --timeout=900 -P tmp/${LAYER}-${filetime}.idx
+        wget $file_link_indx --timeout=900 -O tmp/${LAYER}-${filetime}.idx
         if [[ $? -ne 0 ]]; then
             echo -en "${RED} $file_link_indx not downloaded${NC}"
             exit 1;
         else
             echo -en "${GREEN} $file_link_indx downloaded${NC}"
         fi
-        wget $file_link --timeout=900 -P tmp/${LAYER}-${filetime}
+        wget $file_link --timeout=900 -O tmp/${LAYER}-${filetime}
         if [[ $? -ne 0 ]]; then
             echo -en "${RED} $file_link not downloaded${NC}"
             exit 1;
@@ -90,4 +90,4 @@ get_bands_tiff() {
 
 get_0_24
 get_bands_tiff
-#rm -rf tmp/
+rm -rf tmp/
