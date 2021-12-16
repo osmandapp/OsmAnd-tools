@@ -52,10 +52,10 @@ get_raw_files() {
         fi
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        ( cd $DATE; wget -N $file_link_indx --timeout=900 )
+        ( cd $DATE; wget -c -N $file_link_indx --timeout=900 )
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
-        ( cd $DATE; wget -N $file_link --timeout=900 )
+        ( cd $DATE; wget -c -N $file_link --timeout=900 )
         rm $filetime.gt || true
         ln -s $DATE/${filename} $filetime.gt
         cd ..;
@@ -79,6 +79,7 @@ get_bands_tiff() {
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
 find $DW_FOLDER/ -type f -mtime +${DAYS_TO_KEEP} -delete
+find $DW_FOLDER/ -type d -empty -delete
 
 get_raw_files
 get_bands_tiff
