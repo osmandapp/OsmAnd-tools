@@ -61,7 +61,7 @@ get_0_24() {
 get_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*
     do
-        if [[ $WFILE == "*.idx" ]]; then
+        if [[ $WFILE == *.idx ]]; then
             continue
         fi
         band_numbers=""
