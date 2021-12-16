@@ -66,7 +66,8 @@ get_bands_tiff() {
             band_numbers="$band_numbers -b $b_num"
         done
         mkdir -p $TIFF_FOLDER/
-        gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${WFILE}.tiff
+        BS=$(basename $WFILE)
+        gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
     done
 }
 
