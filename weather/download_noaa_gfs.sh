@@ -52,12 +52,12 @@ get_0_24() {
             filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
         mkdir -p "tmp/"
-        wget $file_link_id --timeout=900 -P tmp/${LAYER}-${filetime}.idx
+        wget $file_link_indx --timeout=900 -P tmp/${LAYER}-${filetime}.idx
         if [[ $? -ne 0 ]]; then
-            echo -en "${RED} $file_link_id not downloaded${NC}"
+            echo -en "${RED} $file_link_indx not downloaded${NC}"
             exit 1;
         else
-            echo -en "${GREEN} $file_link_id downloaded${NC}"
+            echo -en "${GREEN} $file_link_indx downloaded${NC}"
         fi
         wget $file_link --timeout=900 -P tmp/${LAYER}-${filetime}
         if [[ $? -ne 0 ]]; then
