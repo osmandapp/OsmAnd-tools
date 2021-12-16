@@ -23,10 +23,10 @@ NC='\033[0m' # No Color
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
     if [[ $OS =~ "Darwin" ]]; then
-        HOURS=$(date -u -v-${DELAY_HOURS}H '+%H')]
+        HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
         DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
     else
-        HOURS=$(date -u '+%H' -d "-${DELAY_HOURS} hours")
+        HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
         DATE=$(date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
     fi
     # Round down HOURS to 0/6/12/18
