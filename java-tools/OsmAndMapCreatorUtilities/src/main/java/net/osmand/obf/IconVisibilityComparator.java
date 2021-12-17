@@ -16,7 +16,7 @@ import static net.osmand.binary.BinaryMapIndexReader.*;
 
 public class IconVisibilityComparator {
 	String RENDER_FILE = "/home/user/osmand/issues/i985/default.render.xml";
-	String TEST_FILE = "/home/user/osmand/issues/i985/test.obf";
+	String TEST_FILE = "/home/user/osmand/issues/i985/Synthetic_test_rendering.obf";
 	Map<Integer, List<VisibleObject>> mapObjectMap = new LinkedHashMap<>();
 	private int maxZoom = 0;
 	private int minZoom = 22;
@@ -96,17 +96,40 @@ public class IconVisibilityComparator {
 	}
 
 	private void printDiffs() {
+		List<VisibleObject> groupA = new ArrayList<>();
+		List<VisibleObject> groupB = new ArrayList<>();
 		for (int zoom = minZoom; zoom < maxZoom; zoom++) {
 			List<VisibleObject> zoomList = mapObjectMap.get(zoom);
 			List<VisibleObject> zoom1List = mapObjectMap.get(zoom + 1);
-			for (VisibleObject oz : zoomList) {
-				for (VisibleObject oz1 : zoom1List) {
+			groupA.clear();
+			groupB.clear();
+			System.out.println("zoom: " + zoom + " - " + (zoom + 1));
+			for (VisibleObject oz1 : zoom1List) {
+				for (VisibleObject oz : zoomList) {
 					if (oz.mapDataObject.getId() == oz1.mapDataObject.getId()) {
+						groupB.add(oz1);
 						break;
 					}
 				}
+				if (!groupB.contains(oz1)) {
+					groupA.add(oz1);
+				}
 			}
-			System.out.println(zoom);
+			for (VisibleObject a : groupA) {
+				for (VisibleObject b : groupB) {
+					if (b.iconOrder > 0 && a.iconOrder > 0 && b.iconOrder < a.iconOrder) {
+						System.out.printf("icon name=\"%s\" %d < a name=\"%s\" %d%n",
+								b.mapDataObject.getName(), b.iconOrder,
+								a.mapDataObject.getName(), a.iconOrder);
+					}
+					if (b.textOrder > 0 && a.textOrder > 0 && b.textOrder < a.textOrder) {
+						System.out.printf("text b name=\"%s\" %d < a name=\"%s\" %d%n",
+								b.mapDataObject.getName(), b.textOrder,
+								a.mapDataObject.getName(), a.textOrder);
+					}
+				}
+			}
+
 		}
 	}
 
