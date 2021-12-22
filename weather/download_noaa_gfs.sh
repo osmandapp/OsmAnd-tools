@@ -30,6 +30,8 @@ NC='\033[0m' # No Color
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
+    rm $DW_FOLDER/*.gt || true
+    rm $DW_FOLDER/*.gt.idx || true
     if [[ $OS =~ "Darwin" ]]; then
         HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
         DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
@@ -89,7 +91,7 @@ get_bands_tiff() {
             -co "SPARSE_OK=TRUE" -t_srs "+init=epsg:3857 +over" \
             -r cubic -multi \
             $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}.M.tiff
-        gdal_translate -b $TILES_BAND ${FILE_NAME}.M.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
+        gdal_translate -b ${TILES_BAND} ${FILE_NAME}.M.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
         gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
         gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
         mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
@@ -100,12 +102,9 @@ get_bands_tiff() {
     done
 }
 # cleanup 
-rm $DW_FOLDER/*.gt || true
-rm $DW_FOLDER/*.gt.idx || true
 find $DW_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
 find $DW_FOLDER/ -type d -empty -delete
-
-# get_raw_files
+get_raw_files
 get_bands_tiff
 
 find $TIFF_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
