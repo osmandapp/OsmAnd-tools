@@ -9,8 +9,6 @@
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 
-#include <SkImageDecoder.h>
-
 #include <OsmAndCore/QtExtensions.h>
 #include <QString>
 #include <QList>
@@ -186,8 +184,6 @@ int main(int argc, char** argv)
         nullptr,
         nullptr);
     //////////////////////////////////////////////////////////////////////////
-
-    const std::unique_ptr<SkImageDecoder> pngDecoder(CreatePNGImageDecoder());
 
     for (int argIdx = 1; argIdx < argc; argIdx++)
     {
