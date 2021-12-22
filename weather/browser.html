@@ -86,15 +86,17 @@
         }
         //var prefix = '.';
         var prefix = 'https://test.osmand.net/weather/gfs/';
-        var cloud = L.tileLayer(prefix+'/tiles/cloud/' + weather_date + '/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
-        var temperature = L.tileLayer(prefix +'/tiles/temperature/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
-        var pressure = L.tileLayer(prefix +'/tiles/pressure/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
-        var wind = L.tileLayer(prefix +'/tiles/wind/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
-        var precip = L.tileLayer(prefix +'/tiles/precip/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
+        const nativeMaxZoom = 4;
+        const maxScaleZoom = 11;
+        var cloud = L.tileLayer(prefix+'/tiles/cloud/' + weather_date + '/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var temperature = L.tileLayer(prefix +'/tiles/temperature/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var pressure = L.tileLayer(prefix +'/tiles/pressure/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var wind = L.tileLayer(prefix +'/tiles/wind/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var precip = L.tileLayer(prefix +'/tiles/precip/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
         // Map
         var map = L.map('map', {
             center: [50, 10],
-            zoom: 6,
+            zoom: 5,
             minZoom: 1,
             maxZoom: 11,
             layers: [osm]

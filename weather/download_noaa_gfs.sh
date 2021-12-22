@@ -17,7 +17,8 @@ TIFF_FOLDER=tiff
 
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=4
-TILES_ZOOM_RES=6
+TILES_ZOOM_RES=4
+PARALLEL_TO_TILES=3
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
@@ -99,8 +100,8 @@ get_bands_tiff() {
             gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
             gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
             mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            gdal2tiles.py -z 1-${TILES_ZOOM_GEN} ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            rm $TILES_FOLDER/$TILES_BAND_NAME/*.html || true
+            gdal2tiles.py --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
+            rm $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME/*.html || true
             cp "${THIS_LOCATION}/browser.html" .
         done
         rm *.O.tiff || true
