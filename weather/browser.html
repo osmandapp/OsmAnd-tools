@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+    <title>Weather</title>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.5/leaflet.css" />
+    <script src="http://cdn.leafletjs.com/leaflet-0.7.5/leaflet.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body,
+        table,
+        tr,
+        td,
+        th,
+        div,
+        h1,
+        h2,
+        input {
+            font-family: "Calibri", "Trebuchet MS", "Ubuntu", Serif;
+            font-size: 11pt;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        /* full size */
+        .ctl {
+            padding: 2px 10px 2px 10px;
+            background: white;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            text-align: right;
+        }
+
+        .title {
+            font-size: 18pt;
+            font-weight: bold;
+        }
+
+        .src {
+            font-size: 10pt;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <script>
+        /* **** Leaflet **** */
+
+        // Base layers
+        //  .. OpenStreetMap
+        var osm = L.tileLayer('https://tile.osmand.net/hd/{z}/{x}/{y}.png', { attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors', minZoom: 1, maxZoom: 18 });
+
+        //  .. CartoDB Positron
+        //var cartodb = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>', minZoom: 6, maxZoom: 6 });
+
+        //  .. OSM Toner
+        //var toner = L.tileLayer('http://{s}.tile.stamen.com/toner/{z}/{x}/{y}.png', { attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.', minZoom: 6, maxZoom: 6 });
+
+        //  .. White background
+        var white = L.tileLayer("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEX///+nxBvIAAAAH0lEQVQYGe3BAQ0AAADCIPunfg43YAAAAAAAAAAA5wIhAAAB9aK9BAAAAABJRU5ErkJggg==", { minZoom: 6, maxZoom: 6 });
+        
+        var now_date = new Date();
+        var weather_date = now_date.getUTCFullYear() + '' + now_date.getUTCMonth() + '' + now_date.getUTCDate() + "_" + now_date.getUTCHours() +"00";
+        // "20211222_0600"
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('date')) {
+            weather_date = urlParams.get('date');
+        }
+        //var prefix = '.';
+        var prefix = 'https://test.osmand.net/weather/gfs/';
+        var cloud = L.tileLayer(prefix+'/tiles/cloud/' + weather_date + '/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
+        var temperature = L.tileLayer(prefix +'/tiles/temperature/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
+        var pressure = L.tileLayer(prefix +'/tiles/pressure/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
+        var wind = L.tileLayer(prefix +'/tiles/wind/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
+        var precip = L.tileLayer(prefix +'/tiles/precip/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:6, maxZoom: 11});
+        // Map
+        var map = L.map('map', {
+            center: [50, 10],
+            zoom: 6,
+            minZoom: 1,
+            maxZoom: 11,
+            layers: [osm]
+        });
+
+        var basemaps = { "OpenStreetMap": osm, "Without background": white }
+        var overlaymaps = { "Cloud":cloud, "Temperature": temperature, "Pressure": pressure,  "Wind": wind, "Precipation": precip }
+
+        // Title
+        var title = L.control();
+        title.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'ctl title');
+            this.update();
+            return this._div;
+        };
+        title.update = function (props) {
+            this._div.innerHTML = weather_date;
+        };
+        title.addTo(map);
+
+        // Add base layers
+        L.control.layers(basemaps, overlaymaps, { collapsed: false }).addTo(map);
+
+        // Fit to overlay bounds (SW and NE points with (lat, lon))
+        //map.fitBounds([[-81.10948101, 179.881186189], [81.1125, -179.999755859]]);
+
+    </script>
+
+</body>
+
+</html>

@@ -6,7 +6,7 @@ LAYER=${LAYER:-"atmos"}
 # usually 4 hours is enough to get freshest files 
 DELAY_HOURS=${DELAY_HOURS:-4}
 BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
-BANDS_NAMES="cloud temperature pressure wind precip"
+BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip")
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
 FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
 MINUTES_TO_KEEP=${MINUTES_TO_KEEP:-1800} # 30 hours
@@ -18,8 +18,6 @@ TIFF_FOLDER=tiff
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=6
 TILES_ZOOM_RES=6
-TILES_BAND=5
-TILES_BAND_NAME=precip
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
@@ -75,8 +73,8 @@ get_raw_files() {
 get_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
-        rm *M.tiff || true
-        rm *.vrt || true
+        # rm *M.tiff || true
+        # rm *.vrt || true
 
         band_numbers=""
         for i in ${!BANDS[@]}; do
@@ -88,19 +86,25 @@ get_bands_tiff() {
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
 
         ## generate gdal2tiles fo a given band with given rasterization
-        local FILE_NAME="${BS%%.*}"
+        
         local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
         gdalwarp -of GTiff --config 4 4 \
             -co "SPARSE_OK=TRUE" -t_srs "+init=epsg:3857 +over" \
             -r cubic -multi \
             $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}.M.tiff
-        gdal_translate -b ${TILES_BAND} ${FILE_NAME}.M.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
-        gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
-        gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
-        mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-        gdal2tiles.py -z $TILES_ZOOM_GEN ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-        # rm *M.tiff || true
-        # rm *.vrt || true
+        for TILES_BAND in ${!BANDS_NAMES[@]}; do
+            local FILE_NAME="${BS%%.*}"
+            local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
+            gdal_translate -b ${TILES_BAND} ${FILE_NAME}.M.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
+            gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
+            gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
+            mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
+            gdal2tiles.py -z 1-${TILES_ZOOM_GEN} ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
+            rm $TILES_FOLDER/$TILES_BAND_NAME/*.html || true
+            rm *M.tiff || true
+            rm *.vrt || true
+            cp "${THIS_LOCATION}/browser.html" .
+        done
     done
 }
 # cleanup 
