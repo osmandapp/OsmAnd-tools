@@ -102,7 +102,7 @@ generate_tiles() {
             local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
             local BAND_IND=$(( $TILES_BAND + 1 ))
             local TEMP_NAME=${FILE_NAME}_${TILES_BAND_NAME}
-            gdal_translate -b ${BAND_IND} ${TEMP_NAME}.O.tiff ${TEMP_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
+            gdal_translate -b ${BAND_IND} ${FILE_NAME}.O.tiff ${TEMP_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
             gdaldem color-relief -alpha ${TEMP_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${TEMP_NAME}.APM.tiff
             gdal_translate -of VRT -ot Byte -scale ${TEMP_NAME}.APM.tiff ${TEMP_NAME}.APM.vrt
             mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
