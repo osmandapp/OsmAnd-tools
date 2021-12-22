@@ -84,7 +84,7 @@ get_bands_tiff() {
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
 
         ## generate gdal2tiles fo a given band with given rasterization
-        
+        local FILE_NAME="${BS%%.*}"
         local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
         gdalwarp -of GTiff --config 4 4 \
             -co "SPARSE_OK=TRUE" -t_srs "+init=epsg:3857 +over" \
@@ -93,7 +93,6 @@ get_bands_tiff() {
         for TILES_BAND in ${!BANDS_NAMES[@]}; do
             rm *M.tiff || true
             rm *.vrt || true
-            local FILE_NAME="${BS%%.*}"
             local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
             local BAND_IND=$(( $TILES_BAND + 1 ))
             gdal_translate -b ${BAND_IND} ${FILE_NAME}.O.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
