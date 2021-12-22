@@ -93,7 +93,7 @@ generate_tiles() {
         local FILE_NAME="${BS%%.*}"
         local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
         gdalwarp -of GTiff --config 4 4 \
-            -co "SPARSE_OK=TRUE" -t_srs "+init=epsg:3857 +over" \
+            -co "SPARSE_OK=TRUE" -t_srs epsg:3857 \
             -r cubic -multi \
             $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}.O.tiff
         for TILES_BAND in ${!BANDS_NAMES[@]}; do
