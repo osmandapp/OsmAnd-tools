@@ -79,30 +79,57 @@
         //var toner = L.tileLayer('http://{s}.tile.stamen.com/toner/{z}/{x}/{y}.png', { attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.', minZoom: 6, maxZoom: 6 });
 
         //  .. White background
-        var white = L.tileLayer("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEX///+nxBvIAAAAH0lEQVQYGe3BAQ0AAADCIPunfg43YAAAAAAAAAAA5wIhAAAB9aK9BAAAAABJRU5ErkJggg==", { minZoom: 6, maxZoom: 6 });
+        var white = L.tileLayer("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEX///+nxBvIAAAAH0lEQVQYGe3BAQ0AAADCIPunfg43YAAAAAAAAAAA5wIhAAAB9aK9BAAAAABJRU5ErkJggg==", { minZoom: 1, maxZoom: 18 });
         
         var now_date = new Date();
-        var weather_date = now_date.getUTCFullYear() + '' + now_date.getUTCMonth() + '' + now_date.getUTCDate() + "_" + now_date.getUTCHours() +"00";
         // "20211222_0600"
         const urlParams = new URLSearchParams(window.location.search);
+        var weatherDateObj = new Date();
         if (urlParams.get('date')) {
-            weather_date = urlParams.get('date');
+            var weather_date = urlParams.get('date');
+            weatherDateObj.setUTCFullYear(parseInt(weather_date.slice(0, 4)));
+            weatherDateObj.setUTCMonth(parseInt(weather_date.slice(4, 6)) - 1);
+            weatherDateObj.setUTCDate(parseInt(weather_date.slice(6, 8)));
+            weatherDateObj.setUTCHours(parseInt(weather_date.slice(9, 11)));
         }
+        weatherDateObj.setUTCMinutes(0);
+        weatherDateObj.setUTCSeconds(0);
         //var prefix = '.';
-        var prefix = 'https://test.osmand.net/weather/gfs/';
+        var prefix = 'https://test.osmand.net/weather/gfs';
         const nativeMaxZoom = 4;
         const maxScaleZoom = 11;
-        var cloud = L.tileLayer(prefix+'/tiles/cloud/' + weather_date + '/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
-        var temperature = L.tileLayer(prefix +'/tiles/temperature/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
-        var pressure = L.tileLayer(prefix +'/tiles/pressure/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
-        var wind = L.tileLayer(prefix +'/tiles/wind/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
-        var precip = L.tileLayer(prefix +'/tiles/precip/' + weather_date +'/{z}/{x}/{y}.png', { tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        function getTime() {
+            let h = weatherDateObj.getUTCHours();
+            if (h < 10) {
+                h = '0' + h;
+            }
+            let m = weatherDateObj.getUTCMonth() + 1;
+            if (m < 10) {
+                m = '0' + m;
+            }
+            let d = weatherDateObj.getUTCDate();
+            if (d < 10) {
+                d = '0' + d;
+            }
+            const layer_date = weatherDateObj.getUTCFullYear() + '' + m + '' + d + "_" + h + "00";
+            return layer_date;
+        }
+        function getUrl(layer) {
+            return prefix + '/tiles/' + layer +'/{time}/{z}/{x}/{y}.png';
+        }
+
+        var cloud = L.tileLayer(getUrl('cloud'), { time : getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var temperature = L.tileLayer(getUrl('temperature'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var pressure = L.tileLayer(getUrl('pressure'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var wind = L.tileLayer(getUrl('wind'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var precip = L.tileLayer(getUrl('precip'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
         // Map
         var map = L.map('map', {
             center: [50, 10],
             zoom: 5,
             minZoom: 1,
             maxZoom: 11,
+            zoomControl:false,
             layers: [osm]
         });
 
@@ -110,16 +137,28 @@
         var overlaymaps = { "Cloud":cloud, "Temperature": temperature, "Pressure": pressure,  "Wind": wind, "Precipation": precip }
 
         // Title
-        var title = L.control();
+        var title = L.control({ position: 'topleft' });
         title.onAdd = function (map) {
             this._div = L.DomUtil.create('div', 'ctl title');
             this.update();
             return this._div;
         };
         title.update = function (props) {
-            this._div.innerHTML = weather_date;
+            let hours = (-(new Date().getTime() - weatherDateObj.getTime()) / 3600000).toFixed(0);
+            //this._div.innerHTML = weather_date.slice(6, 8) + '-' + weather_date.slice(4, 6) + '-' + weather_date.slice(0, 4) + " " + weather_date.slice(9, 11) + ":00 UTC";
+            if (hours > 0) {
+                hours = "+"  + hours;
+            }
+            let text = weatherDateObj.toDateString() + "  " + weatherDateObj.getHours() + ":00 [" + hours + " hours ]";
+            this._div.innerHTML = text + " <button href='#' onclick='prevHour()'>-</button> <button href='#' onclick='nextHour()'>+</button>";
+
+
         };
         title.addTo(map);
+
+        L.control.zoom({
+            position: 'bottomright'
+        }).addTo(map);
 
         // Add base layers
         L.control.layers(basemaps, overlaymaps, { collapsed: false }).addTo(map);
@@ -127,6 +166,27 @@
         // Fit to overlay bounds (SW and NE points with (lat, lon))
         //map.fitBounds([[-81.10948101, 179.881186189], [81.1125, -179.999755859]]);
 
+        function nextDate(hours) {
+            weatherDateObj.setTime(weatherDateObj.getTime() + (hours * 60 * 60 * 1000));
+            cloud.options.time = getTime();
+            cloud.redraw();
+            temperature.options.time = getTime();
+            temperature.redraw();
+            pressure.options.time = getTime();
+            pressure.redraw();
+            wind.options.time = getTime();
+            wind.redraw();
+            precip.options.time = getTime();
+            precip.redraw();
+            title.update();            
+        }
+
+        function nextHour(){
+            nextDate(1);
+        }
+        function prevHour() {
+            nextDate(-1);
+        }
     </script>
 
 </body>

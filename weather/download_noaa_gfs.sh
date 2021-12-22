@@ -16,9 +16,9 @@ DW_FOLDER=raw
 TIFF_FOLDER=tiff
 
 TILES_FOLDER=tiles
-TILES_ZOOM_GEN=4
+TILES_ZOOM_GEN=3
 TILES_ZOOM_RES=4
-PARALLEL_TO_TILES=3
+PARALLEL_TO_TILES=2
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
@@ -71,9 +71,7 @@ get_raw_files() {
     done
 }
          
-get_bands_tiff() {
-    rm *.O.tiff || true
-    cp "${THIS_LOCATION}/browser.html" .
+generate_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
         band_numbers=""
@@ -84,7 +82,13 @@ get_bands_tiff() {
         mkdir -p $TIFF_FOLDER/
         BS=$(basename $WFILE)
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
-
+    done
+}
+generate_tiles() {
+    rm *.O.tiff || true
+    for WFILE in ${DW_FOLDER}/*.gt
+    do
+        BS=$(basename $WFILE)
         ## generate gdal2tiles fo a given band with given rasterization
         local FILE_NAME="${BS%%.*}"
         local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
@@ -101,18 +105,20 @@ get_bands_tiff() {
             gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
             gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
             mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            gdal2tiles.py --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
+            gdal2tiles.py --tilesize=512 --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${FILE_NAME}.APM.vrt \
+                     $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
             rm $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME/*.html || true
         done
         rm *.O.tiff || true
     done
 }
-# cleanup 
+
+
 get_raw_files
-get_bands_tiff
+generate_bands_tiff
+cp "${THIS_LOCATION}/browser.html" .
+# generate_tiles
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
-
-
 #rm -rf $DW_FOLDER/
