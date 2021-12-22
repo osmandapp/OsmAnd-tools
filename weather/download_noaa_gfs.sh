@@ -71,6 +71,7 @@ get_raw_files() {
 }
          
 get_bands_tiff() {
+    rm *.O.tiff || true
     for WFILE in ${DW_FOLDER}/*.gt
     do
         band_numbers=""
