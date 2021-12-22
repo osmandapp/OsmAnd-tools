@@ -114,9 +114,9 @@ generate_tiles() {
 }
 
 
+cp "${THIS_LOCATION}/browser.html" .
 get_raw_files
 generate_bands_tiff
-cp "${THIS_LOCATION}/browser.html" .
 # generate_tiles
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
