@@ -1192,7 +1192,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				menu.add(new AbstractAction(entry) {
 					@Override
 					public void actionPerformed(ActionEvent actionEvent) {
-						showRoute(o);
+						showRoute(o, entry);
 					}
 				});
 			}
@@ -1210,7 +1210,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			return isRoute;
 		}
 
-		void showRoute(RenderedObject o) {
+		void showRoute(RenderedObject o, String key) {
 			new Thread(() -> {
 
 				NativeSwingRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
@@ -1227,13 +1227,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 						List<Way> ways = new ArrayList<>();
 						for (GPXFile file : files) {
 							for (Track track : file.tracks) {
-								Way w = new Way(-1);
 								for (TrkSegment segment : track.segments) {
+									Way w = new Way(-1);
 									for (WptPt point : segment.points) {
 										w.addNode(new Node(point.lat, point.lon, -1));
 									}
+									ways.add(w);
 								}
-								ways.add(w);
 							}
 							for (Way w : ways) {
 								LatLon n = w.getLatLon();
