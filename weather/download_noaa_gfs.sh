@@ -82,14 +82,13 @@ get_bands_tiff() {
         BS=$(basename $WFILE)
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
 
-        ## generate band 5 color
-        local INPUT_FILE=${BS}.tiff
-        local FILE_NAME="${INPUT_FILE%%.*}"
+        ## generate gdal2tiles fo a given band with given rasterization
+        local FILE_NAME="${BS%%.*}"
         local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
         gdalwarp -of GTiff --config 4 4 \
             -co "SPARSE_OK=TRUE" -t_srs "+init=epsg:3857 +over" \
             -r cubic -multi \
-            $INPUT_FILE ${FILE_NAME}.M.tiff
+            $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}.M.tiff
         gdal_translate -b $TILES_BAND ${FILE_NAME}.M.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
         gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
         gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
@@ -106,7 +105,7 @@ rm $DW_FOLDER/*.gt.idx || true
 find $DW_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
 find $DW_FOLDER/ -type d -empty -delete
 
-get_raw_files
+# get_raw_files
 get_bands_tiff
 
 find $TIFF_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
