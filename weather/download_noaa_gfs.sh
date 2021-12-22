@@ -16,7 +16,7 @@ DW_FOLDER=raw
 TIFF_FOLDER=tiff
 
 TILES_FOLDER=tiles
-TILES_ZOOM_GEN=4
+TILES_ZOOM_GEN=3
 TILES_ZOOM_RES=5
 PARALLEL_TO_TILES=2
 
@@ -97,19 +97,19 @@ generate_tiles() {
             -r cubic -multi \
             $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}.O.tiff
         for TILES_BAND in ${!BANDS_NAMES[@]}; do
-            rm *M.tiff || true
-            rm *.vrt || true
             local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
             local BAND_IND=$(( $TILES_BAND + 1 ))
             local TEMP_NAME=${FILE_NAME}_${TILES_BAND_NAME}
             gdal_translate -b ${BAND_IND} ${FILE_NAME}.O.tiff ${TEMP_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
             gdaldem color-relief -alpha ${TEMP_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${TEMP_NAME}.APM.tiff
-            gdal_translate -of VRT -ot Byte -scale ${TEMP_NAME}.APM.tiff ${TEMP_NAME}.APM.vrt
+            # gdal_translate -of VRT -ot Byte -scale ${TEMP_NAME}.APM.tiff ${TEMP_NAME}.APM.vrt
             mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            gdal2tiles.py --tilesize=512 --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${TEMP_NAME}.APM.vrt \
+            gdal2tiles.py --tilesize=512 --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${TEMP_NAME}.APM.tiff \
                      $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
             rm $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME/*.html || true
         done
+        rm *M.tiff || true
+        rm *.vrt || true
         rm *.O.tiff || true
     done
 }
