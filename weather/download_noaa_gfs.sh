@@ -98,7 +98,7 @@ get_bands_tiff() {
         gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
         gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
         mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-        gdal2tiles.py -z $ZOOM ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
+        gdal2tiles.py -z $TILES_ZOOM_GEN ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
         # rm *M.tiff || true
         # rm *.vrt || true
     done
