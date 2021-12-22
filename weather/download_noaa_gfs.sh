@@ -75,6 +75,9 @@ get_raw_files() {
 get_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
+        rm *M.tiff || true
+        rm *.vrt || true
+
         band_numbers=""
         for i in ${!BANDS[@]}; do
             local b_num=$(cat $WFILE.idx | grep "${BANDS[$i]}" | awk 'NR==1{print $1}' | awk -F ":" '{print $1}')
@@ -96,9 +99,8 @@ get_bands_tiff() {
         gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
         mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
         gdal2tiles.py -z $ZOOM ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-        #rm *M.tiff || true
-        #rm *.vrt || true
-
+        # rm *M.tiff || true
+        # rm *.vrt || true
     done
 }
 # cleanup 
