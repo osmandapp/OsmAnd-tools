@@ -9,10 +9,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="script/L.Control.Opacity.js"> </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.css"
         integrity="sha512-1xoFisiGdy9nvho8EgXuXvnpR5GAMSjFwp40gSRE3NwdUdIMIKuPa7bqoUhLD0O/5tPNhteAsE5XyyMi5reQVA=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
+    <link rel="stylesheet" href="css/L.Control.Opacity.css"/>
     <style>
         body {
             margin: 0;
@@ -118,10 +119,11 @@
             return prefix + '/tiles/' + layer +'/{time}/{z}/{x}/{y}.png';
         }
 
-        var cloud = L.tileLayer(getUrl('cloud'), { time : getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
-        var temperature = L.tileLayer(getUrl('temperature'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
-        var pressure = L.tileLayer(getUrl('pressure'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
-        var wind = L.tileLayer(getUrl('wind'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        
+        var temperature = L.tileLayer(getUrl('temperature'), { time: getTime(), tms: true, opacity: 0.5, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var pressure = L.tileLayer(getUrl('pressure'), { time: getTime(), tms: true, opacity: 0.6, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var wind = L.tileLayer(getUrl('wind'), { time: getTime(), tms: true, opacity: 0.6, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var cloud = L.tileLayer(getUrl('cloud'), { time: getTime(), tms: true, opacity: 0.5, attribution: "", minZoom: 1, maxNativeZoom: nativeMaxZoom, maxZoom: maxScaleZoom });
         var precip = L.tileLayer(getUrl('precip'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
         // Map
         var map = L.map('map', {
@@ -134,7 +136,7 @@
         });
 
         var basemaps = { "OpenStreetMap": osm, "Without background": white }
-        var overlaymaps = { "Cloud":cloud, "Temperature": temperature, "Pressure": pressure,  "Wind": wind, "Precipitation": precip }
+        var overlaymaps = { "Temperature": temperature,  "Pressure": pressure,  "Wind": wind, "Cloud": cloud, "Precipitation": precip }
 
         // Title
         var title = L.control({ position: 'topleft' });
@@ -157,11 +159,27 @@
         title.addTo(map);
 
         L.control.zoom({
-            position: 'bottomright'
+            position: 'bottomleft'
         }).addTo(map);
 
         // Add base layers
         L.control.layers(basemaps, overlaymaps, { collapsed: false }).addTo(map);
+        var opacityCheckbox = L.control({ position: 'topright' });
+        opacityCheckbox.onAdd = function (map) {
+            var input = L.DomUtil.create('input');
+            input.setAttribute('type', 'button');
+            input.setAttribute('value', 'Configure Opacity');
+            input.addEventListener('click', function (e) {
+                e.preventDefault();
+                input.style.visibility = "hidden";
+                L.control.opacity(overlaymaps, {
+                    label: 'Opacity',
+                }).addTo(map);
+            })
+            return input;
+        };
+        opacityCheckbox.addTo(map);
+
 
         // Fit to overlay bounds (SW and NE points with (lat, lon))
         //map.fitBounds([[-81.10948101, 179.881186189], [81.1125, -179.999755859]]);

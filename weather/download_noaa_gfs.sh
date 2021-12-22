@@ -117,6 +117,8 @@ generate_tiles() {
 
 
 cp "${THIS_LOCATION}/browser.html" .
+cp -r "${THIS_LOCATION}/script" .
+cp -r "${THIS_LOCATION}/css" .
 get_raw_files
 generate_bands_tiff
 generate_tiles
