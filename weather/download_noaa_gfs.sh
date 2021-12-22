@@ -1,4 +1,5 @@
 #!/bin/bash -xe
+THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BASE_URL=${BASE_URL:-"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"}
 PROVIDER=${PROVIDER:-"gfs"}
 LAYER=${LAYER:-"atmos"}
@@ -13,6 +14,13 @@ HOURS_TO_DOWNLOAD=${HOURS_TO_DOWNLOAD:-36}
 
 DW_FOLDER=raw
 TIFF_FOLDER=tiff
+
+TILES_FOLDER=tiles
+TILES_ZOOM_GEN=6
+TILES_ZOOM_RES=6
+TILES_BAND=5
+TILES_BAND_NAME=cloud
+
 OS=$(uname -a)
 TIME_ZONE="GMT"
 RED='\033[0;31m'
@@ -73,6 +81,23 @@ get_bands_tiff() {
         mkdir -p $TIFF_FOLDER/
         BS=$(basename $WFILE)
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
+
+        ## generate band 5 color
+        local INPUT_FILE=${BS}.tiff
+        local FILE_NAME="${INPUT_FILE%%.*}"
+        local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
+        gdalwarp -of GTiff --config 4 4 \
+            -co "SPARSE_OK=TRUE" -t_srs "+init=epsg:3857 +over" \
+            -r cubic -multi \
+            $INPUT_FILE ${FILE_NAME}.M.tiff
+        gdal_translate -b $TILES_BAND ${FILE_NAME}.M.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
+        gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
+        gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
+        mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
+        gdal2tiles.py -z $ZOOM ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
+        #rm *M.tiff || true
+        #rm *.vrt || true
+
     done
 }
 # cleanup 
