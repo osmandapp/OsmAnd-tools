@@ -29,8 +29,9 @@ NC='\033[0m' # No Color
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
-    #rm $DW_FOLDER/*.gt || true
-    #rm $DW_FOLDER/*.gt.idx || true
+    # cleanup old files to not process them
+    rm $DW_FOLDER/*.gt || true
+    rm $DW_FOLDER/*.gt.idx || true
     if [[ $OS =~ "Darwin" ]]; then
         HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
         DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
@@ -116,7 +117,7 @@ generate_tiles() {
 
 
 cp "${THIS_LOCATION}/browser.html" .
-get_raw_files
+# get_raw_files
 generate_bands_tiff
 generate_tiles
 
