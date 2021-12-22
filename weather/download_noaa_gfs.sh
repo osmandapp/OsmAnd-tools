@@ -4,7 +4,7 @@ BASE_URL=${BASE_URL:-"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"}
 PROVIDER=${PROVIDER:-"gfs"}
 LAYER=${LAYER:-"atmos"}
 # usually 4 hours is enough to get freshest files 
-DELAY_HOURS=${DELAY_HOURS:-4}
+DELAY_HOURS=${DELAY_HOURS:-6}
 BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
 BANDS_NAMES="cloud temperature pressure wind precip"
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
@@ -19,7 +19,7 @@ TILES_FOLDER=tiles
 TILES_ZOOM_GEN=6
 TILES_ZOOM_RES=6
 TILES_BAND=5
-TILES_BAND_NAME=cloud
+TILES_BAND_NAME=precip
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
