@@ -73,6 +73,7 @@ get_raw_files() {
          
 get_bands_tiff() {
     rm *.O.tiff || true
+    cp "${THIS_LOCATION}/browser.html" .
     for WFILE in ${DW_FOLDER}/*.gt
     do
         band_numbers=""
@@ -102,16 +103,16 @@ get_bands_tiff() {
             mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
             gdal2tiles.py --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
             rm $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME/*.html || true
-            cp "${THIS_LOCATION}/browser.html" .
         done
         rm *.O.tiff || true
     done
 }
 # cleanup 
-find $DW_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
-find $DW_FOLDER/ -type d -empty -delete
-#get_raw_files
+get_raw_files
 get_bands_tiff
 
-find $TIFF_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
+find . -type f -mmin +${MINUTES_TO_KEEP} -delete
+find . -type d -empty -delete
+
+
 #rm -rf $DW_FOLDER/
