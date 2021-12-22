@@ -16,8 +16,8 @@ DW_FOLDER=raw
 TIFF_FOLDER=tiff
 
 TILES_FOLDER=tiles
-TILES_ZOOM_GEN=3
-TILES_ZOOM_RES=1
+TILES_ZOOM_GEN=4
+TILES_ZOOM_RES=5
 PARALLEL_TO_TILES=2
 
 OS=$(uname -a)
@@ -116,8 +116,8 @@ generate_tiles() {
 
 
 cp "${THIS_LOCATION}/browser.html" .
-# get_raw_files
-# generate_bands_tiff
+get_raw_files
+generate_bands_tiff
 generate_tiles
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
