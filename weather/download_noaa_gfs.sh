@@ -105,9 +105,9 @@ generate_tiles() {
             gdaldem color-relief -alpha ${TEMP_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${TEMP_NAME}.APM.tiff
             # gdal_translate -of VRT -ot Byte -scale ${TEMP_NAME}.APM.tiff ${TEMP_NAME}.APM.vrt
             mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            gdal2tiles.py --tilesize=512 --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${TEMP_NAME}.APM.tiff \
+            gdal2tiles.py -w none --tilesize=512 --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} ${TEMP_NAME}.APM.tiff \
                      $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            rm $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME/*.html || true
+            # rm $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME/*.html || true
         done
         rm *M.tiff || true
         rm *.vrt || true
@@ -117,7 +117,7 @@ generate_tiles() {
 
 
 cp "${THIS_LOCATION}/browser.html" .
-# get_raw_files
+get_raw_files
 generate_bands_tiff
 generate_tiles
 
