@@ -4,7 +4,7 @@ BASE_URL=${BASE_URL:-"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"}
 PROVIDER=${PROVIDER:-"gfs"}
 LAYER=${LAYER:-"atmos"}
 # usually 4 hours is enough to get freshest files 
-DELAY_HOURS=${DELAY_HOURS:-6}
+DELAY_HOURS=${DELAY_HOURS:-4}
 BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
 BANDS_NAMES="cloud temperature pressure wind precip"
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
@@ -104,7 +104,7 @@ get_bands_tiff() {
 # cleanup 
 find $DW_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
 find $DW_FOLDER/ -type d -empty -delete
-get_raw_files
+#get_raw_files
 get_bands_tiff
 
 find $TIFF_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
