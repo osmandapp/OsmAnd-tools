@@ -8,7 +8,7 @@ BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "G
 BANDS_NAMES="cloud temperature pressure wind precip"
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
 FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
-DAYS_TO_KEEP=${DAYS_TO_KEEP:-2}
+MINUTES_TO_KEEP=${MINUTES_TO_KEEP:-1800} # 30 hours
 HOURS_TO_DOWNLOAD=${HOURS_TO_DOWNLOAD:-36}
 
 DW_FOLDER=raw
@@ -78,11 +78,11 @@ get_bands_tiff() {
 # cleanup 
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
-find $DW_FOLDER/ -type f -mtime +${DAYS_TO_KEEP} -delete
+find $DW_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
 find $DW_FOLDER/ -type d -empty -delete
 
 get_raw_files
 get_bands_tiff
 
-find $TIFF_FOLDER/ -type f -mtime +${DAYS_TO_KEEP} -delete
+find $TIFF_FOLDER/ -type f -mmin +${MINUTES_TO_KEEP} -delete
 #rm -rf $DW_FOLDER/
