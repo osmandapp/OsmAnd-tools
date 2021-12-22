@@ -94,7 +94,7 @@ get_bands_tiff() {
             rm *.vrt || true
             local FILE_NAME="${BS%%.*}"
             local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
-            local BAND_IND = $(( $TILES_BAND + 1 ))
+            local BAND_IND=$(( $TILES_BAND + 1 ))
             gdal_translate -b ${BAND_IND} ${FILE_NAME}.O.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
             gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
             gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
