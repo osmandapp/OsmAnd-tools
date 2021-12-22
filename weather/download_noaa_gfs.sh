@@ -73,9 +73,6 @@ get_raw_files() {
 get_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
-        # rm *M.tiff || true
-        # rm *.vrt || true
-
         band_numbers=""
         for i in ${!BANDS[@]}; do
             local b_num=$(cat $WFILE.idx | grep "${BANDS[$i]}" | awk 'NR==1{print $1}' | awk -F ":" '{print $1}')
@@ -91,21 +88,22 @@ get_bands_tiff() {
         gdalwarp -of GTiff --config 4 4 \
             -co "SPARSE_OK=TRUE" -t_srs "+init=epsg:3857 +over" \
             -r cubic -multi \
-            $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}.M.tiff
+            $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}.O.tiff
         for TILES_BAND in ${!BANDS_NAMES[@]}; do
+            rm *M.tiff || true
+            rm *.vrt || true
             local FILE_NAME="${BS%%.*}"
             local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
             local BAND_IND = $(( $TILES_BAND + 1 ))
-            gdal_translate -b ${BAND_IND} ${FILE_NAME}.M.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
+            gdal_translate -b ${BAND_IND} ${FILE_NAME}.O.tiff ${FILE_NAME}.PM.tiff  -outsize $IMG_SIZE $IMG_SIZE -r lanczos
             gdaldem color-relief -alpha ${FILE_NAME}.PM.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" ${FILE_NAME}.APM.tiff
             gdal_translate -of VRT -ot Byte -scale ${FILE_NAME}.APM.tiff ${FILE_NAME}.APM.vrt
             mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
             gdal2tiles.py -z 1-${TILES_ZOOM_GEN} ${FILE_NAME}.APM.vrt  $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
             rm $TILES_FOLDER/$TILES_BAND_NAME/*.html || true
-            rm *M.tiff || true
-            rm *.vrt || true
             cp "${THIS_LOCATION}/browser.html" .
         done
+        rm *.O.tiff || true
     done
 }
 # cleanup 
