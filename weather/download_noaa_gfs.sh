@@ -16,8 +16,8 @@ DW_FOLDER=raw
 TIFF_FOLDER=tiff
 
 TILES_FOLDER=tiles
-TILES_ZOOM_GEN=6
-TILES_ZOOM_RES=7
+TILES_ZOOM_GEN=3
+TILES_ZOOM_RES=5
 PARALLEL_TO_TILES=2
 
 OS=$(uname -a)
@@ -112,7 +112,6 @@ generate_tiles() {
         rm *M.tiff || true
         rm *.vrt || true
         rm *.O.tiff || true
-        exit 0
     done
 }
 
@@ -120,8 +119,8 @@ generate_tiles() {
 cp "${THIS_LOCATION}/browser.html" .
 cp -r "${THIS_LOCATION}/script" .
 cp -r "${THIS_LOCATION}/css" .
-# get_raw_files
-# generate_bands_tiff
+get_raw_files
+generate_bands_tiff
 generate_tiles
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
