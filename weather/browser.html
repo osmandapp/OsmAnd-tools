@@ -95,6 +95,7 @@
         }
         weatherDateObj.setUTCMinutes(0);
         weatherDateObj.setUTCSeconds(0);
+        var originalDateObj = new Date(weatherDateObj);
         //var prefix = '.';
         var prefix = 'https://test.osmand.net/weather/gfs';
         const nativeMaxZoom = 3;
@@ -139,24 +140,40 @@
         var overlaymaps = { "Temperature": temperature,  "Pressure": pressure,  "Wind": wind, "Cloud": cloud, "Precipitation": precip }
 
         // Title
-        var title = L.control({ position: 'topleft' });
-        title.onAdd = function (map) {
+        var titleHour = L.control({ position: 'topleft' });
+        titleHour.onAdd = function (map) {
             this._div = L.DomUtil.create('div', 'ctl title');
             this.update();
             return this._div;
         };
-        title.update = function (props) {
+        titleHour.update = function (props) {
             let hours = (-(new Date().getTime() - weatherDateObj.getTime()) / 3600000).toFixed(0);
             //this._div.innerHTML = weather_date.slice(6, 8) + '-' + weather_date.slice(4, 6) + '-' + weather_date.slice(0, 4) + " " + weather_date.slice(9, 11) + ":00 UTC";
             if (hours > 0) {
                 hours = "+"  + hours;
             }
             let text = weatherDateObj.toDateString() + "  " + weatherDateObj.getHours() + ":00 [" + hours + " hours ]";
-            this._div.innerHTML = text + " <button href='#' onclick='prevHour()'>-</button> <button href='#' onclick='nextHour()'>+</button>";
-
-
+            this._div.innerHTML = text ;
         };
-        title.addTo(map);
+        titleHour.addTo(map);
+
+        var titleHourPlus = L.control({ position: 'topleft' });
+        titleHourPlus.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'ctl');
+            // <input type="range" min="1" max="100" value="50" class="slider" id="myRange">
+            this._div.innerHTML = " <button href='#' onclick='prevHour(event)'>-</button> " +
+                                  " <input type='range' min='-6' max='24' value='0' class='slider' id='hourslider' onchange='hourSlider(event)'>" +
+                                  " <button href='#' onclick='nextHour(event)'>+</button> ";
+            return this._div;
+        };
+        titleHourPlus.addTo(map);
+        // if (!L.Browser.touch) {
+        //     L.DomEvent.disableClickPropagation(titleHourPlus._div);
+        //     L.DomEvent.on(titleHourPlus._div, 'mousedrag', L.DomEvent.stopPropagation);
+        //     L.DomEvent.on(titleHourPlus._div, 'mousewheel', L.DomEvent.stopPropagation);
+        // } else {
+        //     L.DomEvent.on(titleHourPlus._div, 'click', L.DomEvent.stopPropagation);            
+        // }
 
         L.control.zoom({
             position: 'bottomleft'
@@ -184,8 +201,8 @@
         // Fit to overlay bounds (SW and NE points with (lat, lon))
         //map.fitBounds([[-81.10948101, 179.881186189], [81.1125, -179.999755859]]);
 
-        function nextDate(hours) {
-            weatherDateObj.setTime(weatherDateObj.getTime() + (hours * 60 * 60 * 1000));
+        function nextDate(dateObj, hours) {
+            weatherDateObj.setTime(dateObj.getTime() + (hours * 60 * 60 * 1000));
             cloud.options.time = getTime();
             cloud.redraw();
             temperature.options.time = getTime();
@@ -196,14 +213,20 @@
             wind.redraw();
             precip.options.time = getTime();
             precip.redraw();
-            title.update();            
+            titleHour.update();            
         }
 
-        function nextHour(){
-            nextDate(1);
+        function nextHour(e){
+            nextDate(weatherDateObj, 1);
+            return false;
         }
-        function prevHour() {
-            nextDate(-1);
+        function hourSlider(e) {
+            nextDate(originalDateObj, parseInt(e.target.value))
+            return false;
+        }
+        function prevHour(e) {
+            nextDate(weatherDateObj, -1);
+            return false;
         }
     </script>
 
