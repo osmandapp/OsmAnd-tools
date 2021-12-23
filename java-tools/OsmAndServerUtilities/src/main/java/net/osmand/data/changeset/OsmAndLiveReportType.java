@@ -4,6 +4,7 @@ public enum OsmAndLiveReportType {
 	// DEPRECATED
 	SUPPORTERS("getSupporters"),
 	REGION_RANKING_RANGE("getRegionRankingRange", true),
+	REGION_MIN_CHANGES("getRegionRankingRangeMin", true),
 	EUR_VALUE("getEurValue", true),
 	
 	// Current

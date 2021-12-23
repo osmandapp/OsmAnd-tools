@@ -59,17 +59,24 @@ public class IndexHeightData {
 			
 		}
 		
-		public void loadData(File folder) throws IOException {
+		public File loadData(File folder) throws IOException {
 			dataLoaded = true;
-			String nd = getFileName();
-			File f = new File(folder, nd +".tif");
+			File f = getFile(folder);
 			BufferedImage img;
-			if(f.exists()) {
+			if (f.exists()) {
 				img = ImageIO.read(f);
 				width = img.getWidth();
 				height = img.getHeight();
-				data = (DataBufferShort) img.getRaster().getDataBuffer(); 
+				data = (DataBufferShort) img.getRaster().getDataBuffer();
+				return null;
 			}
+			return f;
+		}
+		
+		private File getFile(File folder) {
+			String nd = getFileName();
+			File f = new File(folder, nd +".tif");
+			return f;
 		}
 
 		private String getFileName() {
@@ -437,26 +444,30 @@ public class IndexHeightData {
 	}
 	
 	public double getPointHeight(double lat, double lon) {
-		return getPointHeight(lat, lon, null);
+		return getPointHeight(lat, lon, null, null);
 	}
 	
-	public double getPointHeight(double lat, double lon, double[] neighboors) {
+	public double getPointHeight(double lat, double lon, File[] fileName) {
+		return getPointHeight(lat, lon, fileName, null);
+	}
+	
+	private double getPointHeight(double lat, double lon, File[] fileName, double[] neighboors) {
 		int lt = (int) lat;
 		int ln = (int) lon;
 		double lonDelta = lon - ln;
 		double latDelta = lat - lt;
-		if(lonDelta < 0) {
+		if (lonDelta < 0) {
 			lonDelta += 1;
 			ln -= 1;
 		}
-		if(latDelta < 0) {
+		if (latDelta < 0) {
 			latDelta += 1;
 			lt -= 1;
 		}
 		int id = getTileId(lt, ln);
 		TileData tileData = map.get(id);
-		if(tileData == null) {
-			if(MAXIMUM_LOADED_DATA != -1 && map.size() >= MAXIMUM_LOADED_DATA) {
+		if (tileData == null) {
+			if (MAXIMUM_LOADED_DATA != -1 && map.size() >= MAXIMUM_LOADED_DATA) {
 				log.info(String.format("SRTM: GC srtm data %d.", map.size()));
 				map.clear();
 				System.gc();
@@ -464,10 +475,13 @@ public class IndexHeightData {
 			tileData = new TileData(id);
 			map.put(id, tileData);
 		}
-		if(!tileData.dataLoaded) {
+		if (!tileData.dataLoaded) {
 			try {
-				log.info(String.format("SRTM: Load srtm data %d: %d %d", id, (int) lt,  (int)ln));
-				tileData.loadData(srtmData);
+				log.info(String.format("SRTM: Load srtm data %d: %d %d", id, (int) lt, (int) ln));
+				File missingFile = tileData.loadData(srtmData);
+				if (fileName != null && fileName.length > 0) {
+					fileName[0] = missingFile;
+				}
 			} catch (IOException e) {
 				log.error(e.getMessage(), e);
 			}
@@ -619,7 +633,7 @@ public class IndexHeightData {
 
 	private static void cmp(IndexHeightData hd, double lat, double lon, double exp) {
 		double[] nh = new double[16];
-		double pointHeight = hd.getPointHeight(lat, lon, nh);
+		double pointHeight = hd.getPointHeight(lat, lon, null, nh);
 		System.out.println("Lat " + lat + " lon " + lon);
 		if (pointHeight != exp) {
 			String extra = " NO NEIGHBOR FOUND " + Arrays.toString(nh);

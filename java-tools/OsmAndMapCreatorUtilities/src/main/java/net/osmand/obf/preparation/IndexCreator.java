@@ -902,14 +902,16 @@ public class IndexCreator {
 		String file = rootFolder + "/temp/map.osm";
 		// String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
+//		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 
-		// String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
-		// settings.keepOnlyRouteRelationObjects = true;
-		// creator.setMapFileName(name + ".travel.obf");
-
+//		settings.keepOnlyRouteRelationObjects = true;
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		String name = file.substring(st, e);
+		
+		
+//		creator.setMapFileName(name + ".travel.obf");
+		
 		creator.setNodesDBFile(new File(rootFolder + "/maps/" + name + ".tmp.odb"));
 
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos/resources/poi/poi_types.xml"));

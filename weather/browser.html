@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+    <title>Weather</title>
+    <!-- Leaflet -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="script/L.Control.Opacity.js"> </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.css"
+        integrity="sha512-1xoFisiGdy9nvho8EgXuXvnpR5GAMSjFwp40gSRE3NwdUdIMIKuPa7bqoUhLD0O/5tPNhteAsE5XyyMi5reQVA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="css/L.Control.Opacity.css"/>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body,
+        table,
+        tr,
+        td,
+        th,
+        div,
+        h1,
+        h2,
+        input {
+            font-family: "Calibri", "Trebuchet MS", "Ubuntu", Serif;
+            font-size: 11pt;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        /* full size */
+        .ctl {
+            padding: 2px 10px 2px 10px;
+            background: white;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            text-align: right;
+        }
+
+        .title {
+            font-size: 18pt;
+            font-weight: bold;
+        }
+
+        .src {
+            font-size: 10pt;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <script>
+        /* **** Leaflet **** */
+
+        // Base layers
+        //  .. OpenStreetMap
+        var osm = L.tileLayer('https://tile.osmand.net/hd/{z}/{x}/{y}.png', { attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors', minZoom: 1, maxZoom: 18 });
+
+        //  .. CartoDB Positron
+        //var cartodb = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>', minZoom: 6, maxZoom: 6 });
+
+        //  .. OSM Toner
+        //var toner = L.tileLayer('http://{s}.tile.stamen.com/toner/{z}/{x}/{y}.png', { attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.', minZoom: 6, maxZoom: 6 });
+
+        //  .. White background
+        var white = L.tileLayer("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEX///+nxBvIAAAAH0lEQVQYGe3BAQ0AAADCIPunfg43YAAAAAAAAAAA5wIhAAAB9aK9BAAAAABJRU5ErkJggg==", { minZoom: 1, maxZoom: 18 });
+        
+        var now_date = new Date();
+        // "20211222_0600"
+        const urlParams = new URLSearchParams(window.location.search);
+        var weatherDateObj = new Date();
+        if (urlParams.get('date')) {
+            var weather_date = urlParams.get('date');
+            weatherDateObj.setUTCFullYear(parseInt(weather_date.slice(0, 4)));
+            weatherDateObj.setUTCMonth(parseInt(weather_date.slice(4, 6)) - 1);
+            weatherDateObj.setUTCDate(parseInt(weather_date.slice(6, 8)));
+            weatherDateObj.setUTCHours(parseInt(weather_date.slice(9, 11)));
+        }
+        weatherDateObj.setUTCMinutes(0);
+        weatherDateObj.setUTCSeconds(0);
+        var originalDateObj = new Date(weatherDateObj);
+        //var prefix = '.';
+        var prefix = 'https://test.osmand.net/weather/gfs';
+        const nativeMaxZoom = 3;
+        const maxScaleZoom = 11;
+        function getTime() {
+            let h = weatherDateObj.getUTCHours();
+            if (h < 10) {
+                h = '0' + h;
+            }
+            let m = weatherDateObj.getUTCMonth() + 1;
+            if (m < 10) {
+                m = '0' + m;
+            }
+            let d = weatherDateObj.getUTCDate();
+            if (d < 10) {
+                d = '0' + d;
+            }
+            const layer_date = weatherDateObj.getUTCFullYear() + '' + m + '' + d + "_" + h + "00";
+            return layer_date;
+        }
+        function getUrl(layer) {
+            return prefix + '/tiles/' + layer +'/{time}/{z}/{x}/{y}.png';
+        }
+
+        
+        var temperature = L.tileLayer(getUrl('temperature'), { time: getTime(), tms: true, opacity: 0.5, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var pressure = L.tileLayer(getUrl('pressure'), { time: getTime(), tms: true, opacity: 0.6, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var wind = L.tileLayer(getUrl('wind'), { time: getTime(), tms: true, opacity: 0.6, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        var cloud = L.tileLayer(getUrl('cloud'), { time: getTime(), tms: true, opacity: 0.5, attribution: "", minZoom: 1, maxNativeZoom: nativeMaxZoom, maxZoom: maxScaleZoom });
+        var precip = L.tileLayer(getUrl('precip'), { time: getTime(), tms: true, opacity: 0.7, attribution: "", minZoom: 1, maxNativeZoom:nativeMaxZoom, maxZoom: maxScaleZoom});
+        // Map
+        var map = L.map('map', {
+            center: [50, 10],
+            zoom: 5,
+            minZoom: 1,
+            maxZoom: 11,
+            zoomControl:false,
+            layers: [osm]
+        });
+
+        var basemaps = { "OpenStreetMap": osm, "Without background": white }
+        var overlaymaps = { "Temperature": temperature,  "Pressure": pressure,  "Wind": wind, "Cloud": cloud, "Precipitation": precip }
+
+        // Title
+        var titleHour = L.control({ position: 'topleft' });
+        titleHour.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'ctl title');
+            this.update();
+            return this._div;
+        };
+        titleHour.update = function (props) {
+            let hours = (-(new Date().getTime() - weatherDateObj.getTime()) / 3600000).toFixed(0);
+            //this._div.innerHTML = weather_date.slice(6, 8) + '-' + weather_date.slice(4, 6) + '-' + weather_date.slice(0, 4) + " " + weather_date.slice(9, 11) + ":00 UTC";
+            if (hours > 0) {
+                hours = "+"  + hours;
+            }
+            let text = weatherDateObj.toDateString() + "  " + weatherDateObj.getHours() + ":00 [" + hours + " hours ]";
+            this._div.innerHTML = text ;
+        };
+        titleHour.addTo(map);
+
+        var titleHourPlus = L.control({ position: 'topleft' });
+        titleHourPlus.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'ctl');
+            // <input type="range" min="1" max="100" value="50" class="slider" id="myRange">
+            this._div.innerHTML = " <button href='#' onclick='prevHour(event)'>-</button> " +
+                                  " <input type='range' min='-6' max='24' value='0' class='slider' id='hourslider' onchange='hourSlider(event)'>" +
+                                  " <button href='#' onclick='nextHour(event)'>+</button> ";
+            return this._div;
+        };
+        titleHourPlus.addTo(map);
+        // if (!L.Browser.touch) {
+        //     L.DomEvent.disableClickPropagation(titleHourPlus._div);
+        //     L.DomEvent.on(titleHourPlus._div, 'mousedrag', L.DomEvent.stopPropagation);
+        //     L.DomEvent.on(titleHourPlus._div, 'mousewheel', L.DomEvent.stopPropagation);
+        // } else {
+        //     L.DomEvent.on(titleHourPlus._div, 'click', L.DomEvent.stopPropagation);            
+        // }
+
+        L.control.zoom({
+            position: 'bottomleft'
+        }).addTo(map);
+
+        // Add base layers
+        L.control.layers(basemaps, overlaymaps, { collapsed: false }).addTo(map);
+        var opacityCheckbox = L.control({ position: 'topright' });
+        opacityCheckbox.onAdd = function (map) {
+            var input = L.DomUtil.create('input');
+            input.setAttribute('type', 'button');
+            input.setAttribute('value', 'Configure Opacity');
+            input.addEventListener('click', function (e) {
+                e.preventDefault();
+                input.style.visibility = "hidden";
+                L.control.opacity(overlaymaps, {
+                    label: 'Opacity',
+                }).addTo(map);
+            })
+            return input;
+        };
+        opacityCheckbox.addTo(map);
+
+
+        // Fit to overlay bounds (SW and NE points with (lat, lon))
+        //map.fitBounds([[-81.10948101, 179.881186189], [81.1125, -179.999755859]]);
+
+        function nextDate(dateObj, hours) {
+            weatherDateObj.setTime(dateObj.getTime() + (hours * 60 * 60 * 1000));
+            cloud.options.time = getTime();
+            cloud.redraw();
+            temperature.options.time = getTime();
+            temperature.redraw();
+            pressure.options.time = getTime();
+            pressure.redraw();
+            wind.options.time = getTime();
+            wind.redraw();
+            precip.options.time = getTime();
+            precip.redraw();
+            titleHour.update();            
+        }
+
+        function nextHour(e){
+            nextDate(weatherDateObj, 1);
+            return false;
+        }
+        function hourSlider(e) {
+            nextDate(originalDateObj, parseInt(e.target.value))
+            return false;
+        }
+        function prevHour(e) {
+            nextDate(weatherDateObj, -1);
+            return false;
+        }
+    </script>
+
+</body>
+
+</html>
