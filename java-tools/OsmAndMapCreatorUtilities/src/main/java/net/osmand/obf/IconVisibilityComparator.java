@@ -4,6 +4,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
 import org.xmlpull.v1.XmlPullParser;
@@ -15,36 +16,42 @@ import java.util.*;
 import static net.osmand.binary.BinaryMapIndexReader.*;
 
 public class IconVisibilityComparator {
-	String RENDER_FILE = "/home/user/osmand/issues/i985/default.render.xml";
-	String TEST_FILE = "/home/user/osmand/issues/i985/Synthetic_test_rendering.obf";
+
+	public static final int ICON = 0;
+	public static final int TEXT = 1;
+	public static final int ALL = 2;
+	public static final int TEST_FILE = 0;
+	public static final int RENDER_FILE = 1;
 	Map<Integer, List<VisibleObject>> mapObjectMap = new LinkedHashMap<>();
-	private int maxZoom = 0;
-	private int minZoom = 22;
+	Map<Integer, Integer> maxIconOrderInZoom = new LinkedHashMap<>();
+	Map<Integer, Integer> maxTextOrderInZoom = new LinkedHashMap<>();
 
 	public static void main(String[] args) throws IOException {
+		String[] defArgs = {"Synthetic_test_rendering.obf","default.render.xml"};
+		for (String arg : args) {
+			if (arg.startsWith("--test-obf=")) {
+				defArgs[TEST_FILE] = arg.substring("--test-obf=".length());
+			} else if (arg.startsWith("--render=")) {
+				defArgs[RENDER_FILE] = arg.substring("--render=".length());
+			}
+		}
 		IconVisibilityComparator iconComparator = new IconVisibilityComparator();
-		iconComparator.compare();
+		iconComparator.compare(defArgs[TEST_FILE], defArgs[RENDER_FILE]);
 	}
 
-	void compare() throws IOException {
-		File file = new File(TEST_FILE);
+	void compare(String filePath, String renderFilePath) throws IOException {
+		File file = new File(filePath);
 		RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(r, file);
-		RenderingRuleSearchRequest request = new RenderingRuleSearchRequest(getRenderingStorage());
+		RenderingRulesStorage storage = getRenderingStorage(renderFilePath);
+		RenderingRuleSearchRequest request = new RenderingRuleSearchRequest(storage);
+		initCustomRules(storage, request);
 		for (MapIndex mapIndex : reader.getMapIndexes()) {
 			for (MapRoot root : mapIndex.getRoots()) {
-				int rootMaxZoom = root.getMaxZoom();
-				int rootMinZoom = root.getMinZoom();
-				System.out.printf("min %d max %d %n", rootMinZoom, rootMaxZoom);
-				if (rootMaxZoom > maxZoom) {
-					maxZoom = rootMaxZoom;
-				}
-				if (rootMinZoom < minZoom) {
-					minZoom = rootMinZoom;
-				}
 
-				for (int zoom = rootMaxZoom; zoom >= rootMinZoom; zoom--) {
-					final int[] count = {0, 0, 0};
+				for (int zoom = root.getMaxZoom(); zoom >= root.getMinZoom(); zoom--) {
+					final int[] maxOrder = {0, 0};
+					final int[] statCounts = {0, 0, 0};
 					int finalZoom = zoom;
 					final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
 							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, zoom,
@@ -52,24 +59,32 @@ public class IconVisibilityComparator {
 							new ResultMatcher<BinaryMapDataObject>() {
 								@Override
 								public boolean publish(BinaryMapDataObject obj) {
-									count[0]++;
+									statCounts[ALL]++;
 									for (int j = 0; j < obj.getTypes().length; j++) {
 										int wholeType = obj.getTypes()[j];
-										TagValuePair pair = obj.getMapIndex().decodeType(wholeType);
+										TagValuePair pair = mapIndex.decodeType(wholeType);
 										request.setInitialTagValueZoom(pair.tag, pair.value, finalZoom, obj);
 										request.search(RenderingRulesStorage.TEXT_RULES);
-										int textOrder = request.getIntPropertyValue(request.ALL.R_TEXT_ORDER);
+										int textOrder = -1;//request.getIntPropertyValue(request.ALL.R_TEXT_ORDER);
 										if (textOrder > 0) {
-											count[1]++;
+											if (textOrder > maxOrder[TEXT]) {
+												maxOrder[TEXT] = textOrder;
+											}
+											statCounts[TEXT]++;
 										}
+										request.setInitialTagValueZoom(pair.tag, pair.value, finalZoom, obj);
 										request.search(RenderingRulesStorage.POINT_RULES);
 										int iconOrder = request.getIntPropertyValue(request.ALL.R_ICON_ORDER);
 										if (iconOrder > 0) {
-											count[2]++;
+											if (iconOrder > maxOrder[ICON]) {
+												maxOrder[ICON] = iconOrder;
+											}
+											statCounts[ICON]++;
 										}
 										if (textOrder > 0 || iconOrder > 0) {
 											VisibleObject vo = new VisibleObject();
 											vo.mapDataObject = obj;
+											vo.icon = request.getStringPropertyValue(request.ALL.R_ICON);
 											vo.iconOrder = iconOrder;
 											vo.textOrder = textOrder;
 											List<VisibleObject> voList = mapObjectMap
@@ -88,7 +103,18 @@ public class IconVisibilityComparator {
 							});
 
 					reader.searchMapIndex(req, mapIndex);
-					System.out.printf("zoom %d count %d text: %d icon: %d%n", zoom, count[0], count[1], count[2]);
+					System.out.printf("zoom %d total objects: %d ", zoom, statCounts[ALL]);
+					if (maxOrder[ICON] != 0) {
+						maxIconOrderInZoom.put(zoom, maxOrder[ICON]);
+						System.out.printf("icon: %d , maxOrder %d",
+								statCounts[ICON], maxOrder[ICON]);
+					}
+					if (maxOrder[TEXT] != 0) {
+						maxIconOrderInZoom.put(zoom, maxOrder[TEXT]);
+						System.out.printf("text: %d , maxOrder %d ",
+								statCounts[TEXT], maxOrder[TEXT]);
+					}
+					System.out.println();
 				}
 			}
 		}
@@ -98,16 +124,26 @@ public class IconVisibilityComparator {
 	private void printDiffs() {
 		List<VisibleObject> groupA = new ArrayList<>();
 		List<VisibleObject> groupB = new ArrayList<>();
-		for (int zoom = minZoom; zoom < maxZoom; zoom++) {
+		List<Integer> selectedZooms = new ArrayList<>(maxIconOrderInZoom.keySet());
+		Collections.sort(selectedZooms);
+		for (int zoom = selectedZooms.get(0); zoom < selectedZooms.get(selectedZooms.size() - 1); zoom++) {
+			int maxIconOrderZoom = 0;
+			int maxTextOrderZoom = 0;
+			if (maxIconOrderInZoom.containsKey(zoom)) {
+				maxIconOrderZoom = maxIconOrderInZoom.get(zoom);
+			}
+			if (maxTextOrderInZoom.containsKey(zoom)) {
+				maxTextOrderZoom = maxTextOrderInZoom.get(zoom);
+			}
 			List<VisibleObject> zoomList = mapObjectMap.get(zoom);
-			List<VisibleObject> zoom1List = mapObjectMap.get(zoom + 1);
+			List<VisibleObject> zoomNextList = mapObjectMap.get(zoom + 1);
 			groupA.clear();
 			groupB.clear();
-			System.out.println("zoom: " + zoom + " - " + (zoom + 1));
-			for (VisibleObject oz1 : zoom1List) {
+			System.out.printf("zoom: %d (min order %d) -> %d%n", zoom, maxIconOrderZoom, (zoom + 1));
+			for (VisibleObject oz1 : zoomNextList) {
 				for (VisibleObject oz : zoomList) {
 					if (oz.mapDataObject.getId() == oz1.mapDataObject.getId()) {
-						groupB.add(oz1);
+						groupB.add(oz);
 						break;
 					}
 				}
@@ -115,27 +151,27 @@ public class IconVisibilityComparator {
 					groupA.add(oz1);
 				}
 			}
-			for (VisibleObject a : groupA) {
-				for (VisibleObject b : groupB) {
-					if (b.iconOrder > 0 && a.iconOrder > 0 && b.iconOrder < a.iconOrder) {
-						System.out.printf("icon name=\"%s\" %d < a name=\"%s\" %d%n",
-								b.mapDataObject.getName(), b.iconOrder,
-								a.mapDataObject.getName(), a.iconOrder);
-					}
-					if (b.textOrder > 0 && a.textOrder > 0 && b.textOrder < a.textOrder) {
-						System.out.printf("text b name=\"%s\" %d < a name=\"%s\" %d%n",
-								b.mapDataObject.getName(), b.textOrder,
-								a.mapDataObject.getName(), a.textOrder);
-					}
-				}
+			for (VisibleObject b : groupB) {
+				printMapObj(zoom, b, "B");
 			}
-
+			for (VisibleObject a : groupA) {
+//				printMapObj(zoom, a, "A");
+			}
 		}
 	}
 
-	RenderingRulesStorage getRenderingStorage() throws IOException {
+	private void printMapObj(int zoom, VisibleObject obj, String group) {
+		System.out.printf("ZOOM %d: %s id %-10d icon %s tags[", zoom, group, obj.mapDataObject.getId() >> 7, obj.icon);
+		for (int at = 0; at < obj.mapDataObject.getTypes().length; at++) {
+			TagValuePair tagValuePair = obj.mapDataObject.getMapIndex().decodeType(obj.mapDataObject.getTypes()[at]);
+			System.out.printf("\"%s\" ", tagValuePair.tag + "=" + tagValuePair.value);
+		}
+		System.out.println("] " + obj.iconOrder);
+	}
+
+	RenderingRulesStorage getRenderingStorage(String renderFilePath) throws IOException {
 		final Map<String, String> renderingConstants = new LinkedHashMap<>();
-		InputStream is = new FileInputStream(RENDER_FILE);
+		InputStream is = new FileInputStream(renderFilePath);
 		try {
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(is, "UTF-8");
@@ -157,7 +193,7 @@ public class IconVisibilityComparator {
 			is.close();
 		}
 		RenderingRulesStorage storage = new RenderingRulesStorage("default", renderingConstants);
-		is = new FileInputStream(RENDER_FILE);
+		is = new FileInputStream(renderFilePath);
 		try {
 			storage.parseRulesFromXmlInputStream(is, (nm, ref) -> null);
 		} catch (XmlPullParserException e) {
@@ -168,9 +204,23 @@ public class IconVisibilityComparator {
 		return storage;
 	}
 
+	private void initCustomRules(RenderingRulesStorage storage, RenderingRuleSearchRequest request) {
+		for (RenderingRuleProperty customProp : storage.PROPS.getCustomRules()) {
+			if (customProp.isString()) {
+				request.setStringFilter(customProp, "");
+			} else if (customProp.isBoolean()) {
+				request.setBooleanFilter(customProp, false);
+			} else {
+				request.setIntFilter(customProp, -1);
+			}
+		}
+		request.saveState();
+	}
+
 	static class VisibleObject {
 		BinaryMapDataObject mapDataObject;
 		int textOrder;
 		int iconOrder;
+		String icon;
 	}
 }
