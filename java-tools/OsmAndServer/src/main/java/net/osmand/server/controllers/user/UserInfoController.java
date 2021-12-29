@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,6 +21,8 @@ public class UserInfoController {
 			Authentication authentication = oAuth2Authentication.getUserAuthentication();
 			pg += authentication.getDetails();
 			pg += authentication.getAuthorities();
+		} else if(user instanceof AbstractAuthenticationToken) {
+			pg += user.getClass().getName() + ". Roles: " + ((AbstractAuthenticationToken)user).getAuthorities();
 		}
 		
     	return pg;
