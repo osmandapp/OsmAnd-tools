@@ -24,8 +24,9 @@ public class IconVisibilityTest {
 	public static final int ALL = 2;
 	public static final int TEST_FILE = 0;
 	public static final int RENDER_FILE = 1;
-	public static final String[] defArgs = {"src/test/resources/Synthetic_test_rendering.obf", "src/test/resources/default.render.xml"};
-	public static final String helpMessage = "use --test-obf=file.obf --render=file.render.xml for compare icon visibility in the file.obf map on the file.render.xml style";
+	public static final String[] defArgs = {"src/test/resources/Synthetic_test_rendering.obf", "default.render.xml"};
+	public static final String helpMessage = "use --test-obf=file.obf [--render=file.render.xml] for compare icon visibility in the file.obf map on the file.render.xml style\n" +
+			"\t if --render is omitted used default.render.xml";
 	Map<Integer, List<VisibleObject>> mapObjectMap = new LinkedHashMap<>();
 	Map<Integer, Integer> maxIconOrderInZoom = new LinkedHashMap<>();
 	Map<Integer, Integer> maxTextOrderInZoom = new LinkedHashMap<>();
@@ -37,16 +38,22 @@ public class IconVisibilityTest {
 	}
 
 	public static void main(String[] args) throws IOException {
-		if (args == null || args.length < 2) {
+		if (args == null || args.length < 1) {
 			System.out.println(helpMessage);
 			return;
 		}
+		boolean validArgs = false;
 		for (String arg : args) {
 			if (arg.startsWith("--test-obf=")) {
 				defArgs[TEST_FILE] = arg.substring("--test-obf=".length());
+				validArgs = true;
 			} else if (arg.startsWith("--render=")) {
 				defArgs[RENDER_FILE] = arg.substring("--render=".length());
 			}
+		}
+		if (!validArgs) {
+			System.out.println(helpMessage);
+			return;
 		}
 		IconVisibilityTest iconComparator = new IconVisibilityTest();
 		iconComparator.compare(defArgs[TEST_FILE], defArgs[RENDER_FILE]);
@@ -141,6 +148,10 @@ public class IconVisibilityTest {
 	private void compareOrder() {
 		List<VisibleObject> visibleObjects = new ArrayList<>();
 		List<Integer> selectedZooms = new ArrayList<>(maxIconOrderInZoom.keySet());
+		if (selectedZooms.isEmpty()) {
+			System.out.println("Icons not found");
+			return;
+		}
 		Collections.sort(selectedZooms);
 		int maxIconOrderZoom = 0;
 		int maxTextOrderZoom = 0;
@@ -174,7 +185,7 @@ public class IconVisibilityTest {
 
 	RenderingRulesStorage getRenderingStorage(String renderFilePath) throws IOException {
 		final Map<String, String> renderingConstants = new LinkedHashMap<>();
-		InputStream is = new FileInputStream(renderFilePath);
+		InputStream is = getInputStream(renderFilePath);
 		try {
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(is, "UTF-8");
@@ -196,15 +207,30 @@ public class IconVisibilityTest {
 			is.close();
 		}
 		RenderingRulesStorage storage = new RenderingRulesStorage("default", renderingConstants);
-		is = new FileInputStream(renderFilePath);
+		is = getInputStream(renderFilePath);
+		final RenderingRulesStorage.RenderingRulesStorageResolver resolver = (name, ref) -> {
+			RenderingRulesStorage depends = new RenderingRulesStorage(name, renderingConstants);
+			depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name + ".render.xml"), ref);
+			return depends;
+		};
 		try {
-			storage.parseRulesFromXmlInputStream(is, (nm, ref) -> null);
+			storage.parseRulesFromXmlInputStream(is, resolver);
 		} catch (XmlPullParserException e) {
 			e.printStackTrace();
 		} finally {
 			is.close();
 		}
 		return storage;
+	}
+
+	private InputStream getInputStream(String renderFilePath) throws FileNotFoundException {
+		InputStream is;
+		if (renderFilePath.equals("default.render.xml")) {
+			is = RenderingRulesStorage.class.getResourceAsStream(renderFilePath);
+		} else {
+			is = new FileInputStream(renderFilePath);
+		}
+		return is;
 	}
 
 	private void initCustomRules(RenderingRulesStorage storage, RenderingRuleSearchRequest request) {
