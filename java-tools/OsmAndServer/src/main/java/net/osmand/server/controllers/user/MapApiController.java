@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.user;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Collections;
 
 import javax.servlet.ServletException;
@@ -11,7 +12,9 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +25,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.google.gson.Gson;
 
+import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 
 @Controller
 @RequestMapping("/map/api")
@@ -92,6 +98,34 @@ public class MapApiController {
 			throws ServletException, IOException {
 		return userdataController.webUserRegister(us.username);
 	}
+	
+	private ResponseEntity<String> tokenNotValid() {
+	    return new ResponseEntity<String>("Unauthorized", HttpStatus.UNAUTHORIZED);
+
+	}
+
+	private PremiumUserDevice checkUser() {
+		OsmAndProUser user = (OsmAndProUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		if (user != null) {
+			return user.getUserDevice();
+		}
+		return null;
+	}
+	
+	@GetMapping(value = "/list-files")
+	@ResponseBody
+	public ResponseEntity<String> listFiles(
+			@RequestParam(name = "name", required = false) String name,
+			@RequestParam(name = "type", required = false) String type,
+			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions) throws IOException, SQLException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions);
+		return ResponseEntity.ok(gson.toJson(res));
+	}
+
 
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody

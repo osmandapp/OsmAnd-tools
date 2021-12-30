@@ -83,6 +83,23 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
     public static final String ROLE_USER = "ROLE_USER";
     
+    
+	public static class OsmAndProUser extends User {
+
+		private static final long serialVersionUID = -881322456618342435L;
+		PremiumUserDevice userDevice;
+
+		public OsmAndProUser(String username, String password, PremiumUserDevice pud,
+				List<GrantedAuthority> authorities) {
+			super(username, password, authorities);
+			this.userDevice = pud;
+		}
+
+		public PremiumUserDevice getUserDevice() {
+			return userDevice;
+		}
+	}
+    
 
     @Override
     protected void configure(final AuthenticationManagerBuilder auth) throws Exception {
@@ -98,7 +115,8 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				if (pud == null) {
 					throw new UsernameNotFoundException(username);
 				}
-				return new User(username, pud.accesstoken,
+				
+				return new OsmAndProUser(username, pud.accesstoken, pud,
 						AuthorityUtils.createAuthorityList(WebSecurityConfiguration.ROLE_PRO_USER));
 			}
     	});
