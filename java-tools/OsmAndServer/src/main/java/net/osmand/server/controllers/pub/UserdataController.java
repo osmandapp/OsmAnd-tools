@@ -31,6 +31,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -67,6 +68,7 @@ import net.osmand.util.Algorithms;
 @RequestMapping("/userdata")
 public class UserdataController {
 
+	public static final String TOKEN_DEVICE_WEB = "web";
 	private static final String USER_FOLDER_PREFIX = "user-";
 	private static final String FILE_NAME_SUFFIX = ".gz";
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
@@ -98,6 +100,9 @@ public class UserdataController {
 
 	Gson gson = new Gson();
 
+	@Autowired
+	PasswordEncoder encoder;
+	
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
@@ -307,6 +312,32 @@ public class UserdataController {
 		usersRepository.saveAndFlush(pu);
 		return ok();
 	}
+	
+	public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
+		return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
+	}
+	
+	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email) throws IOException {
+		// allow to register only with small case
+		email = email.toLowerCase().trim();
+		if (!email.contains("@")) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+		}
+		PremiumUser pu = usersRepository.findByEmail(email);
+		if (pu == null) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+		}
+		String errorMsg = checkOrderIdPremium(pu.orderid);
+		if (errorMsg != null) {
+			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+		}
+		pu.tokendevice = TOKEN_DEVICE_WEB;
+		pu.token = (new Random().nextInt(8999) + 1000) + "";
+		pu.tokenTime = new Date();
+		usersRepository.saveAndFlush(pu);
+		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token);
+		return ok();
+	}
 
 	@PostMapping(value = "/user-register")
 	@ResponseBody
@@ -376,6 +407,11 @@ public class UserdataController {
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "token", required = true) String token,
 			@RequestParam(name = "deviceid", required = false) String deviceId) throws IOException {
+		String accessToken = UUID.randomUUID().toString();
+		return registerNewDevice(email, token, deviceId, accessToken);
+	}
+
+	private ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken) {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
 			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
@@ -387,10 +423,14 @@ public class UserdataController {
 		pu.token = null;
 		pu.tokenTime = null;
 		PremiumUserDevice device = new PremiumUserDevice();
+		PremiumUserDevice sameDevice = devicesRepository.findByUseridAndDeviceid(pu.id, deviceId);
+		if (sameDevice != null) {
+			devicesRepository.delete(sameDevice);
+		}
 		device.userid = pu.id;
 		device.deviceid = deviceId;
 		device.udpatetime = new Date();
-		device.accesstoken = UUID.randomUUID().toString();
+		device.accesstoken = accessToken;
 		usersRepository.saveAndFlush(pu);
 		devicesRepository.saveAndFlush(device);
 		return ResponseEntity.ok(gson.toJson(device));

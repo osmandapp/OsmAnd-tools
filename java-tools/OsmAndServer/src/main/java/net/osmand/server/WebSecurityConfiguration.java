@@ -28,6 +28,10 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
@@ -45,6 +49,12 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.controllers.pub.UserdataController;
+
 @Configuration
 @EnableOAuth2Client
 public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
@@ -59,7 +69,11 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     private String adminEmails;
     
     @Autowired
-    OsmAndProUserDetailsService userDetailsService;
+	protected PremiumUsersRepository usersRepository;
+    
+    @Autowired
+	protected PremiumUserDevicesRepository devicesRepository;
+    
     
     private Set<String> adminEmailsSet = new TreeSet<>();
     
@@ -72,7 +86,22 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(final AuthenticationManagerBuilder auth) throws Exception {
-    	auth.userDetailsService(userDetailsService);//.passwordEncoder(new BCryptPasswordEncoder(11));
+    	auth.userDetailsService(new UserDetailsService() {
+    	    @Override
+			public UserDetails loadUserByUsername(String username) {
+				PremiumUser pu = usersRepository.findByEmail(username);
+				if (pu == null) {
+					throw new UsernameNotFoundException(username);
+				}
+				PremiumUserDevice pud = devicesRepository.findByUseridAndDeviceid(pu.id,
+						UserdataController.TOKEN_DEVICE_WEB);
+				if (pud == null) {
+					throw new UsernameNotFoundException(username);
+				}
+				return new User(username, pud.accesstoken,
+						AuthorityUtils.createAuthorityList(WebSecurityConfiguration.ROLE_PRO_USER));
+			}
+    	});
     }
     
     @Override
@@ -121,17 +150,16 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 					@Override
 					public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
 							Authentication authentication) throws IOException, ServletException {
-						// TODO Auto-generated method stub
-						// TODO sucess url
+						// TODO sucess url + fix redirects
 						super.onAuthenticationSuccess(request, response, authentication);
 					}
-				}).loginProcessingUrl("/map/api/auth/login").defaultSuccessUrl("/map/loginSuccess");
+				}).loginProcessingUrl("/map/api/auth/loginProcess").defaultSuccessUrl("/map/loginSuccess");
 		LoginUrlAuthenticationEntryPoint mapLogin = new LoginUrlAuthenticationEntryPoint("/map/loginForm");
 		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
 			mapLogin.setForceHttps(true);
 		}
 		http.exceptionHandling()
-				.defaultAuthenticationEntryPointFor(mapLogin, new AntPathRequestMatcher("/map/u/**"))
+				.defaultAuthenticationEntryPointFor(mapLogin, new AntPathRequestMatcher("/map/api/**"))
 				.defaultAuthenticationEntryPointFor(oauthAdminLogin, new AntPathRequestMatcher("**"));
 		http.addFilterBefore(ssoFilter("/login"), BasicAuthenticationFilter.class);
         
@@ -189,10 +217,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	
 	@Bean
 	public PasswordEncoder passwordEncoder() {
-		// return new BCryptPasswordEncoder(11);
 	    DelegatingPasswordEncoder delegatingPasswordEncoder = 
 	    		(DelegatingPasswordEncoder) PasswordEncoderFactories.createDelegatingPasswordEncoder();
-	    delegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder(11));
+	    delegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder());
 		return delegatingPasswordEncoder;
 	}
 	
