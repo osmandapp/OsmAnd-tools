@@ -1,12 +1,15 @@
 package net.osmand.server;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -22,8 +25,13 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.OAuth2ClientContext;
 import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientAuthenticationProcessingFilter;
@@ -31,6 +39,7 @@ import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilt
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -50,7 +59,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     private String adminEmails;
     
     @Autowired
-    OsmAndUserDetailsService userDetailsService;
+    OsmAndProUserDetailsService userDetailsService;
     
     private Set<String> adminEmailsSet = new TreeSet<>();
     
@@ -97,7 +106,8 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		}
     	LOG.info("Admin logins are:" + adminEmailsSet);
     	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
-    							.antMatchers("/map/u/**").hasAuthority(ROLE_PRO_USER)
+    							.antMatchers("/map/api/auth/**").permitAll()
+    							.antMatchers("/map/api/**").hasAuthority(ROLE_PRO_USER)
     							.antMatchers("/u/**").hasAnyAuthority(ROLE_USER, ROLE_PRO_USER, ROLE_ADMIN) // user
 //    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**").permitAll()
     							.anyRequest().permitAll();
@@ -105,9 +115,17 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
 			oauthAdminLogin.setForceHttps(true);
 		}
-		
 		http.formLogin()
-				.loginPage("/map/loginForm").loginProcessingUrl("/map/login").defaultSuccessUrl("/map");
+				.loginPage("/map/api/auth/loginForm").successHandler(new SavedRequestAwareAuthenticationSuccessHandler() {
+					
+					@Override
+					public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+							Authentication authentication) throws IOException, ServletException {
+						// TODO Auto-generated method stub
+						// TODO sucess url
+						super.onAuthenticationSuccess(request, response, authentication);
+					}
+				}).loginProcessingUrl("/map/api/auth/login").defaultSuccessUrl("/map/loginSuccess");
 		LoginUrlAuthenticationEntryPoint mapLogin = new LoginUrlAuthenticationEntryPoint("/map/loginForm");
 		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
 			mapLogin.setForceHttps(true);
@@ -167,6 +185,15 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	@ConfigurationProperties("google.client")
 	public AuthorizationCodeResourceDetails google() {
 		return new AuthorizationCodeResourceDetails();
+	}
+	
+	@Bean
+	public PasswordEncoder passwordEncoder() {
+		// return new BCryptPasswordEncoder(11);
+	    DelegatingPasswordEncoder delegatingPasswordEncoder = 
+	    		(DelegatingPasswordEncoder) PasswordEncoderFactories.createDelegatingPasswordEncoder();
+	    delegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder(11));
+		return delegatingPasswordEncoder;
 	}
 	
 }

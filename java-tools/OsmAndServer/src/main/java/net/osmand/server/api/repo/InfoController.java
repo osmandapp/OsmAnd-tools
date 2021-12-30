@@ -1,4 +1,4 @@
-package net.osmand.server.controllers.user;
+package net.osmand.server.api.repo;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -9,11 +9,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class UserInfoController {
+@RequestMapping("/info")
+public class InfoController {
 
-	protected static final Log logger = LogFactory.getLog(UserInfoController.class);
+	protected static final Log logger = LogFactory.getLog(InfoController.class);
 	
-    @RequestMapping("/u/info")
+    @RequestMapping("/user")
     public String index(java.security.Principal user) throws Exception {
 		String pg = "Authorized page. Information about " +  user.getName() + ": ";
 		if (user instanceof OAuth2Authentication) {
