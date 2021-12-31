@@ -93,6 +93,8 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				List<GrantedAuthority> authorities) {
 			super(username, password, authorities);
 			this.userDevice = pud;
+			// clean up access token to not get it displayed
+			this.userDevice.accesstoken = null;
 		}
 
 		public PremiumUserDevice getUserDevice() {

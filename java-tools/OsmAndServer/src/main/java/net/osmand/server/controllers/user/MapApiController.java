@@ -68,8 +68,8 @@ public class MapApiController {
 	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
 	public String loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
-		request.logout();
-		request.login(us.username, us.password);
+		// request.logout();
+		request.login(us.username, us.password); // SecurityContextHolder.getContext().getAuthentication();
 		return okStatus();
 	}
 
