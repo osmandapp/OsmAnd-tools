@@ -7,6 +7,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -32,6 +33,7 @@ public class IconVisibilityTest {
 	Map<Integer, Integer> maxTextOrderInZoom = new LinkedHashMap<>();
 
 	@Test
+	@Ignore
 	public void testVisibility() throws IOException {
 		IconVisibilityTest iconComparator = new IconVisibilityTest();
 		iconComparator.compare(defArgs[TEST_FILE], defArgs[RENDER_FILE]);
