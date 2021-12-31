@@ -195,14 +195,14 @@ public class ApiController {
         	dataMissingSearch.save(feedback);
         }
     	
-        return "{'status':'OK'}";
+        return "{\"status\":\"OK\"}";
     }
     
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
 	public String checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
-		return "{'status':'OK'}";
+		return "{\"status\":\"OK\"}";
 	}
     
     

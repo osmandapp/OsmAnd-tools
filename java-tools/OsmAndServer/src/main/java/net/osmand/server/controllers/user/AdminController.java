@@ -155,10 +155,10 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Configurations are reloaded");
 		redirectAttrs.addFlashAttribute("services", new String[]{"motd", "download"});
-        if(!errors.isEmpty()) {
-        	redirectAttrs.addFlashAttribute("update_status", "FAILED");
-        	redirectAttrs.addFlashAttribute("update_errors", "Errors: " +errors);
-        }
+		if (!errors.isEmpty()) {
+			redirectAttrs.addFlashAttribute("update_status", "FAILED");
+			redirectAttrs.addFlashAttribute("update_errors", "Errors: " + errors);
+		}
         //return index(model);
         return "redirect:info";
 	}

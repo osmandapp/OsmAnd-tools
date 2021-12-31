@@ -1,12 +1,15 @@
 package net.osmand.server;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -18,10 +21,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.OAuth2ClientContext;
 import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientAuthenticationProcessingFilter;
@@ -29,9 +43,17 @@ import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilt
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.controllers.pub.UserdataController;
 
 @Configuration
 @EnableOAuth2Client
@@ -46,23 +68,66 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     @Value("${admin.emails}")
     private String adminEmails;
     
+    @Autowired
+	protected PremiumUsersRepository usersRepository;
+    
+    @Autowired
+	protected PremiumUserDevicesRepository devicesRepository;
+    
+    
     private Set<String> adminEmailsSet = new TreeSet<>();
     
     private static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
     
     public static final String ROLE_ADMIN = "ROLE_ADMIN";
+    public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
     public static final String ROLE_USER = "ROLE_USER";
-
-	
     
+    
+	public static class OsmAndProUser extends User {
+
+		private static final long serialVersionUID = -881322456618342435L;
+		PremiumUserDevice userDevice;
+
+		public OsmAndProUser(String username, String password, PremiumUserDevice pud,
+				List<GrantedAuthority> authorities) {
+			super(username, password, authorities);
+			this.userDevice = pud;
+			// clean up access token to not get it displayed
+			this.userDevice.accesstoken = null;
+		}
+
+		public PremiumUserDevice getUserDevice() {
+			return userDevice;
+		}
+	}
+    
+
+    @Override
+    protected void configure(final AuthenticationManagerBuilder auth) throws Exception {
+    	auth.userDetailsService(new UserDetailsService() {
+    	    @Override
+			public UserDetails loadUserByUsername(String username) {
+				PremiumUser pu = usersRepository.findByEmail(username);
+				if (pu == null) {
+					throw new UsernameNotFoundException(username);
+				}
+				PremiumUserDevice pud = devicesRepository.findByUseridAndDeviceid(pu.id,
+						UserdataController.TOKEN_DEVICE_WEB);
+				if (pud == null) {
+					throw new UsernameNotFoundException(username);
+				}
+				
+				return new OsmAndProUser(username, pud.accesstoken, pud,
+						AuthorityUtils.createAuthorityList(WebSecurityConfiguration.ROLE_PRO_USER));
+			}
+    	});
+    }
     
     @Override
 	protected void configure(HttpSecurity http) throws Exception {
-		for (String admin : adminEmails.split(",")) {
-			adminEmailsSet.add(admin.trim());
-		}
-    	LOG.info("Admin logins are:" + adminEmailsSet);
     	// http.csrf().disable().antMatcher("/**");
+    	// 1. CSRF
     	Set<String> enabledMethods = new TreeSet<>(
     			Arrays.asList("GET", "HEAD", "TRACE", "OPTIONS", "POST", "DELETE"));
     	http.csrf().requireCsrfProtectionMatcher(new RequestMatcher() {
@@ -84,19 +149,43 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			}
 		}).csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
     	
-    	// all top level are accessible without login
+    	// 2. Configure admins - all top level are accessible without login
+    	for (String admin : adminEmails.split(",")) {
+			adminEmailsSet.add(admin.trim());
+		}
+    	LOG.info("Admin logins are:" + adminEmailsSet);
     	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
-    							.antMatchers("/u/**").hasAuthority(ROLE_ADMIN) // user
-//    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**",
-//                                        "/device/*/**", "/download.php*", "/download*", "/api/**").permitAll()
+    							.antMatchers("/map/api/auth/**").permitAll()
+    							.antMatchers("/map/api/**").hasAuthority(ROLE_PRO_USER)
+    							.antMatchers("/u/**").hasAnyAuthority(ROLE_USER, ROLE_PRO_USER, ROLE_ADMIN) // user
+//    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**").permitAll()
     							.anyRequest().permitAll();
-    	LoginUrlAuthenticationEntryPoint login = new LoginUrlAuthenticationEntryPoint("/login");
-    	if(getApplicationContext().getEnvironment().acceptsProfiles("production")){
-    		login.setForceHttps(true);
-    	}
-		http.exceptionHandling().authenticationEntryPoint(login);
-		http.logout().logoutSuccessUrl("/").permitAll();
-		http.addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class);
+    	LoginUrlAuthenticationEntryPoint oauthAdminLogin = new LoginUrlAuthenticationEntryPoint("/login");
+		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
+			oauthAdminLogin.setForceHttps(true);
+		}
+		http.formLogin()
+				.loginPage("/map/api/auth/loginForm").successHandler(new SavedRequestAwareAuthenticationSuccessHandler() {
+					
+					@Override
+					public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+							Authentication authentication) throws IOException, ServletException {
+						// TODO sucess url + fix redirects
+						super.onAuthenticationSuccess(request, response, authentication);
+					}
+				}).loginProcessingUrl("/map/api/auth/loginProcess").defaultSuccessUrl("/map/loginSuccess");
+		LoginUrlAuthenticationEntryPoint mapLogin = new LoginUrlAuthenticationEntryPoint("/map/loginForm");
+		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
+			mapLogin.setForceHttps(true);
+		}
+		http.exceptionHandling()
+				.defaultAuthenticationEntryPointFor(mapLogin, new AntPathRequestMatcher("/map/api/**"))
+				.defaultAuthenticationEntryPointFor(oauthAdminLogin, new AntPathRequestMatcher("**"));
+		http.addFilterBefore(ssoFilter("/login"), BasicAuthenticationFilter.class);
+        
+		http.rememberMe().tokenValiditySeconds(3600*24*14);
+		http.logout().deleteCookies("JSESSIONID").
+			logoutSuccessUrl("/").logoutRequestMatcher(new AntPathRequestMatcher("/logout")).permitAll();
     	
 	}
 
@@ -108,8 +197,8 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		return registration;
 	}
 	
-    private javax.servlet.Filter ssoFilter() {
-		OAuth2ClientAuthenticationProcessingFilter filter = new OAuth2ClientAuthenticationProcessingFilter("/login");
+    private javax.servlet.Filter ssoFilter(String url) {
+		OAuth2ClientAuthenticationProcessingFilter filter = new OAuth2ClientAuthenticationProcessingFilter(url);
 		OAuth2RestTemplate template = new OAuth2RestTemplate(google(), oauth2ClientContext);
 		filter.setRestTemplate(template);
 		UserInfoTokenServices tokenServices = new UserInfoTokenServices(googleUserInfoUri,
@@ -119,8 +208,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			@Override
 			public List<GrantedAuthority> extractAuthorities(Map<String, Object> map) {
 				Object email = map.get("email");
-				if(adminEmailsSet.contains(email) && 
-						"true".equals(map.get("email_verified") + "")) {
+				if (adminEmailsSet.contains(email) && "true".equals(map.get("email_verified") + "")) {
 					LOG.warn("Admin '" + email + "' logged in");
 					return AuthorityUtils.createAuthorityList(ROLE_USER, ROLE_ADMIN);
 				}
@@ -134,12 +222,25 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		return filter;
 	}
     
+	@Bean("authenticationManager")
+	@Override
+	public AuthenticationManager authenticationManagerBean() throws Exception {
+		return super.authenticationManagerBean();
+	}
+    
 
 	@Bean
 	@ConfigurationProperties("google.client")
 	public AuthorizationCodeResourceDetails google() {
 		return new AuthorizationCodeResourceDetails();
 	}
- 
+	
+	@Bean
+	public PasswordEncoder passwordEncoder() {
+	    DelegatingPasswordEncoder delegatingPasswordEncoder = 
+	    		(DelegatingPasswordEncoder) PasswordEncoderFactories.createDelegatingPasswordEncoder();
+	    delegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder());
+		return delegatingPasswordEncoder;
+	}
 	
 }
