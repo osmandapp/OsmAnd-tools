@@ -6,6 +6,7 @@ import java.util.Collections;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -124,6 +125,24 @@ public class MapApiController {
 		}
 		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions);
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+	
+	@GetMapping(value = "/download-file")
+	@ResponseBody
+	public void getFile(HttpServletResponse response, HttpServletRequest request,
+			@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			ResponseEntity<String> error = tokenNotValid();
+			if (error != null) {
+				response.setStatus(error.getStatusCodeValue());
+				response.getWriter().write(error.getBody());
+				return;
+			}
+		}
+		userdataController.getFile(response, request, name, type, updatetime, dev);
 	}
 
 

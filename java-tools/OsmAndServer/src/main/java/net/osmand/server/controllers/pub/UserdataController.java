@@ -627,11 +627,16 @@ public class UserdataController {
 			@RequestParam(name = "updatetime", required = false) Long updatetime,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
-		ResponseEntity<String> error = null;
-		UserFile fl = null;
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		getFile(response, request, name, type, updatetime, dev);
+	}
+
+	public void getFile(HttpServletResponse response, HttpServletRequest request, String name, String type,
+			Long updatetime, PremiumUserDevice dev) throws IOException {
 		InputStream bin = null;
 		try {
+			UserFile fl = null;
+			ResponseEntity<String> error = null;
 			if (dev == null) {
 				error = tokenNotValid();
 			} else {
