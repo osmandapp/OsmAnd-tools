@@ -43,6 +43,7 @@ public class CustomWikiModel extends WikiModel {
 		super(imageBaseURL, linkBaseURL);
 		dataMap = new LinkedHashMap<>();
 		this.preserveContents = preserveContents;
+		getNamespace().getImage().addAlias("קובץ");
 	}
 	
 	public String getContentsJson() {
