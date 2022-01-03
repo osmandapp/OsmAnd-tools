@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -32,6 +33,7 @@ import com.google.gson.Gson;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
+import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IndexConstants;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.obf.OsmGpxWriteContext;
@@ -50,27 +52,6 @@ public class GpxController {
 	@Autowired
 	UserSessionResources session;
 	
-	public static class GPXSessionInfo {
-		public double totalDist;
-		public int trkPoints;
-		public int waypoints;
-		public int files;
-		
-		public static GPXSessionInfo getInfo(GPXSessionContext c) {
-			GPXSessionInfo info = new GPXSessionInfo();
-			info.files = c.files.size();
-			for(int i = 0; i < c.files.size(); i++ ) {
-				GPXTrackAnalysis analysis = c.analysis.get(i);
-				info.totalDist += analysis.totalDistance;
-				info.trkPoints += analysis.points;
-				info.waypoints += analysis.wptPoints;
-			}
-			return info;
-		}
-	}
-	
-	
-	
 	@PostMapping(path = {"/clear"}, produces = "application/json")
 	@ResponseBody
 	public String clear(HttpServletRequest request, HttpSession httpSession) throws IOException {
@@ -81,14 +62,60 @@ public class GpxController {
 		ctx.tempFiles.clear();
 		ctx.files.clear();
 		ctx.analysis.clear();
-		return gson.toJson(GPXSessionInfo.getInfo(ctx));
+		return gson.toJson(Map.of("all", ctx.analysis));
 	}
 	
 	@GetMapping(path = {"/get-gpx-info"}, produces = "application/json")
 	@ResponseBody
 	public String getGpx(HttpServletRequest request, HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
-		return gson.toJson(GPXSessionInfo.getInfo(ctx));
+		return gson.toJson(Map.of("all", ctx.analysis));
+	}
+	
+	@GetMapping(path = {"/get-gpx-file"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<Resource> getGpx(@RequestParam(required = true) String name, 
+			HttpSession httpSession) throws IOException {
+		GPXSessionContext ctx = session.getGpxResources(httpSession);
+		File tmpGpx = null;
+		for (int i = 0; i < ctx.analysis.size(); i++) {
+			GPXTrackAnalysis analysis = ctx.analysis.get(i);
+			if (analysis.name.equals(name)) {
+				tmpGpx = ctx.files.get(i);
+			}
+		}
+		if (tmpGpx == null) {
+			return ResponseEntity.notFound().build();
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"" + name + "\""));
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(tmpGpx));
+	}
+	
+	private void cleanupFromNanAnalysis(GPXTrackAnalysis analysis) {
+		// process analysis
+		if (Double.isNaN(analysis.minHdop)) {
+			analysis.minHdop = -1;
+			analysis.maxHdop = -1;
+		}
+		cleanupNans(analysis.locationStart);
+		cleanupNans(analysis.locationEnd);
+	}
+
+	private void cleanupNans(WptPt wpt) {
+		if (wpt == null) {
+			return;
+		}
+		if (Float.isNaN(wpt.heading)) {
+			wpt.heading = 0;
+		}
+		if (Double.isNaN(wpt.ele)) {
+			wpt.ele = 99999;
+		}
+		if (Double.isNaN(wpt.hdop)) {
+			wpt.hdop = -1;
+		}
 	}
 	
 	@PostMapping(path = {"/upload-session-gpx"}, produces = "application/json")
@@ -105,16 +132,17 @@ public class GpxController {
 		fous.close();
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
 		if (gpxFile != null) {
+			gpxFile.path = file.getOriginalFilename(); 
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			ctx.files.add(tmpGpx);
 			ctx.analysis.add(analysis);
+			cleanupFromNanAnalysis(analysis);
+			
+			return gson.toJson(Map.of("info", analysis));
 		}
-		return gson.toJson(GPXSessionInfo.getInfo(ctx));
+		return gson.toJson(Map.of("all", ctx.analysis));
 	}
-	
 
-	
-	
 	@RequestMapping(path = { "/download-obf"})
 	@ResponseBody
     public ResponseEntity<Resource> downloadObf(@RequestParam(defaultValue="", required=false) String gzip,

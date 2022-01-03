@@ -28,6 +28,7 @@ import com.google.gson.Gson;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 
@@ -38,6 +39,9 @@ public class MapApiController {
 
 	@Autowired
 	UserdataController userdataController;
+	
+	@Autowired
+	GpxController gpxController;
 
 	Gson gson = new Gson();
 
@@ -144,6 +148,7 @@ public class MapApiController {
 		}
 		userdataController.getFile(response, request, name, type, updatetime, dev);
 	}
+	
 
 
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
