@@ -34,6 +34,7 @@ public class CustomWikiModel extends WikiModel {
 	private Map<String, Map<String, Object>> dataMap;
 	private String prevHead = "";
 	private boolean preserveContents;
+	String[] additionalImageAliases = new String[]{"קובץ", "ملف", "Файл"};
 	
 
 	public static final String ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
@@ -43,7 +44,9 @@ public class CustomWikiModel extends WikiModel {
 		super(imageBaseURL, linkBaseURL);
 		dataMap = new LinkedHashMap<>();
 		this.preserveContents = preserveContents;
-		getNamespace().getImage().addAlias("קובץ");
+		for (String alias : additionalImageAliases) {
+			getNamespace().getImage().addAlias(alias);
+		}
 	}
 	
 	public String getContentsJson() {
