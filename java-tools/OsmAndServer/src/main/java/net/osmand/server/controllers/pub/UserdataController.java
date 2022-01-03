@@ -635,35 +635,17 @@ public class UserdataController {
 			Long updatetime, PremiumUserDevice dev) throws IOException {
 		InputStream bin = null;
 		try {
-			UserFile fl = null;
-			ResponseEntity<String> error = null;
-			if (dev == null) {
-				error = tokenNotValid();
-			} else {
-				if (updatetime != null) {
-					fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-							new Date(updatetime));
-				} else {
-					fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
-				}
-				if (fl == null) {
-					error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-				} else if (fl.data == null) {
-					bin = storageService.getFileInputStream(fl.storage, userFolder(fl), storageFileName(fl));
-					if (bin == null) {
-						error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-					}
-				} else {
-					bin = new ByteArrayInputStream(fl.data);
-				}
-			}
+			@SuppressWarnings("unchecked")
+			ResponseEntity<String>[] error = new ResponseEntity[] { null };
+			UserFile[] fl = new UserFile[] { null };
+			bin = getInputStream(name, type, updatetime, dev, error, fl);
 
-			if (error != null) {
-				response.setStatus(error.getStatusCodeValue());
-				response.getWriter().write(error.getBody());
+			if (error[0] != null) {
+				response.setStatus(error[0].getStatusCodeValue());
+				response.getWriter().write(error[0].getBody());
 				return;
 			}
-			response.setHeader("Content-Disposition", "attachment; filename=" + fl.name);
+			response.setHeader("Content-Disposition", "attachment; filename=" + fl[0].name);
 			// InputStream bin = fl.data.getBinaryStream();
 
 			String acceptEncoding = request.getHeader("Accept-Encoding");
@@ -683,6 +665,32 @@ public class UserdataController {
 				bin.close();
 			}
 		}
+	}
+
+	public InputStream getInputStream(String name, String type, Long updatetime, PremiumUserDevice dev,
+			ResponseEntity<String>[] error, UserFile[] fl) {
+		InputStream bin = null; 
+		if (dev == null) {
+			error[0] = tokenNotValid();
+		} else {
+			if (updatetime != null) {
+				fl[0] = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
+						new Date(updatetime));
+			} else {
+				fl[0]= filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+			}
+			if (fl[0] == null) {
+				error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+			} else if (fl[0].data == null) {
+				bin = storageService.getFileInputStream(fl[0].storage, userFolder(fl[0]), storageFileName(fl[0]));
+				if (bin == null) {
+					error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				}
+			} else {
+				bin = new ByteArrayInputStream(fl[0].data);
+			}
+		}
+		return bin;
 	}
 
 	private ResponseEntity<String> tokenNotValid() {

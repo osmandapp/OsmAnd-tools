@@ -1,8 +1,11 @@
 package net.osmand.server.controllers.user;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -26,8 +29,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.google.gson.Gson;
 
+import net.osmand.GPXUtilities;
+import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
@@ -42,7 +49,7 @@ public class MapApiController {
 	
 	@Autowired
 	GpxController gpxController;
-
+	
 	Gson gson = new Gson();
 
 	public static class UserPasswordPost {
@@ -147,6 +154,39 @@ public class MapApiController {
 			}
 		}
 		userdataController.getFile(response, request, name, type, updatetime, dev);
+	}
+	
+	@GetMapping(value = "/get-gpx-info")
+	@ResponseBody
+	public ResponseEntity<String> getGpxInfo(HttpServletResponse response, HttpServletRequest request,
+			@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
+		PremiumUserDevice dev = checkUser();
+		InputStream bin = null;
+		try {
+			@SuppressWarnings("unchecked")
+			ResponseEntity<String>[] error = new ResponseEntity[] { null };
+			UserFile[] fl = new UserFile[] { null };
+			bin = userdataController.getInputStream(name, type, updatetime, dev, error, fl);
+			if (error[0] != null) {
+				response.setStatus(error[0].getStatusCodeValue());
+				response.getWriter().write(error[0].getBody());
+				return error[0];
+			}
+			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
+			if (gpxFile == null) {
+				return ResponseEntity.badRequest().body(String.format("File %s not found", fl[0].name));
+			}
+			gpxFile.path = fl[0].name;
+			GPXTrackAnalysis analysis = gpxFile.getAnalysis(fl[0].clienttime == null ? 0 : fl[0].clienttime.getTime());
+			gpxController.cleanupFromNan(analysis);
+			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
+		} finally {
+			if (bin != null) {
+				bin.close();
+			}
+		}
 	}
 	
 

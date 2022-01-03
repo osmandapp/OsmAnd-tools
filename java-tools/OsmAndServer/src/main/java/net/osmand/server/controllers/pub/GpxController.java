@@ -93,17 +93,17 @@ public class GpxController {
 		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(tmpGpx));
 	}
 	
-	private void cleanupFromNanAnalysis(GPXTrackAnalysis analysis) {
+	public void cleanupFromNan(GPXTrackAnalysis analysis) {
 		// process analysis
 		if (Double.isNaN(analysis.minHdop)) {
 			analysis.minHdop = -1;
 			analysis.maxHdop = -1;
 		}
-		cleanupNans(analysis.locationStart);
-		cleanupNans(analysis.locationEnd);
+		cleanupFromNan(analysis.locationStart);
+		cleanupFromNan(analysis.locationEnd);
 	}
 
-	private void cleanupNans(WptPt wpt) {
+	private void cleanupFromNan(WptPt wpt) {
 		if (wpt == null) {
 			return;
 		}
@@ -136,7 +136,7 @@ public class GpxController {
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			ctx.files.add(tmpGpx);
 			ctx.analysis.add(analysis);
-			cleanupFromNanAnalysis(analysis);
+			cleanupFromNan(analysis);
 			
 			return gson.toJson(Map.of("info", analysis));
 		}
