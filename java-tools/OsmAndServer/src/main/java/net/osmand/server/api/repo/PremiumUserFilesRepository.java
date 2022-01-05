@@ -1,14 +1,10 @@
 package net.osmand.server.api.repo;
 
 
-import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
-import javax.persistence.AttributeConverter;
 import javax.persistence.Column;
-import javax.persistence.Converter;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -18,13 +14,11 @@ import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
 import org.hibernate.annotations.Type;
-import org.postgresql.util.PGobject;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
@@ -162,37 +156,4 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 		}
 	}
 	
-	@Converter
-	public class JSONBConverter implements AttributeConverter<Map<String, Object>, Object> {
-
-		private Gson gson;
-
-		public JSONBConverter() {
-			gson = new Gson();
-		}
-
-		@Override
-		public Object convertToDatabaseColumn(Map<String, Object> attribute) {
-			PGobject result = new PGobject();
-			result.setType("json");
-			try {
-				result.setValue(gson.toJson(attribute));
-			} catch (SQLException e) {
-				throw new IllegalArgumentException("Unable to set jsonb value");
-			}
-			return result;
-		}
-
-		@SuppressWarnings("unchecked")
-		@Override
-		public Map<String, Object> convertToEntityAttribute(Object dbData) {
-			if (dbData instanceof PGobject) {
-				String str = ((PGobject) dbData).getValue();
-				return gson.fromJson(str, Map.class);
-			}
-			return null;
-		}
-	}
-	
-
 }
