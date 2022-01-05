@@ -54,6 +54,7 @@ public class MapApiController {
 	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
 	private static final String ANALYSIS_DONE = "analysis-done";
+	private static final long ANALYSIS_RERUN = 1641420205357l; // 05-01-2022
 
 	@Autowired
 	UserdataController userdataController;
@@ -162,9 +163,9 @@ public class MapApiController {
 		}
 		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions, true);
 		for (UserFileNoData nd : res.uniqueFiles) {
-			if (nd.type.equalsIgnoreCase("gpx")
-					&& (nd.details == null || 
-					(!nd.details.has(ANALYSIS_DONE) && !nd.details.has(ANALYSIS)))) {
+			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
+			if (nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && (nd.details == null || 
+					(!nd.details.has(ANALYSIS_DONE) || nd.details.get(ANALYSIS_DONE).getAsLong() < ANALYSIS_RERUN))) {
 				GPXTrackAnalysis analysis = null;
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				UserFile uf = of.get();
@@ -245,7 +246,8 @@ public class MapApiController {
 
 	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile) {
 		gpxFile.path = file.name;
-		GPXTrackAnalysis analysis = gpxFile.getAnalysis(file.clienttime == null ? 0 : file.clienttime.getTime());
+		// file.clienttime == null ? 0 : file.clienttime.getTime()
+		GPXTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
 		gpxController.cleanupFromNan(analysis);
 		if (file.details == null) {
 			file.details = new JsonObject();

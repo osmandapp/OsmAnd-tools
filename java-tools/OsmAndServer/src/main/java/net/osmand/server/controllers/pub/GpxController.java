@@ -99,6 +99,12 @@ public class GpxController {
 			analysis.minHdop = -1;
 			analysis.maxHdop = -1;
 		}
+		if(analysis.minSpeed > analysis.maxSpeed) {
+			analysis.minSpeed = analysis.maxSpeed;
+		}
+		if(analysis.startTime > analysis.endTime) {
+			analysis.startTime = analysis.endTime = 0;
+		}
 		cleanupFromNan(analysis.locationStart);
 		cleanupFromNan(analysis.locationEnd);
 	}
