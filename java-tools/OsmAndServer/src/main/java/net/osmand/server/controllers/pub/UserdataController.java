@@ -86,6 +86,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 	
@@ -280,7 +281,7 @@ public class UserdataController {
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
@@ -296,7 +297,7 @@ public class UserdataController {
 			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(orderid);
 		if (errorMsg != null) {
@@ -314,6 +315,9 @@ public class UserdataController {
 	}
 	
 	public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
+		if (password.length() < 6) {
+			return error(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
+		}
 		return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
 	}
 	
@@ -325,7 +329,7 @@ public class UserdataController {
 		}
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
@@ -512,7 +516,7 @@ public class UserdataController {
 			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
 					"Subscription is not valid any more: " + errorMsg);
 		}
-		UserFilesResults res = generateFiles(dev.userid, null, null, false);
+		UserFilesResults res = generateFiles(dev.userid, null, null, false, false);
 		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
 			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
 					"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
@@ -709,12 +713,14 @@ public class UserdataController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		UserFilesResults res = generateFiles(dev.userid, name, type, allVersions);
+		UserFilesResults res = generateFiles(dev.userid, name, type, allVersions, false);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions) {
-		List<UserFileNoData> fl = filesRepository.listFilesByUserid(userId, name, type);
+	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
+		List<UserFileNoData> fl = 
+				details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) : 
+						filesRepository.listFilesByUserid(userId, name, type);
 		UserFilesResults res = new UserFilesResults();
 		res.maximumAccountSize = MAXIMUM_ACCOUNT_SIZE;
 		res.uniqueFiles = new ArrayList<>();
@@ -753,6 +759,6 @@ public class UserdataController {
 		public List<UserFileNoData> uniqueFiles;
 		public int userid;
 		public long maximumAccountSize;
-
+		
 	}
 }

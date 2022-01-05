@@ -18,6 +18,9 @@ import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,12 +31,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
@@ -49,6 +54,12 @@ public class MapApiController {
 	
 	@Autowired
 	GpxController gpxController;
+	
+	@Autowired
+	PremiumUserFilesRepository userFilesRepository;
+	
+	@Autowired
+	AuthenticationManager authManager;
 	
 	Gson gson = new Gson();
 
@@ -73,14 +84,22 @@ public class MapApiController {
 		return gson.toJson(user);
 	}
 
-	private String okStatus() {
-		return gson.toJson(Collections.singletonMap("status", "ok"));
+	private ResponseEntity<String> okStatus() {
+		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
 	}
 
 	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public String loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
 		// request.logout();
+		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(us.username, us.password);
+		try {
+			//Authentication res = 
+			authManager.authenticate(pwt);
+			// System.out.println(res);
+		} catch (AuthenticationException e) {
+			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", us.username));
+		}
 		request.login(us.username, us.password); // SecurityContextHolder.getContext().getAuthentication();
 		return okStatus();
 	}
@@ -93,13 +112,14 @@ public class MapApiController {
 		if (res.getStatusCodeValue() < 300) {
 			request.logout();
 			request.login(us.username, us.password);
+			return okStatus();
 		}
 		return res;
 	}
 
 	@PostMapping(path = { "/auth/logout" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public String logoutMapUser(HttpServletRequest request) throws ServletException {
+	public ResponseEntity<String> logoutMapUser(HttpServletRequest request) throws ServletException {
 		request.logout();
 		return okStatus();
 	}
@@ -134,7 +154,7 @@ public class MapApiController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions);
+		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions, true);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 	
@@ -156,6 +176,7 @@ public class MapApiController {
 		userdataController.getFile(response, request, name, type, updatetime, dev);
 	}
 	
+	@SuppressWarnings("unchecked")
 	@GetMapping(value = "/get-gpx-info")
 	@ResponseBody
 	public ResponseEntity<String> getGpxInfo(HttpServletResponse response, HttpServletRequest request,
@@ -165,22 +186,28 @@ public class MapApiController {
 		PremiumUserDevice dev = checkUser();
 		InputStream bin = null;
 		try {
-			@SuppressWarnings("unchecked")
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
 			UserFile[] fl = new UserFile[] { null };
 			bin = userdataController.getInputStream(name, type, updatetime, dev, error, fl);
-			if (error[0] != null) {
-				response.setStatus(error[0].getStatusCodeValue());
-				response.getWriter().write(error[0].getBody());
-				return error[0];
+			UserFile file = fl[0];
+			ResponseEntity<String> err = error[0];
+			if (err != null) {
+				response.setStatus(err.getStatusCodeValue());
+				response.getWriter().write(err.getBody());
+				return err;
 			}
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
 			if (gpxFile == null) {
-				return ResponseEntity.badRequest().body(String.format("File %s not found", fl[0].name));
+				return ResponseEntity.badRequest().body(String.format("File %s not found", file.name));
 			}
-			gpxFile.path = fl[0].name;
-			GPXTrackAnalysis analysis = gpxFile.getAnalysis(fl[0].clienttime == null ? 0 : fl[0].clienttime.getTime());
+			gpxFile.path = file.name;
+			GPXTrackAnalysis analysis = gpxFile.getAnalysis(file.clienttime == null ? 0 : file.clienttime.getTime());
 			gpxController.cleanupFromNan(analysis);
+			if (file.details == null) {
+				file.details = new JsonObject();
+			}
+			file.details.add("analysis", gson.toJsonTree(analysis));
+			userFilesRepository.save(file);
 			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
 		} finally {
 			if (bin != null) {
@@ -193,7 +220,7 @@ public class MapApiController {
 
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
-	public String checkDownload(@RequestParam(value = "file_name", required = false) String fn,
+	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
 		return okStatus();
 	}

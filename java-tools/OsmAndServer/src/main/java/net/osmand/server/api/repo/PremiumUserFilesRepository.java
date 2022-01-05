@@ -1,9 +1,14 @@
 package net.osmand.server.api.repo;
 
+
+import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
+import javax.persistence.AttributeConverter;
 import javax.persistence.Column;
+import javax.persistence.Converter;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -12,10 +17,15 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import org.hibernate.annotations.Type;
+import org.postgresql.util.PGobject;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 
@@ -27,6 +37,11 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	UserFile findTopByUseridAndNameAndTypeAndUpdatetime(int userid, String name, String type, Date updatetime);
 	
 	Iterable<UserFile> findAllByUserid(int userid);
+	
+//	@Modifying
+//	@Query("update UserFile uf set uf.details = ?1 where uf.id = ?2")
+//	@Transactional
+//	int updateUserFileDetails(JsonObject details, long id);
 	
     @Entity(name = "UserFile")
     @Table(name = "user_files")
@@ -65,6 +80,10 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Column(name = "storage")
         public String storage;
         
+        @Column(name = "gendetails", columnDefinition = "jsonb")
+        @Type(type = "net.osmand.server.assist.data.JsonbType")
+        public JsonObject details;
+        
 //      @Fetch(FetchMode.JOIN)
         @Column(name = "data", columnDefinition="bytea")
         public byte[] data;
@@ -75,11 +94,21 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
     
     // COALESCE(length(u.data), -1))
-	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData(u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize ) "
+	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
+			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
 			+ " order by updatetime desc")
-	List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid, @Param(value = "name") String name, @Param(value = "type") String type);
+	List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
+			@Param(value = "name") String name, @Param(value = "type") String type);
+	
+	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
+			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.details ) "
+			+ " from UserFile u "
+			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
+			+ " order by updatetime desc")
+	List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid, 
+			@Param(value = "name") String name, @Param(value = "type") String type);
 	
 	// file used to be transmitted to client as is
 	class UserFileNoData {
@@ -94,6 +123,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public Date clienttime;
         public long clienttimems;
 		public long zipSize;
+		public JsonObject details;
 		
 		public UserFileNoData(UserFile c) {
 			this.userid = c.userid;
@@ -107,10 +137,16 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
 			this.clienttime = c.clienttime;
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
+			this.details = c.details;
 		}
 		
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
+				Date updatetime, Date clienttime, Long filesize, Long zipSize) {
+			this(id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipSize, null);
+		}
 		
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, Date updatetime, Date clienttime, Long filesize, Long zipSize) {
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
+				Date updatetime, Date clienttime, Long filesize, Long zipSize, JsonObject details) {
 			this.userid = userid;
 			this.id = id;
 			this.deviceid = deviceid;
@@ -122,6 +158,39 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
 			this.clienttime = clienttime;
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
+			this.details = details;
+		}
+	}
+	
+	@Converter
+	public class JSONBConverter implements AttributeConverter<Map<String, Object>, Object> {
+
+		private Gson gson;
+
+		public JSONBConverter() {
+			gson = new Gson();
+		}
+
+		@Override
+		public Object convertToDatabaseColumn(Map<String, Object> attribute) {
+			PGobject result = new PGobject();
+			result.setType("json");
+			try {
+				result.setValue(gson.toJson(attribute));
+			} catch (SQLException e) {
+				throw new IllegalArgumentException("Unable to set jsonb value");
+			}
+			return result;
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public Map<String, Object> convertToEntityAttribute(Object dbData) {
+			if (dbData instanceof PGobject) {
+				String str = ((PGobject) dbData).getValue();
+				return gson.fromJson(str, Map.class);
+			}
+			return null;
 		}
 	}
 	

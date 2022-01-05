@@ -237,7 +237,7 @@ public class AdminController {
 					deviceSub = ls.get(0);
 				}
 				if (deviceSub != null) {
-					UserFilesResults ufs = userDataController.generateFiles(pu.id, null, null, true);
+					UserFilesResults ufs = userDataController.generateFiles(pu.id, null, null, true, false);
 					ufs.allFiles.clear();
 					ufs.uniqueFiles.clear();
 					deviceSub.payload = gson.toJson(ufs);
