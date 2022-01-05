@@ -683,18 +683,23 @@ public class UserdataController {
 			} else {
 				fl[0]= filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
 			}
-			if (fl[0] == null) {
+			UserFile userFile = fl[0];
+			if (userFile == null) {
 				error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-			} else if (fl[0].data == null) {
-				bin = storageService.getFileInputStream(fl[0].storage, userFolder(fl[0]), storageFileName(fl[0]));
+			} else if (userFile.data == null) {
+				bin = getInputStream(userFile);
 				if (bin == null) {
 					error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 				}
 			} else {
-				bin = new ByteArrayInputStream(fl[0].data);
+				bin = new ByteArrayInputStream(userFile.data);
 			}
 		}
 		return bin;
+	}
+
+	public InputStream getInputStream(UserFile userFile) {
+		return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
 	}
 
 	private ResponseEntity<String> tokenNotValid() {

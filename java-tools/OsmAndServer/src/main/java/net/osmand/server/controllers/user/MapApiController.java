@@ -1,10 +1,12 @@
 package net.osmand.server.controllers.user;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
@@ -40,6 +42,7 @@ import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
+import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
@@ -47,7 +50,10 @@ import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 @Controller
 @RequestMapping("/map/api")
 public class MapApiController {
+
 	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);
+	private static final String ANALYSIS = "analysis";
+	private static final String ANALYSIS_DONE = "analysis-done";
 
 	@Autowired
 	UserdataController userdataController;
@@ -155,6 +161,34 @@ public class MapApiController {
 			return tokenNotValid();
 		}
 		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions, true);
+		for (UserFileNoData nd : res.uniqueFiles) {
+			if (nd.type.equalsIgnoreCase("gpx")
+					&& (nd.details == null || 
+					(!nd.details.has(ANALYSIS_DONE) && !nd.details.has(ANALYSIS)))) {
+				GPXTrackAnalysis analysis = null;
+				Optional<UserFile> of = userFilesRepository.findById(nd.id);
+				UserFile uf = of.get();
+				if (uf != null) {
+					try {
+						InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
+								: userdataController.getInputStream(uf);
+						if (in != null) {
+							GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+							if (gpxFile != null) {
+								analysis = getAnalysis(uf, gpxFile);
+							}
+						}
+					} catch (RuntimeException e) {
+					}
+					if (analysis == null) {
+						uf.details = new JsonObject();
+						uf.details.addProperty(ANALYSIS_DONE, System.currentTimeMillis());
+						userFilesRepository.save(uf);
+					}
+					nd.details = uf.details;
+				}
+			}
+		}
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 	
@@ -200,20 +234,26 @@ public class MapApiController {
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", file.name));
 			}
-			gpxFile.path = file.name;
-			GPXTrackAnalysis analysis = gpxFile.getAnalysis(file.clienttime == null ? 0 : file.clienttime.getTime());
-			gpxController.cleanupFromNan(analysis);
-			if (file.details == null) {
-				file.details = new JsonObject();
-			}
-			file.details.add("analysis", gson.toJsonTree(analysis));
-			userFilesRepository.save(file);
+			GPXTrackAnalysis analysis = getAnalysis(file, gpxFile);
 			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
 			}
 		}
+	}
+
+	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile) {
+		gpxFile.path = file.name;
+		GPXTrackAnalysis analysis = gpxFile.getAnalysis(file.clienttime == null ? 0 : file.clienttime.getTime());
+		gpxController.cleanupFromNan(analysis);
+		if (file.details == null) {
+			file.details = new JsonObject();
+		}
+		file.details.add(ANALYSIS, gson.toJsonTree(analysis));
+		file.details.addProperty(ANALYSIS_DONE, System.currentTimeMillis());
+		userFilesRepository.save(file);
+		return analysis;
 	}
 	
 
