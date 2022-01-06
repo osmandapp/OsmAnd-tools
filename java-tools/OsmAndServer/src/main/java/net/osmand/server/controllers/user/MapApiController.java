@@ -176,7 +176,7 @@ public class MapApiController {
 						if (in != null) {
 							GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
 							if (gpxFile != null) {
-								analysis = getAnalysis(uf, gpxFile);
+								analysis = getAnalysis(uf, gpxFile, false);
 							}
 						}
 					} catch (RuntimeException e) {
@@ -235,7 +235,7 @@ public class MapApiController {
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", file.name));
 			}
-			GPXTrackAnalysis analysis = getAnalysis(file, gpxFile);
+			GPXTrackAnalysis analysis = getAnalysis(file, gpxFile, true);
 			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
 		} finally {
 			if (bin != null) {
@@ -244,11 +244,15 @@ public class MapApiController {
 		}
 	}
 
-	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile) {
+	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile, boolean full) {
 		gpxFile.path = file.name;
 		// file.clienttime == null ? 0 : file.clienttime.getTime()
 		GPXTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
 		gpxController.cleanupFromNan(analysis);
+		if (!full) {
+			analysis.speedData.clear();
+			analysis.elevationData.clear();
+		}
 		if (file.details == null) {
 			file.details = new JsonObject();
 		}
