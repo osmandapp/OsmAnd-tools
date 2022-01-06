@@ -54,7 +54,7 @@ public class MapApiController {
 	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
 	private static final String ANALYSIS_DONE = "analysis-done";
-	private static final long ANALYSIS_RERUN = 1641420205357l; // 05-01-2022
+	private static final long ANALYSIS_RERUN = 1641420210000l; // 05-01-2022
 
 	@Autowired
 	UserdataController userdataController;
