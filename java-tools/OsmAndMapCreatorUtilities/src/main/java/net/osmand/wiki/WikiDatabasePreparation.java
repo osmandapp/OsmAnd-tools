@@ -100,7 +100,7 @@ public class WikiDatabasePreparation {
 		}
 
 	}
-    
+
 	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -132,7 +132,9 @@ public class WikiDatabasePreparation {
 					bld.append(parseGalleryString(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
-				}  
+				} else if (val.startsWith("wide image") || val.startsWith("תמונה רחבה")) {
+					bld.append(parseWideImageString(val));
+				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
 					bld.append(parseListing(val, wikidata, lang));
@@ -150,7 +152,7 @@ public class WikiDatabasePreparation {
 					parseAndAppendMetricData(val, bld);
 				} else if (key.equals(WikivoyageTemplates.TRANSLATION.getType())) {
 					parseAndAppendTranslation(val, bld);
-				} 	
+				}
 				if (!key.isEmpty() && blockResults != null) {
 					if (key.contains("|")) {
 						for (String str : key.split("\\|")) {
@@ -183,7 +185,7 @@ public class WikiDatabasePreparation {
 							indEnd = indEnd + calculateHeaderLevel(text, indEnd);
 							char ch = indEnd < text.length() - 2 ? text.charAt(indEnd + 1) : text.charAt(indEnd);
 							int nextHeader = calculateHeaderLevel(text, ch == '\n' ? indEnd + 2 : indEnd + 1);
-							if (nextHeader > 1 && headerLvl >= nextHeader ) {
+							if (nextHeader > 1 && headerLvl >= nextHeader) {
 								i = indEnd;
 								continue;
 							} else if (headerLvl == 2) {
@@ -197,7 +199,7 @@ public class WikiDatabasePreparation {
 							} else {
 								bld.append(text.charAt(i));
 							}
-						}						
+						}
 					} else {
 						bld.append(text.charAt(i));
 					}
@@ -428,12 +430,34 @@ public class WikiDatabasePreparation {
 		bld.append("</p>");
 	}
 
+	private static String parseWideImageString(String val) {
+		String[] parts = val.split("\\|");
+		StringBuilder bld = new StringBuilder();
+		bld.append("[[");
+		for (int i = 1; i < parts.length; i++) {
+			String part = parts[i];
+			String toCompare = part.toLowerCase();
+			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg")
+					|| toCompare.contains(".png") || toCompare.contains(".gif")) {
+				if (!toCompare.contains(":")) {
+					bld.append("File:");
+				}
+			}
+			bld.append(part);
+			if (i < parts.length - 1) {
+				bld.append("|");
+			}
+		}
+		bld.append("]]");
+		return bld.toString();
+	}
+
 	private static String parseGalleryString(String val) {
 		String[] parts = val.split("\n");
 		StringBuilder bld = new StringBuilder();
 		for (String part : parts) {
 			String toCompare = part.toLowerCase();
-			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
+			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg")
 					|| toCompare.contains(".png") || toCompare.contains(".gif")) {
 				bld.append("[[");
 				bld.append(part);
