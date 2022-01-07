@@ -29,7 +29,17 @@ echo "Tile size (full):     $TILE_FULL_SIZE"
 
 GDAL2TILES=`which gdal2tiles.py`
 GDAL2TILES_PATH=$(dirname "$GDAL2TILES")
-echo "gdal2tiles:           $GDAL2TILES"
+if "$SRC_PATH/test_gdal2tiles.py"; then
+    echo "gdal2tiles:           $GDAL2TILES (visible to python)"
+else
+    if [ -z "$PYTHONPATH" ]; then
+        export PYTHONPATH="$GDAL2TILES_PATH"
+    else
+        export PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH"
+    fi
+    "$SRC_PATH/test_gdal2tiles.py" || exit $?
+    echo "gdal2tiles:           $GDAL2TILES (added to PYTHONPATH)"
+fi
 
 # Step 0. Clean output path and recreate it
 if [ -e "${OUTPUT_PATH}" ]; then
@@ -83,7 +93,7 @@ fi
 echo "Slicing..."
 mkdir -p "$WORK_PATH/tiles"
 (cd "$WORK_PATH/tiles" && \
-PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/slicer.py" \
+"$SRC_PATH/slicer.py" \
     --size=$TILE_SIZE \
     --driver=GTiff \
     --extension=tif \
@@ -105,7 +115,7 @@ mkdir -p "$WORK_PATH/overlapped_tiles"
 echo "Packing..."
 mkdir -p "$WORK_PATH/db"
 (cd "$WORK_PATH/db" && \
-PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/packer.py" \
+"$SRC_PATH/packer.py" \
     --verbose \
     "$WORK_PATH/overlapped_tiles" "$WORK_PATH/db")
 
