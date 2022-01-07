@@ -4,7 +4,7 @@
 # These DBs contain tiles of specified size by zoom levels
 
 # Basic usage is
-# bake_heightmaps.sh /path/to/dem/collection /path/to/output/dir
+# generate.sh /path/to/dem/collection /path/to/output/dir
 
 # Fail on any error
 set -e
@@ -45,7 +45,7 @@ if [ ! -f "$WORK_PATH/heightdbs.vrt" ]; then
     gdalbuildvrt \
         -resolution highest \
         -hidenodata \
-        -vrtnodata "-32768" \
+        -vrtnodata "0" \
         "$WORK_PATH/heightdbs.vrt" "$DEMS_PATH"/*)
 fi
 
