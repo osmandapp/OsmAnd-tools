@@ -15,7 +15,6 @@ import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -65,7 +64,12 @@ public class GpxController {
 		return gson.toJson(Map.of("all", ctx.analysis));
 	}
 	
-	
+	@GetMapping(path = { "/get-gpx-info" }, produces = "application/json")
+	@ResponseBody
+	public String getGpx(HttpServletRequest request, HttpSession httpSession) throws IOException {
+		GPXSessionContext ctx = session.getGpxResources(httpSession);
+		return gson.toJson(Map.of("all", ctx.analysis));
+	}
 	
 	@GetMapping(path = {"/get-gpx-file"}, produces = "application/json")
 	@ResponseBody
