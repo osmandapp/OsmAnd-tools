@@ -1,7 +1,6 @@
 package net.osmand.server.controllers.user;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
@@ -17,7 +16,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
@@ -40,10 +38,6 @@ import com.google.gson.JsonObject;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.GPXUtilities.Track;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
-import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
@@ -75,9 +69,6 @@ public class MapApiController {
 	
 	@Autowired
 	AuthenticationManager authManager;
-	
-	@Value("${srtm.location}")
-	String srtmLocation;
 	
 	Gson gson = new Gson();
 
@@ -308,7 +299,7 @@ public class MapApiController {
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", file.name));
 			}
-			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+			GPXFile srtmGpx = gpxController.calculateSrtmAltitude(gpxFile, null);
 			GPXTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(file, srtmGpx, true);
 			if (analysisNotPresent(SRTM_ANALYSIS, file.details)) {
 				saveAnalysis(SRTM_ANALYSIS, file, analysis);
@@ -322,34 +313,6 @@ public class MapApiController {
 	}
 	
 	
-	
-	protected GPXFile calculateSrtmAltitude(GPXFile gpxFile, File[] missingFile) {
-		if (srtmLocation == null) {
-			return null;
-		}
-		File srtmFolder = new File(srtmLocation);
-		if (!srtmFolder.exists()) {
-			return null;
-		}
-		IndexHeightData hd = new IndexHeightData();
-		hd.setSrtmData(srtmFolder);
-		for (Track tr : gpxFile.tracks) {
-			for (TrkSegment s : tr.segments) {
-				for (int i = 0; i < s.points.size(); i++) {
-					WptPt wpt = s.points.get(i);
-					double h = hd.getPointHeight(wpt.lat, wpt.lon, missingFile);
-					if (h != IndexHeightData.INEXISTENT_HEIGHT) {
-						wpt.ele = h;
-					} else if (i == 0) {
-						return null;
-					}
-
-				}
-			}
-		}
-		return gpxFile;
-	}
-
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,

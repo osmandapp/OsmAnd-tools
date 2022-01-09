@@ -1,10 +1,12 @@
 package net.osmand.server.controllers.pub;
 
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +17,7 @@ import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -33,11 +36,15 @@ import com.google.gson.Gson;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
+import net.osmand.GPXUtilities.Track;
+import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IndexConstants;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.OsmGpxWriteContext.QueryParams;
+import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
+import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.util.Algorithms;
 
 
@@ -51,6 +58,9 @@ public class GpxController {
 	@Autowired
 	UserSessionResources session;
 	
+	@Value("${srtm.location}")
+	String srtmLocation;
+	
 	@PostMapping(path = {"/clear"}, produces = "application/json")
 	@ResponseBody
 	public String clear(HttpServletRequest request, HttpSession httpSession) throws IOException {
@@ -60,16 +70,17 @@ public class GpxController {
 		}
 		ctx.tempFiles.clear();
 		ctx.files.clear();
-		ctx.analysis.clear();
-		return gson.toJson(Map.of("all", ctx.analysis));
+		return gson.toJson(Map.of("all", ctx.files));
 	}
 	
 	@GetMapping(path = { "/get-gpx-info" }, produces = "application/json")
 	@ResponseBody
 	public String getGpx(HttpServletRequest request, HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
-		return gson.toJson(Map.of("all", ctx.analysis));
+		return gson.toJson(Map.of("all", ctx.files));
 	}
+	
+	
 	
 	@GetMapping(path = {"/get-gpx-file"}, produces = "application/json")
 	@ResponseBody
@@ -77,10 +88,10 @@ public class GpxController {
 			HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = null;
-		for (int i = 0; i < ctx.analysis.size(); i++) {
-			GPXTrackAnalysis analysis = ctx.analysis.get(i);
-			if (analysis.name.equals(name)) {
-				tmpGpx = ctx.files.get(i);
+		for (int i = 0; i < ctx.files.size(); i++) {
+			GPXSessionFile file = ctx.files.get(i);
+			if (file.analysis != null && file.analysis.name.equals(name)) {
+				tmpGpx = file.file;
 			}
 		}
 		if (tmpGpx == null) {
@@ -129,23 +140,31 @@ public class GpxController {
 			@RequestParam(required = true) MultipartFile file) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-		ctx.tempFiles.add(tmpGpx);
 		InputStream is = file.getInputStream();
 		FileOutputStream fous = new FileOutputStream(tmpGpx);
 		Algorithms.streamCopy(is, fous);
 		is.close();
 		fous.close();
+		
+		ctx.tempFiles.add(tmpGpx);
+		
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
 		if (gpxFile != null) {
-			gpxFile.path = file.getOriginalFilename(); 
-			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-			ctx.files.add(tmpGpx);
-			ctx.analysis.add(analysis);
-			cleanupFromNan(analysis);
+			GPXSessionFile sessionFile = new GPXSessionFile();
+			ctx.files.add(sessionFile);
+			gpxFile.path = file.getOriginalFilename();
 			
-			return gson.toJson(Map.of("info", analysis));
+			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			sessionFile.file = tmpGpx;
+			
+			cleanupFromNan(analysis);
+			sessionFile.analysis = analysis;
+			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+			GPXTrackAnalysis srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+			sessionFile.srtmAnalysis = srtmAnalysis;
+			return gson.toJson(Map.of("info", sessionFile));
 		}
-		return gson.toJson(Map.of("all", ctx.analysis));
+		return gson.toJson(Map.of("info", null));
 	}
 
 	@RequestMapping(path = { "/download-obf"})
@@ -156,7 +175,10 @@ public class GpxController {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm.gz");
 		ctx.tempFiles.add(tmpOsm);
-		List<File> files = ctx.files;
+		List<File> files = new ArrayList<>();
+		for (GPXSessionFile f : ctx.files) {
+			files.add(f.file);
+		}
 		String sessionId = httpSession.getId();
 		File tmpFolder = new File(tmpOsm.getParentFile(), sessionId);
 		String fileName = "gpx_" + sessionId;
@@ -174,6 +196,31 @@ public class GpxController {
 	}
 	
 	
+	public GPXFile calculateSrtmAltitude(GPXFile gpxFile, File[] missingFile) {
+		if (srtmLocation == null) {
+			return null;
+		}
+		File srtmFolder = new File(srtmLocation);
+		if (!srtmFolder.exists()) {
+			return null;
+		}
+		IndexHeightData hd = new IndexHeightData();
+		hd.setSrtmData(srtmFolder);
+		for (Track tr : gpxFile.tracks) {
+			for (TrkSegment s : tr.segments) {
+				for (int i = 0; i < s.points.size(); i++) {
+					WptPt wpt = s.points.get(i);
+					double h = hd.getPointHeight(wpt.lat, wpt.lon, missingFile);
+					if (h != IndexHeightData.INEXISTENT_HEIGHT) {
+						wpt.ele = h;
+					} else if (i == 0) {
+						return null;
+					}
 
+				}
+			}
+		}
+		return gpxFile;
+	}
 
 }
