@@ -177,7 +177,7 @@ public class MapApiController {
 						if (in != null) {
 							GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
 							if (gpxFile != null) {
-								analysis = getAnalysis(uf, gpxFile, false);
+								analysis = getAnalysis(uf, gpxFile);
 							}
 						}
 					} catch (RuntimeException e) {
@@ -185,6 +185,14 @@ public class MapApiController {
 					saveAnalysis(ANALYSIS, uf, analysis);
 					nd.details = uf.details;
 				}
+			}
+			if (analysisPresent(ANALYSIS, nd.details)) {
+				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
+				nd.details.get(ANALYSIS).getAsJsonObject().remove("elevationData");
+			}
+			if (analysisPresent(SRTM_ANALYSIS, nd.details)) {
+				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
+				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
@@ -247,7 +255,7 @@ public class MapApiController {
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
-			GPXTrackAnalysis analysis = getAnalysis(userFile, gpxFile, true);
+			GPXTrackAnalysis analysis = getAnalysis(userFile, gpxFile);
 			if (!analysisPresent(ANALYSIS, userFile)) {
 				saveAnalysis(ANALYSIS, userFile, analysis);
 			}
@@ -259,15 +267,15 @@ public class MapApiController {
 		}
 	}
 
-	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile, boolean full) {
+	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile) {
 		gpxFile.path = file.name;
 		// file.clienttime == null ? 0 : file.clienttime.getTime()
 		GPXTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
 		gpxController.cleanupFromNan(analysis);
-		if (!full) {
-			analysis.speedData.clear();
-			analysis.elevationData.clear();
-		}
+//		if (!full) {
+//			analysis.speedData.clear();
+//			analysis.elevationData.clear();
+//		}
 		return analysis;
 	}
 
@@ -313,7 +321,7 @@ public class MapApiController {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
 			GPXFile srtmGpx = gpxController.calculateSrtmAltitude(gpxFile, null);
-			GPXTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(userFile, srtmGpx, true);
+			GPXTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(userFile, srtmGpx);
 			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
 				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
