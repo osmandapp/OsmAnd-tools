@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
@@ -55,7 +54,7 @@ public class MapApiController {
 	private static final String ANALYSIS = "analysis";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
-	private static final long ANALYSIS_RERUN = 1641844136000l; // 10-01-2022
+	private static final long ANALYSIS_RERUN = 1641847021000l; // 10-01-2022
 											   
 
 	@Autowired
@@ -183,7 +182,7 @@ public class MapApiController {
 					} catch (RuntimeException e) {
 					}
 					saveAnalysis(ANALYSIS, uf, analysis);
-					nd.details = uf.details;
+					nd.details = uf.details.deepCopy();
 				}
 			}
 			if (analysisPresent(ANALYSIS, nd.details)) {
@@ -208,7 +207,8 @@ public class MapApiController {
 
 	private boolean analysisPresent(String tag, JsonObject details) {
 		return details != null && details.has(tag + DONE_SUFFIX)
-				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
+				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
+				&& details.has(tag) && !details.get(tag).isJsonNull();
 	}
 	
 	@GetMapping(value = "/download-file")
@@ -242,7 +242,7 @@ public class MapApiController {
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
 			UserFile userFile = userdataController.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(ANALYSIS, userFile)) {
-				return ResponseEntity.ok(gson.toJson(Map.of("info", userFile.details.get(ANALYSIS))));
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(ANALYSIS))));
 			}
 			bin = userdataController.getInputStream(dev, error, userFile);
 			ResponseEntity<String> err = error[0];
@@ -259,7 +259,7 @@ public class MapApiController {
 			if (!analysisPresent(ANALYSIS, userFile)) {
 				saveAnalysis(ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
@@ -307,7 +307,7 @@ public class MapApiController {
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
 			UserFile userFile = userdataController.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
-				return ResponseEntity.ok(gson.toJson(Map.of("info", userFile.details.get(SRTM_ANALYSIS))));
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(SRTM_ANALYSIS))));
 			}
 			bin = userdataController.getInputStream(dev, error, userFile);
 			ResponseEntity<String> err = error[0];
@@ -325,7 +325,7 @@ public class MapApiController {
 			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
 				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();

@@ -122,24 +122,24 @@ public class GpxController {
 		cleanupFromNan(analysis.locationEnd);
 		Iterator<Speed> itS = analysis.speedData.iterator();
 		float sumDist = 0;
-		while(itS.hasNext()) {
+		while (itS.hasNext()) {
 			Speed sp = itS.next();
 			if (Float.isNaN(sp.speed)) {
 				sumDist += sp.distance;
 				itS.remove();
-			} else if(sumDist > 0) {
+			} else if (sumDist > 0) {
 				sp.distance += sumDist;
 				sumDist = 0;
 			}
 		}
 		Iterator<Elevation> itE = analysis.elevationData.iterator();
 		sumDist = 0;
-		while(itE.hasNext()) {
+		while (itE.hasNext()) {
 			Elevation e = itE.next();
 			if (Float.isNaN(e.elevation)) {
 				sumDist += e.distance;
 				itE.remove();
-			} else if(sumDist > 0) {
+			} else if (sumDist > 0) {
 				e.distance += sumDist;
 				sumDist = 0;
 			}
