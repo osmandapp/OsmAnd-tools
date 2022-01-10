@@ -10,10 +10,9 @@ public class ExtractorHandler extends DefaultHandler {
 	private boolean start;
 	private boolean article;
 	private String articleId;
-	private int startNumberBefore;
-	private int endNumberBefore;
-	private int startNumberAfter;
-	private int endNumberAfter;
+	private int endHeaderLine;
+	private int firstArticleLine;
+	private int endArticleLine;
 	private final String title;
 
 
@@ -47,11 +46,7 @@ public class ExtractorHandler extends DefaultHandler {
 		if (qName.equals("page")) {
 			if (!start) {
 				start = true;
-				startNumberBefore = locator.getLineNumber();
-			}
-			if (article) {
-				article = false;
-				startNumberAfter = locator.getLineNumber();
+				endHeaderLine = locator.getLineNumber();
 			}
 		}
 	}
@@ -61,13 +56,18 @@ public class ExtractorHandler extends DefaultHandler {
 
 		if (qName.equalsIgnoreCase("title")) {
 			if (currentValue.toString().startsWith(title)) {
-				endNumberBefore = locator.getLineNumber() - 1;
+				firstArticleLine = locator.getLineNumber() - 1;
 				System.out.println(locator.getLineNumber() + " " + currentValue);
 				article = true;
 			}
 		}
-		if (qName.equalsIgnoreCase("page")) {
-			endNumberAfter = locator.getLineNumber();
+		if (qName.equals("page")) {
+			if (article) {
+				article = false;
+				endArticleLine = locator.getLineNumber();
+				System.out.println("Parsing time: " + (System.currentTimeMillis() - startTime) / 1000);
+				throw new StopParsingException();
+			}
 		}
 		if (qName.equalsIgnoreCase("id")) {
 			if (article) {
@@ -83,24 +83,23 @@ public class ExtractorHandler extends DefaultHandler {
 		currentValue.append(ch, start, length);
 	}
 
-	public int getStartNumberBefore() {
-		return startNumberBefore;
+	public int getEndHeaderLine() {
+		return endHeaderLine;
 	}
 
-	public int getEndNumberBefore() {
-		return endNumberBefore;
+	public int getFirstArticleLine() {
+		return firstArticleLine;
 	}
 
-	public int getStartNumberAfter() {
-		return startNumberAfter;
-	}
-
-	public int getEndNumberAfter() {
-		return endNumberAfter;
+	public int getEndArticleLine() {
+		return endArticleLine;
 	}
 
 	public String getArticleId() {
 		return articleId;
+	}
+
+	static class StopParsingException extends RuntimeException {
 	}
 }
 

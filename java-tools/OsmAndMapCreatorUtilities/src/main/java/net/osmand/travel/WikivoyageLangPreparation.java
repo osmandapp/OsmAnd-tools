@@ -28,6 +28,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.wiki.WikiImageUrlStorage;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -219,6 +220,7 @@ public class WikivoyageLangPreparation {
 		private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		private DBDialect dialect = DBDialect.SQLITE;
 		private Connection conn;
+		private final WikiImageUrlStorage imageUrlStorage;
 		private PreparedStatement prep;
 		private int batch = 0;
 		private final static int BATCH_SIZE = 500;
@@ -238,6 +240,7 @@ public class WikivoyageLangPreparation {
 			progress.startTask("Parse wiki xml", progIS.available());
 
 			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			imageUrlStorage = new WikiImageUrlStorage(conn);
 			createInitialDbStructure(conn, uncompressed);
 			prep = generateInsertPrep(conn, uncompressed);
 			wikidataconn  = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
@@ -352,13 +355,15 @@ public class WikivoyageLangPreparation {
 									+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
 						}
 						final HTMLConverter converter = new HTMLConverter(false);
+						imageUrlStorage.setArticleTitle(title.toString());
+						imageUrlStorage.setLang(lang);
 						CustomWikiModel wikiModel = new CustomWikiModel(
 								"https://upload.wikimedia.org/wikipedia/commons/${image}",
-								"https://" + lang + ".wikivoyage.org/wiki/${title}", false);
+								"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
 						String plainStr = wikiModel.render(converter, text);
 						plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
 								.replaceAll("<p>/div\n</p>", "</div>");
-						
+
 						if (DEBUG) {
 							String savePath = "/Users/plotva/Documents";
 							File myFile = new File(savePath, "page.html");
