@@ -55,7 +55,7 @@ public class MapApiController {
 	private static final String ANALYSIS = "analysis";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
-	private static final long ANALYSIS_RERUN = 1641841974168l; // 10-01-2022
+	private static final long ANALYSIS_RERUN = 1641841975000l; // 10-01-2022
 											   
 
 	@Autowired
