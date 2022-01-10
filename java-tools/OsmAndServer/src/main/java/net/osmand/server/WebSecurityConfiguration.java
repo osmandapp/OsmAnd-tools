@@ -1,15 +1,12 @@
 package net.osmand.server;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -25,7 +22,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.User;
@@ -43,7 +39,6 @@ import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilt
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -93,8 +88,6 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				List<GrantedAuthority> authorities) {
 			super(username, password, authorities);
 			this.userDevice = pud;
-			// clean up access token to not get it displayed
-			this.userDevice.accesstoken = null;
 		}
 
 		public PremiumUserDevice getUserDevice() {
@@ -164,16 +157,8 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
 			oauthAdminLogin.setForceHttps(true);
 		}
-		http.formLogin()
-				.loginPage("/map/api/auth/loginForm").successHandler(new SavedRequestAwareAuthenticationSuccessHandler() {
-					
-					@Override
-					public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
-							Authentication authentication) throws IOException, ServletException {
-						// TODO sucess url + fix redirects
-						super.onAuthenticationSuccess(request, response, authentication);
-					}
-				}).loginProcessingUrl("/map/api/auth/loginProcess").defaultSuccessUrl("/map/loginSuccess");
+		http.formLogin().loginPage("/map/api/auth/loginForm").
+				loginProcessingUrl("/map/api/auth/loginProcess").defaultSuccessUrl("/map/loginSuccess");
 		LoginUrlAuthenticationEntryPoint mapLogin = new LoginUrlAuthenticationEntryPoint("/map/loginForm");
 		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
 			mapLogin.setForceHttps(true);

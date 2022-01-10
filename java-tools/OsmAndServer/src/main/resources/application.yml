@@ -47,6 +47,7 @@ night-builds-json.location: https://dl2.osmand.net/night-builds-json/
 files.location: ${user.dir}/../../../help
 gen.location: ${files.location}/gen
 web.location: ${files.location}/website
+srtm.location: ${SRTM_LOCATION:}
 
 management:
   endpoints:

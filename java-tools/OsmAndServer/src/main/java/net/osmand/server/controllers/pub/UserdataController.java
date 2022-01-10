@@ -86,6 +86,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 	
@@ -280,7 +281,7 @@ public class UserdataController {
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
@@ -296,7 +297,7 @@ public class UserdataController {
 			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(orderid);
 		if (errorMsg != null) {
@@ -314,6 +315,9 @@ public class UserdataController {
 	}
 	
 	public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
+		if (password.length() < 6) {
+			return error(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
+		}
 		return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
 	}
 	
@@ -325,7 +329,7 @@ public class UserdataController {
 		}
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
@@ -512,7 +516,7 @@ public class UserdataController {
 			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
 					"Subscription is not valid any more: " + errorMsg);
 		}
-		UserFilesResults res = generateFiles(dev.userid, null, null, false);
+		UserFilesResults res = generateFiles(dev.userid, null, null, false, false);
 		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
 			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
 					"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
@@ -635,35 +639,17 @@ public class UserdataController {
 			Long updatetime, PremiumUserDevice dev) throws IOException {
 		InputStream bin = null;
 		try {
-			UserFile fl = null;
-			ResponseEntity<String> error = null;
-			if (dev == null) {
-				error = tokenNotValid();
-			} else {
-				if (updatetime != null) {
-					fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-							new Date(updatetime));
-				} else {
-					fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
-				}
-				if (fl == null) {
-					error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-				} else if (fl.data == null) {
-					bin = storageService.getFileInputStream(fl.storage, userFolder(fl), storageFileName(fl));
-					if (bin == null) {
-						error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-					}
-				} else {
-					bin = new ByteArrayInputStream(fl.data);
-				}
-			}
+			@SuppressWarnings("unchecked")
+			ResponseEntity<String>[] error = new ResponseEntity[] { null };
+			UserFile[] fl = new UserFile[] { null };
+			bin = getInputStream(name, type, updatetime, dev, error, fl);
 
-			if (error != null) {
-				response.setStatus(error.getStatusCodeValue());
-				response.getWriter().write(error.getBody());
+			if (error[0] != null) {
+				response.setStatus(error[0].getStatusCodeValue());
+				response.getWriter().write(error[0].getBody());
 				return;
 			}
-			response.setHeader("Content-Disposition", "attachment; filename=" + fl.name);
+			response.setHeader("Content-Disposition", "attachment; filename=" + fl[0].name);
 			// InputStream bin = fl.data.getBinaryStream();
 
 			String acceptEncoding = request.getHeader("Accept-Encoding");
@@ -685,6 +671,37 @@ public class UserdataController {
 		}
 	}
 
+	public InputStream getInputStream(String name, String type, Long updatetime, PremiumUserDevice dev,
+			ResponseEntity<String>[] error, UserFile[] fl) {
+		InputStream bin = null; 
+		if (dev == null) {
+			error[0] = tokenNotValid();
+		} else {
+			if (updatetime != null) {
+				fl[0] = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
+						new Date(updatetime));
+			} else {
+				fl[0]= filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+			}
+			UserFile userFile = fl[0];
+			if (userFile == null) {
+				error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+			} else if (userFile.data == null) {
+				bin = getInputStream(userFile);
+				if (bin == null) {
+					error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				}
+			} else {
+				bin = new ByteArrayInputStream(userFile.data);
+			}
+		}
+		return bin;
+	}
+
+	public InputStream getInputStream(UserFile userFile) {
+		return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
+	}
+
 	private ResponseEntity<String> tokenNotValid() {
 		return error(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
 	}
@@ -701,12 +718,14 @@ public class UserdataController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		UserFilesResults res = generateFiles(dev.userid, name, type, allVersions);
+		UserFilesResults res = generateFiles(dev.userid, name, type, allVersions, false);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions) {
-		List<UserFileNoData> fl = filesRepository.listFilesByUserid(userId, name, type);
+	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
+		List<UserFileNoData> fl = 
+				details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) : 
+						filesRepository.listFilesByUserid(userId, name, type);
 		UserFilesResults res = new UserFilesResults();
 		res.maximumAccountSize = MAXIMUM_ACCOUNT_SIZE;
 		res.uniqueFiles = new ArrayList<>();
@@ -745,6 +764,6 @@ public class UserdataController {
 		public List<UserFileNoData> uniqueFiles;
 		public int userid;
 		public long maximumAccountSize;
-
+		
 	}
 }
