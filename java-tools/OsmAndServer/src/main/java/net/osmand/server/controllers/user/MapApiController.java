@@ -200,7 +200,7 @@ public class MapApiController {
 
 	private boolean analysisPresent(String tag, JsonObject details) {
 		return details != null && details.has(tag + DONE_SUFFIX)
-				&& details.get(tag + DONE_SUFFIX).getAsLong() < ANALYSIS_RERUN;
+				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 	
 	@GetMapping(value = "/download-file")
