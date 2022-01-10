@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -34,8 +35,10 @@ import org.xmlpull.v1.XmlPullParserException;
 import com.google.gson.Gson;
 
 import net.osmand.GPXUtilities;
+import net.osmand.GPXUtilities.Elevation;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
+import net.osmand.GPXUtilities.Speed;
 import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
@@ -117,6 +120,30 @@ public class GpxController {
 		}
 		cleanupFromNan(analysis.locationStart);
 		cleanupFromNan(analysis.locationEnd);
+		Iterator<Speed> itS = analysis.speedData.iterator();
+		float sumDist = 0;
+		while(itS.hasNext()) {
+			Speed sp = itS.next();
+			if (Float.isNaN(sp.speed)) {
+				sumDist += sp.distance;
+				itS.remove();
+			} else if(sumDist > 0) {
+				sp.distance += sumDist;
+				sumDist = 0;
+			}
+		}
+		Iterator<Elevation> itE = analysis.elevationData.iterator();
+		sumDist = 0;
+		while(itE.hasNext()) {
+			Elevation e = itE.next();
+			if (Float.isNaN(e.elevation)) {
+				sumDist += e.distance;
+				itE.remove();
+			} else if(sumDist > 0) {
+				e.distance += sumDist;
+				sumDist = 0;
+			}
+		}
 	}
 
 	private void cleanupFromNan(WptPt wpt) {
