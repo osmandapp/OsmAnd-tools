@@ -641,15 +641,14 @@ public class UserdataController {
 		try {
 			@SuppressWarnings("unchecked")
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
-			UserFile[] fl = new UserFile[] { null };
-			bin = getInputStream(name, type, updatetime, dev, error, fl);
-
+			UserFile userFile = getUserFile(name, type, updatetime, dev);
+			bin = getInputStream(dev, error, userFile);
 			if (error[0] != null) {
 				response.setStatus(error[0].getStatusCodeValue());
 				response.getWriter().write(error[0].getBody());
 				return;
 			}
-			response.setHeader("Content-Disposition", "attachment; filename=" + fl[0].name);
+			response.setHeader("Content-Disposition", "attachment; filename=" + userFile.name);
 			// InputStream bin = fl.data.getBinaryStream();
 
 			String acceptEncoding = request.getHeader("Accept-Encoding");
@@ -671,19 +670,11 @@ public class UserdataController {
 		}
 	}
 
-	public InputStream getInputStream(String name, String type, Long updatetime, PremiumUserDevice dev,
-			ResponseEntity<String>[] error, UserFile[] fl) {
+	public InputStream getInputStream(PremiumUserDevice dev, ResponseEntity<String>[] error, UserFile userFile) {
 		InputStream bin = null; 
 		if (dev == null) {
 			error[0] = tokenNotValid();
 		} else {
-			if (updatetime != null) {
-				fl[0] = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-						new Date(updatetime));
-			} else {
-				fl[0]= filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
-			}
-			UserFile userFile = fl[0];
 			if (userFile == null) {
 				error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 			} else if (userFile.data == null) {
@@ -696,6 +687,18 @@ public class UserdataController {
 			}
 		}
 		return bin;
+	}
+
+	public UserFile getUserFile(String name, String type, Long updatetime, PremiumUserDevice dev) {
+		if (dev == null) {
+			return null;
+		}
+		if (updatetime != null) {
+			return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
+					new Date(updatetime));
+		} else {
+			return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+		}
 	}
 
 	public InputStream getInputStream(UserFile userFile) {
