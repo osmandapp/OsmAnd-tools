@@ -275,10 +275,11 @@ public class MapApiController {
 		if (file.details == null) {
 			file.details = new JsonObject();
 		}
-		if (analysis != null) {
-			analysis.speedData.clear();
-			analysis.elevationData.clear();
-		}
+		// store data in db to speed up retrieval
+//		if (analysis != null) {
+//			analysis.speedData.clear();
+//			analysis.elevationData.clear();
+//		}
 		file.details.add(tag, gson.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
