@@ -17,12 +17,14 @@ import javax.servlet.http.HttpSession;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,7 +56,9 @@ import net.osmand.util.Algorithms;
 @RestController
 @RequestMapping("/gpx/")
 public class GpxController {
-	
+    
+    public static final int MAX_SIZE_FILES = 10;
+    public static final int MAX_SIZE_FILES_AUTH = 100;
 
 	Gson gson = new Gson();
 	
@@ -87,7 +91,7 @@ public class GpxController {
 	
 	@GetMapping(path = {"/get-gpx-file"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<Resource> getGpx(@RequestParam(required = true) String name, 
+	public ResponseEntity<Resource> getGpx(@RequestParam(required = true) String name,
 			HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = null;
@@ -163,10 +167,23 @@ public class GpxController {
 	
 	@PostMapping(path = {"/upload-session-gpx"}, produces = "application/json")
 	@ResponseBody
-	public String uploadGpx(HttpServletRequest request, HttpSession httpSession,
+	public ResponseEntity<String> uploadGpx(HttpServletRequest request, HttpSession httpSession,
 			@RequestParam(required = true) MultipartFile file) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		
+        double fileSizeMb = file.getSize()/(double)(1 << 20);
+        double filesSize = getCommonSavedFilesSize(ctx.files);
+        double maxSizeMb = getCommonMaxSizeFiles();
+        
+        if (fileSizeMb + filesSize > maxSizeMb) {
+            return ResponseEntity.badRequest().body(String.format("You don't have enough cloud space to store this file!"
+                    + "\nUploaded file size: %.1f MB."
+                    + "\nMax cloud space: %.0f MB."
+                    + "\nAvailable free space: %.1f MB.", 
+                      fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
+        }
+        
 		InputStream is = file.getInputStream();
 		FileOutputStream fous = new FileOutputStream(tmpGpx);
 		Algorithms.streamCopy(is, fous);
@@ -176,23 +193,43 @@ public class GpxController {
 		ctx.tempFiles.add(tmpGpx);
 		
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
-		if (gpxFile != null) {
+		if (gpxFile.error != null) {
+            return ResponseEntity.badRequest().body("Error reading gpx!");
+        } else {
 			GPXSessionFile sessionFile = new GPXSessionFile();
 			ctx.files.add(sessionFile);
 			gpxFile.path = file.getOriginalFilename();
 			
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
-			
+            sessionFile.size = fileSizeMb;
 			cleanupFromNan(analysis);
 			sessionFile.analysis = analysis;
 			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
-			GPXTrackAnalysis srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+            GPXTrackAnalysis srtmAnalysis = null;
+			if (srtmGpx != null) {
+                srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+            }
 			sessionFile.srtmAnalysis = srtmAnalysis;
-			return gson.toJson(Map.of("info", sessionFile));
+			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
-		return gson.toJson(Map.of("info", null));
 	}
+    
+    private double getCommonMaxSizeFiles() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof OsmAndProUser) {
+            return MAX_SIZE_FILES_AUTH;
+        } else
+            return MAX_SIZE_FILES;
+    }
+    
+    private double getCommonSavedFilesSize(List<GPXSessionFile> files) {
+	    double sizeFiles = 0L;
+        for (GPXSessionFile file: files) {
+            sizeFiles += file.size;
+        }
+        return sizeFiles;
+    }
 
 	@RequestMapping(path = { "/download-obf"})
 	@ResponseBody
