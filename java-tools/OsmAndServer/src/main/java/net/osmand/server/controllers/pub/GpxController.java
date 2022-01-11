@@ -216,7 +216,9 @@ public class GpxController {
 				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
 			}
 			sessionFile.srtmAnalysis = srtmAnalysis;
-			cleanupFromNan(srtmAnalysis);
+			if (srtmAnalysis != null) {
+				cleanupFromNan(srtmAnalysis);
+			}
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
 	}
