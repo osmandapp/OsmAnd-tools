@@ -150,13 +150,11 @@ public class GpxController {
         double maxSizeMb = getCommonMaxSizeFiles();
         
         if (fileSizeMb + filesSize > maxSizeMb) {
-            return ResponseEntity.badRequest().body(String.format("You don't have enough space to save this file!"
-                    + "\n"
-                    + "Size of your file = %.2f Mb"
-                    + "\n"
-                    + "Max storage files = %.2f Mb"
-                    + "\n"
-                    + "Free space = %.2f Mb", fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
+            return ResponseEntity.badRequest().body(String.format("You don't have enough cloud space to store this file!"
+                    + "\nUploaded file size: %.1f MB."
+                    + "\nMax cloud space: %.0f MB."
+                    + "\nAvailable free space: %.1f MB.", 
+                      fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
         }
         
 		InputStream is = file.getInputStream();
