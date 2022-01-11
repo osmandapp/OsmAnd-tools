@@ -21,6 +21,7 @@ public class UserSessionResources implements HttpSessionListener {
 	
 	static class GPXSessionFile {
 		transient File file;
+		double size;
 		GPXTrackAnalysis analysis;
 		GPXTrackAnalysis srtmAnalysis;
 	}

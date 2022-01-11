@@ -54,8 +54,8 @@ import net.osmand.util.Algorithms;
 @RequestMapping("/gpx/")
 public class GpxController {
     
-    public static final int MAX_SIZE_FILE = 10;
-    public static final int MAX_SIZE_FILE_AUTH = 100;
+    public static final int MAX_SIZE_FILES = 10;
+    public static final int MAX_SIZE_FILES_AUTH = 100;
 
 	Gson gson = new Gson();
 	
@@ -144,12 +144,21 @@ public class GpxController {
 			@RequestParam(required = true) MultipartFile file) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-
-        double fileSizeMb = file.getSize()/Math.pow(1000, 2);
-        double maxSizeMb = getMaxSizeFile();
-        if (fileSizeMb > maxSizeMb) {
-            return ResponseEntity.badRequest().body(String.format("File size large than '%s' Mb! ('%s' Mb)", maxSizeMb, fileSizeMb));
+		
+        double fileSizeMb = file.getSize()/(double)(1 << 20);
+        double filesSize = getCommonSavedFilesSize(ctx.files);
+        double maxSizeMb = getCommonMaxSizeFiles();
+        
+        if (fileSizeMb + filesSize > maxSizeMb) {
+            return ResponseEntity.badRequest().body(String.format("You don't have enough space to save this file!"
+                    + "\n"
+                    + "Size of your file = %.2f Mb"
+                    + "\n"
+                    + "Max storage file = %.2f Mb"
+                    + "\n"
+                    + "Free space = %.2f Mb", fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
         }
+        
 		InputStream is = file.getInputStream();
 		FileOutputStream fous = new FileOutputStream(tmpGpx);
 		Algorithms.streamCopy(is, fous);
@@ -168,7 +177,7 @@ public class GpxController {
 			
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
-			
+            sessionFile.size = fileSizeMb;
 			cleanupFromNan(analysis);
 			sessionFile.analysis = analysis;
 			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
@@ -181,12 +190,20 @@ public class GpxController {
 		}
 	}
     
-    public double getMaxSizeFile() {
+    private double getCommonMaxSizeFiles() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof OsmAndProUser) {
-            return MAX_SIZE_FILE_AUTH;
+            return MAX_SIZE_FILES_AUTH;
         } else
-            return MAX_SIZE_FILE;
+            return MAX_SIZE_FILES;
+    }
+    
+    private double getCommonSavedFilesSize(List<GPXSessionFile> files) {
+	    double sizeFiles = 0L;
+        for (GPXSessionFile file: files) {
+            sizeFiles += file.size;
+        }
+        return sizeFiles;
     }
 
 	@RequestMapping(path = { "/download-obf"})
