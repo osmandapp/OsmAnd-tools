@@ -14,6 +14,9 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
@@ -29,6 +32,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -166,50 +170,51 @@ public class GpxController {
 	}
 	
 	@PostMapping(path = {"/upload-session-gpx"}, produces = "application/json")
-	@ResponseBody
-	public ResponseEntity<String> uploadGpx(HttpServletRequest request, HttpSession httpSession,
-			@RequestParam(required = true) MultipartFile file) throws IOException {
+	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file, 
+			HttpServletRequest request, HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-		
-        double fileSizeMb = file.getSize()/(double)(1 << 20);
-        double filesSize = getCommonSavedFilesSize(ctx.files);
-        double maxSizeMb = getCommonMaxSizeFiles();
-        
-        if (fileSizeMb + filesSize > maxSizeMb) {
-            return ResponseEntity.badRequest().body(String.format("You don't have enough cloud space to store this file!"
-                    + "\nUploaded file size: %.1f MB."
-                    + "\nMax cloud space: %.0f MB."
-                    + "\nAvailable free space: %.1f MB.", 
-                      fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
-        }
-        
+
+		double fileSizeMb = file.getSize() / (double) (1 << 20);
+		double filesSize = getCommonSavedFilesSize(ctx.files);
+		double maxSizeMb = getCommonMaxSizeFiles();
+
+		if (fileSizeMb + filesSize > maxSizeMb) {
+			return ResponseEntity.badRequest()
+					.body(String.format(
+							"You don't have enough cloud space to store this file!" 
+									+ "\nUploaded file size: %.1f MB."
+									+ "\nMax cloud space: %.0f MB."  
+									+ "\nAvailable free space: %.1f MB.",
+							fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
+		}
+
 		InputStream is = file.getInputStream();
 		FileOutputStream fous = new FileOutputStream(tmpGpx);
 		Algorithms.streamCopy(is, fous);
 		is.close();
 		fous.close();
-		
+
 		ctx.tempFiles.add(tmpGpx);
-		
+
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
 		if (gpxFile.error != null) {
-            return ResponseEntity.badRequest().body("Error reading gpx!");
-        } else {
+			return ResponseEntity.badRequest().body("Error reading gpx!");
+		} else {
 			GPXSessionFile sessionFile = new GPXSessionFile();
 			ctx.files.add(sessionFile);
 			gpxFile.path = file.getOriginalFilename();
-			
+
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
-            sessionFile.size = fileSizeMb;
+			sessionFile.size = fileSizeMb;
 			cleanupFromNan(analysis);
 			sessionFile.analysis = analysis;
 			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
-            GPXTrackAnalysis srtmAnalysis = null;
+			GPXTrackAnalysis srtmAnalysis = null;
 			if (srtmGpx != null) {
-                srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
-            }
+				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+			}
 			sessionFile.srtmAnalysis = srtmAnalysis;
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
