@@ -154,7 +154,7 @@ public class GpxController {
                     + "\n"
                     + "Size of your file = %.2f Mb"
                     + "\n"
-                    + "Max storage file = %.2f Mb"
+                    + "Max storage files = %.2f Mb"
                     + "\n"
                     + "Free space = %.2f Mb", fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
         }
