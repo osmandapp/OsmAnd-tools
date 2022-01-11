@@ -41,15 +41,14 @@ public class UserSessionResources implements HttpSessionListener {
 	
 	@Override
 	public void sessionCreated(HttpSessionEvent se) {
+		//time before the session will invalidate - 2 days
+		se.getSession().setMaxInactiveInterval(172800);
 	}
 
 	@Override
 	public void sessionDestroyed(HttpSessionEvent se) {
 		GPXSessionContext ctx = (GPXSessionContext) se.getSession().getAttribute(SESSION_GPX);
 		if (ctx != null) {
-			for (File f : ctx.tempFiles) {
-				f.delete();
-			}
 			ctx.tempFiles.clear();
 			ctx.files.clear();
 		}
