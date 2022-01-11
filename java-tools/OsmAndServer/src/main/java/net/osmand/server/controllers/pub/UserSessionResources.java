@@ -48,6 +48,9 @@ public class UserSessionResources implements HttpSessionListener {
 	public void sessionDestroyed(HttpSessionEvent se) {
 		GPXSessionContext ctx = (GPXSessionContext) se.getSession().getAttribute(SESSION_GPX);
 		if (ctx != null) {
+            for (File f : ctx.tempFiles) {
+				f.delete();
+			}
 			ctx.tempFiles.clear();
 			ctx.files.clear();
 		}
