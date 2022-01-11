@@ -41,8 +41,6 @@ public class UserSessionResources implements HttpSessionListener {
 	
 	@Override
 	public void sessionCreated(HttpSessionEvent se) {
-		//time before the session will invalidate - 2 days
-		se.getSession().setMaxInactiveInterval(172800);
 	}
 
 	@Override
