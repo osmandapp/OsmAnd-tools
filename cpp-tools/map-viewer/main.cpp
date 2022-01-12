@@ -817,7 +817,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                 renderer->setElevationDataProvider(
                     std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
                         heightsCollection,
-                        renderer->getHeixelsPerTileSide()
+                        renderer->getElevationDataTileSize()
                     )
                 );
                 // renderer->setElevationDataConfiguration(OsmAnd::ElevationDataConfiguration()
