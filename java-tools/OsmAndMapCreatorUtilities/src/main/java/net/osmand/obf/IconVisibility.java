@@ -7,8 +7,6 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
-import org.junit.Ignore;
-import org.junit.Test;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -16,9 +14,8 @@ import java.io.*;
 import java.util.*;
 
 import static net.osmand.binary.BinaryMapIndexReader.*;
-import static org.junit.Assert.assertTrue;
 
-public class IconVisibilityTest {
+public class IconVisibility {
 
 	public static final int ICON = 0;
 	public static final int TEXT = 1;
@@ -31,13 +28,7 @@ public class IconVisibilityTest {
 	Map<Integer, List<VisibleObject>> mapObjectMap = new LinkedHashMap<>();
 	Map<Integer, Integer> maxIconOrderInZoom = new LinkedHashMap<>();
 	Map<Integer, Integer> maxTextOrderInZoom = new LinkedHashMap<>();
-
-	@Test
-	@Ignore
-	public void testVisibility() throws IOException {
-		IconVisibilityTest iconComparator = new IconVisibilityTest();
-		iconComparator.compare(defArgs[TEST_FILE], defArgs[RENDER_FILE]);
-	}
+	private final StringBuilder outMessage = new StringBuilder();
 
 	public static void main(String[] args) throws IOException {
 		if (args == null || args.length < 1) {
@@ -57,11 +48,11 @@ public class IconVisibilityTest {
 			System.out.println(helpMessage);
 			return;
 		}
-		IconVisibilityTest iconComparator = new IconVisibilityTest();
+		IconVisibility iconComparator = new IconVisibility();
 		iconComparator.compare(defArgs[TEST_FILE], defArgs[RENDER_FILE]);
 	}
 
-	void compare(String filePath, String renderFilePath) throws IOException {
+	public String compare(String filePath, String renderFilePath) throws IOException {
 		File file = new File(filePath);
 		RandomAccessFile raf = new RandomAccessFile(file.getAbsolutePath(), "r");
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, file);
@@ -69,7 +60,7 @@ public class IconVisibilityTest {
 		RenderingRuleSearchRequest request = new RenderingRuleSearchRequest(storage);
 		initCustomRules(storage, request);
 		loadMapObject(reader, request);
-		compareOrder();
+		return compareOrder();
 	}
 
 	private void loadMapObject(BinaryMapIndexReader reader, RenderingRuleSearchRequest request) throws IOException {
@@ -80,7 +71,7 @@ public class IconVisibilityTest {
 					final int[] maxOrder = {0, 0};
 					final int[] statCounts = {0, 0, 0};
 					int finalZoom = zoom;
-					final SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(
+					final BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> req = buildSearchRequest(
 							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, zoom,
 							(types, index) -> true,
 							new ResultMatcher<BinaryMapDataObject>() {
@@ -92,7 +83,9 @@ public class IconVisibilityTest {
 										TagValuePair pair = mapIndex.decodeType(wholeType);
 										request.setInitialTagValueZoom(pair.tag, pair.value, finalZoom, obj);
 										request.search(RenderingRulesStorage.TEXT_RULES);
-										int textOrder = -1;//request.getIntPropertyValue(request.ALL.R_TEXT_ORDER);
+										int textOrder = -1;
+										// uncomment for textOrder check
+										// int textOrder = request.getIntPropertyValue(request.ALL.R_TEXT_ORDER);
 										if (textOrder > 0) {
 											if (textOrder > maxOrder[TEXT]) {
 												maxOrder[TEXT] = textOrder;
@@ -130,50 +123,61 @@ public class IconVisibilityTest {
 							});
 
 					reader.searchMapIndex(req, mapIndex);
-					System.out.printf("zoom %d total objects: %d ", zoom, statCounts[ALL]);
+					outMessage.append(String.format("zoom %d total objects: %d ", zoom, statCounts[ALL]));
 					if (maxOrder[ICON] != 0) {
 						maxIconOrderInZoom.put(zoom, maxOrder[ICON]);
-						System.out.printf("icon: %d , maxIconOrder %d",
-								statCounts[ICON], maxOrder[ICON]);
+						outMessage.append(String.format("icon: %d , maxIconOrder %d",
+								statCounts[ICON], maxOrder[ICON]));
 					}
 					if (maxOrder[TEXT] != 0) {
 						maxIconOrderInZoom.put(zoom, maxOrder[TEXT]);
-						System.out.printf("text: %d , maxTextOrder %d ",
-								statCounts[TEXT], maxOrder[TEXT]);
+						outMessage.append(String.format("text: %d , maxTextOrder %d ",
+								statCounts[TEXT], maxOrder[TEXT]));
 					}
-					System.out.println();
+					outMessage.append("\n");
 				}
 			}
 		}
 	}
 
-	private void compareOrder() {
+	private String compareOrder() {
 		List<VisibleObject> visibleObjects = new ArrayList<>();
 		List<Integer> selectedZooms = new ArrayList<>(maxIconOrderInZoom.keySet());
+		String testMessage = "";
 		if (selectedZooms.isEmpty()) {
 			System.out.println("Icons not found");
-			return;
+			return "Icons not found";
 		}
 		Collections.sort(selectedZooms);
 		int maxIconOrderZoom = 0;
 		int maxTextOrderZoom = 0;
+		boolean test = true;
+		List<Long> checkedObject = new ArrayList<>();
 		for (int zoom = selectedZooms.get(0); zoom < selectedZooms.get(selectedZooms.size() - 1); zoom++) {
-			System.out.printf("zoom: %d (min icon order %d) -> %d%n", zoom, maxIconOrderZoom, (zoom + 1));
+			outMessage.append(String.format("zoom: %d (min icon order %d) -> %d%n", zoom, maxIconOrderZoom, (zoom + 1)));
 			List<VisibleObject> zoomList = mapObjectMap.get(zoom);
 			List<VisibleObject> zoomNextList = mapObjectMap.get(zoom + 1);
 			visibleObjects.clear();
 			for (VisibleObject objectNextZoom : zoomNextList) {
 				for (VisibleObject object : zoomList) {
-					if (object.mapDataObject.getId() == objectNextZoom.mapDataObject.getId()) {
+					if (object.mapDataObject.getId() == objectNextZoom.mapDataObject.getId() //  ){
+							&& !checkedObject.contains(objectNextZoom.mapDataObject.getId())) {
 						visibleObjects.add(objectNextZoom);
 						break;
 					}
 				}
 			}
 			for (VisibleObject object : visibleObjects) {
-				String message = object.toStringWithZoom(zoom) + String.format(" <= min order (%d) for zoom %d", maxIconOrderZoom, zoom);
-				assertTrue(message, object.iconOrder > maxIconOrderZoom);
-				System.out.println(object.toStringWithZoom(zoom));
+				if (object.iconOrder <= maxIconOrderZoom) {
+					checkedObject.add(object.mapDataObject.getId());
+					outMessage.append(object.toStringWithZoom(zoom))
+							.append(String.format(" <= max order (%d) for zoom %d%n", maxIconOrderZoom, zoom - 1));
+					if (test) {
+						testMessage = object.toStringWithZoom(zoom) + String.format(" <= max order (%d) for zoom %d%n",
+								maxIconOrderZoom, zoom - 1);
+						test = false;
+					}
+				}
 			}
 
 			if (maxIconOrderInZoom.containsKey(zoom)) {
@@ -183,6 +187,10 @@ public class IconVisibilityTest {
 				maxTextOrderZoom = maxTextOrderInZoom.get(zoom);
 			}
 		}
+		if (!test) {
+			System.out.println(outMessage);
+		}
+		return testMessage;
 	}
 
 	RenderingRulesStorage getRenderingStorage(String renderFilePath) throws IOException {
