@@ -13,7 +13,8 @@ public class NativeSwingRendering {
 				DataExtractionSettings.getSettings().getBinaryFilesDir(), 
 				findFontFolder());
 	}
-	private static String findFontFolder() {
+	
+	public static String findFontFolder() {
 		// "fonts" for *.zip, "OsmAndMapCreator/fonts" for IDE
 		String[] folders = {"fonts", "OsmAndMapCreator/fonts"};
 		for (String d : folders) {
