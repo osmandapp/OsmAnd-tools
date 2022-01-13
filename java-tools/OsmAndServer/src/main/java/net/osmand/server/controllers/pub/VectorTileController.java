@@ -130,8 +130,9 @@ public class VectorTileController {
 				config.tempDir.deleteOnExit();
 				ClassLoader cl = NativeJavaRendering.class.getClassLoader(); 
 				ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver(cl);
-				Resource[] resources = resolver.getResources("classpath*:/map.fonts/**.ttf") ;
+				Resource[] resources = resolver.getResources("classpath:/map/fonts/*.ttf") ;
 				File fontsFolder = new File(config.tempDir, "fonts");
+				fontsFolder.mkdirs();
 				fontsFolder.deleteOnExit();
 				for (Resource resource : resources) {
 					InputStream ios = resource.getInputStream();
