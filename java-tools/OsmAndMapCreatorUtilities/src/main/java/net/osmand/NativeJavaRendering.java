@@ -193,8 +193,8 @@ public class NativeJavaRendering extends NativeLibrary {
 			this.mapDensity = mapDensity;
 			leftX =  (((double) sleft) / MapUtils.getPowZoom(31 - zoom));
 			topY = (((double) stop) / MapUtils.getPowZoom(31 - zoom));
-			width = (int) Math.round((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8 + hd));
-			height = (int) Math.round((sbottom - stop) / MapUtils.getPowZoom(31 - zoom - 8 + hd));
+			width = (int) Math.round((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8 - hd));
+			height = (int) Math.round((sbottom - stop) / MapUtils.getPowZoom(31 - zoom - 8 - hd));
 		}
 
 		public RenderingImageContext(double lat, double lon, int width, int height, int zoom,

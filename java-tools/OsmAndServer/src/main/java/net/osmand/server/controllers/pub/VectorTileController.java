@@ -49,7 +49,7 @@ public class VectorTileController {
 	int metatileSize;
 	
 	@Value("${tile-server.tile-size}")
-	int singleTileSize = 512;
+	int singleTileSize = 256;
 	
 	
 	VectorTileServerConfig config; 
@@ -161,6 +161,11 @@ public class VectorTileController {
 	}
 	
 	private synchronized ResponseEntity<String> renderMetaTile(VectorMetatile tile) throws IOException {
+		VectorMetatile rendered = config.tileCache.get(tile.key);
+		if (rendered != null && rendered.runtimeImage != null) {
+			tile.runtimeImage = rendered.runtimeImage;
+			return null;
+		}
 		int tilesize = (1 << Math.min(31 - tile.z + metatileSize, 31));
 		if(tilesize <= 0) {
 			tilesize = Integer.MAX_VALUE;
@@ -174,7 +179,8 @@ public class VectorTileController {
 			bottom = Integer.MAX_VALUE;
 		}
 		long now = System.currentTimeMillis();
-		RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z, 
+		RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z,
+				// TODO doesn't work correctly
 				(singleTileSize >> 9), 1);
 		if (ctx.width > 8192) {
 			return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
