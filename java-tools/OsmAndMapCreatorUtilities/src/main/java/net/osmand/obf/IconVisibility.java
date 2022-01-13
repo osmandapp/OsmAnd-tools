@@ -170,13 +170,18 @@ public class IconVisibility {
 			for (VisibleObject object : visibleObjects) {
 				if (object.iconOrder <= maxIconOrderZoom) {
 					checkedObject.add(object.mapDataObject.getId());
-					outMessage.append(object.toStringWithZoom(zoom))
-							.append(String.format(" <= max order (%d) for zoom %d%n", maxIconOrderZoom, zoom - 1));
+					outMessage.append(String.format("!!!ZOOM %d: id %-10d max order for %d zoom %d >= ", zoom,
+							object.mapDataObject.getId() >> 7,
+							zoom - 1, maxIconOrderZoom)).append(object.toStringWithZoom(zoom)).append("\n");
 					if (test) {
-						testMessage = object.toStringWithZoom(zoom) + String.format(" <= max order (%d) for zoom %d%n",
-								maxIconOrderZoom, zoom - 1);
+						testMessage = String.format("ZOOM %d: id %-10d max order for %d zoom %d >= ", zoom,
+								object.mapDataObject.getId() >> 7,
+								zoom - 1, maxIconOrderZoom) + object.toStringWithZoom(zoom);
 						test = false;
 					}
+				} else {
+					outMessage.append(String.format("ZOOM %d: id %-10d order ", zoom,
+							object.mapDataObject.getId() >> 7)).append(object.toStringWithZoom(zoom)).append("\n");
 				}
 			}
 
@@ -263,13 +268,16 @@ public class IconVisibility {
 		String icon;
 
 		public String toStringWithZoom(int zoom) {
-			StringBuilder result = new StringBuilder(String.format("ZOOM %d: id %-10d icon %s tags[", zoom,
-					mapDataObject.getId() >> 7, icon));
+			StringBuilder result = new StringBuilder(String.format("%d : icon %s tags[", iconOrder, icon));
 			for (int at = 0; at < mapDataObject.getTypes().length; at++) {
 				TagValuePair tagValuePair = mapDataObject.getMapIndex().decodeType(mapDataObject.getTypes()[at]);
 				result.append(String.format("\"%s\" ", tagValuePair.tag + "=" + tagValuePair.value));
 			}
-			result.append(String.format("] order=%d", iconOrder));
+			for (int at = 0; at < mapDataObject.getAdditionalTypes().length; at++) {
+				TagValuePair tagValuePair = mapDataObject.getMapIndex().decodeType(mapDataObject.getAdditionalTypes()[at]);
+				result.append(String.format("\"%s\" ", tagValuePair.tag + "=" + tagValuePair.value));
+			}
+			result.append(String.format("]"));
 			return result.toString();
 		}
 	}
