@@ -69,6 +69,7 @@ import org.xmlpull.v1.XmlPullParser;
 
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.MapCreatorVersion;
+import net.osmand.NativeJavaRendering;
 import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
@@ -84,8 +85,8 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.NetworkUtils;
-import net.osmand.swing.NativeSwingRendering.MapDiff;
-import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
+import net.osmand.NativeJavaRendering.MapDiff;
+import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -107,7 +108,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 
 
-	public static MapPanel showMainWindow(int wx, int hy, NativeSwingRendering nativeLib) {
+	public static MapPanel showMainWindow(int wx, int hy, NativeJavaRendering nativeLib) {
 		JFrame frame = new JFrame(Messages.getString("MapPanel.MAP.VIEW")); //$NON-NLS-1$
 	    try {
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -144,7 +145,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	// name of source map
 	private ITileSource map = TileSourceManager.getMapnikSource();
 
-	private NativeSwingRendering nativeLibRendering;
+	private NativeJavaRendering nativeLibRendering;
 	private NativeRendererRunnable lastAddedRunnable;
 	private Image nativeRenderingImg;
 	private RenderingImageContext lastContext;
@@ -452,10 +453,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		return getHeight() / 2;
 	}
 
-	public NativeSwingRendering getNativeLibrary() {
+	public NativeJavaRendering getNativeLibrary() {
 		return nativeLibRendering;
 	}
-	public void setNativeLibrary( NativeSwingRendering nl) {
+
+	public void setNativeLibrary(NativeJavaRendering nl) {
 		nativeLibRendering = nl;
 		fullMapRedraw();
 	}
@@ -1260,7 +1262,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public void run() {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
-					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom, mapDensity);
+					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom, 0, mapDensity);
 					nativeRenderingImg = nativeLibRendering.renderImage(lastContext);
                     Rect rect = new Rect();
                     rect.left31 = sleft;

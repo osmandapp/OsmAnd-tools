@@ -8,37 +8,10 @@ jar {
 	}
 }
 
-task collectMdpiIcons(type: Copy) {
-	from("../../../resources/rendering_styles/style-icons/map-shaders-png/drawable-mdpi")
-	into "src/main/resources/resources"
-}
 
-task collectMdpiIcons2(type: Copy) {
-	from("../../../resources/rendering_styles/style-icons/map-icons-png/drawable-mdpi")
-	into "src/main/resources/resources"
-}
-
-task collectFonts(type: Copy) {
-	from("../../../resources/rendering_styles/fonts"){
-		include "05_NotoSans-Regular.ttf"
-		include "10_NotoSans-Bold.ttf"
-		include "15_NotoSans-Italic.ttf"
-		include "20_NotoSans-BoldItalic.ttf"
-		include "25_NotoSansArabic-Regular.ttf"
-		include "30_NotoSansArabic-Bold.ttf"
-		include "35_NotoSansSouthAsian-Regular.ttf"
-		include "40_NotoSansSouthAsian-Bold.ttf"
-		include "45_NotoSansSoutheastAsian-Regular.ttf"
-		include "50_NotoSansSoutheastAsian-Bold.ttf"
-		include "55_NotoSansTibetan-Regular.ttf"
-		include "60_NotoSansTibetan-Bold.ttf"
-		include "65_NotoSansNastaliqUrdu-Regular.ttf"
-
-		include "DroidSansFallback.ttf"
-		include "MTLmr3m.ttf"
-	}
-
-	into "fonts"	
+task collectFonts(type: Sync) {
+	from("../../../resources/rendering_styles/fonts/")
+	into "fonts/"	
 }
 
 task buildDistribution(type: Zip) {
@@ -71,7 +44,7 @@ task buildDistribution(type: Zip) {
 }
 
 compileJava {
-	dependsOn collectMdpiIcons, collectMdpiIcons2, collectFonts
+	dependsOn collectFonts
 }
 
 dependencies {

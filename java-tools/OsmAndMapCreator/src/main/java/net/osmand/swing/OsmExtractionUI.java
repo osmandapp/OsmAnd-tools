@@ -49,6 +49,7 @@ import javax.swing.filechooser.FileFilter;
 import javax.xml.stream.XMLStreamException;
 
 import net.osmand.MapCreatorVersion;
+import net.osmand.NativeJavaRendering;
 import net.osmand.SQLiteBigPlanetIndex;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
@@ -58,7 +59,6 @@ import net.osmand.data.Street;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.OsmandRegions;
-import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapPoiTypes;
@@ -535,7 +535,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			}
 			targetFile = genFile;
 		}
-		NativeSwingRendering lib = NativeSwingRendering.getDefaultFromSettings();
+		NativeJavaRendering lib = NativeSwingRendering.getDefaultFromSettings();
 		if (lib != null) {
 			try {
 				lib.closeAllFiles();

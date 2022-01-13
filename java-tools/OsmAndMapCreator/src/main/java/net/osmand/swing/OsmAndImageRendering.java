@@ -30,7 +30,8 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import net.osmand.NativeLibrary;
-import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
+import net.osmand.NativeJavaRendering;
+import net.osmand.NativeJavaRendering.RenderingImageContext;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -218,7 +219,7 @@ public class OsmAndImageRendering {
 			if(maps.isEmpty()) {
                 throw new UnsupportedOperationException("No maps element found for wpt "+ name);
             }
-			NativeSwingRendering nsr = nativeLib != null ? new NativeSwingRendering() : null;
+			NativeJavaRendering nsr = nativeLib != null ? NativeSwingRendering.getDefaultFromSettings() : null;
 //			nsr.initFilesInDir(new File(dirWithObf));
 			ArrayList<File> obfFiles = new ArrayList<File>();
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr, obfFiles);
@@ -347,7 +348,7 @@ public class OsmAndImageRendering {
 		return name;
 	}
 
-	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeSwingRendering nsr,
+	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeJavaRendering nsr,
 			List<File> initFiles)
 			throws FileNotFoundException, IOException {
 		for(String map : maps.split(",")) {
