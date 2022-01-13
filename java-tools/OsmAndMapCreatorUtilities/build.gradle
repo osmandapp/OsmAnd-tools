@@ -1,3 +1,13 @@
+task collectTestResources(type: Copy) {
+	into "src/test/resources/"
+	from("../../../resources/test-resources") {
+		include "Synthetic_test_rendering.obf"
+	}
+}
+
+compileJava {
+	dependsOn collectTestResources
+}
 
 
 task collectMdpiIcons(type: Sync) {

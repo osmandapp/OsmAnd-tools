@@ -43,8 +43,6 @@ import net.osmand.util.SplitHillshadeIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 
-import static net.osmand.IndexConstants.*;
-
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
 
@@ -98,6 +96,8 @@ public class MainUtilities {
 				SQLiteBigPlanetIndex.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
+			} else if (utl.equals("test-icons")) {
+				IconVisibility.main(subArgsArray);
 			} else if (utl.equals("generate-ocbf")) {
 				CountryOcbfGeneration.main(subArgsArray);
 			} else if (utl.equals("generate-obf")) {
