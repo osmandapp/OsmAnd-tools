@@ -456,8 +456,8 @@ public class NativeJavaRendering extends NativeLibrary {
 		if (defaultLoadedLibrary != null) {
 			return defaultLoadedLibrary;
 		}
-		File f = new File(filename);
-		if (filename.length() == 0 || !(f.exists())) {
+		File f = filename == null ? null : new File(filename);
+		if (filename == null || filename.length() == 0 || !(f.exists())) {
 			filename = null;
 		}
 		boolean loaded;
