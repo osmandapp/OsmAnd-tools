@@ -835,30 +835,30 @@ public class FixBasemapRoads {
 	private static final int CONNECT_S4= 4;
 
 	private int getConnectionType(RoadLine longRoadToKeep, RoadLine candidate, boolean onlyUnique) {
-        boolean refEqual = Algorithms.stringsEqual(longRoadToKeep.getSimpleRef(), candidate.getSimpleRef());
-        boolean intRefEqual = Algorithms.stringsEqual(longRoadToKeep.getIntRef(), candidate.getIntRef());
-        boolean intRefEqualNotNull = intRefEqual && longRoadToKeep.getIntRef() != null;
-        boolean differentHighway = !Algorithms.stringsEqual(longRoadToKeep.getHighway(), candidate.getHighway());
-        if (differentHighway) {
+		boolean refEqual = Algorithms.stringsEqual(longRoadToKeep.getSimpleRef(), candidate.getSimpleRef());
+		boolean intRefEqual = Algorithms.stringsEqual(longRoadToKeep.getIntRef(), candidate.getIntRef());
+		boolean intRefEqualNotNull = intRefEqual && longRoadToKeep.getIntRef() != null;
+		boolean differentHighway = !Algorithms.stringsEqual(longRoadToKeep.getHighway(), candidate.getHighway());
+		if (differentHighway) {
 			if (!onlyUnique && (refEqual || intRefEqualNotNull) && candidate.distance < MINIMAL_DISTANCE) {
 				// connect roads with same ref
 				return CONNECT_S4;
 			}
-            return CONNECT_NOT_ALLOWED;
+			return CONNECT_NOT_ALLOWED;
 		}
 		if (refEqual && intRefEqual) {
 			return CONNECT_S1;
 		}
-        if (refEqual && (longRoadToKeep.getIntRef() == null || candidate.getIntRef() == null)) {
-            return CONNECT_S2;
-        }
-        if (candidate.distance < MINIMAL_DISTANCE && intRefEqual) {
-            return CONNECT_S3;
-        }
-        if (!onlyUnique && candidate.distance < MINIMAL_DISTANCE && longRoadToKeep.distance > PREFERRED_DISTANCE) {
-            //connect short to long roads
-            return CONNECT_S4;
-        }
+		if (refEqual && (longRoadToKeep.getIntRef() == null || candidate.getIntRef() == null)) {
+			return CONNECT_S2;
+		}
+		if (candidate.distance < MINIMAL_DISTANCE && intRefEqual) {
+			return CONNECT_S3;
+		}
+		if (!onlyUnique && candidate.distance < MINIMAL_DISTANCE && longRoadToKeep.distance > PREFERRED_DISTANCE) {
+			// connect short to long roads
+			return CONNECT_S4;
+		}
 		return CONNECT_NOT_ALLOWED;
 
 	}
@@ -988,7 +988,7 @@ public class FixBasemapRoads {
 		}
 		RoadInfoRefType type = RoadInfoRefType.REF;
 
-        String int_ref = way.getTag("int_ref");
+		String int_ref = way.getTag("int_ref");
 		if (ref == null || ref.isEmpty()) {
 			type = RoadInfoRefType.INT_REF;
 			ref = int_ref;
@@ -1007,11 +1007,11 @@ public class FixBasemapRoads {
 		if (hw != null) {
 			ref += "_" + hw;
 		}
-        if (type == RoadInfoRefType.REF) {
-            if (int_ref != null && !int_ref.isEmpty()) {
-                ref += "_" + int_ref;
-            }
-        }
+		if (type == RoadInfoRefType.REF) {
+			if (int_ref != null && !int_ref.isEmpty()) {
+				ref += "_" + int_ref;
+			}
+		}
 		if(ref != null) {
 			// fix road inconsistency
 			ref = ref.replace("-", "").replace(" ", "");
