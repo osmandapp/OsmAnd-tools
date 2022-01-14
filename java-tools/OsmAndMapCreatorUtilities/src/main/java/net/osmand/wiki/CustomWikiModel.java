@@ -77,7 +77,7 @@ public class CustomWikiModel extends WikiModel {
 	public void parseInternalImageLink(String imageNamespace,
 			String rawImageLink) {
 		String imageName = rawImageLink.split("\\|")[0];
-		imageName = imageName.substring(imageName.indexOf(":") + 1);
+		imageName = imageName.substring(imageName.indexOf(":") + 1).trim();
 		if (imageName.isEmpty()) {
 			return;
 		}

@@ -883,7 +883,7 @@ public class WikiDatabasePreparation {
 		private int batch = 0;
 		private final static int BATCH_SIZE = 1500;
 		private static final long ARTICLES_BATCH = 1000;
-		private final long testArticleId;
+		private long testArticleId;
 
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
@@ -1020,6 +1020,7 @@ public class WikiDatabasePreparation {
 							}
 						} else {
 							wikiId = testArticleId;
+							testArticleId++;
 						}
 						if (wikiId != 0) {
 							try {

@@ -1,6 +1,7 @@
 package net.osmand.wiki;
 
 import com.google.gson.*;
+import net.osmand.util.Algorithms;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -12,6 +13,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class WikiImageUrlStorage {
@@ -20,6 +23,7 @@ public class WikiImageUrlStorage {
 	private int downloadImages = 0;
 	private String title;
 	private String lang;
+	private final List<String> downloadArticles = new ArrayList<>();
 
 	public WikiImageUrlStorage(Connection conn) throws SQLException {
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS image(name text unique, thumb_url text)");
@@ -36,13 +40,14 @@ public class WikiImageUrlStorage {
 	}
 
 	public String getThumbUrl(String imageFileName) {
+		imageFileName = Algorithms.capitalizeFirstLetter(imageFileName.replace("_", " ").trim());
 		String url = null;
 		try {
 			url = getUrl(imageFileName);
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
-		if (url == null) {
+		if (url == null && !downloadArticles.contains(title)) {
 			url = downloadImagesUrl(imageFileName);
 		}
 		return url;
@@ -67,34 +72,55 @@ public class WikiImageUrlStorage {
 			if (++downloadImages % 50 == 0) {
 				System.out.println("Download wiki images " + downloadImages);
 			}
+			String gimContinue = "";
 			StringBuilder imagesData = new StringBuilder();
-			String imageUrl = "https://" + lang + ".wikipedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url"
-					+ "&generator=images&iiurlwidth=320&gimlimit=max&format=json&titles="
-					+ URLEncoder.encode(title, StandardCharsets.UTF_8.toString());
-			InputStream inputStream = new URL(imageUrl).openConnection().getInputStream();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-			String s;
-			while ((s = reader.readLine()) != null) {
-				imagesData.append(s).append("\n");
-			}
-			imagesDataJson = new JsonParser().parse(imagesData.toString()).getAsJsonObject();
-			JsonObject pages = imagesDataJson.getAsJsonObject("query").getAsJsonObject("pages");
-			for (Map.Entry<String, JsonElement> object : pages.entrySet()) {
-				String title = object.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
-				String fileName = title.substring(title.indexOf(":") + 1);
-				String thumbUrl = object.getValue().getAsJsonObject().getAsJsonArray("imageinfo")
-						.get(0).getAsJsonObject().getAsJsonPrimitive("thumburl").getAsString();
-				if (fileName.equals(imageFileName)) {
-					res = thumbUrl;
-					insertUrl(fileName, thumbUrl);
+			do {
+				imagesData.setLength(0);
+				String imageUrl = "https://" + lang + ".wikipedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url"
+						+ "&generator=images&iiurlwidth=320&gimlimit=50&format=json&titles="
+						+ URLEncoder.encode(title, StandardCharsets.UTF_8.toString())
+						+ gimContinue;
+				long start = System.currentTimeMillis();
+				InputStream inputStream = new URL(imageUrl).openConnection().getInputStream();
+				BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+				String s;
+				while ((s = reader.readLine()) != null) {
+					imagesData.append(s).append("\n");
+				}
+				imagesDataJson = new JsonParser().parse(imagesData.toString()).getAsJsonObject();
+				if (imagesDataJson.has("continue")
+						&& imagesDataJson.getAsJsonObject("continue").has("gimcontinue")) {
+					gimContinue = imagesDataJson.getAsJsonObject("continue")
+							.getAsJsonPrimitive("gimcontinue").getAsString();
+					gimContinue = "&gimcontinue=" + URLEncoder.encode(gimContinue, StandardCharsets.UTF_8.toString());
 				} else {
-					if (getUrl(fileName) == null) {
+					gimContinue = "";
+				}
+				JsonObject pages = imagesDataJson.getAsJsonObject("query").getAsJsonObject("pages");
+				for (Map.Entry<String, JsonElement> object : pages.entrySet()) {
+					JsonObject jsonObject = object.getValue().getAsJsonObject();
+					String title = jsonObject.getAsJsonPrimitive("title").getAsString();
+					String fileName = title.substring(title.indexOf(":") + 1);
+					if (!jsonObject.has("imageinfo")) {
+						continue;
+					}
+					String thumbUrl = jsonObject.getAsJsonArray("imageinfo")
+							.get(0).getAsJsonObject().getAsJsonPrimitive("thumburl").getAsString();
+					if (fileName.equals(imageFileName)) {
+						res = thumbUrl;
 						insertUrl(fileName, thumbUrl);
+					} else {
+						if (getUrl(fileName) == null) {
+							insertUrl(fileName, thumbUrl);
+						}
 					}
 				}
+				inputStream.close();
 			}
+			while (!gimContinue.isEmpty());
+			downloadArticles.add(title);
 		} catch (Exception e) {
-			System.err.println("Error downloading wikidata " + imageFileName + " " + e.getMessage());
+			System.err.println("Error downloading image:" + imageFileName + " article:" + title + " " + e.getMessage());
 		}
 		return res;
 	}
