@@ -45,6 +45,8 @@ public class VectorTileController {
 	
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 
+	private static final int ZOOM_EN_PREFERRED_LANG = 7;
+
 	@Value("${tile-server.obf.location}")
 	String obfLocation;
 	
@@ -80,8 +82,13 @@ public class VectorTileController {
 		public final int z;
 		public final int left;
 		public final int top;
+		public final int metaSize;
+		public final int tileSize;
 		
-		public VectorMetatile(int left, int top, int z, long tileId) {
+		public VectorMetatile(int left, int top, int z, long tileId,
+				int metaSize, int tileSize) {
+			this.metaSize = metaSize;
+			this.tileSize = tileSize;
 			this.key = tileId;
 			this.left = left;
 			this.top = top;
@@ -98,9 +105,9 @@ public class VectorTileController {
 			return Long.compare(lastAccess, o.lastAccess);
 		}
 
-		public BufferedImage readSubImage(BufferedImage img, int x, int y, int tileSize) {
-			int subl = x - ((x >> metatileSize) << metatileSize);
-			int subt = y - ((y >> metatileSize) << metatileSize);
+		public BufferedImage readSubImage(BufferedImage img, int x, int y) {
+			int subl = x - ((x >> metaSize) << metaSize);
+			int subt = y - ((y >> metaSize) << metaSize);
 			return img.getSubimage(subl * tileSize, subt * tileSize, tileSize, tileSize);
 		}
 
@@ -121,8 +128,8 @@ public class VectorTileController {
 			if (z > maxZoomCache || cacheLocation == null || cacheLocation.length() == 0) {
 				return null;
 			}
-			int x = left >> (31 - z) >> metatileSize;
-			int y = top >> (31 - z) >> metatileSize;
+			int x = left >> (31 - z) >> metaSize;
+			int y = top >> (31 - z) >> metaSize;
 			StringBuilder loc = new StringBuilder();
 			loc.append(z);
 			while (x >= MAX_FILES_PER_FOLDER) {
@@ -202,8 +209,9 @@ public class VectorTileController {
 			tile.runtimeImage = rendered.runtimeImage;
 			return null;
 		}
-		int tilesize = (1 << Math.min(31 - tile.z + metatileSize, 31));
-		if(tilesize <= 0) {
+		int imgTileSize = tile.tileSize << Math.min(tile.z, tile.metaSize);
+		int tilesize = (1 << Math.min(31 - tile.z + tile.metaSize, 31));
+		if (tilesize <= 0) {
 			tilesize = Integer.MAX_VALUE;
 		}
 		int right = tile.left + tilesize;
@@ -215,14 +223,17 @@ public class VectorTileController {
 			bottom = Integer.MAX_VALUE;
 		}
 		long now = System.currentTimeMillis();
+		if (tile.z < ZOOM_EN_PREFERRED_LANG) {
+			config.nativelib.setRenderingProps("lang=en");
+		}
 		RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z,
 				// TODO doesn't work correctly
-				(singleTileSize >> 9), 1);
+				(tile.tileSize >> 9), 1);
 		if (ctx.width > 8192) {
 			return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
 
 		}
-		if (singleTileSize << metatileSize != ctx.width || singleTileSize << metatileSize != ctx.height) {
+		if (imgTileSize != ctx.width || imgTileSize != ctx.height) {
 			return ResponseEntity.badRequest()
 					.body(String.format("Metatile has wrong size (%d != %d)", tilesize << metatileSize, ctx.width));
 		}
@@ -275,21 +286,25 @@ public class VectorTileController {
 		if (!validateConfig()) {
 			return errorConfig();
 		}
-		int left = ((x >> metatileSize) << metatileSize) << (31 - z);
+		int metaSize = Math.min(metatileSize, z - 1);
+		int left = ((x >> metaSize) << metaSize) << (31 - z);
 		if (left < 0) {
 			left = 0;
 		}
-		int top = ((y >> metatileSize) << metatileSize) << (31 - z);
+		int top = ((y >> metaSize) << metaSize) << (31 - z);
 		if (top < 0) {
 			top = 0;
 		}
 		long tileId = encode(left >> (31 - z), top >> (31 - z), z);
 		VectorMetatile tile = config.tileCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(left, top, z, tileId);
+			tile = new VectorMetatile(left, top, z, tileId, metaSize, singleTileSize);
 			config.tileCache.put(tile.key, tile);
 		}
 		BufferedImage img = tile.getCacheRuntimeImage();
+		if (z < 4) {
+			img = tile.runtimeImage = null;
+		}
 		if (img == null) {
 			ResponseEntity<String> err = renderMetaTile(tile);
 			img = tile.runtimeImage;
@@ -301,7 +316,7 @@ public class VectorTileController {
 		}
 		cleanupCache();
 		tile.touch();
-		BufferedImage subimage = tile.readSubImage(img, x, y, singleTileSize);
+		BufferedImage subimage = tile.readSubImage(img, x, y);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(subimage, "png", baos);
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));

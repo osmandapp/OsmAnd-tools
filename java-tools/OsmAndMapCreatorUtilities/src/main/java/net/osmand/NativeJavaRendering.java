@@ -61,7 +61,7 @@ public class NativeJavaRendering extends NativeLibrary {
 
 	
 	private RenderingRulesStorage storage;
-	private HashMap<String, String> renderingProps;
+	private Map<String, String> renderingProps;
 	private Map<String, MapDiff> diffs = new LinkedHashMap<String, MapDiff>();
 	private List<BinaryMapIndexReader> initializedFiles = new ArrayList<>();
 	
@@ -148,22 +148,11 @@ public class NativeJavaRendering extends NativeLibrary {
 			is.close();
 			is2.close();
 		}
-		renderingProps = new HashMap<String, String>();
-		String[] props = renderingProperties.split(",");
-		for (String s : props) {
-			int i = s.indexOf('=');
-			if (i > 0) {
-				String key = s.substring(0, i).trim();
-				String value = s.substring(i + 1).trim();
-				if(value.contains(";")) {
-					value = value.substring(0, value.indexOf(';'));
-				}
-				renderingProps.put(key, value);
-			}
-		}
+		setRenderingProps(renderingProperties);
 		clearRenderingRulesStorage();
 		initRenderingRulesStorage(storage);
 	}
+
 
 	public NativeJavaRendering() {
 		super();
@@ -178,6 +167,21 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 	}
 
+	public void setRenderingProps(String renderingProperties) {
+		renderingProps = new HashMap<String, String>();
+		String[] props = renderingProperties.split(",");
+		for (String s : props) {
+			int i = s.indexOf('=');
+			if (i > 0) {
+				String key = s.substring(0, i).trim();
+				String value = s.substring(i + 1).trim();
+				if(value.contains(";")) {
+					value = value.substring(0, value.indexOf(';'));
+				}
+				renderingProps.put(key, value);
+			}
+		}
+	}
 
 
 	public static class RenderingImageContext {
