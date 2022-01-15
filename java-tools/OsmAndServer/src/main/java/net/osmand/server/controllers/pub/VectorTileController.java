@@ -83,12 +83,12 @@ public class VectorTileController {
 		public final int left;
 		public final int top;
 		public final int metaSize;
-		public final int tileSize;
+		public final int tileSizeLog;
 		
 		public VectorMetatile(int left, int top, int z, long tileId,
-				int metaSize, int tileSize) {
+				int metaSize, int tileSizeLog) {
 			this.metaSize = metaSize;
-			this.tileSize = tileSize;
+			this.tileSizeLog = tileSizeLog;
 			this.key = tileId;
 			this.left = left;
 			this.top = top;
@@ -108,7 +108,8 @@ public class VectorTileController {
 		public BufferedImage readSubImage(BufferedImage img, int x, int y) {
 			int subl = x - ((x >> metaSize) << metaSize);
 			int subt = y - ((y >> metaSize) << metaSize);
-			return img.getSubimage(subl * tileSize, subt * tileSize, tileSize, tileSize);
+			int tilesize = 256 << tileSizeLog;
+			return img.getSubimage(subl * tilesize, subt * tilesize, tilesize, tilesize);
 		}
 
 		public BufferedImage getCacheRuntimeImage() throws IOException {
@@ -195,11 +196,19 @@ public class VectorTileController {
 		return config.error == null;
 	}
 	
-	private static long encode(int x, int y, int z) {
+	private static long encode(int x, int y, int z, int metasizeLog, int tileSizeLog) {
 		long l = 0 ;
-		l += z ;
-		l += (((long) x) << (z + 5)) ;
-		l += (((long) y) << (z + z + 5)) ;
+		int shift = 0;
+		l += ((long) tileSizeLog) << shift; // 0-2
+		shift += 2;
+		l += ((long) metasizeLog) << shift; // 0-4
+		shift += 3;
+		l += ((long) z) << shift; // 1-22
+		shift += 5;
+		l += ((long) x) << shift;
+		shift += z;
+		l += ((long) y) << shift;
+		shift += z;
 		return l;
 	}
 	
@@ -209,7 +218,7 @@ public class VectorTileController {
 			tile.runtimeImage = rendered.runtimeImage;
 			return null;
 		}
-		int imgTileSize = tile.tileSize << Math.min(tile.z, tile.metaSize);
+		int imgTileSize = (256 << tile.tileSizeLog) << Math.min(tile.z, tile.metaSize);
 		int tilesize = (1 << Math.min(31 - tile.z + tile.metaSize, 31));
 		if (tilesize <= 0) {
 			tilesize = Integer.MAX_VALUE;
@@ -223,14 +232,14 @@ public class VectorTileController {
 			bottom = Integer.MAX_VALUE;
 		}
 		long now = System.currentTimeMillis();
+		String props = String.format("density=%d,textScale=%d", 1 << tile.tileSizeLog, 1 << tile.tileSizeLog);
 		if (tile.z < ZOOM_EN_PREFERRED_LANG) {
-			config.nativelib.setRenderingProps("lang=en");
+			config.nativelib.setRenderingProps("lang=en," + props);
 		} else {
-			config.nativelib.setRenderingProps("lang=en");
+			config.nativelib.setRenderingProps(props);
 		}
 		RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z,
-				// TODO doesn't work correctly
-				(tile.tileSize >> 9), 1);
+				tile.tileSizeLog, 1);
 		if (ctx.width > 8192) {
 			return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
 
@@ -289,6 +298,7 @@ public class VectorTileController {
 			return errorConfig();
 		}
 		int metaSize = Math.min(metatileSize, z - 1);
+		int tileSizeLog = 31 - Integer.numberOfLeadingZeros(singleTileSize) - 8;
 		int left = ((x >> metaSize) << metaSize) << (31 - z);
 		if (left < 0) {
 			left = 0;
@@ -297,10 +307,10 @@ public class VectorTileController {
 		if (top < 0) {
 			top = 0;
 		}
-		long tileId = encode(left >> (31 - z), top >> (31 - z), z);
+		long tileId = encode(left >> (31 - z), top >> (31 - z), z, metaSize, tileSizeLog);
 		VectorMetatile tile = config.tileCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(left, top, z, tileId, metaSize, singleTileSize);
+			tile = new VectorMetatile(left, top, z, tileId, metaSize, tileSizeLog);
 			config.tileCache.put(tile.key, tile);
 		}
 		BufferedImage img = tile.getCacheRuntimeImage();

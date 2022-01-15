@@ -52,7 +52,7 @@ srtm.location: ${SRTM_LOCATION:}
 tile-server: 
   obf.location: ${OBF_LOCATION:}
   metatile-powsize: 3 # 2^3 * 256 = 2048, metatile = 2048 x 2048
-  tile-size: 256 
+  tile-size: 512 
   cache:
     location: ${TILE_SERVER_CACHE_LOCATION:tiles}
     max-zoom: 16 
