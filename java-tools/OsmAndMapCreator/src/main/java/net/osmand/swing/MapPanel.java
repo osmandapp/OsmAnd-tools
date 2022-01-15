@@ -1262,7 +1262,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public void run() {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
-					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom, 0, mapDensity);
+					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom);
 					nativeRenderingImg = nativeLibRendering.renderImage(lastContext);
                     Rect rect = new Rect();
                     rect.left31 = sleft;

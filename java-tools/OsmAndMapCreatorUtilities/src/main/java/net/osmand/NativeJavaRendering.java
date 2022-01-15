@@ -192,24 +192,22 @@ public class NativeJavaRendering extends NativeLibrary {
 		public final int sbottom;
 		private double leftX;
 		private double topY;
-		public final  int width;
+		public final int width;
 		public final int height;
 		public long searchTime;
 		public long renderingTime;
-		public double mapDensity;
 		public RenderingContext context;
 
-		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom, int hd, double mapDensity) {
+		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
 			this.sleft = sleft;
 			this.sright = sright;
 			this.stop = stop;
 			this.sbottom = sbottom;
 			this.zoom = zoom;
-			this.mapDensity = mapDensity;
 			leftX =  (((double) sleft) / MapUtils.getPowZoom(31 - zoom));
 			topY = (((double) stop) / MapUtils.getPowZoom(31 - zoom));
-			width = (int) Math.round((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8 - hd));
-			height = (int) Math.round((sbottom - stop) / MapUtils.getPowZoom(31 - zoom - 8 - hd));
+			width = (int) Math.round((sright - sleft) / MapUtils.getPowZoom(31 - zoom - 8));
+			height = (int) Math.round((sbottom - stop) / MapUtils.getPowZoom(31 - zoom - 8));
 		}
 
 		public RenderingImageContext(double lat, double lon, int width, int height, int zoom,
@@ -222,8 +220,6 @@ public class NativeJavaRendering extends NativeLibrary {
 				setLocation(lat, lon).build();
 			tb.setMapDensity(mapDensity);
 			final QuadPointDouble lt = tb.getLeftTopTile(tb.getZoom());
-
-
 			this.leftX = lt.x /** MapUtils.getPowZoom(tb.getZoomScale())*/;
 			this.topY = lt.y /** MapUtils.getPowZoom(tb.getZoomScale())*/;
 			QuadRect ll = tb.getLatLonBounds();

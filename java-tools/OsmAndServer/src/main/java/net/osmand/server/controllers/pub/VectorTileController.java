@@ -238,15 +238,14 @@ public class VectorTileController {
 		} else {
 			config.nativelib.setRenderingProps(props);
 		}
-		RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z,
-				tile.tileSizeLog, 1);
+		RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z);
 		if (ctx.width > 8192) {
 			return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
 
 		}
-		if (imgTileSize != ctx.width || imgTileSize != ctx.height) {
+		if (imgTileSize != ctx.width << tile.tileSizeLog || imgTileSize != ctx.height << tile.tileSizeLog) {
 			return ResponseEntity.badRequest()
-					.body(String.format("Metatile has wrong size (%d != %d)", tilesize << metatileSize, ctx.width));
+					.body(String.format("Metatile has wrong size (%d != %d)", imgTileSize, ctx.width << tile.tileSizeLog));
 		}
 		tile.runtimeImage = config.nativelib.renderImage(ctx);
 		if (tile.runtimeImage != null) {
