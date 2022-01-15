@@ -45,7 +45,7 @@ public class VectorTileController {
 	
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 
-	private static final int ZOOM_EN_PREFERRED_LANG = 7;
+	private static final int ZOOM_EN_PREFERRED_LANG = 6;
 
 	@Value("${tile-server.obf.location}")
 	String obfLocation;
