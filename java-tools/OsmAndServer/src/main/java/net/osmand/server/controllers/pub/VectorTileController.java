@@ -225,6 +225,8 @@ public class VectorTileController {
 		long now = System.currentTimeMillis();
 		if (tile.z < ZOOM_EN_PREFERRED_LANG) {
 			config.nativelib.setRenderingProps("lang=en");
+		} else {
+			config.nativelib.setRenderingProps("lang=en");
 		}
 		RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z,
 				// TODO doesn't work correctly
