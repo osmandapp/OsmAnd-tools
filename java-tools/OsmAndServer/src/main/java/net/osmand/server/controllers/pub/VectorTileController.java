@@ -304,9 +304,6 @@ public class VectorTileController {
 			config.tileCache.put(tile.key, tile);
 		}
 		BufferedImage img = tile.getCacheRuntimeImage();
-		if (z < 4) {
-			img = tile.runtimeImage = null;
-		}
 		if (img == null) {
 			ResponseEntity<String> err = renderMetaTile(tile);
 			img = tile.runtimeImage;
