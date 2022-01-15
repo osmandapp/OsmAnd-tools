@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.imageio.ImageIO;
 
@@ -41,6 +42,8 @@ public class VectorTileController {
 	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 40;
 	
 	private static final int MAX_RUNTIME_TILES_CACHE_SIZE = 10000;
+	
+	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 
 	@Value("${tile-server.obf.location}")
 	String obfLocation;
@@ -48,35 +51,41 @@ public class VectorTileController {
 	@Value("${tile-server.cache.location}")
 	String cacheLocation;
 	
+	@Value("${tile-server.cache.max-zoom}")
+	int maxZoomCache = 16;
+	
 	@Value("${tile-server.metatile-powsize}")
 	int metatileSize;
 	
 	@Value("${tile-server.tile-size}")
 	int singleTileSize = 256;
 	
+	AtomicInteger cacheTouch = new AtomicInteger(0);
 	
 	VectorTileServerConfig config; 
+	
+	public static class VectorTileServerConfig {
+		NativeJavaRendering nativelib;
+		Map<Long, VectorMetatile> tileCache = new ConcurrentHashMap<>();
+		String error;
+		File tempDir;
+	}
+
 	
 	public class VectorMetatile implements Comparable<VectorMetatile> {
 		
 		public BufferedImage runtimeImage;
-		public File cacheFile; 
 		public long lastAccess;
 		public final long key;
 		public final int z;
 		public final int left;
 		public final int top;
-		public final int metatileSize;
-		public final File cacheLocation;
 		
-		public VectorMetatile(int left, int top, int z, long tileId, 
-				int metatileSize, File cacheLocation) {
+		public VectorMetatile(int left, int top, int z, long tileId) {
 			this.key = tileId;
 			this.left = left;
 			this.top = top;
 			this.z = z;
-			this.metatileSize = metatileSize;
-			this.cacheLocation = cacheLocation;
 			touch();
 		}
 
@@ -96,6 +105,10 @@ public class VectorTileController {
 		}
 
 		public BufferedImage getCacheRuntimeImage() throws IOException {
+			BufferedImage img = runtimeImage;
+			if (img != null) {
+				return img;
+			}
 			File cf = getCacheFile();
 			if (cf != null && cf.exists()) {
 				runtimeImage = ImageIO.read(cf);
@@ -105,28 +118,32 @@ public class VectorTileController {
 		}
 
 		public File getCacheFile() {
-			if (z > 15) {
+			if (z > maxZoomCache || cacheLocation == null || cacheLocation.length() == 0) {
 				return null;
 			}
-			// could be improved by interlay bits for z 10-15
-			return new File(cacheLocation, z + "/" + left + "/" + top + ".png");
+			int x = left >> (31 - z) >> metatileSize;
+			int y = top >> (31 - z) >> metatileSize;
+			StringBuilder loc = new StringBuilder();
+			loc.append(z);
+			while (x >= MAX_FILES_PER_FOLDER) {
+				int nx = x % MAX_FILES_PER_FOLDER;
+				loc.append("/").append(nx);
+				x = (x - nx) / MAX_FILES_PER_FOLDER;
+			}
+			loc.append("/").append(x);
+			while (y >= MAX_FILES_PER_FOLDER) {
+				int ny = y % MAX_FILES_PER_FOLDER;
+				loc.append("/").append(ny);
+				y = (y - ny) / MAX_FILES_PER_FOLDER;
+			}
+			loc.append("/").append(y).append(".png");
+			return new File(cacheLocation, loc.toString());
 		}
 	}
 	
-	public static class VectorTileServerConfig {
-		String error;
-		File obfLocation;
-		File cacheLocation;
-		NativeJavaRendering nativelib;
-		Map<Long, VectorMetatile> tileCache = new ConcurrentHashMap<>();
-		File tempDir;
-		int cacheTouch;
-		
-	}
-
 	private ResponseEntity<?> errorConfig() {
-		return ResponseEntity.badRequest().body("Tile service is not initialized: " + 
-				(config == null ? "" : config.error));
+		return ResponseEntity.badRequest()
+				.body("Tile service is not initialized: " + (config == null ? "" : config.error));
 	}
 	
 	public boolean validateConfig() throws IOException {
@@ -139,15 +156,10 @@ public class VectorTileController {
 				if (obfLocation == null || obfLocation.isEmpty()) {
 					config.error = "Files location is not specified";
 				} else {
-					config.obfLocation = new File(obfLocation);
-					if (!config.obfLocation.exists()) {
+					File obfLocationF = new File(obfLocation);
+					if (!obfLocationF.exists()) {
 						config.error = "Files location is not specified";
 					}
-				}
-				config.cacheLocation = new File(cacheLocation);
-				config.cacheLocation.mkdirs();
-				if (config.cacheLocation.exists()) {
-					config.error = "Tiles location is not specified";
 				}
 				config.tempDir = Files.createTempDirectory("osmandserver").toFile();
 				LOGGER.info("Init temp rendering directory for libs / fonts: " + config.tempDir.getAbsolutePath());
@@ -230,9 +242,10 @@ public class VectorTileController {
 	}
 
 	private void cleanupCache() {
-		if (config.cacheTouch++ > MAX_RUNTIME_IMAGE_CACHE_SIZE) {
-			config.cacheTouch = 0;
-
+		int version = cacheTouch.incrementAndGet();
+		// so with atomic only 1 thread will get % X == 0
+		if (version % MAX_RUNTIME_IMAGE_CACHE_SIZE == 0 && version > 0) {
+			cacheTouch.set(0);
 			TreeSet<VectorMetatile> sortCache = new TreeSet<>(config.tileCache.values());
 			List<VectorMetatile> imageTiles = new ArrayList<>();
 			for (VectorMetatile vm : sortCache) {
@@ -259,7 +272,7 @@ public class VectorTileController {
 	@RequestMapping(path = "/{z}/{x}/{y}.png", produces = "image/png")
 	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y)
 			throws IOException {
-		if (validateConfig()) {
+		if (!validateConfig()) {
 			return errorConfig();
 		}
 		int left = ((x >> metatileSize) << metatileSize) << (31 - z);
@@ -273,7 +286,7 @@ public class VectorTileController {
 		long tileId = encode(left >> (31 - z), top >> (31 - z), z);
 		VectorMetatile tile = config.tileCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(left, top, z, tileId, metatileSize, config.cacheLocation);
+			tile = new VectorMetatile(left, top, z, tileId);
 			config.tileCache.put(tile.key, tile);
 		}
 		BufferedImage img = tile.getCacheRuntimeImage();
