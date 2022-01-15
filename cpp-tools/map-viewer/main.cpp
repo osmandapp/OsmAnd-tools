@@ -35,6 +35,7 @@
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/RoadLocator.h>
 #include <OsmAndCore/IRoadLocator.h>
+#include <OsmAndCore/TileSqliteDatabasesCollection.h>
 #include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
 #include <OsmAndCore/Data/Amenity.h>
@@ -52,7 +53,7 @@
 #include <OsmAndCore/Map/OnlineTileSources.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
-#include <OsmAndCore/Map/HeightmapTileProvider.h>
+#include <OsmAndCore/Map/SqliteHeightmapTileProvider.h>
 #include <OsmAndCore/Map/ObfMapObjectsProvider.h>
 #include <OsmAndCore/Map/MapPrimitivesProvider.h>
 #include <OsmAndCore/Map/MapRasterLayerProvider_Software.h>
@@ -88,6 +89,7 @@ OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
+std::shared_ptr<const OsmAnd::ITileSqliteDatabasesCollection> heightsCollection;
 std::shared_ptr<OsmAnd::ObfMapObjectsProvider> binaryMapObjectsProvider;
 std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
 std::shared_ptr<OsmAnd::MapPrimitiviser> primitivizer;
@@ -112,7 +114,7 @@ bool dataDirSpecified = false;
 QDir dataDir;
 QDir cacheDir(QDir::current());
 QDir heightsDir;
-bool wasHeightsDirSpecified = false;
+bool heightsDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
 
@@ -134,6 +136,7 @@ bool use43 = false;
 bool constantRefresh = false;
 bool nSight = false;
 bool gDEBugger = false;
+bool profiler = false;
 const float density = 1.0f;
 const float mapScale = 1.0f;
 const float symbolsScale = 1.0f;
@@ -227,7 +230,7 @@ int main(int argc, char** argv)
         else if (arg.startsWith("-heightsDir="))
         {
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
-            wasHeightsDirSpecified = true;
+            heightsDirSpecified = true;
         }
         else if (arg == "-nsight")
         {
@@ -236,6 +239,7 @@ int main(int argc, char** argv)
             constantRefresh = true;
             nSight = true;
             gDEBugger = false;
+            profiler = false;
         }
         else if (arg == "-gdebugger")
         {
@@ -244,6 +248,16 @@ int main(int argc, char** argv)
             constantRefresh = true;
             nSight = false;
             gDEBugger = true;
+            profiler = false;
+        }
+        else if (arg == "-profiler")
+        {
+            useSpecificOpenGL = true;
+            use43 = false;
+            constantRefresh = true;
+            nSight = false;
+            gDEBugger = false;
+            profiler = true;
         }
     }
 
@@ -358,6 +372,14 @@ int main(int argc, char** argv)
         stylesCollection.reset(pMapStylesCollection);
     }
 
+    if (heightsDirSpecified)
+    {
+        const auto manualHeightsCollection = new OsmAnd::TileSqliteDatabasesCollection();
+        manualHeightsCollection->addDirectory(heightsDir);
+
+        heightsCollection.reset(manualHeightsCollection);
+    }
+
     if (!styleName.isEmpty())
     {
         style = stylesCollection->getResolvedStyleByName(styleName);
@@ -367,7 +389,6 @@ int main(int argc, char** argv)
             OsmAnd::ReleaseCore();
             return EXIT_FAILURE;
         }
-
     }
 
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
@@ -791,10 +812,17 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         else
         {
-            if (wasHeightsDirSpecified)
+            if (heightsCollection)
             {
-                //auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
-                //renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
+                renderer->setElevationDataProvider(
+                    std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
+                        heightsCollection,
+                        renderer->getHeixelsPerTileSide()
+                    )
+                );
+                // renderer->setElevationDataConfiguration(OsmAnd::ElevationDataConfiguration()
+                //     .setScaleFactor(10.0f)
+                // );
             }
         }
     }
