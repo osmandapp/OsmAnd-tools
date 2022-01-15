@@ -1,13 +1,14 @@
 package net.osmand.swing;
 
 import java.io.File;
+import java.io.IOException;
 
 import net.osmand.NativeJavaRendering;
 
 public class NativeSwingRendering {
 
 
-	public static NativeJavaRendering getDefaultFromSettings() {
+	public static NativeJavaRendering getDefaultFromSettings() throws IOException {
 		return NativeJavaRendering.getDefault(
 				DataExtractionSettings.getSettings().getNativeLibFile(), 
 				DataExtractionSettings.getSettings().getBinaryFilesDir(), 

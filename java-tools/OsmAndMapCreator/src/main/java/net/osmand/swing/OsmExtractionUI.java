@@ -48,6 +48,12 @@ import javax.swing.UIManager;
 import javax.swing.filechooser.FileFilter;
 import javax.xml.stream.XMLStreamException;
 
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
+
 import net.osmand.MapCreatorVersion;
 import net.osmand.NativeJavaRendering;
 import net.osmand.SQLiteBigPlanetIndex;
@@ -78,13 +84,6 @@ import net.osmand.search.core.SearchSettings;
 import net.osmand.swing.MapPanel.MapSelectionArea;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.xml.sax.SAXException;
-import org.xmlpull.v1.XmlPullParserException;
-
 import rtree.RTree;
 
 
@@ -210,7 +209,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				if (bdirFile.exists() && bdirFile.listFiles() != null) {
 					List<File> asList = Arrays.asList(Algorithms.getSortedFilesVersions(bdirFile));
 					ArrayList<File> sortedFiles = new ArrayList<>(asList);
-//					Collections.reverse(sortedFiles);
+					// Collections.reverse(sortedFiles);
 					for (File obf : sortedFiles) {
 						if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
 							try {
@@ -226,7 +225,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						}
 					}
 				}
-				if(!files.isEmpty()) {
+				if (!files.isEmpty()) {
 					cache.writeToFile(cacheFile);
 				}
 			} catch (IOException e) {
@@ -535,25 +534,26 @@ public class OsmExtractionUI implements IMapLocationListener {
 			}
 			targetFile = genFile;
 		}
-		NativeJavaRendering lib = NativeSwingRendering.getDefaultFromSettings();
-		if (lib != null) {
-			try {
+		try {
+			NativeJavaRendering lib = NativeSwingRendering.getDefaultFromSettings();
+			if (lib != null) {
+				// reinit
 				lib.closeAllFiles();
 				lib.initFilesInDir(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()));
 				lib.loadRuleStorage(targetFile, renderingProperties);
 				mapPanel.setNativeLibrary(lib);
-			} catch (SAXException e) {
-				log.error(e.getMessage(), e);
-				throw new RuntimeException(e);
-			} catch (IOException e) {
-				log.error(e.getMessage(), e);
-				throw new RuntimeException(e);
-			} catch (XmlPullParserException e) {
-				log.error(e.getMessage(), e);
-				throw new RuntimeException(e);
+			} else {
+				JOptionPane.showMessageDialog(frame, "Native library was not configured in settings");
 			}
-		} else {
-			JOptionPane.showMessageDialog(frame, "Native library was not configured in settings");
+		} catch (SAXException e) {
+			log.error(e.getMessage(), e);
+			throw new RuntimeException(e);
+		} catch (IOException e) {
+			log.error(e.getMessage(), e);
+			throw new RuntimeException(e);
+		} catch (XmlPullParserException e) {
+			log.error(e.getMessage(), e);
+			throw new RuntimeException(e);
 		}
 	}
 

@@ -7,10 +7,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -23,6 +25,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
@@ -30,6 +34,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.data.QuadPointDouble;
 import net.osmand.data.QuadRect;
 import net.osmand.data.RotatedTileBox;
@@ -46,13 +51,19 @@ import resources._R;
 public class NativeJavaRendering extends NativeLibrary {
 
 
-	RenderingRulesStorage storage;
-	private HashMap<String, String> renderingProps;
-
+	private static final String INDEXES_CACHE = "indexes.cache";
+	
 	public static Boolean loaded = null;
+	
 	private static NativeJavaRendering defaultLoadedLibrary;
 	
+	private static final Log log = LogFactory.getLog(NativeJavaRendering.class);
+
+	
+	private RenderingRulesStorage storage;
+	private HashMap<String, String> renderingProps;
 	private Map<String, MapDiff> diffs = new LinkedHashMap<String, MapDiff>();
+	private List<BinaryMapIndexReader> initializedFiles = new ArrayList<>();
 	
 	public static class MapDiff {
 		public String baseName;
@@ -335,29 +346,37 @@ public class NativeJavaRendering extends NativeLibrary {
 
 	public void initFilesInDir(File filesDir) {
 		File[] lf = Algorithms.getSortedFilesVersions(filesDir);
-		for(File f : lf){
-			if(f.getName().endsWith(".obf")) {
-				// "_16_05_06.obf"
-				int l = f.getName().length() - 4;
-				if(f.getName().charAt(l - 3) == '_' && f.getName().charAt(l - 6) == '_' && 
-						f.getName().charAt(l - 9) == '_') {
-					String baseName = f.getName().substring(0, l - 9);
-					if(!diffs.containsKey(baseName)) {
-						MapDiff md = new MapDiff();
-						md.baseName = baseName;
-						diffs.put(baseName, md);
-					}
-					MapDiff md = diffs.get(baseName);
-					md.diffs.put(f.getName().substring(l - 8, l), f);
-				} else if( !f.getName().contains("basemap")){
-					if(f.getName().endsWith("_2.obf")) {
-						updateBoundaries(f, f.getName().substring(0, f.getName().length() - 6));	
-					} else {
-						updateBoundaries(f, f.getName().substring(0, f.getName().length() - 4));
-					}
-				}
-				initMapFile(f.getAbsolutePath(), true);
+		List<File> obfFiles = new ArrayList<File>();
+		for (File f : lf) {
+			if (f.getName().endsWith(".obf")) {
+				obfFiles.add(f);
 			}
+		}
+		initFilesInDir(obfFiles);
+	}
+	
+	public void initFilesInDir(List<File> obfFiles) {
+		for (File f : obfFiles) {
+			// "_16_05_06.obf"
+			int l = f.getName().length() - 4;
+			if (f.getName().charAt(l - 3) == '_' && f.getName().charAt(l - 6) == '_'
+					&& f.getName().charAt(l - 9) == '_') {
+				String baseName = f.getName().substring(0, l - 9);
+				if (!diffs.containsKey(baseName)) {
+					MapDiff md = new MapDiff();
+					md.baseName = baseName;
+					diffs.put(baseName, md);
+				}
+				MapDiff md = diffs.get(baseName);
+				md.diffs.put(f.getName().substring(l - 8, l), f);
+			} else if (!f.getName().contains("basemap")) {
+				if (f.getName().endsWith("_2.obf")) {
+					updateBoundaries(f, f.getName().substring(0, f.getName().length() - 6));
+				} else {
+					updateBoundaries(f, f.getName().substring(0, f.getName().length() - 4));
+				}
+			}
+			initMapFile(f.getAbsolutePath(), true);
 		}
 	}
 
@@ -392,13 +411,13 @@ public class NativeJavaRendering extends NativeLibrary {
 	}
 	
 	public void enableBaseFile(MapDiff m, boolean enable) {
-		if(enable) {
-			if(!m.enableBaseMap) {
+		if (enable) {
+			if (!m.enableBaseMap) {
 				initBinaryMapFile(m.baseFile.getAbsolutePath(), true, false);
 				m.enableBaseMap = true;
 			}
 		} else {
-			if(m.enableBaseMap) {
+			if (m.enableBaseMap) {
 				closeBinaryMapFile(m.baseFile.getAbsolutePath());
 				m.enableBaseMap = false;
 			}
@@ -422,12 +441,12 @@ public class NativeJavaRendering extends NativeLibrary {
 			String fp = md.diffs.get(s).getAbsolutePath();
 			enable = enable || s.equals(df);
 			if(!enable) {
-				if(!md.disabled.contains(fp)) {
+				if (!md.disabled.contains(fp)) {
 					closeBinaryMapFile(fp);
 					md.disabled.add(fp);
 				}
 			} else {
-				if(md.disabled.contains(fp)) {
+				if (md.disabled.contains(fp)) {
 					initBinaryMapFile(fp, true, false);
 					md.disabled.remove(fp);
 				}
@@ -449,10 +468,83 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 		return null;
 	}
+	
+	public List<BinaryMapIndexReader> initIndexesCache(File dir, 
+			List<File> filesToUse, boolean filterDuplicates) throws IOException {
+	    List<BinaryMapIndexReader> files = new ArrayList<>();
+		File cacheFile = new File(dir, INDEXES_CACHE);
+		CachedOsmandIndexes cache = new CachedOsmandIndexes();
+		if (cacheFile.exists()) {
+			cache.readFromFile(cacheFile, CachedOsmandIndexes.VERSION);
+		}
+		if (filesToUse == null) {
+			filesToUse = new ArrayList<>();
+		}
+			
+		if (dir.exists() && dir.listFiles() != null) {
+			TreeSet<String> allFileNames = new TreeSet<String>();
+			for (File obf : Algorithms.getSortedFilesVersions(dir)) {
+				if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
+					filesToUse.add(obf);
+					allFileNames.add(obf.getName());
+				}
+			}
+			// Collections.reverse(sortedFiles);
+			Iterator<File> fileIt = filesToUse.iterator();
+			while (fileIt.hasNext()) {
+				File obf = fileIt.next();
+				try {
+					BinaryMapIndexReader bmir = cache.getReader(obf, true);
+					// BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"), obf);
+					// BinaryMapIndexReader bmir2 = new BinaryMapIndexReader(new RandomAccessFile(bmir.getFile(), "r"), bmir);
+					boolean basemapPresent = checkMoreGenericMapPresent(allFileNames, obf.getName());
+					if (filterDuplicates && basemapPresent) {
+						log.debug("SKIP initializing cause bigger map is present: " + obf.getName());
+						fileIt.remove();
+					} else {
+						files.add(bmir);
+					}
+				} catch (Exception e1) {
+					e1.printStackTrace();
+				}
+			}
+		}
+		if (!files.isEmpty()) {
+			cache.writeToFile(cacheFile);
+		}
+		this.initializedFiles = files;
+		return files;
+	}
+
+	private boolean checkMoreGenericMapPresent(TreeSet<String> allFileNames, String file) {
+		String[] splitParts = file.split("_");
+		boolean presentBaseFile = false;
+		for (int i = 0; i < splitParts.length - 1 && !presentBaseFile; i++) {
+			String baseFile = "";
+			for (int j = 0; j < splitParts.length; j++) {
+				if (i == j) {
+					continue;
+				}
+				if (baseFile.length() > 0) {
+					baseFile += "_";
+				}
+				baseFile += splitParts[j];
+			}
+			if (allFileNames.contains(baseFile)) {
+				presentBaseFile = true;
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public List<BinaryMapIndexReader> getFiles() {
+		return initializedFiles;
+	}
 
 
 	public static NativeJavaRendering getDefault(String filename, String obfFolder,
-			String fontsFolder) {
+			String fontsFolder) throws IOException {
 		if (defaultLoadedLibrary != null) {
 			return defaultLoadedLibrary;
 		}
@@ -465,7 +557,11 @@ public class NativeJavaRendering extends NativeLibrary {
 		loaded = NativeLibrary.loadOldLib(path);
 		if (loaded) {
 			defaultLoadedLibrary = new NativeJavaRendering();
-			defaultLoadedLibrary.initFilesInDir(new File(obfFolder));
+			File filesFolder = new File(obfFolder);
+			List<File> obfFiles = new ArrayList<>();
+			defaultLoadedLibrary.initIndexesCache(filesFolder, obfFiles, true);
+			defaultLoadedLibrary.initCacheMapFile(new File(filesFolder, INDEXES_CACHE).getAbsolutePath());
+			defaultLoadedLibrary.initFilesInDir(obfFiles);
 			defaultLoadedLibrary.loadFontData(new File(fontsFolder));
 		}
 		return defaultLoadedLibrary;
