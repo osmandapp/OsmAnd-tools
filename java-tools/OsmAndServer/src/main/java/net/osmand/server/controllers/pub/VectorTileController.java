@@ -7,8 +7,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,7 +38,9 @@ public class VectorTileController {
 	
     private static final Log LOGGER = LogFactory.getLog(VectorTileController.class);
 
-	private static final int MAX_RUNTIME_CACHE_SIZE = 15;
+	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 40;
+	
+	private static final int MAX_RUNTIME_TILES_CACHE_SIZE = 10000;
 
 	@Value("${tile-server.obf.location}")
 	String obfLocation;
@@ -54,23 +57,26 @@ public class VectorTileController {
 	
 	VectorTileServerConfig config; 
 	
-	public static class VectorMetatile implements Comparable<VectorMetatile> {
+	public class VectorMetatile implements Comparable<VectorMetatile> {
 		
 		public BufferedImage runtimeImage;
+		public File cacheFile; 
 		public long lastAccess;
 		public final long key;
 		public final int z;
 		public final int left;
 		public final int top;
 		public final int metatileSize;
+		public final File cacheLocation;
 		
 		public VectorMetatile(int left, int top, int z, long tileId, 
-				int metatileSize) {
+				int metatileSize, File cacheLocation) {
 			this.key = tileId;
 			this.left = left;
 			this.top = top;
 			this.z = z;
 			this.metatileSize = metatileSize;
+			this.cacheLocation = cacheLocation;
 			touch();
 		}
 
@@ -83,10 +89,27 @@ public class VectorTileController {
 			return Long.compare(lastAccess, o.lastAccess);
 		}
 
-		public BufferedImage readSubImage(int x, int y, int tileSize) {
+		public BufferedImage readSubImage(BufferedImage img, int x, int y, int tileSize) {
 			int subl = x - ((x >> metatileSize) << metatileSize);
 			int subt = y - ((y >> metatileSize) << metatileSize);
-			return runtimeImage.getSubimage(subl * tileSize, subt * tileSize, tileSize, tileSize);
+			return img.getSubimage(subl * tileSize, subt * tileSize, tileSize, tileSize);
+		}
+
+		public BufferedImage getCacheRuntimeImage() throws IOException {
+			File cf = getCacheFile();
+			if (cf != null && cf.exists()) {
+				runtimeImage = ImageIO.read(cf);
+				return runtimeImage;
+			}
+			return null;
+		}
+
+		public File getCacheFile() {
+			if (z > 15) {
+				return null;
+			}
+			// could be improved by interlay bits for z 10-15
+			return new File(cacheLocation, z + "/" + left + "/" + top + ".png");
 		}
 	}
 	
@@ -96,7 +119,8 @@ public class VectorTileController {
 		File cacheLocation;
 		NativeJavaRendering nativelib;
 		Map<Long, VectorMetatile> tileCache = new ConcurrentHashMap<>();
-		public File tempDir;
+		File tempDir;
+		int cacheTouch;
 		
 	}
 
@@ -191,18 +215,45 @@ public class VectorTileController {
 					.body(String.format("Metatile has wrong size (%d != %d)", tilesize << metatileSize, ctx.width));
 		}
 		tile.runtimeImage = config.nativelib.renderImage(ctx);
+		if (tile.runtimeImage != null) {
+			File cacheFile = tile.getCacheFile();
+			if (cacheFile != null) {
+				cacheFile.getParentFile().mkdirs();
+				if (cacheFile.getParentFile().exists()) {
+					ImageIO.write(tile.runtimeImage, "png", cacheFile);
+				}
+			}
+		}
 		LOGGER.debug(String.format("Rendered %d %d at %d: %dx%d - %d ms", tile.left, tile.top, tile.z, ctx.width, ctx.height,
 				(int) (System.currentTimeMillis() - now)));
-		if (config.tileCache.size() >= MAX_RUNTIME_CACHE_SIZE) {
-			Iterator<VectorMetatile> it = new TreeSet<>(config.tileCache.values()).iterator();
-			while (config.tileCache.size() >= MAX_RUNTIME_CACHE_SIZE / 2 && it.hasNext()) {
-				VectorMetatile metatTile = it.next();
-				config.tileCache.remove(metatTile.key);
-			}
-
-		}
-		config.tileCache.put(tile.key, tile);
 		return null;
+	}
+
+	private void cleanupCache() {
+		if (config.cacheTouch++ > MAX_RUNTIME_IMAGE_CACHE_SIZE) {
+			config.cacheTouch = 0;
+
+			TreeSet<VectorMetatile> sortCache = new TreeSet<>(config.tileCache.values());
+			List<VectorMetatile> imageTiles = new ArrayList<>();
+			for (VectorMetatile vm : sortCache) {
+				if (vm.runtimeImage != null) {
+					imageTiles.add(vm);
+				}
+			}
+			if (imageTiles.size() >= MAX_RUNTIME_IMAGE_CACHE_SIZE) {
+				for (int i = 0; i < MAX_RUNTIME_IMAGE_CACHE_SIZE / 2; i++) {
+					VectorMetatile vm = imageTiles.get(i);
+					vm.runtimeImage = null;
+				}
+			}
+			if (config.tileCache.size() >= MAX_RUNTIME_TILES_CACHE_SIZE) {
+				Iterator<VectorMetatile> it = sortCache.iterator();
+				while (config.tileCache.size() >= MAX_RUNTIME_TILES_CACHE_SIZE / 2 && it.hasNext()) {
+					VectorMetatile metatTile = it.next();
+					config.tileCache.remove(metatTile.key);
+				}
+			}
+		}
 	}
 
 	@RequestMapping(path = "/{z}/{x}/{y}.png", produces = "image/png")
@@ -222,15 +273,22 @@ public class VectorTileController {
 		long tileId = encode(left >> (31 - z), top >> (31 - z), z);
 		VectorMetatile tile = config.tileCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(left, top, z, tileId, metatileSize);
+			tile = new VectorMetatile(left, top, z, tileId, metatileSize, config.cacheLocation);
+			config.tileCache.put(tile.key, tile);
+		}
+		BufferedImage img = tile.getCacheRuntimeImage();
+		if (img == null) {
 			ResponseEntity<String> err = renderMetaTile(tile);
+			img = tile.runtimeImage;
 			if (err != null) {
 				return err;
+			} else if (img == null) {
+				return ResponseEntity.badRequest().body("Unexpected error during rendering");
 			}
-		} else {
-			tile.touch();
 		}
-		BufferedImage subimage = tile.readSubImage(x, y, singleTileSize);
+		cleanupCache();
+		tile.touch();
+		BufferedImage subimage = tile.readSubImage(img, x, y, singleTileSize);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(subimage, "png", baos);
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
