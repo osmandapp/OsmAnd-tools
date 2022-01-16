@@ -124,11 +124,11 @@ public class NativeJavaRendering extends NativeLibrary {
 				return depends;
 			}
 		};
-		if(path == null || path.equals("default.render.xml")) {
+		if (path == null || path.equals("default.render.xml")) {
 			loadRenderingAttributes(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),
 					renderingConstants);
 			storage = new RenderingRulesStorage("default", renderingConstants);
-			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"), resolver);
+			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),resolver);
 		} else {
 			InputStream is = null;
 			InputStream is2 = null;
@@ -229,6 +229,10 @@ public class NativeJavaRendering extends NativeLibrary {
 			this.stop = MapUtils.get31TileNumberY(ll.top);
 		}
 	}
+	
+	public RenderingRulesStorage getRenderingRuleStorage() {
+		return storage;
+	}
 
 	public ByteBuffer render(RenderingImageContext ctx) throws IOException {
 		long time = -System.currentTimeMillis();
@@ -313,8 +317,8 @@ public class NativeJavaRendering extends NativeLibrary {
 		ctx.searchTime = search;
 		ctx.renderingTime = rendering;
 		ctx.context = rctx;
-		long last = time + System.currentTimeMillis() - rendering;
-		System.out.println(" TIMES search - " + search + " rendering - " + rendering + " unpack - " + last);
+//		long last = time + System.currentTimeMillis() - rendering;
+//		System.out.println(" TIMES search - " + search + " rendering - " + rendering + " unpack - " + last);
 		res.deleteNativeResult();
 		return rres.bitmapBuffer;
 	}
@@ -437,10 +441,10 @@ public class NativeJavaRendering extends NativeLibrary {
 			reverse.addFirst(s);
 		}
 		boolean enable = false;
-		for(String s : reverse) {
+		for (String s : reverse) {
 			String fp = md.diffs.get(s).getAbsolutePath();
 			enable = enable || s.equals(df);
-			if(!enable) {
+			if (!enable) {
 				if (!md.disabled.contains(fp)) {
 					closeBinaryMapFile(fp);
 					md.disabled.add(fp);
@@ -451,7 +455,7 @@ public class NativeJavaRendering extends NativeLibrary {
 					md.disabled.remove(fp);
 				}
 			}
-			 
+
 		}
 		md.selected = df;
 		if(md.enableBaseMap) {

@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,15 +21,23 @@ import javax.imageio.ImageIO;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
+
+import com.google.gson.Gson;
 
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
@@ -46,48 +56,91 @@ public class VectorTileController {
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 
 	private static final int ZOOM_EN_PREFERRED_LANG = 6;
-
-	@Value("${tile-server.obf.location}")
-	String obfLocation;
-	
-	@Value("${tile-server.cache.location}")
-	String cacheLocation;
-	
-	@Value("${tile-server.cache.max-zoom}")
-	int maxZoomCache = 16;
-	
-	@Value("${tile-server.metatile-powsize}")
-	int metatileSize;
-	
-	@Value("${tile-server.tile-size}")
-	int singleTileSize = 256;
 	
 	AtomicInteger cacheTouch = new AtomicInteger(0);
 	
+	Gson gson = new Gson();
+	
+	@Autowired
 	VectorTileServerConfig config; 
 	
+
+	@Configuration
+	@ConfigurationProperties("tile-server")
 	public static class VectorTileServerConfig {
+		
+		@Value("${tile-server.obf.location}")
+		String obfLocation;
+		
+		@Value("${tile-server.cache.location}")
+		String cacheLocation;
+		
+		@Value("${tile-server.cache.max-zoom}")
+		int maxZoomCache = 16;
+		
+		@Value("${tile-server.metatile-size}")
+		int metatileSize;
+		
+		public Map<String, VectorStyle> style = new TreeMap<String, VectorStyle>();
+		
+		public void setStyle(Map<String, String> style) {
+			for (Entry<String, String> e : style.entrySet()) {
+				VectorStyle vectorStyle = new VectorStyle();
+				vectorStyle.key = e.getKey();
+				vectorStyle.name = "";
+				vectorStyle.maxZoomCache = maxZoomCache;
+				// fast log_2_n calculation
+				vectorStyle.metaTileSizeLog = 31 - Integer.numberOfLeadingZeros(Math.max(256, metatileSize)) - 8;
+				vectorStyle.tileSizeLog = 31 - Integer.numberOfLeadingZeros(256) - 8;
+				for (String s : e.getValue().split(",")) {
+					String value = s.substring(s.indexOf('=') + 1);
+					if (s.startsWith("style=")) {
+						vectorStyle.name = value;
+					} else if (s.startsWith("tilesize=")) {
+						vectorStyle.tileSizeLog = 31 - Integer.numberOfLeadingZeros(Integer.parseInt(value)) - 8;
+					} else if (s.startsWith("metatilesize=")) {
+						vectorStyle.metaTileSizeLog = 31 - Integer.numberOfLeadingZeros(Integer.parseInt(value)) - 8;
+					}
+				}
+				this.style.put(vectorStyle.key, vectorStyle);
+			}
+		}
+		
+		Map<String, VectorMetatile> tileCache = new ConcurrentHashMap<>();
+		
 		NativeJavaRendering nativelib;
-		Map<Long, VectorMetatile> tileCache = new ConcurrentHashMap<>();
-		String error;
+		
+		String initErrorMessage;
+		
 		File tempDir;
 	}
-
 	
-	public class VectorMetatile implements Comparable<VectorMetatile> {
+	public static class VectorStyle {
+		public String key;
+		public String name;
+		public int maxZoomCache;
+		public int tileSizeLog;
+		public int metaTileSizeLog;
+	}
+	
+	public static class VectorMetatile implements Comparable<VectorMetatile> {
 		
 		public BufferedImage runtimeImage;
 		public long lastAccess;
-		public final long key;
+		public final String key;
 		public final int z;
 		public final int left;
 		public final int top;
-		public final int metaSize;
+		public final int metaSizeLog;
 		public final int tileSizeLog;
+		public final VectorStyle style;
+		private final VectorTileServerConfig cfg;
 		
-		public VectorMetatile(int left, int top, int z, long tileId,
-				int metaSize, int tileSizeLog) {
-			this.metaSize = metaSize;
+		public VectorMetatile(VectorTileServerConfig cfg, String tileId, VectorStyle style, 
+				int z, int left, int top,  int metaSizeLog, int tileSizeLog) {
+			this.cfg = cfg;
+			this.style = style;
+			this.metaSizeLog = metaSizeLog;
 			this.tileSizeLog = tileSizeLog;
 			this.key = tileId;
 			this.left = left;
@@ -106,8 +159,8 @@ public class VectorTileController {
 		}
 
 		public BufferedImage readSubImage(BufferedImage img, int x, int y) {
-			int subl = x - ((x >> metaSize) << metaSize);
-			int subt = y - ((y >> metaSize) << metaSize);
+			int subl = x - ((x >> metaSizeLog) << metaSizeLog);
+			int subt = y - ((y >> metaSizeLog) << metaSizeLog);
 			int tilesize = 256 << tileSizeLog;
 			return img.getSubimage(subl * tilesize, subt * tilesize, tilesize, tilesize);
 		}
@@ -126,13 +179,13 @@ public class VectorTileController {
 		}
 
 		public File getCacheFile() {
-			if (z > maxZoomCache || cacheLocation == null || cacheLocation.length() == 0) {
+			if (z > cfg.maxZoomCache || cfg.cacheLocation == null || cfg.cacheLocation.length() == 0) {
 				return null;
 			}
-			int x = left >> (31 - z) >> metaSize;
-			int y = top >> (31 - z) >> metaSize;
+			int x = left >> (31 - z) >> metaSizeLog;
+			int y = top >> (31 - z) >> metaSizeLog;
 			StringBuilder loc = new StringBuilder();
-			loc.append(z);
+			loc.append(style.key).append("/").append(z);
 			while (x >= MAX_FILES_PER_FOLDER) {
 				int nx = x % MAX_FILES_PER_FOLDER;
 				loc.append("/").append(nx);
@@ -144,29 +197,29 @@ public class VectorTileController {
 				loc.append("/").append(ny);
 				y = (y - ny) / MAX_FILES_PER_FOLDER;
 			}
-			loc.append("/").append(y).append(".png");
-			return new File(cacheLocation, loc.toString());
+			loc.append("/").append(y);
+			loc.append("-").append(metaSizeLog).append("-").append(tileSizeLog).append(".png");
+			return new File(cfg.cacheLocation, loc.toString());
 		}
 	}
 	
 	private ResponseEntity<?> errorConfig() {
 		return ResponseEntity.badRequest()
-				.body("Tile service is not initialized: " + (config == null ? "" : config.error));
+				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
 	}
 	
 	public boolean validateConfig() throws IOException {
-		if (config == null) {
+		if (config.nativelib == null && config.initErrorMessage == null) {
 			synchronized (this) {
-				if (config != null) {
-					return config.error == null;
+				if (!(config.nativelib == null && config.initErrorMessage == null)) {
+					return config.initErrorMessage == null;
 				}
-				config = new VectorTileServerConfig();
-				if (obfLocation == null || obfLocation.isEmpty()) {
-					config.error = "Files location is not specified";
+				if (config.obfLocation == null || config.obfLocation.isEmpty()) {
+					config.initErrorMessage = "Files location is not specified";
 				} else {
-					File obfLocationF = new File(obfLocation);
+					File obfLocationF = new File(config.obfLocation);
 					if (!obfLocationF.exists()) {
-						config.error = "Files location is not specified";
+						config.initErrorMessage = "Files location is not specified";
 					}
 				}
 				config.tempDir = Files.createTempDirectory("osmandserver").toFile();
@@ -187,39 +240,41 @@ public class VectorTileController {
 					fous.close();
 					ios.close();
 				}
-				config.nativelib = NativeJavaRendering.getDefault(null, obfLocation, fontsFolder.getAbsolutePath());
+				config.nativelib = NativeJavaRendering.getDefault(null, config.obfLocation, fontsFolder.getAbsolutePath());
 				if (config.nativelib == null) {
-					config.error = "Tile rendering engine is not initialized";
+					config.initErrorMessage = "Tile rendering engine is not initialized";
 				}
 			}
 		}
-		return config.error == null;
+		return config.initErrorMessage == null;
 	}
 	
-	private static long encode(int x, int y, int z, int metasizeLog, int tileSizeLog) {
-		long l = 0 ;
-		int shift = 0;
-		l += ((long) tileSizeLog) << shift; // 0-2
-		shift += 2;
-		l += ((long) metasizeLog) << shift; // 0-4
-		shift += 3;
-		l += ((long) z) << shift; // 1-22
-		shift += 5;
-		l += ((long) x) << shift;
-		shift += z;
-		l += ((long) y) << shift;
-		shift += z;
-		return l;
+	private static String encode(String style, int x, int y, int z, int metasizeLog, int tileSizeLog) {
+//		long l = 0 ;
+//		int shift = 0;
+//		l += ((long) tileSizeLog) << shift; // 0-2
+//		shift += 2;
+//		l += ((long) metasizeLog) << shift; // 0-4
+//		shift += 3;
+//		l += ((long) z) << shift; // 1-22
+//		shift += 5;
+//		l += ((long) x) << shift;
+//		shift += z;
+//		l += ((long) y) << shift;
+//		shift += z;
+		StringBuilder sb = new StringBuilder();
+		return sb.append(style).append('-').append(metasizeLog).append('-').append(tileSizeLog).
+				append('/').append(z).append('/').append(x).append('/').append(y).toString();
 	}
 	
-	private synchronized ResponseEntity<String> renderMetaTile(VectorMetatile tile) throws IOException {
+	private synchronized ResponseEntity<String> renderMetaTile(VectorMetatile tile) throws IOException, XmlPullParserException, SAXException {
 		VectorMetatile rendered = config.tileCache.get(tile.key);
 		if (rendered != null && rendered.runtimeImage != null) {
 			tile.runtimeImage = rendered.runtimeImage;
 			return null;
 		}
-		int imgTileSize = (256 << tile.tileSizeLog) << Math.min(tile.z, tile.metaSize);
-		int tilesize = (1 << Math.min(31 - tile.z + tile.metaSize, 31));
+		int imgTileSize = (256 << tile.tileSizeLog) << Math.min(tile.z, tile.metaSizeLog);
+		int tilesize = (1 << Math.min(31 - tile.z + tile.metaSizeLog, 31));
 		if (tilesize <= 0) {
 			tilesize = Integer.MAX_VALUE;
 		}
@@ -234,7 +289,10 @@ public class VectorTileController {
 		long now = System.currentTimeMillis();
 		String props = String.format("density=%d,textScale=%d", 1 << tile.tileSizeLog, 1 << tile.tileSizeLog);
 		if (tile.z < ZOOM_EN_PREFERRED_LANG) {
-			config.nativelib.setRenderingProps("lang=en," + props);
+			props += ",lang=en";
+		}
+		if (!tile.style.name.equals(config.nativelib.getRenderingRuleStorage().getName())) {
+			config.nativelib.loadRuleStorage(tile.style.name + ".render.xml", props);
 		} else {
 			config.nativelib.setRenderingProps(props);
 		}
@@ -290,26 +348,34 @@ public class VectorTileController {
 		}
 	}
 
-	@RequestMapping(path = "/{z}/{x}/{y}.png", produces = "image/png")
-	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y)
-			throws IOException {
+	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<?> getStyles() {
+		return ResponseEntity.ok(gson.toJson(config.style));
+	}
+
+	@RequestMapping(path = "/{style}/{z}/{x}/{y}.png", produces = MediaType.IMAGE_PNG_VALUE)
+	public ResponseEntity<?> getTile(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y)
+			throws IOException, XmlPullParserException, SAXException {
 		if (!validateConfig()) {
 			return errorConfig();
 		}
-		int metaSize = Math.min(metatileSize, z - 1);
-		int tileSizeLog = 31 - Integer.numberOfLeadingZeros(singleTileSize) - 8;
-		int left = ((x >> metaSize) << metaSize) << (31 - z);
+		VectorStyle vectorStyle = config.style.get(style);
+		if (vectorStyle == null) {
+			return ResponseEntity.badRequest().body("Rendering style is undefined: " + style);
+		}
+		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
+		int left = ((x >> metaSizeLog) << metaSizeLog) << (31 - z);
 		if (left < 0) {
 			left = 0;
 		}
-		int top = ((y >> metaSize) << metaSize) << (31 - z);
+		int top = ((y >> metaSizeLog) << metaSizeLog) << (31 - z);
 		if (top < 0) {
 			top = 0;
 		}
-		long tileId = encode(left >> (31 - z), top >> (31 - z), z, metaSize, tileSizeLog);
+		String tileId = encode(style, left >> (31 - z), top >> (31 - z), z, metaSizeLog, vectorStyle.tileSizeLog);
 		VectorMetatile tile = config.tileCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(left, top, z, tileId, metaSize, tileSizeLog);
+			tile = new VectorMetatile(config, tileId, vectorStyle, z, left, top, metaSizeLog, vectorStyle.tileSizeLog);
 			config.tileCache.put(tile.key, tile);
 		}
 		BufferedImage img = tile.getCacheRuntimeImage();
