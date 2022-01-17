@@ -291,7 +291,7 @@ public class VectorTileController {
 		if (tile.z < ZOOM_EN_PREFERRED_LANG) {
 			props += ",lang=en";
 		}
-		if (!tile.style.name.equals(config.nativelib.getRenderingRuleStorage().getName())) {
+		if (!tile.style.name.equalsIgnoreCase(config.nativelib.getRenderingRuleStorage().getName())) {
 			config.nativelib.loadRuleStorage(tile.style.name + ".render.xml", props);
 		} else {
 			config.nativelib.setRenderingProps(props);
@@ -315,8 +315,12 @@ public class VectorTileController {
 				}
 			}
 		}
-		LOGGER.debug(String.format("Rendered %d %d at %d: %dx%d - %d ms", tile.left, tile.top, tile.z, ctx.width, ctx.height,
-				(int) (System.currentTimeMillis() - now)));
+		String msg = String.format("Rendered %d %d at %d (%s %s): %dx%d - %d ms", tile.left, tile.top, tile.z,
+				tile.style.name, props,
+				ctx.width, ctx.height,
+				(int) (System.currentTimeMillis() - now));
+		System.out.println(msg);
+//		LOGGER.debug();
 		return null;
 	}
 

@@ -143,7 +143,14 @@ public class NativeJavaRendering extends NativeLibrary {
 				throw new IllegalArgumentException("Can't find rendering style '" + path + "'");
 			}
 			loadRenderingAttributes(is, renderingConstants);
-			storage = new RenderingRulesStorage("default", renderingConstants);
+			String name = path;
+			if (name.endsWith(".render.xml")) {
+				name = name.substring(0, name.length() - ".render.xml".length());
+			}
+			if (name.lastIndexOf('/') != -1) {
+				name = name.substring(name.lastIndexOf('/') + 1);
+			}
+			storage = new RenderingRulesStorage(name, renderingConstants);
 			storage.parseRulesFromXmlInputStream(is2, resolver);
 			is.close();
 			is2.close();
