@@ -49,6 +49,24 @@ gen.location: ${files.location}/gen
 web.location: ${files.location}/website
 srtm.location: ${SRTM_LOCATION:}
 
+tile-server: 
+  obf.location: ${OBF_LOCATION:}
+  metatile-size: 2048 # render tiles as 2048 x 2048
+  style:
+    df: style=default,tilesize=256 
+    hd: style=default,tilesize=512
+    topo: style=topo,tilesize=256
+    topo-hd: style=topo,tilesize=512
+    skimap: style=skimap,tilesize=256
+    snowmobile: style=snowmobile,tilesize=256
+    nautical: style=nautical,tilesize=256
+    desert: style=desert,tilesize=256
+    offroad: style=offroad,tilesize=256
+    touring: style=Touring-view_(more-contrast-and-details),tilesize=256
+  cache:
+    location: ${TILE_SERVER_CACHE_LOCATION:tiles}
+    max-zoom: 16 
+  
 management:
   endpoints:
     web:

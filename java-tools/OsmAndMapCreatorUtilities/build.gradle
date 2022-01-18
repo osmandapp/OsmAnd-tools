@@ -1,3 +1,30 @@
+task collectTestResources(type: Copy) {
+	into "src/test/resources/"
+	from("../../../resources/test-resources") {
+		include "Synthetic_test_rendering.obf"
+	}
+}
+
+compileJava {
+	dependsOn collectTestResources
+}
+
+
+task collectMdpiIcons(type: Sync) {
+	from("../../../resources/rendering_styles/style-icons/map-shaders-png/drawable-mdpi")
+	from("../../../resources/rendering_styles/style-icons/map-icons-png/drawable-mdpi")
+	into "src/main/resources/resources"
+}
+
+task collectFonts(type: Sync) {
+	from("../../../resources/rendering_styles/fonts")
+	into "src/main/resources/map/fonts"
+}
+
+compileJava {
+	dependsOn collectMdpiIcons, collectFonts
+}
+
 
 dependencies {
 	testImplementation group: 'junit', name: 'junit', version: '4.12'

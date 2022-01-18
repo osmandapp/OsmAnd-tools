@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
@@ -55,7 +54,7 @@ public class MapApiController {
 	private static final String ANALYSIS = "analysis";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
-	private static final long ANALYSIS_RERUN = 1641700311725l; // 08-01-2022
+	private static final long ANALYSIS_RERUN = 1641847021000l; // 10-01-2022
 											   
 
 	@Autowired
@@ -166,7 +165,7 @@ public class MapApiController {
 		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions, true);
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
-			if (nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && analysisNotPresent(ANALYSIS, nd.details)) {
+			if (nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details)) {
 				GPXTrackAnalysis analysis = null;
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				UserFile uf = of.get();
@@ -177,22 +176,39 @@ public class MapApiController {
 						if (in != null) {
 							GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
 							if (gpxFile != null) {
-								analysis = getAnalysis(uf, gpxFile, false);
+								analysis = getAnalysis(uf, gpxFile);
 							}
 						}
 					} catch (RuntimeException e) {
 					}
 					saveAnalysis(ANALYSIS, uf, analysis);
-					nd.details = uf.details;
+					nd.details = uf.details.deepCopy();
 				}
+			}
+			if (analysisPresent(ANALYSIS, nd.details)) {
+				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
+				nd.details.get(ANALYSIS).getAsJsonObject().remove("elevationData");
+			}
+			if (analysisPresent(SRTM_ANALYSIS, nd.details)) {
+				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
+				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	private boolean analysisNotPresent(String tag, JsonObject details) {
-		return details == null || (!details.has(tag + DONE_SUFFIX)
-				|| details.get(tag + DONE_SUFFIX).getAsLong() < ANALYSIS_RERUN);
+	private boolean analysisPresent(String tag, UserFile userFile) {
+		if(userFile == null) {
+			return false;
+		}
+		JsonObject details = userFile.details;
+		return analysisPresent(tag, details);
+	}
+
+	private boolean analysisPresent(String tag, JsonObject details) {
+		return details != null && details.has(tag + DONE_SUFFIX)
+				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
+				&& details.has(tag) && !details.get(tag).isJsonNull();
 	}
 	
 	@GetMapping(value = "/download-file")
@@ -224,9 +240,11 @@ public class MapApiController {
 		InputStream bin = null;
 		try {
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
-			UserFile[] fl = new UserFile[] { null };
-			bin = userdataController.getInputStream(name, type, updatetime, dev, error, fl);
-			UserFile file = fl[0];
+			UserFile userFile = userdataController.getUserFile(name, type, updatetime, dev);
+			if (analysisPresent(ANALYSIS, userFile)) {
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(ANALYSIS))));
+			}
+			bin = userdataController.getInputStream(dev, error, userFile);
 			ResponseEntity<String> err = error[0];
 			if (err != null) {
 				response.setStatus(err.getStatusCodeValue());
@@ -235,13 +253,13 @@ public class MapApiController {
 			}
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
 			if (gpxFile == null) {
-				return ResponseEntity.badRequest().body(String.format("File %s not found", file.name));
+				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
-			GPXTrackAnalysis analysis = getAnalysis(file, gpxFile, true);
-			if (analysisNotPresent(ANALYSIS, file.details)) {
-				saveAnalysis(ANALYSIS, file, analysis);
+			GPXTrackAnalysis analysis = getAnalysis(userFile, gpxFile);
+			if (!analysisPresent(ANALYSIS, userFile)) {
+				saveAnalysis(ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
@@ -249,15 +267,15 @@ public class MapApiController {
 		}
 	}
 
-	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile, boolean full) {
+	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile) {
 		gpxFile.path = file.name;
 		// file.clienttime == null ? 0 : file.clienttime.getTime()
 		GPXTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
 		gpxController.cleanupFromNan(analysis);
-		if (!full) {
-			analysis.speedData.clear();
-			analysis.elevationData.clear();
-		}
+//		if (!full) {
+//			analysis.speedData.clear();
+//			analysis.elevationData.clear();
+//		}
 		return analysis;
 	}
 
@@ -265,10 +283,11 @@ public class MapApiController {
 		if (file.details == null) {
 			file.details = new JsonObject();
 		}
-		if (analysis != null) {
-			analysis.speedData.clear();
-			analysis.elevationData.clear();
-		}
+		// store data in db to speed up retrieval
+//		if (analysis != null) {
+//			analysis.speedData.clear();
+//			analysis.elevationData.clear();
+//		}
 		file.details.add(tag, gson.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
@@ -286,9 +305,11 @@ public class MapApiController {
 		try {
 			@SuppressWarnings("unchecked")
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
-			UserFile[] fl = new UserFile[] { null };
-			bin = userdataController.getInputStream(name, type, updatetime, dev, error, fl);
-			UserFile file = fl[0];
+			UserFile userFile = userdataController.getUserFile(name, type, updatetime, dev);
+			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(SRTM_ANALYSIS))));
+			}
+			bin = userdataController.getInputStream(dev, error, userFile);
 			ResponseEntity<String> err = error[0];
 			if (err != null) {
 				response.setStatus(err.getStatusCodeValue());
@@ -297,14 +318,14 @@ public class MapApiController {
 			}
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
 			if (gpxFile == null) {
-				return ResponseEntity.badRequest().body(String.format("File %s not found", file.name));
+				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
 			GPXFile srtmGpx = gpxController.calculateSrtmAltitude(gpxFile, null);
-			GPXTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(file, srtmGpx, true);
-			if (analysisNotPresent(SRTM_ANALYSIS, file.details)) {
-				saveAnalysis(SRTM_ANALYSIS, file, analysis);
+			GPXTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(userFile, srtmGpx);
+			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
+				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Map.of("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
