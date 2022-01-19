@@ -925,7 +925,7 @@ public class WikiDatabasePreparation {
 			if (this.testArticleId == 0) {
 				selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
 			}
-			imageUrlStorage = new WikiImageUrlStorage(conn);
+			imageUrlStorage = new WikiImageUrlStorage(conn, sqliteFile.getParent(), lang);
 			log.info("Tables are prepared");
 		}
 
@@ -1024,8 +1024,6 @@ public class WikiDatabasePreparation {
 						}
 						if (wikiId != 0) {
 							try {
-								imageUrlStorage.setArticleTitle(title.toString());
-								imageUrlStorage.setLang(lang);
 								plainStr = generateHtmlArticle(ctext.toString(), lang, imageUrlStorage);
 							} catch (RuntimeException e) {
 								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);

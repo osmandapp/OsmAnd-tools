@@ -19,10 +19,10 @@ public class ArticleExtractor {
 	// "The accumulated size of entities is "50,000,001" that exceeded the "50,000,000" limit set by "FEATURE_SECURE_PROCESSING"
 	// need to add three java arguments -DentityExpansionLimit=2147480000 -DtotalEntitySizeLimit=2147480000
 	// -Djdk.xml.totalEntitySizeLimit=2147480000
-	public static final String helpMessage = " --mode=<cut|test> --lang=<lang> --title=<title> --dir=<work_folder> " +
+	public static final String helpMessage = " --mode=<cut|test> --lang=<lang> --title=<title> --amount=<amount>--dir=<work_folder> " +
 			"--testID=<article_ID> --LatLon=<testLatLon>\n" +
-			"mode cut - cut out article with <title> from <lang>wiki-latest-pages-articles.xml.gz and create obf file \n" +
-			"to the <LatLon> coordinates(lat;lon)\n" +
+			"mode cut - cut out <amount> of articles, beginning with <title> from <lang>wiki-latest-pages-articles.xml.gz and create obf file \n" +
+			"on the <LatLon> coordinates(lat;lon)\n" +
 			"mode test - create obf file for article with <articleID> to the <LatLon> coordinates(lat;lon)\n";
 
 	public static void main(String[] args) throws IOException {
@@ -32,6 +32,7 @@ public class ArticleExtractor {
 		String articleID = "";
 		String articleLatLon = "50.45191;30.59195";
 		String articleTitle = "";
+		int amount = 1;
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
 			String key = arg.substring(0, arg.indexOf("=") + 1);
@@ -44,6 +45,13 @@ public class ArticleExtractor {
 					break;
 				case "--title=":
 					articleTitle = val;
+					break;
+				case "--amount=":
+					try {
+						amount = Integer.parseInt(val);
+					}catch (NumberFormatException e){
+						amount = 1;
+					}
 					break;
 				case "--dir=":
 					workDir = val;
@@ -70,7 +78,7 @@ public class ArticleExtractor {
 		try {
 			if ("cut".equals(mode)) {
 				File outFile = new File(outputDir, inFile.getName());
-				ExtractorHandler handler = new ExtractorHandler(articleTitle);
+				ExtractorHandler handler = new ExtractorHandler(articleTitle, amount);
 				GZIPInputStream is = new GZIPInputStream(new FileInputStream(fileName));
 				SAXParser saxParser = factory.newSAXParser();
 				try {

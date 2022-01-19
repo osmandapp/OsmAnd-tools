@@ -13,14 +13,14 @@ public class ExtractorHandler extends DefaultHandler {
 	private int endHeaderLine;
 	private int firstArticleLine;
 	private int endArticleLine;
-	private int articleCount = 1;
+	private int articleCount;
 	private final String title;
-
 
 	private final StringBuilder currentValue = new StringBuilder();
 
-	public ExtractorHandler(String title) {
+	public ExtractorHandler(String title, int articleCount) {
 		this.title = title;
+		this.articleCount = articleCount;
 	}
 
 	@Override
