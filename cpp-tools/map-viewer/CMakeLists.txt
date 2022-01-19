@@ -28,9 +28,21 @@ else()
 	endif()
 endif()
 
+set(target_specific_sources "")
+if (CMAKE_TARGET_OS STREQUAL "macosx")
+	set(target_specific_sources ${target_specific_sources}
+		"x11.cpp"
+	)
+endif()
+
+set(sources
+	"main.cpp"
+	${target_specific_sources}
+)
+
 if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 	add_executable(bird
-		"main.cpp"
+		${sources}
 	)
 
 	add_dependencies(bird
@@ -47,7 +59,7 @@ endif()
 
 if (TARGET OsmAndCore_static_standalone)
 	add_executable(bird_standalone
-		"main.cpp"
+		${sources}
 	)
 
 	add_dependencies(bird_standalone

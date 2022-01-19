@@ -23,7 +23,7 @@ WORK_PATH="${OUTPUT_PATH}/.tmp"
 echo "Work directory:       $WORK_PATH"
 
 TILE_SIZE=32
-let "TILE_FULL_SIZE = $TILE_SIZE + 1"
+let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
 echo "Tile size:            $TILE_SIZE"
 echo "Tile size (full):     $TILE_FULL_SIZE"
 
