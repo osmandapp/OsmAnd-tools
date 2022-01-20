@@ -31,6 +31,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
@@ -154,7 +155,7 @@ public class MapTransportLayer implements MapPanelLayer {
 			r = results.get(currentRoute);
 		}
 		calculateResult(ways, r);
-		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		DataTileManager<Entity> points = new DataTileManager<>(11);
 		int ind = -1;
 		for (Way w : ways) {
 			Way wl = new Way(ind--);
