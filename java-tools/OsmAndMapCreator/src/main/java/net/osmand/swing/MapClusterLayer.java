@@ -25,19 +25,17 @@ import net.osmand.binary.RouteDataObject;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Way;
-import net.osmand.router.BinaryRoutePlanner;
+import net.osmand.router.*;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
-import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
-import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
-import net.osmand.router.RoutingContext;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import static net.osmand.router.RoutePlannerFrontEnd.*;
 import static net.osmand.router.RoutingConfiguration.*;
 
 
@@ -195,6 +193,11 @@ public class MapClusterLayer implements MapPanelLayer {
 				} catch (InvocationTargetException e) {
 					e.printStackTrace();
 				}
+			}
+
+			@Override
+			public void visitSegments(List<RouteSegmentResult> segment, GpxPoint start, GpxPoint target) {
+
 			}
 
 		});

@@ -128,13 +128,13 @@ public class MapRouterLayer implements MapPanelLayer {
 		}
 	};
 
-	public ActionListener setEndActionListener = new ActionListener(){
+	public ActionListener setEndActionListener = new ActionListener() {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			setEnd(new LatLon(map.getLatitude(), map.getLongitude()));
 		}
 	};
-
+	private boolean gpx = false;
 
 
 	@Override
@@ -1089,6 +1089,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
 			boolean gpx, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
+		this.gpx = gpx;
 		List<Way> res = new ArrayList<Way>();
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
@@ -1329,7 +1330,10 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void visitSegment(RouteSegment s, int  endSegment, boolean poll) {
-				if(stop) {
+				if (gpx) {
+					return;
+				}
+				if (stop) {
 					throw new RuntimeException("Interrupted");
 				}
 				if (!animateRoutingCalculation) {
@@ -1358,8 +1362,39 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 			}
 
+			@Override
+			public void visitSegments(List<RouteSegmentResult> segment, GpxPoint start, GpxPoint target) {
+				if (stop) {
+					throw new RuntimeException("Interrupted");
+				}
+				if (!animateRoutingCalculation) {
+					return;
+				}
+				points.clear();
+				startRoute = start.loc;
+				endRoute = target.loc;
+				for (int i = 0; i < segment.size(); i++) {
+					cache.add(new RouteSegment(segment.get(i).getObject(), segment.get(i).getStartPointIndex()));
+					cacheInt.add(segment.get(i).getEndPointIndex());
+				}
+				if (cache.size() < steps) {
+					return;
+				}
+				if (pause) {
+					registerObjects(points, false, pollCache, null);
+					pollCache.clear();
+				}
+				registerObjects(points, false, cache, cacheInt);
+				cache.clear();
+				cacheInt.clear();
+				redraw();
+				if (pause) {
+					waitNextPress();
+				}
+			}
+
 			private void registerObjects(final DataTileManager<Entity> points, boolean white, List<RouteSegment> registerCache,
-					List<Integer> cacheInt) {
+			                             List<Integer> cacheInt) {
 				for (int l = 0; l < registerCache.size(); l++) {
 					RouteSegment segment = registerCache.get(l);
 					Way way = new Way(-1);
