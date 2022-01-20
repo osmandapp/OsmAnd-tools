@@ -196,7 +196,7 @@ public class MapClusterLayer implements MapPanelLayer {
 			}
 
 			@Override
-			public void visitSegments(List<RouteSegmentResult> segment, GpxPoint start, GpxPoint target) {
+			public void visitApproximatedSegments(List<RouteSegmentResult> segment, GpxPoint start, GpxPoint target) {
 
 			}
 
