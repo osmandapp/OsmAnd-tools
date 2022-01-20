@@ -33,7 +33,7 @@ public class MapPointsLayer implements MapPanelLayer {
 	private MapPanel map;
 
 	// special points to draw
-	private DataTileManager<? extends Entity> points;
+	private DataTileManager<Entity> points;
 
 
 	private Color color = Color.black;
@@ -123,7 +123,6 @@ public class MapPointsLayer implements MapPanelLayer {
 		for (LineObject e : linesToDraw) {
 			Line2D p = e.line;
 			Way w = e.w;
-			g.setColor(color);
 			String name = null;
 			boolean white = false;
 			if(w != null) {
@@ -131,8 +130,17 @@ public class MapPointsLayer implements MapPanelLayer {
 					name = w.getTag("name");
 				}
 				white = "white".equalsIgnoreCase(w.getTag("color"));
-				if(white){
+				if (white) {
 					g.setColor(Color.gray);
+				} else if (w.getTag("colour") != null) {
+					try {
+						Color clr = (Color) Color.class.getField(w.getTag("colour").toUpperCase()).get(null);
+						g.setColor(clr);
+					} catch (Exception e1) {
+						e1.printStackTrace();
+					}
+				} else {
+					g.setColor(color);
 				}
 			}
 			AffineTransform transform = new AffineTransform();
@@ -207,19 +215,23 @@ public class MapPointsLayer implements MapPanelLayer {
 			pointsToDraw.clear();
 			linesToDraw.clear();
 			for (Entity e : objects) {
-				if(e instanceof Way){
-					List<Node> nodes = ((Way)e).getNodes();
+				if (e instanceof Way) {
+					List<Node> nodes = ((Way) e).getNodes();
 					if (nodes.size() > 1) {
 						int prevPixX = 0;
 						int prevPixY = 0;
 						for (int i = 0; i < nodes.size(); i++) {
 							Node n = nodes.get(i);
-							int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), n.getLongitude(), map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
-							int pixY = (int) (MapUtils.getPixelShiftY(map.getZoom(), n.getLatitude(), map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
+							int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), n.getLongitude(),
+									map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
+							int pixY = (int) (MapUtils.getPixelShiftY(map.getZoom(), n.getLatitude(), map.getLatitude(),
+									map.getTileSize()) + map.getCenterPointY());
 							if (i > 0) {
 								// i == nodes.size() / 2
-								linesToDraw.add(new LineObject((Way) e, new Line2D.Float(pixX, pixY, prevPixX, prevPixY), i == 1));
 								
+								linesToDraw.add(new LineObject((Way) e,
+										new Line2D.Float(pixX, pixY, prevPixX, prevPixY), i == 1));
+
 							}
 							prevPixX = pixX;
 							prevPixY = pixY;
@@ -241,11 +253,11 @@ public class MapPointsLayer implements MapPanelLayer {
 		}
 	}
 
-	public DataTileManager<? extends Entity> getPoints() {
+	public DataTileManager<Entity> getPoints() {
 		return points;
 	}
 
-	public void setPoints(DataTileManager<? extends Entity> points) {
+	public void setPoints(DataTileManager<Entity> points) {
 		this.points = points;
 	}
 

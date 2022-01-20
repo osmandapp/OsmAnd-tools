@@ -353,7 +353,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					@Override
 					public void run() {
 						List<Way> ways = route_YOURS(startRoute, endRoute);
-						DataTileManager<Way> points = new DataTileManager<Way>(11);
+						DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 						for(Way w : ways){
 							LatLon n = w.getLatLon();
 							points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -506,7 +506,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					map.setPoints(points);
 					selectedGPXFile = null;
 					displayGpxFiles();
@@ -572,6 +572,8 @@ public class MapRouterLayer implements MapPanelLayer {
 					for (WptPt p : ts.points) {
 						w.addNode(new net.osmand.osm.edit.Node(p.lat, p.lon, -1));
 					}
+					w.putTag("gpx", "yes");
+					w.putTag("colour", "green");
 					LatLon n = w.getLatLon();
 					points.registerObject(n.getLatitude(), n.getLongitude(), w);
 				}
@@ -655,7 +657,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 			ways.add(wr);
 		}
-		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 		for (Way w : ways) {
 			LatLon n = w.getLatLon();
 			points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -683,7 +685,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			public void run() {
 				List<Way> ways = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
 				if (ways != null) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Way w : ways) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -707,7 +709,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			public void run() {
 				List<Way> ways = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
 				if (ways != null) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Way w : ways) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -1088,7 +1090,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + " mode for routing");
-				final DataTileManager<Entity> points = new DataTileManager<Entity>(11);
+				final DataTileManager<Entity> points = map.getPoints();
 				map.setPoints(points);
 				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
 				// Choose native or not native
@@ -1289,7 +1291,16 @@ public class MapRouterLayer implements MapPanelLayer {
 				if (!animateRoutingCalculation) {
 					return;
 				}
-				points.clear();
+//				points.clear();
+				for(List<Entity> list : points.getAllEditObjects()) {
+					Iterator<Entity> it = list.iterator();
+					while(it.hasNext()) {
+						Entity e = it.next();
+						if (!"yes".equals(e.getTag("gpx"))) {
+							it.remove();
+						}
+					}
+				}
 				startRoute = start.loc;
 				endRoute = target.loc;
 				for (int i = 0; i < segment.size(); i++) {
