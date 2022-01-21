@@ -833,7 +833,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
 
 		String street = null;
-		if (houseNumber != null) {
+		if (houseNumber != null || houseName != null) {
 			street = e.getTag(OSMTagKey.ADDR_STREET);
 			if (street == null) {
 				street = e.getTag(OSMTagKey.ADDR_PLACE);

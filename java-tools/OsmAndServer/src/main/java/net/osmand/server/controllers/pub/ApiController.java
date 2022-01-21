@@ -2,13 +2,16 @@ package net.osmand.server.controllers.pub;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -423,12 +426,12 @@ public class ApiController {
     @GetMapping(path = {"/email/subscribe"}, produces = "text/html;charset=UTF-8")
     public String emailSubscribe(@RequestParam(required=false) String id, 
     		@RequestParam(required=false) String email, @RequestParam(required=false) String group) throws IOException  {
-    	if(Algorithms.isEmpty(email)) {
-    		if(Algorithms.isEmpty(id)) {
-    			throw new IllegalArgumentException("Missing email parameter");
-    		}
-    		email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
-    	}
+		if (Algorithms.isEmpty(email)) {
+			if (Algorithms.isEmpty(id)) {
+				throw new IllegalArgumentException("Missing email parameter");
+			}
+			email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+		}
     	unsubscribedRepo.deleteAllByEmail(email);
     	return "pub/email/subscribe";
     }
