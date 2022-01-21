@@ -236,15 +236,15 @@ public class WikivoyageLangPreparation {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
-			this.pageInfos = pageInfos;		
+			this.pageInfos = pageInfos;
 			progress.startTask("Parse wiki xml", progIS.available());
 
-			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-			imageUrlStorage = new WikiImageUrlStorage(conn);
+			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			imageUrlStorage = new WikiImageUrlStorage(conn, sqliteFile.getParent(), lang);
 			createInitialDbStructure(conn, uncompressed);
 			prep = generateInsertPrep(conn, uncompressed);
-			wikidataconn  = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
-			
+			wikidataconn = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
+
 		}
 
 		public void addBatch() throws SQLException {
@@ -355,8 +355,6 @@ public class WikivoyageLangPreparation {
 									+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
 						}
 						final HTMLConverter converter = new HTMLConverter(false);
-						imageUrlStorage.setArticleTitle(title.toString());
-						imageUrlStorage.setLang(lang);
 						CustomWikiModel wikiModel = new CustomWikiModel(
 								"https://upload.wikimedia.org/wikipedia/commons/${image}",
 								"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);

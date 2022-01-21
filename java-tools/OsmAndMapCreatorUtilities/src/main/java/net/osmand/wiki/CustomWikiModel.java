@@ -37,8 +37,7 @@ public class CustomWikiModel extends WikiModel {
 	private boolean preserveContents;
 	String[] additionalImageAliases = new String[]{"קובץ", "ملف", "Файл"};
 
-
-	public static final String ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
+	public static final String WIKIPEDIA_COMMONS = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String PREFIX = "320px-";
 	private final WikiImageUrlStorage imageUrlStorage;
 
@@ -77,7 +76,7 @@ public class CustomWikiModel extends WikiModel {
 	public void parseInternalImageLink(String imageNamespace,
 			String rawImageLink) {
 		String imageName = rawImageLink.split("\\|")[0];
-		imageName = imageName.substring(imageName.indexOf(":") + 1);
+		imageName = imageName.substring(imageName.indexOf(":") + 1).trim();
 		if (imageName.isEmpty()) {
 			return;
 		}
@@ -327,7 +326,7 @@ public class CustomWikiModel extends WikiModel {
 	public String getThumbUrl(String fileName) {
 		String simplify = fileName.replace(' ', '_');
 		if (imageUrlStorage != null) {
-			String thumbUrl = imageUrlStorage.getThumbUrl(fileName);
+			String thumbUrl = imageUrlStorage.getThumbUrl(simplify);
 			if (!Algorithms.isEmpty(thumbUrl)) {
 				return thumbUrl;
 			}
@@ -335,6 +334,6 @@ public class CustomWikiModel extends WikiModel {
 		String md5 = DigestUtils.md5Hex(simplify);
 		String hash1 = md5.substring(0, 1);
 		String hash2 = md5.substring(0, 2);
-		return ROOT_URL + "thumb/" + hash1 + "/" + hash2 + "/" + simplify + "/" + PREFIX + simplify;
+		return WIKIPEDIA_COMMONS + "thumb/" + hash1 + "/" + hash2 + "/" + simplify + "/" + PREFIX + simplify;
 	}
 }
