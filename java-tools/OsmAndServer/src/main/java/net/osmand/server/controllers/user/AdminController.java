@@ -1091,6 +1091,7 @@ public class AdminController {
 		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
 		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 
 		case "net.osmand.maps.subscription.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
