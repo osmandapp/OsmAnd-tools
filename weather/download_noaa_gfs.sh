@@ -43,7 +43,7 @@ cleanuptimestamp() {
     local prevprocfile=$(cat $DW_FOLDER/timestamp.proc)
     if [[ "$prevprocfile" != "$procfile" ]]; then 
         if [[ ! -z "$prevprocfile" ]]; then
-            rm $prevprocfile* || true
+            rm $DW_FOLDER/$prevprocfile* || true
         fi
         echo $procfile > $DW_FOLDER/timestamp.proc
     fi
