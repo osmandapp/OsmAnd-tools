@@ -982,12 +982,12 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		}
 		super.processKeyEvent(e);
 	}
-
-	public DataTileManager<? extends Entity> getPoints() {
+	
+	public DataTileManager<Entity> getPoints() {
 		return getLayer(MapPointsLayer.class).getPoints();
 	}
-
-	public void setPoints(DataTileManager<? extends Entity> points) {
+	
+	public void setPoints(DataTileManager<Entity> points) {
 		getLayer(MapPointsLayer.class).setPoints(points);
 		prepareImage();
 	}

@@ -134,8 +134,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			setEnd(new LatLon(map.getLatitude(), map.getLongitude()));
 		}
 	};
-
-
+	
+	private boolean gpx = false;
 
 	@Override
 	public void destroyLayer() {
@@ -355,7 +355,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					@Override
 					public void run() {
 						List<Way> ways = route_YOURS(startRoute, endRoute);
-						DataTileManager<Way> points = new DataTileManager<Way>(11);
+						DataTileManager<Entity> points = new DataTileManager<Entity>(11);;
 						for(Way w : ways){
 							LatLon n = w.getLatLon();
 							points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -508,7 +508,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					map.setPoints(points);
 					selectedGPXFile = null;
 					displayGpxFiles();
@@ -648,9 +648,18 @@ public class MapRouterLayer implements MapPanelLayer {
 			for (Track t : selectedGPXFile.tracks) {
 				for (TrkSegment ts : t.segments) {
 					Way w = new Way(-1);
+					int id = 0;
 					for (WptPt p : ts.points) {
-						w.addNode(new net.osmand.osm.edit.Node(p.lat, p.lon, -1));
+						net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(p.lat, p.lon, -1);
+						w.addNode(n);
+						n.putTag(OSMTagKey.NAME.getValue(), String.valueOf(id));
+						n.putTag("gpx", "yes");
+						n.putTag("colour", "blue");
+						points.registerObject(n.getLatitude(), n.getLongitude(), n);
+						id++;
 					}
+					w.putTag("gpx", "yes");
+					w.putTag("colour", "green");
 					LatLon n = w.getLatLon();
 					points.registerObject(n.getLatitude(), n.getLongitude(), w);
 				}
@@ -734,7 +743,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 			ways.add(wr);
 		}
-		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 		for (Way w : ways) {
 			LatLon n = w.getLatLon();
 			points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -762,7 +771,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			public void run() {
 				List<Way> ways = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
 				if (ways != null) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Way w : ways) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -786,7 +795,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			public void run() {
 				List<Way> ways = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
 				if (ways != null) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Way w : ways) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -1089,6 +1098,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
 			boolean gpx, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
+		this.gpx = gpx;
 		List<Way> res = new ArrayList<Way>();
 		long time = System.currentTimeMillis();
 		List<File> files = new ArrayList<File>();
@@ -1329,7 +1339,10 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void visitSegment(RouteSegment s, int  endSegment, boolean poll) {
-				if(stop) {
+				if (gpx) {
+					return;
+				}
+				if (stop) {
 					throw new RuntimeException("Interrupted");
 				}
 				if (!animateRoutingCalculation) {
@@ -1350,6 +1363,37 @@ public class MapRouterLayer implements MapPanelLayer {
 					pollCache.clear();
 				}
 				registerObjects(points, !poll, cache, cacheInt);
+				cache.clear();
+				cacheInt.clear();
+				redraw();
+				if (pause) {
+					waitNextPress();
+				}
+			}
+			
+			@Override
+			public void visitApproximatedSegments(List<RouteSegmentResult> segment, GpxPoint start, GpxPoint target) {
+				if (stop) {
+					throw new RuntimeException("Interrupted");
+				}
+				if (!animateRoutingCalculation) {
+					return;
+				}
+				points.clear();
+				startRoute = start.loc;
+				endRoute = target.loc;
+				for (int i = 0; i < segment.size(); i++) {
+					cache.add(new RouteSegment(segment.get(i).getObject(), segment.get(i).getStartPointIndex()));
+					cacheInt.add(segment.get(i).getEndPointIndex());
+				}
+				if (cache.size() < steps) {
+					return;
+				}
+				if (pause) {
+					registerObjects(points, false, pollCache, null);
+					pollCache.clear();
+				}
+				registerObjects(points, false, cache, cacheInt);
 				cache.clear();
 				cacheInt.clear();
 				redraw();
@@ -1378,6 +1422,11 @@ public class MapRouterLayer implements MapPanelLayer {
 						if (i >= 0 && i < segment.getRoad().getPointsLength()) {
 							net.osmand.osm.edit.Node n = createNode(segment, i);
 							way.addNode(n);
+							if (i == from || i == to) {
+								n.putTag("colour", "red");
+							}
+							points.registerObject(n.getLatitude(), n.getLongitude(), n);
+							
 						}
 					}
 					LatLon n = way.getLatLon();
