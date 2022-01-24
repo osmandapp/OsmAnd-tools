@@ -569,8 +569,15 @@ public class MapRouterLayer implements MapPanelLayer {
 			for (Track t : selectedGPXFile.tracks) {
 				for (TrkSegment ts : t.segments) {
 					Way w = new Way(-1);
+					int id = 0;
 					for (WptPt p : ts.points) {
-						w.addNode(new net.osmand.osm.edit.Node(p.lat, p.lon, -1));
+						net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(p.lat, p.lon, -1);
+						w.addNode(n);
+						n.putTag(OSMTagKey.NAME.getValue(), String.valueOf(id));
+						n.putTag("gpx", "yes");
+						n.putTag("colour", "blue");
+						points.registerObject(n.getLatitude(), n.getLongitude(), n);
+						id++;
 					}
 					w.putTag("gpx", "yes");
 					w.putTag("colour", "green");
@@ -1343,6 +1350,10 @@ public class MapRouterLayer implements MapPanelLayer {
 						if (i >= 0 && i < segment.getRoad().getPointsLength()) {
 							net.osmand.osm.edit.Node n = createNode(segment, i);
 							way.addNode(n);
+							if (i == from || i == to) {
+								n.putTag("colour", "red");
+							}
+							points.registerObject(n.getLatitude(), n.getLongitude(), n);
 						}
 					}
 					LatLon n = way.getLatLon();
