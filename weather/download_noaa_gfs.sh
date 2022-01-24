@@ -10,7 +10,8 @@ BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip")
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
 FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
 MINUTES_TO_KEEP=${MINUTES_TO_KEEP:-1800} # 30 hours
-HOURS_TO_DOWNLOAD=${HOURS_TO_DOWNLOAD:-36}
+HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
+HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-168}
 
 DW_FOLDER=raw
 TIFF_FOLDER=tiff
@@ -29,6 +30,8 @@ NC='\033[0m' # No Color
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
+    HOURS_ALL=$1
+    HOURS_INC=$2
     # cleanup old files to not process them
     rm $DW_FOLDER/*.gt || true
     rm $DW_FOLDER/*.gt.idx || true
@@ -43,7 +46,7 @@ get_raw_files() {
     RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
-    for (( c=0; c<=${HOURS_TO_DOWNLOAD}; c++ ))
+    for (( c=0; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
         local h=$c
         if [ $c -lt 10 ]; then
@@ -119,9 +122,10 @@ generate_tiles() {
 cp "${THIS_LOCATION}/browser.html" .
 cp -r "${THIS_LOCATION}/script" .
 cp -r "${THIS_LOCATION}/css" .
-get_raw_files
+get_raw_files $HOURS_1H_TO_DOWNLOAD 1
 generate_bands_tiff
-generate_tiles
+# generate_tiles
+get_raw_files $HOURS_3H_TO_DOWNLOAD 3
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
