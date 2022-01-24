@@ -124,8 +124,10 @@ cp -r "${THIS_LOCATION}/script" .
 cp -r "${THIS_LOCATION}/css" .
 get_raw_files $HOURS_1H_TO_DOWNLOAD 1
 generate_bands_tiff
-# generate_tiles
 get_raw_files $HOURS_3H_TO_DOWNLOAD 3
+generate_bands_tiff
+generate_tiles
+
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
