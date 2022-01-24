@@ -28,19 +28,32 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+if [[ $OS =~ "Darwin" ]]; then
+    HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
+    DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
+else
+    HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
+    DATE=$(date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
+fi
+# Round down HOURS to 0/6/12/18
+RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
+
+cleanuptimestamp() {
+    local procfile=$DATE/${FILE_PREFIX}${RNDHOURS}${FILE_NAME}
+    local prevprocfile=$(cat timestamp.proc)
+    if [[ "$prevprocfile" != "$procfile" ]]; then 
+        if [[ ! -z "$prevprocfile" ]]; then
+            rm $prevprocfile* || true
+        fi
+        echo $procfile > timestamp.proc
+    fi
+
+}
+
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
     HOURS_ALL=$1
     HOURS_INC=$2
-    if [[ $OS =~ "Darwin" ]]; then
-        HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
-        DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
-    else
-        HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
-        DATE=$(date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
-    fi
-    # Round down HOURS to 0/6/12/18
-    RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
     for (( c=0; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
@@ -123,11 +136,13 @@ cp -r "${THIS_LOCATION}/css" .
 # cleanup old files to not process them
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
+cleanuptimestamp
 
-get_raw_files $HOURS_1H_TO_DOWNLOAD 1
-generate_bands_tiff
-get_raw_files $HOURS_3H_TO_DOWNLOAD 3
-generate_bands_tiff
+get_raw_files $HOURS_1H_TO_DOWNLOAD 1 & 
+# generate_bands_tiff
+get_raw_files $HOURS_3H_TO_DOWNLOAD 3 &
+# generate_bands_tiff
+wait
 generate_tiles
 
 
