@@ -1379,7 +1379,16 @@ public class MapRouterLayer implements MapPanelLayer {
 				if (!animateRoutingCalculation) {
 					return;
 				}
-				points.clear();
+//				points.clear();
+				for(List<Entity> list : points.getAllEditObjects()) {
+					Iterator<Entity> it = list.iterator();
+					while(it.hasNext()) {
+						Entity e = it.next();
+						if (!"yes".equals(e.getTag("gpx"))) {
+							it.remove();
+						}
+					}
+				}
 				startRoute = start.loc;
 				endRoute = target.loc;
 				for (int i = 0; i < segment.size(); i++) {
