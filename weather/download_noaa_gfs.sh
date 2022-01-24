@@ -139,7 +139,6 @@ rm $DW_FOLDER/*.gt.idx || true
 cleanuptimestamp
 
 get_raw_files $HOURS_1H_TO_DOWNLOAD 1 & 
-generate_bands_tiff
 get_raw_files $HOURS_3H_TO_DOWNLOAD 3 &
 # generate_bands_tiff
 wait
