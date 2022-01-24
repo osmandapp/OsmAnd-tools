@@ -32,9 +32,6 @@ NC='\033[0m' # No Color
 get_raw_files() {
     HOURS_ALL=$1
     HOURS_INC=$2
-    # cleanup old files to not process them
-    rm $DW_FOLDER/*.gt || true
-    rm $DW_FOLDER/*.gt.idx || true
     if [[ $OS =~ "Darwin" ]]; then
         HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
         DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
@@ -122,6 +119,11 @@ generate_tiles() {
 cp "${THIS_LOCATION}/browser.html" .
 cp -r "${THIS_LOCATION}/script" .
 cp -r "${THIS_LOCATION}/css" .
+
+# cleanup old files to not process them
+rm $DW_FOLDER/*.gt || true
+rm $DW_FOLDER/*.gt.idx || true
+
 get_raw_files $HOURS_1H_TO_DOWNLOAD 1
 generate_bands_tiff
 get_raw_files $HOURS_3H_TO_DOWNLOAD 3
