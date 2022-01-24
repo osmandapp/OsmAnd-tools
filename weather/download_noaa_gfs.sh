@@ -40,12 +40,12 @@ RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
 
 cleanuptimestamp() {
     local procfile=$DATE/${FILE_PREFIX}${RNDHOURS}${FILE_NAME}
-    local prevprocfile=$(cat timestamp.proc)
+    local prevprocfile=$(cat $DW_FOLDER/timestamp.proc)
     if [[ "$prevprocfile" != "$procfile" ]]; then 
         if [[ ! -z "$prevprocfile" ]]; then
             rm $prevprocfile* || true
         fi
-        echo $procfile > timestamp.proc
+        echo $procfile > $DW_FOLDER/timestamp.proc
     fi
 
 }
