@@ -15,6 +15,7 @@ HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-168}
 
 DW_FOLDER=raw
 TIFF_FOLDER=tiff
+SPLIT_ZOOM_TIFF=4
 
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=3
@@ -97,6 +98,19 @@ generate_bands_tiff() {
         mkdir -p $TIFF_FOLDER/
         BS=$(basename $WFILE)
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
+        MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
+        
+        # generate subgeotiffs into folder
+        # 1440*720 / (48*48) = 450
+        mkdir -p $TIFF_FOLDER/${BS}
+        # for (( x=0; x< $MAXVALUE; x++ )); do
+            # for (( y=0; y< $MAXVALUE; y++ )); do
+                #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
+                # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
+            # done
+        # done
+        rm $TIFF_FOLDER/${BS}.tiff.gz || true
+        gzip $TIFF_FOLDER/${BS}.tiff
     done
 }
 generate_tiles() {
@@ -107,8 +121,9 @@ generate_tiles() {
         ## generate gdal2tiles fo a given band with given rasterization
         local FILE_NAME="${BS%%.*}"
         local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
+        gzip -cd $TIFF_FOLDER/${BS}.tiff  > ${FILE_NAME}_orig.O.tiff
         gdal_translate -projwin -180 84 180 -84 -of GTiff \
-            $TIFF_FOLDER/${BS}.tiff ${FILE_NAME}_cut.O.tiff
+            ${FILE_NAME}_orig.O.tiff ${FILE_NAME}_cut.O.tiff
         gdalwarp -of GTiff -t_srs epsg:3857 -r cubic -multi \
             ${FILE_NAME}_cut.O.tiff ${FILE_NAME}_webmerc.O.tiff
         for TILES_BAND in ${!BANDS_NAMES[@]}; do
