@@ -129,20 +129,29 @@ generate_tiles() {
 }
 
 
+# 0. html to test data
 cp "${THIS_LOCATION}/browser.html" .
 cp -r "${THIS_LOCATION}/script" .
 cp -r "${THIS_LOCATION}/css" .
 
-# cleanup old files to not process them
+# 1. cleanup old files to not process them
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
 cleanuptimestamp
 
+# 2. download raw files and generate tiffs
 get_raw_files $HOURS_1H_TO_DOWNLOAD 1 & 
 get_raw_files $HOURS_3H_TO_DOWNLOAD 3 &
-# generate_bands_tiff
 wait
 generate_bands_tiff
+
+# 3. redownload what's missing again (double check)
+get_raw_files $HOURS_1H_TO_DOWNLOAD 1 & 
+get_raw_files $HOURS_3H_TO_DOWNLOAD 3 &
+wait
+generate_bands_tiff
+
+# 4. generate tiles
 generate_tiles
 
 
