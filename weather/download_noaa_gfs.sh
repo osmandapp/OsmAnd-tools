@@ -52,11 +52,12 @@ cleanuptimestamp() {
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
-    HOURS_ALL=$1
-    HOURS_INC=$2
+    HOURS_START=$1
+    HOURS_ALL=$2
+    HOURS_INC=$3
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
-    for (( c=0; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
+    for (( c=${HOURS_START}; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
         local h=$c
         if [ $c -lt 10 ]; then
@@ -140,14 +141,14 @@ rm $DW_FOLDER/*.gt.idx || true
 cleanuptimestamp
 
 # 2. download raw files and generate tiffs
-get_raw_files $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_3H_TO_DOWNLOAD 3 &
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 generate_bands_tiff
 
 # 3. redownload what's missing again (double check)
-get_raw_files $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_3H_TO_DOWNLOAD 3 &
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 generate_bands_tiff
 
