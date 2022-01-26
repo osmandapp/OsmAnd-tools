@@ -168,7 +168,7 @@ wait
 generate_bands_tiff
 
 # 4. generate tiles
-generate_tiles
+# generate_tiles
 
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
