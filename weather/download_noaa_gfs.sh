@@ -96,26 +96,25 @@ generate_bands_tiff() {
             band_numbers="$band_numbers -b $b_num"
         done
         mkdir -p $TIFF_FOLDER/
-        BS=$(basename $WFILE)
-        gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
+        local BS=$(basename $WFILE)
+        local FILE_NAME="${BS%%.*}"
+        gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
 
-        mkdir -p $TIFF_FOLDER/${BS}/
-        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/
+        mkdir -p $TIFF_FOLDER/${FILE_NAME}/
+        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 $TIFF_FOLDER/${FILE_NAME}.tiff $TIFF_FOLDER/${FILE_NAME}/
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         
-
-        
-        find $TIFF_FOLDER/${BS}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
+        find $TIFF_FOLDER/${FILE_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
         # for (( x=0; x< $MAXVALUE; x++ )); do
             # for (( y=0; y< $MAXVALUE; y++ )); do
                 #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
                 # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
             # done
         # done
-        rm $TIFF_FOLDER/${BS}.tiff.gz || true
-        gzip $TIFF_FOLDER/${BS}.tiff
+        rm $TIFF_FOLDER/${FILE_NAME}.tiff.gz || true
+        gzip $TIFF_FOLDER/${FILE_NAME}.tiff
     done
 }
 generate_tiles() {
@@ -126,7 +125,7 @@ generate_tiles() {
         ## generate gdal2tiles fo a given band with given rasterization
         local FILE_NAME="${BS%%.*}"
         local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
-        gzip -cd $TIFF_FOLDER/${BS}.tiff  > ${FILE_NAME}_orig.O.tiff
+        gzip -cd $TIFF_FOLDER/${FILE_NAME}.tiff.gz  > ${FILE_NAME}_orig.O.tiff
         gdal_translate -projwin -180 84 180 -84 -of GTiff \
             ${FILE_NAME}_orig.O.tiff ${FILE_NAME}_cut.O.tiff
         gdalwarp -of GTiff -t_srs epsg:3857 -r cubic -multi \
