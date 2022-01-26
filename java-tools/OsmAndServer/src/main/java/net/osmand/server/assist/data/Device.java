@@ -78,10 +78,6 @@ public class Device {
 	}
 
 
-	public String getExternalId() {
-		return device.externalId;
-	}
-	
 	public String getDeviceName() {
 		return device.deviceName;
 	}
@@ -94,10 +90,6 @@ public class Device {
 		return device.createdDate;
 	}
 	
-	
-	public TrackerConfiguration getExternalConfiguration() {
-		return device.externalConfiguration;
-	}
 	
 	public JsonObject getMessageJson(int updateId) {
 		JsonObject obj = new JsonObject();

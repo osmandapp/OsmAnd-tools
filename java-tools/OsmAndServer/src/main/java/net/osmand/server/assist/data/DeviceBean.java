@@ -3,10 +3,7 @@ package net.osmand.server.assist.data;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EntityListeners;
-import javax.persistence.FetchType;
 import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
@@ -32,19 +29,11 @@ public class DeviceBean {
 	@Column(nullable = false)
 	public long userId;
 	
-	
 	@Column(nullable = false)
 	public long chatId;
 	
 	@Column(nullable = false, length = 200, name="device_name")
 	public String deviceName;
-	
-	@JoinColumn(nullable = true, name = "ext_config")
-	@ManyToOne(optional = true, fetch = FetchType.EAGER)
-	public TrackerConfiguration externalConfiguration;
-	
-	@Column(nullable = true, length = 200, name="ext_id")
-	public String externalId;
 	
 	@Column(name = "created_date", nullable = false, updatable = false)
 	@CreatedDate

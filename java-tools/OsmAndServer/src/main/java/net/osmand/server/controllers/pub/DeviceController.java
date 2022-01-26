@@ -57,7 +57,6 @@ public class DeviceController {
 		db.id = deviceBean.id;
 		db.userId = deviceBean.userId;
 		db.deviceName = deviceBean.deviceName;
-		db.externalId = deviceBean.getEncodedId();
 		db.data = deviceBean.data.deepCopy();
 		return db;
 	}
@@ -125,10 +124,8 @@ public class DeviceController {
 		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(Long.parseLong(uid));
 		DevicesInfo result = new DevicesInfo();
 		for(DeviceBean b : devices) {
-			if(b.externalConfiguration == null && b.externalId == null) {
-				DeviceBean db = simplifyDevice(b);
-				result.devices.add(db);
-			}
+			DeviceBean db = simplifyDevice(b);
+			result.devices.add(db);
 		}
 		return gson.toJson(result);
 	}

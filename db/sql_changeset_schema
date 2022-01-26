@@ -67,50 +67,15 @@ CREATE MATERIALIZED VIEW changeset_country_view AS SELECT * FROM changeset_count
 
 --  TELEGRAM SERVER MONITORING 
 CREATE TABLE telegram_monitoring (
-  id bigint NOT NULL,
-  first_name varchar(100)  DEFAULT NULL,
-  last_name varchar(100)  DEFAULT NULL,
-  user_id bigint DEFAULT NULL,
-  data jsonb,
-  PRIMARY KEY (id)
+  id bigint NOT NULL, first_name varchar(100)  DEFAULT NULL, last_name varchar(100)  DEFAULT NULL, user_id bigint DEFAULT NULL, data jsonb, PRIMARY KEY (id)
 );
 
 --  TELEGRAM TRACKER CONFIGURATION 
-CREATE TABLE telegram_devices (
-    id bigint NOT NULL,
-    chat_id bigint NOT NULL,
-    created_date timestamp NOT NULL,
-    modified_date timestamp,
-    device_name character varying(200)  NOT NULL,
-    ext_config  bigint,
-    ext_id character varying(200),
-    user_id bigint NOT NULL,
-    data jsonb,
-    PRIMARY KEY (id)
+CREATE TABLE telegram_devices (id bigint NOT NULL, chat_id bigint NOT NULL, created_date timestamp NOT NULL,
+    modified_date timestamp, device_name character varying(200)  NOT NULL, user_id bigint NOT NULL, data jsonb, PRIMARY KEY (id)
 );
 CREATE INDEX telegram_devices_idx on telegram_devices(user_id);
 
-CREATE TABLE telegram_tracker_configuration (
-    id bigint NOT NULL,
-    chat_id bigint NOT NULL,
-    created_date timestamp NOT NULL,
-    modified_date timestamp,
-    tracker_id character varying(200)  NOT NULL,
-    tracker_name character varying(200)  NOT NULL,
-    token character varying(200),
-    user_id bigint NOT NULL,
-    data jsonb,
-    PRIMARY KEY (id)
-);
-CREATE INDEX telegram_tracker_configuration_user_idx on telegram_tracker_configuration(user_id);
-
-CREATE SEQUENCE telegram_tracker_configuration_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-;
 ALTER TABLE ONLY telegram_tracker_configuration ALTER COLUMN id SET DEFAULT nextval('telegram_tracker_configuration_id_seq'::regclass);
 ALTER SEQUENCE telegram_tracker_configuration_id_seq OWNED BY telegram_tracker_configuration.id;
 
@@ -129,16 +94,8 @@ CREATE TABLE lottery_series(name text, type text, promocodes text, usedpromos te
 
 --  ANALYTICS 
 CREATE TABLE analytics (
-    ip text,
-    date timestamp,
-    aid text,
-    nd integer,
-    ns integer,
-    version text,
-    lang text,
-    start_date timestamp,
-    finish_date timestamp,
-    data bytea
+    ip text, date timestamp, aid text, nd integer, ns integer, version text,
+    lang text, start_date timestamp, finish_date timestamp, data bytea
 );
 
 -- SPECIFY USER -- -- -- -- -- -- -- -- -- -- -- -- 
