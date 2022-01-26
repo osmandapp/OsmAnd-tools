@@ -33,15 +33,15 @@ public class MapPointsLayer implements MapPanelLayer {
 	private MapPanel map;
 
 	// special points to draw
-	private DataTileManager<? extends Entity> points;
+	private DataTileManager<Entity> points;
 
 
 	private Color color = Color.black;
 	private int size = 3;
 	private String tagToShow = OSMTagKey.NAME.getValue();
 
-	private Map<Point, String> pointsToDraw = new LinkedHashMap<Point, String>();
-	private List<LineObject> linesToDraw = new ArrayList<LineObject>();
+	private Map<Point, Node> pointsToDraw = new LinkedHashMap<>();
+	private List<LineObject> linesToDraw = new ArrayList<>();
 
 	private Font whiteFont;
 	GPXUtilities.GPXFile gpxFile;
@@ -84,38 +84,13 @@ public class MapPointsLayer implements MapPanelLayer {
 	}
 
 
-
 	@Override
 	public void paintLayer(Graphics2D g) {
-		Map<Point, String> pointsToDraw = this.pointsToDraw;
-		g.setColor(color);
-		if (whiteFont == null) {
-			whiteFont = g.getFont().deriveFont(15).deriveFont(Font.BOLD);
-		}
-		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-		g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-		// draw user points
-		for (Point p : pointsToDraw.keySet()) {
-			g.drawOval(p.x, p.y, size, size);
-			g.fillOval(p.x, p.y, size, size);
-			if(tagToShow != null && pointsToDraw.get(p) != null && map.getZoom() > 14){
-				int i = 0;
-				int k;
-				String s = pointsToDraw.get(p);
-				while ((k = s.indexOf('\n')) != -1) {
-					g.drawString(s.substring(0, k), p.x, (p.y + i++ * 15));
-					s = s.substring(k + 1);
-				}
-				g.drawString(s, p.x, (p.y + i++ * 15));
-			}
-		}
-		if (colorizationType != ColorizationType.NONE) {
-			colorizeRoute(g);
-			return;
-		}
+		drawLines(g);
+		drawPoints(g);
+	}
 
-		
-
+	private void drawLines(Graphics2D g) {
 		List<LineObject> linesToDraw = this.linesToDraw;
 		// draw user points
 		int[] xPoints = new int[4];
@@ -123,16 +98,24 @@ public class MapPointsLayer implements MapPanelLayer {
 		for (LineObject e : linesToDraw) {
 			Line2D p = e.line;
 			Way w = e.w;
-			g.setColor(color);
 			String name = null;
 			boolean white = false;
-			if(w != null) {
+			if (w != null) {
 				if (e.nameDraw) {
 					name = w.getTag("name");
 				}
 				white = "white".equalsIgnoreCase(w.getTag("color"));
-				if(white){
+				if (white) {
 					g.setColor(Color.gray);
+				} else if (w.getTag("colour") != null) {
+					try {
+						Color clr = (Color) Color.class.getField(w.getTag("colour").toUpperCase()).get(null);
+						g.setColor(clr);
+					} catch (Exception e1) {
+						e1.printStackTrace();
+					}
+				} else {
+					g.setColor(color);
 				}
 			}
 			AffineTransform transform = new AffineTransform();
@@ -152,7 +135,7 @@ public class MapPointsLayer implements MapPanelLayer {
 			g.fillPolygon(xPoints, yPoints, 4);
 			if(name != null && name.length() > 0 && map.getZoom() >= 16) {
 				g.drawOval((int) p.getX2(), (int) p.getY2(), 6, 6);
-				
+
 				Font prevFont = g.getFont();
 				Color prevColor = g.getColor();
 				AffineTransform prev = g.getTransform();
@@ -189,11 +172,56 @@ public class MapPointsLayer implements MapPanelLayer {
 		}
 	}
 
+	private void drawPoints(Graphics2D g) {
+		Map<Point, Node> pointsToDraw = this.pointsToDraw;
+		g.setColor(color);
+		if (whiteFont == null) {
+			whiteFont = g.getFont().deriveFont(15).deriveFont(Font.BOLD);
+		}
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+		// draw user points
+		for (Point p : pointsToDraw.keySet()) {
+			Node n = pointsToDraw.get(p);
+			if (n.getTag("colour") != null) {
+				try {
+					Color clr = (Color) Color.class.getField(n.getTag("colour").toUpperCase()).get(null);
+					g.setColor(clr);
+				} catch (Exception e1) {
+					e1.printStackTrace();
+				}
+			} else {
+				g.setColor(color);
+			}
+			g.drawOval(p.x, p.y, size, size);
+			g.fillOval(p.x, p.y, size, size);
+			boolean showGpxPointNumber = isGpx(n) && DataExtractionSettings.getSettings().isAnimateRouting()
+					&& map.getZoom() >= 18;
+			if (tagToShow != null && n.getTag(tagToShow) != null && showGpxPointNumber && map.getZoom() > 14) {
+				int i = 0;
+				int k;
+				String s = n.getTag(tagToShow);
+				while ((k = s.indexOf('\n')) != -1) {
+					g.drawString(s.substring(0, k), p.x, (p.y + i++ * 15));
+					s = s.substring(k + 1);
+				}
+				g.drawString(s, p.x, (p.y + i++ * 15));
+			}
+		}
+		if (colorizationType != ColorizationType.NONE) {
+			colorizeRoute(g);
+		}
+	}
+
+	private boolean isGpx(Node n) {
+		return n.getTag("gpx") != null;
+	}
+
 	@Override
 	public void prepareToDraw() {
 		if (points != null) {
-			Map<Point, String> pointsToDraw = new LinkedHashMap<Point, String>();
-			List<LineObject> linesToDraw = new ArrayList<LineObject>();
+			Map<Point, Node> pointsToDraw = new LinkedHashMap<>();
+			List<LineObject> linesToDraw = new ArrayList<>();
 			double xTileLeft = map.getXTile() - map.getCenterPointX() / map.getTileSize();
 			double xTileRight = map.getXTile() + map.getCenterPointX() / map.getTileSize();
 			double yTileUp = map.getYTile() - map.getCenterPointY() / map.getTileSize();
@@ -207,19 +235,23 @@ public class MapPointsLayer implements MapPanelLayer {
 			pointsToDraw.clear();
 			linesToDraw.clear();
 			for (Entity e : objects) {
-				if(e instanceof Way){
-					List<Node> nodes = ((Way)e).getNodes();
+				if (e instanceof Way) {
+					List<Node> nodes = ((Way) e).getNodes();
 					if (nodes.size() > 1) {
 						int prevPixX = 0;
 						int prevPixY = 0;
 						for (int i = 0; i < nodes.size(); i++) {
 							Node n = nodes.get(i);
-							int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), n.getLongitude(), map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
-							int pixY = (int) (MapUtils.getPixelShiftY(map.getZoom(), n.getLatitude(), map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
+							int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), n.getLongitude(),
+									map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
+							int pixY = (int) (MapUtils.getPixelShiftY(map.getZoom(), n.getLatitude(), map.getLatitude(),
+									map.getTileSize()) + map.getCenterPointY());
 							if (i > 0) {
 								// i == nodes.size() / 2
-								linesToDraw.add(new LineObject((Way) e, new Line2D.Float(pixX, pixY, prevPixX, prevPixY), i == 1));
 								
+								linesToDraw.add(new LineObject((Way) e,
+										new Line2D.Float(pixX, pixY, prevPixX, prevPixY), i == 1));
+
 							}
 							prevPixX = pixX;
 							prevPixY = pixY;
@@ -231,7 +263,7 @@ public class MapPointsLayer implements MapPanelLayer {
 					int pixX = (int) (MapUtils.getPixelShiftX(map.getZoom(), n.getLongitude(), map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
 					int pixY = (int) (MapUtils.getPixelShiftY(map.getZoom(), n.getLatitude(), map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
 					if (pixX >= 0 && pixY >= 0) {
-						pointsToDraw.put(new Point(pixX, pixY), n.getTag(tagToShow));
+						pointsToDraw.put(new Point(pixX, pixY), n);
 					}
 				} else {
 				}
@@ -241,11 +273,11 @@ public class MapPointsLayer implements MapPanelLayer {
 		}
 	}
 
-	public DataTileManager<? extends Entity> getPoints() {
+	public DataTileManager<Entity> getPoints() {
 		return points;
 	}
 
-	public void setPoints(DataTileManager<? extends Entity> points) {
+	public void setPoints(DataTileManager<Entity> points) {
 		this.points = points;
 	}
 
