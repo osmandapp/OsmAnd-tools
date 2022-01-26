@@ -47,7 +47,7 @@ import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 
 @Controller
-@RequestMapping("/map/api")
+@RequestMapping("/mapapi")
 public class MapApiController {
 
 	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);

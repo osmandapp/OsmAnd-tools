@@ -10,7 +10,7 @@ CREATE TABLE changesets (id bigint, bot int, created_at timestamp, closed_at tim
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));
 CREATE TABLE changeset_country(changesetid bigint, countryid int, small int);
 
-CREATE TABLE supporters(userid text, token text, visiblename text, useremail text, preferred_region text, os text, orderid text);
+CREATE TABLE supporters(userid bigint not null, token text, visiblename text, useremail text, preferred_region text, os text, orderid text);
 CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
 
