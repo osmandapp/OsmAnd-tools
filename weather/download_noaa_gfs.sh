@@ -99,10 +99,15 @@ generate_bands_tiff() {
         BS=$(basename $WFILE)
         gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${BS}.tiff
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
-        
+
+        mkdir -p $TIFF_FOLDER/${BS}/
+        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
-        mkdir -p $TIFF_FOLDER/${BS}
+        
+
+        
+        find $TIFF_FOLDER/${BS}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
         # for (( x=0; x< $MAXVALUE; x++ )); do
             # for (( y=0; y< $MAXVALUE; y++ )); do
                 #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
