@@ -93,6 +93,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private TreeSet<String> langAttributes = new TreeSet<String>();
 	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
+    private static final int SHIFT_BOUNDARY_CENTER = 2;
 
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
@@ -147,8 +148,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
-					// boundary centerId can be from NODE or WAY with shift, from RELATION - without
-					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getAdminCenterId() << SHIFT_ID) {
+					if (c.getId() == boundary.getAdminCenterId() >> SHIFT_BOUNDARY_CENTER) {
 						boundary.setCityType(c.getType());
 						cityFound = c;
 						break;
@@ -190,7 +190,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					ctx.loadEntityRelation((Relation) e);
 				}
 				cityFound = createMissingCity(e, boundary.getCityType());
-				boundary.setAdminCenterId(cityFound.getId());
+				boundary.setAdminCenterId(getBoundaryCenter(cityFound.getId(), e));
 			}
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
@@ -290,17 +290,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// max 10
 		int adminLevelImportance = getAdminLevelImportance(b);
 		// boundary centerId can be from NODE or WAY with shift, from RELATION - without
-		long shiftedBoundaryCenterId = b.getAdminCenterId() << SHIFT_ID;
 		if (nameEq) {
 			if (cityBoundary) {
 				return 0;
-			} else if (c.getId() == b.getAdminCenterId() || c.getId() == shiftedBoundaryCenterId ||
+			} else if (c.getId() == b.getAdminCenterId() >> SHIFT_BOUNDARY_CENTER ||
 					!b.hasAdminCenterId()) {
 				return adminLevelImportance;
 			}
 			return 10 + adminLevelImportance;
 		} else {
-			if (c.getId() == b.getAdminCenterId() || c.getId() == shiftedBoundaryCenterId) {
+			if (c.getId() == b.getAdminCenterId() >> SHIFT_BOUNDARY_CENTER) {
 				return 20 + adminLevelImportance;
 			} else {
 				return 30 + adminLevelImportance;
@@ -380,7 +379,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			final City city = createMissingCity(e, CityType.SUBURB);
 			if (city != null) {
-				centerId = city.getId();
+				centerId = getBoundaryCenter(city.getId(), e);
 				ct = CityType.SUBURB;
 			}
 		}
@@ -411,9 +410,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 					} else if (es.getEntity() instanceof Node &&
 							("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
-						centerId = es.getEntity().getId();
+						centerId = getBoundaryCenter(es.getEntity().getId(), es.getEntity());
 					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()) && centerId == 0)) {
-						centerId = es.getEntity().getId();
+						centerId = getBoundaryCenter(es.getEntity().getId(), es.getEntity());
 					}
 				}
 			} else if (e instanceof Way) {
@@ -433,6 +432,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			return null;
 		}
 	}
+
+	private long getBoundaryCenter(long centerId, Entity e) {
+	    if (e instanceof Node) {
+	        long id = centerId << SHIFT_ID;
+	        return (id << SHIFT_BOUNDARY_CENTER) + 0;
+        }
+	    if (e instanceof Way) {
+            long id = centerId << SHIFT_ID;
+            return (id << SHIFT_BOUNDARY_CENTER) + 1;
+        }
+	    //relation
+	    return (centerId << SHIFT_BOUNDARY_CENTER) + 2;
+    }
 
 
 	private City createMissingCity(Entity e, CityType t) throws SQLException {
