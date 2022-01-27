@@ -75,6 +75,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	// MEMORY address : address structure
 	// load it in memory
 	private Map<EntityId, City> cities = new LinkedHashMap<EntityId, City>();
+	private List<Long> debugCityIds = new ArrayList<>();
 	private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
 	private DataTileManager<City> cityManager = new DataTileManager<City>(10);
 	private List<Relation> postalCodeRelations = new ArrayList<Relation>();
@@ -126,6 +127,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityVillageManager.registerObject(l.getLatitude(), l.getLongitude(), city);
 			}
 			cities.put(EntityId.valueOf(e), city);
+			debugCityIds.add(city.getId());
 		}
 	}
 
@@ -145,7 +147,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
-					if (c.getId() == boundary.getAdminCenterId()) {
+					// boundary centerId can be from NODE or WAY with shift, from RELATION - without
+					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getAdminCenterId() << SHIFT_ID) {
 						boundary.setCityType(c.getType());
 						cityFound = c;
 						break;
@@ -286,16 +289,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		boolean cityBoundary = b.getCityType() != null;
 		// max 10
 		int adminLevelImportance = getAdminLevelImportance(b);
+		// boundary centerId can be from NODE or WAY with shift, from RELATION - without
+		long shiftedBoundaryCenterId = b.getAdminCenterId() << SHIFT_ID;
 		if (nameEq) {
 			if (cityBoundary) {
 				return 0;
-			} else if (c.getId() == b.getAdminCenterId() ||
+			} else if (c.getId() == b.getAdminCenterId() || c.getId() == shiftedBoundaryCenterId ||
 					!b.hasAdminCenterId()) {
 				return adminLevelImportance;
 			}
 			return 10 + adminLevelImportance;
 		} else {
-			if (c.getId() == b.getAdminCenterId()) {
+			if (c.getId() == b.getAdminCenterId() || c.getId() == shiftedBoundaryCenterId) {
 				return 20 + adminLevelImportance;
 			} else {
 				return 30 + adminLevelImportance;
@@ -421,7 +426,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setBoundaryId(e.getId());
 			boundary.setCityType(ct);
 			if (centerId != 0) {
-				boundary.setAdminCenterId(centerId >> SHIFT_ID);
+				boundary.setAdminCenterId(centerId);
 			}
 			return boundary;
 		} else {
@@ -435,7 +440,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (c.getLocation() == null) {
 			return null;
 		}
-//		long centerId = e.getId();
+		if (debugCityIds.contains(c.getId())) {
+			log.error("SQL ERROR!!! City ID already exists in \"city\" table \n" +
+					"insert into city (id, latitude, longitude, name, name_en, city_type) values (" +
+					+c.getId() +
+					", " + c.getLocation().getLatitude() +
+					"," + c.getLocation().getLongitude() +
+					", " + c.getName() +
+					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
+					", " + CityType.valueToString(c.getType()) + ")");
+		}
 		regCity(c, e);
 		writeCity(c);
 		commitWriteCity();
