@@ -17,11 +17,6 @@ DW_FOLDER=raw
 TIFF_FOLDER=tiff
 SPLIT_ZOOM_TIFF=4
 
-TILES_FOLDER=tiles
-TILES_ZOOM_GEN=3
-TILES_ZOOM_RES=5
-PARALLEL_TO_TILES=2
-
 OS=$(uname -a)
 TIME_ZONE="GMT"
 RED='\033[0;31m'
@@ -117,42 +112,6 @@ generate_bands_tiff() {
         gzip $TIFF_FOLDER/${FILE_NAME}.tiff
     done
 }
-generate_tiles() {
-    rm *.O.tiff || true
-    for WFILE in ${DW_FOLDER}/*.gt
-    do
-        BS=$(basename $WFILE)
-        ## generate gdal2tiles fo a given band with given rasterization
-        local FILE_NAME="${BS%%.*}"
-        local IMG_SIZE=$(( 2 ** TILES_ZOOM_RES * 256)) # generate (2^Z) 256 px
-        gzip -cd $TIFF_FOLDER/${FILE_NAME}.tiff.gz  > ${FILE_NAME}_orig.O.tiff
-        gdal_translate -projwin -180 84 180 -84 -of GTiff \
-            ${FILE_NAME}_orig.O.tiff ${FILE_NAME}_cut.O.tiff
-        gdalwarp -of GTiff -t_srs epsg:3857 -r cubic -multi \
-            ${FILE_NAME}_cut.O.tiff ${FILE_NAME}_webmerc.O.tiff
-        for TILES_BAND in ${!BANDS_NAMES[@]}; do
-            local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
-            local BAND_IND=$(( $TILES_BAND + 1 ))
-            local FILE_BAND_NAME=${FILE_NAME}_${TILES_BAND_NAME}
-            gdal_translate -b ${BAND_IND} -outsize $IMG_SIZE $IMG_SIZE -r lanczos \
-                     ${FILE_NAME}_webmerc.O.tiff ${FILE_BAND_NAME}_img.M.tiff
-            gdaldem color-relief -alpha ${FILE_BAND_NAME}_img.M.tiff "${THIS_LOCATION}/${TILES_BAND_NAME}_color.txt" \
-                     ${FILE_BAND_NAME}_clr.M.tiff
-            mkdir -p $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            gdal2tiles.py -w none --tilesize=512 --processes=${PARALLEL_TO_TILES} -z 1-${TILES_ZOOM_GEN} \
-                    ${FILE_BAND_NAME}_clr.M.tiff $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME
-            # rm $TILES_FOLDER/$TILES_BAND_NAME/$FILE_NAME/*.html || true
-        done
-        rm *.M.tiff || true
-        rm *.O.tiff || true
-    done
-}
-
-
-# 0. html to test data
-cp "${THIS_LOCATION}/browser.html" .
-cp -r "${THIS_LOCATION}/script" .
-cp -r "${THIS_LOCATION}/css" .
 
 # 1. cleanup old files to not process them
 rm $DW_FOLDER/*.gt || true
@@ -171,10 +130,6 @@ get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 
 generate_bands_tiff
-
-# 4. generate tiles
-generate_tiles
-
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
