@@ -164,11 +164,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private OsmandRegions osmandRegions;
 	
 
-	public OsmExtractionUI(){
+	public OsmExtractionUI() {
 		createUI();
 	}
 
-	public void createUI(){
+	public void createUI() {
 		frame = new JFrame(Messages.getString("OsmExtractionUI.OSMAND_MAP_CREATOR")); //$NON-NLS-1$
 	    try {
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -196,42 +196,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
 	    File workingDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
 	    statusBarLabel.setText(workingDir == null ? Messages.getString("OsmExtractionUI.WORKING_DIR_UNSPECIFIED") : Messages.getString("OsmExtractionUI.WORKING_DIRECTORY") + workingDir.getAbsolutePath()); //$NON-NLS-1$ //$NON-NLS-2$
-	    String bdir = DataExtractionSettings.getSettings().getBinaryFilesDir();
-	    List<BinaryMapIndexReader> files = new ArrayList<>();
-		if (!Algorithms.isEmpty(bdir)) {
-			try {
-				File bdirFile = new File(bdir);
-				File cacheFile = new File(bdirFile, "indexes.cache");
-				CachedOsmandIndexes cache = new CachedOsmandIndexes();
-				if (cacheFile.exists()) {
-					cache.readFromFile(cacheFile, 2);
-				}
-				if (bdirFile.exists() && bdirFile.listFiles() != null) {
-					List<File> asList = Arrays.asList(Algorithms.getSortedFilesVersions(bdirFile));
-					ArrayList<File> sortedFiles = new ArrayList<>(asList);
-					// Collections.reverse(sortedFiles);
-					for (File obf : sortedFiles) {
-						if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
-							try {
-								// BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"),
-								// obf);
-								BinaryMapIndexReader bmir = cache.getReader(obf, true);
-								RandomAccessFile raf = new RandomAccessFile(obf, "r");
-								BinaryMapIndexReader bmir2 = new BinaryMapIndexReader(raf, bmir);
-								files.add(bmir2);
-							} catch (Exception e1) {
-								e1.printStackTrace();
-							}
-						}
-					}
-				}
-				if (!files.isEmpty()) {
-					cache.writeToFile(cacheFile);
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+		
 	    String loc = DataExtractionSettings.getSettings().getSearchLocale();
 	    if(loc.isEmpty()) {
 	    	loc = null;
@@ -239,7 +204,13 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 		searchUICore = new SearchUICore(MapPoiTypes.getDefault(), loc, false);
 		searchUICore.getSearchSettings().setRegions(osmandRegions);
-	    searchUICore.getSearchSettings().setOfflineIndexes(files);
+		try {
+			BinaryMapIndexReader[] files = DataExtractionSettings.getSettings().getObfReaders();
+			searchUICore.getSearchSettings().setOfflineIndexes(Arrays.asList(files));
+		} catch (IOException e) {
+			e.printStackTrace();
+			log.error(e.getMessage(), e);
+		}
 	    searchUICore.init();
 	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
 

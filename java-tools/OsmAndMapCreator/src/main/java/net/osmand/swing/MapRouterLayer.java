@@ -1,6 +1,8 @@
 package net.osmand.swing;
 
 
+import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics2D;
@@ -15,7 +17,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.RandomAccessFile;
 import java.io.Reader;
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
@@ -91,11 +92,9 @@ import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.router.RoutingConfiguration.*;
 
 
 public class MapRouterLayer implements MapPanelLayer {
@@ -1101,12 +1100,6 @@ public class MapRouterLayer implements MapPanelLayer {
 		this.gpx = gpx;
 		List<Way> res = new ArrayList<Way>();
 		long time = System.currentTimeMillis();
-		List<File> files = new ArrayList<File>();
-		for (File f : Algorithms.getSortedFilesVersions(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
-			if(f.getName().endsWith(".obf")){
-				files.add(f);
-			}
-		}
 
 
 		final boolean animateRoutingCalculation = DataExtractionSettings.getSettings().isAnimateRouting();
@@ -1118,27 +1111,23 @@ public class MapRouterLayer implements MapPanelLayer {
 			playPauseButton.setText("Play");
 		}
 		stop = false;
-		if(files.isEmpty()){
-			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Please specify obf file in settings", "Obf file not found",
-					JOptionPane.ERROR_MESSAGE);
-			return null;
-		}
+		
 		System.out.println("Self made route from " + start + " to " + end);
 		if (start != null && end != null) {
 			try {
-				BinaryMapIndexReader[] rs = new BinaryMapIndexReader[files.size()];
-				int it = 0;
-				for (File f : files) {
-					RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-					rs[it++] = new BinaryMapIndexReader(raf, f);
+				BinaryMapIndexReader[] files = DataExtractionSettings.getSettings().getObfReaders();
+				if (files.length == 0) {
+					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+							"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
+					return null;
 				}
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 
 				Map<String, String> paramsR = new LinkedHashMap<String, String>();
-				for(String p : props) {
-					if(p.contains("=")) {
+				for (String p : props) {
+					if (p.contains("=")) {
 						paramsR.put(p.split("=")[0], p.split("=")[1]);
 					} else {
 						paramsR.put(p, "true");
@@ -1146,34 +1135,38 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
-//						addImpassableRoad(6859437l).
-//						addImpassableRoad(46859655089l).
-						setDirectionPoints(directionPointsFile).build(props[0],
-						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ memoryLimit, paramsR);
+				// addImpassableRoad(6859437l).
+				// addImpassableRoad(46859655089l).
+						setDirectionPoints(directionPointsFile)
+						.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
-//				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
-//				start = lts[0];
-//				end = lts[lts.length - 1];
-//				System.out.println("Start " + start + " end " + end);
-//				precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
-//				precalculatedRouteDirection.setFollowNext(true);
-//				config.planRoadDirection = 1;
+				// LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
+				// start = lts[0];
+				// end = lts[lts.length - 1];
+				// System.out.println("Start " + start + " end " + end);
+				// precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
+				// precalculatedRouteDirection.setFollowNext(true);
+				// config.planRoadDirection = 1;
 				// Test initial direction
-//				config.initialDirection = 90d / 180d * Math.PI; // EAST
-//				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
-//				config.initialDirection = -90d / 180d * Math.PI; // WEST
-//				config.initialDirection = 0 / 180d * Math.PI; // NORTH
+				// config.initialDirection = 90d / 180d * Math.PI; // EAST
+				// config.initialDirection = 180d / 180d * Math.PI; // SOUTH
+				// config.initialDirection = -90d / 180d * Math.PI; // WEST
+				// config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
 				try {
-					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).parse("19.07.2019 12:40").getTime();
+					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
+							.parse("19.07.2019 12:40").getTime();
 				} catch (Exception e) {
 				}
 				config.routeCalculationTime = System.currentTimeMillis();
-				
-				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
-					null, rs, rm);
+
+				final RoutingContext ctx = router.buildRoutingContext(config,
+						DataExtractionSettings.getSettings().useNativeRouting()
+								? NativeSwingRendering.getDefaultFromSettings()
+								: null,
+						files, rm);
 
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
@@ -1187,11 +1180,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				try {
 					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
-					List<RouteSegmentResult> searchRoute = gpx ?
-							getGpxAproximation(router, gctx, gpxPoints) :
-							router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+					List<RouteSegmentResult> searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
+							: router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
-					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
+					System.out.println("Routing time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
 						playPauseButton.setVisible(false);
 						nextTurn.setText("FINISH");
@@ -1211,11 +1203,12 @@ public class MapRouterLayer implements MapPanelLayer {
 				playPauseButton.setVisible(false);
 				nextTurn.setVisible(false);
 				stopButton.setVisible(false);
-				if(map.getPoints() != null) {
+				if (map.getPoints() != null) {
 					map.getPoints().clear();
 				}
 			}
-			System.out.println("!!! Finding self route: " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println(
+					"!!! Finding self route: " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
 	}
