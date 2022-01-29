@@ -217,7 +217,8 @@ public class OsmAndImageRendering {
 			if(maps.isEmpty()) {
                 throw new UnsupportedOperationException("No maps element found for wpt "+ name);
             }
-			NativeJavaRendering nsr = nativeLib != null ? NativeSwingRendering.getDefaultFromSettings() : null;
+			NativeJavaRendering nsr = nativeLib != null ? NativeJavaRendering.getDefault(
+					nativeLib, null, NativeSwingRendering.findFontFolder()) : null;
 //			nsr.initFilesInDir(new File(dirWithObf));
 			ArrayList<File> obfFiles = new ArrayList<File>();
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr, obfFiles);
@@ -387,7 +388,7 @@ public class OsmAndImageRendering {
 					targetFile.setLastModified(sourceZip.lastModified());
 				}
 			}
-			if(nsr != null) {
+			if (nsr != null) {
 				nsr.initMapFile(targetFile.getAbsolutePath(), true);
 			}
 			initFiles.add(targetFile);
