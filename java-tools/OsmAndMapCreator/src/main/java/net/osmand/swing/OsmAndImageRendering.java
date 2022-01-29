@@ -29,7 +29,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import net.osmand.NativeLibrary;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 
@@ -159,14 +158,14 @@ public class OsmAndImageRendering {
 		}
 
 		String backup = null;
-		if (nativeLib != null) {
-			boolean old = NativeLibrary.loadOldLib(nativeLib);
-			NativeLibrary nl = new NativeLibrary();
-			nl.loadFontData(new File(NativeSwingRendering.findFontFolder()));
-			if (!old) {
-				throw new UnsupportedOperationException("Not supported");
-			}
-		}
+//		if (nativeLib != null) {
+//			boolean old = NativeLibrary.loadOldLib(nativeLib);
+//			NativeLibrary nl = new NativeLibrary();
+//			nl.loadFontData(new File(NativeSwingRendering.findFontFolder()));
+//			if (!old) {
+//				throw new UnsupportedOperationException("Not supported");
+//			}
+//		}
 		DocumentBuilder docBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		org.w3c.dom.Document doc = docBuilder.parse(new File(gpxFile));
 		Element de = doc.getDocumentElement();
