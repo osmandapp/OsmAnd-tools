@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,9 +31,9 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.binary.CachedOsmandIndexes;
+import net.osmand.binary.OsmandIndex.FileIndex;
+import net.osmand.binary.OsmandIndex.MapLevel;
 import net.osmand.data.QuadPointDouble;
 import net.osmand.data.QuadRect;
 import net.osmand.data.RotatedTileBox;
@@ -62,9 +61,9 @@ public class NativeJavaRendering extends NativeLibrary {
 	
 	private RenderingRulesStorage storage;
 	private Map<String, String> renderingProps;
-	private Map<String, MapDiff> diffs = new LinkedHashMap<String, MapDiff>();
-	private List<BinaryMapIndexReader> initializedFiles = new ArrayList<>();
 	
+	
+	private Map<String, MapDiff> diffs = new LinkedHashMap<String, MapDiff>();
 	public static class MapDiff {
 		public String baseName;
 		public File baseFile;
@@ -98,9 +97,9 @@ public class NativeJavaRendering extends NativeLibrary {
 	}
 	
 	public void closeAllFiles() {
-		for(String s : diffs.keySet()) {
+		for (String s : diffs.keySet()) {
 			MapDiff md = diffs.get(s);
-			if(md.baseFile != null) {
+			if (md.baseFile != null) {
 				closeBinaryMapFile(md.baseFile.getAbsolutePath());
 			}
 			if (md.diffs != null) {
@@ -355,18 +354,13 @@ public class NativeJavaRendering extends NativeLibrary {
 		return img;
 	}
 
-	public void initFilesInDir(File filesDir) {
-		File[] lf = Algorithms.getSortedFilesVersions(filesDir);
-		List<File> obfFiles = new ArrayList<File>();
-		for (File f : lf) {
-			if (f.getName().endsWith(".obf")) {
-				obfFiles.add(f);
-			}
-		}
-		initFilesInDir(obfFiles);
+	public void initFilesInDir(File filesDir) throws IOException {
+		List<File> obfFiles = new ArrayList<>();
+		Map<String, FileIndex> mp = initIndexesCache(filesDir, obfFiles, false);
+		initFilesInDir(obfFiles, mp);
 	}
 	
-	public void initFilesInDir(List<File> obfFiles) {
+	private void initFilesInDir(List<File> obfFiles, Map<String, FileIndex> boundaries) {
 		for (File f : obfFiles) {
 			// "_16_05_06.obf"
 			int l = f.getName().length() - 4;
@@ -380,44 +374,36 @@ public class NativeJavaRendering extends NativeLibrary {
 				}
 				MapDiff md = diffs.get(baseName);
 				md.diffs.put(f.getName().substring(l - 8, l), f);
-			} else if (!f.getName().contains("basemap")) {
+			} else if (!f.getName().contains("basemap") && boundaries != null) {
+				FileIndex mapIndex = boundaries.get(f.getAbsolutePath());
 				if (f.getName().endsWith("_2.obf")) {
-					updateBoundaries(f, f.getName().substring(0, f.getName().length() - 6));
+					updateBoundaries(f, mapIndex, f.getName().substring(0, f.getName().length() - 6));
 				} else {
-					updateBoundaries(f, f.getName().substring(0, f.getName().length() - 4));
+					updateBoundaries(f, mapIndex, f.getName().substring(0, f.getName().length() - 4));
 				}
 			}
 			initMapFile(f.getAbsolutePath(), true);
 		}
 	}
 
-	private void updateBoundaries(File f, String nm) {
-		try {
-			BinaryMapIndexReader r = new BinaryMapIndexReader(new RandomAccessFile(f, "r"), f);
-			try {
-				if (r.getMapIndexes().isEmpty() || r.getMapIndexes().get(0).getRoots().isEmpty()) {
-					return;
-				}
-				MapRoot rt = r.getMapIndexes().get(0).getRoots().get(0);
-				if (!diffs.containsKey(nm)) {
-					MapDiff mm = new MapDiff();
-					mm.baseName = nm;
-					diffs.put(nm, mm);
-				}
-				MapDiff dd = diffs.get(nm);
-				dd.baseFile = f;
-				dd.timestamp = r.getDateCreated();
-				dd.bounds = new QuadRect(MapUtils.get31LongitudeX(rt.getLeft()), MapUtils.get31LatitudeY(rt.getTop()),
-						MapUtils.get31LongitudeX(rt.getRight()), MapUtils.get31LatitudeY(rt.getBottom()));
-				Iterator<String> iterator = dd.diffs.keySet().iterator();
-				while (iterator.hasNext()) {
-					dd.selected = iterator.next();
-				}
-			} finally {
-				r.close();
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
+	private void updateBoundaries(File f, FileIndex mapIndex, String nm) {
+		if (mapIndex == null || mapIndex.getMapIndexCount() == 0 || mapIndex.getMapIndex(0).getLevelsCount() == 0) {
+			return;
+		}
+		if (!diffs.containsKey(nm)) {
+			MapDiff mm = new MapDiff();
+			mm.baseName = nm;
+			diffs.put(nm, mm);
+		}
+		MapLevel rt = mapIndex.getMapIndex(0).getLevels(0);
+		MapDiff dd = diffs.get(nm);
+		dd.baseFile = f;
+		dd.timestamp = mapIndex.getDateModified();
+		dd.bounds = new QuadRect(MapUtils.get31LongitudeX(rt.getLeft()), MapUtils.get31LatitudeY(rt.getTop()),
+				MapUtils.get31LongitudeX(rt.getRight()), MapUtils.get31LatitudeY(rt.getBottom()));
+		Iterator<String> iterator = dd.diffs.keySet().iterator();
+		while (iterator.hasNext()) {
+			dd.selected = iterator.next();
 		}
 	}
 	
@@ -480,9 +466,9 @@ public class NativeJavaRendering extends NativeLibrary {
 		return null;
 	}
 	
-	public List<BinaryMapIndexReader> initIndexesCache(File dir, 
+	public Map<String, FileIndex> initIndexesCache(File dir, 
 			List<File> filesToUse, boolean filterDuplicates) throws IOException {
-	    List<BinaryMapIndexReader> files = new ArrayList<>();
+	    Map<String, FileIndex> map = new TreeMap<>();
 		File cacheFile = new File(dir, INDEXES_CACHE);
 		CachedOsmandIndexes cache = new CachedOsmandIndexes();
 		if (cacheFile.exists()) {
@@ -505,26 +491,22 @@ public class NativeJavaRendering extends NativeLibrary {
 			while (fileIt.hasNext()) {
 				File obf = fileIt.next();
 				try {
-					BinaryMapIndexReader bmir = cache.getReader(obf, true);
-					// BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(obf, "r"), obf);
-					// BinaryMapIndexReader bmir2 = new BinaryMapIndexReader(new RandomAccessFile(bmir.getFile(), "r"), bmir);
+					FileIndex fileIndex = cache.getFileIndex(obf, true);
+					if (fileIndex != null) {
+						map.put(obf.getAbsolutePath(), fileIndex);
+					}
 					boolean basemapPresent = checkMoreGenericMapPresent(allFileNames, obf.getName());
 					if (filterDuplicates && basemapPresent) {
 						log.debug("SKIP initializing cause bigger map is present: " + obf.getName());
 						fileIt.remove();
-					} else {
-						files.add(bmir);
 					}
 				} catch (Exception e1) {
 					e1.printStackTrace();
 				}
 			}
 		}
-		if (!files.isEmpty()) {
-			cache.writeToFile(cacheFile);
-		}
-		this.initializedFiles = files;
-		return files;
+		cache.writeToFile(cacheFile);
+		return map;
 	}
 
 	private boolean checkMoreGenericMapPresent(TreeSet<String> allFileNames, String file) {
@@ -548,11 +530,6 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 		return false;
 	}
-	
-	public List<BinaryMapIndexReader> getFiles() {
-		return initializedFiles;
-	}
-
 
 	public static NativeJavaRendering getDefault(String filename, String obfFolder,
 			String fontsFolder) throws IOException {
@@ -570,10 +547,10 @@ public class NativeJavaRendering extends NativeLibrary {
 			defaultLoadedLibrary = new NativeJavaRendering();
 			File filesFolder = new File(obfFolder);
 			List<File> obfFiles = new ArrayList<>();
-			defaultLoadedLibrary.initIndexesCache(filesFolder, obfFiles, true);
+			Map<String, FileIndex> map = defaultLoadedLibrary.initIndexesCache(filesFolder, obfFiles, true);
 			long now = System.currentTimeMillis();
 			defaultLoadedLibrary.initCacheMapFile(new File(filesFolder, INDEXES_CACHE).getAbsolutePath());
-			defaultLoadedLibrary.initFilesInDir(obfFiles);
+			defaultLoadedLibrary.initFilesInDir(obfFiles, map);
 			log.info(String.format("Init native library with maps: %d ms", System.currentTimeMillis() - now));
 			defaultLoadedLibrary.loadFontData(new File(fontsFolder));
 		}
