@@ -25,7 +25,7 @@ import net.osmand.util.Algorithms;
 public class DataExtractionSettings {
 
 	// public static final String INDEXES_CACHE = "";
-	public static final String INDEXES_CACHE = "indexes.cache";
+	public static final String INDEXES_CACHE = CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME;
 	private static DataExtractionSettings settings = null;
 	public static DataExtractionSettings getSettings(){
 		if(settings == null){
