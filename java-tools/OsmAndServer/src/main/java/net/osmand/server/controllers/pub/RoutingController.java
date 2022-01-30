@@ -1,3 +1,4 @@
+
 package net.osmand.server.controllers.pub;
 
 import java.io.IOException;
@@ -17,9 +18,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
 
 import net.osmand.data.LatLon;
+import net.osmand.router.RouteSegmentResult;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.VectorTileServerConfig;
 import net.osmand.util.MapUtils;
@@ -28,7 +29,11 @@ import net.osmand.util.MapUtils;
 @RequestMapping("/routing")
 public class RoutingController {
 	
-    protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
+
+	private static final int DISTANCE_MID_POINT = 25000;
+	private static final int MAX_DISTANCE = 1000000;
+
+	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
@@ -90,6 +95,8 @@ public class RoutingController {
 		List<LatLon> list = new ArrayList<LatLon>();
 		double lat = 0;
 		int k = 0;
+		boolean tooLong = false;
+		LatLon prev = null;
 		for (String point : points) {
 			String[] sl = point.split(",");
 			for (String p : sl) {
@@ -97,26 +104,50 @@ public class RoutingController {
 				if (k++ % 2 == 0) {
 					lat = vl;
 				} else {
-					list.add(new LatLon(lat, vl));
+					LatLon pnt = new LatLon(lat, vl);
+					if (list.size() > 0) {
+						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > MAX_DISTANCE;
+					}
+					list.add(pnt);
+					prev = pnt;
 				}
 			}
 		}
+		List<LatLon> resList = new ArrayList<LatLon>();
 		if (list.size() >= 2) {
-			// osmAndMapsService.routing(routeMode, list.get(0), list.get(list.size() - 1),
-			// list.subList(1, list.size() - 1));
+			LatLon last = null;
+			List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, list.get(0), list.get(list.size() - 1),
+					list.subList(1, list.size() - 1));
+			for (RouteSegmentResult r : res) {
+				int i;
+				int dir = r.isForwardDirection() ? 1 : -1;
+				for (i = r.getStartPointIndex(); i != r.getEndPointIndex(); i += dir) {
+					resList.add(r.getPoint(i));
+				}
+				last = r.getPoint(i);
+			}
+			if (last != null) {
+				resList.add(last);
+			}
 		}
-		
+		if (resList.size() == 0) {
+			resList = new ArrayList<LatLon>(list);
+			calculateStraightLine(resList);
+		}
+
+		Feature feature = new Feature(Geometry.lineString(resList));
+		return ResponseEntity.ok(gson.toJson(new FeatureCollection(feature)));
+	}
+
+	private void calculateStraightLine(List<LatLon> list) {
 		for (int i = 1; i < list.size();) {
-			if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > 10000) {
+			if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {
 				LatLon midPoint = MapUtils.calculateMidPoint(list.get(i - 1), list.get(i));
 				list.add(i, midPoint);
 			} else {
 				i++;
 			}
 		}
-
-		Feature feature = new Feature(Geometry.lineString(list));
-		return ResponseEntity.ok(gson.toJson(new FeatureCollection(feature)));
 	}
 
 

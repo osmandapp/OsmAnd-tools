@@ -53,55 +53,56 @@ import net.osmand.util.Algorithms;
 
 @Service
 public class OsmAndMapsService {
-    private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
+	private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
 
 	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 40;
-	
+
 	private static final int MAX_RUNTIME_TILES_CACHE_SIZE = 10000;
-	
+
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 
 	private static final int ZOOM_EN_PREFERRED_LANG = 6;
-	
+
+	private static final boolean DEFAULT_USE_ROUTING_NATIVE_LIB = true;
+
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new ConcurrentHashMap<>();
-	
+
 	AtomicInteger cacheTouch = new AtomicInteger(0);
-	
+
 	Map<String, VectorMetatile> tileCache = new ConcurrentHashMap<>();
-	
+
 	NativeJavaRendering nativelib;
-	
+
 	File tempDir;
-	
+
 	@Autowired
-	VectorTileServerConfig config; 
-	
-	public static class BinaryMapIndexReaderReference { 
+	VectorTileServerConfig config;
+
+	public static class BinaryMapIndexReaderReference {
 		File file;
 		BinaryMapIndexReader reader;
 	}
-	
-	
+
 	@Configuration
 	@ConfigurationProperties("tile-server")
 	public static class VectorTileServerConfig {
-		
+
 		@Value("${tile-server.obf.location}")
 		String obfLocation;
-		
+
 		@Value("${tile-server.cache.location}")
 		String cacheLocation;
-		
+
 		@Value("${tile-server.cache.max-zoom}")
 		int maxZoomCache = 16;
-		
+
 		@Value("${tile-server.metatile-size}")
 		int metatileSize;
-		
+
 		public String initErrorMessage;
-		
+
 		public Map<String, VectorStyle> style = new TreeMap<String, VectorStyle>();
-		
+
 		public void setStyle(Map<String, String> style) {
 			for (Entry<String, String> e : style.entrySet()) {
 				VectorStyle vectorStyle = new VectorStyle();
@@ -124,9 +125,9 @@ public class OsmAndMapsService {
 				this.style.put(vectorStyle.key, vectorStyle);
 			}
 		}
-		
+
 	}
-	
+
 	public static class VectorStyle {
 		public String key;
 		public String name;
@@ -134,9 +135,9 @@ public class OsmAndMapsService {
 		public int tileSizeLog;
 		public int metaTileSizeLog;
 	}
-	
+
 	public static class VectorMetatile implements Comparable<VectorMetatile> {
-		
+
 		public BufferedImage runtimeImage;
 		public long lastAccess;
 		public final String key;
@@ -147,9 +148,9 @@ public class OsmAndMapsService {
 		public final int tileSizeLog;
 		public final VectorStyle style;
 		private final VectorTileServerConfig cfg;
-		
-		public VectorMetatile(VectorTileServerConfig cfg, String tileId, VectorStyle style, 
-				int z, int left, int top,  int metaSizeLog, int tileSizeLog) {
+
+		public VectorMetatile(VectorTileServerConfig cfg, String tileId, VectorStyle style, int z, int left, int top,
+				int metaSizeLog, int tileSizeLog) {
 			this.cfg = cfg;
 			this.style = style;
 			this.metaSizeLog = metaSizeLog;
@@ -164,7 +165,7 @@ public class OsmAndMapsService {
 		public void touch() {
 			lastAccess = System.currentTimeMillis();
 		}
-		
+
 		@Override
 		public int compareTo(VectorMetatile o) {
 			return Long.compare(lastAccess, o.lastAccess);
@@ -214,17 +215,15 @@ public class OsmAndMapsService {
 			return new File(cfg.cacheLocation, loc.toString());
 		}
 	}
-	
-	
+
 	public VectorTileServerConfig getConfig() {
 		return config;
 	}
-	
+
 	public VectorStyle getStyle(String style) {
 		return config.style.get(style);
 	}
 
-	
 	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y) {
 		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
 		int left = ((x >> metaSizeLog) << metaSizeLog) << (31 - z);
@@ -235,7 +234,8 @@ public class OsmAndMapsService {
 		if (top < 0) {
 			top = 0;
 		}
-		String tileId = encode(vectorStyle.key, left >> (31 - z), top >> (31 - z), z, metaSizeLog, vectorStyle.tileSizeLog);
+		String tileId = encode(vectorStyle.key, left >> (31 - z), top >> (31 - z), z, metaSizeLog,
+				vectorStyle.tileSizeLog);
 		VectorMetatile tile = tileCache.get(tileId);
 		if (tile == null) {
 			tile = new VectorMetatile(config, tileId, vectorStyle, z, left, top, metaSizeLog, vectorStyle.tileSizeLog);
@@ -243,7 +243,7 @@ public class OsmAndMapsService {
 		}
 		return tile;
 	}
-	
+
 	public boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && config.initErrorMessage == null) {
 			synchronized (this) {
@@ -261,9 +261,9 @@ public class OsmAndMapsService {
 				tempDir = Files.createTempDirectory("osmandserver").toFile();
 				LOGGER.info("Init temp rendering directory for libs / fonts: " + tempDir.getAbsolutePath());
 				tempDir.deleteOnExit();
-				ClassLoader cl = NativeJavaRendering.class.getClassLoader(); 
+				ClassLoader cl = NativeJavaRendering.class.getClassLoader();
 				ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver(cl);
-				Resource[] resources = resolver.getResources("classpath:/map/fonts/*.ttf") ;
+				Resource[] resources = resolver.getResources("classpath:/map/fonts/*.ttf");
 				File fontsFolder = new File(tempDir, "fonts");
 				fontsFolder.mkdirs();
 				fontsFolder.deleteOnExit();
@@ -284,7 +284,7 @@ public class OsmAndMapsService {
 		}
 		return config.initErrorMessage == null;
 	}
-	
+
 	public ResponseEntity<String> renderMetaTile(VectorMetatile tile)
 			throws IOException, XmlPullParserException, SAXException {
 		// don't synchronize this to not block routing
@@ -375,32 +375,36 @@ public class OsmAndMapsService {
 		}
 	}
 
-
 	private static String encode(String style, int x, int y, int z, int metasizeLog, int tileSizeLog) {
-//		long l = 0 ;
-//		int shift = 0;
-//		l += ((long) tileSizeLog) << shift; // 0-2
-//		shift += 2;
-//		l += ((long) metasizeLog) << shift; // 0-4
-//		shift += 3;
-//		l += ((long) z) << shift; // 1-22
-//		shift += 5;
-//		l += ((long) x) << shift;
-//		shift += z;
-//		l += ((long) y) << shift;
-//		shift += z;
+		// long l = 0 ;
+		// int shift = 0;
+		// l += ((long) tileSizeLog) << shift; // 0-2
+		// shift += 2;
+		// l += ((long) metasizeLog) << shift; // 0-4
+		// shift += 3;
+		// l += ((long) z) << shift; // 1-22
+		// shift += 5;
+		// l += ((long) x) << shift;
+		// shift += z;
+		// l += ((long) y) << shift;
+		// shift += z;
 		StringBuilder sb = new StringBuilder();
-		return sb.append(style).append('-').append(metasizeLog).append('-').append(tileSizeLog).
-				append('/').append(z).append('/').append(x).append('/').append(y).toString();
+		return sb.append(style).append('-').append(metasizeLog).append('-').append(tileSizeLog).append('/').append(z)
+				.append('/').append(x).append('/').append(y).toString();
 	}
-	
+
 	public synchronized List<RouteSegmentResult> routing(String routeMode, LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
 		String[] props = routeMode.split("\\,");
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
+		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
 		for (String p : props) {
-			if (p.contains("=")) {
+			if (p.startsWith("nativerouting")) {
+				useNativeLib = true;
+			} else if (p.startsWith("nonnativerouting")) {
+				useNativeLib = false;
+			} else if (p.contains("=")) {
 				paramsR.put(p.split("=")[0], p.split("=")[1]);
 			} else {
 				paramsR.put(p, "true");
@@ -417,7 +421,7 @@ public class OsmAndMapsService {
 		if (!validateAndInitConfig()) {
 			return Collections.emptyList();
 		}
-		final RoutingContext ctx = router.buildRoutingContext(config, nativelib, getObfReaders(),
+		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib? nativelib : null, getObfReaders(),
 				RouteCalculationMode.COMPLEX);
 		ctx.leftSideNavigation = false;
 		// ctx.previouslyCalculatedRoute = previousRoute;
@@ -428,7 +432,7 @@ public class OsmAndMapsService {
 				router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 		return route;
 	}
-	
+
 	public synchronized BinaryMapIndexReader[] getObfReaders() throws IOException {
 		List<BinaryMapIndexReader> files = new ArrayList<>();
 		File mapsFolder = new File(config.obfLocation);
