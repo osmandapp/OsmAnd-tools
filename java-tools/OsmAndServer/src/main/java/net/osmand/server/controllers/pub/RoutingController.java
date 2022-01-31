@@ -117,18 +117,26 @@ public class RoutingController {
 		List<LatLon> resList = new ArrayList<LatLon>();
 		if (list.size() >= 2) {
 			LatLon last = null;
-			List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, list.get(0), list.get(list.size() - 1),
-					list.subList(1, list.size() - 1));
-			for (RouteSegmentResult r : res) {
-				int i;
-				int dir = r.isForwardDirection() ? 1 : -1;
-				for (i = r.getStartPointIndex(); i != r.getEndPointIndex(); i += dir) {
-					resList.add(r.getPoint(i));
+			try {
+				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, list.get(0), list.get(list.size() - 1),
+						list.subList(1, list.size() - 1));
+				for (RouteSegmentResult r : res) {
+					int i;
+					int dir = r.isForwardDirection() ? 1 : -1;
+					for (i = r.getStartPointIndex(); i != r.getEndPointIndex(); i += dir) {
+						resList.add(r.getPoint(i));
+					}
+					last = r.getPoint(i);
 				}
-				last = r.getPoint(i);
-			}
-			if (last != null) {
-				resList.add(last);
+				if (last != null) {
+					resList.add(last);
+				}
+			} catch (IOException e) {
+				LOGGER.error(e.getMessage(), e);
+			} catch (InterruptedException e) {
+				LOGGER.error(e.getMessage(), e);
+			} catch (RuntimeException e) {
+				LOGGER.error(e.getMessage());
 			}
 		}
 		if (resList.size() == 0) {
