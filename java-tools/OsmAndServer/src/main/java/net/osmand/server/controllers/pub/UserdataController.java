@@ -434,7 +434,7 @@ public class UserdataController {
 		}
 		device.userid = pu.id;
 		device.deviceid = deviceId;
-		device.udpatetime = new Date();
+		device.updatetime = new Date();
 		device.accesstoken = accessToken;
 		usersRepository.saveAndFlush(pu);
 		devicesRepository.saveAndFlush(device);

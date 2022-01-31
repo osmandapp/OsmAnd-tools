@@ -22,7 +22,7 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
 	
 	PremiumUserDevice findById(int id);
 	
-	PremiumUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
+	PremiumUserDevice findTopByUseridAndDeviceidOrderByUpdatetimeDesc(int userid, String deviceid);
 
 
     @Entity
@@ -45,7 +45,7 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
 
         @Column(name = "udpatetime")
         @Temporal(TemporalType.TIMESTAMP)
-        public Date udpatetime;
+        public Date updatetime;
         
     }
 
