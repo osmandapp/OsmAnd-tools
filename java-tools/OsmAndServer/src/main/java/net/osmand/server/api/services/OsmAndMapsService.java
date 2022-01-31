@@ -63,7 +63,7 @@ public class OsmAndMapsService {
 
 	private static final int ZOOM_EN_PREFERRED_LANG = 6;
 
-	private static final boolean DEFAULT_USE_ROUTING_NATIVE_LIB = true;
+	private static final boolean DEFAULT_USE_ROUTING_NATIVE_LIB = false;
 
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new ConcurrentHashMap<>();
 

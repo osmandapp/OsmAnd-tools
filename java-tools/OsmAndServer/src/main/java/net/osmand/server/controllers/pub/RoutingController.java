@@ -31,6 +31,7 @@ public class RoutingController {
 	
 
 	private static final int DISTANCE_MID_POINT = 25000;
+	
 	private static final int MAX_DISTANCE = 1000000;
 
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
