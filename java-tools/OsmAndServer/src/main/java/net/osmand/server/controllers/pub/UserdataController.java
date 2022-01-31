@@ -428,13 +428,13 @@ public class UserdataController {
 		pu.tokenTime = null;
 		PremiumUserDevice device = new PremiumUserDevice();
 		PremiumUserDevice sameDevice ;
-		while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUpdatetimeDesc(pu.id,
+		while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
 				deviceId)) != null) {
 			devicesRepository.delete(sameDevice);
 		}
 		device.userid = pu.id;
 		device.deviceid = deviceId;
-		device.updatetime = new Date();
+		device.udpatetime = new Date();
 		device.accesstoken = accessToken;
 		usersRepository.saveAndFlush(pu);
 		devicesRepository.saveAndFlush(device);
