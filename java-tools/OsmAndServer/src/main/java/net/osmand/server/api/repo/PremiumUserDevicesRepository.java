@@ -22,7 +22,7 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
 	
 	PremiumUserDevice findById(int id);
 	
-	PremiumUserDevice findByUseridAndDeviceid(int userid, String deviceid);
+	PremiumUserDevice findTopByUseridAndDeviceidOrderByUpdatetimeDesc(int userid, String deviceid);
 
 
     @Entity

@@ -105,7 +105,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				if (pu == null) {
 					throw new UsernameNotFoundException(username);
 				}
-				PremiumUserDevice pud = devicesRepository.findByUseridAndDeviceid(pu.id,
+				PremiumUserDevice pud = devicesRepository.findTopByUseridAndDeviceidOrderByUpdatetimeDesc(pu.id,
 						UserdataController.TOKEN_DEVICE_WEB);
 				if (pud == null) {
 					throw new UsernameNotFoundException(username);

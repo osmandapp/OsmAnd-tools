@@ -427,8 +427,9 @@ public class UserdataController {
 		pu.token = null;
 		pu.tokenTime = null;
 		PremiumUserDevice device = new PremiumUserDevice();
-		PremiumUserDevice sameDevice = devicesRepository.findByUseridAndDeviceid(pu.id, deviceId);
-		if (sameDevice != null) {
+		PremiumUserDevice sameDevice ;
+		while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUpdatetimeDesc(pu.id,
+				deviceId)) != null) {
 			devicesRepository.delete(sameDevice);
 		}
 		device.userid = pu.id;
