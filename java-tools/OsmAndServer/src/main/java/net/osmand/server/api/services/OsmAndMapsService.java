@@ -64,6 +64,8 @@ public class OsmAndMapsService {
 	private static final int ZOOM_EN_PREFERRED_LANG = 6;
 
 	private static final boolean DEFAULT_USE_ROUTING_NATIVE_LIB = false;
+	
+	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new ConcurrentHashMap<>();
 
@@ -410,8 +412,7 @@ public class OsmAndMapsService {
 				paramsR.put(p, "true");
 			}
 		}
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_NATIVE_MEMORY_LIMIT * 4,
-				DEFAULT_NATIVE_MEMORY_LIMIT * 4);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().
 		// addImpassableRoad(6859437l).
 		// setDirectionPoints(directionPointsFile).
