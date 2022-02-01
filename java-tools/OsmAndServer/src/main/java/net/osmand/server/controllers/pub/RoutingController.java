@@ -65,6 +65,11 @@ public class RoutingController {
 		public Feature(Geometry geometry) {
 			this.geometry = geometry;
 		}
+		
+		public Feature prop(String key, Object vl) {
+			properties.put(key, vl);
+			return this;
+		}
 	}
 	
 	public static class Geometry {
@@ -83,6 +88,12 @@ public class RoutingController {
 				coordnates[i] = new double[] {lst.get(i).getLongitude(), lst.get(i).getLatitude() };
 			}
 			gm.coordinates = coordnates;
+			return gm;
+		}
+		
+		public static Geometry point(LatLon pnt) {
+			Geometry gm = new Geometry("Point");
+			gm.coordinates = new double[] {pnt.getLongitude(), pnt.getLatitude() };
 			return gm;
 		}
 	}
@@ -115,6 +126,7 @@ public class RoutingController {
 			}
 		}
 		List<LatLon> resList = new ArrayList<LatLon>();
+		List<Feature> features = new ArrayList<Feature>();
 		if (list.size() >= 2) {
 			LatLon last = null;
 			try {
@@ -123,10 +135,17 @@ public class RoutingController {
 				for (RouteSegmentResult r : res) {
 					int i;
 					int dir = r.isForwardDirection() ? 1 : -1;
-					for (i = r.getStartPointIndex(); i != r.getEndPointIndex(); i += dir) {
-						resList.add(r.getPoint(i));
+					if (r.getDescription() != null && r.getDescription().length() > 0) {
+						features.add(new Feature(Geometry.point(r.getStartPoint())).prop("description", r.getDescription()));
 					}
-					last = r.getPoint(i);
+					for (i = r.getStartPointIndex(); ; i += dir) {
+						if(i != r.getEndPointIndex()) {
+							resList.add(r.getPoint(i));
+						} else {
+							last = r.getPoint(i);
+							break;
+						}
+					}
 				}
 				if (last != null) {
 					resList.add(last);
@@ -143,9 +162,9 @@ public class RoutingController {
 			resList = new ArrayList<LatLon>(list);
 			calculateStraightLine(resList);
 		}
+		features.add(0, new Feature(Geometry.lineString(resList)));
 
-		Feature feature = new Feature(Geometry.lineString(resList));
-		return ResponseEntity.ok(gson.toJson(new FeatureCollection(feature)));
+		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 	}
 
 	private void calculateStraightLine(List<LatLon> list) {
