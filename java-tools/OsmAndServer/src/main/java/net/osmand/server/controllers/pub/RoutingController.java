@@ -127,7 +127,7 @@ public class RoutingController {
 		}
 		List<LatLon> resList = new ArrayList<LatLon>();
 		List<Feature> features = new ArrayList<Feature>();
-		if (list.size() >= 2) {
+		if (list.size() >= 2 && !tooLong) {
 			LatLon last = null;
 			try {
 				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, list.get(0), list.get(list.size() - 1),

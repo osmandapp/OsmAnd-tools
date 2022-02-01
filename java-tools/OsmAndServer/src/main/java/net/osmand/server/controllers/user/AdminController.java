@@ -209,13 +209,18 @@ public class AdminController {
 		subscriptionsRepository.save(deviceSub);
 		if (emailSender.isEmail(comment)) {
 			String email = comment;
-			PremiumUser pu = new PremiumUsersRepository.PremiumUser();
-			pu.email = email;
-			pu.regTime = new Date();
-			pu.orderid = deviceSub.orderId;
-			usersRepository.saveAndFlush(pu);
-			deviceSub.purchaseToken += " (email sent & registered)";
-			emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
+			PremiumUser existingUser = usersRepository.findByEmail(email);
+			if (existingUser == null) {
+				PremiumUser pu = new PremiumUsersRepository.PremiumUser();
+				pu.email = email;
+				pu.regTime = new Date();
+				pu.orderid = deviceSub.orderId;
+				usersRepository.saveAndFlush(pu);
+				deviceSub.purchaseToken += " (email sent & registered)";
+				emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
+			} else {
+				deviceSub.purchaseToken += " (ERROR: email is already registered)";
+			}
 		}
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
         return "redirect:info#audience";
