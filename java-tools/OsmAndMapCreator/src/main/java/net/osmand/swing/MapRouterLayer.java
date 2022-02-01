@@ -1275,41 +1275,39 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	private void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute) {
-		net.osmand.osm.edit.Node prevWayNode = null;
-		for (RouteSegmentResult s : searchRoute) {
+		RouteSegmentResult prevSegm = null;
+		for (RouteSegmentResult segm : searchRoute) {
 			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
 			Way way = new Way(-1);
 //					String name = String.format("time %.2f ", s.getSegmentTime());
-			String name = s.getDescription();
-			if(s.getTurnType() != null) {
-				name += " (TA " + s.getTurnType().getTurnAngle() + ") ";
+			String name = segm.getDescription();
+			if(segm.getTurnType() != null) {
+				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
 			}
 //					String name = String.format("beg %.2f end %.2f ", s.getBearingBegin(), s.getBearingEnd());
 			way.putTag(OSMTagKey.NAME.getValue(),name);
-			boolean plus = s.getStartPointIndex() < s.getEndPointIndex();
-			int i = s.getStartPointIndex();
+			if (prevSegm != null
+					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
+				net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevSegm.getEndPoint().getLatitude(), prevSegm.getEndPoint().getLongitude(), -1);
+				res.add(pp);
+				pp.putTag("colour", "blue");
+				net.osmand.osm.edit.Node pn = new net.osmand.osm.edit.Node(segm.getStartPoint().getLatitude(), segm.getStartPoint().getLongitude() , -1);
+				pn.putTag("colour", "red");
+				res.add(pn);
+				System.out.println(String.format("Not connected road '%f m' (%.5f/%.5f -> %.5f/%.5f) [%d: %s -> %d: %s]",
+						MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()), 
+						pp.getLatLon().getLatitude(), pp.getLatLon().getLongitude(), pn.getLatLon().getLatitude(), pn.getLatLon().getLongitude(), 
+						segm.getStartPointIndex(), segm.getObject(), prevSegm.getStartPointIndex(), prevSegm.getObject() ));
+			}
+			boolean plus = segm.getStartPointIndex() < segm.getEndPointIndex();
+			int ind = segm.getStartPointIndex();
 			while (true) {
-				LatLon l = s.getPoint(i);
+				LatLon l = segm.getPoint(ind);
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
-				if (prevWayNode != null) {
-					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
-						net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevWayNode, -1);
-						pp.putTag("colour", "blue");
-						net.osmand.osm.edit.Node pn = new net.osmand.osm.edit.Node(n, -1);
-						pn.putTag("colour", "red");
-						res.add(pn);
-						res.add(pp);
-						System.out.println(String.format("Not connected road '%f m' (%.5f/%.5f -> %.5f/%.5f),  %d ind %s", 
-								OsmMapUtils.getDistance(prevWayNode, n), 
-								prevWayNode.getLatLon().getLatitude(), prevWayNode.getLatLon().getLongitude(), 
-								n.getLatLon().getLatitude(), n.getLatLon().getLongitude(), 
-								i, s.getObject()));
-					}
-					prevWayNode = null;
-				}
-				int[] pointTypes = s.getObject().getPointTypes(i);
+				
+				int[] pointTypes = segm.getObject().getPointTypes(ind);
 				if (pointTypes != null && pointTypes.length == 1) {
-					RouteTypeRule rtr = s.getObject().region.quickGetEncodingRule(pointTypes[0]);
+					RouteTypeRule rtr = segm.getObject().region.quickGetEncodingRule(pointTypes[0]);
 					if (rtr == null || !rtr.getTag().equals("osmand_dp")) {
 						// skip all intermediate added points (should no be visual difference)
 						way.addNode(n);
@@ -1317,20 +1315,19 @@ public class MapRouterLayer implements MapPanelLayer {
 				} else {
 					way.addNode(n);
 				}
-				if (i == s.getEndPointIndex()) {
+				if (ind == segm.getEndPointIndex()) {
 					break;
 				}
 				if (plus) {
-					i++;
+					ind++;
 				} else {
-					i--;
+					ind--;
 				}
 			}
 			if (way.getNodes().size() > 0) {
-				prevWayNode = way.getNodes().get(way.getNodes().size() - 1);
 				res.add(way);
 			}
-
+			prevSegm = segm;
 		}
 	}
 
