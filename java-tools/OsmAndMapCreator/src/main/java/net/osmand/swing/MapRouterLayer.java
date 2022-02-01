@@ -453,12 +453,14 @@ public class MapRouterLayer implements MapPanelLayer {
 					// new Thread() {
 					// @Override
 					// public void run() {
-					List<Way> ways = new ArrayList<>();
-					calculateResult(ways, previousRoute);
+					List<Entity> es = new ArrayList<>();
+					calculateResult(es, previousRoute);
 					List<Location> locations = new ArrayList<>();
-					for (Way way : ways) {
-						for (net.osmand.osm.edit.Node node : way.getNodes()) {
-							locations.add(new Location("", node.getLatitude(), node.getLongitude()));
+					for (Entity ent : es) {
+						if (ent instanceof Way) {
+							for (net.osmand.osm.edit.Node node : ((Way) ent).getNodes()) {
+								locations.add(new Location("", node.getLatitude(), node.getLongitude()));
+							}
 						}
 					}
 					String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
@@ -768,10 +770,10 @@ public class MapRouterLayer implements MapPanelLayer {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Way> ways = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
-				if (ways != null) {
+				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
+				if (entities != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
-					for (Way w : ways) {
+					for (Entity w : entities) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
 					}
@@ -792,10 +794,10 @@ public class MapRouterLayer implements MapPanelLayer {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Way> ways = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
-				if (ways != null) {
+				List<Entity> res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+				if (res != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
-					for (Way w : ways) {
+					for (Entity w : res) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
 					}
@@ -1095,10 +1097,10 @@ public class MapRouterLayer implements MapPanelLayer {
 
 
 
-	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
+	public List<Entity> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
 			boolean gpx, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
 		this.gpx = gpx;
-		List<Way> res = new ArrayList<Way>();
+		List<Entity> res = new ArrayList<Entity>();
 		long time = System.currentTimeMillis();
 
 
@@ -1272,7 +1274,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		}.start();
 	}
 
-	private void calculateResult(List<Way> res, List<RouteSegmentResult> searchRoute) {
+	private void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute) {
 		net.osmand.osm.edit.Node prevWayNode = null;
 		for (RouteSegmentResult s : searchRoute) {
 			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
@@ -1291,8 +1293,17 @@ public class MapRouterLayer implements MapPanelLayer {
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				if (prevWayNode != null) {
 					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
-						System.out.println(String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s", OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i,
-								s.getObject()));
+						net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevWayNode, -1);
+						pp.putTag("colour", "blue");
+						net.osmand.osm.edit.Node pn = new net.osmand.osm.edit.Node(n, -1);
+						pn.putTag("colour", "red");
+						res.add(pn);
+						res.add(pp);
+						System.out.println(String.format("Not connected road '%f m' (%.5f/%.5f -> %.5f/%.5f),  %d ind %s", 
+								OsmMapUtils.getDistance(prevWayNode, n), 
+								prevWayNode.getLatLon().getLatitude(), prevWayNode.getLatLon().getLongitude(), 
+								n.getLatLon().getLatitude(), n.getLatLon().getLongitude(), 
+								i, s.getObject()));
 					}
 					prevWayNode = null;
 				}
