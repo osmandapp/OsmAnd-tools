@@ -35,6 +35,7 @@
 #include <OsmAndCore/WorldRegions.h>
 #include <OsmAndCore/RoadLocator.h>
 #include <OsmAndCore/IRoadLocator.h>
+#include <OsmAndCore/TileSqliteDatabasesCollection.h>
 #include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
 #include <OsmAndCore/Data/Amenity.h>
@@ -52,7 +53,7 @@
 #include <OsmAndCore/Map/OnlineTileSources.h>
 #include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
-#include <OsmAndCore/Map/HeightmapTileProvider.h>
+#include <OsmAndCore/Map/SqliteHeightmapTileProvider.h>
 #include <OsmAndCore/Map/ObfMapObjectsProvider.h>
 #include <OsmAndCore/Map/MapPrimitivesProvider.h>
 #include <OsmAndCore/Map/MapRasterLayerProvider_Software.h>
@@ -88,6 +89,7 @@ OsmAnd::AreaI viewport;
 std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
+std::shared_ptr<const OsmAnd::ITileSqliteDatabasesCollection> heightsCollection;
 std::shared_ptr<OsmAnd::ObfMapObjectsProvider> binaryMapObjectsProvider;
 std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
 std::shared_ptr<OsmAnd::MapPrimitiviser> primitivizer;
@@ -112,7 +114,7 @@ bool dataDirSpecified = false;
 QDir dataDir;
 QDir cacheDir(QDir::current());
 QDir heightsDir;
-bool wasHeightsDirSpecified = false;
+bool heightsDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
 
@@ -134,6 +136,7 @@ bool use43 = false;
 bool constantRefresh = false;
 bool nSight = false;
 bool gDEBugger = false;
+bool profiler = false;
 const float density = 1.0f;
 const float mapScale = 1.0f;
 const float symbolsScale = 1.0f;
@@ -150,6 +153,136 @@ void idleHandler(void);
 void closeHandler(void);
 void activateProvider(int layerIdx, int idx);
 void verifyOpenGL();
+
+#if defined(OSMAND_TARGET_OS_macosx)
+void x11Init();
+void x11Release();
+void x11AlterModifiers(int& modifiers);
+#endif // defined(OSMAND_TARGET_OS_macosx)
+
+int elevationConfigurationPresetIndex = 0;
+std::pair<QString, OsmAnd::ElevationConfiguration> elevationConfigurationPresets[] =
+{
+    {
+        QStringLiteral("none"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::None)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::None)
+    },
+    {
+        QStringLiteral("hs-traditional-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeTraditional)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("hs-traditional-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeTraditional)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("hs-igor-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeIgor)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("hs-igor-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeIgor)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("hs-combined-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeCombined)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("hs-combined-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeCombined)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("hs-multidir-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeMultidirectional)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("hs-multidir-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeMultidirectional)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
+    },
+    {
+        QStringLiteral("slope°-grayscale-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
+    },
+    {
+        QStringLiteral("slope°-grayscale-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
+    },
+    {
+        QStringLiteral("slope°-terrain-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
+    },
+    {
+        QStringLiteral("slope°-terrain-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
+    },
+    {
+        QStringLiteral("slope%-grayscale-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
+    },
+    {
+        QStringLiteral("slope%-grayscale-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
+    },
+    {
+        QStringLiteral("slope%-terrain-ZT"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
+    },
+    {
+        QStringLiteral("slope%-terrain-H"),
+        OsmAnd::ElevationConfiguration()
+            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
+            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
+            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
+    }
+};
+const int elevationConfigurationPresetsCount = std::size(elevationConfigurationPresets);
 
 OsmAnd::PointI lastClickedLocation31;
 
@@ -227,7 +360,7 @@ int main(int argc, char** argv)
         else if (arg.startsWith("-heightsDir="))
         {
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
-            wasHeightsDirSpecified = true;
+            heightsDirSpecified = true;
         }
         else if (arg == "-nsight")
         {
@@ -236,6 +369,7 @@ int main(int argc, char** argv)
             constantRefresh = true;
             nSight = true;
             gDEBugger = false;
+            profiler = false;
         }
         else if (arg == "-gdebugger")
         {
@@ -244,6 +378,16 @@ int main(int argc, char** argv)
             constantRefresh = true;
             nSight = false;
             gDEBugger = true;
+            profiler = false;
+        }
+        else if (arg == "-profiler")
+        {
+            useSpecificOpenGL = true;
+            use43 = false;
+            constantRefresh = true;
+            nSight = false;
+            gDEBugger = false;
+            profiler = true;
         }
     }
 
@@ -293,6 +437,10 @@ int main(int argc, char** argv)
         glutIdleFunc(&idleHandler);
         glutCloseFunc(&closeHandler);
         verifyOpenGL();
+
+#if defined(OSMAND_TARGET_OS_macosx)
+        x11Init();
+#endif // defined(OSMAND_TARGET_OS_macosx)
 
         glutWasInitialized = true;
     }
@@ -358,6 +506,14 @@ int main(int argc, char** argv)
         stylesCollection.reset(pMapStylesCollection);
     }
 
+    if (heightsDirSpecified)
+    {
+        const auto manualHeightsCollection = new OsmAnd::TileSqliteDatabasesCollection();
+        manualHeightsCollection->addDirectory(heightsDir);
+
+        heightsCollection.reset(manualHeightsCollection);
+    }
+
     if (!styleName.isEmpty())
     {
         style = stylesCollection->getResolvedStyleByName(styleName);
@@ -367,7 +523,6 @@ int main(int argc, char** argv)
             OsmAnd::ReleaseCore();
             return EXIT_FAILURE;
         }
-
     }
 
     roadLocator.reset(new OsmAnd::RoadLocator(obfsCollection));
@@ -548,7 +703,10 @@ void textInfoDialog(const QString& title, const QString& text)
 
 void mouseHandler(int button, int state, int x, int y)
 {
-    const auto modifiers = glutGetModifiers();
+    auto modifiers = glutGetModifiers();
+#if defined(OSMAND_TARGET_OS_macosx)
+    x11AlterModifiers(modifiers);
+#endif // defined(OSMAND_TARGET_OS_macosx)
 
     if (button == GLUT_LEFT_BUTTON)
     {
@@ -652,6 +810,9 @@ void mouseHandler(int button, int state, int x, int y)
                     }
                 }
             }
+
+            if (!constantRefresh)
+                glutPostRedisplay();
         }
     }
 }
@@ -687,7 +848,11 @@ void mouseMotion(int x, int y)
 
 void mouseWheelHandler(int button, int dir, int x, int y)
 {
-    const auto modifiers = glutGetModifiers();
+    auto modifiers = glutGetModifiers();
+#if defined(OSMAND_TARGET_OS_macosx)
+    x11AlterModifiers(modifiers);
+#endif // defined(OSMAND_TARGET_OS_macosx)
+
     if (modifiers & GLUT_ACTIVE_ALT)
     {
         const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
@@ -721,7 +886,11 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 
 void keyboardHandler(unsigned char key, int x, int y)
 {
-    const auto modifiers = glutGetModifiers();
+    auto modifiers = glutGetModifiers();
+#if defined(OSMAND_TARGET_OS_macosx)
+    x11AlterModifiers(modifiers);
+#endif // defined(OSMAND_TARGET_OS_macosx)
+
     const auto state = renderer->getState();
     const auto wasdZoom = static_cast<int>(
         state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f));
@@ -732,107 +901,161 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
     case '\x1B':
         glutLeaveMainLoop();
-        break;
+        return;
     case 'W':
     case 'w':
     {
         auto newTarget = state.target31;
         newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
         renderer->setTarget(newTarget);
+        return;
     }
-        break;
     case 'S':
     case 's':
     {
         auto newTarget = state.target31;
         newTarget.y += wasdStep / (key == 's' ? 50 : 10);
         renderer->setTarget(newTarget);
+        return;
     }
-        break;
     case 'A':
     case 'a':
     {
         auto newTarget = state.target31;
         newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
         renderer->setTarget(newTarget);
+        return;
     }
-        break;
     case 'D':
     case 'd':
     {
         auto newTarget = state.target31;
         newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
         renderer->setTarget(newTarget);
+        return;
     }
-        break;
     case 'r':
     {
         auto fogConfiguration = state.fogConfiguration;
         fogConfiguration.distanceToFog += 1.0f;
         renderer->setFogConfiguration(fogConfiguration);
-        break;
+        return;
     }
     case 'f':
     {
         auto fogConfiguration = state.fogConfiguration;
         fogConfiguration.distanceToFog += 1.0f;
         renderer->setFogConfiguration(fogConfiguration);
-        break;
+        return;
     }
     case 'x':
         renderWireframe = !renderWireframe;
         glutPostRedisplay();
-        break;
+        return;
     case 'e':
-    {
-        if (state.elevationDataProvider)
+        if (modifiers & GLUT_ACTIVE_ALT)
         {
-            renderer->resetElevationDataProvider();
+            if (state.elevationDataProvider)
+            {
+                renderer->resetElevationDataProvider();
+            }
+            else
+            {
+                if (heightsCollection)
+                {
+                    renderer->setElevationDataProvider(
+                        std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
+                            heightsCollection,
+                            renderer->getElevationDataTileSize()
+                        )
+                    );
+                    elevationConfigurationPresetIndex = 0;
+                    renderer->setElevationConfiguration(elevationConfigurationPresets[elevationConfigurationPresetIndex].second);
+                }
+            }
         }
         else
         {
-            if (wasHeightsDirSpecified)
+            if (modifiers & GLUT_ACTIVE_CTRL)
             {
-                //auto provider = new OsmAnd::HeightmapTileProvider(heightsDir, cacheDir.absoluteFilePath(OsmAnd::HeightmapTileProvider::defaultIndexFilename));
-                //renderer->setElevationDataProvider(std::shared_ptr<OsmAnd::IMapElevationDataProvider>(provider));
+                if (--elevationConfigurationPresetIndex < 0)
+                {
+                    elevationConfigurationPresetIndex += elevationConfigurationPresetsCount;
+                }
             }
+            else
+            {
+                elevationConfigurationPresetIndex = (elevationConfigurationPresetIndex + 1) % elevationConfigurationPresetsCount;
+            }
+            renderer->setElevationConfiguration(elevationConfigurationPresets[elevationConfigurationPresetIndex].second);
         }
+        return;
+    case 'E':
+    {
+        if (modifiers & GLUT_ACTIVE_ALT)
+        {
+            auto configuration = state.elevationConfiguration;
+            const auto step = 0.5f;
+            if (modifiers & GLUT_ACTIVE_CTRL)
+            {
+                configuration.visualizationZ -= step;
+            }
+            else
+            {
+                configuration.visualizationZ += step;
+            }
+            renderer->setElevationConfiguration(configuration);
+        }
+        else
+        {
+            auto configuration = state.elevationConfiguration;
+            const auto step = 0.1f;
+            if (modifiers & GLUT_ACTIVE_CTRL)
+            {
+                configuration.visualizationAlpha += step;
+            }
+            else
+            {
+                configuration.visualizationAlpha -= step;
+            }
+            renderer->setElevationConfiguration(configuration);
+        }
+        return;
     }
-        break;
     case 't':
     {
         auto fogConfiguration = state.fogConfiguration;
         fogConfiguration.density += 0.01f;
         renderer->setFogConfiguration(fogConfiguration);
-        break;
+        return;
     }
     case 'g':
     {
         auto fogConfiguration = state.fogConfiguration;
         fogConfiguration.density -= 0.01f;
         renderer->setFogConfiguration(fogConfiguration);
-        break;
+        return;
     }
     case 'u':
     {
         auto fogConfiguration = state.fogConfiguration;
         fogConfiguration.originFactor += 0.01f;
         renderer->setFogConfiguration(fogConfiguration);
-        break;
+        return;
     }
     case 'j':
     {
         auto fogConfiguration = state.fogConfiguration;
         fogConfiguration.originFactor -= 0.01f;
         renderer->setFogConfiguration(fogConfiguration);
-        break;
+        return;
     }
     case 'i':
         renderer->setFieldOfView(state.fieldOfView + 0.5f);
-        break;
+        return;
     case 'k':
         renderer->setFieldOfView(state.fieldOfView - 0.5f);
-        break;
+        return;
     case 'o':
     {
         auto position31 = renderer->getState().target31;
@@ -847,7 +1070,7 @@ void keyboardHandler(unsigned char key, int x, int y)
             roads.append(static_cast<const OsmAnd::ReverseGeocoder::ResultEntry&>(resultEntry).toString());
         });
         textInfoDialog("Reverse geocoding", roads.join("\n"));
-        break;
+        return;
     }
     case 'l':
     {
@@ -856,40 +1079,38 @@ void keyboardHandler(unsigned char key, int x, int y)
         latLon = OsmAnd::CoordinateSearch::search(text);
         auto target31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
         renderer->setTarget(target31);
-        break;
+        return;
     }
     case 'c':
     {
         auto config = renderer->getConfiguration();
         config->limitTextureColorDepthBy16bits = !config->limitTextureColorDepthBy16bits;
         renderer->setConfiguration(config);
+        return;
     }
-        break;
     case 'b':
     {
         auto config = renderer->getConfiguration();
         config->texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Normal;
         renderer->setConfiguration(config);
+        return;
     }
-        break;
     case 'n':
     {
         auto config = renderer->getConfiguration();
         config->texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Good;
         renderer->setConfiguration(config);
+        return;
     }
-        break;
     case 'm':
     {
         auto config = renderer->getConfiguration();
         config->texturesFilteringQuality = OsmAnd::TextureFilteringQuality::Best;
         renderer->setConfiguration(config);
+        return;
     }
-        break;
     case 'p':
-    {
-        std::async(std::launch::async,
-            [=]
+        std::async(std::launch::async, [=]
         {
             const auto downloadProgress =
                 []
@@ -915,8 +1136,7 @@ void keyboardHandler(unsigned char key, int x, int y)
             else if (resourcesManager->isInstalledResourceOutdated(QLatin1String("netherlands_europe.map.obf")))
                 resourcesManager->updateFromRepository(QLatin1String("netherlands_europe.map.obf"), downloadProgress);
         });
-    }
-        break;
+        return;
     case 'h':
     {
         if (mapObjectsSymbolsProvider && renderer->removeSymbolsProvider(mapObjectsSymbolsProvider))
@@ -932,7 +1152,7 @@ void keyboardHandler(unsigned char key, int x, int y)
             mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
-        break;
+        return;
     }
     case '.':
     {
@@ -945,14 +1165,14 @@ void keyboardHandler(unsigned char key, int x, int y)
             amenitySymbolsProvider.reset(new OsmAnd::AmenitySymbolsProvider(obfsCollection, 1.0f, 256.0f));
             renderer->addSymbolsProvider(amenitySymbolsProvider);
         }
-        break;
+        return;
     }
     case 'q':
         animator->pause();
         animator->cancelAllAnimations();
         animator->animateAzimuthTo(0.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
         animator->resume();
-        break;
+        return;
     case 'v':
     {
         OsmAnd::AddressesByNameSearch addressByNameSearch{obfsCollection};
@@ -966,7 +1186,7 @@ void keyboardHandler(unsigned char key, int x, int y)
             result.append(static_cast<const OsmAnd::AddressesByNameSearch::ResultEntry&>(resultEntry).address->toString());
         });
         textInfoDialog("Search results", result.join("\n"));
-        break;
+        return;
     }
     case 'z':
     {
@@ -975,7 +1195,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         double zoom = text.toDouble(&ok);
         if (ok)
             renderer->setZoom(zoom);
-        break;
+        return;
     }
     case '0':
     case '1':
@@ -990,26 +1210,26 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto layerId = (modifiers & GLUT_ACTIVE_ALT) ? 1 : 0;
         activateProvider(layerId, key - '0');
-        break;
+        return;
     }
     case '[':
         if (renderer->isSymbolsUpdateSuspended())
             while (!renderer->resumeSymbolsUpdate());
         else
             while (!renderer->suspendSymbolsUpdate());
-        break;
+        return;
     case ']':
         if (renderer->isGpuWorkerPaused())
             while (!renderer->resumeGpuWorker());
         else
             while (!renderer->suspendGpuWorker());
-        break;
+        return;
     case '\\':
     {
         auto settings = renderer->getDebugSettings();
         settings->mapLayersBatchingForbidden = !settings->mapLayersBatchingForbidden;
         renderer->setDebugSettings(settings);
-        break;
+        return;
     }
     case ' ':
     {
@@ -1027,8 +1247,8 @@ void keyboardHandler(unsigned char key, int x, int y)
         animator->cancelAllAnimations();
         animator->animateMoveTo(target, 1.0f, false, false, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
         animator->resume();
+        return;
     }
-        break;
     case '-':
         if (modifiers & GLUT_ACTIVE_SHIFT)
         {
@@ -1042,7 +1262,7 @@ void keyboardHandler(unsigned char key, int x, int y)
             animator->animateZoomBy(-1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
             animator->resume();
         }
-        break;
+        return;
     case '+':
         if (modifiers & GLUT_ACTIVE_SHIFT)
         {
@@ -1056,15 +1276,25 @@ void keyboardHandler(unsigned char key, int x, int y)
             animator->animateZoomBy(+1.0f, 1.0f, OsmAnd::MapAnimator::TimingFunction::EaseInOutQuadratic);
             animator->resume();
         }
-        break;
-    case '*':
-        break;
+        return;
     }
+
+    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Warning,
+        "Unknown hot-key '%c' (%u) (ctrl%s, alt%s, shift%s)",
+        key,
+        static_cast<unsigned int>(key),
+        modifiers & GLUT_ACTIVE_CTRL ? "+" : "-",
+        modifiers & GLUT_ACTIVE_ALT ? "+" : "-",
+        modifiers & GLUT_ACTIVE_SHIFT ? "+" : "-");
 }
 
 void specialHandler(int key, int x, int y)
 {
-    const auto modifiers = glutGetModifiers();
+    auto modifiers = glutGetModifiers();
+#if defined(OSMAND_TARGET_OS_macosx)
+    x11AlterModifiers(modifiers);
+#endif // defined(OSMAND_TARGET_OS_macosx)
+
     const auto state = renderer->getState();
     const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
 
@@ -1072,31 +1302,42 @@ void specialHandler(int key, int x, int y)
     {
     case GLUT_KEY_F5:
         renderer->forcedFrameInvalidate();
-        break;
+        return;
     case GLUT_KEY_F6:
         renderer->forcedGpuProcessingCycle();
-        break;
+        return;
     case GLUT_KEY_F2:
         renderer->dumpResourcesInfo();
-        break;
+        return;
     case GLUT_KEY_LEFT:
         renderer->setAzimuth(state.azimuth + step);
-        break;
+        return;
     case GLUT_KEY_RIGHT:
         renderer->setAzimuth(state.azimuth - step);
-        break;
+        return;
     case GLUT_KEY_UP:
         renderer->setElevationAngle(state.elevationAngle + step);
-        break;
+        return;
     case GLUT_KEY_DOWN:
         renderer->setElevationAngle(state.elevationAngle - step);
-        break;
+        return;
     }
+
+    OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Warning,
+        "Unknown hot-key %d (ctrl%s, alt%s, shift%s)",
+        key,
+        modifiers & GLUT_ACTIVE_CTRL ? "+" : "-",
+        modifiers & GLUT_ACTIVE_ALT ? "+" : "-",
+        modifiers & GLUT_ACTIVE_SHIFT ? "+" : "-");
 }
 
 void closeHandler(void)
 {
     renderer->releaseRendering(true);
+
+#if defined(OSMAND_TARGET_OS_macosx)
+    x11Release();
+#endif // defined(OSMAND_TARGET_OS_macosx)
 }
 
 void activateProvider(int layerIdx, int idx)
@@ -1283,7 +1524,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 16 * 23;
+        auto h1 = 15.5f * 26;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1299,112 +1540,129 @@ void displayHandler()
 #else
         glColor3f(0.2f, 0.2f, 0.2f);
 #endif
-        glRasterPos2f(8, t - 16 * 1);
+        auto line = 0;
+
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("fov (keys i,k)         : %1").arg(state.fieldOfView)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 2);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("fog distance (keys r,f): %1").arg(state.fogConfiguration.distanceToFog)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 3);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("azimuth (arrows l,r)   : %1").arg(state.azimuth)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 4);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("pitch (arrows u,d)     : %1").arg(state.elevationAngle)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 5);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("target (keys w,a,s,d,l): %1 %2").arg(state.target31.x).arg(state.target31.y)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 6);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("zoom (mouse wheel)     : %1").arg(state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f))));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 7);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("zoom level (key z)     : %1").arg(state.zoomLevel)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 8);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("visual zoom (+ shift)  : %1 + %2").arg(state.visualZoom).arg(state.visualZoomShift)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 9);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("visible tiles          : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getVisibleTilesCount())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 10);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("wireframe (key x)      : %1").arg(renderWireframe)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 11);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("elevation data (key e) : %1").arg((bool)state.elevationDataProvider)));
+            QString("elevation (key alt+e)  : %1").arg((bool)state.elevationDataProvider)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 12);
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString(" -> preset (key e)     : %1").arg(elevationConfigurationPresets[elevationConfigurationPresetIndex].first)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString(" -> alpha (key E)      : %1").arg(state.elevationConfiguration.visualizationAlpha)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString(" -> z (key alt+E)      : %1").arg(state.elevationConfiguration.visualizationZ)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("fog density (keys t,g) : %1").arg(state.fogConfiguration.density)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 13);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("fog origin F (keys u,j): %1").arg(state.fogConfiguration.originFactor)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 14);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QStringLiteral("reverse geocoding (key o)")));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 15);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("16-bit textures (key c): %1").arg(configuration->limitTextureColorDepthBy16bits)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 16);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(configuration->texturesFilteringQuality))));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 17);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols (key h)        : %1").arg(!state.keyedSymbolsProviders.isEmpty() || !state.tiledSymbolsProviders.isEmpty())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 18);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols loaded         : %1").arg(renderer->getSymbolsCount())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 19);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols suspended ([)  : %1").arg(renderer->isSymbolsUpdateSuspended())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 20);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("GPU worker paused (])  : %1").arg(renderer->isGpuWorkerPaused())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 21);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Raster batching off (\\): %1").arg(renderer->getDebugSettings()->mapLayersBatchingForbidden)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * 22);
+        glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("# of resource tasks    : %1").arg(renderer->getActiveResourceRequestsCount())));
         verifyOpenGL();

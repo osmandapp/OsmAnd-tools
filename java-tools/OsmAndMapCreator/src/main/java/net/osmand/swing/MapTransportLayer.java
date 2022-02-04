@@ -6,8 +6,6 @@ import java.awt.Component;
 import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,6 +29,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
@@ -42,7 +41,6 @@ import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
 import net.osmand.router.TransportRouteResult;
 import net.osmand.router.TransportRoutingConfiguration;
 import net.osmand.router.TransportRoutingContext;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 
@@ -154,7 +152,7 @@ public class MapTransportLayer implements MapPanelLayer {
 			r = results.get(currentRoute);
 		}
 		calculateResult(ways, r);
-		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		DataTileManager<Entity> points = new DataTileManager<>(11);
 		int ind = -1;
 		for (Way w : ways) {
 			Way wl = new Way(ind--);
@@ -214,27 +212,15 @@ public class MapTransportLayer implements MapPanelLayer {
 
 	public void buildRoute(boolean schedule) {
 		long time = System.currentTimeMillis();
-		List<File> files = new ArrayList<File>();
-		File folder = new File(DataExtractionSettings.getSettings().getBinaryFilesDir());
-		for (File f : Algorithms.getSortedFilesVersions(folder)) {
-			if (f.getName().endsWith(".obf")) {
-				files.add(f);
-			}
-		}
-		if(files.isEmpty()){
-			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Please specify obf file in settings", "Obf file not found",
-					JOptionPane.ERROR_MESSAGE);
-			return;
-		}
-		System.out.println("Transport route from " + start + " to " + end);
 		if (start != null && end != null) {
 			try {
-				BinaryMapIndexReader[] rs = new BinaryMapIndexReader[files.size()];
-				int it = 0;
-				for (File f : files) {
-					RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-					rs[it++] = new BinaryMapIndexReader(raf, f);
+				BinaryMapIndexReader[] files = DataExtractionSettings.getSettings().getObfReaders();
+				if (files.length == 0) {
+					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Please specify obf file in settings", "Obf file not found",
+							JOptionPane.ERROR_MESSAGE);
+					return;
 				}
+				System.out.println("Transport route from " + start + " to " + end);
 				Builder builder = DataExtractionSettings.getSettings().getRoutingConfig();
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
@@ -252,7 +238,7 @@ public class MapTransportLayer implements MapPanelLayer {
 				TransportRoutePlanner planner = new TransportRoutePlanner();
 
 				TransportRoutingContext ctx = new TransportRoutingContext(cfg, 
-						DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() : null, rs); 
+						DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() : null, files); 
 				if (ctx.library != null) {
 					NativeTransportRoutingResult[] nativeRes = ctx.library.runNativePTRouting(
 							MapUtils.get31TileNumberX(start.getLongitude()),

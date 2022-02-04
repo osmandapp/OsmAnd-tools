@@ -6,9 +6,9 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.osmand.NativeJavaRendering;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.swing.DataExtractionSettings;
-import net.osmand.swing.NativeSwingRendering;
 import net.osmand.util.Algorithms;
 
 import org.junit.Before;
@@ -19,7 +19,7 @@ import org.junit.Test;
 public class JUnitRouteTest  {
 
 	static BinaryMapIndexReader[]  rs;
-	static NativeSwingRendering lib;
+	static NativeJavaRendering lib;
 
 
 	@Before

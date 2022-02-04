@@ -4,18 +4,28 @@ import java.awt.Rectangle;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.prefs.Preferences;
 
 import org.xmlpull.v1.XmlPullParserException;
 
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.MapZooms;
 import net.osmand.data.LatLon;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
+import net.osmand.util.Algorithms;
 
 
 public class DataExtractionSettings {
 
+	// public static final String INDEXES_CACHE = "";
+	public static final String INDEXES_CACHE = CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME;
 	private static DataExtractionSettings settings = null;
 	public static DataExtractionSettings getSettings(){
 		if(settings == null){
@@ -25,9 +35,53 @@ public class DataExtractionSettings {
 
 	}
 
+	
+	Map<String, BinaryMapIndexReaderReference> obfFiles = new ConcurrentHashMap<>();
+	
 	Preferences preferences = Preferences.userRoot();
 
-	private long lastSaved = 0;
+	long lastSaved = 0;
+	
+	public static class BinaryMapIndexReaderReference { 
+		File file;
+		BinaryMapIndexReader reader;
+	}
+	
+	
+	public BinaryMapIndexReader[] getObfReaders() throws IOException {
+		List<BinaryMapIndexReader> files = new ArrayList<>();
+		File mapsFolder = new File(getBinaryFilesDir());
+		CachedOsmandIndexes cache = null;
+		File cacheFile = new File(mapsFolder, INDEXES_CACHE);
+		if (mapsFolder.exists() && obfFiles.isEmpty() && INDEXES_CACHE.length() > 0) {
+				cache = new CachedOsmandIndexes();
+				if (cacheFile.exists()) {
+					cache.readFromFile(cacheFile, 2);
+				}
+				
+		}
+		for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
+			if (obf.getName().endsWith(".obf")) {
+				BinaryMapIndexReaderReference ref = obfFiles.get(obf.getAbsolutePath());
+				if (ref == null || ref.reader == null) {
+					ref = new BinaryMapIndexReaderReference();
+					ref.file = obf;
+					if (cache == null) {
+						RandomAccessFile raf = new RandomAccessFile(obf, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+						ref.reader = new BinaryMapIndexReader(raf, obf);
+					} else {
+						ref.reader = cache.getReader(obf, true);
+					}
+					obfFiles.put(obf.getAbsolutePath(), ref);
+				}
+				files.add(ref.reader);
+			}
+		}
+		if (cache != null && !files.isEmpty()) {
+			cache.writeToFile(cacheFile);
+		}
+		return files.toArray(new BinaryMapIndexReader[files.size()]);
+	}
 
 	public void saveLocation(double lat, double lon, int zoom, boolean save) {
 		long ms = System.currentTimeMillis();

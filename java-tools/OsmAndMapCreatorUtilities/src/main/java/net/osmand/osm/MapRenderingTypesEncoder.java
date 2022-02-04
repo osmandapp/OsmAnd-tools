@@ -40,16 +40,16 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private MapRulType coastlineRuleType;
 	private String regionName;
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
-	
+
 	private static final Collection<String> NODE_NETWORK_IDS = Arrays.asList("network:type", "expected_rcn_route_relations");
-	private static final Collection<String> NODE_NETWORKS_REF_TYPES = 
+	private static final Collection<String> NODE_NETWORKS_REF_TYPES =
 			new TreeSet<>(Arrays.asList("icn_ref", "ncn_ref", "rcn_ref", "lcn_ref", "iwn_ref", "nwn_ref", "rwn_ref", "lwn_ref"));
 	private static final String NODE_NETWORK_TAG = "node_network_point";
 	private static final String NODE_NETWORK_MULTIPLE_VALUE = "multiple";
 	private static final boolean DELETE_AFTER_38_RELEASE = false;
-	
+
 	private Map<String, TIntArrayList> socketTypes;
-	
+
 	public MapRenderingTypesEncoder(String fileName, String regionName) {
 		super(fileName != null && fileName.length() == 0 ? null : fileName);
 		this.regionName = "$" + regionName.toLowerCase() + "^";
@@ -59,7 +59,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		super(null);
 		this.regionName = "$" + regionName.toLowerCase() + "^";
 	}
-	
+
 	private void initSocketTypes() {
 		Map<String, TIntArrayList> m = new HashMap<>();
 		m.put("socket:type2:output", new TIntArrayList(new int[] {20, 35}));
@@ -83,7 +83,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	
+
 
 
 	private MapRulType getMapRuleType(String tag, String val) {
@@ -179,8 +179,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	protected void parseConvertCol(Map<String, String> mp, List<TagValuePattern> col, String prefix) {
 		parseConvertCol(mp, col, prefix, null);
 	}
-	
-	protected void parseConvertCol(Map<String, String> mp, List<TagValuePattern> col, String prefix, 
+
+	protected void parseConvertCol(Map<String, String> mp, List<TagValuePattern> col, String prefix,
 			String emptyVal) {
 		for (int i = 1; i <= 20; i++) {
 			String tg = mp.get(prefix +"tag" + i); //$NON-NLS-1$
@@ -303,7 +303,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					outTypes.add(combineOrderAndId(rType));
 				}
 				if (rType.isAdditionalOrText() && rType.isMap()) {
-					if (rType.isAdditional()) {
+					if (rType.isAdditional() && isSpecificGlueTag(tag)) {
 						outAddTypes.add(combineOrderAndId(rType));
 					} else if (rType.isText()) {
 						namesToEncode.put(rType, val);
@@ -384,14 +384,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					}
 				}
 			}
-			if (oh.length() > originalOH.length()) {				
+			if (oh.length() > originalOH.length()) {
 				tags = new LinkedHashMap<>(tags);
 				tags.put("opening_hours", oh);
 			}
 		}
 		return tags;
 	}
-	
+
 	private Map<String, String> transformChargingTags(Map<String, String> tags, EntityType entity) {
 		if (entity == EntityType.NODE) {
 			if (socketTypes == null) {
@@ -406,11 +406,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					tags.put(newKey, filterValues(val, socketTypes.get(key)));
 				}
 			}
-			
+
 		}
 		return tags;
 	}
-	
+
 	private String parseSocketType(String string) {
 		int firstColon = string.indexOf(':');
 		int secondColon = string.indexOf(':', firstColon+1);
@@ -485,7 +485,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return tags;
 	}
-	
+
 	private Map<String, String> transformAddMultipleNetwoksTag(Map<String, String> tags) {
 		int networkTypesCount = 0;
 		boolean networkId = false;
@@ -507,7 +507,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	private Map<String, String> transformShieldTags(Map<String, String> tags, EntityType entity,
 			EntityConvertApplyType appType) {
-		
+
 		if(entity == EntityType.WAY && !Algorithms.isEmpty(tags.get("ref")) && tags.containsKey("highway")) {
 			String wayRef = tags.get("ref");
 			String wayRefColor = tags.get("ref:colour");
@@ -529,7 +529,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							&& tags.get(routeRoadRefColorTag) == null && wayRefs.contains(ref)) {
 						missingColors.put(routeRoadRefColorTag, wayRefColor);
 					}
-				} 
+				}
 			}
 			wayRefs.removeAll(exisitingRefs);
 			if (wayRefs.size() > 0 || missingColors.size() > 0) {
@@ -542,15 +542,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					}
 					checkOrMainRule("route_road", "", 1);
 					tags.put("route_road", "");
-					
+
 					String basePart = "route_road_" + maxModifier;
 					checkOrCreateAdditional(basePart, "", null);
 					tags.put(basePart, "");
-					
+
 					checkOrCreateTextRule(basePart + "_ref", getRuleType("ref", null, appType));
 					tags.put(basePart + "_ref", ref);
-					
-					
+
+
 					if (!Algorithms.isEmpty(wayRefColor)) {
 						checkOrCreateTextRule(basePart + "_ref:colour", getRuleType("ref:colour", null, appType));
 						tags.put(basePart + "_ref:colour", wayRefColor);
@@ -565,7 +565,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			}
 
 		}
-		
+
 		if(entity == EntityType.WAY && tags.containsKey("highway") && tags.containsKey("name")) {
 			tags = new LinkedHashMap<String, String>(tags);
 			String name = tags.get("name");
@@ -1108,10 +1108,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 
 		if ("N".equalsIgnoreCase(val) || "NNW".equalsIgnoreCase(val) || "NW".equalsIgnoreCase(val)
-				|| "NNE".equalsIgnoreCase(val) || "NE".equalsIgnoreCase(val) 
-				|| "E".equalsIgnoreCase(val) || "ESE".equalsIgnoreCase(val) || "ENE".equalsIgnoreCase(val) 
-				|| "W".equalsIgnoreCase(val) || "WSW".equalsIgnoreCase(val) || "WNW".equalsIgnoreCase(val) 
-				|| "S".equalsIgnoreCase(val) || "SSW".equalsIgnoreCase(val) || "SW".equalsIgnoreCase(val)  
+				|| "NNE".equalsIgnoreCase(val) || "NE".equalsIgnoreCase(val)
+				|| "E".equalsIgnoreCase(val) || "ESE".equalsIgnoreCase(val) || "ENE".equalsIgnoreCase(val)
+				|| "W".equalsIgnoreCase(val) || "WSW".equalsIgnoreCase(val) || "WNW".equalsIgnoreCase(val)
+				|| "S".equalsIgnoreCase(val) || "SSW".equalsIgnoreCase(val) || "SW".equalsIgnoreCase(val)
 				|| "SSE".equalsIgnoreCase(val) || "SE".equalsIgnoreCase(val)) {
 			return val.toLowerCase();
 		}
@@ -1121,7 +1121,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		double circle = 360;
 		try {
 			double simple01 = Double.parseDouble(val) / circle;
-			if(simple01 > Integer.MAX_VALUE || simple01 < Integer.MIN_VALUE) { 
+			if(simple01 > Integer.MAX_VALUE || simple01 < Integer.MIN_VALUE) {
 				return "n";
 			}
 			if (simple01 < 0) {
@@ -1294,7 +1294,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			"wolfshook",
 			"rectangle_line",
 	}));
-	
+
 	final java.util.Map<String, String> precolors = new java.util.HashMap<String, String>();
 	{
             precolors.put("white_red_diamond","red");
@@ -1353,7 +1353,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 		return tags;
 	}
-	
+
 
 	private static int[] calculateIntegrity(Map<String, String> mp) {
 		int result = 0;
@@ -1667,6 +1667,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 	}
-	
+
+	private boolean isSpecificGlueTag(String tag) {
+		String[] specific = { "layer", "ref", "tunnel", "covered", "bridge", "network", "road"};
+		for (String s : specific) {
+			if (tag.contains(s)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 }

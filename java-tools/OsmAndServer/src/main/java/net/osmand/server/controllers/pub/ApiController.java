@@ -195,14 +195,14 @@ public class ApiController {
         	dataMissingSearch.save(feedback);
         }
     	
-        return "{'status':'OK'}";
+        return "{\"status\":\"OK\"}";
     }
     
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
 	public String checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
-		return "{'status':'OK'}";
+		return "{\"status\":\"OK\"}";
 	}
     
     
@@ -423,12 +423,12 @@ public class ApiController {
     @GetMapping(path = {"/email/subscribe"}, produces = "text/html;charset=UTF-8")
     public String emailSubscribe(@RequestParam(required=false) String id, 
     		@RequestParam(required=false) String email, @RequestParam(required=false) String group) throws IOException  {
-    	if(Algorithms.isEmpty(email)) {
-    		if(Algorithms.isEmpty(id)) {
-    			throw new IllegalArgumentException("Missing email parameter");
-    		}
-    		email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
-    	}
+		if (Algorithms.isEmpty(email)) {
+			if (Algorithms.isEmpty(id)) {
+				throw new IllegalArgumentException("Missing email parameter");
+			}
+			email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+		}
     	unsubscribedRepo.deleteAllByEmail(email);
     	return "pub/email/subscribe";
     }

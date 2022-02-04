@@ -100,7 +100,7 @@ public class WikiDatabasePreparation {
 		}
 
 	}
-    
+
 	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -132,7 +132,9 @@ public class WikiDatabasePreparation {
 					bld.append(parseGalleryString(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
-				}  
+				} else if (val.startsWith("wide image") || val.startsWith("תמונה רחבה")) {
+					bld.append(parseWideImageString(val));
+				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
 					bld.append(parseListing(val, wikidata, lang));
@@ -150,7 +152,7 @@ public class WikiDatabasePreparation {
 					parseAndAppendMetricData(val, bld);
 				} else if (key.equals(WikivoyageTemplates.TRANSLATION.getType())) {
 					parseAndAppendTranslation(val, bld);
-				} 	
+				}
 				if (!key.isEmpty() && blockResults != null) {
 					if (key.contains("|")) {
 						for (String str : key.split("\\|")) {
@@ -183,7 +185,7 @@ public class WikiDatabasePreparation {
 							indEnd = indEnd + calculateHeaderLevel(text, indEnd);
 							char ch = indEnd < text.length() - 2 ? text.charAt(indEnd + 1) : text.charAt(indEnd);
 							int nextHeader = calculateHeaderLevel(text, ch == '\n' ? indEnd + 2 : indEnd + 1);
-							if (nextHeader > 1 && headerLvl >= nextHeader ) {
+							if (nextHeader > 1 && headerLvl >= nextHeader) {
 								i = indEnd;
 								continue;
 							} else if (headerLvl == 2) {
@@ -197,7 +199,7 @@ public class WikiDatabasePreparation {
 							} else {
 								bld.append(text.charAt(i));
 							}
-						}						
+						}
 					} else {
 						bld.append(text.charAt(i));
 					}
@@ -428,12 +430,34 @@ public class WikiDatabasePreparation {
 		bld.append("</p>");
 	}
 
+	private static String parseWideImageString(String val) {
+		String[] parts = val.split("\\|");
+		StringBuilder bld = new StringBuilder();
+		bld.append("[[");
+		for (int i = 1; i < parts.length; i++) {
+			String part = parts[i];
+			String toCompare = part.toLowerCase();
+			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg")
+					|| toCompare.contains(".png") || toCompare.contains(".gif")) {
+				if (!toCompare.contains(":")) {
+					bld.append("File:");
+				}
+			}
+			bld.append(part);
+			if (i < parts.length - 1) {
+				bld.append("|");
+			}
+		}
+		bld.append("]]");
+		return bld.toString();
+	}
+
 	private static String parseGalleryString(String val) {
 		String[] parts = val.split("\n");
 		StringBuilder bld = new StringBuilder();
 		for (String part : parts) {
 			String toCompare = part.toLowerCase();
-			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") 
+			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg")
 					|| toCompare.contains(".png") || toCompare.contains(".gif")) {
 				bld.append("[[");
 				bld.append(part);
@@ -651,7 +675,7 @@ public class WikiDatabasePreparation {
 		br.close();
 		//content = removeMacroBlocks(content, null, "en", null);
 		//for testing file.html after removeMacroBlocks and generating new file.html
-		content = generateHtmlArticle(content,"en");
+		content = generateHtmlArticle(content, "en", null);
 		String savePath = "/Users/plotva/Documents";
 		File myFile = new File(savePath, "page.html");
 		BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
@@ -853,12 +877,13 @@ public class WikiDatabasePreparation {
 
 		private DBDialect dialect = DBDialect.SQLITE;
 		private Connection conn;
+		private final WikiImageUrlStorage imageUrlStorage;
 		private PreparedStatement insertPrep;
 		private PreparedStatement selectPrep;
 		private int batch = 0;
 		private final static int BATCH_SIZE = 1500;
 		private static final long ARTICLES_BATCH = 1000;
-		private final long testArticleId;
+		private long testArticleId;
 
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
@@ -900,6 +925,7 @@ public class WikiDatabasePreparation {
 			if (this.testArticleId == 0) {
 				selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
 			}
+			imageUrlStorage = new WikiImageUrlStorage(conn, sqliteFile.getParent(), lang);
 			log.info("Tables are prepared");
 		}
 
@@ -994,10 +1020,11 @@ public class WikiDatabasePreparation {
 							}
 						} else {
 							wikiId = testArticleId;
+							testArticleId++;
 						}
 						if (wikiId != 0) {
 							try {
-								plainStr = generateHtmlArticle(ctext.toString(), lang);
+								plainStr = generateHtmlArticle(ctext.toString(), lang, imageUrlStorage);
 							} catch (RuntimeException e) {
 								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
 							}
@@ -1030,11 +1057,12 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static String generateHtmlArticle(String contentText, String lang) throws IOException, SQLException {
+	private static String generateHtmlArticle(String contentText, String lang, WikiImageUrlStorage imageUrlStorage)
+			throws IOException, SQLException {
 		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
 		final HTMLConverter converter = new HTMLConverter(false);
 		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
-				"http://" + lang + ".wikipedia.org/wiki/${title}", true);
+				"http://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);
 		String plainStr = wikiModel.render(converter, text);
 		plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
 				.replaceAll("<p>/div\n</p>", "</div>");

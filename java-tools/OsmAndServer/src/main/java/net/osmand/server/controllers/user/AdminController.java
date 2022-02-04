@@ -155,10 +155,10 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Configurations are reloaded");
 		redirectAttrs.addFlashAttribute("services", new String[]{"motd", "download"});
-        if(!errors.isEmpty()) {
-        	redirectAttrs.addFlashAttribute("update_status", "FAILED");
-        	redirectAttrs.addFlashAttribute("update_errors", "Errors: " +errors);
-        }
+		if (!errors.isEmpty()) {
+			redirectAttrs.addFlashAttribute("update_status", "FAILED");
+			redirectAttrs.addFlashAttribute("update_errors", "Errors: " + errors);
+		}
         //return index(model);
         return "redirect:info";
 	}
@@ -209,13 +209,18 @@ public class AdminController {
 		subscriptionsRepository.save(deviceSub);
 		if (emailSender.isEmail(comment)) {
 			String email = comment;
-			PremiumUser pu = new PremiumUsersRepository.PremiumUser();
-			pu.email = email;
-			pu.regTime = new Date();
-			pu.orderid = deviceSub.orderId;
-			usersRepository.saveAndFlush(pu);
-			deviceSub.purchaseToken += " (email sent & registered)";
-			emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
+			PremiumUser existingUser = usersRepository.findByEmail(email);
+			if (existingUser == null) {
+				PremiumUser pu = new PremiumUsersRepository.PremiumUser();
+				pu.email = email;
+				pu.regTime = new Date();
+				pu.orderid = deviceSub.orderId;
+				usersRepository.saveAndFlush(pu);
+				deviceSub.purchaseToken += " (email sent & registered)";
+				emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
+			} else {
+				deviceSub.purchaseToken += " (ERROR: email is already registered)";
+			}
 		}
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
         return "redirect:info#audience";
@@ -237,7 +242,7 @@ public class AdminController {
 					deviceSub = ls.get(0);
 				}
 				if (deviceSub != null) {
-					UserFilesResults ufs = userDataController.generateFiles(pu.id, null, null, true);
+					UserFilesResults ufs = userDataController.generateFiles(pu.id, null, null, true, false);
 					ufs.allFiles.clear();
 					ufs.uniqueFiles.clear();
 					deviceSub.payload = gson.toJson(ufs);
@@ -1091,6 +1096,7 @@ public class AdminController {
 		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
 		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 
 		case "net.osmand.maps.subscription.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;

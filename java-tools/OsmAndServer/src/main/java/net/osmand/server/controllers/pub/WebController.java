@@ -132,11 +132,13 @@ public class WebController {
 			if (enableTranslation) {
 				file = "tr_" + file;
 			}
+			String basePath = pth;
 			for (String loc : SUPPORTED_LOCALES) {
 				if (pth.startsWith("/" + loc + "/")) {
 					file = loc + "_" + file;
 					localePath = loc + "/";
 					locale = new Locale(loc);
+					basePath = "/" + pth.substring(loc.length() + 2);
 					break;
 				}
 			}
@@ -149,6 +151,7 @@ public class WebController {
 				}
 				variables.put("translation", enableTranslation);
 				variables.put("locale_path", localePath);
+				variables.put("base_path", basePath);
 				LOGGER.info(String.format("Generate static file %s, localePath %s", file, localePath));
 				gr = new GeneratedResource();
 				File targetFile = new File(genLocation, file);

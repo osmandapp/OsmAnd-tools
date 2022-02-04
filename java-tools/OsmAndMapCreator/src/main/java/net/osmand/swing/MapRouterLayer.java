@@ -1,6 +1,8 @@
 package net.osmand.swing;
 
 
+import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics2D;
@@ -15,7 +17,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.RandomAccessFile;
 import java.io.Reader;
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
@@ -91,11 +92,9 @@ import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.router.RoutingConfiguration.*;
 
 
 public class MapRouterLayer implements MapPanelLayer {
@@ -128,13 +127,13 @@ public class MapRouterLayer implements MapPanelLayer {
 		}
 	};
 
-	public ActionListener setEndActionListener = new ActionListener(){
+	public ActionListener setEndActionListener = new ActionListener() {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			setEnd(new LatLon(map.getLatitude(), map.getLongitude()));
 		}
 	};
-
+	private boolean gpx = false;
 
 
 	@Override
@@ -355,7 +354,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					@Override
 					public void run() {
 						List<Way> ways = route_YOURS(startRoute, endRoute);
-						DataTileManager<Way> points = new DataTileManager<Way>(11);
+						DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 						for(Way w : ways){
 							LatLon n = w.getLatLon();
 							points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -454,12 +453,14 @@ public class MapRouterLayer implements MapPanelLayer {
 					// new Thread() {
 					// @Override
 					// public void run() {
-					List<Way> ways = new ArrayList<>();
-					calculateResult(ways, previousRoute);
+					List<Entity> es = new ArrayList<>();
+					calculateResult(es, previousRoute);
 					List<Location> locations = new ArrayList<>();
-					for (Way way : ways) {
-						for (net.osmand.osm.edit.Node node : way.getNodes()) {
-							locations.add(new Location("", node.getLatitude(), node.getLongitude()));
+					for (Entity ent : es) {
+						if (ent instanceof Way) {
+							for (net.osmand.osm.edit.Node node : ((Way) ent).getNodes()) {
+								locations.add(new Location("", node.getLatitude(), node.getLongitude()));
+							}
 						}
 					}
 					String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
@@ -508,7 +509,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					map.setPoints(points);
 					selectedGPXFile = null;
 					displayGpxFiles();
@@ -648,9 +649,18 @@ public class MapRouterLayer implements MapPanelLayer {
 			for (Track t : selectedGPXFile.tracks) {
 				for (TrkSegment ts : t.segments) {
 					Way w = new Way(-1);
+					int id = 0;
 					for (WptPt p : ts.points) {
-						w.addNode(new net.osmand.osm.edit.Node(p.lat, p.lon, -1));
+						net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(p.lat, p.lon, -1);
+						w.addNode(n);
+						n.putTag(OSMTagKey.NAME.getValue(), String.valueOf(id));
+						n.putTag("gpx", "yes");
+						n.putTag("colour", "blue");
+						points.registerObject(n.getLatitude(), n.getLongitude(), n);
+						id++;
 					}
+					w.putTag("gpx", "yes");
+					w.putTag("colour", "green");
 					LatLon n = w.getLatLon();
 					points.registerObject(n.getLatitude(), n.getLongitude(), w);
 				}
@@ -734,7 +744,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 			ways.add(wr);
 		}
-		DataTileManager<Way> points = new DataTileManager<Way>(11);
+		DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 		for (Way w : ways) {
 			LatLon n = w.getLatLon();
 			points.registerObject(n.getLatitude(), n.getLongitude(), w);
@@ -760,10 +770,10 @@ public class MapRouterLayer implements MapPanelLayer {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Way> ways = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
-				if (ways != null) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
-					for (Way w : ways) {
+				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
+				if (entities != null) {
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
+					for (Entity w : entities) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
 					}
@@ -784,10 +794,10 @@ public class MapRouterLayer implements MapPanelLayer {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Way> ways = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
-				if (ways != null) {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
-					for (Way w : ways) {
+				List<Entity> res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+				if (res != null) {
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
+					for (Entity w : res) {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
 					}
@@ -1087,16 +1097,11 @@ public class MapRouterLayer implements MapPanelLayer {
 
 
 
-	public List<Way> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
+	public List<Entity> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
 			boolean gpx, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
-		List<Way> res = new ArrayList<Way>();
+		this.gpx = gpx;
+		List<Entity> res = new ArrayList<Entity>();
 		long time = System.currentTimeMillis();
-		List<File> files = new ArrayList<File>();
-		for (File f : Algorithms.getSortedFilesVersions(new File(DataExtractionSettings.getSettings().getBinaryFilesDir()))) {
-			if(f.getName().endsWith(".obf")){
-				files.add(f);
-			}
-		}
 
 
 		final boolean animateRoutingCalculation = DataExtractionSettings.getSettings().isAnimateRouting();
@@ -1108,27 +1113,23 @@ public class MapRouterLayer implements MapPanelLayer {
 			playPauseButton.setText("Play");
 		}
 		stop = false;
-		if(files.isEmpty()){
-			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Please specify obf file in settings", "Obf file not found",
-					JOptionPane.ERROR_MESSAGE);
-			return null;
-		}
+		
 		System.out.println("Self made route from " + start + " to " + end);
 		if (start != null && end != null) {
 			try {
-				BinaryMapIndexReader[] rs = new BinaryMapIndexReader[files.size()];
-				int it = 0;
-				for (File f : files) {
-					RandomAccessFile raf = new RandomAccessFile(f, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-					rs[it++] = new BinaryMapIndexReader(raf, f);
+				BinaryMapIndexReader[] files = DataExtractionSettings.getSettings().getObfReaders();
+				if (files.length == 0) {
+					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+							"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
+					return null;
 				}
 				String m = DataExtractionSettings.getSettings().getRouteMode();
 				String[] props = m.split("\\,");
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 
 				Map<String, String> paramsR = new LinkedHashMap<String, String>();
-				for(String p : props) {
-					if(p.contains("=")) {
+				for (String p : props) {
+					if (p.contains("=")) {
 						paramsR.put(p.split("=")[0], p.split("=")[1]);
 					} else {
 						paramsR.put(p, "true");
@@ -1136,39 +1137,43 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
-//						addImpassableRoad(6859437l).
-//						addImpassableRoad(46859655089l).
-						setDirectionPoints(directionPointsFile).build(props[0],
-						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ memoryLimit, paramsR);
+				// addImpassableRoad(6859437l).
+				// addImpassableRoad(46859655089l).
+						setDirectionPoints(directionPointsFile)
+						.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
-//				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
-//				start = lts[0];
-//				end = lts[lts.length - 1];
-//				System.out.println("Start " + start + " end " + end);
-//				precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
-//				precalculatedRouteDirection.setFollowNext(true);
-//				config.planRoadDirection = 1;
+				// LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
+				// start = lts[0];
+				// end = lts[lts.length - 1];
+				// System.out.println("Start " + start + " end " + end);
+				// precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
+				// precalculatedRouteDirection.setFollowNext(true);
+				// config.planRoadDirection = 1;
 				// Test initial direction
-//				config.initialDirection = 90d / 180d * Math.PI; // EAST
-//				config.initialDirection = 180d / 180d * Math.PI; // SOUTH
-//				config.initialDirection = -90d / 180d * Math.PI; // WEST
-//				config.initialDirection = 0 / 180d * Math.PI; // NORTH
+				// config.initialDirection = 90d / 180d * Math.PI; // EAST
+				// config.initialDirection = 180d / 180d * Math.PI; // SOUTH
+				// config.initialDirection = -90d / 180d * Math.PI; // WEST
+				// config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
 				try {
-					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).parse("19.07.2019 12:40").getTime();
+					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
+							.parse("19.07.2019 12:40").getTime();
 				} catch (Exception e) {
 				}
 				config.routeCalculationTime = System.currentTimeMillis();
-				
-				final RoutingContext ctx = router.buildRoutingContext(config, DataExtractionSettings.getSettings().useNativeRouting() ? NativeSwingRendering.getDefaultFromSettings() :
-					null, rs, rm);
+
+				final RoutingContext ctx = router.buildRoutingContext(config,
+						DataExtractionSettings.getSettings().useNativeRouting()
+								? NativeSwingRendering.getDefaultFromSettings()
+								: null,
+						files, rm);
 
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
 				log.info("Use " + config.routerName + " mode for routing");
-				final DataTileManager<Entity> points = new DataTileManager<Entity>(11);
+				final DataTileManager<Entity> points = map.getPoints();
 				map.setPoints(points);
 				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
 				// Choose native or not native
@@ -1177,11 +1182,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				try {
 					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
-					List<RouteSegmentResult> searchRoute = gpx ?
-							getGpxAproximation(router, gctx, gpxPoints) :
-							router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+					List<RouteSegmentResult> searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
+							: router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
-					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
+					System.out.println("Routing time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
 						playPauseButton.setVisible(false);
 						nextTurn.setText("FINISH");
@@ -1201,11 +1205,12 @@ public class MapRouterLayer implements MapPanelLayer {
 				playPauseButton.setVisible(false);
 				nextTurn.setVisible(false);
 				stopButton.setVisible(false);
-				if(map.getPoints() != null) {
+				if (map.getPoints() != null) {
 					map.getPoints().clear();
 				}
 			}
-			System.out.println("!!! Finding self route: " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
+			System.out.println(
+					"!!! Finding self route: " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
 		}
 		return res;
 	}
@@ -1269,33 +1274,40 @@ public class MapRouterLayer implements MapPanelLayer {
 		}.start();
 	}
 
-	private void calculateResult(List<Way> res, List<RouteSegmentResult> searchRoute) {
-		net.osmand.osm.edit.Node prevWayNode = null;
-		for (RouteSegmentResult s : searchRoute) {
+	private void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute) {
+		RouteSegmentResult prevSegm = null;
+		for (RouteSegmentResult segm : searchRoute) {
 			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
 			Way way = new Way(-1);
 //					String name = String.format("time %.2f ", s.getSegmentTime());
-			String name = s.getDescription();
-			if(s.getTurnType() != null) {
-				name += " (TA " + s.getTurnType().getTurnAngle() + ") ";
+			String name = segm.getDescription();
+			if(segm.getTurnType() != null) {
+				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
 			}
 //					String name = String.format("beg %.2f end %.2f ", s.getBearingBegin(), s.getBearingEnd());
 			way.putTag(OSMTagKey.NAME.getValue(),name);
-			boolean plus = s.getStartPointIndex() < s.getEndPointIndex();
-			int i = s.getStartPointIndex();
+			if (prevSegm != null
+					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
+				net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevSegm.getEndPoint().getLatitude(), prevSegm.getEndPoint().getLongitude(), -1);
+				res.add(pp);
+				pp.putTag("colour", "blue");
+				net.osmand.osm.edit.Node pn = new net.osmand.osm.edit.Node(segm.getStartPoint().getLatitude(), segm.getStartPoint().getLongitude() , -1);
+				pn.putTag("colour", "red");
+				res.add(pn);
+				System.out.println(String.format("Not connected road '%f m' (%.5f/%.5f -> %.5f/%.5f) [%d: %s -> %d: %s]",
+						MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()), 
+						pp.getLatLon().getLatitude(), pp.getLatLon().getLongitude(), pn.getLatLon().getLatitude(), pn.getLatLon().getLongitude(), 
+						segm.getStartPointIndex(), segm.getObject(), prevSegm.getStartPointIndex(), prevSegm.getObject() ));
+			}
+			boolean plus = segm.getStartPointIndex() < segm.getEndPointIndex();
+			int ind = segm.getStartPointIndex();
 			while (true) {
-				LatLon l = s.getPoint(i);
+				LatLon l = segm.getPoint(ind);
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
-				if (prevWayNode != null) {
-					if (OsmMapUtils.getDistance(prevWayNode, n) > 0) {
-						System.out.println(String.format("Not connected road '%f m' (prev %s - current %s),  %d ind %s", OsmMapUtils.getDistance(prevWayNode, n), prevWayNode.getLatLon(), n.getLatLon(), i,
-								s.getObject()));
-					}
-					prevWayNode = null;
-				}
-				int[] pointTypes = s.getObject().getPointTypes(i);
+				
+				int[] pointTypes = segm.getObject().getPointTypes(ind);
 				if (pointTypes != null && pointTypes.length == 1) {
-					RouteTypeRule rtr = s.getObject().region.quickGetEncodingRule(pointTypes[0]);
+					RouteTypeRule rtr = segm.getObject().region.quickGetEncodingRule(pointTypes[0]);
 					if (rtr == null || !rtr.getTag().equals("osmand_dp")) {
 						// skip all intermediate added points (should no be visual difference)
 						way.addNode(n);
@@ -1303,20 +1315,19 @@ public class MapRouterLayer implements MapPanelLayer {
 				} else {
 					way.addNode(n);
 				}
-				if (i == s.getEndPointIndex()) {
+				if (ind == segm.getEndPointIndex()) {
 					break;
 				}
 				if (plus) {
-					i++;
+					ind++;
 				} else {
-					i--;
+					ind--;
 				}
 			}
 			if (way.getNodes().size() > 0) {
-				prevWayNode = way.getNodes().get(way.getNodes().size() - 1);
 				res.add(way);
 			}
-
+			prevSegm = segm;
 		}
 	}
 
@@ -1329,7 +1340,10 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			@Override
 			public void visitSegment(RouteSegment s, int  endSegment, boolean poll) {
-				if(stop) {
+				if (gpx) {
+					return;
+				}
+				if (stop) {
 					throw new RuntimeException("Interrupted");
 				}
 				if (!animateRoutingCalculation) {
@@ -1358,8 +1372,48 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 			}
 
+			@Override
+			public void visitApproximatedSegments(List<RouteSegmentResult> segment, GpxPoint start, GpxPoint target) {
+				if (stop) {
+					throw new RuntimeException("Interrupted");
+				}
+				if (!animateRoutingCalculation) {
+					return;
+				}
+//				points.clear();
+				for(List<Entity> list : points.getAllEditObjects()) {
+					Iterator<Entity> it = list.iterator();
+					while(it.hasNext()) {
+						Entity e = it.next();
+						if (!"yes".equals(e.getTag("gpx"))) {
+							it.remove();
+						}
+					}
+				}
+				startRoute = start.loc;
+				endRoute = target.loc;
+				for (int i = 0; i < segment.size(); i++) {
+					cache.add(new RouteSegment(segment.get(i).getObject(), segment.get(i).getStartPointIndex()));
+					cacheInt.add(segment.get(i).getEndPointIndex());
+				}
+				if (cache.size() < steps) {
+					return;
+				}
+				if (pause) {
+					registerObjects(points, false, pollCache, null);
+					pollCache.clear();
+				}
+				registerObjects(points, false, cache, cacheInt);
+				cache.clear();
+				cacheInt.clear();
+				redraw();
+				if (pause) {
+					waitNextPress();
+				}
+			}
+
 			private void registerObjects(final DataTileManager<Entity> points, boolean white, List<RouteSegment> registerCache,
-					List<Integer> cacheInt) {
+			                             List<Integer> cacheInt) {
 				for (int l = 0; l < registerCache.size(); l++) {
 					RouteSegment segment = registerCache.get(l);
 					Way way = new Way(-1);
@@ -1378,6 +1432,10 @@ public class MapRouterLayer implements MapPanelLayer {
 						if (i >= 0 && i < segment.getRoad().getPointsLength()) {
 							net.osmand.osm.edit.Node n = createNode(segment, i);
 							way.addNode(n);
+							if (i == from || i == to) {
+								n.putTag("colour", "red");
+							}
+							points.registerObject(n.getLatitude(), n.getLongitude(), n);
 						}
 					}
 					LatLon n = way.getLatLon();

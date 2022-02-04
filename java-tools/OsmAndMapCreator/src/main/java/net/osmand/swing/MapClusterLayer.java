@@ -24,20 +24,19 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Way;
-import net.osmand.router.BinaryRoutePlanner;
+import net.osmand.router.*;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
-import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
-import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
-import net.osmand.router.RoutingContext;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import static net.osmand.router.RoutePlannerFrontEnd.*;
 import static net.osmand.router.RoutingConfiguration.*;
 
 
@@ -102,7 +101,7 @@ public class MapClusterLayer implements MapPanelLayer {
 			@Override
 			public void run() {
 				try {
-					DataTileManager<Way> points = new DataTileManager<Way>(11);
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					List<RouteSegment> ways = clustering(clusterCtx, latitude, longitude, points);
 					for (RouteSegment s : ways) {
 						Way w = new Way(-1);
@@ -134,7 +133,7 @@ public class MapClusterLayer implements MapPanelLayer {
 	}
 
 	private List<RouteSegment> clustering(final ClusteringContext clusterCtx, double lat, double lon,
-			final DataTileManager<Way> points ) throws IOException{
+			final DataTileManager<Entity> points ) throws IOException{
 		List<BinaryMapIndexReader> rs = new ArrayList<BinaryMapIndexReader>();
 		for (File f : new File(DataExtractionSettings.getSettings().getBinaryFilesDir()).listFiles()) {
 			if (f.getName().endsWith(".obf")) {
@@ -195,6 +194,11 @@ public class MapClusterLayer implements MapPanelLayer {
 				} catch (InvocationTargetException e) {
 					e.printStackTrace();
 				}
+			}
+
+			@Override
+			public void visitApproximatedSegments(List<RouteSegmentResult> segment, GpxPoint start, GpxPoint target) {
+
 			}
 
 		});

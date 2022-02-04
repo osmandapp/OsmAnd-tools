@@ -4,7 +4,7 @@
 # These DBs contain tiles of specified size by zoom levels
 
 # Basic usage is
-# bake_heightmaps.sh /path/to/dem/collection /path/to/output/dir
+# generate.sh /path/to/dem/collection /path/to/output/dir
 
 # Fail on any error
 set -e
@@ -23,13 +23,23 @@ WORK_PATH="${OUTPUT_PATH}/.tmp"
 echo "Work directory:       $WORK_PATH"
 
 TILE_SIZE=32
-let "TILE_FULL_SIZE = $TILE_SIZE + 1"
+let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
 echo "Tile size:            $TILE_SIZE"
 echo "Tile size (full):     $TILE_FULL_SIZE"
 
 GDAL2TILES=`which gdal2tiles.py`
 GDAL2TILES_PATH=$(dirname "$GDAL2TILES")
-echo "gdal2tiles:           $GDAL2TILES"
+if "$SRC_PATH/test_gdal2tiles.py"; then
+    echo "gdal2tiles:           $GDAL2TILES (visible to python)"
+else
+    if [ -z "$PYTHONPATH" ]; then
+        export PYTHONPATH="$GDAL2TILES_PATH"
+    else
+        export PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH"
+    fi
+    "$SRC_PATH/test_gdal2tiles.py" || exit $?
+    echo "gdal2tiles:           $GDAL2TILES (added to PYTHONPATH)"
+fi
 
 # Step 0. Clean output path and recreate it
 if [ -e "${OUTPUT_PATH}" ]; then
@@ -45,7 +55,7 @@ if [ ! -f "$WORK_PATH/heightdbs.vrt" ]; then
     gdalbuildvrt \
         -resolution highest \
         -hidenodata \
-        -vrtnodata "-32768" \
+        -vrtnodata "0" \
         "$WORK_PATH/heightdbs.vrt" "$DEMS_PATH"/*)
 fi
 
@@ -83,7 +93,7 @@ fi
 echo "Slicing..."
 mkdir -p "$WORK_PATH/tiles"
 (cd "$WORK_PATH/tiles" && \
-PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/slicer.py" \
+"$SRC_PATH/slicer.py" \
     --size=$TILE_SIZE \
     --driver=GTiff \
     --extension=tif \
@@ -105,7 +115,7 @@ mkdir -p "$WORK_PATH/overlapped_tiles"
 echo "Packing..."
 mkdir -p "$WORK_PATH/db"
 (cd "$WORK_PATH/db" && \
-PYTHONPATH="$PYTHONPATH:$GDAL2TILES_PATH" "$SRC_PATH/packer.py" \
+"$SRC_PATH/packer.py" \
     --verbose \
     "$WORK_PATH/overlapped_tiles" "$WORK_PATH/db")
 

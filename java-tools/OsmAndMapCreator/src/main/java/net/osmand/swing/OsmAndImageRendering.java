@@ -29,8 +29,8 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import net.osmand.NativeLibrary;
-import net.osmand.swing.NativeSwingRendering.RenderingImageContext;
+import net.osmand.NativeJavaRendering;
+import net.osmand.NativeJavaRendering.RenderingImageContext;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -158,16 +158,14 @@ public class OsmAndImageRendering {
 		}
 
 		String backup = null;
-		if (nativeLib != null) {
-			boolean old = NativeLibrary.loadOldLib(nativeLib);
-			NativeLibrary nl = new NativeLibrary();
-			nl.loadFontData(new File("fonts"));
-			nl.loadFontData(new File("OsmAndMapCreator/fonts"));
-			
-			if (!old) {
-				throw new UnsupportedOperationException("Not supported");
-			}
-		}
+//		if (nativeLib != null) {
+//			boolean old = NativeLibrary.loadOldLib(nativeLib);
+//			NativeLibrary nl = new NativeLibrary();
+//			nl.loadFontData(new File(NativeSwingRendering.findFontFolder()));
+//			if (!old) {
+//				throw new UnsupportedOperationException("Not supported");
+//			}
+//		}
 		DocumentBuilder docBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		org.w3c.dom.Document doc = docBuilder.parse(new File(gpxFile));
 		Element de = doc.getDocumentElement();
@@ -218,7 +216,8 @@ public class OsmAndImageRendering {
 			if(maps.isEmpty()) {
                 throw new UnsupportedOperationException("No maps element found for wpt "+ name);
             }
-			NativeSwingRendering nsr = nativeLib != null ? new NativeSwingRendering() : null;
+			NativeJavaRendering nsr = nativeLib != null ? NativeJavaRendering.getDefault(
+					nativeLib, null, NativeSwingRendering.findFontFolder()) : null;
 //			nsr.initFilesInDir(new File(dirWithObf));
 			ArrayList<File> obfFiles = new ArrayList<File>();
 			initMaps(dirWithObf, backup, gpxFile, maps, nsr, obfFiles);
@@ -273,15 +272,15 @@ public class OsmAndImageRendering {
 					}
 
 				}
-				if(nativeLib != null){
+				if (nativeLib != null) {
 					final String fileName = ic.generateName + ".png";
-					System.out.println("Generate to " + fileName );
+					System.out.println("Generate to " + fileName);
 					nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
-					BufferedImage mg = nsr.renderImage(new RenderingImageContext(lat, lon, imageWidth, imageHeight,
-							ic.zoom, ic.mapDensity));
+					BufferedImage mg = nsr.renderImage(
+							new RenderingImageContext(lat, lon, imageWidth, imageHeight, ic.zoom, ic.mapDensity));
 
 					ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
-					  
+
 					if (html != null) {
 						html.addFile(fileName);
 					}
@@ -347,7 +346,7 @@ public class OsmAndImageRendering {
 		return name;
 	}
 
-	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeSwingRendering nsr,
+	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeJavaRendering nsr,
 			List<File> initFiles)
 			throws FileNotFoundException, IOException {
 		for(String map : maps.split(",")) {
@@ -388,7 +387,7 @@ public class OsmAndImageRendering {
 					targetFile.setLastModified(sourceZip.lastModified());
 				}
 			}
-			if(nsr != null) {
+			if (nsr != null) {
 				nsr.initMapFile(targetFile.getAbsolutePath(), true);
 			}
 			initFiles.add(targetFile);

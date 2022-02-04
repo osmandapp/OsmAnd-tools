@@ -28,6 +28,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.wiki.WikiImageUrlStorage;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -219,6 +220,7 @@ public class WikivoyageLangPreparation {
 		private ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		private DBDialect dialect = DBDialect.SQLITE;
 		private Connection conn;
+		private final WikiImageUrlStorage imageUrlStorage;
 		private PreparedStatement prep;
 		private int batch = 0;
 		private final static int BATCH_SIZE = 500;
@@ -234,14 +236,15 @@ public class WikivoyageLangPreparation {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
-			this.pageInfos = pageInfos;		
+			this.pageInfos = pageInfos;
 			progress.startTask("Parse wiki xml", progIS.available());
 
-			conn = (Connection) dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			imageUrlStorage = new WikiImageUrlStorage(conn, sqliteFile.getParent(), lang);
 			createInitialDbStructure(conn, uncompressed);
 			prep = generateInsertPrep(conn, uncompressed);
-			wikidataconn  = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
-			
+			wikidataconn = new WikidataConnection(new File(sqliteFile.getParentFile(), "wikidata.sqlite"));
+
 		}
 
 		public void addBatch() throws SQLException {
@@ -354,11 +357,11 @@ public class WikivoyageLangPreparation {
 						final HTMLConverter converter = new HTMLConverter(false);
 						CustomWikiModel wikiModel = new CustomWikiModel(
 								"https://upload.wikimedia.org/wikipedia/commons/${image}",
-								"https://" + lang + ".wikivoyage.org/wiki/${title}", false);
+								"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
 						String plainStr = wikiModel.render(converter, text);
 						plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
 								.replaceAll("<p>/div\n</p>", "</div>");
-						
+
 						if (DEBUG) {
 							String savePath = "/Users/plotva/Documents";
 							File myFile = new File(savePath, "page.html");

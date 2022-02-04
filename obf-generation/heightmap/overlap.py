@@ -117,6 +117,8 @@ class OsmAndHeightMapOverlap(object):
             tileZoom = inputTile[2]
             tmsTilesCount = 2**tileZoom
             tmsTileX_plus1 = (tmsTileX + 1) % tmsTilesCount
+            tmsTileX_minus1 = (tmsTileX - 1) if (tmsTileX > 0) else (tmsTilesCount - 1)
+            tmsTileY_plus1 = (tmsTileY + 1) % tmsTilesCount
             tmsTileY_minus1 = (tmsTileY - 1) if (tmsTileY > 0) else (tmsTilesCount - 1)
 
             outputTileFile = os.path.join(self.outputDir, str(tileZoom), str(tmsTileX), "%s.%s" % (tmsTileY, self.options.extension))
@@ -136,28 +138,60 @@ class OsmAndHeightMapOverlap(object):
             # Open base tile
             baseDataset = gdal.Open(inputTile[3], gdal.GA_ReadOnly)
             if self.options.verbose:
-                print("\t",baseDataset.RasterXSize,"x",baseDataset.RasterYSize," -> ",baseDataset.RasterXSize+1,"x",baseDataset.RasterYSize+1)
+                print("\t",baseDataset.RasterXSize,"x",baseDataset.RasterYSize," -> ",baseDataset.RasterXSize+3,"x",baseDataset.RasterYSize+3)
 
             # Create target dataset
-            targetDataset = self.memDriver.Create('', baseDataset.RasterXSize+1, baseDataset.RasterYSize+1, 1, baseDataset.GetRasterBand(1).DataType)
+            targetDataset = self.memDriver.Create('', baseDataset.RasterXSize+3, baseDataset.RasterYSize+3, 1, baseDataset.GetRasterBand(1).DataType)
+
+            # Layout (top-left α, top-right β, bottom-left γ, bottom-right δ) of a 1x1 resulting tile (4x4):
+            # αTββ
+            # LORR
+            # γBδδ
+            # γBδδ
 
             # Copy base to target
             if self.options.verbose:
-                print("\t =0  ",tmsTileX,"x",tmsTileY,"@",tileZoom,"=",inputTile[3])
-            targetDataset.WriteRaster(0, 0, baseDataset.RasterXSize, baseDataset.RasterYSize,
+                print("\t =O  ",tmsTileX,"x",tmsTileY,"@",tileZoom,"=",inputTile[3])
+            targetDataset.WriteRaster(1, 1, baseDataset.RasterXSize, baseDataset.RasterYSize,
                 baseDataset.ReadRaster(0, 0, baseDataset.RasterXSize, baseDataset.RasterYSize))
             del baseDataset
 
+            # Left tile
+            if tmsTileX_minus1 in self.inputFiles[tileZoom] and tmsTileY in self.inputFiles[tileZoom][tmsTileX_minus1]:
+                filename = self.inputFiles[tileZoom][tmsTileX_minus1][tmsTileY]
+                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+
+                if self.options.verbose:
+                    print("\t +L  ",tmsTileX_minus1,"x",tmsTileY,"@",tileZoom,"=",filename)
+
+                targetDataset.WriteRaster(0, 1, 1, dataset.RasterYSize,
+                    dataset.ReadRaster(dataset.RasterXSize - 1, 0, 1, dataset.RasterYSize))
+
+                del dataset
+
             # Right tile
-            if tmsTileX_plus1 in self.inputFiles[tileZoom]:
+            if tmsTileX_plus1 in self.inputFiles[tileZoom] and tmsTileY in self.inputFiles[tileZoom][tmsTileX_plus1]:
                 filename = self.inputFiles[tileZoom][tmsTileX_plus1][tmsTileY]
                 dataset = gdal.Open(filename, gdal.GA_ReadOnly)
 
                 if self.options.verbose:
                     print("\t +R  ",tmsTileX_plus1,"x",tmsTileY,"@",tileZoom,"=",filename)
 
-                targetDataset.WriteRaster(targetDataset.RasterXSize - 1, 0, 1, dataset.RasterYSize,
-                    dataset.ReadRaster(0, 0, 1, dataset.RasterYSize))
+                targetDataset.WriteRaster(targetDataset.RasterXSize - 2, 1, 2, dataset.RasterYSize,
+                    dataset.ReadRaster(0, 0, 2, dataset.RasterYSize))
+
+                del dataset
+
+            # Top tile
+            if tmsTileY_plus1 in self.inputFiles[tileZoom][tmsTileX]:
+                filename = self.inputFiles[tileZoom][tmsTileX][tmsTileY_plus1]
+                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+
+                if self.options.verbose:
+                    print("\t +T  ",tmsTileX,"x",tmsTileY_plus1,"@",tileZoom,"=",filename)
+
+                targetDataset.WriteRaster(1, 0, dataset.RasterXSize, 1,
+                    dataset.ReadRaster(0, dataset.RasterYSize - 1, dataset.RasterXSize, 1))
 
                 del dataset
 
@@ -169,8 +203,47 @@ class OsmAndHeightMapOverlap(object):
                 if self.options.verbose:
                     print("\t +B  ",tmsTileX,"x",tmsTileY_minus1,"@",tileZoom,"=",filename)
 
-                targetDataset.WriteRaster(0, targetDataset.RasterYSize - 1, dataset.RasterXSize, 1,
-                    dataset.ReadRaster(0, 0, dataset.RasterXSize, 1))
+                targetDataset.WriteRaster(1, targetDataset.RasterYSize - 2, dataset.RasterXSize, 2,
+                    dataset.ReadRaster(0, 0, dataset.RasterXSize, 2))
+
+                del dataset
+
+            # Top-left corner
+            if tmsTileX_minus1 in self.inputFiles[tileZoom] and tmsTileY_plus1 in self.inputFiles[tileZoom][tmsTileX_minus1]:
+                filename = self.inputFiles[tileZoom][tmsTileX_minus1][tmsTileY_plus1]
+                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+
+                if self.options.verbose:
+                    print("\t +TR ",tmsTileX_minus1,"x",tmsTileY_plus1,"@",tileZoom,"=",filename)
+
+                targetDataset.WriteRaster(0, 0, 1, 1,
+                    dataset.ReadRaster(dataset.RasterXSize - 1, dataset.RasterYSize - 1, 1, 1))
+
+                del dataset
+
+            # Top-right corner
+            if tmsTileX_plus1 in self.inputFiles[tileZoom] and tmsTileY_plus1 in self.inputFiles[tileZoom][tmsTileX_plus1]:
+                filename = self.inputFiles[tileZoom][tmsTileX_plus1][tmsTileY_plus1]
+                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+
+                if self.options.verbose:
+                    print("\t +TL ",tmsTileX_plus1,"x",tmsTileY_plus1,"@",tileZoom,"=",filename)
+
+                targetDataset.WriteRaster(targetDataset.RasterXSize - 2, 0, 2, 1,
+                    dataset.ReadRaster(0, dataset.RasterYSize - 1, 2, 1))
+
+                del dataset
+
+            # Bottom-left corner
+            if tmsTileX_minus1 in self.inputFiles[tileZoom] and tmsTileY_minus1 in self.inputFiles[tileZoom][tmsTileX_minus1]:
+                filename = self.inputFiles[tileZoom][tmsTileX_minus1][tmsTileY_minus1]
+                dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+
+                if self.options.verbose:
+                    print("\t +BL ",tmsTileX_minus1,"x",tmsTileY_minus1,"@",tileZoom,"=",filename)
+
+                targetDataset.WriteRaster(0, targetDataset.RasterYSize - 2, 1, 2,
+                    dataset.ReadRaster(dataset.RasterXSize - 1, 0, 1, 2))
 
                 del dataset
 
@@ -182,8 +255,8 @@ class OsmAndHeightMapOverlap(object):
                 if self.options.verbose:
                     print("\t +BR ",tmsTileX_plus1,"x",tmsTileY_minus1,"@",tileZoom,"=",filename)
 
-                targetDataset.WriteRaster(targetDataset.RasterXSize - 1, targetDataset.RasterYSize - 1, 1, 1,
-                    dataset.ReadRaster(0, 0, 1, 1))
+                targetDataset.WriteRaster(targetDataset.RasterXSize - 2, targetDataset.RasterYSize - 2, 2, 2,
+                    dataset.ReadRaster(0, 0, 2, 2))
 
                 del dataset
 

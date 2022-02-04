@@ -31,6 +31,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -67,6 +68,7 @@ import net.osmand.util.Algorithms;
 @RequestMapping("/userdata")
 public class UserdataController {
 
+	public static final String TOKEN_DEVICE_WEB = "web";
 	private static final String USER_FOLDER_PREFIX = "user-";
 	private static final String FILE_NAME_SUFFIX = ".gz";
 	private static final int ERROR_CODE_PREMIUM_USERS = 100;
@@ -84,6 +86,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 	
@@ -98,6 +101,9 @@ public class UserdataController {
 
 	Gson gson = new Gson();
 
+	@Autowired
+	PasswordEncoder encoder;
+	
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
@@ -275,7 +281,7 @@ public class UserdataController {
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
@@ -291,7 +297,7 @@ public class UserdataController {
 			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
-			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is registered");
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = checkOrderIdPremium(orderid);
 		if (errorMsg != null) {
@@ -305,6 +311,35 @@ public class UserdataController {
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
+		return ok();
+	}
+	
+	public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
+		if (password.length() < 6) {
+			return error(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
+		}
+		return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
+	}
+	
+	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email) throws IOException {
+		// allow to register only with small case
+		email = email.toLowerCase().trim();
+		if (!email.contains("@")) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+		}
+		PremiumUser pu = usersRepository.findByEmail(email);
+		if (pu == null) {
+			return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+		}
+		String errorMsg = checkOrderIdPremium(pu.orderid);
+		if (errorMsg != null) {
+			return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+		}
+		pu.tokendevice = TOKEN_DEVICE_WEB;
+		pu.token = (new Random().nextInt(8999) + 1000) + "";
+		pu.tokenTime = new Date();
+		usersRepository.saveAndFlush(pu);
+		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token);
 		return ok();
 	}
 
@@ -376,6 +411,11 @@ public class UserdataController {
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "token", required = true) String token,
 			@RequestParam(name = "deviceid", required = false) String deviceId) throws IOException {
+		String accessToken = UUID.randomUUID().toString();
+		return registerNewDevice(email, token, deviceId, accessToken);
+	}
+
+	private ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken) {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
 			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
@@ -387,10 +427,15 @@ public class UserdataController {
 		pu.token = null;
 		pu.tokenTime = null;
 		PremiumUserDevice device = new PremiumUserDevice();
+		PremiumUserDevice sameDevice ;
+		while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
+				deviceId)) != null) {
+			devicesRepository.delete(sameDevice);
+		}
 		device.userid = pu.id;
 		device.deviceid = deviceId;
 		device.udpatetime = new Date();
-		device.accesstoken = UUID.randomUUID().toString();
+		device.accesstoken = accessToken;
 		usersRepository.saveAndFlush(pu);
 		devicesRepository.saveAndFlush(device);
 		return ResponseEntity.ok(gson.toJson(device));
@@ -472,7 +517,7 @@ public class UserdataController {
 			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
 					"Subscription is not valid any more: " + errorMsg);
 		}
-		UserFilesResults res = generateFiles(dev.userid, null, null, false);
+		UserFilesResults res = generateFiles(dev.userid, null, null, false, false);
 		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
 			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
 					"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
@@ -587,38 +632,24 @@ public class UserdataController {
 			@RequestParam(name = "updatetime", required = false) Long updatetime,
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
-		ResponseEntity<String> error = null;
-		UserFile fl = null;
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		getFile(response, request, name, type, updatetime, dev);
+	}
+
+	public void getFile(HttpServletResponse response, HttpServletRequest request, String name, String type,
+			Long updatetime, PremiumUserDevice dev) throws IOException {
 		InputStream bin = null;
 		try {
-			if (dev == null) {
-				error = tokenNotValid();
-			} else {
-				if (updatetime != null) {
-					fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-							new Date(updatetime));
-				} else {
-					fl = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
-				}
-				if (fl == null) {
-					error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-				} else if (fl.data == null) {
-					bin = storageService.getFileInputStream(fl.storage, userFolder(fl), storageFileName(fl));
-					if (bin == null) {
-						error = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-					}
-				} else {
-					bin = new ByteArrayInputStream(fl.data);
-				}
-			}
-
-			if (error != null) {
-				response.setStatus(error.getStatusCodeValue());
-				response.getWriter().write(error.getBody());
+			@SuppressWarnings("unchecked")
+			ResponseEntity<String>[] error = new ResponseEntity[] { null };
+			UserFile userFile = getUserFile(name, type, updatetime, dev);
+			bin = getInputStream(dev, error, userFile);
+			if (error[0] != null) {
+				response.setStatus(error[0].getStatusCodeValue());
+				response.getWriter().write(error[0].getBody());
 				return;
 			}
-			response.setHeader("Content-Disposition", "attachment; filename=" + fl.name);
+			response.setHeader("Content-Disposition", "attachment; filename=" + userFile.name);
 			// InputStream bin = fl.data.getBinaryStream();
 
 			String acceptEncoding = request.getHeader("Accept-Encoding");
@@ -640,6 +671,41 @@ public class UserdataController {
 		}
 	}
 
+	public InputStream getInputStream(PremiumUserDevice dev, ResponseEntity<String>[] error, UserFile userFile) {
+		InputStream bin = null; 
+		if (dev == null) {
+			error[0] = tokenNotValid();
+		} else {
+			if (userFile == null) {
+				error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+			} else if (userFile.data == null) {
+				bin = getInputStream(userFile);
+				if (bin == null) {
+					error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				}
+			} else {
+				bin = new ByteArrayInputStream(userFile.data);
+			}
+		}
+		return bin;
+	}
+
+	public UserFile getUserFile(String name, String type, Long updatetime, PremiumUserDevice dev) {
+		if (dev == null) {
+			return null;
+		}
+		if (updatetime != null) {
+			return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
+					new Date(updatetime));
+		} else {
+			return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+		}
+	}
+
+	public InputStream getInputStream(UserFile userFile) {
+		return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
+	}
+
 	private ResponseEntity<String> tokenNotValid() {
 		return error(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
 	}
@@ -656,12 +722,14 @@ public class UserdataController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		UserFilesResults res = generateFiles(dev.userid, name, type, allVersions);
+		UserFilesResults res = generateFiles(dev.userid, name, type, allVersions, false);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions) {
-		List<UserFileNoData> fl = filesRepository.listFilesByUserid(userId, name, type);
+	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
+		List<UserFileNoData> fl = 
+				details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) : 
+						filesRepository.listFilesByUserid(userId, name, type);
 		UserFilesResults res = new UserFilesResults();
 		res.maximumAccountSize = MAXIMUM_ACCOUNT_SIZE;
 		res.uniqueFiles = new ArrayList<>();
@@ -700,6 +768,6 @@ public class UserdataController {
 		public List<UserFileNoData> uniqueFiles;
 		public int userid;
 		public long maximumAccountSize;
-
+		
 	}
 }

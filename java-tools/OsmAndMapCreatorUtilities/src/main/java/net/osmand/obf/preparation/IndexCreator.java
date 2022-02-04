@@ -880,8 +880,8 @@ public class IndexCreator {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
 		settings.indexMap = true;
-		// settings.indexAddress = true;
-		settings.indexPOI = true;
+		settings.indexAddress = true;
+//		settings.indexPOI = true;
 		// settings.indexTransport = true;
 		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;

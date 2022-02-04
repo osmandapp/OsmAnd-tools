@@ -21,6 +21,9 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
 	
 	
 	PremiumUserDevice findById(int id);
+	
+	PremiumUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
+
 
     @Entity
     @Table(name = "user_account_devices")
@@ -40,6 +43,7 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
         @Column(name = "accesstoken")
         public String accesstoken;
 
+        // TYPO don't fix unless fixed on client side
         @Column(name = "udpatetime")
         @Temporal(TemporalType.TIMESTAMP)
         public Date udpatetime;

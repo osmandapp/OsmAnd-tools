@@ -24,27 +24,34 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import net.osmand.util.Algorithms;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.gson.Gson;
 
 
 public class CustomWikiModel extends WikiModel {
-	
+
 	private Map<String, Map<String, Object>> dataMap;
 	private String prevHead = "";
 	private boolean preserveContents;
-	
+	String[] additionalImageAliases = new String[]{"קובץ", "ملف", "Файл"};
 
-	public static final String ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
+	public static final String WIKIPEDIA_COMMONS = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String PREFIX = "320px-";
+	private final WikiImageUrlStorage imageUrlStorage;
 
-	public CustomWikiModel(String imageBaseURL, String linkBaseURL, boolean preserveContents) {
+	public CustomWikiModel(String imageBaseURL, String linkBaseURL, WikiImageUrlStorage imageUrlStorage,
+	                       boolean preserveContents) {
 		super(imageBaseURL, linkBaseURL);
 		dataMap = new LinkedHashMap<>();
+		this.imageUrlStorage = imageUrlStorage;
 		this.preserveContents = preserveContents;
+		for (String alias : additionalImageAliases) {
+			getNamespace().getImage().addAlias(alias);
+		}
 	}
-	
+
 	public String getContentsJson() {
 		Map<String, Map<String, Map<String, Object>>> finalData = new LinkedHashMap<>();
 		finalData.put("headers", dataMap);
@@ -69,7 +76,7 @@ public class CustomWikiModel extends WikiModel {
 	public void parseInternalImageLink(String imageNamespace,
 			String rawImageLink) {
 		String imageName = rawImageLink.split("\\|")[0];
-		imageName = imageName.substring(imageName.indexOf(":") + 1);
+		imageName = imageName.substring(imageName.indexOf(":") + 1).trim();
 		if (imageName.isEmpty()) {
 			return;
 		}
@@ -315,20 +322,18 @@ public class CustomWikiModel extends WikiModel {
             return new TableOfContentTag("a");
     	}
     }
-	
-	public static String getThumbUrl(String fileName) {
-		String simplify = fileName.replace(' ', '_');
-		String md5 = DigestUtils.md5Hex(simplify);
-		String hash1 = md5.substring(0, 1);
-		String hash2 = md5.substring(0, 2);
-		return ROOT_URL + "thumb/" + hash1 + "/" + hash2 + "/" + simplify + "/" + PREFIX + simplify;
-	}
 
-	public static String getUrl(String fileName) {
+	public String getThumbUrl(String fileName) {
 		String simplify = fileName.replace(' ', '_');
+		if (imageUrlStorage != null) {
+			String thumbUrl = imageUrlStorage.getThumbUrl(simplify);
+			if (!Algorithms.isEmpty(thumbUrl)) {
+				return thumbUrl;
+			}
+		}
 		String md5 = DigestUtils.md5Hex(simplify);
 		String hash1 = md5.substring(0, 1);
 		String hash2 = md5.substring(0, 2);
-		return ROOT_URL + hash1 + "/" + hash2 + "/" + simplify;
+		return WIKIPEDIA_COMMONS + "thumb/" + hash1 + "/" + hash2 + "/" + simplify + "/" + PREFIX + simplify;
 	}
 }

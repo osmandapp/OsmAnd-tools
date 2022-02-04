@@ -75,6 +75,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	// MEMORY address : address structure
 	// load it in memory
 	private Map<EntityId, City> cities = new LinkedHashMap<EntityId, City>();
+	private List<Long> debugCityIds = new ArrayList<>();
 	private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
 	private DataTileManager<City> cityManager = new DataTileManager<City>(10);
 	private List<Relation> postalCodeRelations = new ArrayList<Relation>();
@@ -92,6 +93,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private TreeSet<String> langAttributes = new TreeSet<String>();
 	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
+    private static final int SHIFT_BOUNDARY_CENTER = 2;
 
 	Connection mapConnection;
 	DBStreetDAO streetDAO;
@@ -126,6 +128,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityVillageManager.registerObject(l.getLatitude(), l.getLongitude(), city);
 			}
 			cities.put(EntityId.valueOf(e), city);
+			debugCityIds.add(city.getId());
 		}
 	}
 
@@ -145,7 +148,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
-					if (c.getId() == boundary.getAdminCenterId()) {
+					if (c.getId() == boundary.getAdminCenterId() >> SHIFT_BOUNDARY_CENTER) {
 						boundary.setCityType(c.getType());
 						cityFound = c;
 						break;
@@ -187,7 +190,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					ctx.loadEntityRelation((Relation) e);
 				}
 				cityFound = createMissingCity(e, boundary.getCityType());
-				boundary.setAdminCenterId(cityFound.getId());
+				boundary.setAdminCenterId(getBoundaryCenter(cityFound.getId(), e));
 			}
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
@@ -286,16 +289,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		boolean cityBoundary = b.getCityType() != null;
 		// max 10
 		int adminLevelImportance = getAdminLevelImportance(b);
+		// boundary centerId can be from NODE or WAY with shift, from RELATION - without
 		if (nameEq) {
 			if (cityBoundary) {
 				return 0;
-			} else if (c.getId() == b.getAdminCenterId() ||
+			} else if (c.getId() == b.getAdminCenterId() >> SHIFT_BOUNDARY_CENTER ||
 					!b.hasAdminCenterId()) {
 				return adminLevelImportance;
 			}
 			return 10 + adminLevelImportance;
 		} else {
-			if (c.getId() == b.getAdminCenterId()) {
+			if (c.getId() == b.getAdminCenterId() >> SHIFT_BOUNDARY_CENTER) {
 				return 20 + adminLevelImportance;
 			} else {
 				return 30 + adminLevelImportance;
@@ -375,7 +379,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			final City city = createMissingCity(e, CityType.SUBURB);
 			if (city != null) {
-				centerId = city.getId();
+				centerId = getBoundaryCenter(city.getId(), e);
 				ct = CityType.SUBURB;
 			}
 		}
@@ -406,9 +410,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 					} else if (es.getEntity() instanceof Node &&
 							("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
-						centerId = es.getEntity().getId();
+						centerId = getBoundaryCenter(es.getEntity().getId(), es.getEntity());
 					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()) && centerId == 0)) {
-						centerId = es.getEntity().getId();
+						centerId = getBoundaryCenter(es.getEntity().getId(), es.getEntity());
 					}
 				}
 			} else if (e instanceof Way) {
@@ -421,7 +425,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setBoundaryId(e.getId());
 			boundary.setCityType(ct);
 			if (centerId != 0) {
-				boundary.setAdminCenterId(centerId >> SHIFT_ID);
+				boundary.setAdminCenterId(centerId);
 			}
 			return boundary;
 		} else {
@@ -429,13 +433,35 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	private long getBoundaryCenter(long centerId, Entity e) {
+	    if (e instanceof Node) {
+	        long id = centerId << SHIFT_ID;
+	        return (id << SHIFT_BOUNDARY_CENTER) + 0;
+        }
+	    if (e instanceof Way) {
+            long id = centerId << SHIFT_ID;
+            return (id << SHIFT_BOUNDARY_CENTER) + 1;
+        }
+	    //relation
+	    return (centerId << SHIFT_BOUNDARY_CENTER) + 2;
+    }
+
 
 	private City createMissingCity(Entity e, CityType t) throws SQLException {
 		City c = EntityParser.parseCity(e, t);
 		if (c.getLocation() == null) {
 			return null;
 		}
-//		long centerId = e.getId();
+		if (debugCityIds.contains(c.getId())) {
+			log.error("SQL ERROR!!! City ID already exists in \"city\" table \n" +
+					"insert into city (id, latitude, longitude, name, name_en, city_type) values (" +
+					+c.getId() +
+					", " + c.getLocation().getLatitude() +
+					"," + c.getLocation().getLongitude() +
+					", " + c.getName() +
+					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
+					", " + CityType.valueToString(c.getType()) + ")");
+		}
 		regCity(c, e);
 		writeCity(c);
 		commitWriteCity();
@@ -833,7 +859,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
 
 		String street = null;
-		if (houseNumber != null) {
+		if (houseNumber != null || houseName != null) {
 			street = e.getTag(OSMTagKey.ADDR_STREET);
 			if (street == null) {
 				street = e.getTag(OSMTagKey.ADDR_PLACE);
