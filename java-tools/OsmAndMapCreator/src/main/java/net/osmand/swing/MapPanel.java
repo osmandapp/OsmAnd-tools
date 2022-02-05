@@ -1215,7 +1215,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		void showRoute(RenderedObject o, String key) {
 			new Thread(() -> {
 
-				NativeSwingRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
+				NativeJavaRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
 						MapUtils.get31LatitudeY(o.getY().get(0)),
 						MapUtils.get31LongitudeX(o.getX().get(0)));
 				if (mapDiffs != null) {
@@ -1225,7 +1225,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 						reader[0] = new BinaryMapIndexReader(new RandomAccessFile(mapFile, "r"), mapFile);
 						RouteSelector routeSelector = new RouteSelector(reader);
 						List<GPXFile> files = routeSelector.getRoutes(o);
-						DataTileManager<Way> points = new DataTileManager<>();
+						DataTileManager<Entity> points = new DataTileManager<>();
 						List<Way> ways = new ArrayList<>();
 						for (GPXFile file : files) {
 							for (Track track : file.tracks) {
