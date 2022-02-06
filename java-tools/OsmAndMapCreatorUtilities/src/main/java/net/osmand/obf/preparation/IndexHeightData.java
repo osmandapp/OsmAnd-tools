@@ -522,11 +522,16 @@ public class IndexHeightData {
 //		USE_BILINEAR_INTERPOLATION = false;
 //		simpleTestHeight();
 //		testHeight();
-		testFileSmoothness();
+		
+//		testFileSmoothness();
 
 	}
 
-	private static void testFileSmoothness() throws XmlPullParserException, IOException {
+	
+
+
+
+	protected static void testFileSmoothness() throws XmlPullParserException, IOException {
 //		File fl = new File("/Users/victorshcherb/osmand/maps/route_laspi.gpx");
 		File fl = new File("/Users/victorshcherb/osmand/route.gpx");
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
