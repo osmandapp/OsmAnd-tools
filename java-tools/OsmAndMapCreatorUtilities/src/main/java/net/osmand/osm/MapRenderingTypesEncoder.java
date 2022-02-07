@@ -1669,7 +1669,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private boolean isSpecificGlueTag(String tag) {
-		String[] specific = { "layer", "ref", "tunnel", "covered", "bridge", "network", "road"};
+		String[] specific = { "layer", "ref", "tunnel", "covered", "bridge", "network", "road", "population", "region"};
 		for (String s : specific) {
 			if (tag.contains(s)) {
 				return true;
