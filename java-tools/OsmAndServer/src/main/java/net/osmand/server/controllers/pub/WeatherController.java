@@ -49,6 +49,7 @@ public class WeatherController {
 			Calendar c = Calendar.getInstance();
 			c.set(Calendar.MINUTE, 0);
 			if (week) {
+				increment = 3;
 				c.setTimeZone(TimeZone.getTimeZone("UTC"));
 				int h = c.get(Calendar.HOUR);
 				c.set(Calendar.HOUR, h - (h % 3));
