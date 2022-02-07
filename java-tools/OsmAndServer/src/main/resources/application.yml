@@ -43,11 +43,13 @@ server:
   compression.enabled: true
   compression.min-response-size: 4096
 
-night-builds-json.location: https://dl2.osmand.net/night-builds-json/
-files.location: ${user.dir}/../../../help
-gen.location: ${files.location}/gen
-web.location: ${files.location}/website
-srtm.location: ${SRTM_LOCATION:}
+osmand:
+  night-builds-json.location: https://dl2.osmand.net/night-builds-json/
+  files.location: ${user.dir}/../../../help
+  gen.location: ${osmand.files.location}/gen
+  web.location: ${osmand.files.location}/website
+  srtm.location: ${SRTM_LOCATION:}
+  weather.tiff-location: ${WEATHER_TIFF_LOCATION:}
 
 tile-server: 
   obf.location: ${OBF_LOCATION:}
@@ -86,9 +88,9 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
-  resources.static-locations: file:${web.location}
+  resources.static-locations: file:${osmand.web.location}
   thymeleaf:
-    prefix: file:${web.location}/templates/
+    prefix: file:${osmand.web.location}/templates/
     cache: false
 
 # classpath:/static/
@@ -103,9 +105,7 @@ geoip.url: "http://localhost:8081/json/"
 ---
 spring.jpa.hibernate.ddl-auto: validate
 
-files.location: /var/www-download
-gen.location: ${files.location}/gen
-web.location: ${files.location}/website
+osmand.files.location: /var/www-download
 
 logging:
   file: /var/log/osmand-server-logs/error.log
@@ -128,5 +128,5 @@ server:
 
 spring:
   profiles: production
-  resources.static-locations: file:${web.location}
-  thymeleaf.prefix: file:${web.location}/templates/
+  resources.static-locations: file:${osmand.web.location}
+  thymeleaf.prefix: file:${osmand.web.location}/templates/

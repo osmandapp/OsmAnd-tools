@@ -109,7 +109,7 @@ generate_bands_tiff() {
             # done
         # done
         rm $TIFF_FOLDER/${FILE_NAME}.tiff.gz || true
-        gzip $TIFF_FOLDER/${FILE_NAME}.tiff
+        gzip --keep $TIFF_FOLDER/${FILE_NAME}.tiff
     done
 }
 

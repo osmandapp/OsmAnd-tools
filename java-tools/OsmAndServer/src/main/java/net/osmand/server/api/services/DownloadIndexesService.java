@@ -45,13 +45,13 @@ public class DownloadIndexesService  {
 	private static final String INDEX_FILE = "indexes.xml";
 	private static final String DOWNLOAD_SETTINGS = "api/settings.json";
 	
-	@Value("${files.location}")
+	@Value("${osmand.files.location}")
     private String pathToDownloadFiles;
 	
-	@Value("${gen.location}")
+	@Value("${osmand.gen.location}")
 	private String pathToGenFiles;
 	
-	@Value("${web.location}")
+	@Value("${osmand.web.location}")
     private String websiteLocation;
 
 	private DownloadProperties settings;

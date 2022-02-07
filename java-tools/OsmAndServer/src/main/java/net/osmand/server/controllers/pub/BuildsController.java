@@ -40,13 +40,13 @@ public class BuildsController {
 	private static final long DELAY_TO_REBUILD = 15 * 1000;
 	private final SimpleDateFormat FMT = new SimpleDateFormat("dd.MM.yyyy");
 
-	@Value("${night-builds-json.location}")
+	@Value("${osmand.night-builds-json.location}")
 	private String NIGHT_BUILDS_URL;
 
-	@Value("${files.location}")
+	@Value("${osmand.files.location}")
 	private String ROOT_FOLDER;
 
-	@Value("${gen.location}")
+	@Value("${osmand.gen.location}")
 	private String pathToGenFiles;
 
 	private synchronized void updateBuilds(File output) throws IOException {

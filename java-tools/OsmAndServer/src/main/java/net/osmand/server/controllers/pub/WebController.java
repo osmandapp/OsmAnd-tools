@@ -55,10 +55,10 @@ public class WebController {
 
 	private Random random = new Random();
 
-	@Value("${web.location}")
+	@Value("${osmand.web.location}")
 	private String websiteLocation;
 
-	@Value("${gen.location}")
+	@Value("${osmand.gen.location}")
 	private String genLocation;
 
 	@Autowired

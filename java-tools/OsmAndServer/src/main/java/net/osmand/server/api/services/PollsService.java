@@ -17,7 +17,7 @@ import com.google.gson.Gson;
 public class PollsService {
     private static final Log LOGGER = LogFactory.getLog(PollsService.class);
 
-    @Value("${web.location}")
+    @Value("${osmand.web.location}")
     private String websiteLocation;
     
     Gson gson = new Gson();

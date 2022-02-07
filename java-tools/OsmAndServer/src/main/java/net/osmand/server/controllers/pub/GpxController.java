@@ -69,7 +69,7 @@ public class GpxController {
 	@Autowired
 	UserSessionResources session;
 	
-	@Value("${srtm.location}")
+	@Value("${osmand.srtm.location}")
 	String srtmLocation;
 	
 	@PostMapping(path = {"/clear"}, produces = "application/json")

@@ -32,7 +32,7 @@ public class MotdService {
     private static final String MOTD_SETTINGS = "api/messages/motd_config.json";
     private static final String SUBSCRIPTION_SETTINGS = "api/subscriptions/config.json";
 
-    @Value("${web.location}")
+    @Value("${osmand.web.location}")
     private String websiteLocation;
     
 
