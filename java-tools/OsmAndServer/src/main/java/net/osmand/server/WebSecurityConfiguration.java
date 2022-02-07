@@ -43,6 +43,9 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
@@ -141,6 +144,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				return false;
 			}
 		}).csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
+    	http.cors().configurationSource(corsConfigurationSource());
     	
     	// 2. Configure admins - all top level are accessible without login
     	for (String admin : adminEmails.split(",")) {
@@ -219,13 +223,23 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	public AuthorizationCodeResourceDetails google() {
 		return new AuthorizationCodeResourceDetails();
 	}
-	
+
 	@Bean
 	public PasswordEncoder passwordEncoder() {
-	    DelegatingPasswordEncoder delegatingPasswordEncoder = 
-	    		(DelegatingPasswordEncoder) PasswordEncoderFactories.createDelegatingPasswordEncoder();
-	    delegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder());
+		DelegatingPasswordEncoder delegatingPasswordEncoder = (DelegatingPasswordEncoder) PasswordEncoderFactories
+				.createDelegatingPasswordEncoder();
+		delegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder());
 		return delegatingPasswordEncoder;
 	}
-	
+
+	@Bean
+	CorsConfigurationSource corsConfigurationSource() {
+		CorsConfiguration configuration = new CorsConfiguration();
+		configuration.setAllowedOrigins(Arrays.asList("https://*.osmand.net"));
+		configuration.setAllowedMethods(Arrays.asList("GET", "POST"));
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		source.registerCorsConfiguration("/**", configuration);
+		return source;
+	}
+
 }
