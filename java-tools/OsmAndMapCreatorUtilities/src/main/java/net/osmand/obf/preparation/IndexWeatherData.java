@@ -32,9 +32,14 @@ public class IndexWeatherData {
 		private int height;
 		private int width;
 		private int bands;
+		
 		public WeatherTiff(File file) throws IOException {
 			this.file = file;
 			readFile(file);
+		}
+		
+		public int getBands() {
+			return bands;
 		}
 
 
@@ -184,7 +189,7 @@ public class IndexWeatherData {
 		System.out.println("TIME    :      " + format("%3.0f:00", wth[0]));
 		System.out.println("Cloud %%:      " + format("%6.2f", wth[1]));
 		System.out.println("Temp (C):      " + format("%6.1f", wth[2]));
-		System.out.println("Pressure (Pa): " + format("%6.0f", wth[3]));
+		System.out.println("Pressure (kPa):" + format("%6.2f", wth[3], 0.001));
 		System.out.println("Wind (m/s):    " + format("%6.2f", wth[4]));
 		System.out.println("Precipitation: " + format("%6.2f", wth[5], 1000 * 1000)); // (mg/(m^2 s)
 		System.out.println((System.currentTimeMillis() - ms) + " ms");

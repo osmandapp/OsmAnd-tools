@@ -121,10 +121,10 @@ public class AdminController {
 	@Value("${git.commit.format}")
 	private String serverCommit;
 
-	@Value("${web.location}")
+	@Value("${osmand.web.location}")
 	private String websiteLocation;
 
-	@Value("${files.location}")
+	@Value("${osmand.files.location}")
 	private String filesLocation;
 
 	@Autowired

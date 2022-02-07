@@ -47,7 +47,7 @@ public class IndexController {
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy");
 
-    @Value("${files.location}")
+    @Value("${osmand.files.location}")
     private String filesLocation;
 
     @Autowired

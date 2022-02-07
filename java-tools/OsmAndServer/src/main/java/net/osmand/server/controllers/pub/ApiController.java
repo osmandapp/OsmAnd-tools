@@ -68,10 +68,10 @@ public class ApiController {
 
     private static final String PROC_FILE = ".proc_timestamp";
 
-    @Value("${files.location}")
+    @Value("${osmand.files.location}")
     private String filesLocation;
     
-    @Value("${web.location}")
+    @Value("${osmand.web.location}")
     private String websiteLocation;
 
 	@Autowired

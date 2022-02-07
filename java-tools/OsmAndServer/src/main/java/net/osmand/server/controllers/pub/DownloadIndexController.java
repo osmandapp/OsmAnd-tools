@@ -43,7 +43,7 @@ public class DownloadIndexController {
 	@Autowired
 	private DownloadIndexesService downloadService;
 	
-	@Value("${files.location}")
+	@Value("${osmand.files.location}")
 	private String filesPath;
 
 
