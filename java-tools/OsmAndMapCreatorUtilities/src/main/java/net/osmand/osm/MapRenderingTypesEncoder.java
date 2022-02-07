@@ -303,7 +303,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					outTypes.add(combineOrderAndId(rType));
 				}
 				if (rType.isAdditionalOrText() && rType.isMap()) {
-					if (rType.isAdditional() && isSpecificGlueTag(tag)) {
+					if (rType.isAdditional()) {
 						outAddTypes.add(combineOrderAndId(rType));
 					} else if (rType.isText()) {
 						namesToEncode.put(rType, val);
@@ -1666,16 +1666,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> ifTagsNotLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
-	}
-
-	private boolean isSpecificGlueTag(String tag) {
-		String[] specific = { "layer", "ref", "tunnel", "covered", "bridge", "network", "road", "population", "region"};
-		for (String s : specific) {
-			if (tag.contains(s)) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 }
