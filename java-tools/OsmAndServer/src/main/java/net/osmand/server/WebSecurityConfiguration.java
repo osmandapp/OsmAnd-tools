@@ -238,6 +238,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net", 
 				"https://osmand.net", "https://test.osmand.net"));
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
+		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
 		return source;
