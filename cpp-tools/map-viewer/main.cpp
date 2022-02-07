@@ -72,9 +72,7 @@
 #include <OsmAndCore/Map/AmenitySymbolsProvider.h>
 #include <OsmAndCore/FavoriteLocationsGpxCollection.h>
 #include <OsmAndCore/Map/FavoriteLocationsPresenter.h>
-#include <OsmAndCore/GeoInfoDocument.h>
 #include <OsmAndCore/GpxDocument.h>
-#include <OsmAndCore/Map/GeoInfoPresenter.h>
 #include <OsmAndCore/Search/AmenitiesByNameSearch.h>
 #include <OsmAndCore/Search/AmenitiesInAreaSearch.h>
 #include <OsmAndCore/Search/AddressesByNameSearch.h>
@@ -104,7 +102,6 @@ std::shared_ptr<OsmAnd::FavoriteLocationsGpxCollection> favorites;
 std::shared_ptr<OsmAnd::FavoriteLocationsPresenter> favoritesPresenter;
 std::shared_ptr<OsmAnd::MapMarker> lastClickedLocationMarker;
 std::shared_ptr<OsmAnd::RoadLocator> roadLocator;
-std::shared_ptr<OsmAnd::GeoInfoPresenter> gpxPresenter;
 //const auto obfMapObjectsProviderMode = OsmAnd::ObfMapObjectsProvider::Mode::OnlyBinaryMapObjects;
 const auto obfMapObjectsProviderMode = OsmAnd::ObfMapObjectsProvider::Mode::BinaryMapObjectsAndRoads;
 
@@ -456,13 +453,6 @@ int main(int argc, char** argv)
     }
     animator.reset(new OsmAnd::MapAnimator());
     animator->setMapRenderer(renderer);
-    //////////////////////////////////////////////////////////////////////////
-
-    QList< std::shared_ptr<const OsmAnd::GeoInfoDocument> > geoInfoDocs;
-    if (QFile::exists(QLatin1String("track.gpx")))
-        geoInfoDocs.append(OsmAnd::GpxDocument::loadFrom("track.gpx"));
-    gpxPresenter.reset(new OsmAnd::GeoInfoPresenter(geoInfoDocs));
-
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
@@ -1366,25 +1356,6 @@ void activateProvider(int layerIdx, int idx)
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
-
-        //OsmAnd::MapLayerConfiguration mapLayerConfiguration;
-        //mapLayerConfiguration.opacity = 0.5f;
-        //renderer->setMapLayerConfiguration(layerIdx, mapLayerConfiguration);
-        //
-//        if (gpxPresenter)
-//        {
-//            const std::shared_ptr<OsmAnd::MapPrimitivesProvider> gpxPrimitivesProvider(new OsmAnd::MapPrimitivesProvider(
-//                gpxPresenter->createMapObjectsProvider(),
-//                primitivizer,
-//                256,
-//                OsmAnd::MapPrimitivesProvider::Mode::AllObjectsWithPolygonFiltering));
-//            auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(gpxPrimitivesProvider, false);
-//            renderer->setMapLayerProvider(10, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
-//
-//            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(gpxPrimitivesProvider, 256u));
-//            renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
-//        }
-        //
     }
     else if (idx == 3)
     {
