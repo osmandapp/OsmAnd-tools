@@ -40,15 +40,21 @@ public class WeatherController {
 	String tiffLocation;
 	
 	@RequestMapping(path = "/point-info", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routing(@RequestParam(required = true) double lat, @RequestParam(required = true) double lon)
+	public ResponseEntity<?> routing(@RequestParam(required = true) double lat, @RequestParam(required = true) double lon, 
+			@RequestParam(defaultValue = "false") boolean week)
 			throws IOException, InterruptedException {
 		File folder = new File(tiffLocation);
 		List<Object[]> dt = new ArrayList<>();
+		int increment = 1;
 		if (folder.exists()) {
 			Calendar c = Calendar.getInstance();
 			c.set(Calendar.MINUTE, 0);
-			int err = 0;
-			while (err < 3) {
+			if (week) {
+				c.setTimeZone(TimeZone.getTimeZone("UTC"));
+				int h = c.get(Calendar.HOUR);
+				c.set(Calendar.HOUR, h - (h % 3));
+			}
+			while (true) {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
 				if (fl.exists()) {
 					Object[] data = new Object[7];
@@ -60,9 +66,9 @@ public class WeatherController {
 					}
 					dt.add(data);
 				} else {
-					err++;
+					break;
 				}
-				c.add(Calendar.HOUR, 1);
+				c.add(Calendar.HOUR, increment);
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(dt));
