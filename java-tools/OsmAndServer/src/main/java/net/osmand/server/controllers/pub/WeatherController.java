@@ -41,8 +41,7 @@ public class WeatherController {
 	
 	@RequestMapping(path = "/point-info", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routing(@RequestParam(required = true) double lat, @RequestParam(required = true) double lon, 
-			@RequestParam(defaultValue = "false") boolean week)
-			throws IOException, InterruptedException {
+			@RequestParam(defaultValue = "false") boolean week) {
 		File folder = new File(tiffLocation);
 		List<Object[]> dt = new ArrayList<>();
 		int increment = 1;
@@ -57,14 +56,18 @@ public class WeatherController {
 			while (true) {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
 				if (fl.exists()) {
-					Object[] data = new Object[7];
-					data[0] = c.getTimeInMillis();
-					data[1] = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
-					WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl);
-					for (int i = 0; i < wt.getBands() && i < 5; i++) {
-						data[2 + i] = wt.getValue(i, lat, lon);
+					try {
+						Object[] data = new Object[7];
+						data[0] = c.getTimeInMillis();
+						data[1] = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
+						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl);
+						for (int i = 0; i < wt.getBands() && i < 5; i++) {
+							data[2 + i] = wt.getValue(i, lat, lon);
+						}
+						dt.add(data);
+					} catch (IOException e) {
+						LOGGER.warn(String.format("Error reading %s: %s", fl.getName(), e.getMessage()), e);
 					}
-					dt.add(data);
 				} else {
 					break;
 				}
