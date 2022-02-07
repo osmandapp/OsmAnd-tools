@@ -24,7 +24,7 @@ import net.osmand.obf.preparation.IndexWeatherData;
 import net.osmand.obf.preparation.IndexWeatherData.WeatherTiff;
 
 @Controller
-@RequestMapping("/weather")
+@RequestMapping("/weather-api")
 public class WeatherController {
 	
 	protected static final Log LOGGER = LogFactory.getLog(WeatherController.class);
