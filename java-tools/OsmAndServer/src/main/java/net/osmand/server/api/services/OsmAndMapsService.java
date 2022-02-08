@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -41,7 +40,11 @@ import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
+import net.osmand.binary.OsmandIndex.FileIndex;
+import net.osmand.binary.OsmandIndex.RoutingPart;
+import net.osmand.binary.OsmandIndex.RoutingSubregion;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -50,12 +53,13 @@ import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 @Service
 public class OsmAndMapsService {
 	private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
 
-	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 40;
+	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 80;
 
 	private static final int MAX_RUNTIME_TILES_CACHE_SIZE = 10000;
 
@@ -67,7 +71,7 @@ public class OsmAndMapsService {
 	
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 
-	Map<String, BinaryMapIndexReaderReference> obfFiles = new ConcurrentHashMap<>();
+	Map<String, BinaryMapIndexReaderReference> obfRoutingFiles = new LinkedHashMap<>();
 
 	AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -83,6 +87,7 @@ public class OsmAndMapsService {
 	public static class BinaryMapIndexReaderReference {
 		File file;
 		BinaryMapIndexReader reader;
+		public FileIndex fileIndex;
 	}
 
 	@Configuration
@@ -422,8 +427,8 @@ public class OsmAndMapsService {
 		if (!validateAndInitConfig()) {
 			return Collections.emptyList();
 		}
-		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib? nativelib : null, getObfReaders(),
-				RouteCalculationMode.COMPLEX);
+		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null, 
+				getObfReaders(points(intermediates, start, end)), RouteCalculationMode.COMPLEX);
 		ctx.leftSideNavigation = false;
 		// ctx.previouslyCalculatedRoute = previousRoute;
 		// LOGGER.info("Use " + config.routerName + " mode for routing");
@@ -434,37 +439,83 @@ public class OsmAndMapsService {
 		return route;
 	}
 
-	public synchronized BinaryMapIndexReader[] getObfReaders() throws IOException {
+	private QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
+		int y = MapUtils.get31TileNumberY(start.getLatitude());
+		int x = MapUtils.get31TileNumberX(start.getLongitude());
+		QuadRect upd = new QuadRect(x, y, x, y);
+		addPnt(end, upd);
+		if(intermediates != null) {
+			intermediates.forEach(item -> addPnt(item, upd));
+		}
+		return upd;
+	}
+
+	private void addPnt(LatLon pnt, QuadRect upd) {
+		int y = MapUtils.get31TileNumberY(pnt.getLatitude());
+		int x = MapUtils.get31TileNumberX(pnt.getLongitude());
+		if (upd.left > x) {
+			upd.left = x;
+		}
+		if (upd.right < x) {
+			upd.right = x;
+		}
+		if (upd.bottom < y) {
+			upd.bottom = y;
+		}
+		if (upd.top > y) {
+			upd.top = y;
+		}
+	}
+
+	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
 		List<BinaryMapIndexReader> files = new ArrayList<>();
+		if (obfRoutingFiles.isEmpty()) {
+			initObfReaders();
+		}
+		for (BinaryMapIndexReaderReference ref : obfRoutingFiles.values()) {
+			boolean intersects = false;
+			mainLoop: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
+				for (RoutingSubregion s : rp.getSubregionsList()) {
+					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
+							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
+					if (intersects) {
+						if (ref.reader == null) {
+							long val = System.currentTimeMillis();
+							RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+							ref.reader = CachedOsmandIndexes.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
+							LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms"); 
+						}
+						files.add(ref.reader);
+						break mainLoop;
+					}
+				}
+			}
+		};
+		return files.toArray(new BinaryMapIndexReader[files.size()]);
+	}
+	
+	public synchronized void initObfReaders() throws IOException {
 		File mapsFolder = new File(config.obfLocation);
 		CachedOsmandIndexes cache = null;
 		File cacheFile = new File(mapsFolder, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME);
-		if (mapsFolder.exists() && obfFiles.isEmpty()) {
+		if (mapsFolder.exists()) {
 			cache = new CachedOsmandIndexes();
 			if (cacheFile.exists()) {
 				cache.readFromFile(cacheFile, 2);
 			}
-		}
-		for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
-			if (obf.getName().endsWith(".obf")) {
-				BinaryMapIndexReaderReference ref = obfFiles.get(obf.getAbsolutePath());
-				if (ref == null || ref.reader == null) {
-					ref = new BinaryMapIndexReaderReference();
-					ref.file = obf;
-					if (cache == null) {
-						RandomAccessFile raf = new RandomAccessFile(obf, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-						ref.reader = new BinaryMapIndexReader(raf, obf);
-					} else {
-						ref.reader = cache.getReader(obf, true);
+			for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
+				if (obf.getName().endsWith(".obf")) {
+					BinaryMapIndexReaderReference ref = obfRoutingFiles.get(obf.getAbsolutePath());
+					if (ref == null) {
+						ref = new BinaryMapIndexReaderReference();
+						ref.file = obf;
+						ref.fileIndex = cache.getFileIndex(obf, true);
+						obfRoutingFiles.put(obf.getAbsolutePath(), ref);
 					}
-					obfFiles.put(obf.getAbsolutePath(), ref);
 				}
-				files.add(ref.reader);
 			}
-		}
-		if (cache != null && !files.isEmpty()) {
 			cache.writeToFile(cacheFile);
 		}
-		return files.toArray(new BinaryMapIndexReader[files.size()]);
+		
 	}
 }

@@ -53,6 +53,7 @@ osmand:
 
 tile-server: 
   obf.location: ${OBF_LOCATION:}
+  obf.ziplocation: ${OBF_LOCATION_ZIP:}
   metatile-size: 2048 # render tiles as 2048 x 2048
   style:
     df: style=default,tilesize=256 
