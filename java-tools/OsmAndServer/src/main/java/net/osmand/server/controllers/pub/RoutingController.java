@@ -175,7 +175,7 @@ public class RoutingController {
 			} catch (InterruptedException e) {
 				LOGGER.error(e.getMessage(), e);
 			} catch (RuntimeException e) {
-				LOGGER.error(e.getMessage());
+				LOGGER.error(e.getMessage(), e);
 			}
 		}
 		if (resList.size() == 0) {
