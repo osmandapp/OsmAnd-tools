@@ -41,7 +41,7 @@ import javax.swing.*;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.router.RouteColorize.ColorizationType;
-import net.osmand.router.RouteSelector;
+import net.osmand.router.select.RouteSelector;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
