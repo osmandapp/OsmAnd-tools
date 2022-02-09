@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
@@ -30,9 +31,13 @@ import com.google.gson.Gson;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.data.LatLon;
+import net.osmand.router.GeneralRouter;
+import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.router.RouteSegmentResult;
+import net.osmand.router.RoutingConfiguration;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.VectorTileServerConfig;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 @Controller
@@ -106,6 +111,93 @@ public class RoutingController {
 			gm.coordinates = new double[] {pnt.getLongitude(), pnt.getLatitude() };
 			return gm;
 		}
+	}
+	
+	protected static class RoutingMode {
+		public String key;
+		public String name;
+		public Map<String, RoutingParameter> params = new LinkedHashMap<String, RoutingParameter>();
+	}
+	
+	protected static class RoutingParameter {
+		public String key;
+		public String label;
+		public String description;
+		public String type;
+		public String section;
+		public String group;
+		public Object value;
+		
+		public RoutingParameter(String key, String section, String name, boolean defValue) {
+			this.key = key;
+			this.label = name;
+			this.description = name;
+			this.type = "boolean";
+			this.section = section;
+			this.value = defValue;
+		}
+		
+		public RoutingParameter(String key,  String name, String description, String group, String type) {
+			this.key = key;
+			this.label = name;
+			this.description = description;
+			this.type = type;
+			this.group = group;
+		}
+		
+	}
+	
+	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
+	public ResponseEntity<?> routingParams() {
+		Map<String, RoutingMode> routers = new LinkedHashMap<String, RoutingMode>();
+		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development", 
+				"[Dev] Native routing", true);
+		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
+				"[Dev] Native track approximation", true);
+		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
+			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
+				RoutingMode rm = new RoutingMode();
+				rm.key = e.getKey();
+				rm.name = Algorithms.capitalizeFirstLetter(rm.key).replace('_', ' ');
+				routers.put(rm.key, rm);
+				List<RoutingParameter> rps = new ArrayList<RoutingParameter>();
+				for (Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
+					net.osmand.router.GeneralRouter.RoutingParameter pm = epm.getValue();
+					RoutingParameter rp = new RoutingParameter(pm.getId(), pm.getName(), pm.getDescription(),
+							pm.getGroup(), pm.getType().name().toLowerCase());
+					
+					if (pm.getId().startsWith("avoid")) {
+						rp.section = "Avoid";
+					} else if (pm.getId().startsWith("allow") || pm.getId().startsWith("prefer")) {
+						rp.section = "Allow";
+					}
+					if (pm.getType() == RoutingParameterType.BOOLEAN) {
+						rp.value = pm.getDefaultBoolean();
+						int lastIndex = -1;
+						for (int i = 0; i < rps.size(); i++) {
+							if (Algorithms.objectEquals(rp.section, rps.get(i).section)) {
+								lastIndex = i;
+							}
+						}
+						if (lastIndex != -1) {
+							rps.add(lastIndex + 1, rp);
+						} else {
+							rps.add(rp);
+						}
+					} else {
+						// rm.params.put(pm.getId(), new RoutingParameter(pm.getId(), pm.getDescription(),
+						// pm.getDefaultBoolean()));
+					}
+				}
+				for(RoutingParameter rp : rps) {
+					rm.params.put(rp.key, rp);
+				}
+				rm.params.put(nativeRouting.key, nativeRouting);
+				rm.params.put(nativeTrack.key, nativeTrack);
+			}
+		}
+		return ResponseEntity.ok(gson.toJson(routers));
+
 	}
 	
 
