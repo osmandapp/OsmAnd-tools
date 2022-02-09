@@ -127,6 +127,8 @@ public class RoutingController {
 		public String section;
 		public String group;
 		public Object value;
+		public String[] valueDescriptions;
+		public Object[] values;
 		
 		public RoutingParameter(String key, String section, String name, boolean defValue) {
 			this.key = key;
@@ -170,23 +172,30 @@ public class RoutingController {
 						rp.section = "Avoid";
 					} else if (pm.getId().startsWith("allow") || pm.getId().startsWith("prefer")) {
 						rp.section = "Allow";
+					} else if (pm.getGroup() != null) {
+						rp.section = Algorithms.capitalizeFirstLetter(pm.getGroup().replace('_', ' '));
 					}
 					if (pm.getType() == RoutingParameterType.BOOLEAN) {
 						rp.value = pm.getDefaultBoolean();
-						int lastIndex = -1;
-						for (int i = 0; i < rps.size(); i++) {
-							if (Algorithms.objectEquals(rp.section, rps.get(i).section)) {
-								lastIndex = i;
-							}
-						}
-						if (lastIndex != -1) {
-							rps.add(lastIndex + 1, rp);
-						} else {
-							rps.add(rp);
-						}
 					} else {
-						// rm.params.put(pm.getId(), new RoutingParameter(pm.getId(), pm.getDescription(),
-						// pm.getDefaultBoolean()));
+						if (pm.getType() == RoutingParameterType.NUMERIC) {
+							rp.value = 0;
+						} else {
+							rp.value = "";
+						}
+						rp.valueDescriptions = pm.getPossibleValueDescriptions();
+						rp.values = pm.getPossibleValues();
+					}
+					int lastIndex = -1;
+					for (int i = 0; i < rps.size(); i++) {
+						if (Algorithms.objectEquals(rp.section, rps.get(i).section)) {
+							lastIndex = i;
+						}
+					}
+					if (lastIndex != -1 && !Algorithms.isEmpty(rp.section)) {
+						rps.add(lastIndex + 1, rp);
+					} else {
+						rps.add(rp);
 					}
 				}
 				for(RoutingParameter rp : rps) {

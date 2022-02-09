@@ -507,7 +507,7 @@ public class OsmAndMapsService {
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else {
-				paramsR.put(p, value);
+				paramsR.put(key, value);
 			}
 		}
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
