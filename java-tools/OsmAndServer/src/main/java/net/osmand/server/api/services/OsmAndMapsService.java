@@ -1,8 +1,11 @@
 package net.osmand.server.api.services;
 
 
+
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,6 +22,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
 
@@ -60,18 +65,20 @@ public class OsmAndMapsService {
 	private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
 
 	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 80;
-
 	private static final int MAX_RUNTIME_TILES_CACHE_SIZE = 10000;
-
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
-
 	private static final int ZOOM_EN_PREFERRED_LANG = 6;
-
-	private static final boolean DEFAULT_USE_ROUTING_NATIVE_LIB = false;
 	
+	private static final boolean DEFAULT_USE_ROUTING_NATIVE_LIB = false;
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
+	
+	private static final long INTERVAL_TO_MONITOR_ZIP = 15*60*1000;
+	
+	
 
-	Map<String, BinaryMapIndexReaderReference> obfRoutingFiles = new LinkedHashMap<>();
+	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
+	
+	CachedOsmandIndexes cacheFiles = null; 
 
 	AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -83,6 +90,8 @@ public class OsmAndMapsService {
 
 	@Autowired
 	VectorTileServerConfig config;
+
+	private long lastCheckedZipFiles;
 
 	public static class BinaryMapIndexReaderReference {
 		File file;
@@ -96,6 +105,9 @@ public class OsmAndMapsService {
 
 		@Value("${tile-server.obf.location}")
 		String obfLocation;
+		
+		@Value("${tile-server.obf.ziplocation}")
+		String obfZipLocation;
 
 		@Value("${tile-server.cache.location}")
 		String cacheLocation;
@@ -296,6 +308,7 @@ public class OsmAndMapsService {
 			throws IOException, XmlPullParserException, SAXException {
 		// don't synchronize this to not block routing
 		synchronized (config) {
+			checkZippedFiles();
 			VectorMetatile rendered = tileCache.get(tile.key);
 			if (rendered != null && rendered.runtimeImage != null) {
 				tile.runtimeImage = rendered.runtimeImage;
@@ -466,13 +479,78 @@ public class OsmAndMapsService {
 			upd.top = y;
 		}
 	}
+	
+	public void checkZippedFiles() throws IOException {
+		if (System.currentTimeMillis() - lastCheckedZipFiles < INTERVAL_TO_MONITOR_ZIP) {
+			return;
+		}
+		if (!Algorithms.isEmpty(config.obfZipLocation) && !Algorithms.isEmpty(config.obfLocation)) {
+			for (File zipFile : new File(config.obfZipLocation).listFiles()) {
+				if (zipFile.getName().endsWith(".zip")) {
+
+					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
+					File target = new File(config.obfLocation, fn);
+					if (!target.exists() || target.lastModified() != zipFile.lastModified()) {
+						long val = System.currentTimeMillis();
+						ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+						ZipEntry ze = zis.getNextEntry();
+						boolean success = false;
+						while (ze != null && !success) {
+							if (ze.getName().endsWith(".obf")) {
+								target.delete();
+								FileOutputStream fous = new FileOutputStream(target);
+								Algorithms.streamCopy(zis, fous);
+								fous.close();
+								target.setLastModified(zipFile.lastModified());
+								success = true;
+							}
+							ze = zis.getNextEntry();
+						}
+						zis.close();
+						LOGGER.info("Unzip new obf file " + target.getName() + " " + (System.currentTimeMillis() - val)
+								+ " ms");
+						initNewObfFiles(target);
+					}
+				}
+			}
+		}
+		lastCheckedZipFiles = System.currentTimeMillis();
+	}
+
+	private synchronized void initNewObfFiles(File target) throws IOException, FileNotFoundException {
+		long val = System.currentTimeMillis();
+		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
+		if(ref == null) {
+			ref = new BinaryMapIndexReaderReference();
+			ref.file = target;
+			obfFiles.put(target.getAbsolutePath(), ref);
+		}
+		if (ref.fileIndex != null) {
+			ref.fileIndex = null;
+		}
+		if (ref.reader != null) {
+			ref.reader.close();
+		}
+		if (nativelib != null) {
+			nativelib.closeMapFile(target.getAbsolutePath());
+		}
+		RandomAccessFile raf = new RandomAccessFile(target, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+		ref.reader = new BinaryMapIndexReader(raf, target);
+		if (cacheFiles != null) {
+			ref.fileIndex = cacheFiles.addToCache(ref.reader, target);
+			cacheFiles.writeToFile(target);
+		}
+		if (nativelib != null) {
+			nativelib.initMapFile(target.getAbsolutePath(), false);
+		}
+		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+	}
 
 	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
+		initObfReaders();
+		checkZippedFiles();
 		List<BinaryMapIndexReader> files = new ArrayList<>();
-		if (obfRoutingFiles.isEmpty()) {
-			initObfReaders();
-		}
-		for (BinaryMapIndexReaderReference ref : obfRoutingFiles.values()) {
+		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			boolean intersects = false;
 			mainLoop: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
 				for (RoutingSubregion s : rp.getSubregionsList()) {
@@ -482,7 +560,7 @@ public class OsmAndMapsService {
 						if (ref.reader == null) {
 							long val = System.currentTimeMillis();
 							RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-							ref.reader = CachedOsmandIndexes.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
+							ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
 							LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms"); 
 						}
 						files.add(ref.reader);
@@ -495,27 +573,28 @@ public class OsmAndMapsService {
 	}
 	
 	public synchronized void initObfReaders() throws IOException {
+		if (cacheFiles != null) {
+			return;
+		}
 		File mapsFolder = new File(config.obfLocation);
-		CachedOsmandIndexes cache = null;
-		File cacheFile = new File(mapsFolder, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME);
+		cacheFiles = new CachedOsmandIndexes();
 		if (mapsFolder.exists()) {
-			cache = new CachedOsmandIndexes();
+			File cacheFile = new File(mapsFolder, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME);
 			if (cacheFile.exists()) {
-				cache.readFromFile(cacheFile, 2);
+				cacheFiles.readFromFile(cacheFile, 2);
 			}
 			for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
 				if (obf.getName().endsWith(".obf")) {
-					BinaryMapIndexReaderReference ref = obfRoutingFiles.get(obf.getAbsolutePath());
+					BinaryMapIndexReaderReference ref = obfFiles.get(obf.getAbsolutePath());
 					if (ref == null) {
 						ref = new BinaryMapIndexReaderReference();
 						ref.file = obf;
-						ref.fileIndex = cache.getFileIndex(obf, true);
-						obfRoutingFiles.put(obf.getAbsolutePath(), ref);
+						ref.fileIndex = cacheFiles.getFileIndex(obf, true);
+						obfFiles.put(obf.getAbsolutePath(), ref);
 					}
 				}
 			}
-			cache.writeToFile(cacheFile);
+			cacheFiles.writeToFile(cacheFile);
 		}
-		
 	}
 }
