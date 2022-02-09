@@ -486,7 +486,7 @@ public class OsmAndMapsService {
 		}
 		if (!Algorithms.isEmpty(config.obfZipLocation) && !Algorithms.isEmpty(config.obfLocation)) {
 			for (File zipFile : new File(config.obfZipLocation).listFiles()) {
-				if (zipFile.getName().endsWith(".zip")) {
+				if (zipFile.getName().endsWith(".obf.zip")) {
 
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(config.obfLocation, fn);
