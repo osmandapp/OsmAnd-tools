@@ -467,7 +467,7 @@ public class OsmAndMapsService {
 			if (key.equals("nativerouting")) {
 				useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
-				router.setUseNativeApproximation(true);
+				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else {
 				paramsR.put(p, value);
 			}
