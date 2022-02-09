@@ -56,6 +56,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -440,23 +441,35 @@ public class OsmAndMapsService {
 		for (GpxPoint pnt : r.finalPoints) {
 			route.addAll(pnt.routeToTarget);
 		}
+		if (router.useNativeApproximation) {
+			RouteResultPreparation preparation = new RouteResultPreparation();
+			// preparation.prepareTurnResults(gctx.ctx, route);
+			preparation.addTurnInfoDescriptions(route);
+		}
 		return route;
 	}
 
-	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router)
-			throws IOException {
+	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router) throws IOException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
 		for (String p : props) {
-			if (p.startsWith("nativerouting")) {
-				useNativeLib = true;
-			} else if (p.startsWith("nonnativerouting")) {
-				useNativeLib = false;
-			} else if (p.contains("=")) {
-				paramsR.put(p.split("=")[0], p.split("=")[1]);
+			if (p.length() == 0) {
+				continue;
+			}
+			int ind = p.indexOf('=');
+			String key = p;
+			String value = "true";
+			if (ind != -1) {
+				key = p.substring(0, ind);
+				value = p.substring(ind + 1);
+			}
+			if (key.equals("nativerouting")) {
+				useNativeLib = Boolean.parseBoolean(value);
+			} else if (key.equals("nativeapproximation")) {
+				router.setUseNativeApproximation(true);
 			} else {
-				paramsR.put(p, "true");
+				paramsR.put(p, value);
 			}
 		}
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
