@@ -79,7 +79,6 @@ import net.osmand.data.QuadTree;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
@@ -104,6 +103,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private static final double MIN_STRAIGHT_DIST = 50000;
 	private static final double ANGLE_TO_DECLINE = 15;
 
+	private static boolean TEST_INTERMEDIATE_POINTS = false;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -1215,15 +1215,14 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 
-	private static boolean TEST_INTERMEDIATE_POINTS = true;
 	private List<RouteSegmentResult> getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
 			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
-		if(!TEST_INTERMEDIATE_POINTS) {
+		if (TEST_INTERMEDIATE_POINTS) {
 			return r.result;
 		}
 		List<RouteSegmentResult> rsr = new ArrayList<RouteSegmentResult>();
-		for(GpxPoint pnt : r.finalPoints) {
+		for (GpxPoint pnt : r.finalPoints) {
 			rsr.addAll(pnt.routeToTarget);
 		}
 		return rsr;

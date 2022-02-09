@@ -2,11 +2,16 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -14,11 +19,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
+import net.osmand.GPXUtilities;
+import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.data.LatLon;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -98,6 +108,34 @@ public class RoutingController {
 		}
 	}
 	
+
+	@PostMapping(path = {"/gpx-approximate"}, produces = "application/json")
+	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file, 
+			@RequestParam(defaultValue = "car") String routeMode) throws IOException {
+		InputStream is = file.getInputStream();
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
+		is.close();
+		if (gpxFile.error != null) {
+			return ResponseEntity.badRequest().body("Error reading gpx!");
+		} else {
+			gpxFile.path = file.getOriginalFilename();
+			List<LatLon> resList = new ArrayList<LatLon>();
+			List<Feature> features = new ArrayList<Feature>();
+			try {
+				List<RouteSegmentResult> res = osmAndMapsService.gpxApproximation(routeMode, gpxFile);
+				convertResults(resList, features, res);
+			} catch (IOException e) {
+				LOGGER.error(e.getMessage(), e);
+			} catch (InterruptedException e) {
+				LOGGER.error(e.getMessage(), e);
+			} catch (RuntimeException e) {
+				LOGGER.error(e.getMessage());
+			}
+			features.add(0, new Feature(Geometry.lineString(resList)));
+			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		}
+	}
+	
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routing(@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode)
 			throws IOException, InterruptedException {
@@ -128,28 +166,10 @@ public class RoutingController {
 		List<LatLon> resList = new ArrayList<LatLon>();
 		List<Feature> features = new ArrayList<Feature>();
 		if (list.size() >= 2 && !tooLong) {
-			LatLon last = null;
 			try {
 				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, list.get(0), list.get(list.size() - 1),
 						list.subList(1, list.size() - 1));
-				for (RouteSegmentResult r : res) {
-					int i;
-					int dir = r.isForwardDirection() ? 1 : -1;
-					if (r.getDescription() != null && r.getDescription().length() > 0) {
-						features.add(new Feature(Geometry.point(r.getStartPoint())).prop("description", r.getDescription()));
-					}
-					for (i = r.getStartPointIndex(); ; i += dir) {
-						if(i != r.getEndPointIndex()) {
-							resList.add(r.getPoint(i));
-						} else {
-							last = r.getPoint(i);
-							break;
-						}
-					}
-				}
-				if (last != null) {
-					resList.add(last);
-				}
+				convertResults(resList, features, res);
 			} catch (IOException e) {
 				LOGGER.error(e.getMessage(), e);
 			} catch (InterruptedException e) {
@@ -165,6 +185,28 @@ public class RoutingController {
 		features.add(0, new Feature(Geometry.lineString(resList)));
 
 		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+	}
+
+	private void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
+		LatLon last = null;
+		for (RouteSegmentResult r : res) {
+			int i;
+			int dir = r.isForwardDirection() ? 1 : -1;
+			if (r.getDescription() != null && r.getDescription().length() > 0) {
+				features.add(new Feature(Geometry.point(r.getStartPoint())).prop("description", r.getDescription()));
+			}
+			for (i = r.getStartPointIndex(); ; i += dir) {
+				if(i != r.getEndPointIndex()) {
+					resList.add(r.getPoint(i));
+				} else {
+					last = r.getPoint(i);
+					break;
+				}
+			}
+		}
+		if (last != null) {
+			resList.add(last);
+		}
 	}
 
 	private void calculateStraightLine(List<LatLon> list) {

@@ -42,6 +42,10 @@ import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.NativeJavaRendering;
+import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.GPXUtilities.TrkSegment;
+import net.osmand.GPXUtilities.WptPt;
+import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
@@ -52,6 +56,8 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
+import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
@@ -75,7 +81,6 @@ public class OsmAndMapsService {
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15*60*1000;
 	
 	
-
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
 	CachedOsmandIndexes cacheFiles = null; 
@@ -413,10 +418,34 @@ public class OsmAndMapsService {
 				.append('/').append(x).append('/').append(y).toString();
 	}
 
-	public synchronized List<RouteSegmentResult> routing(String routeMode, LatLon start, LatLon end, List<LatLon> intermediates)
-			throws IOException, InterruptedException {
-		String[] props = routeMode.split("\\,");
+	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, GPXFile file) throws IOException, InterruptedException {
+		if (!file.hasTrkPt()) {
+			return Collections.emptyList();
+		}
+		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+		for (WptPt p : trkSegment.points) {
+			polyline.add(new LatLon(p.lat, p.lon));
+		}
+		QuadRect points = points(polyline, polyline.get(0), null);
+		if (!validateAndInitConfig()) {
+			return Collections.emptyList();
+		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		RoutingContext ctx = prepareRouterContext(routeMode, points, router);
+		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
+		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
+		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
+		List<RouteSegmentResult> route = new ArrayList<RouteSegmentResult>();
+		for (GpxPoint pnt : r.finalPoints) {
+			route.addAll(pnt.routeToTarget);
+		}
+		return route;
+	}
+
+	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router)
+			throws IOException {
+		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
 		for (String p : props) {
@@ -435,20 +464,20 @@ public class OsmAndMapsService {
 		// addImpassableRoad(6859437l).
 		// setDirectionPoints(directionPointsFile).
 				build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
-		PrecalculatedRouteDirection precalculatedRouteDirection = null;
 		config.routeCalculationTime = System.currentTimeMillis();
-		if (!validateAndInitConfig()) {
-			return Collections.emptyList();
-		}
-		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null, 
-				getObfReaders(points(intermediates, start, end)), RouteCalculationMode.COMPLEX);
+		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
+				getObfReaders(points), RouteCalculationMode.COMPLEX);
 		ctx.leftSideNavigation = false;
-		// ctx.previouslyCalculatedRoute = previousRoute;
-		// LOGGER.info("Use " + config.routerName + " mode for routing");
-		// GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
-		// List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
-		List<RouteSegmentResult> route = // gpx ? getGpxAproximation(router, gctx, gpxPoints) :
-				router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+		return ctx;
+	}
+	
+	public synchronized List<RouteSegmentResult> routing(String routeMode, LatLon start, LatLon end, List<LatLon> intermediates)
+			throws IOException, InterruptedException {
+		QuadRect points = points(intermediates, start, end);
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		PrecalculatedRouteDirection precalculatedRouteDirection = null;
+		RoutingContext ctx = prepareRouterContext(routeMode, points, router);
+		List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 		return route;
 	}
 
