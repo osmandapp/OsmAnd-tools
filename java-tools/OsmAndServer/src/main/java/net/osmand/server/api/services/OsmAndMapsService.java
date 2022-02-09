@@ -427,8 +427,8 @@ public class OsmAndMapsService {
 		for (WptPt p : trkSegment.points) {
 			polyline.add(new LatLon(p.lat, p.lon));
 		}
-		QuadRect points = points(polyline, polyline.get(0), null);
-		if (!validateAndInitConfig()) {
+		QuadRect points = points(polyline, null, null);
+		if (!validateAndInitConfig() || points == null) {
 			return Collections.emptyList();
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -482,31 +482,40 @@ public class OsmAndMapsService {
 	}
 
 	private QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
-		int y = MapUtils.get31TileNumberY(start.getLatitude());
-		int x = MapUtils.get31TileNumberX(start.getLongitude());
-		QuadRect upd = new QuadRect(x, y, x, y);
-		addPnt(end, upd);
-		if(intermediates != null) {
-			intermediates.forEach(item -> addPnt(item, upd));
+		QuadRect upd = null;
+		upd = addPnt(start, upd);
+		upd = addPnt(end, upd);
+		if (intermediates != null) {
+			for (LatLon i : intermediates) {
+				upd = addPnt(i, upd);
+			}
 		}
 		return upd;
 	}
 
-	private void addPnt(LatLon pnt, QuadRect upd) {
+	private QuadRect addPnt(LatLon pnt, QuadRect upd) {
+		if (pnt == null) {
+			return upd;
+		}
 		int y = MapUtils.get31TileNumberY(pnt.getLatitude());
 		int x = MapUtils.get31TileNumberX(pnt.getLongitude());
-		if (upd.left > x) {
-			upd.left = x;
+		if (upd == null) {
+			upd = new QuadRect(x, y, x, y);
+		} else {
+			if (upd.left > x) {
+				upd.left = x;
+			}
+			if (upd.right < x) {
+				upd.right = x;
+			}
+			if (upd.bottom < y) {
+				upd.bottom = y;
+			}
+			if (upd.top > y) {
+				upd.top = y;
+			}
 		}
-		if (upd.right < x) {
-			upd.right = x;
-		}
-		if (upd.bottom < y) {
-			upd.bottom = y;
-		}
-		if (upd.top > y) {
-			upd.top = y;
-		}
+		return upd;
 	}
 	
 	public synchronized void checkZippedFiles() throws IOException {

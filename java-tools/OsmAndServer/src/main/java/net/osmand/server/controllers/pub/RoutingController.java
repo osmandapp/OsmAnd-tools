@@ -129,7 +129,7 @@ public class RoutingController {
 			} catch (InterruptedException e) {
 				LOGGER.error(e.getMessage(), e);
 			} catch (RuntimeException e) {
-				LOGGER.error(e.getMessage());
+				LOGGER.error(e.getMessage(), e);
 			}
 			features.add(0, new Feature(Geometry.lineString(resList)));
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
