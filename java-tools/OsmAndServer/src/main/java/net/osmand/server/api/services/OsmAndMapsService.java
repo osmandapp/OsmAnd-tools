@@ -480,29 +480,34 @@ public class OsmAndMapsService {
 		}
 	}
 	
-	public void checkZippedFiles() throws IOException {
+	public synchronized void checkZippedFiles() throws IOException {
 		if (System.currentTimeMillis() - lastCheckedZipFiles < INTERVAL_TO_MONITOR_ZIP) {
 			return;
 		}
 		if (!Algorithms.isEmpty(config.obfZipLocation) && !Algorithms.isEmpty(config.obfLocation)) {
 			for (File zipFile : new File(config.obfZipLocation).listFiles()) {
 				if (zipFile.getName().endsWith(".obf.zip")) {
-
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(config.obfLocation, fn);
-					if (!target.exists() || target.lastModified() != zipFile.lastModified()) {
+					if (!target.exists() || target.lastModified() != zipFile.lastModified() ||
+							zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
 						ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
 						ZipEntry ze = zis.getNextEntry();
 						boolean success = false;
 						while (ze != null && !success) {
-							if (ze.getName().endsWith(".obf")) {
+							if (!ze.isDirectory() &&ze.getName().endsWith(".obf")) {
 								target.delete();
 								FileOutputStream fous = new FileOutputStream(target);
-								Algorithms.streamCopy(zis, fous);
+								byte[] b = new byte[1 << 20];
+								int read;
+								while ((read = zis.read(b)) != -1) {
+									fous.write(b, 0, read);
+								}
 								fous.close();
 								target.setLastModified(zipFile.lastModified());
 								success = true;
+								zis.closeEntry();
 							}
 							ze = zis.getNextEntry();
 						}
@@ -538,7 +543,7 @@ public class OsmAndMapsService {
 		ref.reader = new BinaryMapIndexReader(raf, target);
 		if (cacheFiles != null) {
 			ref.fileIndex = cacheFiles.addToCache(ref.reader, target);
-			cacheFiles.writeToFile(target);
+			cacheFiles.writeToFile(new File(config.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
 		}
 		if (nativelib != null) {
 			nativelib.initMapFile(target.getAbsolutePath(), false);
