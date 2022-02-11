@@ -20,10 +20,12 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.Gson;
 
+import net.osmand.render.RenderingRuleProperty;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.VectorMetatile;
 import net.osmand.server.api.services.OsmAndMapsService.VectorStyle;
 import net.osmand.server.api.services.OsmAndMapsService.VectorTileServerConfig;
+import net.osmand.util.Algorithms;
 
 @Controller
 @RequestMapping("/tile")
@@ -44,6 +46,16 @@ public class VectorTileController {
 	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<?> getStyles() {
 		VectorTileServerConfig config = osmAndMapsService.getConfig();
+		for (VectorStyle vectorStyle : config.style.values()) {
+			vectorStyle.properties.clear();
+			for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
+				if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
+						&& !"ui_hidden".equals(p.getCategory())) {
+					p.setCategory(Algorithms.capitalizeFirstLetter(p.getCategory().replace('_', ' ')));
+					vectorStyle.properties.add(p);
+				}
+			}
+		}
 		return ResponseEntity.ok(gson.toJson(config.style));
 	}
 	

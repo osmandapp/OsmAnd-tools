@@ -75,7 +75,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		public long timestamp; 
 	}
 
-	private void loadRenderingAttributes(InputStream is, final Map<String, String> renderingConstants) throws SAXException, IOException{
+	private static void loadRenderingAttributes(InputStream is, final Map<String, String> renderingConstants) throws SAXException, IOException{
 		try {
 			final SAXParser saxParser = SAXParserFactory.newInstance().newSAXParser();
 			saxParser.parse(is, new DefaultHandler() {
@@ -112,6 +112,14 @@ public class NativeJavaRendering extends NativeLibrary {
 	}
 
 	public void loadRuleStorage(String path, String renderingProperties) throws IOException, XmlPullParserException, SAXException{
+		storage = parseStorage(path);
+		setRenderingProps(renderingProperties);
+		clearRenderingRulesStorage();
+		initRenderingRulesStorage(storage);
+	}
+
+	public static RenderingRulesStorage parseStorage(String path) throws SAXException, IOException, XmlPullParserException{ 
+		RenderingRulesStorage storage;
 		final LinkedHashMap<String, String> renderingConstants = new LinkedHashMap<String, String>();
 
 		final RenderingRulesStorageResolver resolver = new RenderingRulesStorageResolver() {
@@ -154,9 +162,7 @@ public class NativeJavaRendering extends NativeLibrary {
 			is.close();
 			is2.close();
 		}
-		setRenderingProps(renderingProperties);
-		clearRenderingRulesStorage();
-		initRenderingRulesStorage(storage);
+		return storage;
 	}
 
 

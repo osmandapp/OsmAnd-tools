@@ -55,6 +55,8 @@ import net.osmand.binary.OsmandIndex.RoutingPart;
 import net.osmand.binary.OsmandIndex.RoutingSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.render.RenderingRuleProperty;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RouteResultPreparation;
@@ -146,6 +148,18 @@ public class OsmAndMapsService {
 						vectorStyle.metaTileSizeLog = 31 - Integer.numberOfLeadingZeros(Integer.parseInt(value)) - 8;
 					}
 				}
+				try {
+					vectorStyle.storage = NativeJavaRendering.parseStorage(vectorStyle.name + ".render.xml");
+					for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
+						if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
+								&& !"ui_hidden".equals(p.getCategory())) {
+							vectorStyle.properties.add(p);
+						}
+					}
+				} catch (Exception e1) {
+					LOGGER.error(String.format("Error init rendering style %s: %s", vectorStyle.name + ".render.xml",
+							e1.getMessage()), e1);
+				}
 				this.style.put(vectorStyle.key, vectorStyle);
 			}
 		}
@@ -153,6 +167,8 @@ public class OsmAndMapsService {
 	}
 
 	public static class VectorStyle {
+		public transient RenderingRulesStorage storage;
+		public List<RenderingRuleProperty> properties = new ArrayList<RenderingRuleProperty>();
 		public String key;
 		public String name;
 		public int maxZoomCache;
