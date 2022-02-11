@@ -39,6 +39,7 @@ logging:
 server:
   port: 8080
   tomcat.max-threads: 5
+  servlet.session.cookie.same-site: none
   connection-timeout: 120000
   compression.enabled: true
   compression.min-response-size: 4096
