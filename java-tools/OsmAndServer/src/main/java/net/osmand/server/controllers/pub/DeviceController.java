@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import com.google.gson.*;
 import net.osmand.server.assist.DeviceLocationManager;
+import net.osmand.server.assist.OsmAndAssistantBot;
 import net.osmand.server.assist.data.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ public class DeviceController {
 
 	@Autowired
 	DeviceLocationManager deviceLocationManager;
+	
+	@Autowired
+	OsmAndAssistantBot assistantBot;
 	
 	@Autowired
 	DeviceRepository deviceRepo;
@@ -147,7 +151,7 @@ public class DeviceController {
 		if(allRequestParams.containsKey("temp")) {
 			li.setTemperature(Double.parseDouble(allRequestParams.get("temp")));
 		}
-		String res = deviceLocationManager.sendLocation(deviceId, li);
+		String res = deviceLocationManager.sendLocation(assistantBot, deviceId, li);
 		return "{'status':'"+res+"'}";
 	}
 

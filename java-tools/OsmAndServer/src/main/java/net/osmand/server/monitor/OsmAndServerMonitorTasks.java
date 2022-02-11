@@ -36,6 +36,7 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.server.TelegramBotManager;
+import net.osmand.server.monitor.OsmAndServerMonitoringBot.Sender;
 import net.osmand.util.Algorithms;
 
 @Component
@@ -97,8 +98,7 @@ public class OsmAndServerMonitorTasks {
 	boolean mapIndexPrevValidation = true;
 	Map<String, DownloadTestResult> downloadTests = new TreeMap<>();
 
-	@Autowired
-	OsmAndServerMonitoringBot telegram;
+	OsmAndServerMonitoringBot.Sender telegram;
 
 
 
@@ -120,7 +120,7 @@ public class OsmAndServerMonitorTasks {
 			br.close();
 			is.close();
 			long currentDelay = System.currentTimeMillis() - dt.getTime();
-			if (currentDelay - live.previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR) {
+			if (currentDelay - live.previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR && telegram != null) {
 				telegram.sendMonitoringAlertMessage(getLiveDelayedMessage(currentDelay));
 				live.previousOsmAndLiveDelay = currentDelay;
 			}
@@ -130,7 +130,9 @@ public class OsmAndServerMonitorTasks {
 				addStat(RED_KEY_OSMAND_LIVE, currentDelay);
 			}
 		} catch (Exception e) {
-			telegram.sendMonitoringAlertMessage("Exception while checking the server live status.");
+			if (telegram != null) {
+				telegram.sendMonitoringAlertMessage("Exception while checking the server live status.");
+			}
 			LOG.error(e.getMessage(), e);
 		}
 	}
@@ -161,19 +163,21 @@ public class OsmAndServerMonitorTasks {
 			} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
 				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
 				jobsFailedCopy.removeAll(buildServer.jobsFailed);
-				if (!jobsFailedCopy.isEmpty()) {
+				if (!jobsFailedCopy.isEmpty() && telegram != null) {
 					telegram.sendMonitoringAlertMessage("There are new failures on Build Server: " + formatJobNamesAsHref(jobsFailedCopy));
 				}
 				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 				jobsRecoveredCopy.removeAll(jobsFailed);
-				if (!jobsRecoveredCopy.isEmpty()) {
+				if (!jobsRecoveredCopy.isEmpty() && telegram != null) {
 					telegram.sendMonitoringAlertMessage("There are recovered jobs on Build Server: " + formatJobNamesAsHref(jobsRecoveredCopy));
 				}
 				buildServer.jobsFailed = jobsFailed;
 			}
 			buildServer.lastCheckTimestamp = System.currentTimeMillis();
 		} catch (Exception e) {
-			telegram.sendMonitoringAlertMessage("Exception while checking the build server status.");
+			if (telegram != null) {
+				telegram.sendMonitoringAlertMessage("Exception while checking the build server status.");
+			}
 			LOG.error(e.getMessage(), e);
 		}
 	}
@@ -192,8 +196,10 @@ public class OsmAndServerMonitorTasks {
 			validateAndReport(gis);
 			is.close();
 		} catch (IOException ioex) {
+			if (telegram != null) {
+				telegram.sendMonitoringAlertMessage("Exception while checking the map index validity.");
+			}
 			LOG.error(ioex.getMessage(), ioex);
-			telegram.sendMonitoringAlertMessage("Exception while checking the map index validity.");
 		} finally {
 			if (gis != null) {
 				close(gis);
@@ -212,15 +218,17 @@ public class OsmAndServerMonitorTasks {
 				double spd1 = downloadSpeed(url);
 				double spd2 = downloadSpeed(url);
 				res.addSpeedMeasurement(Math.max(spd1, spd2));
-				if (!res.lastSuccess) {
+				if (!res.lastSuccess && telegram != null) {
 					telegram.sendMonitoringAlertMessage(host + " OK. Maps download works fine");
 				}
 				res.lastSuccess = true;
 
 			} catch (IOException ex) {
 				if(res.lastSuccess ) {
-					telegram.sendMonitoringAlertMessage(
+					if (telegram != null) {
+						telegram.sendMonitoringAlertMessage(
 							host + " FAILURE: problems downloading maps " + ex.getMessage());
+					}
 					LOG.error(ex.getMessage(), ex);
 				}
 				res.lastSuccess = false;
@@ -274,14 +282,14 @@ public class OsmAndServerMonitorTasks {
 		int mapsInMapIndex = 0;
 		try {
 			mapsInMapIndex = countMapsInMapIndex(is);
-			if (!mapIndexPrevValidation) {
+			if (!mapIndexPrevValidation && telegram != null) {
 				telegram.sendMonitoringAlertMessage(
 						String.format("download.osmand.net: Map index is correct and serves %d maps.", mapsInMapIndex));
 			}
 
 			if (mapsInMapIndex < MAPS_COUNT_THRESHOLD) {
 				mapIndexCurrValidation = false;
-				if (mapIndexPrevValidation) {
+				if (mapIndexPrevValidation && telegram != null) {
 					telegram.sendMonitoringAlertMessage(String.format(
 							"download.osmand.net: Maps index is not correct and serves only of %d maps.", mapsInMapIndex));
 				}
@@ -289,7 +297,9 @@ public class OsmAndServerMonitorTasks {
 		} catch (XmlPullParserException xmlex) {
 			mapIndexCurrValidation = false;
 			if (mapIndexPrevValidation) {
-				telegram.sendMonitoringAlertMessage("download.osmand.net: problems with parsing map index.");
+				if (telegram != null) {
+					telegram.sendMonitoringAlertMessage("download.osmand.net: problems with parsing map index.");
+				}
 				LOG.error(xmlex.getMessage(), xmlex);
 			}
 
@@ -341,8 +351,10 @@ public class OsmAndServerMonitorTasks {
 			if (failed >= count / 2) {
 				if(retry-- < 0) {
 					String txStatus = getTirexStatus();
-					telegram.sendMonitoringAlertMessage(
+					if (telegram != null) {
+						telegram.sendMonitoringAlertMessage(
 							String.format("tile.osmand.net: problems with downloading tiles: %s (%d) - %s", times, retryCount, txStatus));
+					}
 					return;
 				} else {
 					try {
@@ -679,5 +691,9 @@ public class OsmAndServerMonitorTasks {
 			}
 			return null;
 		}
+	}
+
+	public void setSender(Sender sender) {
+		this.telegram = sender;
 	}
 }

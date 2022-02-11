@@ -9,6 +9,7 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -90,7 +91,7 @@ public class SubscriptionController {
 
     @Autowired
     public SubscriptionController(RestTemplateBuilder builder) {
-        this.restTemplate = builder.setConnectTimeout(TIMEOUT).setReadTimeout(TIMEOUT).build();
+        this.restTemplate = builder.setConnectTimeout(Duration.ofMillis(TIMEOUT)).setReadTimeout(Duration.ofMillis(TIMEOUT)).build();
         String iosSubscriptionKey = System.getenv().get("IOS_SUBSCRIPTION_KEY");
 		if (!Algorithms.isEmpty(iosSubscriptionKey)) {
 			byte[] pkcs8EncodedKey = Base64.getDecoder().decode(System.getenv().get("IOS_SUBSCRIPTION_KEY"));

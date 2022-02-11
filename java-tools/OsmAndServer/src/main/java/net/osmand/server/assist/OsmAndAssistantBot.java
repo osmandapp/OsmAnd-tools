@@ -175,7 +175,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 		aw.setCacheTime(15);
 		String query = iq.getQuery();
 		List<InlineQueryResult> results = new ArrayList<InlineQueryResult>();
-		List<Device> devs = deviceLocManager.getDevicesByUserId(iq.getFrom().getId());
+		List<Device> devs = deviceLocManager.getDevicesByUserId(this, iq.getFrom().getId());
 		Location userLoc = iq.getLocation();
 		for(Device d : devs) {
 			LocationInfo l = d.getLastLocationSignal();
@@ -239,7 +239,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			String inlineMsgId = callbackQuery.getInlineMessageId();
 			if(data.startsWith("msg|")) {
 				String pm = sl.length > 2 ? sl[2] : "";
-				Device d = deviceLocManager.getDevice(sl[1]);
+				Device d = deviceLocManager.getDevice(this, sl[1]);
 				if(pm.equals("starttxt") || pm.equals("updtxt")) {
 					d.showLiveMessage(inlineMsgId);
 				} else if(pm.equals("startmap") || pm.equals("updmap")) {
@@ -271,7 +271,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 			return true;
 		} else if(data.startsWith("dv|")) {
 			String pm = sl.length > 2 ? sl[2] : "";
-			Device d = deviceLocManager.getDevice(sl[1]);
+			Device d = deviceLocManager.getDevice(this, sl[1]);
 			if(d == null) {
 				SendMessage snd = new SendMessage();
 				snd.setChatId(msg.getChatId());
@@ -446,7 +446,7 @@ public class OsmAndAssistantBot extends TelegramLongPollingBot {
 	public void retrieveDevices(UserChatIdentifier ucid, String params, int messageId) throws TelegramApiException {
 		int i = 1;
 		parseRecentParam(params);
-		List<Device> devs = deviceLocManager.getDevicesByUserId(ucid.getUserId()); 
+		List<Device> devs = deviceLocManager.getDevicesByUserId(this, ucid.getUserId()); 
 		InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 		String txt =  "You don't have any added devices. Please use /add_device to register new devices.";
 		if (devs.size() > 0) {

@@ -6,6 +6,8 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +26,6 @@ import net.osmand.server.assist.data.UserChatIdentifier;
 @Component
 public class DeviceLocationManager {
 	
-	@Autowired
-	OsmAndAssistantBot assistantBot;
 	
 	@Autowired
 	DeviceRepository deviceRepo;
@@ -40,19 +40,17 @@ public class DeviceLocationManager {
 	Random rnd = new Random();
 
 
-	public DeviceLocationManager() {
-	}
 
-	public List<Device> getDevicesByUserId(long userId) {
+	public List<Device> getDevicesByUserId(OsmAndAssistantBot assistantBot, long userId) {
 		List<DeviceBean> beans = deviceRepo.findByUserIdOrderByCreatedDate(userId);
 		ArrayList<Device> dvs = new ArrayList<Device>();
 		for(DeviceBean bn : beans) {
-			dvs.add(getFromCache(bn));
+			dvs.add(getFromCache(assistantBot, bn));
 		}
 		return dvs;
 	}
 
-	private Device getFromCache(DeviceBean db) {
+	private Device getFromCache(OsmAndAssistantBot assistantBot, DeviceBean db) {
 		Device ch = devicesCache.get(db.id);
 		if(ch == null) {
 			ch = new Device(db, assistantBot);
@@ -61,13 +59,13 @@ public class DeviceLocationManager {
 		return ch;
 	}
 
-	public Device getDevice(String strDeviceId) {
+	public Device getDevice(OsmAndAssistantBot assistantBot, String strDeviceId) {
 		long deviceId = DeviceBean.getDecodedId(strDeviceId);
 		Device dv = devicesCache.get(deviceId);
 		if (dv == null) {
 			Optional<DeviceBean> bean = deviceRepo.findById(deviceId);
 			if (bean.isPresent()) {
-				dv = getFromCache(bean.get());
+				dv = getFromCache(assistantBot, bean.get());
 			}
 		}
 		return dv;
@@ -115,8 +113,8 @@ public class DeviceLocationManager {
 		devicesCache.remove(deviceId);
 	}
 	
-	public String sendLocation(String deviceId, LocationInfo info)  throws DeviceNotFoundException {
-		Device d = getDevice(deviceId);
+	public String sendLocation(OsmAndAssistantBot assistantBot, String deviceId, LocationInfo info)  throws DeviceNotFoundException {
+		Device d = getDevice(assistantBot, deviceId);
 		if(d == null) {
             throw new DeviceNotFoundException(); 
 		}

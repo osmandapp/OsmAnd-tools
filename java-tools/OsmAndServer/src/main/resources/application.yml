@@ -36,14 +36,6 @@ logging:
   pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{4}"
 
 
-server:
-  port: 8080
-  tomcat.max-threads: 5
-  servlet.session.cookie.same-site: none
-  connection-timeout: 120000
-  compression.enabled: true
-  compression.min-response-size: 4096
-
 osmand:
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
   files.location: ${user.dir}/../../../help
@@ -51,6 +43,18 @@ osmand:
   web.location: ${osmand.files.location}/website
   srtm.location: ${SRTM_LOCATION:}
   weather.tiff-location: ${WEATHER_TIFF_LOCATION:}
+  
+server:
+  port: 8080
+  servlet.session:
+    persistent: true
+    timeout: 7d
+    store-dir: ${osmand.files.location}/session/
+    #cookie.same-site: none
+  tomcat.threads.max: 5
+  connection-timeout: 120s
+  compression.enabled: true
+  compression.min-response-size: 4096
 
 tile-server: 
   obf.location: ${OBF_LOCATION:}
@@ -90,7 +94,7 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
-  resources.static-locations: file:${osmand.web.location}
+  web.resources.static-locations: file:${osmand.web.location}
   thymeleaf:
     prefix: file:${osmand.web.location}/templates/
     cache: false
@@ -115,11 +119,11 @@ logging:
 
 server:
   port: 8090
-  tomcat.max-threads: 50
   servlet.session.timeout: 7d
   # session.timeout: 18000 #432000 #servlet.session.timeout
   address: 127.0.0.1 #keep it behind proxy
   tomcat:
+    threads.max: 50
     protocol_header: x-forwarded-proto
     remote_ip_header: x-forwarded-for
     accesslog:

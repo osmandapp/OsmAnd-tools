@@ -2,6 +2,8 @@ package net.osmand.server.monitor;
 
 import java.util.Collection;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,13 +18,29 @@ import org.telegram.telegrambots.exceptions.TelegramApiException;
 @Component
 public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 
+	public interface Sender {
+		public void sendMonitoringAlertMessage(String text);
+	}
+	
 	@Autowired
 	private MonitoringChatRepository chatRepo;
 
 	@Autowired
 	private OsmAndServerMonitorTasks monitoring;
-
+	
 	private static final Log LOG = LogFactory.getLog(OsmAndServerMonitoringBot.class);
+	
+	@PostConstruct
+	public void init() {
+		monitoring.setSender(new Sender() {
+			
+			@Override
+			public void sendMonitoringAlertMessage(String text) {
+				sendMonitoringAlertMessage(text);
+				
+			}
+		});
+	}
 
 	public Collection<MonitoringChatId> getMonitoringChatIds() {
 		return chatRepo.findAll();

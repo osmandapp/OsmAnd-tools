@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -74,7 +75,7 @@ public class PlacesService {
 	@Autowired
 	public PlacesService(RestTemplateBuilder builder) {
 		this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class)
-				.setConnectTimeout(TIMEOUT).setReadTimeout(TIMEOUT).build();
+				.setConnectTimeout(Duration.ofMillis(TIMEOUT)).setReadTimeout(Duration.ofMillis(TIMEOUT)).build();
 
 		this.executor = new ThreadPoolTaskExecutor();
 		executor.setThreadNamePrefix("ImageService");
