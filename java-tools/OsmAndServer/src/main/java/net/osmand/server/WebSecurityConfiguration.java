@@ -237,8 +237,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net", 
 				"https://osmand.net", "https://test.osmand.net", "http://localhost:3000"));
+		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
-		configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Access-Control-Allow-Credentials"));
+		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
 		return source;
