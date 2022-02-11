@@ -124,7 +124,7 @@ server:
   # session.timeout: 18000 #432000 #servlet.session.timeout
   address: 127.0.0.1 #keep it behind proxy
   tomcat:
-    internal-proxies: .*
+    redirect-context-root: false
     threads.max: 50
     protocol_header: x-forwarded-proto
     remote_ip_header: x-forwarded-for
