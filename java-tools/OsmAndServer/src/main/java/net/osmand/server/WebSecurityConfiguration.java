@@ -18,6 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -158,13 +159,13 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 //    							.antMatchers("/", "/*", "/login/**", "/webjars/**", "/error/**").permitAll()
     							.anyRequest().permitAll();
     	LoginUrlAuthenticationEntryPoint oauthAdminLogin = new LoginUrlAuthenticationEntryPoint("/login");
-		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
+		if (getApplicationContext().getEnvironment().acceptsProfiles(Profiles.of("production"))) {
 			oauthAdminLogin.setForceHttps(true);
 		}
 		http.formLogin().loginPage("/map/api/auth/loginForm").
 				loginProcessingUrl("/map/api/auth/loginProcess").defaultSuccessUrl("/map/loginSuccess");
 		LoginUrlAuthenticationEntryPoint mapLogin = new LoginUrlAuthenticationEntryPoint("/map/loginForm");
-		if (getApplicationContext().getEnvironment().acceptsProfiles("production")) {
+		if (getApplicationContext().getEnvironment().acceptsProfiles(Profiles.of("production"))) {
 			mapLogin.setForceHttps(true);
 		}
 		http.exceptionHandling()
