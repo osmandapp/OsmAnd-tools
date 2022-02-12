@@ -4,9 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
@@ -97,7 +95,7 @@ public class MapApiController {
 			// hide device accesscceToekn
 			if (obj instanceof OsmAndProUser) {
 				OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
-				obj = Map.of("username", pu.getUsername());
+				obj = Collections.singletonMap("username", pu.getUsername());
 
 			}
 			return gson.toJson(obj);
