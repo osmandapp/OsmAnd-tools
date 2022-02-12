@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
@@ -21,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
@@ -89,6 +91,16 @@ public class MapApiController {
 		if (user == null) {
 			return gson.toJson(user);
 		}
+		if (user instanceof Authentication && ((Authentication) user).getPrincipal() instanceof OsmAndProUser) {
+			OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
+			if (pu.getUserDevice() != null) {
+				// hide device accesscceToekn
+				PremiumUserDevice pd = new PremiumUserDevice();
+				pd.id = pu.getUserDevice().id;
+				pu = new OsmAndProUser(pu.getUsername(), null, pd, new ArrayList<>(pu.getAuthorities()));
+			}
+			user = new UsernamePasswordAuthenticationToken(pu, null);
+		}
 		return gson.toJson(user);
 	}
 
@@ -98,8 +110,10 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
-		// request.logout();
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request, java.security.Principal user) throws ServletException {
+		if (user != null) {
+			request.logout();
+		}
 		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(us.username, us.password);
 		try {
 			//Authentication res = 

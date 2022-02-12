@@ -52,7 +52,6 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.client.DefaultResponseErrorHandler;
-import org.springframework.web.client.ResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -91,7 +90,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	public static class OsmAndProUser extends User {
 
 		private static final long serialVersionUID = -881322456618342435L;
-		transient PremiumUserDevice userDevice;
+		PremiumUserDevice userDevice;
 
 		public OsmAndProUser(String username, String password, PremiumUserDevice pud,
 				List<GrantedAuthority> authorities) {
