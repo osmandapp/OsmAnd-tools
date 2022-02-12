@@ -34,7 +34,7 @@ server:
     persistent: true
     timeout: 7d
     store-dir: ${osmand.files.location}/session/
-    #cookie.same-site: none
+    cookie.same-site: none
   tomcat.threads.max: 5
   connection-timeout: 120s
   compression.enabled: true

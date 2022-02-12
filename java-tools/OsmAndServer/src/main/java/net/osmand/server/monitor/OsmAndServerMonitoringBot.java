@@ -18,6 +18,8 @@ import org.telegram.telegrambots.exceptions.TelegramApiException;
 @Component
 public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 
+	private static final Log LOG = LogFactory.getLog(OsmAndServerMonitoringBot.class);
+	
 	public interface Sender {
 		public void sendMonitoringAlertMessage(String text);
 	}
@@ -28,7 +30,6 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 	@Autowired
 	private OsmAndServerMonitorTasks monitoring;
 	
-	private static final Log LOG = LogFactory.getLog(OsmAndServerMonitoringBot.class);
 	
 	@PostConstruct
 	public void init() {
