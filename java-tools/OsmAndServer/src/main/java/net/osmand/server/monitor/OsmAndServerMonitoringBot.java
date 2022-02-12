@@ -36,8 +36,7 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 			
 			@Override
 			public void sendMonitoringAlertMessage(String text) {
-				sendMonitoringAlertMessage(text);
-				
+				sendMonitoringMessage(text);
 			}
 		});
 	}
@@ -54,7 +53,7 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 		chatRepo.deleteById(chatId);
 	}
 
-	public void sendMonitoringAlertMessage(String text) {
+	public void sendMonitoringMessage(String text) {
 		if (!isTokenPresent()) {
 			return;
 		}
