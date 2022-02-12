@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
@@ -91,17 +92,17 @@ public class MapApiController {
 		if (user == null) {
 			return gson.toJson(user);
 		}
-		if (user instanceof Authentication && ((Authentication) user).getPrincipal() instanceof OsmAndProUser) {
-			OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
-			if (pu.getUserDevice() != null) {
-				// hide device accesscceToekn
-				PremiumUserDevice pd = new PremiumUserDevice();
-				pd.id = pu.getUserDevice().id;
-				pu = new OsmAndProUser(pu.getUsername(), null, pd, new ArrayList<>(pu.getAuthorities()));
+		if (user instanceof Authentication) {
+			Object obj = ((Authentication) user).getPrincipal();
+			// hide device accesscceToekn
+			if (obj instanceof OsmAndProUser) {
+				OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
+				obj = Map.of("username", pu.getUsername());
+
 			}
-			user = new UsernamePasswordAuthenticationToken(pu, null);
+			return gson.toJson(obj);
 		}
-		return gson.toJson(user);
+		return gson.toJson(null);
 	}
 
 	private ResponseEntity<String> okStatus() {
