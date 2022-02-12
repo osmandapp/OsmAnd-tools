@@ -145,9 +145,9 @@ public class MapApiController {
 	}
 
 	private PremiumUserDevice checkUser() {
-		OsmAndProUser user = (OsmAndProUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-		if (user != null) {
-			return user.getUserDevice();
+		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		if (user instanceof OsmAndProUser) {
+			return ((OsmAndProUser) user).getUserDevice();
 		}
 		return null;
 	}

@@ -1,23 +1,7 @@
-google:
-  client:
-    clientId: ${GOOGLE_CLIENT_ID:521675454867-pmot5ink84bf4876advcmr16o0mgg8lk.apps.googleusercontent.com}
-    clientSecret: ${GOOGLE_CLIENT_SECRET:bH3wvAogUIln12u-TR-E7IEV}
-    accessTokenUri: https://www.googleapis.com/oauth2/v4/token
-    userAuthorizationUri: https://accounts.google.com/o/oauth2/v2/auth
-    clientAuthenticationScheme: form
-    scope:
-      - openid
-      - email
-  androidPublisher:
-    clientSecret: ${ANDROID_PUBLISHER_CLIENT_SECRET_JSON:}
-  resource:
-    userInfoUri: https://www.googleapis.com/oauth2/v3/userinfo
-    tokenInfoUri:
-    preferTokenInfo: true
 
+admin.api-oauth2-url: https://api.github.com/orgs/osmandapp/teams/serveradmins
 
-admin.emails: ${ADMIN_EMAILS:victor.shcherb@gmail.com}
-
+google.androidPublisher.clientSecret: ${ANDROID_PUBLISHER_CLIENT_SECRET_JSON:}
 
 # local storage to store files in db
 storage:
@@ -98,6 +82,16 @@ spring:
   thymeleaf:
     prefix: file:${osmand.web.location}/templates/
     cache: false
+  security:
+   oauth2:
+     client:
+       registration:
+         github:
+           clientId: ${GITHUB_CLIENT_ID:42f89eddbf81c54c518a}
+           clientSecret: ${GITHUB_CLIENT_SECRET:180c2863aaabb15c7e779bb192c88f1a726507d5}
+           scope: read:org,user:email
+           # creds for localhost
+  
 
 # classpath:/static/
 

@@ -42,12 +42,16 @@ bootJar {
 
 
 dependencies {
+    // make optional for release run
+    implementation "org.springframework.boot:spring-boot-devtools"
+    
     implementation "org.springframework.boot:spring-boot-starter-web"
     implementation "org.springframework.boot:spring-boot-starter-actuator"
     implementation "org.springframework.boot:spring-boot-starter-security"
     implementation "org.springframework.boot:spring-boot-starter-thymeleaf"
     implementation "org.springframework.boot:spring-boot-starter-data-jpa"
     implementation "org.springframework.boot:spring-boot-starter-data-redis"
+    implementation "org.springframework.boot:spring-boot-starter-oauth2-client"
     implementation "org.javassist:javassist:3.25.0-GA"
     implementation "javax.xml.bind:jaxb-api:2.3.1"
     implementation "javax.activation:activation:1.1"
@@ -58,26 +62,15 @@ dependencies {
 
     implementation "nl.basjes.parse.httpdlog:httpdlog-parser:5.1"
 
-    // make optional for release run
-    implementation "org.springframework.boot:spring-boot-devtools"
-
     implementation "org.telegram:telegrambots:3.6"
 
     implementation "org.springframework.security.oauth:spring-security-oauth2:2.2.2.RELEASE"
     implementation "org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:2.0.1.RELEASE"
 
-    // security dependencies consistent
-    // implementation 'org.springframework.security:spring-security-web:5.0.6.RELEASE'
-    // implementation 'org.springframework.security:spring-security-core:5.0.6.RELEASE'
-    // implementation 'org.springframework.security:spring-security-config:5.0.6.RELEASE'
-    // implementation 'org.springframework.security:spring-security-oauth2-client:5.0.6.RELEASE'
-
-
     implementation 'org.apache.httpcomponents:httpclient:4.5.13'
     implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.1019')
     implementation 'com.amazonaws:aws-java-sdk-s3'
-
-    implementation "org.springframework.cloud:spring-cloud-security:1.2.2.RELEASE"
+ //   implementation "org.springframework.cloud:spring-cloud-security:1.2.2.RELEASE"
 
     implementation "org.apache.commons:commons-collections4:4.1"
     implementation "com.j256.simplecsv:simplecsv:2.3"
