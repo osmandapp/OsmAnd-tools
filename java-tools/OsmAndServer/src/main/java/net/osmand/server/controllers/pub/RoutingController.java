@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
@@ -44,9 +45,7 @@ import net.osmand.util.MapUtils;
 @RequestMapping("/routing")
 public class RoutingController {
 	
-
 	private static final int DISTANCE_MID_POINT = 25000;
-	
 	private static final int MAX_DISTANCE = 1000000;
 
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
@@ -222,8 +221,9 @@ public class RoutingController {
 			gpxFile.path = file.getOriginalFilename();
 			List<LatLon> resList = new ArrayList<LatLon>();
 			List<Feature> features = new ArrayList<Feature>();
+			Map<String, Object> props = new TreeMap<>();
 			try {
-				List<RouteSegmentResult> res = osmAndMapsService.gpxApproximation(routeMode, gpxFile);
+				List<RouteSegmentResult> res = osmAndMapsService.gpxApproximation(routeMode, props, gpxFile);
 				convertResults(resList, features, res);
 			} catch (IOException e) {
 				LOGGER.error(e.getMessage(), e);
@@ -232,7 +232,9 @@ public class RoutingController {
 			} catch (RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);
 			}
-			features.add(0, new Feature(Geometry.lineString(resList)));
+			Feature route = new Feature(Geometry.lineString(resList));
+			features.add(0, route);
+			route.properties = props;
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		}
 	}
@@ -266,9 +268,10 @@ public class RoutingController {
 		}
 		List<LatLon> resList = new ArrayList<LatLon>();
 		List<Feature> features = new ArrayList<Feature>();
+		Map<String, Object> props = new TreeMap<>();
 		if (list.size() >= 2 && !tooLong) {
 			try {
-				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, list.get(0), list.get(list.size() - 1),
+				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, props, list.get(0), list.get(list.size() - 1),
 						list.subList(1, list.size() - 1));
 				convertResults(resList, features, res);
 			} catch (IOException e) {
@@ -282,8 +285,15 @@ public class RoutingController {
 		if (resList.size() == 0) {
 			resList = new ArrayList<LatLon>(list);
 			calculateStraightLine(resList);
+			float dist = 0;
+			for (int i = 1; i < resList.size(); i++) {
+				dist += MapUtils.getDistance(resList.get(i - 1), resList.get(i));
+			}
+			props.put("distance", dist);
 		}
-		features.add(0, new Feature(Geometry.lineString(resList)));
+		Feature route = new Feature(Geometry.lineString(resList));
+		route.properties = props;
+		features.add(0, route);
 
 		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 	}

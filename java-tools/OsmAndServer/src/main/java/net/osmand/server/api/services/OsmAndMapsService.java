@@ -58,6 +58,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.PrecalculatedRouteDirection;
+import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
@@ -473,7 +474,7 @@ public class OsmAndMapsService {
 				.append('/').append(x).append('/').append(y).toString();
 	}
 
-	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, GPXFile file) throws IOException, InterruptedException {
+	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {
 			return Collections.emptyList();
 		}
@@ -500,6 +501,7 @@ public class OsmAndMapsService {
 			// preparation.prepareTurnResults(gctx.ctx, route);
 			preparation.addTurnInfoDescriptions(route);
 		}
+		putResultProps(ctx, route, props);
 		return route;
 	}
 
@@ -538,14 +540,69 @@ public class OsmAndMapsService {
 		return ctx;
 	}
 	
-	public synchronized List<RouteSegmentResult> routing(String routeMode, LatLon start, LatLon end, List<LatLon> intermediates)
+	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		PrecalculatedRouteDirection precalculatedRouteDirection = null;
 		RoutingContext ctx = prepareRouterContext(routeMode, points, router);
 		List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+		putResultProps(ctx, route, props);
 		return route;
+	}
+
+	private void putResultProps(RoutingContext ctx, List<RouteSegmentResult> route, Map<String, Object> props) {
+		float completeTime = 0;
+		float completeDistance = 0;
+		for (RouteSegmentResult r : route) {
+			completeTime += r.getSegmentTime();
+			completeDistance += r.getDistance();
+		}
+		TreeMap<String, Object> overall = new TreeMap<String, Object>();
+		props.put("overall", overall);
+		overall.put("distance", completeDistance);
+		overall.put("time", completeTime);
+		overall.put("routingTime", ctx.routingTime);
+		TreeMap<String, Object> dev = new TreeMap<String, Object>();
+		props.put("dev", dev);
+		dev.put("nativeLib", ctx.nativeLib != null);
+		dev.put("alertFasterRoadToVisitedSegments", ctx.alertFasterRoadToVisitedSegments);
+		dev.put("alertSlowerSegmentedWasVisitedEarlier", ctx.alertSlowerSegmentedWasVisitedEarlier);
+		RouteCalculationProgress p = ctx.calculationProgress;
+		if (p != null) {
+			TreeMap<String, Object> tiles = new TreeMap<String, Object>();
+			dev.put("tiles", tiles);
+			tiles.put("loadedTiles", p.loadedTiles);
+			tiles.put("loadedTilesDistinct", p.distinctLoadedTiles);
+			tiles.put("loadedTilesPrevUnloaded", p.loadedPrevUnloadedTiles);
+			tiles.put("loadedTilesMax", p.maxLoadedTiles);
+			TreeMap<String, Object> segms = new TreeMap<String, Object>();
+			dev.put("segments", segms);
+			segms.put("queueDirectSize", p.directQueueSize);
+			segms.put("queueOppositeSize", p.reverseSegmentQueueSize);
+			segms.put("visited", p.visitedSegments);
+			segms.put("visitedOpposite", p.visitedOppositeSegments);
+			segms.put("visitedDirect", p.visitedDirectSegments);
+			TreeMap<String, Object> time = new TreeMap<String, Object>();
+			dev.put("time", time);
+			time.put("timeToCalculate", (float) p.timeToCalculate / 1.0e9);
+			time.put("timeToLoadHeaders", (float) p.timeToLoadHeaders / 1.0e9);
+			time.put("timeToLoad", (float) p.timeToLoad / 1.0e9);
+			time.put("timeToFindInitialSegments", (float) p.timeToFindInitialSegments / 1.0e9);
+			time.put("timeExtra", (float) p.timeNanoToCalcDeviation / 1.0e9);
+			TreeMap<String, Object> metrics = new TreeMap<String, Object>();
+			dev.put("metrics", metrics);
+			if (p.timeToLoad + p.timeToLoadHeaders > 0) {
+				metrics.put("tilesPerSec", (float) (p.loadedTiles * 1.0e9 / (p.timeToLoad + p.timeToLoadHeaders)));
+			}
+			float it = (float) ((p.timeToCalculate - (p.timeToLoad + p.timeToLoadHeaders + p.timeToFindInitialSegments))
+					/ 1.0e9);
+			if (it > 0) {
+				metrics.put("segmentsPerSec", (float) p.visitedSegments / it);
+			} else {
+				metrics.put("segmentsPerSec", (float) 0);
+			}
+		}
 	}
 
 	private QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
