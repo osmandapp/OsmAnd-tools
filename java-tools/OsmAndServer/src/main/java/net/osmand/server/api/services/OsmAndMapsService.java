@@ -535,7 +535,7 @@ public class OsmAndMapsService {
 				build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 		config.routeCalculationTime = System.currentTimeMillis();
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				getObfReaders(points), RouteCalculationMode.COMPLEX);
+				getObfReaders(points), RouteCalculationMode.COMPLEX); // RouteCalculationMode.BASE
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
@@ -570,38 +570,11 @@ public class OsmAndMapsService {
 		dev.put("alertSlowerSegmentedWasVisitedEarlier", ctx.alertSlowerSegmentedWasVisitedEarlier);
 		RouteCalculationProgress p = ctx.calculationProgress;
 		if (p != null) {
-			TreeMap<String, Object> tiles = new TreeMap<String, Object>();
-			dev.put("tiles", tiles);
-			tiles.put("loadedTiles", p.loadedTiles);
-			tiles.put("loadedTilesDistinct", p.distinctLoadedTiles);
-			tiles.put("loadedTilesPrevUnloaded", p.loadedPrevUnloadedTiles);
-			tiles.put("loadedTilesMax", p.maxLoadedTiles);
-			TreeMap<String, Object> segms = new TreeMap<String, Object>();
-			dev.put("segments", segms);
-			segms.put("queueDirectSize", p.directQueueSize);
-			segms.put("queueOppositeSize", p.reverseSegmentQueueSize);
-			segms.put("visited", p.visitedSegments);
-			segms.put("visitedOpposite", p.visitedOppositeSegments);
-			segms.put("visitedDirect", p.visitedDirectSegments);
-			TreeMap<String, Object> time = new TreeMap<String, Object>();
-			dev.put("time", time);
-			time.put("timeToCalculate", (float) p.timeToCalculate / 1.0e9);
-			time.put("timeToLoadHeaders", (float) p.timeToLoadHeaders / 1.0e9);
-			time.put("timeToLoad", (float) p.timeToLoad / 1.0e9);
-			time.put("timeToFindInitialSegments", (float) p.timeToFindInitialSegments / 1.0e9);
-			time.put("timeExtra", (float) p.timeNanoToCalcDeviation / 1.0e9);
-			TreeMap<String, Object> metrics = new TreeMap<String, Object>();
-			dev.put("metrics", metrics);
-			if (p.timeToLoad + p.timeToLoadHeaders > 0) {
-				metrics.put("tilesPerSec", (float) (p.loadedTiles * 1.0e9 / (p.timeToLoad + p.timeToLoadHeaders)));
-			}
-			float it = (float) ((p.timeToCalculate - (p.timeToLoad + p.timeToLoadHeaders + p.timeToFindInitialSegments))
-					/ 1.0e9);
-			if (it > 0) {
-				metrics.put("segmentsPerSec", (float) p.visitedSegments / it);
-			} else {
-				metrics.put("segmentsPerSec", (float) 0);
-			}
+			overall.put("calcTime", (float) p.timeToCalculate / 1.0e9);
+			dev.putAll(p.getInfo(ctx.calculationProgressFirstPhase));
+		}
+		if (ctx.calculationProgressFirstPhase != null) {
+			props.put("devbase", ctx.calculationProgressFirstPhase.getInfo(null));
 		}
 	}
 
