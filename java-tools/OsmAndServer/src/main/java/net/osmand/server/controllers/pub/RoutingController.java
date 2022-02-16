@@ -34,6 +34,7 @@ import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.data.LatLon;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.GeneralRouter.RoutingParameterType;
+import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -152,9 +153,18 @@ public class RoutingController {
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<String, RoutingMode>();
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development", 
-				"[Dev] Native routing", true);
+				"[Dev] C++ routing", true);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
-				"[Dev] Native track approximation", true);
+				"[Dev] C++ route track", true);
+		RoutingParameter calcMode = new RoutingParameter("calcmode", "[Dev] Route mode", 
+				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		calcMode.section = "Development";
+		calcMode.value = "";
+		calcMode.valueDescriptions = new String[] {"Optimal", "Basic", "Slow"};
+		calcMode.values = new String[] {RouteCalculationMode.COMPLEX.name(),
+				RouteCalculationMode.BASE.name(),
+				RouteCalculationMode.NORMAL.name()
+		};
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm = new RoutingMode();
@@ -197,11 +207,12 @@ public class RoutingController {
 						rps.add(rp);
 					}
 				}
-				for(RoutingParameter rp : rps) {
+				for (RoutingParameter rp : rps) {
 					rm.params.put(rp.key, rp);
 				}
 				rm.params.put(nativeRouting.key, nativeRouting);
 				rm.params.put(nativeTrack.key, nativeTrack);
+				rm.params.put(calcMode.key, calcMode);
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(routers));

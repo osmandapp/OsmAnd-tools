@@ -527,7 +527,9 @@ public class OsmAndMapsService {
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else if (key.equals("calcmode")) {
-				paramMode = RouteCalculationMode.valueOf(value);
+				if (value.length() > 0) {
+					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
+				}
 			} else {
 				paramsR.put(key, value);
 			}
