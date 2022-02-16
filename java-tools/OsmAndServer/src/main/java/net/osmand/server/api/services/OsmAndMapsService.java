@@ -57,6 +57,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
+import net.osmand.router.GeneralRouter.GeneralRouterProfile;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
@@ -509,6 +510,7 @@ public class OsmAndMapsService {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
+		RouteCalculationMode paramMode = null;
 		for (String p : props) {
 			if (p.length() == 0) {
 				continue;
@@ -524,6 +526,8 @@ public class OsmAndMapsService {
 				useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
+			} else if (key.equals("calcmode")) {
+				paramMode = RouteCalculationMode.valueOf(value);
 			} else {
 				paramsR.put(key, value);
 			}
@@ -534,8 +538,12 @@ public class OsmAndMapsService {
 		// setDirectionPoints(directionPointsFile).
 				build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 		config.routeCalculationTime = System.currentTimeMillis();
+		if (paramMode == null) {
+			paramMode = GeneralRouterProfile.CAR == config.router.getProfile() ? RouteCalculationMode.COMPLEX
+					: RouteCalculationMode.NORMAL;
+		}
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				getObfReaders(points), RouteCalculationMode.COMPLEX); // RouteCalculationMode.BASE
+				getObfReaders(points), paramMode); // RouteCalculationMode.BASE
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
