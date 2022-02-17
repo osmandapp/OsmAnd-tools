@@ -25,9 +25,9 @@ import javax.xml.stream.XMLStreamException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -181,7 +181,7 @@ public class GpxController {
 	}
 	
 	@PostMapping(path = {"/process-srtm"}, produces = "application/json")
-	public ResponseEntity<StreamingResponseBody> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
+	public ResponseEntity<StreamingResponseBody> attachSrtm(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(file.getInputStream());
 		GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
 	    StreamingResponseBody responseBody = outputStream -> {
@@ -298,15 +298,25 @@ public class GpxController {
 		}
 		if (srtmLocation.startsWith("http://") || srtmLocation.startsWith("https://")) {
 			String serverUrl = srtmLocation + "/gpx/process-srtm";
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-			MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			GPXUtilities.writeGpx(new OutputStreamWriter(baos), gpxFile, null);
-			body.add("file", new ByteArrayResource(baos.toByteArray()));
+			
+			HttpHeaders headers = new HttpHeaders();
+			headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+			
+	        MultiValueMap<String, String> fileMap = new LinkedMultiValueMap<>();
+	        ContentDisposition contentDisposition = ContentDisposition.builder("form-data").name("file")
+					.filename("route.gpx").build();
+	        fileMap.add(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
+	        HttpEntity<byte[]> fileEntity = new HttpEntity<>(baos.toByteArray(), fileMap);
+	        
+			MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+	        body.add("file", fileEntity);
+
 			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<byte[]> response = restTemplate.postForEntity(serverUrl, requestEntity, byte[].class);
+			
 			if (response.getStatusCode().is2xxSuccessful()) {
 				return GPXUtilities.loadGPXFile(new ByteArrayInputStream(response.getBody()));
 			} else {
