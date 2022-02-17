@@ -1186,15 +1186,15 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			super.mouseReleased(e);
 		}
 
-		private JPopupMenu createMenu(RenderedObject o) {
+		private JPopupMenu createMenu(RenderedObject renderedObject) {
 			JPopupMenu menu = new JPopupMenu();
 			menu.add(new JLabel("Select route"));
-			Set<String> keySet = RouteSelector.getRouteStringKeys(o, null);
-			for (String entry : keySet) {
-				menu.add(new AbstractAction(entry) {
+			Set<String> routeKeys = RouteSelector.getRouteStringKeys(renderedObject, null);
+			for (String routeKey : routeKeys) {
+				menu.add(new AbstractAction(routeKey) {
 					@Override
 					public void actionPerformed(ActionEvent actionEvent) {
-						showRoute(o, entry);
+						showRoute(renderedObject, routeKey);
 					}
 				});
 			}
@@ -1211,44 +1211,55 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			}
 			return isRoute;
 		}
+	}
 
-		void showRoute(RenderedObject o, String key) {
-			new Thread(() -> {
-
-				NativeJavaRendering.MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
-						MapUtils.get31LatitudeY(o.getY().get(0)),
-						MapUtils.get31LongitudeX(o.getX().get(0)));
-				if (mapDiffs != null) {
-					File mapFile = mapDiffs.baseFile;
-					BinaryMapIndexReader[] reader = new BinaryMapIndexReader[]{null};
-					try {
-						reader[0] = new BinaryMapIndexReader(new RandomAccessFile(mapFile, "r"), mapFile);
-						RouteSelector routeSelector = new RouteSelector(reader);
-						List<GPXFile> files = routeSelector.getRoutes(o);
-						DataTileManager<Entity> points = new DataTileManager<>();
-						List<Way> ways = new ArrayList<>();
-						for (GPXFile file : files) {
-							for (Track track : file.tracks) {
-								for (TrkSegment segment : track.segments) {
-									Way w = new Way(-1);
-									for (WptPt point : segment.points) {
-										w.addNode(new Node(point.lat, point.lon, -1));
-									}
-									ways.add(w);
-								}
-							}
-							for (Way w : ways) {
-								LatLon n = w.getLatLon();
-								points.registerObject(n.getLatitude(), n.getLongitude(), w);
-							}
-							setPoints(points);
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-			}).start();
+	void showRoute(RenderedObject renderedObject, String routeKey) {
+		BinaryMapIndexReader[] reader = getMapIndexReader(renderedObject);
+		if (reader.length == 0) {
+			return;
 		}
+		new Thread(() -> {
+			RouteSelector routeSelector = new RouteSelector(reader);
+			List<GPXFile> files = routeSelector.getRoutes(renderedObject, routeKey);
+			drawGpxFiles(files);
+		}).start();
+	}
+
+	private void drawGpxFiles(List<GPXFile> files) {
+		DataTileManager<Entity> points = new DataTileManager<>();
+		List<Way> ways = new ArrayList<>();
+		for (GPXFile file : files) {
+			for (Track track : file.tracks) {
+				for (TrkSegment segment : track.segments) {
+					Way w = new Way(-1);
+					for (WptPt point : segment.points) {
+						w.addNode(new Node(point.lat, point.lon, -1));
+					}
+					ways.add(w);
+				}
+			}
+			for (Way w : ways) {
+				LatLon n = w.getLatLon();
+				points.registerObject(n.getLatitude(), n.getLongitude(), w);
+			}
+			setPoints(points);
+		}
+	}
+
+	private BinaryMapIndexReader[] getMapIndexReader(RenderedObject renderedObject) {
+		BinaryMapIndexReader[] reader = new BinaryMapIndexReader[]{null};
+		MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
+				MapUtils.get31LatitudeY(renderedObject.getY().get(0)),
+				MapUtils.get31LongitudeX(renderedObject.getX().get(0)));
+		if (mapDiffs != null) {
+			File mapFile = mapDiffs.baseFile;
+			try {
+				reader[0] = new BinaryMapIndexReader(new RandomAccessFile(mapFile, "r"), mapFile);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return reader;
 	}
 
 	private class NativeRendererRunnable implements Runnable {
