@@ -195,8 +195,8 @@ public class MapPointsLayer implements MapPanelLayer {
 			}
 			g.drawOval(p.x, p.y, size, size);
 			g.fillOval(p.x, p.y, size, size);
-			boolean showGpxPointNumber = isGpx(n) && DataExtractionSettings.getSettings().isAnimateRouting()
-					&& map.getZoom() >= 18;
+			boolean showGpxPointNumber = !isGpx(n) || (DataExtractionSettings.getSettings().isAnimateRouting()
+					&& map.getZoom() >= 18);
 			if (tagToShow != null && n.getTag(tagToShow) != null && showGpxPointNumber && map.getZoom() > 14) {
 				int i = 0;
 				int k;

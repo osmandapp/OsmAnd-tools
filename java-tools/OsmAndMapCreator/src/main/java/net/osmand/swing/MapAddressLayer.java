@@ -187,8 +187,8 @@ public class MapAddressLayer implements MapPanelLayer {
 //		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
 		long lid = -1;
 		for (GeocodingResult r : complete) {
-			if (r.building != null &&
-					r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
+			if (r.building != null && r.getDistance() > minBuildingDistance
+					* GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
 				continue;
 			}
 			Node n = new Node(r.getLocation().getLatitude(), r.getLocation().getLongitude(), lid--);
