@@ -284,7 +284,9 @@ public class RoutingController {
 			try {
 				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, props, list.get(0), list.get(list.size() - 1),
 						list.subList(1, list.size() - 1));
-				convertResults(resList, features, res);
+				if (res != null) {
+					convertResults(resList, features, res);
+				}
 			} catch (IOException e) {
 				LOGGER.error(e.getMessage(), e);
 			} catch (InterruptedException e) {

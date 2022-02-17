@@ -564,9 +564,11 @@ public class OsmAndMapsService {
 	private void putResultProps(RoutingContext ctx, List<RouteSegmentResult> route, Map<String, Object> props) {
 		float completeTime = 0;
 		float completeDistance = 0;
-		for (RouteSegmentResult r : route) {
-			completeTime += r.getSegmentTime();
-			completeDistance += r.getDistance();
+		if (route != null) {
+			for (RouteSegmentResult r : route) {
+				completeTime += r.getSegmentTime();
+				completeDistance += r.getDistance();
+			}
 		}
 		TreeMap<String, Object> overall = new TreeMap<String, Object>();
 		props.put("overall", overall);

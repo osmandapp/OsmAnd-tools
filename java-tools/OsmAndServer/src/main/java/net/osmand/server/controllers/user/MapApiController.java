@@ -285,10 +285,6 @@ public class MapApiController {
 		// file.clienttime == null ? 0 : file.clienttime.getTime()
 		GPXTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
 		gpxController.cleanupFromNan(analysis);
-//		if (!full) {
-//			analysis.speedData.clear();
-//			analysis.elevationData.clear();
-//		}
 		return analysis;
 	}
 
@@ -297,6 +293,7 @@ public class MapApiController {
 			file.details = new JsonObject();
 		}
 		// store data in db to speed up retrieval
+		// clear speed data 
 //		if (analysis != null) {
 //			analysis.speedData.clear();
 //			analysis.elevationData.clear();

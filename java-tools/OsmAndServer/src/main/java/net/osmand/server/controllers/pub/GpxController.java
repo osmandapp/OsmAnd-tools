@@ -1,10 +1,13 @@
 package net.osmand.server.controllers.pub;
 
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -20,14 +23,18 @@ import javax.validation.constraints.NotNull;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
-import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,7 +42,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.Gson;
@@ -48,10 +57,12 @@ import net.osmand.GPXUtilities.Speed;
 import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
+import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.OsmGpxWriteContext.QueryParams;
 import net.osmand.obf.preparation.IndexHeightData;
+import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.util.Algorithms;
@@ -169,6 +180,19 @@ public class GpxController {
 		}
 	}
 	
+	@PostMapping(path = {"/process-srtm"}, produces = "application/json")
+	public ResponseEntity<StreamingResponseBody> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(file.getInputStream());
+		GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+	    StreamingResponseBody responseBody = outputStream -> {
+	    	GPXUtilities.writeGpx(new OutputStreamWriter(outputStream), srtmGpx, IProgress.EMPTY_PROGRESS);
+	    };
+		return ResponseEntity.ok()
+	            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename="+file.getName())
+	            .contentType(MediaType.APPLICATION_XML)
+	            .body(responseBody);
+	}
+	
 	@PostMapping(path = {"/upload-session-gpx"}, produces = "application/json")
 	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file, 
 			HttpServletRequest request, HttpSession httpSession) throws IOException {
@@ -272,23 +296,41 @@ public class GpxController {
 		if (srtmLocation == null) {
 			return null;
 		}
-		File srtmFolder = new File(srtmLocation);
-		if (!srtmFolder.exists()) {
-			return null;
-		}
-		IndexHeightData hd = new IndexHeightData();
-		hd.setSrtmData(srtmFolder);
-		for (Track tr : gpxFile.tracks) {
-			for (TrkSegment s : tr.segments) {
-				for (int i = 0; i < s.points.size(); i++) {
-					WptPt wpt = s.points.get(i);
-					double h = hd.getPointHeight(wpt.lat, wpt.lon, missingFile);
-					if (h != IndexHeightData.INEXISTENT_HEIGHT) {
-						wpt.ele = h;
-					} else if (i == 0) {
-						return null;
-					}
+		if (srtmLocation.startsWith("http://") || srtmLocation.startsWith("https://")) {
+			String serverUrl = srtmLocation + "/gpx/process-srtm";
+			HttpHeaders headers = new HttpHeaders();
+			headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+			MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			GPXUtilities.writeGpx(new OutputStreamWriter(baos), gpxFile, null);
+			body.add("file", new ByteArrayResource(baos.toByteArray()));
+			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<byte[]> response = restTemplate.postForEntity(serverUrl, requestEntity, byte[].class);
+			if (response.getStatusCode().is2xxSuccessful()) {
+				return GPXUtilities.loadGPXFile(new ByteArrayInputStream(response.getBody()));
+			} else {
+				return null;
+			}
+		} else {
+			File srtmFolder = new File(srtmLocation);
+			if (!srtmFolder.exists()) {
+				return null;
+			}
+			IndexHeightData hd = new IndexHeightData();
+			hd.setSrtmData(srtmFolder);
+			for (Track tr : gpxFile.tracks) {
+				for (TrkSegment s : tr.segments) {
+					for (int i = 0; i < s.points.size(); i++) {
+						WptPt wpt = s.points.get(i);
+						double h = hd.getPointHeight(wpt.lat, wpt.lon, missingFile);
+						if (h != IndexHeightData.INEXISTENT_HEIGHT) {
+							wpt.ele = h;
+						} else if (i == 0) {
+							return null;
+						}
 
+					}
 				}
 			}
 		}
