@@ -111,10 +111,11 @@ public class MapPanelSelector {
 			menu.add(new AbstractAction(routeKey.set.toString()) {
 				@Override
 				public void actionPerformed(ActionEvent actionEvent) {
-					NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
-					f.keyFilter = Collections.singleton(routeKey);
+					
 					new Thread(() -> {
 						try {
+							NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
+							f.keyFilter = Collections.singleton(routeKey);
 							NetworkRouteSelector routeSelector = new NetworkRouteSelector(
 									DataExtractionSettings.getSettings().getObfReaders(), f);
 							Map<RouteKey, GPXFile> routes = routeSelector.getRoutes(renderedObject);
