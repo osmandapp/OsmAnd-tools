@@ -26,28 +26,49 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
-import javax.swing.*;
+import javax.swing.AbstractAction;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.JRadioButton;
+import javax.swing.JTextField;
+import javax.swing.KeyStroke;
+import javax.swing.UIManager;
 
-import gnu.trove.list.array.TIntArrayList;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.router.RouteColorize.ColorizationType;
-import net.osmand.router.select.RouteSelector;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
+import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.MapCreatorVersion;
 import net.osmand.NativeJavaRendering;
-import net.osmand.NativeLibrary.RenderedObject;
+import net.osmand.NativeJavaRendering.MapDiff;
+import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
@@ -59,15 +80,11 @@ import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.NetworkUtils;
-import net.osmand.NativeJavaRendering.MapDiff;
-import net.osmand.NativeJavaRendering.RenderingImageContext;
+import net.osmand.router.RouteColorize.ColorizationType;
+import net.osmand.swing.MapPanelSelector.MapSelectionArea;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.GPXUtilities.*;
 
 public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
@@ -148,7 +165,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	private List<IMapLocationListener> listeners = new ArrayList<IMapLocationListener>();
 
-	private MapSelectionArea selectionArea = new MapSelectionArea();
 
 	private List<MapPanelLayer> layers = new ArrayList<MapPanelLayer>();
 
@@ -170,9 +186,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	private JButton buttonOnlineRendering;
 
-
+	private MapPanelSelector mapPanelSelector;
 
 	public MapPanel(File fileWithTiles) {
+		mapPanelSelector = new MapPanelSelector(this);
 		ImageIO.setUseCache(false);
 		downloader.setNoHttps(true);
 
@@ -482,9 +499,9 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			l.paintLayer((Graphics2D) g);
 		}
 
-		if(selectionArea.isVisible()){
+		if(getSelectionArea().isVisible()){
 			g.setColor(new Color(0, 0, 230, 50));
-			Rectangle r = selectionArea.getSelectedArea();
+			Rectangle r = getSelectionArea().getSelectedArea();
 			g.fillRect(r.x, r.y, r.width, r.height);
 		}
 		super.paintComponent(g);
@@ -830,9 +847,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	public int getZoom() {
 		return zoom;
 	}
+	
+	public float getMapDensity() {
+		return mapDensity;
+	}
 
 	public MapSelectionArea getSelectionArea() {
-		return selectionArea;
+		return mapPanelSelector.getSelectionArea();
 	}
 
 	public ITileSource getMap(){
@@ -984,70 +1005,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 
 
-	public class MapSelectionArea {
-		private double lat1;
-		private double lon1;
-		private double lat2;
-		private double lon2;
-
-		public double getLat1() {
-			return lat1;
-		}
-
-		public double getLat2() {
-			return lat2;
-		}
-
-		public double getLon1() {
-			return lon1;
-		}
-
-		public double getLon2() {
-			return lon2;
-		}
-
-		public Rectangle getSelectedArea(){
-			Rectangle r = new Rectangle();
-			r.x = getWidth() / 2 + MapUtils.getPixelShiftX((float) (zoom + Math.log(mapDensity) / Math.log(2)), lon1, getLongitude(), getTileSize());
-			r.y = getHeight() / 2 + MapUtils.getPixelShiftY((float) (zoom + Math.log(mapDensity) / Math.log(2)), lat1, getLatitude(), getTileSize());
-			r.width = getWidth() / 2 + MapUtils.getPixelShiftX((float) (zoom + Math.log(mapDensity) / Math.log(2)), lon2, getLongitude(), getTileSize()) - r.x;
-			r.height = getHeight() / 2 + MapUtils.getPixelShiftY((float) (zoom + Math.log(mapDensity) / Math.log(2)), lat2, getLatitude(), getTileSize()) - r.y;
-			return r;
-		}
-
-		public boolean isVisible(){
-			if(lat1 == lat2 || lon1 == lon2){
-				return false;
-			}
-			Rectangle area = getSelectedArea();
-			return area.width > 4 && area.height > 4;
-		}
-
-
-		public void setSelectedArea(int x1, int y1, int x2, int y2){
-			int rx1 = Math.min(x1, x2);
-			int rx2 = Math.max(x1, x2);
-			int ry1 = Math.min(y1, y2);
-			int ry2 = Math.max(y1, y2);
-			int zoom = getZoom();
-			double xTile = getXTile();
-			double yTile = getYTile();
-			int wid = getWidth();
-			int h = getHeight();
-			double tileSize = getTileSize();
-
-			double xTile1 = xTile - (wid / 2 - rx1) / (tileSize);
-			double yTile1 = yTile - (h / 2 - ry1) / (tileSize);
-			double xTile2 = xTile - (wid / 2 - rx2) / (tileSize);
-			double yTile2 = yTile - (h / 2 - ry2) / (tileSize);
-			lat1 = MapUtils.getLatitudeFromTile(zoom, yTile1);
-			lat2 = MapUtils.getLatitudeFromTile(zoom, yTile2);
-			lon1 = MapUtils.getLongitudeFromTile(zoom, xTile1);
-			lon2 = MapUtils.getLongitudeFromTile(zoom, xTile2);
-			getLayer(MapInformationLayer.class).setAreaButtonVisible(isVisible());
-		}
-
-	}
+	
 
 	public class MapMouseAdapter extends MouseAdapter {
 		private Point startDragging = null;
@@ -1077,7 +1035,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				}
 			}
 			if(startSelecting != null){
-				selectionArea.setSelectedArea(startSelecting.x, startSelecting.y, e.getPoint().x, e.getPoint().y);
+				getSelectionArea().setSelectedArea(startSelecting.x, startSelecting.y, e.getPoint().x, e.getPoint().y);
 				updateUI();
 			}
 		}
@@ -1122,57 +1080,13 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			}
 			if(e.getButton() == MouseEvent.BUTTON1){
 				if(startSelecting != null){
-					selectionArea.setSelectedArea(startSelecting.x, startSelecting.y, e.getPoint().x, e.getPoint().y);
+					getSelectionArea().setSelectedArea(startSelecting.x, startSelecting.y, e.getPoint().x, e.getPoint().y);
 					startSelecting = null;
 				}
-				if(selectionArea.getSelectedArea().getWidth() < 4 && selectionArea.getSelectedArea().getHeight() < 4) {
-					RenderingImageContext ctx = lastContext;
-					if (ctx != null && zoom == ctx.zoom) {
-						NativeRendererRunnable rr = new NativeRendererRunnable(getWidth(), getHeight());
-						int x = (int) ((rr.oleft - ctx.sleft) / MapUtils.getPowZoom(31 - zoom) * getTileSize() + e
-								.getPoint().x);
-						int y = (int) ((rr.otop - ctx.stop) / MapUtils.getPowZoom(31 - zoom) * getTileSize() + e
-								.getPoint().y);
-						System.out.println("Search objects at " + x + " " + y);
-						RenderedObject[] ls = nativeLibRendering.searchRenderedObjectsFromContext(ctx.context, x, y, true);
-						DataTileManager<Entity> points = new DataTileManager<Entity>(6);
-						if(ls != null && ls.length > 0) {
-							for (RenderedObject o : ls) {
-								System.out.println((o.isText() ? o.getName() : "Icon") + " " + o.getId() + " "
-										+ o.getTags() + " (" + o.getBbox() + ") " + " order = " + o.getOrder()
-										+ " visible = " + o.isVisible());
-								if (!o.isVisible()) {
-									continue;
-								}
-								if (o.getX().size() > 1) {
-									if (isRoute(o)) {
-										createMenu(o).show(MapPanel.this, e.getX(), e.getY());
-									} else {
-										Way way = new Way(-1);
-										TIntArrayList x1 = o.getX();
-										TIntArrayList y1 = o.getY();
-										for (int i = 0; i < x1.size(); i++) {
-											Node n = new Node(MapUtils.get31LatitudeY(y1.get(i)),
-													MapUtils.get31LongitudeX(x1.get(i)), -1);
-											way.addNode(n);
-										}
-										LatLon wayCenter = way.getLatLon();
-										points.registerObject(wayCenter.getLatitude(), wayCenter.getLongitude(), way);
-									}
-								} else {
-									LatLon n = o.getLabelLatLon();
-									if (n == null) {
-										n = o.getLocation();
-									}
-									if (n != null) {
-										Node nt = new Node(n.getLatitude(), n.getLongitude(), -1);
-										points.registerObject(n.getLatitude(), n.getLongitude(), nt);
-									}
-								}
-							}
-						}
-						setPoints(points);
-						repaint();
+				if (getSelectionArea().getSelectedArea().getWidth() < 4
+						&& getSelectionArea().getSelectedArea().getHeight() < 4) {
+					if (lastContext != null && zoom == lastContext.zoom) {
+						mapPanelSelector.select(lastContext, e);
 					}
 				}
 			}
@@ -1186,93 +1100,20 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			super.mouseReleased(e);
 		}
 
-		private JPopupMenu createMenu(RenderedObject renderedObject) {
-			JPopupMenu menu = new JPopupMenu();
-			menu.add(new JLabel("Select route"));
-			Set<String> routeKeys = RouteSelector.getRouteStringKeys(renderedObject, null);
-			for (String routeKey : routeKeys) {
-				menu.add(new AbstractAction(routeKey) {
-					@Override
-					public void actionPerformed(ActionEvent actionEvent) {
-						showRoute(renderedObject, routeKey);
-					}
-				});
-			}
-			return menu;
-		}
-
-		public boolean isRoute(RenderedObject o) {
-			boolean isRoute = false;
-			for (String tag : o.getTags().keySet()) {
-				if (RouteSelector.RouteType.isRoute(tag)) {
-					isRoute = true;
-					break;
-				}
-			}
-			return isRoute;
-		}
 	}
 
-	void showRoute(RenderedObject renderedObject, String routeKey) {
-		BinaryMapIndexReader[] reader = getMapIndexReader(renderedObject);
-		if (reader.length == 0) {
-			return;
-		}
-		new Thread(() -> {
-			RouteSelector routeSelector = new RouteSelector(reader);
-			List<GPXFile> files = routeSelector.getRoutes(renderedObject, routeKey);
-			drawGpxFiles(files);
-		}).start();
-	}
 
-	private void drawGpxFiles(List<GPXFile> files) {
-		DataTileManager<Entity> points = new DataTileManager<>();
-		List<Way> ways = new ArrayList<>();
-		for (GPXFile file : files) {
-			for (Track track : file.tracks) {
-				for (TrkSegment segment : track.segments) {
-					Way w = new Way(-1);
-					for (WptPt point : segment.points) {
-						w.addNode(new Node(point.lat, point.lon, -1));
-					}
-					ways.add(w);
-				}
-			}
-			for (Way w : ways) {
-				LatLon n = w.getLatLon();
-				points.registerObject(n.getLatitude(), n.getLongitude(), w);
-			}
-			setPoints(points);
-		}
-	}
-
-	private BinaryMapIndexReader[] getMapIndexReader(RenderedObject renderedObject) {
-		BinaryMapIndexReader[] reader = new BinaryMapIndexReader[]{null};
-		MapDiff mapDiffs = nativeLibRendering.getMapDiffs(
-				MapUtils.get31LatitudeY(renderedObject.getY().get(0)),
-				MapUtils.get31LongitudeX(renderedObject.getX().get(0)));
-		if (mapDiffs != null) {
-			File mapFile = mapDiffs.baseFile;
-			try {
-				reader[0] = new BinaryMapIndexReader(new RandomAccessFile(mapFile, "r"), mapFile);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		return reader;
-	}
-
-	private class NativeRendererRunnable implements Runnable {
-		private int sleft;
-		private int sright;
-		private int stop;
-		private int sbottom;
-		private int oleft;
-		private int oright;
-		private int otop;
-		private int obottom;
-		private int z;
-		private final int cf;
+	class NativeRendererRunnable implements Runnable {
+		int sleft;
+		int sright;
+		int stop;
+		int sbottom;
+		int oright;
+		int oleft;
+		int otop;
+		int obottom;
+		int z;
+		final int cf;
 
 		public NativeRendererRunnable(int w, int h) {
 			LatLon latLon = new LatLon(latitude, longitude);

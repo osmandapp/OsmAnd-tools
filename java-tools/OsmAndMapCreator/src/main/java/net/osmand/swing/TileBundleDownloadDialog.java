@@ -29,7 +29,6 @@ import net.osmand.map.ITileSource;
 import net.osmand.map.MapTileDownloader;
 import net.osmand.map.MapTileDownloader.DownloadRequest;
 import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
-import net.osmand.swing.MapPanel.MapSelectionArea;
 import net.osmand.util.MapUtils;
 
 
@@ -39,7 +38,7 @@ public class TileBundleDownloadDialog extends JDialog {
 
 	private JLabel label;
 	private ITileSource map;
-	private MapSelectionArea selectionArea;
+	private MapPanelSelector.MapSelectionArea selectionArea;
 	private int zoom;
 	private JSpinner startSpinner;
 	private JSpinner endSpinner;

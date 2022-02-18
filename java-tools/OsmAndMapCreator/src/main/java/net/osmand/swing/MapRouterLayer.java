@@ -1135,7 +1135,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						paramsR.put(p, "true");
 					}
 				}
-				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
+				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(2000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
 				// addImpassableRoad(6859437l).
 				// addImpassableRoad(46859655089l).

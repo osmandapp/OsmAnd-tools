@@ -49,7 +49,6 @@ import resources._R;
 
 public class NativeJavaRendering extends NativeLibrary {
 
-
 	private static final String INDEXES_CACHE = "indexes.cache";
 	
 	public static Boolean loaded = null;
@@ -57,13 +56,13 @@ public class NativeJavaRendering extends NativeLibrary {
 	private static NativeJavaRendering defaultLoadedLibrary;
 	
 	private static final Log log = LogFactory.getLog(NativeJavaRendering.class);
-
 	
 	private RenderingRulesStorage storage;
+	
 	private Map<String, String> renderingProps;
 	
-	
 	private Map<String, MapDiff> diffs = new LinkedHashMap<String, MapDiff>();
+	
 	public static class MapDiff {
 		public String baseName;
 		public File baseFile;

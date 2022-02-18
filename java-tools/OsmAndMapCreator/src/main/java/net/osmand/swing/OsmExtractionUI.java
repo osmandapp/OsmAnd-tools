@@ -16,12 +16,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.SQLException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -58,7 +56,6 @@ import net.osmand.MapCreatorVersion;
 import net.osmand.NativeJavaRendering;
 import net.osmand.SQLiteBigPlanetIndex;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.Street;
@@ -81,7 +78,6 @@ import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
-import net.osmand.swing.MapPanel.MapSelectionArea;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import rtree.RTree;
@@ -705,7 +701,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 		    	    dlg.setVisible(true);
 		    		if(res.length() > 0 && panel.getSelectionArea().isVisible()){
-		    			MapSelectionArea area = panel.getSelectionArea();
+		    			MapPanelSelector.MapSelectionArea area = panel.getSelectionArea();
 		    			IOsmStorageFilter filter = new OsmBoundsFilter(area.getLat1(), area.getLon1(), area.getLat2(), area.getLon2());
 		    			loadCountry(fc.getSelectedFile(), filter);
 		    		}
