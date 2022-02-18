@@ -113,21 +113,16 @@ public class MapPanelSelector {
 				public void actionPerformed(ActionEvent actionEvent) {
 					NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
 					f.keyFilter = Collections.singleton(routeKey);
-					try {
-						NetworkRouteSelector routeSelector;
-						routeSelector = new NetworkRouteSelector(DataExtractionSettings.getSettings().getObfReaders(),
-								f);
-						new Thread(() -> {
-							try {
-								Map<RouteKey, GPXFile> routes = routeSelector.getRoutes(renderedObject);
-								drawGpxFiles(routes.values());
-							} catch (IOException e) {
-								log.error(e.getMessage(), e);
-							}
-						}).start();
-					} catch (IOException e) {
-						log.error(e.getMessage(), e);
-					}
+					new Thread(() -> {
+						try {
+							NetworkRouteSelector routeSelector = new NetworkRouteSelector(
+									DataExtractionSettings.getSettings().getObfReaders(), f);
+							Map<RouteKey, GPXFile> routes = routeSelector.getRoutes(renderedObject);
+							drawGpxFiles(routes.values());
+						} catch (IOException e) {
+							log.error(e.getMessage(), e);
+						}
+					}).start();
 				}
 			});
 		}
