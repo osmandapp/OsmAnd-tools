@@ -3,7 +3,6 @@ package net.osmand.swing;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -111,6 +110,8 @@ public class MapPanelSelector {
 		List<RouteKey> routeKeys = RouteType.getRouteStringKeys(renderedObject);
 		for (RouteKey routeKey : routeKeys) {
 			menu.add(new AbstractAction(routeKey.set.toString()) {
+				private static final long serialVersionUID = 8970133073749840163L;
+
 				@Override
 				public void actionPerformed(ActionEvent actionEvent) {
 					threadPool.submit(() -> {
