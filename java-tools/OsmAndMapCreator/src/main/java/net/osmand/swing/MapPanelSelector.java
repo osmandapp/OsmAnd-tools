@@ -140,7 +140,7 @@ public class MapPanelSelector {
 	}
 
 	private void drawGpxFiles(Collection<GPXFile> files) {
-		DataTileManager<Entity> points = new DataTileManager<>();
+		DataTileManager<Entity> points = new DataTileManager<>(10);
 		List<Way> ways = new ArrayList<>();
 		for (GPXFile file : files) {
 			for (Track track : file.tracks) {
@@ -240,7 +240,7 @@ public class MapPanelSelector {
 			Rectangle area = getSelectedArea();
 			return area.width > 4 && area.height > 4;
 		}
-
+		
 
 		public void setSelectedArea(int x1, int y1, int x2, int y2){
 			int rx1 = Math.min(x1, x2);
