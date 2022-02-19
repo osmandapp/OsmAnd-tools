@@ -3,14 +3,15 @@ package net.osmand.swing;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.AbstractAction;
 import javax.swing.JLabel;
@@ -19,20 +20,19 @@ import javax.swing.JPopupMenu;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
-import net.osmand.PlatformUtil;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.Track;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
-import net.osmand.NativeJavaRendering.MapDiff;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.NativeLibrary.RenderedObject;
-import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+import net.osmand.router.network.NetworkRouteContext.NetworkRouteContextStats;
 import net.osmand.router.network.NetworkRouteSelector;
 import net.osmand.router.network.NetworkRouteSelector.NetworkRouteSelectorFilter;
 import net.osmand.router.network.NetworkRouteSelector.RouteKey;
@@ -44,10 +44,12 @@ public class MapPanelSelector {
 	protected static final Log log = PlatformUtil.getLog(MapPanelSelector.class);
 	private final MapPanel panel;
 	private MapSelectionArea mapSelectionArea;
+	private ThreadPoolExecutor threadPool;
 
 	public MapPanelSelector(MapPanel panel) {
 		this.panel = panel;
 		mapSelectionArea = new MapSelectionArea();
+		threadPool = new ThreadPoolExecutor(0, 1, 5, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(5));
 	}
 	
 	public MapSelectionArea getSelectionArea() {
@@ -111,19 +113,25 @@ public class MapPanelSelector {
 			menu.add(new AbstractAction(routeKey.set.toString()) {
 				@Override
 				public void actionPerformed(ActionEvent actionEvent) {
-					
-					new Thread(() -> {
+					threadPool.submit(() -> {
 						try {
 							NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
+							System.out.println("Start loading " + routeKey.set);
+							long tms = System.currentTimeMillis();
 							f.keyFilter = Collections.singleton(routeKey);
 							NetworkRouteSelector routeSelector = new NetworkRouteSelector(
 									DataExtractionSettings.getSettings().getObfReaders(), f);
 							Map<RouteKey, GPXFile> routes = routeSelector.getRoutes(renderedObject);
+							NetworkRouteContextStats stats = routeSelector.getNetworkRouteContext().getStats();
+							String msg = String.format("Load route after %.1f s: loaded %d tiles, %d routes, time %.1f s",
+									(System.currentTimeMillis() - tms) / 1.0e3, stats.loadedTiles,
+									stats.loadedRoutes, stats.loadTimeNs / 1.0e9);
+							System.out.println(msg);
 							drawGpxFiles(routes.values());
-						} catch (IOException e) {
+						} catch (Exception e) {
 							log.error(e.getMessage(), e);
 						}
-					}).start();
+					});
 				}
 			});
 		}
