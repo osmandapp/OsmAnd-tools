@@ -53,6 +53,7 @@ public class DataExtractionSettings {
 		File mapsFolder = new File(getBinaryFilesDir());
 		CachedOsmandIndexes cache = null;
 		File cacheFile = new File(mapsFolder, INDEXES_CACHE);
+		//why INDEXES_CACHE.length() > 0 ??? maybe cacheFile.length() > 0 ???
 		if (mapsFolder.exists() && obfFiles.isEmpty() && INDEXES_CACHE.length() > 0) {
 				cache = new CachedOsmandIndexes();
 				if (cacheFile.exists()) {
@@ -66,12 +67,13 @@ public class DataExtractionSettings {
 				if (ref == null || ref.reader == null) {
 					ref = new BinaryMapIndexReaderReference();
 					ref.file = obf;
-					if (cache == null) {
+					//remove cache reader usage due to duplicates of subregions in routingIndexes
+//					if (cache == null) {
 						RandomAccessFile raf = new RandomAccessFile(obf, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 						ref.reader = new BinaryMapIndexReader(raf, obf);
-					} else {
-						ref.reader = cache.getReader(obf, true);
-					}
+//					} else {
+//						ref.reader = cache.getReader(obf, true);
+//					}
 					obfFiles.put(obf.getAbsolutePath(), ref);
 				}
 				files.add(ref.reader);
