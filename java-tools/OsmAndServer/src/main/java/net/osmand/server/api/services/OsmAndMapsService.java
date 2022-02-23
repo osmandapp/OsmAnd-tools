@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 
 
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -39,10 +40,12 @@ import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.NativeJavaRendering;
+import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
@@ -100,12 +103,48 @@ public class OsmAndMapsService {
 
 	@Autowired
 	VectorTileServerConfig config;
+	
+	@Autowired
+	RoutingServerConfig routingConfig;
 
 
 	public static class BinaryMapIndexReaderReference {
 		File file;
 		BinaryMapIndexReader reader;
 		public FileIndex fileIndex;
+	}
+	
+	
+	public static class RoutingServerConfigEntry {
+		public String type;
+		public String url;
+		public String name;
+		public String profile = "car";
+	}
+	
+	@Configuration
+	@ConfigurationProperties("osmand.routing")
+	public static class RoutingServerConfig {
+		
+		public Map<String, RoutingServerConfigEntry> config = new TreeMap<String, RoutingServerConfigEntry>();
+		
+		public void setConfig(Map<String, String> style) {
+			for (Entry<String, String> e : style.entrySet()) {
+				RoutingServerConfigEntry src = new RoutingServerConfigEntry();
+				src.name = e.getKey();
+				for (String s : e.getValue().split(",")) {
+					String value = s.substring(s.indexOf('=') + 1);
+					if (s.startsWith("type=")) {
+						src.type = value;
+					} else if (s.startsWith("url=")) {
+						src.url = value;
+					} else if (s.startsWith("profile=")) {
+						src.profile = value;
+					}
+				}
+				config.put(src.name, src);
+			}
+		}
 	}
 
 	@Configuration
@@ -301,6 +340,10 @@ public class OsmAndMapsService {
 	public VectorTileServerConfig getConfig() {
 		return config;
 	}
+	
+	public RoutingServerConfig getRoutingConfig() {
+		return routingConfig;
+	}
 
 	public VectorStyle getStyle(String style) {
 		return config.style.get(style);
@@ -489,7 +532,13 @@ public class OsmAndMapsService {
 			return Collections.emptyList();
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router);
+		RoutingContext ctx = prepareRouterContext(routeMode, points, router, null);
+		List<RouteSegmentResult> route = approximate(ctx, router, props, polyline);
+		return route;
+	}
+
+	private List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router, 
+			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
@@ -506,7 +555,8 @@ public class OsmAndMapsService {
 		return route;
 	}
 
-	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router) throws IOException {
+	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router, 
+			RoutingServerConfigEntry[] serverEntry) throws IOException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
@@ -535,10 +585,18 @@ public class OsmAndMapsService {
 			}
 		}
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
+		String routeModeKey = props[0];
+		if (routingConfig.config.containsKey(routeModeKey)) {
+			RoutingServerConfigEntry entry = routingConfig.config.get(routeModeKey);
+			routeModeKey = entry.profile;
+			if (serverEntry != null && serverEntry.length > 0) {
+				serverEntry[0] = entry;
+			}
+		}
 		RoutingConfiguration config = RoutingConfiguration.getDefault().
 		// addImpassableRoad(6859437l).
 		// setDirectionPoints(directionPointsFile).
-				build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
+				build(routeModeKey, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 		config.routeCalculationTime = System.currentTimeMillis();
 		if (paramMode == null) {
 			paramMode = GeneralRouterProfile.CAR == config.router.getProfile() ? RouteCalculationMode.COMPLEX
@@ -554,11 +612,28 @@ public class OsmAndMapsService {
 			throws IOException, InterruptedException {
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		PrecalculatedRouteDirection precalculatedRouteDirection = null;
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router);
-		List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-		putResultProps(ctx, route, props);
-		return route;
+		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
+		RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc);
+		if (rsc[0] != null) {
+			StringBuilder url = new StringBuilder(rsc[0].url);
+			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
+			url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
+			
+	        RestTemplate restTemplate = new RestTemplate();
+	        String gpx = restTemplate.getForObject(url.toString(), String.class);
+	        GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
+			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+			for (WptPt p : trkSegment.points) {
+				polyline.add(new LatLon(p.lat, p.lon));
+			}
+			return approximate(ctx, router, props, polyline);
+		} else { 
+			PrecalculatedRouteDirection precalculatedRouteDirection = null;
+			List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+			putResultProps(ctx, route, props);
+			return route;
+		}
 	}
 
 	private void putResultProps(RoutingContext ctx, List<RouteSegmentResult> route, Map<String, Object> props) {

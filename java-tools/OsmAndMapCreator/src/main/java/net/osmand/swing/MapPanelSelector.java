@@ -140,7 +140,7 @@ public class MapPanelSelector {
 	}
 
 	private void drawGpxFiles(Collection<GPXFile> files) {
-		DataTileManager<Entity> points = new DataTileManager<>(10);
+		DataTileManager<Entity> points = new DataTileManager<>(4);
 		List<Way> ways = new ArrayList<>();
 		for (GPXFile file : files) {
 			for (Track track : file.tracks) {

@@ -54,11 +54,10 @@ public class DataExtractionSettings {
 		CachedOsmandIndexes cache = null;
 		File cacheFile = new File(mapsFolder, INDEXES_CACHE);
 		if (mapsFolder.exists() && obfFiles.isEmpty() && INDEXES_CACHE.length() > 0) {
-				cache = new CachedOsmandIndexes();
-				if (cacheFile.exists()) {
-					cache.readFromFile(cacheFile, 2);
-				}
-				
+			cache = new CachedOsmandIndexes();
+			if (cacheFile.exists()) {
+				cache.readFromFile(cacheFile, 2);
+			}
 		}
 		for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
 			if (obf.getName().endsWith(".obf")) {

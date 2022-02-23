@@ -76,10 +76,6 @@ CREATE TABLE telegram_devices (id bigint NOT NULL, chat_id bigint NOT NULL, crea
 );
 CREATE INDEX telegram_devices_idx on telegram_devices(user_id);
 
-ALTER TABLE ONLY telegram_tracker_configuration ALTER COLUMN id SET DEFAULT nextval('telegram_tracker_configuration_id_seq'::regclass);
-ALTER SEQUENCE telegram_tracker_configuration_id_seq OWNED BY telegram_tracker_configuration.id;
-
-
 CREATE TABLE lottery_users (email text, series text, hashcode text, ip text,
         promocode text, round integer, sent boolean, updatetime timestamp);
 CREATE INDEX lottery_users_series_idx on lottery_users(series);
@@ -102,5 +98,4 @@ CREATE TABLE analytics (
 -- \set DBUSER test;
 -- GRANT ALL privileges ON ALL TABLES IN SCHEMA public to :DBUSER;
 -- GRANT ALL privileges ON supporters_seq to  <user>;
--- GRANT ALL privileges ON telegram_tracker_configuration_id_seq to <user>;
 -- ALTER TABLE <table_name> OWNER TO <user>;

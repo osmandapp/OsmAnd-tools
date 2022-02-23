@@ -38,6 +38,7 @@ import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.OsmAndMapsService.RoutingServerConfigEntry;
 import net.osmand.server.api.services.OsmAndMapsService.VectorTileServerConfig;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -214,6 +215,14 @@ public class RoutingController {
 				rm.params.put(nativeTrack.key, nativeTrack);
 				rm.params.put(calcMode.key, calcMode);
 			}
+		}
+		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
+			RoutingMode rm = new RoutingMode();
+			rm.key = rs.name;
+			rm.name = Algorithms.capitalizeFirstLetter(rs.name).replace('_', ' ');
+			routers.put(rm.key, rm);
+			rm.params.put(nativeRouting.key, nativeRouting);
+			rm.params.put(nativeTrack.key, nativeTrack);
 		}
 		return ResponseEntity.ok(gson.toJson(routers));
 
