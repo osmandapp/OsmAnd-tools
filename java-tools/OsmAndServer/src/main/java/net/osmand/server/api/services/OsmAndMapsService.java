@@ -560,6 +560,7 @@ public class OsmAndMapsService {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
+		router.setUseNativeApproximation(false);
 		RouteCalculationMode paramMode = null;
 		for (String p : props) {
 			if (p.length() == 0) {
