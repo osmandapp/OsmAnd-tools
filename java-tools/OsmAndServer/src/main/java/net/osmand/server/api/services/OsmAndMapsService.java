@@ -38,8 +38,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
@@ -621,7 +623,16 @@ public class OsmAndMapsService {
 			url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
 			
 	        RestTemplate restTemplate = new RestTemplate();
+	        restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+				
+				@Override
+				public void handleError(ClientHttpResponse response) throws IOException {
+					LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
+					super.handleError(response);
+				}
+			});
 	        String gpx = restTemplate.getForObject(url.toString(), String.class);
+	        
 	        GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
 			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
 			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
