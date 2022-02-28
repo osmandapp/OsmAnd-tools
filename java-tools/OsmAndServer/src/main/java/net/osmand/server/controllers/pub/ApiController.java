@@ -60,6 +60,7 @@ import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
 import net.osmand.server.api.services.PlacesService;
 import net.osmand.util.Algorithms;
+import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 
 @Controller
 @RequestMapping("/api")
@@ -100,6 +101,9 @@ public class ApiController {
 	
 	@Autowired
 	SupportersRepository supportersRepository;
+
+	@Autowired
+	private OsmAndServerMonitorTasks monitoring;
 
 	private ObjectMapper jsonMapper;
 
@@ -205,6 +209,12 @@ public class ApiController {
 		return "{\"status\":\"OK\"}";
 	}
     
+	@GetMapping(path = { "/status_server" }, produces = "text/html;charset=UTF-8")
+	@ResponseBody
+	public String statusServer() throws IOException {
+		String refreshAll = monitoring.refreshAll();
+		return refreshAll;
+	}
     
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
 	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
