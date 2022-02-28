@@ -213,7 +213,7 @@ public class ApiController {
 	@ResponseBody
 	public String statusServer() throws IOException {
 		String refreshAll = monitoring.refreshAll();
-		return refreshAll;
+		return "<pre>" + refreshAll + "</pre>";
 	}
     
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
