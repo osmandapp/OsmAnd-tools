@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 
 
+
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -13,6 +14,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -55,6 +57,9 @@ import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
+import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.OsmandIndex.FileIndex;
 import net.osmand.binary.OsmandIndex.RoutingPart;
 import net.osmand.binary.OsmandIndex.RoutingSubregion;
@@ -519,6 +524,64 @@ public class OsmAndMapsService {
 		return sb.append(style).append('-').append(metasizeLog).append('-').append(tileSizeLog).append('/').append(z)
 				.append('/').append(x).append('/').append(y).toString();
 	}
+	
+	public synchronized List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
+		List<GeocodingResult> results = new ArrayList<>();
+		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
+		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null);
+		GeocodingUtilities su = new GeocodingUtilities();
+		double minBuildingDistance = 0;
+		List<GeocodingResult> complete = new ArrayList<GeocodingUtilities.GeocodingResult>();
+		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
+		minBuildingDistance = justifyResults(list, su, complete, res);
+//		complete.addAll(res);
+//		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
+		for (GeocodingResult r : complete) {
+			if (r.building != null && r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
+				continue;
+			}
+			results.add(r);
+		}
+		return results;
+	}
+	
+	private double justifyResults(List<BinaryMapIndexReader> list, GeocodingUtilities su,
+			List<GeocodingResult> complete, List<GeocodingResult> res) throws IOException {
+		double minBuildingDistance = 0;
+		for (GeocodingResult r : res) {
+			BinaryMapIndexReader reader = null;
+			for (BinaryMapIndexReader b : list) {
+				for (RouteRegion rb : b.getRoutingIndexes()) {
+					if (r.regionFP == rb.getFilePointer() && r.regionLen == rb.getLength()) {
+						reader = b;
+						break;
+
+					}
+				}
+				if (reader != null) {
+					break;
+				}
+			}
+			if (reader != null) {
+				List<GeocodingResult> justified = su.justifyReverseGeocodingSearch(r, reader, minBuildingDistance, null);
+				if (!justified.isEmpty()) {
+					double md = justified.get(0).getDistance();
+					if (minBuildingDistance == 0) {
+						minBuildingDistance = md;
+					} else {
+						minBuildingDistance = Math.min(md, minBuildingDistance);
+					}
+					complete.addAll(justified);
+				}
+			} else {
+				complete.add(r);
+			}
+		}
+		su.filterDuplicateRegionResults(complete);
+		return minBuildingDistance;
+	}
 
 	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {
@@ -611,6 +674,7 @@ public class OsmAndMapsService {
 		return ctx;
 	}
 	
+	
 	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
 		QuadRect points = points(intermediates, start, end);
@@ -647,6 +711,7 @@ public class OsmAndMapsService {
 			return route;
 		}
 	}
+	
 
 	private void putResultProps(RoutingContext ctx, List<RouteSegmentResult> route, Map<String, Object> props) {
 		float completeTime = 0;

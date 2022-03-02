@@ -31,6 +31,7 @@ import com.google.gson.Gson;
 
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.LatLon;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.GeneralRouter.RoutingParameterType;
@@ -256,6 +257,30 @@ public class RoutingController {
 			features.add(0, route);
 			route.properties = props;
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		}
+	}
+	
+	@RequestMapping(path = "/geocoding", produces = {MediaType.APPLICATION_JSON_VALUE})
+	public ResponseEntity<?> geocoding(@RequestParam double lat, double lon) throws IOException, InterruptedException {
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return errorConfig();
+		}
+		try {
+			List<GeocodingResult> lst = osmAndMapsService.geocoding(lat, lon);
+			List<Feature> features = new ArrayList<Feature>();
+			for(GeocodingResult rr : lst) {
+				features.add(new Feature(Geometry.point(rr.getLocation())).prop("description", rr.toString()));
+			}
+			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		} catch (IOException e) {
+			LOGGER.error(e.getMessage(), e);
+			throw e;
+		} catch (InterruptedException e) {
+			LOGGER.error(e.getMessage(), e);
+			throw e;
+		} catch (RuntimeException e) {
+			LOGGER.error(e.getMessage(), e);
+			throw e;
 		}
 	}
 	
