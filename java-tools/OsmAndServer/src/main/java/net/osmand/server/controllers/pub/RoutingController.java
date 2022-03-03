@@ -297,6 +297,7 @@ public class RoutingController {
 		try {
 			List<SearchResult> res = osmAndMapsService.search(lat, lon, search);
 			List<Feature> features = new ArrayList<Feature>();
+			int d = 1;
 			for(SearchResult sr : res) {
 				if(sr.location != null) {
 					double loc = MapUtils.getDistance(sr.location, lat, lon) / 1000.0;
@@ -321,7 +322,7 @@ public class RoutingController {
 							typeString += " (CLOSED)";
 						}
 					}
-					String r = String.format("%s %s [%.2f km, %d, %s, %.2f] ", sr.localeName, typeString, loc, sr.getFoundWordCount(), sr.objectType, 
+					String r = String.format("%d. %s %s [%.2f km, %d, %s, %.2f] ", d++, sr.localeName, typeString, loc, sr.getFoundWordCount(), sr.objectType, 
 							sr.getUnknownPhraseMatchWeight());
 					features.add(new Feature(Geometry.point(sr.location)).prop("description", r));
 				}
