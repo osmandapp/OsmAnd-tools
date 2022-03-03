@@ -388,7 +388,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				}
 				if(sr.object instanceof Amenity) {
 					locationString += " " + ((Amenity)sr.object).getSubType();
-					if(((Amenity)sr.object).isClosed()) {
+					if (((Amenity) sr.object).isClosed()) {
 						locationString += " (CLOSED)";
 					}
 				}

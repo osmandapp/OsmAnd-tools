@@ -48,37 +48,44 @@ import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.NativeJavaRendering;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.GPXUtilities.TrkSegment;
 import net.osmand.GPXUtilities.WptPt;
 import net.osmand.LocationsHolder;
+import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.OsmandIndex.FileIndex;
 import net.osmand.binary.OsmandIndex.RoutingPart;
 import net.osmand.binary.OsmandIndex.RoutingSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.map.OsmandRegions;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter.GeneralRouterProfile;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
-import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
+import net.osmand.search.SearchUICore;
+import net.osmand.search.SearchUICore.SearchResultCollection;
+import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -95,6 +102,10 @@ public class OsmAndMapsService {
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 	
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
+	
+	private static final int SEARCH_RADIUS_LEVEL = 1;
+	private static final double SEARCH_RADIUS_DEGREE = 1.5;
+	private static final String SEARCH_LOCALE = "en";
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
@@ -113,6 +124,8 @@ public class OsmAndMapsService {
 	
 	@Autowired
 	RoutingServerConfig routingConfig;
+
+	private OsmandRegions osmandRegions;
 
 
 	public static class BinaryMapIndexReaderReference {
@@ -378,6 +391,8 @@ public class OsmAndMapsService {
 
 	public boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && config.initErrorMessage == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
 			synchronized (this) {
 				if (!(nativelib == null && config.initErrorMessage == null)) {
 					return config.initErrorMessage == null;
@@ -523,6 +538,27 @@ public class OsmAndMapsService {
 		StringBuilder sb = new StringBuilder();
 		return sb.append(style).append('-').append(metasizeLog).append('-').append(tileSizeLog).append('/').append(z)
 				.append('/').append(x).append('/').append(y).toString();
+	}
+	
+	public synchronized List<SearchResult> search(double lat, double lon, String text) throws IOException, InterruptedException {
+		if (!validateAndInitConfig()) {
+			return null;
+		}
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+		searchUICore.getSearchSettings().setRegions(osmandRegions);
+		QuadRect points = points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE), 
+				new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
+		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
+		searchUICore.getSearchSettings().setOfflineIndexes(list);
+	    searchUICore.init();
+	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
+	    
+	    SearchSettings settings = searchUICore.getPhrase().getSettings();
+	    searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
+		SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
+		List<SearchResult> results = r.getCurrentSearchResults();
+		
+	    return results;
 	}
 	
 	public synchronized List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
@@ -859,5 +895,9 @@ public class OsmAndMapsService {
 			}
 			cacheFiles.writeToFile(cacheFile);
 		}
+	}
+
+	public OsmandRegions getOsmandRegions() {
+		return osmandRegions;
 	}
 }

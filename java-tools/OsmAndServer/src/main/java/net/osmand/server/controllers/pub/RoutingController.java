@@ -32,12 +32,16 @@ import com.google.gson.Gson;
 import net.osmand.GPXUtilities;
 import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
+import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
+import net.osmand.data.Street;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.RoutingServerConfigEntry;
 import net.osmand.server.api.services.OsmAndMapsService.VectorTileServerConfig;
@@ -261,7 +265,7 @@ public class RoutingController {
 	}
 	
 	@RequestMapping(path = "/geocoding", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> geocoding(@RequestParam double lat, double lon) throws IOException, InterruptedException {
+	public ResponseEntity<?> geocoding(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig();
 		}
@@ -270,6 +274,57 @@ public class RoutingController {
 			List<Feature> features = new ArrayList<Feature>();
 			for(GeocodingResult rr : lst) {
 				features.add(new Feature(Geometry.point(rr.getLocation())).prop("description", rr.toString()));
+			}
+			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		} catch (IOException e) {
+			LOGGER.error(e.getMessage(), e);
+			throw e;
+		} catch (InterruptedException e) {
+			LOGGER.error(e.getMessage(), e);
+			throw e;
+		} catch (RuntimeException e) {
+			LOGGER.error(e.getMessage(), e);
+			throw e;
+		}
+	}
+	
+	
+	@RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
+	public ResponseEntity<?> geocoding(@RequestParam double lat, @RequestParam double lon, @RequestParam String search) throws IOException, InterruptedException {
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return errorConfig();
+		}
+		try {
+			List<SearchResult> res = osmAndMapsService.search(lat, lon, search);
+			List<Feature> features = new ArrayList<Feature>();
+			for(SearchResult sr : res) {
+				if(sr.location != null) {
+					double loc = MapUtils.getDistance(sr.location, lat, lon) / 1000.0;
+					String typeString = "";
+					if (!Algorithms.isEmpty(sr.localeRelatedObjectName)) {
+						typeString += " " + sr.localeRelatedObjectName;
+						if (sr.distRelatedObjectName != 0) {
+							typeString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
+						}
+					}
+					if(sr.objectType == ObjectType.HOUSE) {
+						if (sr.relatedObject instanceof Street) {
+							typeString += " " + ((Street) sr.relatedObject).getCity().getName();
+						}
+					}
+					if (sr.objectType == ObjectType.LOCATION) {
+						typeString += " " + osmAndMapsService.getOsmandRegions().getCountryName(sr.location);
+					}
+					if (sr.object instanceof Amenity) {
+						typeString += " " + ((Amenity) sr.object).getSubType();
+						if (((Amenity) sr.object).isClosed()) {
+							typeString += " (CLOSED)";
+						}
+					}
+					String r = String.format("%s %s [%.2f km, %d, %s, %.2f] ", sr.localeName, typeString, loc, sr.getFoundWordCount(), sr.objectType, 
+							sr.getUnknownPhraseMatchWeight());
+					features.add(new Feature(Geometry.point(sr.location)).prop("description", r));
+				}
 			}
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		} catch (IOException e) {
