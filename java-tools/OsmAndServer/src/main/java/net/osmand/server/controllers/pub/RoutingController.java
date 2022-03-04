@@ -297,10 +297,12 @@ public class RoutingController {
 		try {
 			List<SearchResult> res = osmAndMapsService.search(lat, lon, search);
 			List<Feature> features = new ArrayList<Feature>();
-			int pos = 1;
+			int pos = 0;
+			int posLoc = 0;
 			for (SearchResult sr : res) {
 				pos++;
 				if (sr.location != null) {
+					posLoc++;
 					double loc = MapUtils.getDistance(sr.location, lat, lon) / 1000.0;
 					String typeString = "";
 					if (!Algorithms.isEmpty(sr.localeRelatedObjectName)) {
@@ -325,7 +327,8 @@ public class RoutingController {
 					}
 					String r = String.format("%d. %s %s [%.2f km, %d, %s, %.2f] ", pos, sr.localeName, typeString, loc,
 							sr.getFoundWordCount(), sr.objectType, sr.getUnknownPhraseMatchWeight());
-					features.add(new Feature(Geometry.point(sr.location)).prop("description", r));
+					features.add(new Feature(Geometry.point(sr.location)).prop("description", r).
+							prop("index", pos).prop("locindex", posLoc).prop("distance", loc).prop("type", sr.objectType));
 				}
 			}
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
