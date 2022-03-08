@@ -171,6 +171,7 @@ public class RoutingController {
 				RouteCalculationMode.BASE.name(),
 				RouteCalculationMode.NORMAL.name()
 		};
+		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false); 
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm = new RoutingMode();
@@ -178,11 +179,14 @@ public class RoutingController {
 				rm.name = Algorithms.capitalizeFirstLetter(rm.key).replace('_', ' ');
 				routers.put(rm.key, rm);
 				List<RoutingParameter> rps = new ArrayList<RoutingParameter>();
+				rps.add(shortWay);
 				for (Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
 					net.osmand.router.GeneralRouter.RoutingParameter pm = epm.getValue();
 					RoutingParameter rp = new RoutingParameter(pm.getId(), pm.getName(), pm.getDescription(),
 							pm.getGroup(), pm.getType().name().toLowerCase());
-					
+					if (pm.getId().equals("short_way")) {
+						continue;
+					}
 					if (pm.getId().startsWith("avoid")) {
 						rp.section = "Avoid";
 					} else if (pm.getId().startsWith("allow") || pm.getId().startsWith("prefer")) {
