@@ -144,6 +144,7 @@ class WeatherGeoTiffSlicer(object):
                 translateOptions = gdal.TranslateOptions(
                     format="GTiff",
                     projWin=[minLon, minLat, maxLon, maxLat],
+                    stats=True,
                 )
                 geoTileDS = gdal.Translate(geoTileOutputFile, inputDataset, options=translateOptions)
                 geoTileDS = None
