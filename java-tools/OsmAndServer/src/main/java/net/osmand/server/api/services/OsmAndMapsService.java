@@ -56,7 +56,6 @@ import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
@@ -562,69 +561,19 @@ public class OsmAndMapsService {
 	}
 	
 	public synchronized List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
-		List<GeocodingResult> results = new ArrayList<>();
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
 		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null);
 		GeocodingUtilities su = new GeocodingUtilities();
-		double minBuildingDistance = 0;
-		List<GeocodingResult> complete = new ArrayList<GeocodingUtilities.GeocodingResult>();
 		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
-		minBuildingDistance = justifyResults(list, su, complete, res);
+		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
 //		complete.addAll(res);
 //		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
-		for (GeocodingResult r : complete) {
-			if (r.building != null && r.getDistance() > minBuildingDistance * GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
-				continue;
-			}
-			results.add(r);
-		}
-		Collections.sort(complete, (o1, o2) -> {
-			int projectionCompare = Double.compare(o1.getDistanceP(), o2.getDistanceP());
-			if (projectionCompare != 0) {
-				return projectionCompare;
-			}
-			return Double.compare(o1.getDistance(), o2.getDistance());
-		});
-		return results;
+		
+		return complete;
 	}
 	
-	private double justifyResults(List<BinaryMapIndexReader> list, GeocodingUtilities su,
-			List<GeocodingResult> complete, List<GeocodingResult> res) throws IOException {
-		double minBuildingDistance = 0;
-		for (GeocodingResult r : res) {
-			BinaryMapIndexReader reader = null;
-			for (BinaryMapIndexReader b : list) {
-				for (RouteRegion rb : b.getRoutingIndexes()) {
-					if (r.regionFP == rb.getFilePointer() && r.regionLen == rb.getLength()) {
-						reader = b;
-						break;
-
-					}
-				}
-				if (reader != null) {
-					break;
-				}
-			}
-			if (reader != null) {
-				List<GeocodingResult> justified = su.justifyReverseGeocodingSearch(r, reader, minBuildingDistance, null);
-				if (!justified.isEmpty()) {
-					double md = justified.get(0).getDistance();
-					if (minBuildingDistance == 0) {
-						minBuildingDistance = md;
-					} else {
-						minBuildingDistance = Math.min(md, minBuildingDistance);
-					}
-					complete.addAll(justified);
-				}
-			} else {
-				complete.add(r);
-			}
-		}
-		su.filterDuplicateRegionResults(complete);
-		return minBuildingDistance;
-	}
 
 	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {

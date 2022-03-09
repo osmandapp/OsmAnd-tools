@@ -179,18 +179,12 @@ public class MapAddressLayer implements MapPanelLayer {
 		RoutingContext ctx = new RoutePlannerFrontEnd().buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
 
 		GeocodingUtilities su = new GeocodingUtilities();
-		double minBuildingDistance = 0;
-		List<GeocodingResult> complete = new ArrayList<GeocodingUtilities.GeocodingResult>();
 		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
-		minBuildingDistance = justifyResults(list, su, complete, res);
+		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
 //		complete.addAll(res);
 //		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
 		long lid = -1;
 		for (GeocodingResult r : complete) {
-			if (r.building != null && r.getDistance() > minBuildingDistance
-					* GeocodingUtilities.THRESHOLD_MULTIPLIER_SKIP_BUILDINGS_AFTER) {
-				continue;
-			}
 			Node n = new Node(r.getLocation().getLatitude(), r.getLocation().getLongitude(), lid--);
 			n.putTag(OSMTagKey.NAME.getValue(), r.toString());
 			results.add(n);
@@ -201,41 +195,6 @@ public class MapAddressLayer implements MapPanelLayer {
 		return results;
 	}
 
-	private double justifyResults(List<BinaryMapIndexReader> list, GeocodingUtilities su,
-			List<GeocodingResult> complete, List<GeocodingResult> res) throws IOException {
-		double minBuildingDistance = 0;
-		for (GeocodingResult r : res) {
-			BinaryMapIndexReader reader = null;
-			for (BinaryMapIndexReader b : list) {
-				for (RouteRegion rb : b.getRoutingIndexes()) {
-					if (r.regionFP == rb.getFilePointer() && r.regionLen == rb.getLength()) {
-						reader = b;
-						break;
-
-					}
-				}
-				if (reader != null) {
-					break;
-				}
-			}
-			if (reader != null) {
-				List<GeocodingResult> justified = su.justifyReverseGeocodingSearch(r, reader, minBuildingDistance, null);
-				if (!justified.isEmpty()) {
-					double md = justified.get(0).getDistance();
-					if (minBuildingDistance == 0) {
-						minBuildingDistance = md;
-					} else {
-						minBuildingDistance = Math.min(md, minBuildingDistance);
-					}
-					complete.addAll(justified);
-				}
-			} else {
-				complete.add(r);
-			}
-		}
-		su.filterDuplicateRegionResults(complete);
-		return minBuildingDistance;
-	}
 
 	private void searchAddressDetailedInfo(BinaryMapIndexReader index, double lat, double lon, List<Entity> results) throws IOException {
 		Map<String, List<Street>> streets = new LinkedHashMap<String, List<Street>>();
