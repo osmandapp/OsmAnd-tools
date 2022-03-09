@@ -580,6 +580,13 @@ public class OsmAndMapsService {
 			}
 			results.add(r);
 		}
+		Collections.sort(complete, (o1, o2) -> {
+			int projectionCompare = Double.compare(o1.getDistanceP(), o2.getDistanceP());
+			if (projectionCompare != 0) {
+				return projectionCompare;
+			}
+			return Double.compare(o1.getDistance(), o2.getDistance());
+		});
 		return results;
 	}
 	

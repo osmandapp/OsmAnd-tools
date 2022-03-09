@@ -276,8 +276,11 @@ public class RoutingController {
 		try {
 			List<GeocodingResult> lst = osmAndMapsService.geocoding(lat, lon);
 			List<Feature> features = new ArrayList<Feature>();
-			for(GeocodingResult rr : lst) {
-				features.add(new Feature(Geometry.point(rr.getLocation())).prop("description", rr.toString()));
+			int i = 0;
+			for (GeocodingResult rr : lst) {
+				i++;
+				features.add(new Feature(Geometry.point(rr.getLocation())).prop("index", i).prop("description",
+						i + ". " + rr.toString()));
 			}
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		} catch (IOException e) {
@@ -294,7 +297,7 @@ public class RoutingController {
 	
 	
 	@RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> geocoding(@RequestParam double lat, @RequestParam double lon, @RequestParam String search) throws IOException, InterruptedException {
+	public ResponseEntity<?> search(@RequestParam double lat, @RequestParam double lon, @RequestParam String search) throws IOException, InterruptedException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig();
 		}
