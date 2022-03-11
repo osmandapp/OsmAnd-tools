@@ -146,15 +146,26 @@ public class MapPanelSelector {
 			for (Track track : file.tracks) {
 				for (TrkSegment segment : track.segments) {
 					Way w = new Way(-1);
+					Node last = null, first = null;
 					for (WptPt point : segment.points) {
-						w.addNode(new Node(point.lat, point.lon, -1));
+						last = new Node(point.lat, point.lon, -1);
+						if (first == null) {
+							first = last;
+						}
+						w.addNode(last);
 					}
-					ways.add(w);
+					if (first != null) {
+						ways.add(w);
+						LatLon n = w.getLatLon();
+						points.registerObject(n.getLatitude(), n.getLongitude(), w);
+						first = new Node(first.getLatitude() + Math.random() * 0.00005, first.getLongitude(), -1);
+						last = new Node(last.getLatitude() + Math.random() * 0.00005, last.getLongitude(), -1);
+						first.putTag("colour", "green");
+						points.registerObject(first.getLatitude(), first.getLongitude(), first);
+						last.putTag("colour", "red");
+						points.registerObject(last.getLatitude(), last.getLongitude(), last);
+					}
 				}
-			}
-			for (Way w : ways) {
-				LatLon n = w.getLatLon();
-				points.registerObject(n.getLatitude(), n.getLongitude(), w);
 			}
 			panel.setPoints(points);
 		}
