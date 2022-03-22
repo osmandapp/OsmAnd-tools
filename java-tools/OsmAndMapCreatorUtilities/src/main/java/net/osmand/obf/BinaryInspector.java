@@ -89,8 +89,8 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=6",
 					// road
-//					"-latlon=48.8416,17.4115",
-					System.getProperty("maps.dir")+"map.obf"
+//					"-latlon=52.55243,13.56753",
+					System.getProperty("maps.dir")+"Germany_berlin_europe_2.obf"
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});

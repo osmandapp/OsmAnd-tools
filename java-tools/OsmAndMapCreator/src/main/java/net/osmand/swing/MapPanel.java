@@ -72,6 +72,7 @@ import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.MapTileDownloader;
@@ -426,6 +427,19 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	public double getTileSize(){
 //		return (map == null ?  256 : map.getTileSize()) * mapDensity;
 		return 256 * mapDensity;
+	}
+	
+	public QuadRect getLatLonBBox() {
+		double xTileLeft = getXTile() - getCenterPointX() / getTileSize();
+		double xTileRight = getXTile() + getCenterPointX() / getTileSize();
+		double yTileUp = getYTile() - getCenterPointY() / getTileSize();
+		double yTileDown = getYTile() + getCenterPointY() / getTileSize();
+		QuadRect qr = new QuadRect();
+		qr.left = MapUtils.getLongitudeFromTile(zoom, xTileLeft);
+		qr.top = MapUtils.getLatitudeFromTile(zoom, yTileUp);
+		qr.right = MapUtils.getLongitudeFromTile(zoom, xTileRight);
+		qr.bottom = MapUtils.getLatitudeFromTile(zoom, yTileDown);
+		return qr;
 	}
 
 
