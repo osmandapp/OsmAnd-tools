@@ -337,16 +337,13 @@ public class IndexUploader {
 					File mainFile = unzippedFolder;
 					boolean skip = false;
 					try {
-						String description = checkfileAndGetDescription(mainFile);
-						timestampCreated = mainFile.lastModified();
-						if (description == null) {
-							log.info("Skip file " + f.getName());
-							skip = true;
-						} else {
-							File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
-							zip(unzippedFolder, zFile, description, timestampCreated);
-							uploadIndex(f, zFile, description, uploadCredentials);
-						}
+					    if (mainFile.isDirectory()) {
+                            for (File lf : mainFile.listFiles()) {
+                                upload(f, lf, timestampCreated, skip, unzippedFolder);
+                            }
+                        } else {
+					        upload(f, mainFile, timestampCreated, skip, unzippedFolder);
+                        }
 					} finally {
 						if (!skip) {
 							if (!f.getName().equals(unzippedFolder.getName())
@@ -369,6 +366,19 @@ public class IndexUploader {
 			uploadCredentials.disconnect();
 		}
 	}
+
+	private void upload(File f, File mainFile, long timestampCreated, boolean skip, File unzippedFolder) throws OneFileException, RTreeException, IOException {
+        String description = checkfileAndGetDescription(mainFile);
+        timestampCreated = mainFile.lastModified();
+        if (description == null) {
+            log.info("Skip file " + f.getName());
+            skip = true;
+        } else {
+            File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
+            zip(unzippedFolder, zFile, description, timestampCreated);
+            uploadIndex(f, zFile, description, uploadCredentials);
+        }
+    }
 
 	public static File zip(File folder, File zFile, String description, long lastModifiedTime) throws OneFileException {
 		try {
@@ -849,7 +859,7 @@ public class IndexUploader {
 		}
 	}
 
-	
+
 
 	public static class UploadSSHCredentials extends UploadCredentials {
 		String privateKey;
