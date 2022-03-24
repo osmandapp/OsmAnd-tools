@@ -86,7 +86,7 @@ CREATE INDEX lottery_rounds_series_idx on lottery_rounds(series);
 
 CREATE TABLE lottery_series(name text, type text, promocodes text, usedpromos text, rounds integer, status text, emailtemplate text, updatetime timestamp);
 
-
+CREATE TABLE poll_results (ip text, date timestamp, pollid text, answer integer);
 
 --  ANALYTICS 
 CREATE TABLE analytics (

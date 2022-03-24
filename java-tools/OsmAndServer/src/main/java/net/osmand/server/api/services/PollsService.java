@@ -2,13 +2,25 @@ package net.osmand.server.api.services;
 
 import java.io.File;
 import java.io.FileReader;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import javax.sql.DataSource;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 
 import com.google.gson.Gson;
@@ -23,6 +35,9 @@ public class PollsService {
     private String websiteLocation;
     
     Gson gson = new Gson();
+    
+    @Autowired
+	private DataSource dataSource;
     
     private PollInfo polls;
     
@@ -63,6 +78,20 @@ public class PollsService {
 	public void submitVote(String remoteAddr, PollQuestion q, int ans) {
 		// insert db
 		if (q != null && ans < q.votes.size()) {
+			Connection conn = DataSourceUtils.getConnection(dataSource);
+			try {
+				PreparedStatement p = conn.prepareStatement(
+						"insert into poll_results(ip, date, pollid, answer) values (?, ?, ?, ?)");
+				p.setString(1, remoteAddr);
+				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
+				p.setString(3, q.id);
+				p.setInt(4, ans);
+				p.executeUpdate();
+			} catch (SQLException e) {
+				throw new IllegalStateException(e);
+			} finally {
+				DataSourceUtils.releaseConnection(conn, dataSource);
+			}
 			q.votes.set(ans, q.votes.get(ans) + 1);
 		}
 	}
@@ -81,12 +110,36 @@ public class PollsService {
 						cur.orderDate = 0;
 					}
 				}
-				// init db
+				Connection conn = DataSourceUtils.getConnection(dataSource);
+				Map<String, Map<Integer, Integer>>  dbResults = new LinkedHashMap<String, Map<Integer,Integer>>(); 
+				try {
+					PreparedStatement p = conn.prepareStatement(
+							"select pollid, answer, count(distinct ip) from poll_results group by pollid, answer");
+					ResultSet rs = p.executeQuery();
+					while(rs.next()) {
+						String pid = rs.getString(1);
+						Map<Integer, Integer> mp = dbResults.get(pid);
+						if(mp == null) {
+							mp = new TreeMap<Integer, Integer>();
+							dbResults.put(pid, mp);
+						}
+						mp.put(rs.getInt(2), rs.getInt(3));
+					}
+				} catch (SQLException e) {
+					throw new IllegalStateException(e);
+				} finally {
+					DataSourceUtils.releaseConnection(conn, dataSource);
+				}
 				for (int i = 0; i < polls.questions.size(); i++) {
 					PollQuestion cur = polls.questions.get(i);
 					cur.id = cur.pubdate + "_" + cur.orderDate;
+					Map<Integer, Integer> dbAnswers = dbResults.get(cur.id);
 					for (int j = 0; j < cur.answers.size(); j++) {
-						cur.votes.add(0);
+						if (dbAnswers != null && dbAnswers.containsKey(i)) {
+							cur.votes.add(dbAnswers.get(i));
+						} else {
+							cur.votes.add(0);
+						}
 					}
 				}
 			} catch (Exception e) {
