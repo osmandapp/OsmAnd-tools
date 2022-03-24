@@ -116,10 +116,10 @@ public class PollsService {
 					PreparedStatement p = conn.prepareStatement(
 							"select pollid, answer, count(distinct ip) from poll_results group by pollid, answer");
 					ResultSet rs = p.executeQuery();
-					while(rs.next()) {
+					while (rs.next()) {
 						String pid = rs.getString(1);
 						Map<Integer, Integer> mp = dbResults.get(pid);
-						if(mp == null) {
+						if (mp == null) {
 							mp = new TreeMap<Integer, Integer>();
 							dbResults.put(pid, mp);
 						}
@@ -135,8 +135,8 @@ public class PollsService {
 					cur.id = cur.pubdate + "_" + cur.orderDate;
 					Map<Integer, Integer> dbAnswers = dbResults.get(cur.id);
 					for (int j = 0; j < cur.answers.size(); j++) {
-						if (dbAnswers != null && dbAnswers.containsKey(i)) {
-							cur.votes.add(dbAnswers.get(i));
+						if (dbAnswers != null && dbAnswers.containsKey(j)) {
+							cur.votes.add(dbAnswers.get(j));
 						} else {
 							cur.votes.add(0);
 						}
