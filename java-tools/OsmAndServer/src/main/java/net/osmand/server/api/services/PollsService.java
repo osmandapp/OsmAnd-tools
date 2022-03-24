@@ -54,6 +54,7 @@ public class PollsService {
     	public List<Integer> votes = new ArrayList<>();
     	public int orderDate;
 		public String id;
+		public int totalVotes;
     }
     
     public void reloadConfigs(List<String> errors) {
@@ -80,8 +81,8 @@ public class PollsService {
 		if (q != null && ans < q.votes.size()) {
 			Connection conn = DataSourceUtils.getConnection(dataSource);
 			try {
-				PreparedStatement p = conn.prepareStatement(
-						"insert into poll_results(ip, date, pollid, answer) values (?, ?, ?, ?)");
+				PreparedStatement p = conn
+						.prepareStatement("insert into poll_results(ip, date, pollid, answer) values (?, ?, ?, ?)");
 				p.setString(1, remoteAddr);
 				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
 				p.setString(3, q.id);
@@ -93,6 +94,7 @@ public class PollsService {
 				DataSourceUtils.releaseConnection(conn, dataSource);
 			}
 			q.votes.set(ans, q.votes.get(ans) + 1);
+			q.totalVotes++;
 		}
 	}
     
@@ -135,11 +137,13 @@ public class PollsService {
 					cur.id = cur.pubdate + "_" + cur.orderDate;
 					Map<Integer, Integer> dbAnswers = dbResults.get(cur.id);
 					for (int j = 0; j < cur.answers.size(); j++) {
+						int votes = 0;
 						if (dbAnswers != null && dbAnswers.containsKey(j)) {
-							cur.votes.add(dbAnswers.get(j));
+							votes = dbAnswers.get(j);
 						} else {
-							cur.votes.add(0);
 						}
+						cur.votes.add(votes);
+						cur.totalVotes += votes;
 					}
 				}
 			} catch (Exception e) {
