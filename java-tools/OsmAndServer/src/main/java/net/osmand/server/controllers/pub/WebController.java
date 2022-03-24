@@ -6,6 +6,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -160,7 +161,7 @@ public class WebController {
 				final IContext ctx = new WebContext(request, response, request.getServletContext(), locale, variables);
 				String content = templateEngine.process(template, ctx);
 				writeToFileSync(targetFile, content);
-				staticResources.put(file, gr);
+//				staticResources.put(file, gr);
 			}
 			return gr.staticResource;
 		} catch (Exception e) {
@@ -186,34 +187,53 @@ public class WebController {
 	@RequestMapping(path = { "/", "/index.html", "/index" })
 	@ResponseBody
 	public FileSystemResource index(HttpServletRequest request, HttpServletResponse response, Model model) {
-		Map<String, PollQuestion> polls = pollService.getPollsConfig(false);
-		List<String> keys = new ArrayList<String>();
-		for (String web : polls.keySet()) {
-			if (web.startsWith("website")) {
-				keys.add(web);
+		model.addAttribute("poll", getPoll("website"));
+		return generateStaticResource("pub/index.html", "index_" + LocalDate.now().toString() + ".html", request, response, model);
+	}
+	
+	private Map<String, Object> getPoll(String id) {
+		Map<String, Object> poll = new LinkedHashMap<String, Object>();
+		List<PollQuestion> filtered = new ArrayList<>();
+		for(PollQuestion q : pollService.getPollsConfig(false)) {
+			if(q.pub.contains(id) && q.active) {
+				filtered.add(q);
 			}
 		}
-		int v = 0;
-		if (keys.size() > 0) {
-			v = random.nextInt(keys.size());
-			model.addAttribute("poll", polls.get(keys.get(v)));
+		PollQuestion question ;
+		if (filtered.size() == 0) {
+			question = new PollQuestion();
+		} else {
+			question = filtered.get(random.nextInt(filtered.size()));
 		}
-		return generateStaticResource("pub/index.html", "index_" + v + ".html", request, response, model);
+		
+		String pollId = question.id;
+		poll.put("id", pollId);
+		poll.put("title", question.title);
+		List<Map<String, Object>> answers = new ArrayList<>();
+		poll.put("answers", answers);
+		int o = 0;
+		for (String a : question.answers) {
+			Map<String, Object> ans = new LinkedHashMap<String, Object>();
+			ans.put("id", pollId + "_" + o);
+			ans.put("value", a);
+			ans.put("ind", o);
+			answers.add(ans);
+			o++;
+		}
+		return poll;
 	}
-
+	
 	@RequestMapping(path = { "/android-poll.html" })
 	@ResponseBody
 	public FileSystemResource androidPoll(HttpServletRequest request, HttpServletResponse response, Model model) {
-		Map<String, PollQuestion> polls = pollService.getPollsConfig(false);
-		model.addAttribute("poll", polls.get("android"));
+		model.addAttribute("poll", getPoll("android"));
 		return generateStaticResource("pub/mobile-poll.html", "android-poll.html", request, response, model);
 	}
 
 	@RequestMapping(path = { "/ios-poll.html" })
 	@ResponseBody
 	public FileSystemResource iosPoll(HttpServletRequest request, HttpServletResponse response, Model model) {
-		Map<String, PollQuestion> polls = pollService.getPollsConfig(false);
-		model.addAttribute("poll", polls.get("ios"));
+		model.addAttribute("poll", getPoll("ios"));
 		return generateStaticResource("pub/mobile-poll.html", "ios-poll.html", request, response, model);
 	}
 

@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -59,6 +60,8 @@ import net.osmand.server.api.services.IpLocationService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
 import net.osmand.server.api.services.PlacesService;
+import net.osmand.server.api.services.PollsService;
+import net.osmand.server.api.services.PollsService.PollQuestion;
 import net.osmand.util.Algorithms;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 
@@ -83,6 +86,9 @@ public class ApiController {
     
     @Autowired
     MotdService motdService;
+    
+    @Autowired
+    PollsService pollsService;
 
     @Autowired 
     EmailSupportSurveyRepository surveyRepo;
@@ -154,6 +160,40 @@ public class ApiController {
 		}
 		return d;
 	}
+
+	private String pollResult(PollQuestion pq) throws JsonProcessingException {
+		Map<String, Integer> res = new LinkedHashMap<String, Integer>();
+		if (pq != null) {
+			for (int i = 0; i < pq.votes.size(); i++) {
+				res.put(pq.id + "_" + i, pq.votes.get(i));
+			}
+		}
+		return jsonMapper.writeValueAsString(res);
+	}
+    
+	@PostMapping(path = { "/poll-submit" }, produces = "application/json")
+	@ResponseBody
+	public String pollSubmit(HttpServletRequest request, @RequestParam(required = true) String pollId, @RequestParam(required = true) String ansId)
+			throws JsonProcessingException {
+		String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
+        }
+		PollQuestion pq = pollsService.getPollById(pollId);
+		if (pq != null) {
+			pollsService.submitVote(remoteAddr, pq, Integer.parseInt(ansId));
+		}
+		return pollResult(pq);
+	}
+
+    
+	@GetMapping(path = { "/poll-results" }, produces = "application/json")
+	@ResponseBody
+	public String pollResults(@RequestParam(required = true) String pollId) throws JsonProcessingException {
+		return pollResult(pollsService.getPollById(pollId));
+	}
+    
     
     @PostMapping(path = {"/missing_search"}, produces = "application/json")
     @ResponseBody
