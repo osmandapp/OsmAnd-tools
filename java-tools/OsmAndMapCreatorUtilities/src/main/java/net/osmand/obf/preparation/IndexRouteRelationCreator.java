@@ -94,6 +94,7 @@ public class IndexRouteRelationCreator {
 				}
 				w.replaceTags(tags);
 				icc.translitJapaneseNames(e, settings.addRegionTag);
+				icc.translitChineseNames(e, settings.addRegionTag);
 				for (int level = 0; level < mapZooms.size(); level++) {
 					icc.getIndexMapCreator().processMainEntity(w, w.getId(), w.getId(), level, tags);
 				}

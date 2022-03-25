@@ -13,6 +13,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
+import net.osmand.util.ChineseTranslitHelper;
 import net.osmand.util.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 
@@ -29,12 +30,15 @@ import java.util.TreeSet;
 
 public class IndexCreationContext {
     private static final Log log = LogFactory.getLog(IndexCreationContext.class);
+    private static final String JAPAN = "japan";
+	private static final String CHINA = "china";
 
     public OsmandRegions allRegions;
     public boolean basemap;
 
     private boolean decryptAbbreviations = false;
     private boolean translitJapaneseNames = false;
+	private boolean translitChineseNames = false;
 	private IndexCreator indexCreator;
 
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
@@ -42,7 +46,8 @@ public class IndexCreationContext {
 		this.allRegions = prepareRegions();
 		this.basemap = basemap;
 		if (regionName != null) {
-			this.translitJapaneseNames = regionName.toLowerCase().startsWith("japan");
+			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
+			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
 		}
 	}
@@ -95,28 +100,41 @@ public class IndexCreationContext {
         }
         return false;
     }
-
+	
 	public void translitJapaneseNames(Entity e, boolean addRegionTag) {
-		boolean u = false;
-		if (!Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
-				|| Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
-			return;
-		}
-		if (translitJapaneseNames) {
-			u = true;
-		} else if (addRegionTag) {
-			Set<String> nms = calcRegionTag(e, false);
-			for (String s : nms) {
-				if (s.toLowerCase().startsWith("japan")) {
-					u = true;
-					break;
-				}
-			}
-		}
-		if (u) {
+		if (needTranslitName(e, addRegionTag, translitJapaneseNames, JAPAN)) {
 			e.putTag(OSMTagKey.NAME_EN.getValue(),
 					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 		}
+	}
+	
+	public void translitChineseNames(Entity e, boolean addRegionTag) {
+		if (needTranslitName(e, addRegionTag, translitChineseNames, CHINA)) {
+			String pinyinNameTag = "name:zh_pinyin";
+			if (e.getNameTags().containsKey(pinyinNameTag)) {
+				e.putTag(OSMTagKey.NAME_EN.getValue(), e.getNameTags().get(pinyinNameTag));
+			} else {
+				e.putTag(OSMTagKey.NAME_EN.getValue(),
+						ChineseTranslitHelper.getPinyinTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+			}
+		}
+	}
+	
+	private boolean needTranslitName(Entity e, boolean addRegionTag, boolean translitByRegionName, String region) {
+		if (!Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
+				|| Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
+			return false;
+		}
+		if (translitByRegionName) {
+			return true;
+		} else if (addRegionTag) {
+			for (String s : calcRegionTag(e, false)) {
+				if (s.toLowerCase().startsWith(region)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 	
 	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
