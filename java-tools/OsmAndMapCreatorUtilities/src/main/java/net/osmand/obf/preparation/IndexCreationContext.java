@@ -110,12 +110,18 @@ public class IndexCreationContext {
 	
 	public void translitChineseNames(Entity e, boolean addRegionTag) {
 		if (needTranslitName(e, addRegionTag, translitChineseNames, CHINA)) {
-			String pinyinNameTag = "name:zh_pinyin";
-			if (e.getNameTags().containsKey(pinyinNameTag)) {
-				e.putTag(OSMTagKey.NAME_EN.getValue(), e.getNameTags().get(pinyinNameTag));
-			} else {
-				e.putTag(OSMTagKey.NAME_EN.getValue(),
-						ChineseTranslitHelper.getPinyinTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+			try {
+				String pinyinNameTag = "name:zh_pinyin";
+				if (e.getNameTags().containsKey(pinyinNameTag)) {
+					e.putTag(OSMTagKey.NAME_EN.getValue(), e.getNameTags().get(pinyinNameTag));
+				} else {
+					e.putTag(OSMTagKey.NAME_EN.getValue(),
+							ChineseTranslitHelper.getPinyinTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+				}
+			} catch (Throwable e1) {
+				// FIXME ugly fix
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
 			}
 		}
 	}
