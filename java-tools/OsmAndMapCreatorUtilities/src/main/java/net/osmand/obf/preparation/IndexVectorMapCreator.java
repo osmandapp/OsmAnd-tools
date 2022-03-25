@@ -715,6 +715,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				icc.calcRegionTag(e, true);
 			}
 			icc.translitJapaneseNames(e, settings.addRegionTag);
+			icc.translitChineseNames(e, settings.addRegionTag);
 			tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e);
 			// manipulate what kind of way to load
 			long originalId = e.getId();

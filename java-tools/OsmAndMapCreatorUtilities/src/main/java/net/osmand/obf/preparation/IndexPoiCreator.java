@@ -107,6 +107,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList.clear();
 		tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e);
 		icc.translitJapaneseNames(e, settings.addRegionTag);
+		icc.translitChineseNames(e, settings.addRegionTag);
 		Map<String, String> tags = e.getTags();
 		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access"));
