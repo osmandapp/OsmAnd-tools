@@ -120,8 +120,7 @@ public class IndexCreationContext {
 				}
 			} catch (Throwable e1) {
 				// FIXME ugly fix
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
+				log.error(e1.getMessage(), e1);
 			}
 		}
 	}
