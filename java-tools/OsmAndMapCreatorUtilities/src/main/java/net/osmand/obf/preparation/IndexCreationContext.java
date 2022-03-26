@@ -119,7 +119,6 @@ public class IndexCreationContext {
 							ChineseTranslitHelper.getPinyinTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 				}
 			} catch (Throwable e1) {
-				// FIXME ugly fix
 				log.error(e1.getMessage(), e1);
 			}
 		}
