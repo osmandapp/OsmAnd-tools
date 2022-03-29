@@ -515,7 +515,7 @@ public class BasemapProcessor {
 							!addtypeUse.isEmpty() ? addtypeUse.toArray() : null,
 							zoomPair, zoomToEncode, quadTrees[level], refId);
 				} else {
-				    polygon = isPolygon(e);
+					polygon = isPolygon(e);
 					List<Node> ns = ((Way) e).getNodes();
 					if (!polygon) {
 						QuadRect qr = ((Way) e).getLatLonBBox();
@@ -549,13 +549,13 @@ public class BasemapProcessor {
 
 		}
 	}
-    
-    private boolean isPolygon(Entity e) {
-        double startEndDist = OsmMapUtils.getDistance(((Way) e).getFirstNode(), ((Way) e).getLastNode());
-        boolean isLongRoad = e.getTag(WATERWAY_TAG) == null && e.getTag(NATURAL_TAG) == null
-                && e.getTag(HIGHWAY_TAG) != null && ((Way) e).getNodes().size() > MIN_SIZE_NODES_LONG_ROAD;
-        return startEndDist < POLYGON_MAX_START_END_DIST && !isLongRoad;
-    }
+
+	private boolean isPolygon(Entity e) {
+		double startEndDist = OsmMapUtils.getDistance(((Way) e).getFirstNode(), ((Way) e).getLastNode());
+		boolean isLongRoad = e.getTag(WATERWAY_TAG) == null && e.getTag(NATURAL_TAG) == null
+				&& e.getTag(HIGHWAY_TAG) != null && ((Way) e).getNodes().size() > MIN_SIZE_NODES_LONG_ROAD;
+		return startEndDist < POLYGON_MAX_START_END_DIST && !isLongRoad;
+	}
 
 	private void addObject(long refId, int level, MapZoomPair zoomPair, int zoomToEncode, List<Node> way, List<List<Node>> inner) {
 		int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
