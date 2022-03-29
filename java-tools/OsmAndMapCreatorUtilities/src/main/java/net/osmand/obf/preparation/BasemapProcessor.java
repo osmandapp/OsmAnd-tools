@@ -58,11 +58,11 @@ public class BasemapProcessor {
 	public static final int PIXELS_THRESHOLD_AREA = 24;
 	
 	private static final int POLYGON_MAX_START_END_DIST= 100;
-    private static final int MAX_RANGE_SIZE = 5;
-    private static final int MAX_DIFF_ANGLE_ROAD = 5;
+    private static final int MIN_SIZE_NODES_LONG_ROAD = 500;
     
     private static final String WATERWAY_TAG = "waterway";
     private static final String NATURAL_TAG = "natural";
+    private static final String HIGHWAY_TAG = "highway";
 
 
     /**
@@ -549,31 +549,12 @@ public class BasemapProcessor {
 
 		}
 	}
-	
-	private boolean isPolygon(Entity e) {
-        double startEndDist = OsmMapUtils.getDistance(((Way) e).getFirstNode(), ((Way) e).getLastNode());
-        return startEndDist < POLYGON_MAX_START_END_DIST && !isRoad(e);
-    }
     
-    private boolean isRoad(Entity e) {
-        if (e.getTag(WATERWAY_TAG) != null || e.getTag(NATURAL_TAG) != null) {
-            return false;
-        } else {
-            Way w = (Way) e;
-            List<Node> nodes = w.getNodes();
-            int ns = nodes.size();
-            int range = ns / 2 > 4 ? Math.min(ns / 4, MAX_RANGE_SIZE) : 1;
-            for (int i = 0; i < range; i++) {
-                double angle1Side = Math.toDegrees(Math.atan2(nodes.get(i + 1).getLatitude()
-                        - nodes.get(i).getLatitude(),nodes.get(i + 1).getLongitude() - nodes.get(i).getLongitude()));
-                double angle2Side = Math.toDegrees(Math.atan2(nodes.get(ns - i - 2).getLatitude()
-                        - nodes.get(ns - i - 1).getLatitude(),nodes.get(ns - i - 2).getLongitude() - nodes.get(ns - i - 1).getLongitude()));
-                if (Math.abs(angle1Side - angle2Side) > MAX_DIFF_ANGLE_ROAD) {
-                    return false;
-                }
-            }
-            return true;
-        }
+    private boolean isPolygon(Entity e) {
+        double startEndDist = OsmMapUtils.getDistance(((Way) e).getFirstNode(), ((Way) e).getLastNode());
+        boolean isLongRoad = e.getTag(WATERWAY_TAG) == null && e.getTag(NATURAL_TAG) == null
+                && e.getTag(HIGHWAY_TAG) != null && ((Way) e).getNodes().size() > MIN_SIZE_NODES_LONG_ROAD;
+        return startEndDist < POLYGON_MAX_START_END_DIST && !isLongRoad;
     }
 
 	private void addObject(long refId, int level, MapZoomPair zoomPair, int zoomToEncode, List<Node> way, List<List<Node>> inner) {
