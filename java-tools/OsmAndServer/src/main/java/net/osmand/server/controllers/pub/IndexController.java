@@ -53,18 +53,6 @@ public class IndexController {
     @Autowired
     private DownloadIndexesService downloadIndexes;
 
-    private DownloadIndexDocument unmarshallIndexes(File fl) throws IOException {
-		try {
-			JAXBContext jc = JAXBContext.newInstance(DownloadIndexDocument.class);
-			Unmarshaller unmarshaller = jc.createUnmarshaller();
-			DownloadIndexDocument did = (DownloadIndexDocument) unmarshaller.unmarshal(fl);
-			did.prepareMaps();
-			return did;
-		} catch (JAXBException ex) {
-			LOGGER.error(ex.getMessage(), ex);
-			throw new IOException(ex);
-		}
-	}
 
     private <T,R extends Comparable<? super R>> Comparator<T> compareBy(Function<T,R> fun) {
         return Comparator.comparing(fun);
@@ -163,8 +151,7 @@ public class IndexController {
     public String indexes(@RequestParam(required=false) boolean update,
     		@RequestParam(required=false)  boolean refresh, Model model) throws IOException {
     	// keep this step
-    	File fl = downloadIndexes.getIndexesXml(refresh || update, false);
-		DownloadIndexDocument doc = unmarshallIndexes(fl);
+    	DownloadIndexDocument doc = downloadIndexes.getIndexesDocument(refresh || update, false);
 		model.addAttribute("region", doc.getMaps());
 		model.addAttribute("road_region", doc.getRoadMaps());
 		List<DownloadIndex> srtms = new ArrayList<>(doc.getSrtmMaps());
@@ -181,8 +168,7 @@ public class IndexController {
     public String list(@RequestParam(required = false) String sortby,
                           @RequestParam(required = false) boolean asc,
                           Model model) throws IOException {
-		File fl = downloadIndexes.getIndexesXml(false, false);
-        DownloadIndexDocument doc = unmarshallIndexes(fl);
+    	DownloadIndexDocument doc = downloadIndexes.getIndexesDocument(false, false);
         List<DownloadIndex> regions = doc.getMaps();
         if (sortby != null && sortby.equals("name")) {
             regions = sortUsingComparatorAndDirection(regions, compareBy(DownloadIndex::getName), asc);

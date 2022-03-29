@@ -70,9 +70,13 @@ public class DownloadIndex {
 	public void setName(String name) {
 		this.name = name;
 	}
-
+	
 	public String getType() {
 		return type.getType();
+	}
+	
+	public DownloadType getDownloadType() {
+		return type;
 	}
 
 	@XmlAttribute(name = "containerSize")
@@ -97,7 +101,7 @@ public class DownloadIndex {
 	public Double getSize() {
 		return size;
 	}
-
+	
 	public Double getTargetsize() {
 		return targetsize;
 	}
@@ -182,4 +186,6 @@ public class DownloadIndex {
 			return v.getType();
 		}
 	}
+
+	
 }

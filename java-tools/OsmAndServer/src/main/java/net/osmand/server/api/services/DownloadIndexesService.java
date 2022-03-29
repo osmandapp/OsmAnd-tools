@@ -25,6 +25,7 @@ import java.util.zip.ZipFile;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -95,20 +96,45 @@ public class DownloadIndexesService  {
 	public DownloadIndexDocument loadDownloadIndexes() {
 		DownloadIndexDocument doc = new DownloadIndexDocument();
 		File rootFolder = new File(pathToDownloadFiles);
-		loadIndexesFromDir(doc.getMaps(), rootFolder, "indexes", DownloadType.MAP);
-		loadIndexesFromDir(doc.getMaps(), rootFolder, ".", DownloadType.MAP);
-		loadIndexesFromDir(doc.getVoices(), rootFolder, "indexes", DownloadType.VOICE);
-		loadIndexesFromDir(doc.getFonts(), rootFolder, "indexes/fonts", DownloadType.FONTS);
-		loadIndexesFromDir(doc.getInapps(), rootFolder, "indexes/inapp/depth", DownloadType.DEPTH);
-		loadIndexesFromDir(doc.getWikimaps(), rootFolder, "wiki", DownloadType.WIKIMAP);
-		loadIndexesFromDir(doc.getTravelGuides(), rootFolder, "travel", DownloadType.TRAVEL);
-		loadIndexesFromDir(doc.getWikivoyages(), rootFolder, "wikivoyage", DownloadType.WIKIVOYAGE);
-		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, "road-indexes", DownloadType.ROAD_MAP);
-		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_MAP_INDEX_EXT);
-		loadIndexesFromDir(doc.getSrtmFeetMaps(), rootFolder, "srtm-countries", DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
-		loadIndexesFromDir(doc.getHillshade(), rootFolder, "hillshade", DownloadType.HILLSHADE);
-		loadIndexesFromDir(doc.getSlope(), rootFolder, "slope", DownloadType.SLOPE);
+		loadIndexesFromDir(doc.getMaps(), rootFolder, DownloadType.MAP);
+		loadIndexesFromDir(doc.getVoices(), rootFolder, DownloadType.VOICE);
+		loadIndexesFromDir(doc.getFonts(), rootFolder, DownloadType.FONTS);
+		loadIndexesFromDir(doc.getInapps(), rootFolder, DownloadType.DEPTH);
+		loadIndexesFromDir(doc.getWikimaps(), rootFolder, DownloadType.WIKIMAP);
+		loadIndexesFromDir(doc.getTravelGuides(), rootFolder, DownloadType.TRAVEL);
+		loadIndexesFromDir(doc.getWikivoyages(), rootFolder, DownloadType.WIKIVOYAGE);
+		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, DownloadType.ROAD_MAP);
+		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, DownloadType.SRTM_MAP.getPath(), DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_MAP_INDEX_EXT);
+		loadIndexesFromDir(doc.getSrtmFeetMaps(), rootFolder, DownloadType.SRTM_MAP.getPath(), DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
+		loadIndexesFromDir(doc.getHillshade(), rootFolder, DownloadType.HILLSHADE);
+		loadIndexesFromDir(doc.getSlope(), rootFolder, DownloadType.SLOPE);
 		return doc;
+	}
+	
+	public File getFilePath(String name) throws IOException {
+		DownloadIndexDocument doc = getIndexesDocument(false, false);
+		int ind = name.indexOf('.');
+		String dwName = name.substring(0, ind) + "_2" + name.substring(ind);
+		File file = null;
+		for (DownloadIndex di : doc.getAllMaps()) {
+			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
+				file = new File(pathToDownloadFiles, dwName + ".zip");
+				if (!file.exists()) {
+					file = new File(pathToDownloadFiles, di.getDownloadType().getPath() + "/" + dwName + ".zip");
+				}
+				if (!file.exists()) {
+					file = new File(pathToDownloadFiles, dwName);
+				}
+				if (!file.exists()) {
+					file = new File(pathToDownloadFiles, di.getDownloadType().getPath() + "/" + dwName);
+				}
+				break;
+			}
+		}
+		if (file != null && file.exists()) {
+			return file;
+		}
+		return null;
 	}
 	
 	public File getIndexesXml(boolean upd, boolean gzip) {
@@ -118,6 +144,12 @@ public class DownloadIndexesService  {
 		}
 		return target;
 	}
+	
+	public DownloadIndexDocument getIndexesDocument(boolean upd, boolean gzip) throws IOException {
+		File target = getIndexesXml(upd, gzip);
+		return unmarshallIndexes(target);
+	}
+
 
 	private File getStandardFilePath(boolean gzip) {
 		return new File(pathToGenFiles, gzip ? INDEX_FILE + ".gz" : INDEX_FILE);
@@ -147,8 +179,11 @@ public class DownloadIndexesService  {
 		}
 	}
 
-	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType type) {
-		loadIndexesFromDir(list, rootFolder, subPath, type, null);
+	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, DownloadType type) {
+		if(type == DownloadType.MAP) {
+			loadIndexesFromDir(list, rootFolder, ".", type, null);
+		}
+		loadIndexesFromDir(list, rootFolder, type.getPath(), type, null);
 	}
 	
 	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType type, String filterFiles) {
@@ -248,18 +283,28 @@ public class DownloadIndexesService  {
 	}
 	
 	public enum DownloadType {
-	    MAP,
-	    VOICE ,
-	    DEPTH ,
-	    FONTS ,
-	    WIKIMAP ,
-	    WIKIVOYAGE ,
-	    TRAVEL ,
-	    ROAD_MAP ,
-	    HILLSHADE ,
-	    SLOPE ,
-	    SRTM_MAP ;
+	    MAP("indexes"),
+	    VOICE("indexes") ,
+	    DEPTH("indexes/inapp/depth") ,
+	    FONTS("indexes/fonts") ,
+	    WIKIMAP("wiki") ,
+	    WIKIVOYAGE("wikivoyage") ,
+	    TRAVEL("travel") ,
+	    ROAD_MAP("road-indexes") ,
+	    HILLSHADE("hillshade") ,
+	    SLOPE("slope") ,
+	    SRTM_MAP("srtm-countries") ;
 
+
+		private final String path;
+
+		DownloadType(String path) {
+			this.path = path;
+		}
+		
+		public String getPath() {
+			return path;
+		}
 
 
 		public boolean acceptFile(File f) {
@@ -431,5 +476,18 @@ public class DownloadIndexesService  {
 			return null;
 		}
 
+	}
+	
+	private DownloadIndexDocument unmarshallIndexes(File fl) throws IOException {
+		try {
+			JAXBContext jc = JAXBContext.newInstance(DownloadIndexDocument.class);
+			Unmarshaller unmarshaller = jc.createUnmarshaller();
+			DownloadIndexDocument did = (DownloadIndexDocument) unmarshaller.unmarshal(fl);
+			did.prepareMaps();
+			return did;
+		} catch (JAXBException ex) {
+			LOGGER.error(ex.getMessage(), ex);
+			throw new IOException(ex);
+		}
 	}
 }

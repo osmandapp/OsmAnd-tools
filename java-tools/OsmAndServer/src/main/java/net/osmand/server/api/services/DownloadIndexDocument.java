@@ -77,6 +77,21 @@ public class DownloadIndexDocument {
 		sortMaps(wikivoyages);
 		sortMaps(travel);
 	}
+	
+	public List<DownloadIndex> getAllMaps() {
+		List<DownloadIndex> indx = new ArrayList<>();
+		indx.addAll(maps);
+		indx.addAll(roadMaps);
+		indx.addAll(srtmMaps);
+		indx.addAll(srtmFeetMaps);
+		indx.addAll(slope);
+		indx.addAll(hillshade);
+		indx.addAll(depths);
+		indx.addAll(wikimaps);
+		indx.addAll(wikivoyages);
+		indx.addAll(travel);
+		return indx;
+	}
 
 	public void sortMaps(List<DownloadIndex> l) {
 		Comparator<DownloadIndex> cmp = new Comparator<DownloadIndex>() {

@@ -74,8 +74,8 @@ public class DeviceController {
 		Without tracker configuration
 	 */
 	@PostMapping(value = "/device/new",
-			consumes = MediaType.APPLICATION_JSON_UTF8_VALUE,
-			produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+			consumes = MediaType.APPLICATION_JSON_VALUE,
+			produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<String> registerNewDevice(@RequestBody String body) {
 		long chatId = 0;
 		JsonObject json = new JsonParser().parse(body).getAsJsonObject();
@@ -113,7 +113,7 @@ public class DeviceController {
 	}
 
 	@DeleteMapping(value = "/device/{deviceId}",
-			produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+			produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<String> deleteDeviceById(@PathVariable(name = "deviceId") Long deviceId) {
 		boolean isDeviceExists = deviceRepo.existsById(deviceId);
 		if (isDeviceExists) {

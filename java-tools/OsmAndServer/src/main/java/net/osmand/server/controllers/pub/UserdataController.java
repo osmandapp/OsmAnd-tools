@@ -4,8 +4,12 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,6 +23,9 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -60,6 +67,7 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.util.Algorithms;
@@ -118,6 +126,9 @@ public class UserdataController {
 
 	@Autowired
 	protected StorageService storageService;
+	
+	@Autowired
+	protected DownloadIndexesService downloadService;
 	
 	@Autowired
 	EmailSenderService emailSender;
@@ -493,6 +504,60 @@ public class UserdataController {
 			return ok();
 		}
 	}
+	
+	private MultipartFile createEmptyMultipartFile(MultipartFile file) {
+		return new MultipartFile() {
+			
+			@Override
+			public void transferTo(File dest) throws IOException, IllegalStateException {
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public boolean isEmpty() {
+				return getSize() == 0;
+			}
+			
+			@Override
+			public long getSize() {
+				try {
+					return getBytes().length;
+				} catch (IOException e) {
+					return 0;
+				}
+			}
+			
+			@Override
+			public String getOriginalFilename() {
+				return file.getOriginalFilename();
+			}
+			
+			@Override
+			public String getName() {
+				return file.getName();
+			}
+			
+			@Override
+			public InputStream getInputStream() throws IOException {
+				return new ByteArrayInputStream(getBytes());
+			}
+			
+			@Override
+			public String getContentType() {
+				return file.getContentType();
+			}
+			
+			@Override
+			public byte[] getBytes() throws IOException {
+				byte[] bytes = "{\"type\":\"obf\"}".getBytes();
+				ByteArrayOutputStream bous = new ByteArrayOutputStream();
+				GZIPOutputStream gz = new GZIPOutputStream(bous);
+				Algorithms.streamCopy(new ByteArrayInputStream(bytes), gz);
+				gz.close();
+				return bous.toByteArray();
+			}
+		};
+	}
 
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	@ResponseBody
@@ -525,6 +590,14 @@ public class UserdataController {
 		}
 		UserFile usf = new PremiumUserFilesRepository.UserFile();
 		long cnt, sum;
+		boolean checkExistingServerMap = type.toLowerCase().equals("file") && name.endsWith(".obf");
+		if (checkExistingServerMap) {
+			File fp = downloadService.getFilePath(name);
+			if (fp != null) {
+				System.out.println("File is found " + fp.getAbsolutePath());
+			}
+			file = createEmptyMultipartFile(file);
+		}
 		long zipsize = file.getSize();
 		try {
 			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
@@ -557,6 +630,8 @@ public class UserdataController {
 
 		return ok();
 	}
+
+	
 
 	private String oldStorageFileName(UserFile usf) {
 		String fldName = usf.type;
@@ -643,7 +718,21 @@ public class UserdataController {
 			@SuppressWarnings("unchecked")
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
 			UserFile userFile = getUserFile(name, type, updatetime, dev);
-			bin = getInputStream(dev, error, userFile);
+			boolean checkExistingServerMap = type.toLowerCase().equals("file") && name.endsWith(".obf");
+			boolean gzin = true, gzout;
+			if(userFile.filesize < 1000 && checkExistingServerMap) {
+				// file is not stored here
+				File fp = downloadService.getFilePath(name);
+				if (fp != null) {
+					gzin = false;
+					bin = getGzipInputStreamFromFile(fp, ".obf");
+				}
+				if (bin == null) {
+					error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				}
+			} else {
+				bin = getInputStream(dev, error, userFile);
+			}
 			if (error[0] != null) {
 				response.setStatus(error[0].getStatusCodeValue());
 				response.getWriter().write(error[0].getBody());
@@ -655,21 +744,42 @@ public class UserdataController {
 			String acceptEncoding = request.getHeader("Accept-Encoding");
 			if (acceptEncoding != null && acceptEncoding.contains("gzip")) {
 				response.setHeader("Content-Encoding", "gzip");
+				gzout = true;
 			} else {
-				bin = new GZIPInputStream(bin);
+				if (gzin) {
+					bin = new GZIPInputStream(bin);
+				}
+				gzout = false;
 			}
 			response.setContentType(APPLICATION_OCTET_STREAM.getType());
 			byte[] buf = new byte[BUFFER_SIZE];
 			int r;
+			OutputStream ous = gzout && !gzin ? new GZIPOutputStream(response.getOutputStream()) : response.getOutputStream();
 			while ((r = bin.read(buf)) != -1) {
-				response.getOutputStream().write(buf, 0, r);
+				ous.write(buf, 0, r);
 			}
+			ous.close();
 		} finally {
 			if (bin != null) {
 				bin.close();
 			}
 		}
 	}
+	
+	private InputStream getGzipInputStreamFromFile(File fp, String ext) throws IOException {
+		if (fp.getName().endsWith(".zip")) {
+			ZipInputStream zis = new ZipInputStream(new FileInputStream(fp));
+			ZipEntry ze = zis.getNextEntry();
+			while (ze != null && !ze.getName().endsWith(ext)) {
+				ze = zis.getNextEntry();
+			}
+			if (ze != null) {
+				return zis;
+			}
+		}
+		return new FileInputStream(fp);
+	}
+
 
 	public InputStream getInputStream(PremiumUserDevice dev, ResponseEntity<String>[] error, UserFile userFile) {
 		InputStream bin = null; 
