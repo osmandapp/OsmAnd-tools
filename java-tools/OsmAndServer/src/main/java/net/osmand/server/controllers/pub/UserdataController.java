@@ -427,6 +427,7 @@ public class UserdataController {
 	}
 
 	private ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken) {
+		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
 			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
