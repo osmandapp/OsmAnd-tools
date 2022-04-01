@@ -1,5 +1,6 @@
 package net.osmand.server.assist.data;
 
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,17 +15,17 @@ import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.telegram.telegrambots.api.methods.BotApiMethod;
-import org.telegram.telegrambots.api.methods.send.SendLocation;
-import org.telegram.telegrambots.api.methods.send.SendMessage;
-import org.telegram.telegrambots.api.methods.updatingmessages.DeleteMessage;
-import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageLiveLocation;
-import org.telegram.telegrambots.api.methods.updatingmessages.EditMessageText;
-import org.telegram.telegrambots.api.objects.Message;
-import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
-import org.telegram.telegrambots.updateshandlers.SentCallback;
+import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.send.SendLocation;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageLiveLocation;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
+import org.telegram.telegrambots.meta.updateshandlers.SentCallback;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -224,42 +225,32 @@ public class Device {
 		bot.saveDeviceInfo(device);
 	}
 	
-	private LocationChatMessage getOrCreate(ChatType tp, Long chatId) {
+	private LocationChatMessage getOrCreate(ChatType tp, String chatId, String inlineMsgId) {
 		for(LocationChatMessage lm : chats) {
-			if(lm.chatId == chatId.longValue() && lm.type == tp) {
+			if(chatId != null && Algorithms.objectEquals(lm.chatId, chatId) && lm.type == tp) {
+				return lm;
+			} else if(inlineMsgId != null && Algorithms.objectEquals(lm.inlineMessageId, inlineMsgId) && lm.type == tp) {
 				return lm;
 			}
 		}
-		LocationChatMessage lm = new LocationChatMessage(this, tp, chatId);
+		LocationChatMessage lm = new LocationChatMessage(this, tp, chatId, inlineMsgId);
 		addChatMessage(lm);
 		return lm;
 	}
-	
-	private LocationChatMessage getOrCreate(ChatType tp, String inlineMsgId) {
-		for(LocationChatMessage lm : chats) {
-			if(Algorithms.objectEquals(inlineMsgId, lm.inlineMessageId) && lm.type == tp) {
-				return lm;
-			}
-		}
-		LocationChatMessage lm = new LocationChatMessage(this, tp, inlineMsgId);
-		addChatMessage(lm);
-		return lm;
+	public void showLiveMap(String chatId) {
+		getOrCreate(ChatType.MAP_CHAT, chatId, null).sendMessage();
 	}
 	
-	public void showLiveMap(Long chatId) {
-		getOrCreate(ChatType.MAP_CHAT, chatId).sendMessage();
+	public void showLiveMessage(String chatId) {
+		getOrCreate(ChatType.MESSAGE_CHAT, chatId, null).sendMessage();
 	}
 	
-	public void showLiveMessage(Long chatId) {
-		getOrCreate(ChatType.MESSAGE_CHAT, chatId).sendMessage();
+	public void showLiveMessageInline(String inlineMsgId) {
+		getOrCreate(ChatType.MESSAGE_INLINE, null, inlineMsgId).sendMessage();
 	}
 	
-	public void showLiveMessage(String inlineMsgId) {
-		getOrCreate(ChatType.MESSAGE_INLINE, inlineMsgId).sendMessage();
-	}
-	
-	public void showLiveMap(String inlineMsgId) {
-		getOrCreate(ChatType.MAP_INLINE, inlineMsgId).sendMessage();
+	public void showLiveMapInline(String inlineMsgId) {
+		getOrCreate(ChatType.MAP_INLINE, null, inlineMsgId).sendMessage();
 	}
 	
 	public void hideInlineMsg(String inlineMsgId) {
@@ -281,9 +272,9 @@ public class Device {
 	}
 	
 	
-	public void hideMessage(Long chatId, int messageId) {
+	public void hideMessage(String chatId, int messageId) {
 		for(LocationChatMessage m : chats) {
-			if(m.messageId == messageId && m.chatId == chatId.longValue()) {
+			if (m.messageId == messageId && Algorithms.objectEquals(m.chatId, chatId)) {
 				m.hide();
 			}
 		}
@@ -338,7 +329,7 @@ public class Device {
 
 		final Device device;
 		final ChatType type;
-		final long chatId;
+		final String chatId;
 		final String inlineMessageId;
 		final long initialTimestamp;
 		
@@ -352,7 +343,7 @@ public class Device {
 		public LocationChatMessage(Device d, JsonObject e) {
 			device = d;
 			this.type = ChatType.valueOf(e.get(CHAT_TYPE).getAsString());
-			this.chatId = Long.parseLong(e.get(CHAT_ID).getAsString());
+			this.chatId = e.get(CHAT_ID).getAsString();
 			this.inlineMessageId = e.has(INLINE_MSG_ID) ?  e.get(INLINE_MSG_ID).getAsString() : null;
 			this.initialTimestamp = Long.parseLong(e.get(INITIAL_TIMESTAMP).getAsString());
 			if(e.has(MSG_ID)) {
@@ -360,32 +351,27 @@ public class Device {
 			}
 		}
 		
-		public LocationChatMessage(Device d, ChatType type, long chatId) {
+		public LocationChatMessage(Device d, ChatType type, String chatId, String inlineMessageId) {
 			device = d;
 			this.type = type;
 			this.chatId = chatId;
-			this.inlineMessageId = null;
-			this.initialTimestamp = System.currentTimeMillis();
-		}
-		
-		public LocationChatMessage(Device d, ChatType type, String inlineMessageId) {
-			device = d;
-			this.type = type;
-			this.chatId = 0;
 			this.inlineMessageId = inlineMessageId;
 			this.initialTimestamp = System.currentTimeMillis();
 		}
 		
+		
 		public JsonObject getAsJsonObject() {
 			JsonObject json = new JsonObject();
 			json.addProperty(CHAT_TYPE, type.name());
-			json.addProperty(CHAT_ID, chatId +"");
-			json.addProperty(INITIAL_TIMESTAMP, initialTimestamp +"");
-			if(inlineMessageId != null) {
-				json.addProperty(INLINE_MSG_ID, inlineMessageId +"");
+			if (chatId != null) {
+				json.addProperty(CHAT_ID, chatId);
 			}
-			if(messageId != 0) {
-				json.addProperty(MSG_ID, messageId +"");
+			json.addProperty(INITIAL_TIMESTAMP, initialTimestamp +"");
+			if (inlineMessageId != null) {
+				json.addProperty(INLINE_MSG_ID, inlineMessageId + "");
+			}
+			if (messageId != 0) {
+				json.addProperty(MSG_ID, messageId + "");
 			}
 			return json;
 		}
@@ -456,15 +442,20 @@ public class Device {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			List<InlineKeyboardButton> lst = new ArrayList<>();
 			if(hide) {
-				lst.add(new InlineKeyboardButton("Start update " + device.getDeviceName()).setCallbackData(
-						"msg|" + device.getStringId() + "|startmap"));
+				InlineKeyboardButton startUpd = new InlineKeyboardButton("Start update " + device.getDeviceName());
+				startUpd.setCallbackData("msg|" + device.getStringId() + "|startmap");
+				lst.add(startUpd);
 			} else {
-				lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
-					"msg|" + device.getStringId() + "|updmap"));
-				lst.add(new InlineKeyboardButton("Stop").setCallbackData(
-					"msg|" + device.getStringId() + "|hide"));
+				InlineKeyboardButton upd = new InlineKeyboardButton("Update " + device.getDeviceName());
+				upd.setCallbackData("msg|" + device.getStringId() + "|updmap");
+				lst.add(upd);
+				InlineKeyboardButton stp = new InlineKeyboardButton("Stop");
+				stp.setCallbackData("msg|" + device.getStringId() + "|hide");
+				lst.add(stp);
 			}
-			markup.getKeyboard().add(lst);
+			List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+			keyboard.add(lst);
+			markup.setKeyboard(keyboard);
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (lastSentLoc == null
 						|| MapUtils.getDistance(lastSentLoc.getLat(), lastSentLoc.getLon(), locSig.getLat(),
@@ -472,8 +463,8 @@ public class Device {
 					EditMessageLiveLocation editMessageText = new EditMessageLiveLocation();
 					editMessageText.setInlineMessageId(inlineMessageId);
 					editMessageText.setChatId("");
-					editMessageText.setLatitude((float) locSig.getLat());
-					editMessageText.setLongitud((float) locSig.getLon());
+					editMessageText.setLatitude(locSig.getLat());
+					editMessageText.setLongitude(locSig.getLon());
 					editMessageText.setChatId((String)null);
 					editMessageText.setReplyMarkup(markup);
 					
@@ -486,15 +477,20 @@ public class Device {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 			List<InlineKeyboardButton> lst = new ArrayList<>();
 			if(hide) {
-				lst.add(new InlineKeyboardButton("Start update " + device.getDeviceName()).setCallbackData(
-						"msg|" + device.getStringId() + "|starttxt"));
+				InlineKeyboardButton startUpd = new InlineKeyboardButton("Start update " + device.getDeviceName());
+				startUpd.setCallbackData("msg|" + device.getStringId() + "|starttxt");
+				lst.add(startUpd);
 			} else {
-				lst.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData(
-						"msg|" + device.getStringId() + "|updtxt"));
-					lst.add(new InlineKeyboardButton("Stop").setCallbackData(
-						"msg|" + device.getStringId() + "|hide"));
+				InlineKeyboardButton upd = new InlineKeyboardButton("Update " + device.getDeviceName());
+				upd.setCallbackData("msg|" + device.getStringId() + "|updtxt");
+				lst.add(upd);
+				InlineKeyboardButton stp = new InlineKeyboardButton("Stop");
+				stp.setCallbackData("msg|" + device.getStringId() + "|hide");
+				lst.add(stp);
 			}
-			markup.getKeyboard().add(lst);
+			List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+			keyboard.add(lst);
+			markup.setKeyboard(keyboard);
 			EditMessageText editMessageText = new EditMessageText();
 			editMessageText.setText(getMessageTxt(updateId));
 			editMessageText.enableHtml(true);
@@ -505,14 +501,19 @@ public class Device {
 		
 		private void sendMapMessage(OsmAndAssistantBot bot, LocationInfo locSig) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			ArrayList<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
-			markup.getKeyboard().add(lt);
-			lt.add(new InlineKeyboardButton("Hide").setCallbackData("dv|" + device.getStringId() + "|hide"));
-			lt.add(new InlineKeyboardButton("Update " + device.getDeviceName()).setCallbackData("dv|" + device.getStringId() + "|loc"));
+			List<InlineKeyboardButton> lt = new ArrayList<InlineKeyboardButton>();
+			List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+			keyboard.add(lt);
+			InlineKeyboardButton hide = new InlineKeyboardButton("Hide");
+			hide.setCallbackData("dv|" + device.getStringId() + "|hide");
+			InlineKeyboardButton updButton = new InlineKeyboardButton("Update " + device.getDeviceName());
+			updButton.setCallbackData("dv|" + device.getStringId() + "|loc");
+			lt.add(hide);
+			lt.add(updButton);
+			markup.setKeyboard(keyboard);
 			if (locSig != null && locSig.isLocationPresent()) {
 				if (messageId == 0) {
-					SendLocation sl = new SendLocation((float) locSig.getLat(), (float) locSig.getLon());
-					sl.setChatId(chatId);
+					SendLocation sl = new SendLocation(chatId, locSig.getLat(), locSig.getLon());
 					sl.setLivePeriod(DEFAULT_UPD_PERIOD);
 					sl.setReplyMarkup(markup);
 					bot.sendMethodAsync(sl, getCallback(locSig));
@@ -523,8 +524,8 @@ public class Device {
 						EditMessageLiveLocation sl = new EditMessageLiveLocation();
 						sl.setMessageId(messageId);
 						sl.setChatId(chatId);
-						sl.setLatitude((float) locSig.getLat());
-						sl.setLongitud((float) locSig.getLon());
+						sl.setLatitude(locSig.getLat());
+						sl.setLongitude(locSig.getLon());
 						sl.setReplyMarkup(markup);
 						bot.sendMethodAsync(sl, getCallback(locSig));
 					}
@@ -534,11 +535,16 @@ public class Device {
 
 		private void sendMsg(OsmAndAssistantBot bot, String text, LocationInfo lastLocSignal) {
 			InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-			markup.getKeyboard().add(Collections.singletonList(new InlineKeyboardButton("Hide").setCallbackData(
-					"dv|" + device.getStringId() + "|hide")));
+			InlineKeyboardButton hide = new InlineKeyboardButton("Hide");
+			hide.setCallbackData("dv|" + device.getStringId() + "|hide");
+			List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+			keyboard.add(Collections.singletonList(hide));
+			markup.setKeyboard(keyboard);
 			if (messageId == 0) {
-				bot.sendMethodAsync(new SendMessage(chatId, text).setReplyMarkup(markup).enableHtml(true), 
-						getCallback(lastLocSignal));
+				SendMessage sendMsg = new SendMessage(chatId, text);
+				sendMsg.setReplyMarkup(markup);
+				sendMsg.enableHtml(true); 
+				bot.sendMethodAsync(sendMsg, getCallback(lastLocSignal));
 			} else {
 				EditMessageText mtd = new EditMessageText();
 				mtd.setChatId(chatId);

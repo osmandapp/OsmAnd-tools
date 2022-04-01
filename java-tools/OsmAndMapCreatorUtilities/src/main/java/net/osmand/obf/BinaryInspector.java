@@ -82,15 +82,15 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-//					"-vrouting",
+					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", "-vstreetgroups",
-					"-vstreets", "-vbuildings", "-vintersections",
+//					"-vaddress", "-vcities", "-vstreetgroups",
+//					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
 					// road
 //					"-latlon=52.55243,13.56753",
-					System.getProperty("maps.dir")+"Germany_berlin_europe_2.obf"
+					System.getProperty("maps.dir")+"Map.obf"
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});

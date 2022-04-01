@@ -1,19 +1,19 @@
 package net.osmand.server.assist.data;
 
-import org.telegram.telegrambots.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.User;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class UserChatIdentifier {
 
-	private long chatId;
+	private Long chatId;
 	private User user;
-	public long getChatId() {
+	public Long getChatId() {
 		return chatId;
 	}
 
-	public void setChatId(long chatId) {
+	public void setChatId(Long chatId) {
 		this.chatId = chatId;
 	}
 	
@@ -22,8 +22,7 @@ public class UserChatIdentifier {
 	}
 
 	public Long getUserId() {
-		Integer id = user.getId();
-		return id == null ? null : new Long(id.intValue());
+		return user.getId();
 	}
 	
 	public User getUser() {
@@ -34,7 +33,7 @@ public class UserChatIdentifier {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + (int) (chatId ^ (chatId >>> 32));
+		result = prime * result + ((chatId == null) ? 0 : chatId.hashCode());
 		result = prime * result + ((getUserId() == null) ? 0 : getUserId().hashCode());
 		return result;
 	}
@@ -48,8 +47,12 @@ public class UserChatIdentifier {
 		if (getClass() != obj.getClass())
 			return false;
 		UserChatIdentifier other = (UserChatIdentifier) obj;
-		if (chatId != other.chatId)
+		if (chatId == null) {
+			if (other.chatId != null)
+				return false;
+		} else if (chatId.longValue() != other.chatId.longValue())
 			return false;
+		
 		if (getUserId() == null) {
 			if (other.getUserId() != null)
 				return false;

@@ -7,8 +7,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.telegram.telegrambots.TelegramBotsApi;
-import org.telegram.telegrambots.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.TelegramBotsApi;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 @Service
 public class TelegramBotManager {
@@ -23,8 +24,8 @@ public class TelegramBotManager {
 	
 	
 	public void init() {
-		TelegramBotsApi telegramBotsApi = new TelegramBotsApi();
 		try {
+			TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
 			if (osmAndServerMonitoringBot.isTokenPresent()) {
 				telegramBotsApi.registerBot(osmAndServerMonitoringBot);
 			}

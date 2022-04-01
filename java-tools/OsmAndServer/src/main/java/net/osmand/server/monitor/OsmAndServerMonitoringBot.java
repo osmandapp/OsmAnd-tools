@@ -8,12 +8,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.api.methods.send.SendMessage;
-import org.telegram.telegrambots.api.objects.Message;
-import org.telegram.telegrambots.api.objects.Update;
-import org.telegram.telegrambots.api.objects.User;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 @Component
 public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
@@ -60,7 +60,7 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 		}
 		for (MonitoringChatId id : getMonitoringChatIds()) {
 			SendMessage snd = new SendMessage();
-			snd.setChatId(id.id);
+			snd.setChatId(id.id + "");
 			snd.setText(text);
 			snd.enableHtml(true);
 			try {
@@ -104,7 +104,7 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 		Message msg = update.getMessage();
 		try {
 			SendMessage snd = new SendMessage();
-			snd.setChatId(msg.getChatId());
+			snd.setChatId(msg.getChatId()+"");
 			String coreMsg = msg.getText();
 			if (coreMsg.startsWith("/")) {
 				coreMsg = coreMsg.substring(1);
@@ -135,7 +135,7 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 				for (MonitoringChatId l : getMonitoringChatIds()) {
 					snd = new SendMessage();
 					snd.enableHtml(true);
-					snd.setChatId(l.id);
+					snd.setChatId(l.id+"");
 					snd.setText(refreshAll);
 					sendText(snd);
 				}

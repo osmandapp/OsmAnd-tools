@@ -9,7 +9,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.telegram.telegrambots.ApiContextInitializer;
 
 import net.osmand.server.api.services.StorageService;
 
@@ -27,7 +26,6 @@ public class Application  {
 	
 	public static void main(String[] args) {
 		System.setProperty("spring.devtools.restart.enabled", "false");
-		ApiContextInitializer.init();
 		SpringApplication.run(Application.class, args);
 	}
 
