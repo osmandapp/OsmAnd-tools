@@ -161,7 +161,7 @@ public class OsmGpxWriteContext {
 				if (gpxInfo != null) {
 					writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
 				} else {
-					writePoint(nid, p, null, null, null);
+					writePoint(nid, p, "point", "gpx", "points");
 				}
 			}
 		}

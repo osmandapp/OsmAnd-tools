@@ -80,7 +80,7 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -90,7 +90,7 @@ public class BinaryInspector {
 //					"-zoom=6",
 					// road
 //					"-latlon=52.55243,13.56753",
-					System.getProperty("maps.dir")+"Map.obf"
+					System.getProperty("maps.dir")+"gpx.obf"
 //					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
