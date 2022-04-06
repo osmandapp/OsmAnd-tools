@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.TreeMap;
 
 import javax.sql.DataSource;
@@ -38,6 +39,8 @@ public class PollsService {
     
     @Autowired
 	private DataSource dataSource;
+    
+    private Random random = new Random();
     
     private PollInfo polls;
     
@@ -153,5 +156,36 @@ public class PollsService {
     	return polls == null ? Collections.emptyList() : polls.questions;
     }
 
+	public Map<String, Object> getPoll(String id) {
+		Map<String, Object> poll = new LinkedHashMap<String, Object>();
+		List<PollQuestion> filtered = new ArrayList<>();
+		for (PollQuestion q : getPollsConfig(false)) {
+			if (q.pub.contains(id) && q.active) {
+				filtered.add(q);
+			}
+		}
+		PollQuestion question;
+		if (filtered.size() == 0) {
+			question = new PollQuestion();
+		} else {
+			question = filtered.get(random.nextInt(filtered.size()));
+		}
+
+		String pollId = question.id;
+		poll.put("id", pollId);
+		poll.put("title", question.title);
+		List<Map<String, Object>> answers = new ArrayList<>();
+		poll.put("answers", answers);
+		int o = 0;
+		for (String a : question.answers) {
+			Map<String, Object> ans = new LinkedHashMap<String, Object>();
+			ans.put("id", pollId + "_" + o);
+			ans.put("value", a);
+			ans.put("ind", o);
+			answers.add(ans);
+			o++;
+		}
+		return poll;
+	}
 	
 }

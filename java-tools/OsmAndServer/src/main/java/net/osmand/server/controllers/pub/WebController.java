@@ -54,8 +54,6 @@ public class WebController {
 	private static final int LATEST_ARTICLES_OTHER = 20;
 	private static final int LATEST_ARTICLES_RSS = 15;
 
-	private Random random = new Random();
-
 	@Value("${osmand.web.location}")
 	private String websiteLocation;
 
@@ -187,53 +185,21 @@ public class WebController {
 	@RequestMapping(path = { "/", "/index.html", "/index" })
 	@ResponseBody
 	public FileSystemResource index(HttpServletRequest request, HttpServletResponse response, Model model) {
-		model.addAttribute("poll", getPoll("website"));
+		model.addAttribute("poll", pollService.getPoll("website"));
 		return generateStaticResource("pub/index.html", "index_" + LocalDate.now().toString() + ".html", request, response, model);
-	}
-	
-	private Map<String, Object> getPoll(String id) {
-		Map<String, Object> poll = new LinkedHashMap<String, Object>();
-		List<PollQuestion> filtered = new ArrayList<>();
-		for(PollQuestion q : pollService.getPollsConfig(false)) {
-			if(q.pub.contains(id) && q.active) {
-				filtered.add(q);
-			}
-		}
-		PollQuestion question ;
-		if (filtered.size() == 0) {
-			question = new PollQuestion();
-		} else {
-			question = filtered.get(random.nextInt(filtered.size()));
-		}
-		
-		String pollId = question.id;
-		poll.put("id", pollId);
-		poll.put("title", question.title);
-		List<Map<String, Object>> answers = new ArrayList<>();
-		poll.put("answers", answers);
-		int o = 0;
-		for (String a : question.answers) {
-			Map<String, Object> ans = new LinkedHashMap<String, Object>();
-			ans.put("id", pollId + "_" + o);
-			ans.put("value", a);
-			ans.put("ind", o);
-			answers.add(ans);
-			o++;
-		}
-		return poll;
 	}
 	
 	@RequestMapping(path = { "/android-poll.html" })
 	@ResponseBody
 	public FileSystemResource androidPoll(HttpServletRequest request, HttpServletResponse response, Model model) {
-		model.addAttribute("poll", getPoll("android"));
+		model.addAttribute("poll", pollService.getPoll("android"));
 		return generateStaticResource("pub/mobile-poll.html", "android-poll.html", request, response, model);
 	}
 
 	@RequestMapping(path = { "/ios-poll.html" })
 	@ResponseBody
 	public FileSystemResource iosPoll(HttpServletRequest request, HttpServletResponse response, Model model) {
-		model.addAttribute("poll", getPoll("ios"));
+		model.addAttribute("poll", pollService.getPoll("ios"));
 		return generateStaticResource("pub/mobile-poll.html", "ios-poll.html", request, response, model);
 	}
 

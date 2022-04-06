@@ -193,6 +193,12 @@ public class ApiController {
 	public String pollResults(@RequestParam(required = true) String pollId) throws JsonProcessingException {
 		return pollResult(pollsService.getPollById(pollId));
 	}
+	
+	@GetMapping(path = { "/latest-poll" }, produces = "application/json")
+	@ResponseBody
+	public String pollDetails(@RequestParam(required = false, defaultValue = "website" ) String channel) throws JsonProcessingException {
+		return jsonMapper.writeValueAsString(pollsService.getPoll(channel));
+	}
     
     
     @PostMapping(path = {"/missing_search"}, produces = "application/json")
