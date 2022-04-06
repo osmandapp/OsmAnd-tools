@@ -160,8 +160,6 @@ public class OsmGpxWriteContext {
 				long nid = id--;
 				if (gpxInfo != null) {
 					writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
-				} else {
-					writePoint(nid, p, "point", "gpx", "points");
 				}
 			}
 		}
@@ -341,7 +339,17 @@ public class OsmGpxWriteContext {
 		for (File gf : files) {
 			GPXFile f = GPXUtilities.loadGPXFile(gf);
 			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
-			writeTrack(null, null, f, analysis, "GPX");
+			OsmGpxFile file = new OsmGpxFile();
+			String name = gf.getName();
+			if (name.lastIndexOf('.') != -1) {
+				name = name.substring(0, name.lastIndexOf('.'));
+			}
+			file.name = name;
+			file.id = gf.lastModified() / 1000;
+			file.timestamp = new Date(gf.lastModified());
+			file.description = "";
+			file.tags = new String[0];
+			writeTrack(file, null, f, analysis, "GPX");
 		}
 		endDocument();
 
