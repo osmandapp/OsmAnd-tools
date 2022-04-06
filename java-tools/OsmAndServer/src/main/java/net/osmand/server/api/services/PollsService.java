@@ -78,6 +78,10 @@ public class PollsService {
 		}
 		return null;
 	}
+	
+	public Map<String, Object> getPollByIdResult(String pollId) {
+		return wrapPoll(getPollById(pollId));
+	}
     
 	public void submitVote(String remoteAddr, PollQuestion q, int ans) {
 		// insert db
@@ -156,11 +160,10 @@ public class PollsService {
     	return polls == null ? Collections.emptyList() : polls.questions;
     }
 
-	public Map<String, Object> getPoll(String id) {
-		Map<String, Object> poll = new LinkedHashMap<String, Object>();
+	public Map<String, Object> getPoll(String channel) {
 		List<PollQuestion> filtered = new ArrayList<>();
 		for (PollQuestion q : getPollsConfig(false)) {
-			if (q.pub.contains(id) && q.active) {
+			if (q.pub.contains(channel) && q.active) {
 				filtered.add(q);
 			}
 		}
@@ -171,19 +174,26 @@ public class PollsService {
 			question = filtered.get(random.nextInt(filtered.size()));
 		}
 
-		String pollId = question.id;
-		poll.put("id", pollId);
-		poll.put("title", question.title);
-		List<Map<String, Object>> answers = new ArrayList<>();
-		poll.put("answers", answers);
-		int o = 0;
-		for (String a : question.answers) {
-			Map<String, Object> ans = new LinkedHashMap<String, Object>();
-			ans.put("id", pollId + "_" + o);
-			ans.put("value", a);
-			ans.put("ind", o);
-			answers.add(ans);
-			o++;
+		return wrapPoll(question);
+	}
+
+	public Map<String, Object> wrapPoll(PollQuestion question) {
+		Map<String, Object> poll = new LinkedHashMap<String, Object>();
+		if (question != null) {
+			String pollId = question.id;
+			poll.put("id", pollId);
+			poll.put("title", question.title);
+			List<Map<String, Object>> answers = new ArrayList<>();
+			poll.put("answers", answers);
+			int o = 0;
+			for (String a : question.answers) {
+				Map<String, Object> ans = new LinkedHashMap<String, Object>();
+				ans.put("id", pollId + "_" + o);
+				ans.put("value", a);
+				ans.put("ind", o);
+				answers.add(ans);
+				o++;
+			}
 		}
 		return poll;
 	}
