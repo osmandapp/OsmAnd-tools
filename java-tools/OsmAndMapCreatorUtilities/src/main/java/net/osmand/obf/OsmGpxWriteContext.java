@@ -158,7 +158,11 @@ public class OsmGpxWriteContext {
 
 			for (WptPt p : gpxFile.getPoints()) {
 				long nid = id--;
-				writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
+				if (gpxInfo != null) {
+					writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
+				} else {
+					writePoint(nid, p, null, null, null);
+				}
 			}
 		}
 		tracks++;
