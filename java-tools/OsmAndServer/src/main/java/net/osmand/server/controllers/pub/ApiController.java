@@ -43,7 +43,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 
 import net.osmand.server.api.repo.DataMissingSearchRepository;
 import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
@@ -53,14 +53,17 @@ import net.osmand.server.api.repo.EmailSupportSurveyRepository;
 import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurveyFeedback;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository;
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
+import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
 import net.osmand.server.api.services.CameraPlace;
 import net.osmand.server.api.services.IpLocationService;
+import net.osmand.server.api.services.LotteryPlayService;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
 import net.osmand.server.api.services.PlacesService;
 import net.osmand.server.api.services.PollsService;
+import net.osmand.server.api.services.LotteryPlayService.LotteryResult;
 import net.osmand.server.api.services.PollsService.PollQuestion;
 import net.osmand.util.Algorithms;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
@@ -110,15 +113,12 @@ public class ApiController {
 
 	@Autowired
 	private OsmAndServerMonitorTasks monitoring;
+	
+	@Autowired
+	LotteryPlayService service;
 
-	private ObjectMapper jsonMapper;
+	Gson gson = new Gson();
 
-    
-    private ApiController() {
-    	ObjectMapper mapper = new ObjectMapper();
-    	this.jsonMapper = mapper;
-    }
-    
 
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
@@ -168,7 +168,7 @@ public class ApiController {
 				res.put(pq.id + "_" + i, pq.votes.get(i));
 			}
 		}
-		return jsonMapper.writeValueAsString(res);
+		return gson.toJson(res);
 	}
     
 	@PostMapping(path = { "/poll-submit" }, produces = "application/json")
@@ -199,9 +199,9 @@ public class ApiController {
 	public String pollDetails(@RequestParam(required = false, defaultValue = "website" ) String channel, 
 			@RequestParam(required = false) String pollId ) throws JsonProcessingException {
 		if(pollId != null) {
-			return jsonMapper.writeValueAsString(pollsService.getPollByIdResult(pollId));
+			return gson.toJson(pollsService.getPollByIdResult(pollId));
 		}
-		return jsonMapper.writeValueAsString(pollsService.getPoll(channel));
+		return gson.toJson(pollsService.getPoll(channel));
 	}
     
     
@@ -270,7 +270,7 @@ public class ApiController {
 	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response)
 			throws JsonProcessingException {
-		placesService.processPlacesAround(headers, request, response, jsonMapper, lat, lon);
+		placesService.processPlacesAround(headers, request, response, gson, lat, lon);
 	}
 
     @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
@@ -394,7 +394,7 @@ public class ApiController {
 				subMap.put("state", state);
 				res.add(subMap);
 			}
-			return jsonMapper.writeValueAsString(res);
+			return gson.toJson(res);
 		}
 		return "{}";
 	}
@@ -430,9 +430,9 @@ public class ApiController {
 			}
 		}
 		
-        HashMap<String, Object> body = motdService.getMessage(params);
+        Map<String, Object> body = motdService.getMessage(params);
         if (body != null) {
-            return jsonMapper.writeValueAsString(body);
+            return gson.toJson(body);
         }
         return "{}";
     }
@@ -535,4 +535,43 @@ public class ApiController {
 		}
 		return "OK";
 	}
+	
+	/// LOTTERY
+	@GetMapping(path = {"/giveaway-series"}, produces = "application/json")
+	@ResponseBody
+	public String series(HttpServletRequest request) throws IOException {
+		return gson.toJson(service.series());
+	}
+	
+	
+	@GetMapping(path = {"/giveaway"}, produces = "application/json")
+	@ResponseBody
+	public String index(HttpServletRequest request, @RequestParam(required = false) String email, 
+			@RequestParam(required = true) String series) throws IOException {
+		LotteryResult res = new LotteryResult();
+		res.series = series;
+		res.message = "";
+		if (!Algorithms.isEmpty(email)) {
+			String remoteAddr = request.getRemoteAddr();
+	    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+	        if (hs != null && hs.hasMoreElements()) {
+	            remoteAddr = hs.nextElement();
+	        }
+			LotteryUser user = service.participate(remoteAddr, email, series);
+			if (user != null) {
+				res.user = user.hashcode;
+				res.message = user.message;
+			}
+		}
+		service.fillSeriesDetails(res);
+		return gson.toJson(res);
+	}
+	
+	
+	@PostMapping(path = {"/giveaway-run"}, produces = "application/json")
+    @ResponseBody
+	public String runLottery(@RequestParam(required = true) String latestHash) throws IOException {
+		return gson.toJson(service.runLottery(latestHash));
+    }
+    
 }

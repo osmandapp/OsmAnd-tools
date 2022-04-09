@@ -32,7 +32,7 @@ public class EmailRegistryService {
 			String table, String category) {
 		List<EmailId> emails = jdbcTemplate.query("select " + emailCol + (dateCol != null ? ", " + dateCol : "")
 				+ (channelCol != null ? ", " + channelCol : "") + " from " + table + " where " + emailCol + " like ?",
-				new String[] { "%" + emailPart + "%" }, new RowMapper<EmailId>() {
+				new RowMapper<EmailId>() {
 
 					@Override
 					public EmailId mapRow(ResultSet rs, int rowNum) throws SQLException {
@@ -53,7 +53,7 @@ public class EmailRegistryService {
 						return emailId;
 					}
 
-				});
+				}, "%" + emailPart + "%" );
 		return emails;
 	}
 

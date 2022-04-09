@@ -9,6 +9,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.vividsolutions.jts.geom.Geometry;
 
 import net.osmand.Location;
@@ -87,7 +88,7 @@ public class PlacesService {
 	}
 
 	public void processPlacesAround(HttpHeaders headers, HttpServletRequest request, HttpServletResponse response,
-			ObjectMapper jsonMapper, double lat, double lon) {
+			Gson gson, double lat, double lon) {
 		AsyncContext asyncCtx = request.startAsync(request, response);
 		long start = System.currentTimeMillis();
 		executor.submit(() -> {
@@ -130,8 +131,7 @@ public class PlacesService {
 				if (wikimediaPrimaryCameraPlace != null) {
 					visibile.add(0, wikimediaPrimaryCameraPlace);
 				}
-				response.getWriter().println(String.format("{%s:%s}", jsonMapper.writeValueAsString("features"),
-						jsonMapper.writeValueAsString(visibile)));
+				response.getWriter().println(gson.toJson(Collections.singletonMap("features", visibile)));
 				asyncCtx.complete();
 			} catch (Exception e) {
 				LOGGER.error("Error processing places: " + e.getMessage());
