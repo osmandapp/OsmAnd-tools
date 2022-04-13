@@ -15,7 +15,6 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,13 +41,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import net.osmand.live.subscriptions.ReceiptValidationHelper;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.server.api.repo.MapUserRepository;
-import net.osmand.server.api.repo.MapUserRepository.MapUser;
 import net.osmand.server.api.repo.OsmRecipientsRepository;
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -56,6 +53,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceS
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.LotteryPlayService;
 import net.osmand.server.api.services.ReceiptValidationService;
 import net.osmand.server.utils.BTCAddrValidator;
 import net.osmand.util.Algorithms;
@@ -73,7 +71,7 @@ public class SubscriptionController {
     private SupportersRepository supportersRepository;
     
     @Autowired
-    private MapUserRepository mapUserRepository;
+    private LotteryPlayService lotteryPlayService;
     
     @Autowired
     private OsmRecipientsRepository osmRecipientsRepository;
@@ -84,8 +82,7 @@ public class SubscriptionController {
     @Autowired
     private ReceiptValidationService validationService;
     
-    private ObjectMapper jsonMapper = new ObjectMapper();
-
+    private Gson gson = new Gson();
 
     private final RestTemplate restTemplate;
 
@@ -151,35 +148,10 @@ public class SubscriptionController {
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> registerEmail(HttpServletRequest request) {
-        MapUser mapUser = new MapUser();
-        mapUser.aid = request.getParameter("aid");
-        String remoteAddr = request.getRemoteAddr();
-    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
-        if (hs != null && hs.hasMoreElements()) {
-            remoteAddr = hs.nextElement();
-        }
-        if(Algorithms.isEmpty(mapUser.aid)) {
-        	mapUser.aid = remoteAddr;
-        }
-        mapUser.email = request.getParameter("email");
-        if(!validateEmail(mapUser.email)) {
-        	throw new IllegalStateException(String.format("Email '%s' is not valid.", mapUser.email));
-        }
-        mapUser.os = request.getParameter("os");
-        mapUser.updateTime = new Date();
-        mapUser = mapUserRepository.save(mapUser);
-        return ok("{\"email\": \"%s\", \"time\": \"%d\"}", mapUser.email, mapUser.updateTime.getTime());
+    	
+		return ok(gson.toJson(lotteryPlayService.subscribeToGiveaways(request, request.getParameter("aid"),
+				request.getParameter("email"), request.getParameter("os"))));
     }
-    
-	private boolean validateEmail(String email) {
-		if(Algorithms.isEmpty(email)) {
-			return false;
-		}
-		if(!email.contains("@")) {
-			return false;
-		}
-		return true;
-	}
 
 	private String userInfoAsJson(Supporter s) {
 		String response = String.format(
@@ -312,7 +284,7 @@ public class SubscriptionController {
 					result.put("eligible_for_subscription_offer", "false");
 					result.put("result", false);
 					result.put("status", NO_SUBSCRIPTIONS_FOUND_STATUS);
-					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
+					return ResponseEntity.ok(gson.toJson(result));
 				} else {
 					result.put("eligible_for_introductory_price",
 							isEligibleForIntroductoryPrice(inAppReceipts) ? "true" : "false");
@@ -338,7 +310,7 @@ public class SubscriptionController {
 					result.put("eligible_for_subscription_offer",
 							isEligibleForSubscriptionOffer(inAppReceipts, activeSubscriptions) ? "true" : "false");
 
-					return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
+					return ResponseEntity.ok(gson.toJson(result));
 				}
 			}
 		}
@@ -390,7 +362,7 @@ public class SubscriptionController {
 			}
 			result.put("signatures", signatures);
 			result.put("status", 0);
-			return ResponseEntity.ok(jsonMapper.writeValueAsString(result));
+			return ResponseEntity.ok(gson.toJson(result));
 		}
 		return error("Product identifiers are not defined.");
 	}

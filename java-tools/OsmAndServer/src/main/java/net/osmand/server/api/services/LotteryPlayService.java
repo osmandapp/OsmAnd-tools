@@ -7,24 +7,30 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.server.api.repo.LotteryRoundsRepository;
+import net.osmand.server.api.repo.LotteryRoundsRepository.LotteryRound;
 import net.osmand.server.api.repo.LotterySeriesRepository;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
-import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
-import net.osmand.util.Algorithms;
 import net.osmand.server.api.repo.LotteryUsersRepository;
+import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
 import net.osmand.server.api.repo.MapUserRepository;
-import net.osmand.server.api.repo.LotteryRoundsRepository.LotteryRound;
+import net.osmand.server.api.repo.MapUserRepository.MapUser;
+import net.osmand.util.Algorithms;
 
 @Service
 public class LotteryPlayService {
@@ -235,4 +241,39 @@ public class LotteryPlayService {
 		return playedRounds;
 	}
 	
+
+	public Map<String, Object> subscribeToGiveaways(HttpServletRequest request, String aid, String email, String os) {
+        MapUser mapUser = new MapUser();
+        mapUser.aid = aid;
+        String remoteAddr = request.getRemoteAddr();
+    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+        if (hs != null && hs.hasMoreElements()) {
+            remoteAddr = hs.nextElement();
+        }
+		if (Algorithms.isEmpty(mapUser.aid)) {
+			mapUser.aid = remoteAddr;
+		}
+        mapUser.email = email;
+		if (!validateEmail(mapUser.email)) {
+			throw new IllegalStateException(String.format("Email '%s' is not valid.", mapUser.email));
+		}
+        mapUser.os = os;
+        mapUser.updateTime = new Date();
+        mapUser = mapUsers.save(mapUser);
+        Map<String, Object> res = new TreeMap<>();
+        res.put("email", mapUser.email);
+        res.put("time", mapUser.updateTime.getTime());
+        res.put("message", "You successfully subscribed to future giveaways with email '" + mapUser.email +"'.");
+        return res;
+    }
+	
+	private boolean validateEmail(String email) {
+		if(Algorithms.isEmpty(email)) {
+			return false;
+		}
+		if(!email.contains("@")) {
+			return false;
+		}
+		return true;
+	}
 }

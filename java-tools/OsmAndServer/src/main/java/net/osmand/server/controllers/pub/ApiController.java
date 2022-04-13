@@ -28,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -40,9 +41,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.gson.Gson;
 
 import net.osmand.server.api.repo.DataMissingSearchRepository;
@@ -112,10 +110,10 @@ public class ApiController {
 	SupportersRepository supportersRepository;
 
 	@Autowired
-	private OsmAndServerMonitorTasks monitoring;
+	OsmAndServerMonitorTasks monitoring;
 	
 	@Autowired
-	LotteryPlayService service;
+	LotteryPlayService lotteryPlayService;
 
 	Gson gson = new Gson();
 
@@ -129,8 +127,7 @@ public class ApiController {
     
     @GetMapping(path = {"/geo-ip"}, produces = "application/json")
     @ResponseBody
-    public String findGeoIP(HttpServletRequest request, @RequestParam(required = false) String ip) throws 
-    	JsonParseException, JsonMappingException, IOException{
+    public String findGeoIP(HttpServletRequest request, @RequestParam(required = false) String ip) throws IOException{
     	String remoteAddr = request.getRemoteAddr();
     	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
         if (hs != null && hs.hasMoreElements()) {
@@ -161,7 +158,7 @@ public class ApiController {
 		return d;
 	}
 
-	private String pollResult(PollQuestion pq) throws JsonProcessingException {
+	private String pollResult(PollQuestion pq) {
 		Map<String, Integer> res = new LinkedHashMap<String, Integer>();
 		if (pq != null) {
 			for (int i = 0; i < pq.votes.size(); i++) {
@@ -173,8 +170,7 @@ public class ApiController {
     
 	@PostMapping(path = { "/poll-submit" }, produces = "application/json")
 	@ResponseBody
-	public String pollSubmit(HttpServletRequest request, @RequestParam(required = true) String pollId, @RequestParam(required = true) String ansId)
-			throws JsonProcessingException {
+	public String pollSubmit(HttpServletRequest request, @RequestParam(required = true) String pollId, @RequestParam(required = true) String ansId) {
 		String remoteAddr = request.getRemoteAddr();
     	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
         if (hs != null && hs.hasMoreElements()) {
@@ -190,14 +186,14 @@ public class ApiController {
     
 	@GetMapping(path = { "/poll-results" }, produces = "application/json")
 	@ResponseBody
-	public String pollResults(@RequestParam(required = true) String pollId) throws JsonProcessingException {
+	public String pollResults(@RequestParam(required = true) String pollId) {
 		return pollResult(pollsService.getPollById(pollId));
 	}
 	
 	@GetMapping(path = { "/latest-poll" }, produces = "application/json")
 	@ResponseBody
 	public String pollDetails(@RequestParam(required = false, defaultValue = "website" ) String channel, 
-			@RequestParam(required = false) String pollId ) throws JsonProcessingException {
+			@RequestParam(required = false) String pollId ) {
 		if(pollId != null) {
 			return gson.toJson(pollsService.getPollByIdResult(pollId));
 		}
@@ -268,8 +264,7 @@ public class ApiController {
     
     @GetMapping(path = {"/cm_place.php", "/cm_place"})
 	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
-			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response)
-			throws JsonProcessingException {
+			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
 		placesService.processPlacesAround(headers, request, response, gson, lat, lon);
 	}
 
@@ -537,14 +532,21 @@ public class ApiController {
 	}
 	
 	/// LOTTERY
-	@GetMapping(path = {"/giveaway-series"}, produces = "application/json")
+	@GetMapping(path = {"/giveaway-series"}, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public String series(HttpServletRequest request) throws IOException {
-		return gson.toJson(service.series());
+		return gson.toJson(lotteryPlayService.series());
 	}
 	
 	
-	@GetMapping(path = {"/giveaway"}, produces = "application/json")
+	@PostMapping(path = {"/giveaway-subscribe" }, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public String registerEmail(HttpServletRequest request, @RequestParam(required=false) String aid, 
+			@RequestParam(required = true) String email, @RequestParam(required = true) String os) {
+		return gson.toJson(lotteryPlayService.subscribeToGiveaways(request, aid, email, os));
+	}
+	
+	@GetMapping(path = {"/giveaway"}, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public String index(HttpServletRequest request, @RequestParam(required = false) String email, 
 			@RequestParam(required = true) String series) throws IOException {
@@ -557,21 +559,21 @@ public class ApiController {
 	        if (hs != null && hs.hasMoreElements()) {
 	            remoteAddr = hs.nextElement();
 	        }
-			LotteryUser user = service.participate(remoteAddr, email, series);
+			LotteryUser user = lotteryPlayService.participate(remoteAddr, email, series);
 			if (user != null) {
 				res.user = user.hashcode;
 				res.message = user.message;
 			}
 		}
-		service.fillSeriesDetails(res);
+		lotteryPlayService.fillSeriesDetails(res);
 		return gson.toJson(res);
 	}
 	
 	
-	@PostMapping(path = {"/giveaway-run"}, produces = "application/json")
+	@PostMapping(path = {"/giveaway-run"}, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
 	public String runLottery(@RequestParam(required = true) String latestHash) throws IOException {
-		return gson.toJson(service.runLottery(latestHash));
+		return gson.toJson(lotteryPlayService.runLottery(latestHash));
     }
     
 }
