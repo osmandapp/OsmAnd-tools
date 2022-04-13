@@ -177,6 +177,33 @@ public class EmailSenderService {
         	return false;
 		}
     }
+	
+	public void sendOsmRecipientsDeleteEmail(String email) {
+		LOGGER.info("Sending mail to: " + email);
+		Email from = new Email(NOREPLY_MAIL_FROM);
+		from.setName("OsmAnd");
+		Email to = new Email(email);
+		String topic = "Important message from OsmAnd!";
+		String contentStr = "Hello OsmAnd Editor!" +
+				"<br><br>" +
+				"You received this message because OsmAnd decided to delete your account.<br>" +
+				"<br><br>" +
+				"Good luck, <br>OsmAnd Team";
+		Content content = new Content("text/html", contentStr);
+		Mail mail = new Mail(from, topic, to, content);
+		mail.from = from;
+		Request request = new Request();
+		try {
+			request.setMethod(Method.POST);
+			request.setEndpoint("mail/send");
+			String body = mail.build();
+			request.setBody(body);
+			Response response = sendGridClient.api(request);
+			LOGGER.info("Response code: " + response.getStatusCode());
+		} catch (Exception e) {
+			LOGGER.warn(e.getMessage(), e);
+		}
+	}
 
 
 	public boolean isEmail(String comment) {

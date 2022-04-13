@@ -6,18 +6,30 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import net.osmand.server.api.repo.OsmRecipientsRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EmailRegistryService {
-
-	@Autowired
-	private JdbcTemplate jdbcTemplate;
-
+	
+	private final JdbcTemplate jdbcTemplate;
+	
+	private final OsmRecipientsRepository recipientsRepository;
+	
+	public EmailRegistryService(OsmRecipientsRepository recipientsRepository, JdbcTemplate jdbcTemplate) {
+		this.recipientsRepository = recipientsRepository;
+		this.jdbcTemplate = jdbcTemplate;
+	}
+	
+	@Transactional
+	public void deleteByEmail(String email) {
+		recipientsRepository.deleteOsmRecipientByEmail(email);
+	}
+	
 	public List<EmailId> searchEmails(String emailPart) {
 		List<EmailId> searchEmails = new ArrayList<EmailId>();
 		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", "os", "email_free_users", "Free users (extra maps)"));

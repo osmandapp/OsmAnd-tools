@@ -33,4 +33,6 @@ public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, Str
         @Temporal(TemporalType.TIMESTAMP)
         public Date updateTime;
     }
+    
+    void deleteOsmRecipientByEmail(String email);
 }

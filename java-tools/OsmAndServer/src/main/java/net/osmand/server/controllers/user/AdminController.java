@@ -44,11 +44,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -264,6 +260,15 @@ public class AdminController {
 			@RequestParam(required = true) String emailPart, final RedirectAttributes redirectAttrs) {
 		redirectAttrs.addFlashAttribute("emailSearch", emailService.searchEmails(emailPart));
         return "redirect:info#audience";
+	}
+	
+	@PostMapping(path = {"/delete-email"})
+	public String deleteEmail(@RequestParam String email, boolean isSendEmail) {
+		if (isSendEmail) {
+			emailSender.sendOsmRecipientsDeleteEmail(email);
+		}
+		emailService.deleteByEmail(email);
+		return "redirect:info#audience";
 	}
 	
 	private String err(RedirectAttributes redirectAttrs, String string) {
