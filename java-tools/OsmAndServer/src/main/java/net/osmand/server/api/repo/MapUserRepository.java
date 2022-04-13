@@ -2,6 +2,7 @@ package net.osmand.server.api.repo;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -19,37 +20,38 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimaryKey> {
-	
-	
-    boolean existsByEmail(String email);
 
-    @Entity
-    @Table(name = "email_free_users")
-    @IdClass(MapUserPrimaryKey.class)
-    class MapUser {
+	boolean existsByEmail(String email);
 
-        @Id
-        @Column(name = "aid")
-        public String aid;
+	List<MapUser> findByEmail(String email);
 
-        @Id
-        @Column(name = "email")
-        public String email;
-        
-        @Column(name = "os")
-        public String os;
+	@Entity
+	@Table(name = "email_free_users")
+	@IdClass(MapUserPrimaryKey.class)
+	class MapUser {
 
-        @Column(name = "updatetime")
-        @Temporal(TemporalType.TIMESTAMP)
-        public Date updateTime;
-    }
+		@Id
+		@Column(name = "aid")
+		public String aid;
 
-    class MapUserPrimaryKey implements Serializable {
-        private static final long serialVersionUID = -6244205107567456100L;
+		@Id
+		@Column(name = "email")
+		public String email;
 
-        public String aid;
-        public String email;
-        
+		@Column(name = "os")
+		public String os;
+
+		@Column(name = "updatetime")
+		@Temporal(TemporalType.TIMESTAMP)
+		public Date updateTime;
+	}
+
+	class MapUserPrimaryKey implements Serializable {
+		private static final long serialVersionUID = -6244205107567456100L;
+
+		public String aid;
+		public String email;
+
 		@Override
 		public int hashCode() {
 			final int prime = 31;
@@ -58,7 +60,7 @@ public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimary
 			result = prime * result + ((email == null) ? 0 : email.hashCode());
 			return result;
 		}
-		
+
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj) {
@@ -87,6 +89,6 @@ public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimary
 			}
 			return true;
 		}
-        
-    }
+
+	}
 }

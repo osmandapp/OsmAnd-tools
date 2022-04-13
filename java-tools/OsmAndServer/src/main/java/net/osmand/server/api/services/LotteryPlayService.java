@@ -34,47 +34,45 @@ import net.osmand.util.Algorithms;
 
 @Service
 public class LotteryPlayService {
-	
+
 	@Autowired
 	LotteryRoundsRepository roundsRepo;
-	
+
 	@Autowired
 	LotterySeriesRepository seriesRepo;
 
 	@Autowired
 	LotteryUsersRepository usersRepo;
-	
+
 	@Autowired
 	MapUserRepository mapUsers;
-	
+
 	@Autowired
 	EmailSenderService emailSender;
-	
+
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("MM/dd HH:mm");
 	static {
 		FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
-	
+
 	public static class LotteryResult {
 		public String series;
 		String type;
 		LotteryStatus status;
 		String date;
 		int totalRounds;
-		
-		
+
 		public String message;
 		public String user;
-		
+
 		int participants;
 		int activeParticipants;
 		int winners;
-		
-		
+
 		List<LotteryUsersRepository.LotteryUser> users = new ArrayList<LotteryUsersRepository.LotteryUser>();
 		List<LotteryRoundsRepository.LotteryRound> rounds = new ArrayList<LotteryRoundsRepository.LotteryRound>();
 		List<LotterySeries> seriesList;
-		
+
 	}
 
 	public LotteryResult series() {
@@ -89,9 +87,8 @@ public class LotteryPlayService {
 		}
 		return res;
 	}
-	
-	public LotteryUser participate(String remoteAddr, String email, String series)
-			throws IOException {
+
+	public LotteryUser participate(String remoteAddr, String email, String series) throws IOException {
 		LotteryUser usr = new LotteryUsersRepository.LotteryUser();
 		if (Algorithms.isEmpty(email) || !mapUsers.existsByEmail(email)) {
 			usr.message = String.format("User with email '%s' is not subscribed", email);
@@ -128,19 +125,19 @@ public class LotteryPlayService {
 	public void fillSeriesDetails(LotteryResult res) {
 		String series = res.series;
 		Optional<LotterySeries> s = seriesRepo.findById(series);
-		if(s.isPresent()) {
+		if (s.isPresent()) {
 			res.totalRounds = s.get().rounds;
 			res.status = s.get().status;
 			res.type = s.get().type;
 			res.date = FORMAT.format(s.get().updateTime);
 		}
-		
+
 		for (LotteryUsersRepository.LotteryUser u : usersRepo.findBySeriesOrderByUpdateTime(series)) {
 			LotteryUsersRepository.LotteryUser c = new LotteryUser();
 			c.hashcode = u.hashcode;
 			c.roundId = u.roundId;
 			c.date = FORMAT.format(u.updateTime);
-			res.participants ++;
+			res.participants++;
 			if (Algorithms.isEmpty(u.promocode)) {
 				c.status = "Participating";
 				res.activeParticipants++;
@@ -155,7 +152,7 @@ public class LotteryPlayService {
 			rnd.seedInteger = new BigInteger(rnd.seed, 16).toString();
 			res.rounds.add(rnd);
 		}
-				
+
 	}
 
 	public Object runLottery(String latestHash) throws IOException {
@@ -240,38 +237,45 @@ public class LotteryPlayService {
 		}
 		return playedRounds;
 	}
-	
 
 	public Map<String, Object> subscribeToGiveaways(HttpServletRequest request, String aid, String email, String os) {
-        MapUser mapUser = new MapUser();
-        mapUser.aid = aid;
-        String remoteAddr = request.getRemoteAddr();
-    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
-        if (hs != null && hs.hasMoreElements()) {
-            remoteAddr = hs.nextElement();
-        }
+		MapUser mapUser = new MapUser();
+		mapUser.aid = aid;
+		String remoteAddr = request.getRemoteAddr();
+		Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+		if (hs != null && hs.hasMoreElements()) {
+			remoteAddr = hs.nextElement();
+		}
 		if (Algorithms.isEmpty(mapUser.aid)) {
 			mapUser.aid = remoteAddr;
 		}
-        mapUser.email = email;
+		mapUser.email = email;
 		if (!validateEmail(mapUser.email)) {
 			throw new IllegalStateException(String.format("Email '%s' is not valid.", mapUser.email));
 		}
-        mapUser.os = os;
-        mapUser.updateTime = new Date();
-        mapUser = mapUsers.save(mapUser);
-        Map<String, Object> res = new TreeMap<>();
-        res.put("email", mapUser.email);
-        res.put("time", mapUser.updateTime.getTime());
-        res.put("message", "You successfully subscribed to future giveaways with email '" + mapUser.email +"'.");
-        return res;
-    }
-	
+		mapUser.os = os;
+		mapUser.updateTime = new Date();
+
+		Map<String, Object> res = new TreeMap<>();
+		res.put("email", mapUser.email);
+		res.put("time", mapUser.updateTime.getTime());
+		List<MapUser> ex = mapUsers.findByEmail(email);
+		for (MapUser u : ex) {
+			if (Algorithms.stringsEqual(os, u.os)) {
+				res.put("message", "You have already subscribed to giveaways with email '" + mapUser.email + "'.");
+				return res;
+			}
+		}
+		mapUser = mapUsers.save(mapUser);
+		res.put("message", "You successfully subscribed to future giveaways with email '" + mapUser.email + "'.");
+		return res;
+	}
+
 	private boolean validateEmail(String email) {
-		if(Algorithms.isEmpty(email)) {
+		if (Algorithms.isEmpty(email)) {
 			return false;
 		}
-		if(!email.contains("@")) {
+		if (!email.contains("@")) {
 			return false;
 		}
 		return true;
