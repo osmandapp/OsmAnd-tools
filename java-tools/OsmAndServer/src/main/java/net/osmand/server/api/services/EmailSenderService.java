@@ -180,15 +180,16 @@ public class EmailSenderService {
 	
 	public void sendOsmRecipientsDeleteEmail(String email) {
 		LOGGER.info("Sending mail to: " + email);
-		Email from = new Email(NOREPLY_MAIL_FROM);
-		from.setName("OsmAnd");
+		Email from = new Email(DEFAULT_MAIL_FROM);
+		from.setName("OSM BTC");
 		Email to = new Email(email);
-		String topic = "Important message from OsmAnd!";
-		String contentStr = "Hello OsmAnd Editor!" +
+		String topic = "Important message from OSM BTC!";
+		String contentStr = "Hello OpenStreetMap Editor!" +
 				"<br><br>" +
-				"You received this message because OsmAnd decided to delete your account.<br>" +
+				"You received this message because OsmAnd suspect that you didn't follow OSM BTC guidelines and your account was suspended." +
+                "Please contact our support if you believe it was done by mistake.<br>" +
 				"<br><br>" +
-				"Good luck, <br>OsmAnd Team";
+				"Best Regards, <br>OsmAnd Team";
 		Content content = new Content("text/html", contentStr);
 		Mail mail = new Mail(from, topic, to, content);
 		mail.from = from;
