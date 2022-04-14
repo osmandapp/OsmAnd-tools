@@ -270,9 +270,15 @@ public class AdminController {
 		return "redirect:info#audience";
 	}
 	
-	@PostMapping(path = {"/delete-emails"})
-	public String deleteEmails(@RequestParam List<String> osmidList) {
-		for (String id : osmidList) {
+	@PostMapping(path = {"/ban-by-osmids"})
+	public String deleteEmails(@RequestParam String osmidList) {
+		
+		String[] osmids = Arrays.stream(osmidList.split("[, ]"))
+				.filter(s-> !s.equals(""))
+				.map(String::trim)
+				.toArray(String[]::new);
+		
+		for (String id : osmids) {
 			OsmRecipientsRepository.OsmRecipient recipient = emailService.getOsmRecipient(id);
 			if (recipient != null) {
 				emailSender.sendOsmRecipientsDeleteEmail(recipient.email);
