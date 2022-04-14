@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import net.osmand.server.api.repo.OsmRecipientsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -14,10 +15,24 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class EmailRegistryService {
-
+	
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
-
+	@Autowired
+	private OsmRecipientsRepository recipientsRepository;
+	
+	public void deleteByEmail(String email) {
+		recipientsRepository.deleteOsmRecipientByEmail(email);
+	}
+	
+	public void deleteByOsmid(String osmid) {
+		recipientsRepository.deleteOsmRecipientByOsmId(osmid);
+	}
+	
+	public OsmRecipientsRepository.OsmRecipient getOsmRecipient(String osmid) {
+		return recipientsRepository.getOsmRecipientByOsmId(osmid);
+	}
+	
 	public List<EmailId> searchEmails(String emailPart) {
 		List<EmailId> searchEmails = new ArrayList<EmailId>();
 		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", "os", "email_free_users", "Free users (extra maps)"));

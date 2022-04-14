@@ -29,6 +29,7 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.api.repo.OsmRecipientsRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,11 +45,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -264,6 +261,31 @@ public class AdminController {
 			@RequestParam(required = true) String emailPart, final RedirectAttributes redirectAttrs) {
 		redirectAttrs.addFlashAttribute("emailSearch", emailService.searchEmails(emailPart));
         return "redirect:info#audience";
+	}
+	
+	@PostMapping(path = {"/delete-email"})
+	public String deleteEmail(@RequestParam String email) {
+		emailSender.sendOsmRecipientsDeleteEmail(email);
+		emailService.deleteByEmail(email);
+		return "redirect:info#audience";
+	}
+	
+	@PostMapping(path = {"/ban-by-osmids"})
+	public String banByOsmids(@RequestParam String osmidList) {
+		
+		String[] osmids = Arrays.stream(osmidList.split("[, ]"))
+				.filter(s-> !s.equals(""))
+				.map(String::trim)
+				.toArray(String[]::new);
+		
+		for (String id : osmids) {
+			OsmRecipientsRepository.OsmRecipient recipient = emailService.getOsmRecipient(id);
+			if (recipient != null) {
+				emailSender.sendOsmRecipientsDeleteEmail(recipient.email);
+				emailService.deleteByOsmid(id);
+			}
+		}
+		return "redirect:info#audience";
 	}
 	
 	private String err(RedirectAttributes redirectAttrs, String string) {

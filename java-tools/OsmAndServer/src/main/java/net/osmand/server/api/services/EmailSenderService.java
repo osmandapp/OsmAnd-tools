@@ -177,6 +177,34 @@ public class EmailSenderService {
         	return false;
 		}
     }
+	
+	public void sendOsmRecipientsDeleteEmail(String email) {
+		LOGGER.info("Sending mail to: " + email);
+		Email from = new Email(DEFAULT_MAIL_FROM);
+		from.setName("OSM BTC");
+		Email to = new Email(email);
+		String topic = "Important message from OSM BTC!";
+		String contentStr = "Hello OpenStreetMap Editor!" +
+				"<br><br>" +
+				"You received this message because OsmAnd suspect that you didn't follow OSM BTC guidelines and your account was suspended." +
+                "Please contact our support if you believe it was done by mistake.<br>" +
+				"<br><br>" +
+				"Best Regards, <br>OsmAnd Team";
+		Content content = new Content("text/html", contentStr);
+		Mail mail = new Mail(from, topic, to, content);
+		mail.from = from;
+		Request request = new Request();
+		try {
+			request.setMethod(Method.POST);
+			request.setEndpoint("mail/send");
+			String body = mail.build();
+			request.setBody(body);
+			Response response = sendGridClient.api(request);
+			LOGGER.info("Response code: " + response.getStatusCode());
+		} catch (Exception e) {
+			LOGGER.warn(e.getMessage(), e);
+		}
+	}
 
 
 	public boolean isEmail(String comment) {
