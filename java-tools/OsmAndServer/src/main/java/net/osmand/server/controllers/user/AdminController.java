@@ -271,7 +271,7 @@ public class AdminController {
 	}
 	
 	@PostMapping(path = {"/ban-by-osmids"})
-	public String deleteEmails(@RequestParam String osmidList) {
+	public String banByOsmids(@RequestParam String osmidList) {
 		
 		String[] osmids = Arrays.stream(osmidList.split("[, ]"))
 				.filter(s-> !s.equals(""))
