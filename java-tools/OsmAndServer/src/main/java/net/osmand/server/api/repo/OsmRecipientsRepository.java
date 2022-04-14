@@ -12,8 +12,18 @@ import javax.persistence.TemporalType;
 import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, String> {
+    
+    @Transactional
+    void deleteOsmRecipientByEmail(String email);
+    
+    @Transactional
+    void deleteOsmRecipientByOsmId(String osmid);
+    
+    OsmRecipient getOsmRecipientByOsmId(@Param("osmid") String osmId);
 
     @Entity
     @Table(name = "osm_recipients")
@@ -33,6 +43,4 @@ public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, Str
         @Temporal(TemporalType.TIMESTAMP)
         public Date updateTime;
     }
-    
-    void deleteOsmRecipientByEmail(String email);
 }

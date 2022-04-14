@@ -7,27 +7,30 @@ import java.util.Date;
 import java.util.List;
 
 import net.osmand.server.api.repo.OsmRecipientsRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EmailRegistryService {
 	
-	private final JdbcTemplate jdbcTemplate;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private OsmRecipientsRepository recipientsRepository;
 	
-	private final OsmRecipientsRepository recipientsRepository;
-	
-	public EmailRegistryService(OsmRecipientsRepository recipientsRepository, JdbcTemplate jdbcTemplate) {
-		this.recipientsRepository = recipientsRepository;
-		this.jdbcTemplate = jdbcTemplate;
-	}
-	
-	@Transactional
 	public void deleteByEmail(String email) {
 		recipientsRepository.deleteOsmRecipientByEmail(email);
+	}
+	
+	public void deleteByOsmid(String osmid) {
+		recipientsRepository.deleteOsmRecipientByOsmId(osmid);
+	}
+	
+	public OsmRecipientsRepository.OsmRecipient getOsmRecipient(String osmid) {
+		return recipientsRepository.getOsmRecipientByOsmId(osmid);
 	}
 	
 	public List<EmailId> searchEmails(String emailPart) {

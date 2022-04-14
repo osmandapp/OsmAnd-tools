@@ -29,6 +29,7 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.api.repo.OsmRecipientsRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -263,11 +264,21 @@ public class AdminController {
 	}
 	
 	@PostMapping(path = {"/delete-email"})
-	public String deleteEmail(@RequestParam String email, boolean isSendEmail) {
-		if (isSendEmail) {
-			emailSender.sendOsmRecipientsDeleteEmail(email);
-		}
+	public String deleteEmail(@RequestParam String email) {
+		emailSender.sendOsmRecipientsDeleteEmail(email);
 		emailService.deleteByEmail(email);
+		return "redirect:info#audience";
+	}
+	
+	@PostMapping(path = {"/delete-emails"})
+	public String deleteEmails(@RequestParam List<String> osmidList) {
+		for (String id : osmidList) {
+			OsmRecipientsRepository.OsmRecipient recipient = emailService.getOsmRecipient(id);
+			if (recipient != null) {
+				emailSender.sendOsmRecipientsDeleteEmail(recipient.email);
+				emailService.deleteByOsmid(id);
+			}
+		}
 		return "redirect:info#audience";
 	}
 	
