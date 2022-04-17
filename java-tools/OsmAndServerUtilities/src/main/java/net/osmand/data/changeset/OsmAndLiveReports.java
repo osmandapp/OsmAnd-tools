@@ -12,6 +12,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -496,13 +497,13 @@ public class OsmAndLiveReports {
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, region);
 			ps.setString(2, month);
-			rs = ps.executeQuery();
+			rs = executeQuery(ps, r, region, month);
 		} else {
 			String r = "select count ( distinct username) users, count(*) changes, sum(changes_count) achanges from "+CHANGESETS_VIEW+
 						" where substr(closed_at_day, 0, 8) = ?";
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
-			rs = ps.executeQuery();
+			rs = executeQuery(ps, r, month);
 		}
 		rs.next();
 		report.users = rs.getInt("users");
@@ -511,6 +512,15 @@ public class OsmAndLiveReports {
 		return report;
 	}
 	
+	private ResultSet executeQuery(PreparedStatement ps, String sql, Object... args) throws SQLException {
+		try {
+			return ps.executeQuery();
+		} catch (SQLException e) {
+			LOG.info(String.format("ERROR while executing '%s' with args '%s'", sql, Arrays.toString(args)));
+			throw e;
+		}
+	}
+
 	public RankingReport getRanking(String region) throws SQLException, IOException {
 		RankingReport report = new RankingReport();
 		report.month = month;
@@ -534,7 +544,7 @@ public class OsmAndLiveReports {
 			ps.setString(1, month);
 			ps.setString(2, region);
 			ps.setInt(3, minChanges);
-			rs = ps.executeQuery();
+			rs = executeQuery(ps, r, month, region, minChanges);
 		} else {
 			minChanges = getNumberReport(OsmAndLiveReportType.MIN_CHANGES).intValue();
 			rankingRange = getNumberReport(OsmAndLiveReportType.RANKING_RANGE).intValue();
@@ -546,7 +556,7 @@ public class OsmAndLiveReports {
 			PreparedStatement ps = conn.prepareStatement(r);
 			ps.setString(1, month);
 			ps.setInt(2, minChanges);
-			rs = ps.executeQuery();
+			rs = executeQuery(ps, r, month, minChanges);
 		}
 		List<RankingRange> lst = report.rows;
 		while (rs.next()) {
