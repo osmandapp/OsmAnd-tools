@@ -97,32 +97,70 @@ public class BinaryMerger {
 		BinaryMerger in = new BinaryMerger();
 		String pathWithGeneratedMapZips = args[0];
 		String pathToPutJointFiles = args[1];
-		boolean mapFiles = args.length > 2 && args[2].equals("--map");
-		String filter = args.length > 3? args[3] : null;
+		boolean mapFiles = false;
+		boolean skipExisting = false;
+		boolean ignoreFailures = true;
+		String filter = null;
+		for(String arg : args) {
+			String val = null;
+			String[] s = arg.split("=");
+			String key = s[0];
+			if (s.length > 1) {
+				val = s[1].trim();
+			}
+			if (key.equals("--map")) {
+				mapFiles = true;
+			} else if (key.equals("--filter")) {
+				filter = val;
+			} else if (key.equals("--skip-existing")) {
+				skipExisting = true;
+			} else if (key.equals("--fail-fast")) {
+				ignoreFailures = false;
+			}
+		}
+		List<String> failedCountries = new ArrayList<String>();
 		CountryRegion world = new CountryOcbfGeneration().parseDefaultOsmAndRegionStructure();
 		Iterator<CountryRegion> it = world.iterator();
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			CountryRegion cr = it.next();
-			if((cr.jointMap && mapFiles) || (cr.jointRoads && !mapFiles)) {
-				if(!Algorithms.isEmpty(filter) && !cr.getDownloadName().toLowerCase().startsWith(filter.toLowerCase())) {
+			if ((cr.jointMap && mapFiles) || (cr.jointRoads && !mapFiles)) {
+				if (!Algorithms.isEmpty(filter)
+						&& !cr.getDownloadName().toLowerCase().startsWith(filter.toLowerCase())) {
 					continue;
 				}
 				List<CountryRegion> list = cr.getChildren();
 				List<String> sargs = new ArrayList<String>();
 				String ext = "_2" + (mapFiles ? ".obf" : ".road.obf");
 				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + ext;
+				File targetFile = new File(pathToPutJointFiles, targetFileName);
+				if (skipExisting && targetFile.exists()) {
+					continue;
+				}
 				sargs.add(targetFileName);
 				sargs.add("--address");
 				sargs.add("--poi");
 				for (CountryRegion reg : list) {
-					if(reg.map || (!mapFiles && reg.roads)) {
-						sargs.add(pathWithGeneratedMapZips + Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext + ".zip");
+					if (reg.map || (!mapFiles && reg.roads)) {
+						sargs.add(pathWithGeneratedMapZips
+								+ Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext + ".zip");
 					}
 				}
 				log.info("Merge file with arguments: " + sargs);
-				in.merger(sargs.toArray(new String[sargs.size()]));
-				new File(targetFileName).renameTo(new File(pathToPutJointFiles, targetFileName));
+				try {
+					in.merger(sargs.toArray(new String[sargs.size()]));
+					new File(targetFileName).renameTo(targetFile);
+				} catch (IOException | SQLException e) {
+					if (!ignoreFailures) {
+						throw e;
+					}
+					failedCountries.add(cr.getDownloadName());
+				}
 			}
+		}
+		if (!failedCountries.isEmpty()) {
+			String msg = "Failed generation for such countries: " + failedCountries;
+			log.error(msg);
+			throw new RuntimeException(msg);
 		}
 	}
 
