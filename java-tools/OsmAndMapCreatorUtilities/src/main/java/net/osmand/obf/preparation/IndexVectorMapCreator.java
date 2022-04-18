@@ -880,8 +880,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		int i = name.indexOf(SPECIAL_CHAR);
 		while (i != -1) {
 			int n = name.indexOf(SPECIAL_CHAR, i + 2);
-			int ch = (short) name.charAt(i + 1);
-			MapRulType rt = renderingTypes.getTypeByInternalId(ch);
+			int typeIndex = Short.toUnsignedInt((short) name.charAt(i + 1));
+			MapRulType rt = renderingTypes.getTypeByInternalId(typeIndex);
 			if (n == -1) {
 				tempNames.put(rt, name.substring(i + 2));
 			} else {
