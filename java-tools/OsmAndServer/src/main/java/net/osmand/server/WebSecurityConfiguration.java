@@ -240,8 +240,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	@Bean
 	CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net", 
-				"https://osmand.net", "https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
+		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net",
+				"https://docs.osmand.net", "https://osmand.net", 
+				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
