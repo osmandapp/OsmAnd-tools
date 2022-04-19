@@ -153,6 +153,7 @@ public class BinaryMerger {
 					if (!ignoreFailures) {
 						throw e;
 					}
+					log.error(e.getMessage(), e);
 					failedCountries.add(cr.getDownloadName());
 				}
 			}
