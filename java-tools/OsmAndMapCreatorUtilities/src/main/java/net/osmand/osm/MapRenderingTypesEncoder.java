@@ -467,8 +467,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		if(tags.containsKey("highway") && entity == EntityType.WAY) {
 			tags = new LinkedHashMap<>(tags);
-			int integrity = calculateIntegrity(tags)[0];
-			int integrity_bicycle_routing = calculateIntegrity(tags)[1];
+			int[] integrityResult = calculateIntegrity(tags);
+			int integrity = integrityResult[0];
+			int integrity_bicycle_routing = integrityResult[1];
 			int max_integrity = 30;
 			int normalised_integrity_brouting = 0;
 			if (integrity_bicycle_routing >= 0) {
