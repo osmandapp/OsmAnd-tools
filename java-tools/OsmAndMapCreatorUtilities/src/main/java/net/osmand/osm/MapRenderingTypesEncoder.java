@@ -47,6 +47,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private static final String NODE_NETWORK_TAG = "node_network_point";
 	private static final String NODE_NETWORK_MULTIPLE_VALUE = "multiple";
 	private static final boolean DELETE_AFTER_38_RELEASE = false;
+	private static final String EMPTY_STRING = "";
 
 	private Map<String, TIntArrayList> socketTypes;
 
@@ -1326,33 +1327,80 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public Map<String, String> transformOsmcAndColorTags(Map<String, String> tags) {
 		if (tags.containsKey("osmc:symbol")) {
-			tags = new LinkedHashMap<String, String>(tags);
+			tags = new LinkedHashMap<>(tags);
 			// osmc:symbol=black:red:blue_rectangle ->
 			// 1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
 			// 2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2,
 			// osmc_text, osmc_textcolor, osmc_stub_name=. ,
 			String value = tags.get("osmc:symbol");
 			String[] tokens = value.split(":", 6);
-			osmcBackwardCompatility(tags, tokens);
-			if (tokens != null) {
-				String[] tokensToAdd = tokens;
-				if ((tokens.length == 4 && isColor(tokens[3])) || (tokens.length == 5 && isColor(tokens[4]))) {
-					tokensToAdd = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
-							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
+			tokens = toLowerCaseOsmcTags(tokens);
+			
+			boolean isSkipCase = isSkipCaseOsmcTags(tokens);
+			
+			if (!isSkipCase) {
+				osmcBackwardCompatility(tags, tokens);
+				if (tokens.length > 0) {
+					String[] tokensToAdd = tokens;
+					if (tokens.length == 4 && isColor(tokens[3]) && isText(tokens[2])) {
+						tokensToAdd = new String[]{
+								tokens[0], tokens[1], EMPTY_STRING, EMPTY_STRING, tokens[2], tokens[3]
+						};
+					} else if (tokens.length == 5 && isColor(tokens[4])) {
+						tokensToAdd = new String[]{
+								tokens[0], tokens[1], tokens[2], EMPTY_STRING, tokens[3], tokens[4]
+						};
+						// osmc:symbol=yellow:brown::HSG:gray
+					} else if (tokens.length == 5 && isText(tokens[3])) {
+						tokensToAdd = new String[]{
+								tokens[0], tokens[1], EMPTY_STRING, EMPTY_STRING, tokens[3], tokens[4]
+						};
+						// osmc:symbol=purple:white:::M:purple
+					} else if (tokens.length == 6 && isText(tokens[4])) {
+						tokensToAdd = new String[]{
+								tokens[0], tokens[1], EMPTY_STRING, EMPTY_STRING, tokens[4], tokens[5]
+						};
+					}
+					addOsmcNewTags(tags, tokensToAdd, EMPTY_STRING);
 				}
-				addOsmcNewTags(tags, tokensToAdd, "");
 			}
 		}
+		
 		if (tags.containsKey("color")) {
-			tags = new LinkedHashMap<String, String>(tags);
+			tags = new LinkedHashMap<>(tags);
 			prepareColorTag(tags, "color");
 		}
 		if (tags.containsKey("colour")) {
-			tags = new LinkedHashMap<String, String>(tags);
+			tags = new LinkedHashMap<>(tags);
 			prepareColorTag(tags, "colour");
 		}
 
 		return tags;
+	}
+	
+	private boolean isText(String s) {
+		if (!s.equals("")) {
+			char firstLetterText = s.charAt(0);
+			return Character.isDigit(firstLetterText) || Character.isUpperCase(firstLetterText);
+		}
+		return false;
+	}
+	
+	private String[] toLowerCaseOsmcTags(String[] tokens) {
+		ArrayList<String> res = new ArrayList<>();
+		for (String token : tokens) {
+			if (!isText(token)) {
+				res.add(token.toLowerCase());
+			} else {
+				res.add(token);
+			}
+		}
+		return res.toArray(new String[0]);
+	}
+	
+	private boolean isSkipCaseOsmcTags(String[] tokens) {
+		//osmc:symbol=red:red:yellow_lower:black
+		return tokens.length == 4 && isColor(tokens[3]) && !isText(tokens[2]);
 	}
 
 
