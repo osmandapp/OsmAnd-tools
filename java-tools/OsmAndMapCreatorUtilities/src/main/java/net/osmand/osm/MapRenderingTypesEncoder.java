@@ -1364,13 +1364,13 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			tokens = toLowerCaseOsmcTags(tokens);
 			int tokensLength = tokens.length;
 			
-			OsmcSymbol osmcSymbol = new OsmcSymbol();
+			// TODO: need to delete
+			osmcBackwardCompatility(tags, tokens);
 			
-			if (tokensLength > 1) {
-				if (isColor(tokens[0]) && (isBackground(tokens[1]) || isForeground(tokens[1]))) {
-					osmcBackwardCompatility(tags, tokens);
-					//get waycolor
-					osmcSymbol.waycolor = tokens[0];
+			if (tokensLength > 0) {
+				OsmcSymbol osmcSymbol = new OsmcSymbol();
+				osmcSymbol.waycolor = isColor(tokens[0]) ? tokens[0] : osmcSymbol.waycolor;
+				if (tokensLength > 1) {
 					if (isBackground(tokens[1])) {
 						//get background
 						osmcSymbol.background = tokens[1];
@@ -1378,36 +1378,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						//get foreground when hasn't background
 						osmcSymbol.foreground = tokens[1];
 					}
-					if (tokensLength > 2) {
-						int textInd = getTextIndex(tokens);
-						if (textInd != -1) {
-							if (textInd + 1 < tokens.length && isColor(tokens[textInd + 1])) {
-								//get text
-								osmcSymbol.text = tokens[textInd];
-								//get textcolor
-								osmcSymbol.textcolor = tokens[textInd + 1];
-								int countForeground = textInd - 1;
-								if (!osmcSymbol.foreground.equals(EMPTY_STRING)) {
-									countForeground--;
-								}
-								if (countForeground > 0) {
-									//get foreground when has text
-									osmcSymbol.foreground = isForeground(tokens[2]) ? tokens[2] : osmcSymbol.foreground;
-									if (countForeground > 1) {
-										//get foreground2 when has text
-										osmcSymbol.foreground2 = isForeground(tokens[3]) ? tokens[3] : osmcSymbol.foreground2;
-									}
-								}
-							}
-						} else {
-							//get foreground when hasn't text
-							osmcSymbol.foreground = isForeground(tokens[2]) ? tokens[2] : osmcSymbol.foreground;
-							if (tokensLength > 3) {
-								//get foreground2 when hasn't text
-								osmcSymbol.foreground2 = isForeground(tokens[3]) ? tokens[3] : osmcSymbol.foreground2;
-							}
-						}
-					}
+				}
+				if (tokensLength > 2) {
+					int textInd = getTextIndex(tokens);
+					getText(osmcSymbol, tokens, textInd);
+					getForegrounds(osmcSymbol, tokens, textInd);
 				}
 				String[] tokensToAdd = osmcSymbol.getFields();
 				addOsmcNewTags(tags, trimEmptyTokens(tokensToAdd), EMPTY_STRING);
@@ -1424,6 +1399,45 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 
 		return tags;
+	}
+	
+	private void getForegrounds(OsmcSymbol osmcSymbol, String[] tokens, int textInd) {
+		int foregraundIndex = -1;
+		int foregraundIndex2 = -1;
+		
+		if (textInd != -1) {
+			if (osmcSymbol.hasForeground()) {
+				foregraundIndex2 = textInd - 1 >= 2 ? textInd - 1 : -1;
+			} else {
+				if (textInd - 1 == 3 && isForeground(tokens[3])) {
+					foregraundIndex = isForeground(tokens[2]) ? 2 : -1;
+					foregraundIndex2 = 3;
+				} else if (textInd - 1 == 2 && isForeground(tokens[2])) {
+					foregraundIndex = 2;
+				}
+			}
+		} else {
+			if (osmcSymbol.hasForeground()) {
+				foregraundIndex = ArrayUtils.indexOf(tokens, osmcSymbol.foreground);
+				if (isForeground(tokens[foregraundIndex + 1])) {
+					foregraundIndex2 = foregraundIndex + 1;
+				}
+			} else {
+				foregraundIndex = isForeground(tokens[2]) ? 2 : -1;
+				if (tokens.length > 3) {
+					foregraundIndex2 = isForeground(tokens[3]) ? 3 : -1;
+				}
+			}
+		}
+		osmcSymbol.foreground = foregraundIndex != -1 ? tokens[foregraundIndex] : osmcSymbol.foreground;
+		osmcSymbol.foreground2 = foregraundIndex2 != -1 ? tokens[foregraundIndex2] : osmcSymbol.foreground2;
+	}
+	
+	private void getText(OsmcSymbol osmcSymbol, String[] tokens, int textInd) {
+		if (textInd != -1 && textInd + 1 < tokens.length && isColor(tokens[textInd + 1])) {
+			osmcSymbol.text = tokens[textInd];
+			osmcSymbol.textcolor = tokens[textInd + 1];
+		}
 	}
 	
 	private int getTextIndex(String[] tokens) {
@@ -1781,6 +1795,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		
 		private String[] getFields() {
 			return new String[]{this.waycolor, this.background, this.foreground, this.foreground2, this.text, this.textcolor};
+		}
+		
+		private boolean hasForeground() {
+			return !this.foreground.equals(EMPTY_STRING);
 		}
 	}
 
