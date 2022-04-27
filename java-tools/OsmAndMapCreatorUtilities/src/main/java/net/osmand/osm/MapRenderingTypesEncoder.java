@@ -2,7 +2,6 @@ package net.osmand.osm;
 
 import gnu.trove.list.array.TIntArrayList;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
