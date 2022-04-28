@@ -1313,82 +1313,42 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
             precolors.put("bridleway","white");
 	}
 
-	private boolean isColor(String s) {
-		return s.equals("black")
-				|| s.equals("blue")
-				|| s.equals("green")
-				|| s.equals("red")
-				|| s.equals("white")
-				|| s.equals("yellow")
-				|| s.equals("orange")
-				|| s.equals("purple")
-				|| s.equals("brown")
-				|| s.equals("gray");
-	}
-	
-	private boolean isForeground(String s) {
-		return (s.equals("ammonit")
-				|| s.equals("bridleway")
-				|| s.equals("heart")
-				|| s.equals("hiker")
-				|| s.equals("mine")
-				|| s.equals("planet")
-				|| s.equals("shell")
-				|| s.equals("shell_modern")
-				|| s.equals("tower")
-				|| s.equals("wolfshook")) || (s.contains("_") && isColor(s.split("_")[0]));
-	}
-	
-	private boolean isBackground(String s) {
-		return (s.contains("_") && isColor(s.split("_")[0]))
-				|| isColor(s);
-	}
-	
-	private boolean isText(String s) {
-		if (!s.equals("")) {
-			char firstLetterText = s.charAt(0);
-			return Character.isDigit(firstLetterText) || Character.isUpperCase(firstLetterText);
-		}
-		return false;
-	}
-	
 	public Map<String, String> transformOsmcAndColorTags(Map<String, String> tags) {
 		if (tags.containsKey("osmc:symbol")) {
+
 			tags = new LinkedHashMap<>(tags);
-			// osmc:symbol=black:red:blue_rectangle ->
-			// 1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
-			// 2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2,
-			// osmc_text, osmc_textcolor, osmc_stub_name=. ,
 			String value = tags.get("osmc:symbol");
-			String[] tokens = value.split(":", 6);
-			tokens = toLowerCaseOsmcTags(tokens);
-			int tokensLength = tokens.length;
-			
-			// TODO: need to delete
-			osmcBackwardCompatility(tags, tokens);
-			
-			if (tokensLength > 0) {
-				OsmcSymbol osmcSymbol = new OsmcSymbol();
-				osmcSymbol.waycolor = isColor(tokens[0]) ? tokens[0] : osmcSymbol.waycolor;
-				if (tokensLength > 1) {
-					if (isBackground(tokens[1])) {
-						//get background
-						osmcSymbol.background = tokens[1];
-					} else if (isForeground(tokens[1])) {
-						//get foreground when hasn't background
-						osmcSymbol.foreground = tokens[1];
+			OsmcSymbol osmcSymbol = new OsmcSymbol(value);
+			osmcSymbol.addOsmcNewTags(tags);
+
+		} else if (tags.containsKey("route") && tags.get("route").equals("hiking")) {
+
+			if (tags.containsKey("ref")) {
+				tags = new LinkedHashMap<>(tags);
+				String ref = tags.get("ref");
+				if (!ref.isEmpty()) {
+					OsmcSymbol osmcSymbol = new OsmcSymbol("white", ref.toUpperCase(), "black");
+					osmcSymbol.addOsmcNewTags(tags);
+				}
+			} else if (tags.containsKey("name")) {
+				tags = new LinkedHashMap<>(tags);
+				String name = tags.get("name");
+				int count = name.codePointCount(0, name.length());
+				String text = "";
+				for (int i = 0; i < count; i++) {
+					int codePoint = name.codePointAt(i);
+					if (Character.isUpperCase(codePoint)) {
+						char[] c = Character.toChars(codePoint);
+						text += new String(c);
 					}
 				}
-				if (tokensLength > 2) {
-					int textInd = getTextIndex(tokens);
-					getText(osmcSymbol, tokens, textInd);
-					getForegrounds(osmcSymbol, tokens, textInd);
+				if (!text.isEmpty()) {
+					OsmcSymbol osmcSymbol = new OsmcSymbol("white", text, "black");
+					osmcSymbol.addOsmcNewTags(tags);
 				}
-				String[] tokensToAdd = osmcSymbol.getFields();
-				addOsmcNewTags(tags, trimEmptyTokens(tokensToAdd), EMPTY_STRING);
 			}
 		}
-		
+
 		if (tags.containsKey("color")) {
 			tags = new LinkedHashMap<>(tags);
 			prepareColorTag(tags, "color");
@@ -1400,78 +1360,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 		return tags;
 	}
-	
-	private void getForegrounds(OsmcSymbol osmcSymbol, String[] tokens, int textInd) {
-		int foregraundIndex = -1;
-		int foregraundIndex2 = -1;
-		
-		if (textInd != -1) {
-			if (osmcSymbol.hasForeground()) {
-				foregraundIndex2 = textInd - 1 >= 2 ? textInd - 1 : -1;
-			} else {
-				if (textInd - 1 == 3 && isForeground(tokens[3])) {
-					foregraundIndex = isForeground(tokens[2]) ? 2 : -1;
-					foregraundIndex2 = 3;
-				} else if (textInd - 1 == 2 && isForeground(tokens[2])) {
-					foregraundIndex = 2;
-				}
-			}
-		} else {
-			if (osmcSymbol.hasForeground()) {
-				foregraundIndex = ArrayUtils.indexOf(tokens, osmcSymbol.foreground);
-				if (isForeground(tokens[foregraundIndex + 1])) {
-					foregraundIndex2 = foregraundIndex + 1;
-				}
-			} else {
-				foregraundIndex = isForeground(tokens[2]) ? 2 : -1;
-				if (tokens.length > 3) {
-					foregraundIndex2 = isForeground(tokens[3]) ? 3 : -1;
-				}
-			}
-		}
-		osmcSymbol.foreground = foregraundIndex != -1 ? tokens[foregraundIndex] : osmcSymbol.foreground;
-		osmcSymbol.foreground2 = foregraundIndex2 != -1 ? tokens[foregraundIndex2] : osmcSymbol.foreground2;
-	}
-	
-	private void getText(OsmcSymbol osmcSymbol, String[] tokens, int textInd) {
-		if (textInd != -1 && textInd + 1 < tokens.length && isColor(tokens[textInd + 1])) {
-			osmcSymbol.text = tokens[textInd];
-			osmcSymbol.textcolor = tokens[textInd + 1];
-		}
-	}
-	
-	private int getTextIndex(String[] tokens) {
-		for (String token : tokens) {
-			if (isText(token)) {
-				return ArrayUtils.indexOf(tokens, token);
-			}
-		}
-		return -1;
-	}
-	
-	private String[] trimEmptyTokens(String[] tokens) {
-		int ind = 0;
-		for (int i = tokens.length - 1; i >= 0; i--) {
-			if (!tokens[i].equals(EMPTY_STRING)) {
-				ind = i;
-				break;
-			}
-		}
-		return Arrays.copyOf(tokens, ind + 1);
-	}
-	
-	private String[] toLowerCaseOsmcTags(String[] tokens) {
-		ArrayList<String> res = new ArrayList<>();
-		for (String token : tokens) {
-			if (!isText(token)) {
-				res.add(token.toLowerCase());
-			} else {
-				res.add(token);
-			}
-		}
-		return res.toArray(new String[0]);
-	}
-	
+
 	private static int[] calculateIntegrity(Map<String, String> mp) {
 		int result = 0;
 		int result_bicycle_routing = 0;
@@ -1668,74 +1557,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return result_array;
 	}
 
-
-	private void addOsmcNewTags(Map<String, String> propogated, String[] tokens, String routeTag) {
-		if (tokens.length > 0) {
-			String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
-			propogated.put(routeTag + "osmc_waycolor", wayColor);
-			if (tokens.length > 1) {
-				String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
-				propogated.put(routeTag + "osmc_background", bgColor);
-				propogated.put("osmc_stub_name", ".");
-				if (tokens.length > 2) {
-					String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
-					propogated.put(routeTag + "osmc_foreground", shpVl);
-					if (tokens.length > 3) {
-						String shp2Vl = tokens[3];
-						propogated.put(routeTag + "osmc_foreground2", shp2Vl);
-						if (tokens.length > 4) {
-							String txtVl = tokens[4];
-							propogated.put(routeTag + "osmc_text", txtVl);
-							propogated.put(routeTag + "osmc_text_symbol", txtVl);
-							if (tokens.length > 5) {
-								String txtcolorVl = tokens[5];
-								propogated.put(routeTag + "osmc_textcolor", txtcolorVl);
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-
-	private void osmcBackwardCompatility(Map<String, String> propogated, String[] tokens) {
-		if (tokens.length > 0) {
-			String wayColor = formatColorToPalette(tokens[0], true);
-			propogated.put("osmc_symbol_" + wayColor, "");
-			propogated.put("osmc_symbol", wayColor);
-			if (tokens.length > 1) {
-				String bgColor = tokens[1];
-				String fgColorPrefix = "";
-				String shape = "";
-				if (tokens.length > 2) {
-					String fgColor = tokens[2];
-					if (precolors.containsKey(fgColor)) {
-						shape = fgColor;
-						fgColor = precolors.get(fgColor);
-					} else if (fgColor.indexOf('_') >= 0) {
-						final int i = fgColor.indexOf('_');
-						shape = fgColor.substring(i + 1).toLowerCase();
-						fgColor = fgColor.substring(0, i);
-					}
-					fgColorPrefix = "_" + fgColor;
-				}
-				String shpValue = "none";
-				if (shape.length() != 0) {
-					shpValue = barValues.contains(shape) ? "bar" : "circle";
-				}
-				propogated.put("osmc_shape", shpValue);
-				String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) + fgColorPrefix + "_name";
-				String name = "."; // "\u00A0";
-				// if (tokens.length > 3 && tokens[3].trim().length() > 0) {
-				// name = tokens[3];
-				// }
-
-				propogated.put(symbol, name);
-			}
-		}
-	}
-
 	public static class MapRouteTag {
 		String tag;
 		String value;
@@ -1784,22 +1605,4 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 	}
-	
-	private static class OsmcSymbol {
-		String waycolor = EMPTY_STRING;
-		String background = EMPTY_STRING;
-		String foreground = EMPTY_STRING;
-		String foreground2 = EMPTY_STRING;
-		String text = EMPTY_STRING;
-		String textcolor = EMPTY_STRING;
-		
-		private String[] getFields() {
-			return new String[]{this.waycolor, this.background, this.foreground, this.foreground2, this.text, this.textcolor};
-		}
-		
-		private boolean hasForeground() {
-			return !this.foreground.equals(EMPTY_STRING);
-		}
-	}
-
 }
