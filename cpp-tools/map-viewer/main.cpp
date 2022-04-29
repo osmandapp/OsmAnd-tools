@@ -465,7 +465,7 @@ int main(int argc, char** argv)
             dataDir.absoluteFilePath(QLatin1String("tmp"))));
 
         const auto renderer_ = renderer;
-        resourcesManager->localResourcesChangeObservable.attach(nullptr,
+        resourcesManager->localResourcesChangeObservable.attach(0,
             [renderer_]
         (const OsmAnd::ResourcesManager* const resourcesManager,
             const QList<QString>& added,
