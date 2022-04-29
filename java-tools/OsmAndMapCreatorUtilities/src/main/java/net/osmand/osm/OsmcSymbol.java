@@ -7,6 +7,7 @@ import java.util.Map;
 public class OsmcSymbol {
 	private String waycolor = "";
 	private String background = "";
+	private String background_v2 = "";
 	private String foreground = "";
 	private String foreground2 = "";
 	private String text = "";
@@ -28,6 +29,7 @@ public class OsmcSymbol {
 				if (isBackground(tokens[1])) {
 					//get background
 					background = tokens[1];
+					background_v2 = background;
 				} else if (isForeground(tokens[1])) {
 					//get foreground when hasn't background
 					foreground = tokens[1];
@@ -44,6 +46,7 @@ public class OsmcSymbol {
 
 	public OsmcSymbol(String background, String text, String textcolor) {
 		this.background = background;
+		this.background_v2 = background;
 		this.text = text;
 		this.textcolor = textcolor;
 		addTextLengthToBgAndFrg();
@@ -55,13 +58,16 @@ public class OsmcSymbol {
 		}
 		if (!background.isEmpty()) {
 			tags.put("osmc_background", background);
+			tags.put("osmc_background_v2", background_v2);
 			tags.put("osmc_stub_name", ".");
 		} else {
 			if (!waycolor.isEmpty()) {
 				//osmc:symbol=blue:shell_modern equals blue:blue:shell_modern
 				tags.put("osmc_background", waycolor);
+				tags.put("osmc_background_v2", waycolor);
 			} else {
 				tags.put("osmc_background", "white");
+				tags.put("osmc_background_v2", "white");
 			}
 			tags.put("osmc_stub_name", ".");
 		}
@@ -86,8 +92,8 @@ public class OsmcSymbol {
 		int textLength = text.codePointCount(0, text.length());
 		textLength = Math.min(textLength, 4);
 		if (textLength > 1) {
-			if (!background.isEmpty()) {
-				background += "_" + textLength;
+			if (!background_v2.isEmpty()) {
+				background_v2 += "_" + textLength;
 			}
 			if (!foreground.isEmpty()) {
 				foreground += "_" + textLength;
