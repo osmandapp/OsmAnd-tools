@@ -106,9 +106,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
 		tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e);
-		if(e.getTag("name") != null && e.getTag("name").contains("堀田通七丁目")){
-			System.out.println("asd");
-		}
 		icc.translitJapaneseNames(e, settings.addRegionTag);
 		icc.translitChineseNames(e, settings.addRegionTag);
 		Map<String, String> tags = e.getTags();
