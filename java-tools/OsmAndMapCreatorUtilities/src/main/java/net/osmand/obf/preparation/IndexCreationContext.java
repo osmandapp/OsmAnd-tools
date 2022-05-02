@@ -13,8 +13,8 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
-import net.osmand.util.ChineseTranslitHelper;
-import net.osmand.util.JapaneseTranslitHelper;
+import net.osmand.util.translit.ChineseTranslitHelper;
+import net.osmand.util.translit.JapaneseTranslitHelper;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
