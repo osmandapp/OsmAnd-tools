@@ -2,6 +2,7 @@ package net.osmand.util.translit.japanese;
 
 import java.math.BigDecimal;
 
+//used data from https://github.com/jikyo/suji4j
 public class NumberCreator {
     private static final BigDecimal OKU = BigDecimal.valueOf(100000000L);
     
