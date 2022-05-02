@@ -24,6 +24,7 @@ public class JapaneseTranslitHelperTest {
         testData.put("東郊通百五十一", "Tōkōtōri 151");
         testData.put("東郊通151", "Tōkōtōri 151");
         testData.put("東郊通百五十一-百五十一", "Tōkōtōri 151 - 151");
+        testData.put("東郊通百五十一松田", "Tōkōtōri 151 Matsuda");
     }
     
     @Test
