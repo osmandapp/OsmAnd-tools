@@ -1,8 +1,6 @@
 package net.osmand.util.translit.japanese;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 
 public class NumberCreator {
     private static final BigDecimal OKU = BigDecimal.valueOf(100000000L);
@@ -76,8 +74,8 @@ public class NumberCreator {
         return (this.oku.add(this.val.add(this.valCardinal))).toString();
     }
     
-    public static List<String> convertNumber(final String src) {
-        List<String> val = new ArrayList<>();
+    public static String convertNumber(final String src) {
+        StringBuilder val = new StringBuilder();
         NumberCreator creator = new NumberCreator();
         
         for (int i = 0; i < src.length(); i++) {
@@ -108,14 +106,14 @@ public class NumberCreator {
             }
             
             if (creator.inside()) {
-                val.add(creator.value());
+                val.append(creator.value());
                 creator = new NumberCreator();
             }
         }
         
         if (creator.inside()) {
-            val.add(creator.value());
+            val.append(creator.value());
         }
-        return val;
+        return val.toString();
     }
 }

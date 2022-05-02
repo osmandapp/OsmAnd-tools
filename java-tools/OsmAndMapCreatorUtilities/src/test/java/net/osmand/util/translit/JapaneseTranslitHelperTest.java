@@ -21,13 +21,16 @@ public class JapaneseTranslitHelperTest {
         testData.put("名古屋高速道路小牧-大高線高架路", "Nagoya Kōsoku Dōro Omaki - Dai Daka Sen Kōka Ro");
         testData.put("松田橋", "Matsuda Kyō");
         testData.put("スガノ皮膚科", "Suga ノHifu Ka");
+        testData.put("東郊通百五十一", "Tōkōtōri 151");
+        testData.put("東郊通151", "Tōkōtōri 151");
+        testData.put("東郊通百五十一-百五十一", "Tōkōtōri 151 - 151");
     }
     
     @Test
     public void getEnglishTransliteration() {
         for (Map.Entry<String, String> entry : testData.entrySet()) {
             String res = JapaneseTranslitHelper.getEnglishTransliteration(entry.getKey());
-            assertEquals(res, entry.getValue());
+            assertEquals(entry.getValue(), res);
         }
     }
 }

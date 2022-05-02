@@ -27,6 +27,7 @@ public class JapaneseTranslitHelper {
 		boolean capitalizeWords = true;
 		List<Token> tokens = tokenizer.tokenize(text);
 		StringBuilder builder = new StringBuilder();
+		StringBuilder number = new StringBuilder();
 		for (Token token : tokens) {
 			if (token.getAllFeaturesArray()[0].equals(JAPANESE_SYMBOL)) {
 				builder.append(token.getSurface());
@@ -34,12 +35,19 @@ public class JapaneseTranslitHelper {
 			}
 			switch (token.getAllFeaturesArray()[1]) {
 			case JAPANESE_NUMBER:
-				builder.append(NumberCreator.convertNumber(token.getSurface()).get(0)).append(SPACE);
+				number.append(token.getSurface());
+				if (tokens.indexOf(token) == tokens.size() - 1) {
+					builder.append(NumberCreator.convertNumber(number.toString()));
+				}
 				continue;
 			case UNDEFINED_VALUE:
 				builder.append(token.getSurface()).append(SPACE);
 				continue;
 			default:
+				if (!number.toString().equals("")) {
+					builder.append(NumberCreator.convertNumber(number.toString())).append(SPACE);
+					number = new StringBuilder();
+				}
 				String lastFeature = token.getAllFeaturesArray()[8];
 				if (lastFeature.equals("*")) {
 					builder.append(token.getSurface());
