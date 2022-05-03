@@ -2,6 +2,8 @@ package net.osmand.swing;
 
 
 import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
+import static net.osmand.router.network.NetworkRouteSelector.*;
+import static net.osmand.swing.DataExtractionSettings.getSettings;
 
 import java.awt.Color;
 import java.awt.Component;
@@ -44,6 +46,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import net.osmand.router.network.GPXApproximator;
+import net.osmand.router.network.NetworkRouteSelector;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -143,21 +147,21 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	public void setStart(LatLon start) {
 		startRoute = start;
-		DataExtractionSettings.getSettings().saveStartLocation(start.getLatitude(), start.getLongitude());
+		getSettings().saveStartLocation(start.getLatitude(), start.getLongitude());
 		map.repaint();
 	}
 
 	public void setEnd(LatLon end) {
 		endRoute = end;
-		DataExtractionSettings.getSettings().saveEndLocation(end.getLatitude(), end.getLongitude());
+		getSettings().saveEndLocation(end.getLatitude(), end.getLongitude());
 		map.repaint();
 	}
 
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		startRoute =  DataExtractionSettings.getSettings().getStartLocation();
-		endRoute =  DataExtractionSettings.getSettings().getEndLocation();
+		startRoute =  getSettings().getStartLocation();
+		endRoute =  getSettings().getEndLocation();
 
 		nextTurn = new JButton(">>"); //$NON-NLS-1$
 		nextTurn.addActionListener(new ActionListener(){
@@ -317,16 +321,20 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					if (selectedGPXFile.hasTrkPt()) {
-						TrkSegment trkSegment = selectedGPXFile.tracks.get(0).segments.get(0);
-						startRoute = toLatLon(trkSegment.points.get(0));
-						endRoute = toLatLon(trkSegment.points.get(trkSegment.points.size() - 1));
-						List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-						for (WptPt p : trkSegment.points) {
-							polyline.add(toLatLon(p));
-						}
-						calcRouteGpx(polyline);
-					}
+					calcRouteGpxAction(false);
+				}
+
+			};
+			directions.add(recalculate);
+		}
+
+		if (selectedGPXFile != null) {
+			Action recalculate = new AbstractAction("Calculate GPX route (Network)") {
+				private static final long serialVersionUID = 4221853329749387476L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					calcRouteGpxAction(true);
 				}
 
 			};
@@ -388,7 +396,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					// @Override
 					// public void run() {
 					JFileChooser fileChooser = new JFileChooser(
-							DataExtractionSettings.getSettings().getDefaultWorkingDir());
+							getSettings().getDefaultWorkingDir());
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
 						Gson gson = new Gson();
@@ -467,7 +475,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null);
 					GPXFile gpxFile = exporter.exportRoute();
 					JFileChooser fileChooser = new JFileChooser(
-							DataExtractionSettings.getSettings().getDefaultWorkingDir());
+							getSettings().getDefaultWorkingDir());
 					if (fileChooser.showSaveDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
 						GPXUtilities.writeGpxFile(file, gpxFile);
@@ -529,7 +537,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					GPXFile res = calculateAltitude(selectedGPXFile, missingFile);
 					if (res == null || missingFile[0] != null) {
 						String msg = missingFile[0] != null ? "Missing in 'srtm' folder: " + missingFile[0].getName()
-								: ("Missing 'srtm' folder: " + DataExtractionSettings.getSettings().getBinaryFilesDir() + "/srtm");
+								: ("Missing 'srtm' folder: " + getSettings().getBinaryFilesDir() + "/srtm");
 						JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), msg, "Missing srtm data",
 								JOptionPane.INFORMATION_MESSAGE);
 					} else {
@@ -582,6 +590,19 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	}
 
+	private void calcRouteGpxAction(boolean byNetwork) {
+		if (selectedGPXFile.hasTrkPt()) {
+			TrkSegment trkSegment = selectedGPXFile.tracks.get(0).segments.get(0);
+			startRoute = toLatLon(trkSegment.points.get(0));
+			endRoute = toLatLon(trkSegment.points.get(trkSegment.points.size() - 1));
+			List<LatLon> polyline = new ArrayList<>(trkSegment.points.size());
+			for (WptPt p : trkSegment.points) {
+				polyline.add(toLatLon(p));
+			}
+			calcRouteGpx(polyline, byNetwork);
+		}
+	}
+
 
 	protected void displayTrackInfo(GPXFile gpxFile, String header) {
 		GPXTrackAnalysis analysis = selectedGPXFile.getAnalysis(gpxFile.modifiedTime);
@@ -620,7 +641,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	
 	
 	protected GPXFile calculateAltitude(GPXFile gpxFile, File[] missingFile) {
-		File srtmFolder = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "srtm");
+		File srtmFolder = new File(getSettings().getBinaryFilesDir(), "srtm");
 		if (!srtmFolder.exists()) {
 			return null;
 		}
@@ -766,21 +787,24 @@ public class MapRouterLayer implements MapPanelLayer {
 		return new LatLon(wptPt.lat, wptPt.lon);
 	}
 
-	private void calcRouteGpx(List<LatLon> polyline) {
+	private void calcRouteGpx(List<LatLon> polyline, boolean byNetwork) {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
-				if (entities != null) {
-					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
-					for (Entity w : entities) {
-						LatLon n = w.getLatLon();
-						points.registerObject(n.getLatitude(), n.getLongitude(), w);
+				List<Entity> entities;
+				if(byNetwork){
+					NetworkRouteSelectorFilter filter = new NetworkRouteSelectorFilter();
+					try {
+						NetworkRouteSelector routeSelector = new NetworkRouteSelector(getSettings().getObfReaders(), filter);
+						GPXApproximator gpxApproximator = new GPXApproximator(routeSelector);
+						entities = gpxApproximator.approximate(selectedGPXFile);
+					} catch (IOException e) {
+						throw new RuntimeException(e);
 					}
-					map.setPoints(points);
-					map.fillPopupActions();
+				}else {
+					entities = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
 				}
-
+				outputPoints(entities);
 				if (selectedGPXFile != null) {
 					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Check validity of GPX File",
 							"GPX route correction", JOptionPane.INFORMATION_MESSAGE);
@@ -789,23 +813,26 @@ public class MapRouterLayer implements MapPanelLayer {
 		}.start();
 	}
 
-
 	private void calcRoute(final RouteCalculationMode m) {
 		new Thread() {
 			@Override
 			public void run() {
 				List<Entity> res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
-				if (res != null) {
-					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
-					for (Entity w : res) {
-						LatLon n = w.getLatLon();
-						points.registerObject(n.getLatitude(), n.getLongitude(), w);
-					}
-					map.setPoints(points);
-					map.fillPopupActions();
-				}
+				outputPoints(res);
 			}
 		}.start();
+	}
+
+	private void outputPoints(List<Entity> entities) {
+		if (entities != null) {
+			DataTileManager<Entity> points = new DataTileManager<Entity>(11);
+			for (Entity w : entities) {
+				LatLon n = w.getLatLon();
+				points.registerObject(n.getLatitude(), n.getLongitude(), w);
+			}
+			map.setPoints(points);
+			map.fillPopupActions();
+		}
 	}
 
 	public static List<Way> route_YOURS(LatLon start, LatLon end){
@@ -1043,7 +1070,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		if (start != null && end != null) {
 			try {
 				StringBuilder uri = new StringBuilder();
-				uri.append(DataExtractionSettings.getSettings().getOsrmServerAddress());
+				uri.append(getSettings().getOsrmServerAddress());
 				uri.append("/viaroute?");
 				uri.append("&loc=").append(start.getLatitude()).append(",").append(start.getLongitude());
 				uri.append("&loc=").append(end.getLatitude()).append(",").append(end.getLongitude());
@@ -1104,7 +1131,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		long time = System.currentTimeMillis();
 
 
-		final boolean animateRoutingCalculation = DataExtractionSettings.getSettings().isAnimateRouting();
+		final boolean animateRoutingCalculation = getSettings().isAnimateRouting();
 		if(animateRoutingCalculation) {
 			nextTurn.setVisible(true);
 			playPauseButton.setVisible(true);
@@ -1117,13 +1144,13 @@ public class MapRouterLayer implements MapPanelLayer {
 		System.out.println("Self made route from " + start + " to " + end);
 		if (start != null && end != null) {
 			try {
-				BinaryMapIndexReader[] files = DataExtractionSettings.getSettings().getObfReaders();
+				BinaryMapIndexReader[] files = getSettings().getObfReaders();
 				if (files.length == 0) {
 					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
 							"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
 					return null;
 				}
-				String m = DataExtractionSettings.getSettings().getRouteMode();
+				String m = getSettings().getRouteMode();
 				String[] props = m.split("\\,");
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 
@@ -1136,7 +1163,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					}
 				}
 				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(2000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
-				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
+				RoutingConfiguration config = getSettings().getRoutingConfig().
 				// addImpassableRoad(6859437l).
 				// addImpassableRoad(46859655089l).
 						setDirectionPoints(directionPointsFile)
@@ -1165,7 +1192,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				config.routeCalculationTime = System.currentTimeMillis();
 
 				final RoutingContext ctx = router.buildRoutingContext(config,
-						DataExtractionSettings.getSettings().useNativeRouting()
+						getSettings().useNativeRouting()
 								? NativeSwingRendering.getDefaultFromSettings()
 								: null,
 						files, rm);
