@@ -69,6 +69,7 @@ public class OsmcSymbol {
 			tags.put("osmc_foreground", foreground);
 		}
 		if (!text.isEmpty()) {
+		    text = text.substring(0, Math.min(text.length(), 7));
 			tags.put("osmc_text", text);
 			if (!textcolor.isEmpty()) {
 				tags.put("osmc_textcolor", textcolor);
