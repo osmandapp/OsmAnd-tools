@@ -2,7 +2,6 @@ package net.osmand.swing;
 
 
 import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
-import static net.osmand.router.network.NetworkRouteSelector.*;
 import static net.osmand.swing.DataExtractionSettings.getSettings;
 
 import java.awt.Color;
@@ -46,8 +45,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import net.osmand.router.network.GPXApproximator;
-import net.osmand.router.network.NetworkRouteSelector;
+import net.osmand.router.network.NetworkRouteGpxApproximator;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -793,11 +791,11 @@ public class MapRouterLayer implements MapPanelLayer {
 			public void run() {
 				List<Entity> entities;
 				if(byNetwork){
-					NetworkRouteSelectorFilter filter = new NetworkRouteSelectorFilter();
 					try {
-						NetworkRouteSelector routeSelector = new NetworkRouteSelector(getSettings().getObfReaders(), filter);
-						GPXApproximator gpxApproximator = new GPXApproximator(routeSelector);
-						entities = gpxApproximator.approximate(selectedGPXFile);
+						NetworkRouteGpxApproximator gpxApproximator =
+								new NetworkRouteGpxApproximator(getSettings().getObfReaders(), true);
+						gpxApproximator.setGpxFile(selectedGPXFile);
+						entities = gpxApproximator.approximate();
 					} catch (IOException e) {
 						throw new RuntimeException(e);
 					}
