@@ -75,7 +75,7 @@ public class MapPanelSelector {
 					continue;
 				}
 				if (o.getX().size() > 1) {
-					List<RouteKey> keys = RouteType.getRouteStringKeys(o);
+					List<RouteKey> keys = RouteType.getRouteKeys(o);
 					if (keys.size() > 0) {
 						try {
 							createMenu(o).show(panel, e.getX(), e.getY());
@@ -122,7 +122,7 @@ public class MapPanelSelector {
 			routeKeys = routeMap.keySet();
 		} else {
 			routeMap = null;
-			routeKeys = RouteType.getRouteStringKeys(renderedObject);
+			routeKeys = RouteType.getRouteKeys(renderedObject);
 		}
 		for (RouteKey routeKey : routeKeys) {
 			menu.add(new AbstractAction(routeKey.set.toString()) {
