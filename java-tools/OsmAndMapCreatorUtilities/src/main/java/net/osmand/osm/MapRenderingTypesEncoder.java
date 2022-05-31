@@ -696,7 +696,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						rtags.put("us_state_network", "yes");
 					}
 					if (network.length() > 5) {
-						network = network.substring(0, 5);
 						rtags.put("network", network);
 					}
 				}
