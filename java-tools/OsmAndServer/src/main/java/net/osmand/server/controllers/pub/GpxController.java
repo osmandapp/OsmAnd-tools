@@ -186,19 +186,29 @@ public class GpxController {
 	}
 	
 	@PostMapping(path = {"/process-srtm"}, produces = "application/json")
-	public ResponseEntity<?> attachSrtm(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
+	public ResponseEntity<StreamingResponseBody> attachSrtm(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(file.getInputStream());
+		final StringBuilder err = new StringBuilder(); 
 		if (srtmLocation == null) {
-			return ResponseEntity.badRequest().body(String.format("Server is not configured for srtm processing"));
+			err.append(String.format("Server is not configured for srtm processing. "));
 		}
 		GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
 		if (srtmGpx == null) {
-			return ResponseEntity.badRequest().body(String.format("Couldn't calculate altitude for %s (%d KB)",
-					file.getName(), file.getSize() / 1024l));
+			err.append(String.format(String.format("Couldn't calculate altitude for %s (%d KB)",
+					file.getName(), file.getSize() / 1024l)));
 		}
 	    StreamingResponseBody responseBody = outputStream -> {
-	    	GPXUtilities.writeGpx(new OutputStreamWriter(outputStream), srtmGpx, IProgress.EMPTY_PROGRESS);
+	    	OutputStreamWriter ouw = new OutputStreamWriter(outputStream);
+			if (err.length() > 0) {
+				ouw.write(err.toString());
+			} else {
+				GPXUtilities.writeGpx(ouw, srtmGpx, IProgress.EMPTY_PROGRESS);
+			}
+	    	ouw.close();
 	    };
+	    if (err.length() > 0) {
+	    	return ResponseEntity.badRequest().body(responseBody);
+	    }
 		return ResponseEntity.ok()
 	            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename="+file.getName())
 	            .contentType(MediaType.APPLICATION_XML)
