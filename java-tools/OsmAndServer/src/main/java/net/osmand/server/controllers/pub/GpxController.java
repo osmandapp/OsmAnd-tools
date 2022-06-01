@@ -23,6 +23,8 @@ import javax.validation.constraints.NotNull;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -42,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
@@ -72,6 +75,8 @@ import net.osmand.util.Algorithms;
 @RequestMapping("/gpx/")
 public class GpxController {
     
+	protected static final Log LOGGER = LogFactory.getLog(GpxController.class);
+	
     public static final int MAX_SIZE_FILES = 10;
     public static final int MAX_SIZE_FILES_AUTH = 100;
 
@@ -322,13 +327,15 @@ public class GpxController {
 
 			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 			RestTemplate restTemplate = new RestTemplate();
-			ResponseEntity<byte[]> response = restTemplate.postForEntity(serverUrl, requestEntity, byte[].class);
-			
-			if (response.getStatusCode().is2xxSuccessful()) {
-				return GPXUtilities.loadGPXFile(new ByteArrayInputStream(response.getBody()));
-			} else {
-				return null;
+			try {
+				ResponseEntity<byte[]> response = restTemplate.postForEntity(serverUrl, requestEntity, byte[].class);
+				if (response.getStatusCode().is2xxSuccessful()) {
+					return GPXUtilities.loadGPXFile(new ByteArrayInputStream(response.getBody()));
+				}
+			} catch (RestClientException e) {
+				LOGGER.error(e.getMessage(), e);
 			}
+			return null;
 		} else {
 			File srtmFolder = new File(srtmLocation);
 			if (!srtmFolder.exists()) {
