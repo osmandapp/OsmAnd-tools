@@ -4,6 +4,6 @@ def filterTags(attrs):
     tags = {}
 
     tags.update({'point':'depth'})
-    tags.update({'name':attrs['depth']})
+    tags.update({'name':str(round(float(attrs['rast_val']), 1))})
 
     return tags
