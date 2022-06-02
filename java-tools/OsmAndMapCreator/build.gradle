@@ -17,7 +17,7 @@ task collectFonts(type: Sync) {
 task buildDistribution(type: Zip) {
 	dependsOn jar
 	from(configurations.runtime.allArtifacts.files) {
-		rename { it.it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
+		rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
 	//	into '.'
 	}
 
