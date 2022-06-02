@@ -14,7 +14,7 @@ subprojects {
 
 
 	group 'net.osmand'
-	version '1.0'
+	version 'master-snapshot'
 	sourceCompatibility = 1.8
 
 	test {
