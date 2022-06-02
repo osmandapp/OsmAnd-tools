@@ -17,7 +17,7 @@ task collectFonts(type: Sync) {
 task buildDistribution(type: Zip) {
 	dependsOn jar
 	from(configurations.runtime.allArtifacts.files) {
-		rename { it.contains("OsmAnd") ? it.replace("-1.0", '') : it }
+		rename { it.startsWith("OsmAnd-java") ? it.replace("-master-snapshot", '') : it }
 	//	into '.'
 	}
 
