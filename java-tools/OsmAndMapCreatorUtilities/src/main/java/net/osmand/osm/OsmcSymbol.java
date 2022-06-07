@@ -171,7 +171,7 @@ public class OsmcSymbol {
 
 	private int getTextIndex(String[] tokens) {
 		for (String token : tokens) {
-			if (isText(token) || isSpecSymbol(token)) {
+			if (isText(token) || isSpecSymbol(token.trim())) {
 				return ArrayUtils.indexOf(tokens, token);
 			}
 		}
