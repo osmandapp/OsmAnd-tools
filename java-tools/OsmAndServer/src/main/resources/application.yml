@@ -31,11 +31,11 @@ osmand:
 server:
   port: 8080
   servlet.session:
-    persistent: true
     timeout: 7d
-    store-dir: ${osmand.files.location}/session/
     cookie.same-site: none
     cookie.secure: true
+    # store-dir: ${osmand.files.location}/session/
+    # persistent: true
   tomcat.threads.max: 5
   connection-timeout: 120s
   compression.enabled: true
