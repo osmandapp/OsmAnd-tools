@@ -185,14 +185,17 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			@Override
     		public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
 				OAuth2User user = super.loadUser(userRequest);
+				LOG.info("User to test");
 				if (user == null) {
 					return null;
 				}
 				Set<GrantedAuthority> authorities = new LinkedHashSet<>();
+				LOG.info("Test with adminOauth2Url url: " + adminOauth2Url + " " + user.getAttribute("url"));
 				if (!Algorithms.isEmpty(adminOauth2Url) && 
 						user.getAttribute("url") != null
 						&& user.getAttribute("url").toString().contains("github.com")) {
 					Map<String, Object> orgs = checkPermissionAccess(adminOauth2Url, userRequest, user);
+					LOG.info("Get organisations: " + adminOauth2Url + " " + user.getAttribute("url"));
 					// orgs.get("privacy").equals("closed");
 					if (orgs != null) {
 						authorities.add(new SimpleGrantedAuthority(ROLE_ADMIN));
@@ -200,6 +203,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				}
 				String userNameAttributeName = userRequest.getClientRegistration().getProviderDetails().
 						getUserInfoEndpoint().getUserNameAttributeName();
+				LOG.info("User userNameAttributeName: " + userNameAttributeName);
     			return new DefaultOAuth2User(authorities, user.getAttributes(), userNameAttributeName);
     		}
 
@@ -213,6 +217,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				ResponseEntity<Map<String, Object>> res = restTemplate.exchange(request, 
 						new ParameterizedTypeReference<Map<String, Object>>() {});
 				if (!res.getStatusCode().is2xxSuccessful()) {
+					LOG.warn("Result status code from github: " + res.getStatusCode().name() + " " + res.getBody());
 					return null;
 				}
 				return res.getBody();
