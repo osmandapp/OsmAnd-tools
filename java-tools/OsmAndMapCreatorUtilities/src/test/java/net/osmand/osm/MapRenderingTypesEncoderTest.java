@@ -56,6 +56,8 @@ public class MapRenderingTypesEncoderTest {
         tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(9).get(OSMC_TAG)));
         //osmc:symbol=green:white:green_bar
         tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(10).get(OSMC_TAG)));
+        //osmc:symbol=red:white: :V:red
+        tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(11).get(OSMC_TAG)));
     }
 
     private void createTransformOsmcResult() {
@@ -142,6 +144,14 @@ public class MapRenderingTypesEncoderTest {
                 Map.entry("osmc_background", "white"),
                 Map.entry("osmc_stub_name", "."),
                 Map.entry("osmc_foreground", "green_bar")
+        ));
+        resultTagsList.add(Map.ofEntries(
+                Map.entry("osmc:symbol", "red:white: :V:red"),
+                Map.entry("osmc_waycolor", "red"),
+                Map.entry("osmc_background", "white"),
+                Map.entry("osmc_stub_name", "."),
+                Map.entry("osmc_text", "V"),
+                Map.entry("osmc_textcolor", "red")
         ));
     }
 }
