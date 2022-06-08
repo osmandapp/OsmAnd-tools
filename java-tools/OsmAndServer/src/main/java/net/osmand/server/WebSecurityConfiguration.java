@@ -184,18 +184,19 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		DefaultOAuth2UserService service = new DefaultOAuth2UserService() {
 			@Override
     		public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
+				LOG.warn("User to test");
 				OAuth2User user = super.loadUser(userRequest);
-				LOG.info("User to test");
+				LOG.warn("User to test: " + user);
 				if (user == null) {
 					return null;
 				}
 				Set<GrantedAuthority> authorities = new LinkedHashSet<>();
-				LOG.info("Test with adminOauth2Url url: " + adminOauth2Url + " " + user.getAttribute("url"));
+				LOG.warn("Test with adminOauth2Url url: " + adminOauth2Url + " " + user.getAttribute("url"));
 				if (!Algorithms.isEmpty(adminOauth2Url) && 
 						user.getAttribute("url") != null
 						&& user.getAttribute("url").toString().contains("github.com")) {
 					Map<String, Object> orgs = checkPermissionAccess(adminOauth2Url, userRequest, user);
-					LOG.info("Get organisations: " + adminOauth2Url + " " + user.getAttribute("url"));
+					LOG.warn("Get organisations: " + adminOauth2Url + " " + user.getAttribute("url"));
 					// orgs.get("privacy").equals("closed");
 					if (orgs != null) {
 						authorities.add(new SimpleGrantedAuthority(ROLE_ADMIN));
@@ -203,7 +204,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				}
 				String userNameAttributeName = userRequest.getClientRegistration().getProviderDetails().
 						getUserInfoEndpoint().getUserNameAttributeName();
-				LOG.info("User userNameAttributeName: " + userNameAttributeName);
+				LOG.warn("User userNameAttributeName: " + userNameAttributeName);
     			return new DefaultOAuth2User(authorities, user.getAttributes(), userNameAttributeName);
     		}
 
