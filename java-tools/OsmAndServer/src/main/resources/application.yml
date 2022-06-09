@@ -112,11 +112,11 @@ logging:
   file: /var/log/osmand-server-logs/error.log
   config: classpath:logback-spring.xml
 
-server.forward-headers-strategy: NATIVE
 server:
   port: 8090
   servlet.session.timeout: 7d
   # use-forward-headers: true
+  forward-headers-strategy: native
   # session.timeout: 18000 #432000 #servlet.session.timeout
   address: 127.0.0.1 #keep it behind proxy
   tomcat:
