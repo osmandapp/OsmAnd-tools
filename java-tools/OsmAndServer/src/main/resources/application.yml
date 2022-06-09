@@ -37,7 +37,6 @@ server:
     # store-dir: ${osmand.files.location}/session/
     # persistent: true
   tomcat.threads.max: 5
-  forward-headers-strategy: NATIVE
   connection-timeout: 120s
   compression.enabled: true
   compression.min-response-size: 4096
@@ -113,6 +112,7 @@ logging:
   file: /var/log/osmand-server-logs/error.log
   config: classpath:logback-spring.xml
 
+server.forward-headers-strategy: NATIVE
 server:
   port: 8090
   servlet.session.timeout: 7d
