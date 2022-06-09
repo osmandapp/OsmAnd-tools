@@ -30,6 +30,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -166,7 +167,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			mapLogin.setForceHttps(true);
 		}
 		http.exceptionHandling().defaultAuthenticationEntryPointFor(mapLogin, new AntPathRequestMatcher("/mapapi/**"));
-		
+		http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.ALWAYS));
 		http.rememberMe().tokenValiditySeconds(3600*24*14);
 		http.logout().deleteCookies("JSESSIONID").
 			logoutSuccessUrl("/").logoutRequestMatcher(new AntPathRequestMatcher("/logout")).permitAll();
@@ -253,7 +254,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**", configuration);
+		source.registerCorsConfiguration("/**",  configuration);
 		return source;
 	}
 

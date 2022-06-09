@@ -32,8 +32,8 @@ server:
   port: 8080
   servlet.session:
     timeout: 7d
+    cookie.secure: false
     # cookie.same-site: none
-    # cookie.secure: false
     # store-dir: ${osmand.files.location}/session/
     # persistent: true
   tomcat.threads.max: 5
