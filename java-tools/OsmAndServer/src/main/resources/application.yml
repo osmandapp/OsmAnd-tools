@@ -37,7 +37,7 @@ server:
     # store-dir: ${osmand.files.location}/session/
     # persistent: true
   tomcat.threads.max: 5
-  forward-headers-strategy: native
+  forward-headers-strategy: NATIVE
   connection-timeout: 120s
   compression.enabled: true
   compression.min-response-size: 4096
