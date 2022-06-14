@@ -661,7 +661,7 @@ public class OsmAndMapsService {
 					: RouteCalculationMode.NORMAL;
 		}
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				new BinaryMapIndexReader[]{getObfReaders(points)[0]}, paramMode); // RouteCalculationMode.BASE
+				getObfReaders(points), paramMode); // RouteCalculationMode.BASE
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
