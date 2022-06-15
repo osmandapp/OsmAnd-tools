@@ -260,7 +260,7 @@ public class UserdataController {
                     if (loadReceipt.result) {
                         JsonObject receiptObj = loadReceipt.response;
                         SubscriptionPurchase subscription = null;
-                        subscription = parseIosSubscription(s.sku, s.orderId, s.introcycles == null ? 0 : s.introcycles, receiptObj);
+                        subscription = UpdateSubscription.parseIosSubscription(s.sku, s.orderId, s.introcycles == null ? 0 : s.introcycles, receiptObj);
                         if (subscription != null) {
                             if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
                                 s.expiretime = new Date(subscription.getExpiryTimeMillis());
@@ -308,60 +308,6 @@ public class UserdataController {
             json.addProperty("error", errorMsg);
         }
         return json;
-    }
-
-    private SubscriptionPurchase parseIosSubscription(String sku, String orderId, int prevIntroCycles,
-                                                      JsonObject receiptObj) {
-        SubscriptionPurchase subscription = null;
-        List<ReceiptValidationHelper.InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
-        if (!inAppReceipts.isEmpty()) {
-            boolean autoRenewing = false;
-            int introCycles = 0;
-            long startDate = 0;
-            long expiresDate = 0;
-            String appstoreOrderId = null;
-            for (ReceiptValidationHelper.InAppReceipt receipt : inAppReceipts) {
-                // there could be multiple subscriptions for same purchaseToken !
-                // i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
-                if (sku.equals(receipt.getProductId()) && orderId.equals(receipt.getOrderId())) {
-                    appstoreOrderId = receipt.getOrderId();
-                    Map<String, String> fields = receipt.fields;
-                    // purchase_date_ms is purchase date of prolongation
-                    boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
-                    long inAppStartDateMs = Long.parseLong(fields.get("purchase_date_ms"));
-                    long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
-                    if (startDate == 0 || inAppStartDateMs < startDate) {
-                        startDate = inAppStartDateMs;
-                    }
-                    if (inAppExpiresDateMs > expiresDate) {
-                        autoRenewing = receipt.autoRenew;
-                        expiresDate = inAppExpiresDateMs;
-                    }
-                    if (introPeriod) {
-                        introCycles++;
-                    }
-                }
-            }
-            if (expiresDate > 0) {
-                IntroductoryPriceInfo ipo = null;
-                introCycles = Math.max(prevIntroCycles, introCycles);
-                if (introCycles > 0) {
-                    ipo = new IntroductoryPriceInfo();
-                    ipo.setIntroductoryPriceCycles(introCycles);
-                }
-                subscription = new SubscriptionPurchase()
-                        .setIntroductoryPriceInfo(ipo)
-                        .setStartTimeMillis(startDate)
-                        .setExpiryTimeMillis(expiresDate)
-                        .setAutoRenewing(autoRenewing)
-                        .setOrderId(appstoreOrderId);
-                if (!Algorithms.objectEquals(subscription.getOrderId(), orderId)) {
-                    throw new IllegalStateException(
-                            String.format("Order id '%s' != '%s' don't match", orderId, subscription.getOrderId()));
-                }
-            }
-        }
-        return subscription;
     }
 
 	private String checkOrderIdPremium(String orderid) {

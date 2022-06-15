@@ -349,7 +349,7 @@ public class UpdateSubscription {
 		}
 	}
 
-	private SubscriptionPurchase parseIosSubscription(String sku, String orderId, int prevIntroCycles,
+	public static SubscriptionPurchase parseIosSubscription(String sku, String orderId, int prevIntroCycles,
 			JsonObject receiptObj) {
 		SubscriptionPurchase subscription = null;
 		List<InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
