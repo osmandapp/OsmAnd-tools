@@ -30,6 +30,7 @@ import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
 
+import net.osmand.map.WorldRegion;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -804,7 +805,10 @@ public class OsmAndMapsService {
 
 	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
 		initObfReaders();
+		osmandRegions = new OsmandRegions();
+		osmandRegions.prepareFile();
 		List<BinaryMapIndexReader> files = new ArrayList<>();
+		List<String> regionNameList = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			boolean intersects = false;
 			mainLoop: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
@@ -812,19 +816,60 @@ public class OsmAndMapsService {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						if (ref.reader == null) {
-							long val = System.currentTimeMillis();
-							RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-							ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
-							LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms"); 
+						boolean containsBiggerMap = checkBiggerMapExist(files, regionNameList, ref.fileIndex.getFileName());
+						if (!containsBiggerMap) {
+							if (ref.reader == null) {
+								long val = System.currentTimeMillis();
+								RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+								ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
+								LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+							}
+							files.add(ref.reader);
 						}
-						files.add(ref.reader);
 						break mainLoop;
 					}
 				}
 			}
-		};
-		return files.toArray(new BinaryMapIndexReader[files.size()]);
+		}
+		return files.toArray(new BinaryMapIndexReader[0]);
+	}
+	
+	private boolean checkBiggerMapExist(List<BinaryMapIndexReader> files, List<String> regionNameList, String fileName) {
+		String name = getRegionName(fileName);
+		WorldRegion wr = osmandRegions.getRegionDataByDownloadName(name);
+		String parentRegionName = wr.getSuperregion().getRegionDownloadName();
+		if (!containsBiggerMap(regionNameList, parentRegionName) || parentRegionName == null) {
+			if (!regionNameList.isEmpty()) {
+				removeSubregionsIfExist(wr, regionNameList, files);
+			}
+			regionNameList.add(name);
+			return false;
+		}
+		return true;
+	}
+	
+	private boolean containsBiggerMap(List<String> regionNameList, String parentName) {
+		for (String name : regionNameList) {
+			if (name.equalsIgnoreCase(parentName)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private void removeSubregionsIfExist(WorldRegion wr, List<String> regionNameList, List<BinaryMapIndexReader> files) {
+		for (WorldRegion subr : wr.getSubregions()) {
+			String subrName = subr.getRegionDownloadName();
+			if (regionNameList.contains(subrName)) {
+				regionNameList.remove(subrName);
+				files.removeIf(file -> file.getMapIndexes().get(0).getName().toLowerCase().equals(subrName));
+			}
+		}
+	}
+	
+	private String getRegionName(String fileName) {
+		String name = fileName.split("\\.")[0];
+		return name.substring(0,name.length() - 2).toLowerCase();
 	}
 	
 	public synchronized void initObfReaders() throws IOException {
