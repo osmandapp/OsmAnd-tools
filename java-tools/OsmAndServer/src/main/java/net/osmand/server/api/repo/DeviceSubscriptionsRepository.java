@@ -74,8 +74,8 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 		@Column(name = "prevvalidpurchasetoken")
 		public String prevvalidpurchasetoken;
 
-        @Column(name = "introcycles")
-        public Integer introcycles ;
+		@Column(name = "introcycles")
+		public Integer introcycles ;
 	}
 
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
