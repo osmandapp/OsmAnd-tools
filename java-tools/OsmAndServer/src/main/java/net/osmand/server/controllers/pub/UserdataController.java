@@ -33,6 +33,9 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
+import com.google.gson.JsonObject;
+import net.osmand.live.subscriptions.ReceiptValidationHelper;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,7 +100,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
-	
+
 	private static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
 	private static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
 	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
@@ -106,12 +109,13 @@ public class UserdataController {
 	private static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_1 = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_M;
 	private static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_2 = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y;
 	private static final String OSMAND_PRO_AMAZON_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_AMAZON_SUBSCRIPTION_PART;
+    private static final String OSMAND_PRO_IOS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX;
 
 	Gson gson = new Gson();
 
 	@Autowired
 	PasswordEncoder encoder;
-	
+
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
@@ -126,10 +130,10 @@ public class UserdataController {
 
 	@Autowired
 	protected StorageService storageService;
-	
+
 	@Autowired
 	protected DownloadIndexesService downloadService;
-	
+
 	@Autowired
 	EmailSenderService emailSender;
 
@@ -153,7 +157,7 @@ public class UserdataController {
 	private ResponseEntity<String> ok() {
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
 	}
-	
+
 	private SupporterDeviceSubscription revalidateGoogleSubscription(SupporterDeviceSubscription s) {
 		if (!Algorithms.isEmpty(clientSecretFile) ) {
 			if (androidPublisher == null) {
@@ -238,6 +242,128 @@ public class UserdataController {
 		return s;
 	}
 
+    private JsonObject revalidateiOSSubscription(String orderid) {
+        String errorMsg = "";
+        List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
+        SupporterDeviceSubscription result = null;
+        for (SupporterDeviceSubscription s : lst) {
+            if (!s.sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
+                errorMsg = "subscription has not iOS sku " + s.sku;
+                continue;
+            }
+            // s.sku could be checked for premium
+            if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
+                ReceiptValidationHelper receiptValidationHelper = new ReceiptValidationHelper();
+                String purchaseToken = s.purchaseToken;
+                try {
+                    ReceiptValidationHelper.ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken);
+                    if (loadReceipt.result) {
+                        JsonObject receiptObj = loadReceipt.response;
+                        SubscriptionPurchase subscription = null;
+                        subscription = parseIosSubscription(s.sku, s.orderId, s.introcycles == null ? 0 : s.introcycles, receiptObj);
+                        if (subscription != null) {
+                            if (s.expiretime == null || s.expiretime.getTime() < subscription.getExpiryTimeMillis()) {
+                                s.expiretime = new Date(subscription.getExpiryTimeMillis());
+                                // s.checktime = new Date(); // don't set checktime let jenkins do its job
+                                s.valid = System.currentTimeMillis() < subscription.getExpiryTimeMillis();
+                                subscriptionsRepo.save(s);
+                            }
+                            result = s;
+                            errorMsg = "";
+                            break;
+                        } else {
+                            errorMsg = "no purchases purchase format";
+                        }
+                    } else if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
+                        errorMsg = "Apple code:" + loadReceipt.error + " The user account cannot be found or has been deleted";
+                    } else if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
+                        errorMsg = "Apple code:" + loadReceipt.error + " This receipt is from the test environment";
+                    } else {
+                        errorMsg = "Apple code:" + loadReceipt.error + " See code status https://developer.apple.com/documentation/appstorereceipts/status";
+                    }
+                } catch (RuntimeException e) {
+                    errorMsg = e.getMessage();
+                }
+            } else {
+                result = s;
+                errorMsg = "";
+                break;
+            }
+        }
+        if (errorMsg.isEmpty()) {
+            if (result == null || result.valid == null || !result.valid) {
+                errorMsg = "no valid subscription present";
+            } else if (!result.sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
+                errorMsg = "subscription has not iOS sku " + result.sku;
+            } else if (result.expiretime == null || result.expiretime.getTime() < System.currentTimeMillis()) {
+                errorMsg = "subscription is expired or not validated yet";
+            }
+        }
+        JsonObject json = new JsonObject();
+        if (errorMsg.isEmpty()) {
+            json.addProperty("sku", result.sku);
+            json.addProperty("starttime", result.starttime.getTime());
+            json.addProperty("expiretime", result.expiretime.getTime());
+        } else {
+            json.addProperty("error", errorMsg);
+        }
+        return json;
+    }
+
+    private SubscriptionPurchase parseIosSubscription(String sku, String orderId, int prevIntroCycles,
+                                                      JsonObject receiptObj) {
+        SubscriptionPurchase subscription = null;
+        List<ReceiptValidationHelper.InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
+        if (!inAppReceipts.isEmpty()) {
+            boolean autoRenewing = false;
+            int introCycles = 0;
+            long startDate = 0;
+            long expiresDate = 0;
+            String appstoreOrderId = null;
+            for (ReceiptValidationHelper.InAppReceipt receipt : inAppReceipts) {
+                // there could be multiple subscriptions for same purchaseToken !
+                // i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
+                if (sku.equals(receipt.getProductId()) && orderId.equals(receipt.getOrderId())) {
+                    appstoreOrderId = receipt.getOrderId();
+                    Map<String, String> fields = receipt.fields;
+                    // purchase_date_ms is purchase date of prolongation
+                    boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
+                    long inAppStartDateMs = Long.parseLong(fields.get("purchase_date_ms"));
+                    long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
+                    if (startDate == 0 || inAppStartDateMs < startDate) {
+                        startDate = inAppStartDateMs;
+                    }
+                    if (inAppExpiresDateMs > expiresDate) {
+                        autoRenewing = receipt.autoRenew;
+                        expiresDate = inAppExpiresDateMs;
+                    }
+                    if (introPeriod) {
+                        introCycles++;
+                    }
+                }
+            }
+            if (expiresDate > 0) {
+                IntroductoryPriceInfo ipo = null;
+                introCycles = Math.max(prevIntroCycles, introCycles);
+                if (introCycles > 0) {
+                    ipo = new IntroductoryPriceInfo();
+                    ipo.setIntroductoryPriceCycles(introCycles);
+                }
+                subscription = new SubscriptionPurchase()
+                        .setIntroductoryPriceInfo(ipo)
+                        .setStartTimeMillis(startDate)
+                        .setExpiryTimeMillis(expiresDate)
+                        .setAutoRenewing(autoRenewing)
+                        .setOrderId(appstoreOrderId);
+                if (!Algorithms.objectEquals(subscription.getOrderId(), orderId)) {
+                    throw new IllegalStateException(
+                            String.format("Order id '%s' != '%s' don't match", orderId, subscription.getOrderId()));
+                }
+            }
+        }
+        return subscription;
+    }
+
 	private String checkOrderIdPremium(String orderid) {
 		if (Algorithms.isEmpty(orderid)) {
 			return "no subscription provided";
@@ -281,7 +407,7 @@ public class UserdataController {
 		}
 		return null;
 	}
-	
+
 	@GetMapping(value = "/user-validate-sub")
 	@ResponseBody
 	public ResponseEntity<String> check(@RequestParam(name = "deviceid", required = true) int deviceId,
@@ -300,6 +426,16 @@ public class UserdataController {
 		}
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
+
+    @GetMapping(value = "/user-validate-ios-sub")
+    @ResponseBody
+    public ResponseEntity<String> checkOrderid(@RequestParam(name = "orderid", required = true) String orderid) throws IOException {
+        JsonObject json = revalidateiOSSubscription(orderid);
+        if (json.has("error")) {
+            return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, json.get("error").getAsString());
+        }
+        return ResponseEntity.ok(json.toString());
+    }
 
 	@PostMapping(value = "/user-update-orderid")
 	@ResponseBody
@@ -324,14 +460,14 @@ public class UserdataController {
 		usersRepository.saveAndFlush(pu);
 		return ok();
 	}
-	
+
 	public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
 		if (password.length() < 6) {
 			return error(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
 		}
 		return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
 	}
-	
+
 	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email) throws IOException {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
@@ -505,20 +641,20 @@ public class UserdataController {
 			return ok();
 		}
 	}
-	
+
 	private MultipartFile createEmptyMultipartFile(MultipartFile file) {
 		return new MultipartFile() {
-			
+
 			@Override
 			public void transferTo(File dest) throws IOException, IllegalStateException {
 				throw new UnsupportedOperationException();
 			}
-			
+
 			@Override
 			public boolean isEmpty() {
 				return getSize() == 0;
 			}
-			
+
 			@Override
 			public long getSize() {
 				try {
@@ -527,27 +663,27 @@ public class UserdataController {
 					return 0;
 				}
 			}
-			
+
 			@Override
 			public String getOriginalFilename() {
 				return file.getOriginalFilename();
 			}
-			
+
 			@Override
 			public String getName() {
 				return file.getName();
 			}
-			
+
 			@Override
 			public InputStream getInputStream() throws IOException {
 				return new ByteArrayInputStream(getBytes());
 			}
-			
+
 			@Override
 			public String getContentType() {
 				return file.getContentType();
 			}
-			
+
 			@Override
 			public byte[] getBytes() throws IOException {
 				byte[] bytes = "{\"type\":\"obf\"}".getBytes();
@@ -627,7 +763,7 @@ public class UserdataController {
 
 		return ok();
 	}
-	
+
 	@GetMapping(value = "/check-file-on-server")
 	@ResponseBody
 	public ResponseEntity<String> upload(@RequestParam(name = "name", required = true) String name,
@@ -650,7 +786,7 @@ public class UserdataController {
 		return checkExistingServerMap;
 	}
 
-	
+
 
 	private String oldStorageFileName(UserFile usf) {
 		String fldName = usf.type;
@@ -784,7 +920,7 @@ public class UserdataController {
 			}
 		}
 	}
-	
+
 	private InputStream getGzipInputStreamFromFile(File fp, String ext) throws IOException {
 		if (fp.getName().endsWith(".zip")) {
 			ZipInputStream zis = new ZipInputStream(new FileInputStream(fp));
@@ -801,7 +937,7 @@ public class UserdataController {
 
 
 	public InputStream getInputStream(PremiumUserDevice dev, ResponseEntity<String>[] error, UserFile userFile) {
-		InputStream bin = null; 
+		InputStream bin = null;
 		if (dev == null) {
 			error[0] = tokenNotValid();
 		} else {
@@ -856,8 +992,8 @@ public class UserdataController {
 	}
 
 	public UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
-		List<UserFileNoData> fl = 
-				details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) : 
+		List<UserFileNoData> fl =
+				details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) :
 						filesRepository.listFilesByUserid(userId, name, type);
 		UserFilesResults res = new UserFilesResults();
 		res.maximumAccountSize = MAXIMUM_ACCOUNT_SIZE;
@@ -897,6 +1033,6 @@ public class UserdataController {
 		public List<UserFileNoData> uniqueFiles;
 		public int userid;
 		public long maximumAccountSize;
-		
+
 	}
 }

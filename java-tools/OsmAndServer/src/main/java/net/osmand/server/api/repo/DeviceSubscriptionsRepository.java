@@ -19,7 +19,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceS
 
 public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDeviceSubscription, SupporterDeviceSubscriptionPrimaryKey> {
 
-	
+
 	List<SupporterDeviceSubscription> findByOrderId(String orderId);
 
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
@@ -27,7 +27,7 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
 	public class SupporterDeviceSubscription {
-		
+
 		@Id
 		@Column(name = "sku")
 		public String sku;
@@ -35,10 +35,10 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 		@Id
 		@Column(name = "orderid")
 		public String orderId;
-		
+
 		@Column(name = "purchasetoken")
 		public String purchaseToken;
-		
+
 
 		@Column(name = "payload")
 		public String payload;
@@ -50,11 +50,11 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 		@Column(name = "starttime")
 		@Temporal(TemporalType.TIMESTAMP)
 		public Date starttime;
-		
+
 		@Column(name = "expiretime")
 		@Temporal(TemporalType.TIMESTAMP)
 		public Date expiretime;
-		
+
 		@Column(name = "checktime")
 		@Temporal(TemporalType.TIMESTAMP)
 		public Date checktime;
@@ -67,12 +67,15 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 		@Column(name = "valid")
 		public Boolean valid;
-		
+
 		@Column(name = "kind")
 		public String kind;
-		
+
 		@Column(name = "prevvalidpurchasetoken")
 		public String prevvalidpurchasetoken;
+
+        @Column(name = "introcycles")
+        public Integer introcycles ;
 	}
 
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {

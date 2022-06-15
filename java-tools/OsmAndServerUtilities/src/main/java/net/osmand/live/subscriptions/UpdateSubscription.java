@@ -60,6 +60,7 @@ public class UpdateSubscription {
 	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y = ".huawei.annual.pro";
 	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_M = ".huawei.monthly.pro";
 	public static final String OSMAND_PRO_AMAZON_SUBSCRIPTION_PART = ".amazon.pro";
+    public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription";
 
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
@@ -81,12 +82,12 @@ public class UpdateSubscription {
 	protected PreparedStatement updCheckStat;
 	protected SubscriptionType subType;
 	private AndroidPublisher publisher;
-	
+
 	private static class UpdateParams {
 		public boolean verifyAll;
 		public boolean verbose;
 	}
-	
+
 	public enum SubscriptionType {
 		HUAWEI,
 		AMAZON,
@@ -95,7 +96,7 @@ public class UpdateSubscription {
 //		ANDROID_LEGACY,
 		PROMO,
 		UNKNOWN;
-		
+
 		public static SubscriptionType fromSku(String sku) {
 			if (sku.contains(".huawei.")) {
 				return HUAWEI;
@@ -105,13 +106,13 @@ public class UpdateSubscription {
 				return IOS;
 			} else if (sku.startsWith("osm_live_subscription_") || sku.startsWith("osm_free_live_subscription_")) {
 				// 1st gen:
-				// 		osm_live_subscription_2 
+				// 		osm_live_subscription_2
 				// 		osm_free_live_subscription_2
 				// 2nd gen:
 				// 		osm_live_subscription_annual_ full_v1 / full_v2 / free_v1 / ...
 				// legacy
 				return ANDROID;
-				
+
 			} else if (sku.startsWith("osmand_pro_") || sku.startsWith("osmand_maps_")) {
 				// osmand_pro_annual_full_v1
 				// osmand_maps_annual_free_v1
@@ -121,9 +122,9 @@ public class UpdateSubscription {
 			}
 			return UNKNOWN;
 		}
-		
+
 	}
-	
+
 	public UpdateSubscription(AndroidPublisher publisher, SubscriptionType subType, boolean revalidateInvalid) {
 		this.subType = subType;
 		this.publisher = publisher;
@@ -207,7 +208,7 @@ public class UpdateSubscription {
 		updStat = conn.prepareStatement(updQuery);
 		delStat = conn.prepareStatement(delQuery);
 		updCheckStat = conn.prepareStatement(updCheckQuery);
-		
+
 		HuaweiIAPHelper huaweiIAPHelper = null;
 		AmazonIAPHelper amazonIAPHelper = null;
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
@@ -216,7 +217,7 @@ public class UpdateSubscription {
 		while (rs.next()) {
 			String purchaseToken = rs.getString("purchaseToken");
 			String prevpurchaseToken = rs.getString("prevvalidpurchasetoken");
-			
+
 			String sku = rs.getString("sku");
 			String orderId = rs.getString("orderid");
 			Timestamp checkTime = rs.getTimestamp("checktime");
@@ -251,7 +252,7 @@ public class UpdateSubscription {
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			try {
 				if (subType == SubscriptionType.IOS) {
-					SubscriptionPurchase sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId, 
+					SubscriptionPurchase sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId,
 							regTime, startTime, expireTime, currentTime, introcycles, pms.verbose);
 					if (sub == null && prevpurchaseToken != null) {
 						throw new IllegalStateException("This situation need to be checked, we have prev valid purchase token but current token is not valid.");
@@ -306,7 +307,7 @@ public class UpdateSubscription {
 		}
 	}
 
-	private SubscriptionPurchase processIosSubscription(ReceiptValidationHelper receiptValidationHelper, String purchaseToken, String sku, String orderId, 
+	private SubscriptionPurchase processIosSubscription(ReceiptValidationHelper receiptValidationHelper, String purchaseToken, String sku, String orderId,
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, int prevIntroCycles,
 			boolean verbose) throws SQLException, SubscriptionUpdateException {
 		try {
@@ -401,7 +402,7 @@ public class UpdateSubscription {
 		}
 		return subscription;
 	}
-	
+
 	private SubscriptionPurchase processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId,
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
 		HuaweiSubscription subscription = null;
@@ -538,7 +539,7 @@ public class UpdateSubscription {
 		return subscriptionPurchase;
 	}
 
-	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId, 
+	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId,
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
 		SubscriptionPurchase subscription = null;
 		String reason = "";
@@ -630,7 +631,7 @@ public class UpdateSubscription {
 			int maxDays = 40;
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > maxDays * DAY && startTime.getTime() > 100000 * 1000L) {
 				throw new SubscriptionUpdateException(orderId, String.format(
-						"ERROR: Start timestamp changed more than %d days '%s' (db) != '%s' (appstore) '%s' %s", 
+						"ERROR: Start timestamp changed more than %d days '%s' (db) != '%s' (appstore) '%s' %s",
 						maxDays, new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis()), orderId, sku));
 //				System.err.println(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
 //						new Date(startTime.getTime()),
@@ -724,13 +725,13 @@ public class UpdateSubscription {
 		}
 		return updated;
 	}
-	
+
 	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
 	    File dataStoreDir = new File(new File(file).getParentFile(), ".credentials");
 	    JacksonFactory jsonFactory = new com.google.api.client.json.jackson2.JacksonFactory();
-		
+
 	    GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jsonFactory, new InputStreamReader(new FileInputStream(file)));
 	    NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
 
@@ -745,7 +746,7 @@ public class UpdateSubscription {
 		// it only works with localhost ! with other hosts gives incorrect redirect uri (looks like it's not supported for service accounts)
 		// bld.setHost(serverPublicUrl);
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
-		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());		
+		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());
 		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
 				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
 
@@ -777,9 +778,9 @@ public class UpdateSubscription {
 			e.printStackTrace();
 		}
 	}
-	
+
 	protected static class SubscriptionUpdateException extends Exception {
-		
+
 		private static final long serialVersionUID = -7058574093912760811L;
 		private String orderid;
 
@@ -787,14 +788,14 @@ public class UpdateSubscription {
 			super(message);
 			this.orderid = orderid;
 		}
-		
+
 		public String getOrderid() {
 			return orderid;
 		}
 	}
 
-	
 
-	
+
+
 
 }
