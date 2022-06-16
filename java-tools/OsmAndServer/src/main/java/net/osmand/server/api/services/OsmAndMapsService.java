@@ -88,6 +88,8 @@ import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.util.FilterMap.*;
+
 @Service
 public class OsmAndMapsService {
 	private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
@@ -801,30 +803,39 @@ public class OsmAndMapsService {
 		}
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
-
+	
 	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
 		initObfReaders();
+		osmandRegions = new OsmandRegions();
+		osmandRegions.prepareFile();
+		
 		List<BinaryMapIndexReader> files = new ArrayList<>();
+		List<String> regionNameList = new ArrayList<>();
+		
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
-			boolean intersects = false;
-			mainLoop: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
+			boolean intersects;
+			mainLoop:
+			for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
 				for (RoutingSubregion s : rp.getSubregionsList()) {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						if (ref.reader == null) {
-							long val = System.currentTimeMillis();
-							RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-							ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
-							LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms"); 
+						boolean containsBiggerMap = checkBiggerMapExist(files, regionNameList, ref.fileIndex.getFileName(), osmandRegions);
+						if (!containsBiggerMap) {
+							if (ref.reader == null) {
+								long val = System.currentTimeMillis();
+								RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+								ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
+								LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+							}
+							files.add(ref.reader);
 						}
-						files.add(ref.reader);
 						break mainLoop;
 					}
 				}
 			}
-		};
-		return files.toArray(new BinaryMapIndexReader[files.size()]);
+		}
+		return files.toArray(new BinaryMapIndexReader[0]);
 	}
 	
 	public synchronized void initObfReaders() throws IOException {
