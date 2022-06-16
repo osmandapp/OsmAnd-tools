@@ -24,6 +24,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xml.sax.Attributes;
@@ -471,69 +472,33 @@ public class NativeJavaRendering extends NativeLibrary {
 		return null;
 	}
 	
-	public Map<String, FileIndex> initIndexesCache(File dir, 
-			List<File> filesToUse, boolean filterDuplicates) throws IOException {
-	    Map<String, FileIndex> map = new TreeMap<>();
+	public Map<String, FileIndex> initIndexesCache(File dir, List<File> filesToUse, boolean filterDuplicates) throws IOException {
+		Map<String, FileIndex> map = new TreeMap<>();
 		File cacheFile = new File(dir, INDEXES_CACHE);
 		CachedOsmandIndexes cache = new CachedOsmandIndexes();
 		if (cacheFile.exists()) {
 			cache.readFromFile(cacheFile, CachedOsmandIndexes.VERSION);
 		}
-		if (filesToUse == null) {
-			filesToUse = new ArrayList<>();
-		}
-			
 		if (dir.exists() && dir.listFiles() != null) {
-			TreeSet<String> allFileNames = new TreeSet<String>();
+			MapsCollection mapsCollection = new MapsCollection(filterDuplicates);
 			for (File obf : Algorithms.getSortedFilesVersions(dir)) {
 				if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
-					filesToUse.add(obf);
-					allFileNames.add(obf.getName());
+					mapsCollection.add(obf);
 				}
 			}
-			// Collections.reverse(sortedFiles);
-			Iterator<File> fileIt = filesToUse.iterator();
-			while (fileIt.hasNext()) {
-				File obf = fileIt.next();
-				try {
-					FileIndex fileIndex = cache.getFileIndex(obf, true);
-					if (fileIndex != null) {
-						map.put(obf.getAbsolutePath(), fileIndex);
-					}
-					boolean basemapPresent = checkMoreGenericMapPresent(allFileNames, obf.getName());
-					if (filterDuplicates && basemapPresent) {
-						log.debug("SKIP initializing cause bigger map is present: " + obf.getName());
-						fileIt.remove();
-					}
-				} catch (Exception e1) {
-					e1.printStackTrace();
+			List<File> filteredMaps = mapsCollection.getFilesToUse();
+			for (File file : filteredMaps) {
+				FileIndex fileIndex = cache.getFileIndex(file, true);
+				if (fileIndex != null) {
+					map.put(file.getAbsolutePath(), fileIndex);
 				}
+			}
+			if (filesToUse != null) {
+				filesToUse.addAll(filteredMaps);
 			}
 		}
 		cache.writeToFile(cacheFile);
 		return map;
-	}
-
-	private boolean checkMoreGenericMapPresent(TreeSet<String> allFileNames, String file) {
-		String[] splitParts = file.split("_");
-		boolean presentBaseFile = false;
-		for (int i = 0; i < splitParts.length - 1 && !presentBaseFile; i++) {
-			String baseFile = "";
-			for (int j = 0; j < splitParts.length; j++) {
-				if (i == j) {
-					continue;
-				}
-				if (baseFile.length() > 0) {
-					baseFile += "_";
-				}
-				baseFile += splitParts[j];
-			}
-			if (allFileNames.contains(baseFile)) {
-				presentBaseFile = true;
-				return true;
-			}
-		}
-		return false;
 	}
 
 	public static NativeJavaRendering getDefault(String filename, String obfFolder,
