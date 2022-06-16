@@ -38,8 +38,8 @@ public class UtilityToExcludeDuplicatedMaps {
         return true;
     }
     
-    public void checkBiggerMapExistNative(File file, List<String> regionNameList,
-                                          List<File> files, TreeSet<String> allFileNames, boolean filterDuplicates) throws IOException {
+    public void isCurrentMainMapNative(File file, List<String> regionNameList,
+                                       List<File> files, TreeSet<String> allFileNames, boolean filterDuplicates) throws IOException {
         osmandRegions = new OsmandRegions();
         osmandRegions.prepareFile();
         String name = getRegionName(file.getName());

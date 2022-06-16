@@ -48,8 +48,6 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import resources._R;
 
-import static net.osmand.util.UtilityToExcludeDuplicatedMaps.*;
-
 public class NativeJavaRendering extends NativeLibrary {
 
 	private static final String INDEXES_CACHE = "indexes.cache";
@@ -504,7 +502,7 @@ public class NativeJavaRendering extends NativeLibrary {
 				if (fileIndex != null) {
 					map.put(file.getAbsolutePath(), fileIndex);
 				}
-				excludeDuplicatedMaps.checkBiggerMapExistNative(file, regionNameList, files, allFileNames, filterDuplicates);
+				excludeDuplicatedMaps.isCurrentMainMapNative(file, regionNameList, files, allFileNames, filterDuplicates);
 			}
 			filesToUse.retainAll(files);
 		}
