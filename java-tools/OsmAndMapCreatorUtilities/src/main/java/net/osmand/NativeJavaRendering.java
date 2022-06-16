@@ -505,7 +505,7 @@ public class NativeJavaRendering extends NativeLibrary {
 				if (fileIndex != null) {
 					map.put(file.getAbsolutePath(), fileIndex);
 				}
-				excludeDuplicatedMaps.isCurrentMainMapNative(file, regionNameList, files, allFileNames, filterDuplicates, osmandRegions);
+				excludeDuplicatedMaps.checkBiggerMapExistNative(file, regionNameList, files, allFileNames, filterDuplicates, osmandRegions);
 			}
 			filesToUse.retainAll(files);
 		}

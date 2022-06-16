@@ -818,8 +818,8 @@ public class OsmAndMapsService {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						boolean isMainMap = excludeDuplicatedMaps.isCurrentMainMap(files, regionNameList, ref.fileIndex.getFileName(), osmandRegions);
-						if (!isMainMap) {
+						boolean containsBiggerMap = excludeDuplicatedMaps.checkBiggerMapExist(files, regionNameList, ref.fileIndex.getFileName(), osmandRegions);
+						if (!containsBiggerMap) {
 							if (ref.reader == null) {
 								long val = System.currentTimeMillis();
 								RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$

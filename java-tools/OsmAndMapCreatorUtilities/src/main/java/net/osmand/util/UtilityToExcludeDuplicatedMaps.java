@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class UtilityToExcludeDuplicatedMaps {
     private static final Log log = LogFactory.getLog(UtilityToExcludeDuplicatedMaps.class);
     
-    public boolean isCurrentMainMap(List<BinaryMapIndexReader> files, List<String> regionNameList, String fileName, OsmandRegions osmandRegions) throws IOException {
+    public boolean checkBiggerMapExist(List<BinaryMapIndexReader> files, List<String> regionNameList, String fileName, OsmandRegions osmandRegions) throws IOException {
         String name = getRegionName(fileName);
         WorldRegion wr = osmandRegions.getRegionDataByDownloadName(name);
         String parentRegionName = wr.getSuperregion().getRegionDownloadName();
@@ -34,8 +34,8 @@ public class UtilityToExcludeDuplicatedMaps {
         return true;
     }
     
-    public void isCurrentMainMapNative(File file, List<String> regionNameList,
-                                       List<File> files, TreeSet<String> allFileNames, boolean filterDuplicates, OsmandRegions osmandRegions) throws IOException {
+    public void checkBiggerMapExistNative(File file, List<String> regionNameList,
+                                          List<File> files, TreeSet<String> allFileNames, boolean filterDuplicates, OsmandRegions osmandRegions) throws IOException {
         String name = getRegionName(file.getName());
         WorldRegion wr = osmandRegions.getRegionDataByDownloadName(name);
         if (wr == null) {
