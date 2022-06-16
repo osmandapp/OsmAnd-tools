@@ -24,8 +24,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import net.osmand.map.OsmandRegions;
-import net.osmand.util.UtilityToExcludeDuplicatedMaps;
+import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xml.sax.Attributes;
@@ -473,41 +472,30 @@ public class NativeJavaRendering extends NativeLibrary {
 		return null;
 	}
 	
-	public Map<String, FileIndex> initIndexesCache(File dir,
-	                                               List<File> filesToUse, boolean filterDuplicates) throws IOException {
+	public Map<String, FileIndex> initIndexesCache(File dir, List<File> filesToUse, boolean filterDuplicates) throws IOException {
 		Map<String, FileIndex> map = new TreeMap<>();
 		File cacheFile = new File(dir, INDEXES_CACHE);
 		CachedOsmandIndexes cache = new CachedOsmandIndexes();
-		UtilityToExcludeDuplicatedMaps excludeDuplicatedMaps = new UtilityToExcludeDuplicatedMaps();
 		if (cacheFile.exists()) {
 			cache.readFromFile(cacheFile, CachedOsmandIndexes.VERSION);
 		}
-		if (filesToUse == null) {
-			filesToUse = new ArrayList<>();
-		}
-		
 		if (dir.exists() && dir.listFiles() != null) {
-			TreeSet<String> allFileNames = new TreeSet<>();
+			MapsCollection mapsCollection = new MapsCollection(filterDuplicates);
 			for (File obf : Algorithms.getSortedFilesVersions(dir)) {
 				if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
-					filesToUse.add(obf);
-					allFileNames.add(obf.getName());
+					mapsCollection.add(obf);
 				}
 			}
-			
-			List<String> regionNameList = new ArrayList<>();
-			List<File> files = new ArrayList<>();
-			OsmandRegions osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
-			
-			for (File file : filesToUse) {
+			List<File> filteredMaps = mapsCollection.getFilesToUse();
+			for (File file : filteredMaps) {
 				FileIndex fileIndex = cache.getFileIndex(file, true);
 				if (fileIndex != null) {
 					map.put(file.getAbsolutePath(), fileIndex);
 				}
-				excludeDuplicatedMaps.checkBiggerMapExistNative(file, regionNameList, files, allFileNames, filterDuplicates, osmandRegions);
 			}
-			filesToUse.retainAll(files);
+			if (filesToUse != null) {
+				filesToUse.addAll(filteredMaps);
+			}
 		}
 		cache.writeToFile(cacheFile);
 		return map;
