@@ -123,6 +123,11 @@ public class RoutingController {
 		public String key;
 		public String name;
 		public Map<String, RoutingParameter> params = new LinkedHashMap<String, RoutingParameter>();
+
+		public RoutingMode(String key) {
+			this.key = key;
+			name = Algorithms.capitalizeFirstLetter(key).replace('_', ' ');
+		}
 	}
 	
 	protected static class RoutingParameter {
@@ -174,73 +179,96 @@ public class RoutingController {
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false); 
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
-				RoutingMode rm = new RoutingMode();
-				rm.key = e.getKey();
-				rm.name = Algorithms.capitalizeFirstLetter(rm.key).replace('_', ' ');
-				routers.put(rm.key, rm);
-				List<RoutingParameter> rps = new ArrayList<RoutingParameter>();
-				rps.add(shortWay);
-				for (Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
-					net.osmand.router.GeneralRouter.RoutingParameter pm = epm.getValue();
-					RoutingParameter rp = new RoutingParameter(pm.getId(), pm.getName(), pm.getDescription(),
-							pm.getGroup(), pm.getType().name().toLowerCase());
-					if (pm.getId().equals("short_way")) {
-						continue;
+				RoutingMode rm;
+				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
+				if (derivedProfiles != null) {
+					String[] derivedProfilesList = derivedProfiles.split(",");
+					for (String profile : derivedProfilesList) {
+						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
+						routers.put(rm.key, rm);
+						fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 					}
-					if (pm.getId().startsWith("avoid")) {
-						rp.section = "Avoid";
-					} else if (pm.getId().startsWith("allow") || pm.getId().startsWith("prefer")) {
-						rp.section = "Allow";
-					} else if (pm.getGroup() != null) {
-						rp.section = Algorithms.capitalizeFirstLetter(pm.getGroup().replace('_', ' '));
-					}
-					if (pm.getType() == RoutingParameterType.BOOLEAN) {
-						rp.value = pm.getDefaultBoolean();
-					} else {
-						if (pm.getType() == RoutingParameterType.NUMERIC) {
-							rp.value = 0;
-						} else {
-							rp.value = "";
-						}
-						rp.valueDescriptions = pm.getPossibleValueDescriptions();
-						rp.values = pm.getPossibleValues();
-					}
-					int lastIndex = -1;
-					for (int i = 0; i < rps.size(); i++) {
-						if (Algorithms.objectEquals(rp.section, rps.get(i).section)) {
-							lastIndex = i;
-						}
-					}
-					if (lastIndex != -1 && !Algorithms.isEmpty(rp.section)) {
-						rps.add(lastIndex + 1, rp);
-					} else {
-						rps.add(rp);
-					}
+				} else {
+					rm = new RoutingMode(e.getKey());
+					routers.put(rm.key, rm);
+					fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 				}
-				for (RoutingParameter rp : rps) {
-					rm.params.put(rp.key, rp);
-				}
-				rm.params.put(nativeRouting.key, nativeRouting);
-				rm.params.put(nativeTrack.key, nativeTrack);
-				rm.params.put(calcMode.key, calcMode);
 			}
 		}
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
-			RoutingMode rm = new RoutingMode();
-			rm.key = rs.name;
-			rm.name = Algorithms.capitalizeFirstLetter(rs.name).replace('_', ' ');
+			RoutingMode rm = new RoutingMode(rs.name);
 			routers.put(rm.key, rm);
 			rm.params.put(nativeRouting.key, nativeRouting);
 			rm.params.put(nativeTrack.key, nativeTrack);
 		}
 		return ResponseEntity.ok(gson.toJson(routers));
-
 	}
-	
+
+	private void fillRoutingModeParams(RoutingParameter nativeRouting, RoutingParameter nativeTrack, RoutingParameter calcMode,
+	                                   RoutingParameter shortWay, Entry<String, GeneralRouter> e, RoutingMode rm) {
+		List<RoutingParameter> rps = new ArrayList<>();
+		rps.add(shortWay);
+		for (Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
+			GeneralRouter.RoutingParameter pm = epm.getValue();
+			String[] profiles = pm.getProfiles();
+			if (profiles != null) {
+				boolean accept = false;
+				for (String profile : profiles) {
+					if ("default".equals(profile) && rm.key.equals(e.getKey()) || rm.key.equals(profile)) {
+						accept = true;
+						break;
+					}
+				}
+				if (!accept) {
+					continue;
+				}
+			}
+			RoutingParameter rp = new RoutingParameter(pm.getId(), pm.getName(), pm.getDescription(),
+					pm.getGroup(), pm.getType().name().toLowerCase());
+			if (pm.getId().equals("short_way")) {
+				continue;
+			}
+			if (pm.getId().startsWith("avoid")) {
+				rp.section = "Avoid";
+			} else if (pm.getId().startsWith("allow") || pm.getId().startsWith("prefer")) {
+				rp.section = "Allow";
+			} else if (pm.getGroup() != null) {
+				rp.section = Algorithms.capitalizeFirstLetter(pm.getGroup().replace('_', ' '));
+			}
+			if (pm.getType() == RoutingParameterType.BOOLEAN) {
+				rp.value = pm.getDefaultBoolean();
+			} else {
+				if (pm.getType() == RoutingParameterType.NUMERIC) {
+					rp.value = 0;
+				} else {
+					rp.value = "";
+				}
+				rp.valueDescriptions = pm.getPossibleValueDescriptions();
+				rp.values = pm.getPossibleValues();
+			}
+			int lastIndex = -1;
+			for (int i = 0; i < rps.size(); i++) {
+				if (Algorithms.objectEquals(rp.section, rps.get(i).section)) {
+					lastIndex = i;
+				}
+			}
+			if (lastIndex != -1 && !Algorithms.isEmpty(rp.section)) {
+				rps.add(lastIndex + 1, rp);
+			} else {
+				rps.add(rp);
+			}
+		}
+		for (RoutingParameter rp : rps) {
+			rm.params.put(rp.key, rp);
+		}
+		rm.params.put(nativeRouting.key, nativeRouting);
+		rm.params.put(nativeTrack.key, nativeTrack);
+		rm.params.put(calcMode.key, calcMode);
+	}
 
 	@PostMapping(path = {"/gpx-approximate"}, produces = "application/json")
-	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file, 
-			@RequestParam(defaultValue = "car") String routeMode) throws IOException {
+	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                        @RequestParam(defaultValue = "car") String routeMode) throws IOException {
 		InputStream is = file.getInputStream();
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
 		is.close();
