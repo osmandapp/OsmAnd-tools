@@ -47,25 +47,16 @@ public class MapsCollection {
 		}
 		TreeSet<String> allDwNames = new TreeSet<>();
 		for (File file : allFiles) {
-			String dwName = getDownloadNameByFileName(file.getName());
-			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
-			if (wr != null) {
-				allDwNames.add(wr.getRegionDownloadName());
-			}
+			allDwNames.add(getDownloadNameByFileName(file.getName()));
 		}
 		for (File file : allFiles) {
 			String dwName = getDownloadNameByFileName(file.getName());
 			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
-			if (wr == null) {
-				// unknown map add to use
-				filesToUse.add(file);
+			if (wr != null && wr.getSuperregion() != null && wr.getSuperregion().getRegionDownloadName() != null
+					&& allDwNames.contains(wr.getSuperregion().getRegionDownloadName())) {
+				log.debug("SKIP initializing cause bigger map is present: " + file.getName());
 			} else {
-				if (wr.getSuperregion() != null && 
-						allDwNames.contains(wr.getSuperregion().getRegionDownloadName())) {
-					log.debug("SKIP initializing cause bigger map is present: " + file.getName());
-				} else {
-					filesToUse.add(file);
-				}
+				filesToUse.add(file);
 			}
 		}
 		return filesToUse;
