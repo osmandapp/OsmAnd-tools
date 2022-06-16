@@ -30,6 +30,7 @@ import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
 
+import net.osmand.util.UtilityToExcludeDuplicatedMaps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -87,8 +88,6 @@ import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.util.FilterMap.*;
 
 @Service
 public class OsmAndMapsService {
@@ -806,12 +805,10 @@ public class OsmAndMapsService {
 	
 	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
 		initObfReaders();
-		osmandRegions = new OsmandRegions();
-		osmandRegions.prepareFile();
 		
 		List<BinaryMapIndexReader> files = new ArrayList<>();
 		List<String> regionNameList = new ArrayList<>();
-		
+		UtilityToExcludeDuplicatedMaps excludeDuplicatedMaps = new UtilityToExcludeDuplicatedMaps();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			boolean intersects;
 			mainLoop:
@@ -820,8 +817,8 @@ public class OsmAndMapsService {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						boolean containsBiggerMap = checkBiggerMapExist(files, regionNameList, ref.fileIndex.getFileName(), osmandRegions);
-						if (!containsBiggerMap) {
+						boolean isMainMap = excludeDuplicatedMaps.isCurrentMainMap(files, regionNameList, ref.fileIndex.getFileName());
+						if (!isMainMap) {
 							if (ref.reader == null) {
 								long val = System.currentTimeMillis();
 								RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$

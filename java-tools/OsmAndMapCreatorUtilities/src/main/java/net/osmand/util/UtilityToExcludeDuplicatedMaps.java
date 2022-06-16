@@ -3,18 +3,23 @@ package net.osmand.util;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-public class FilterMap {
+public class UtilityToExcludeDuplicatedMaps {
     
-    FilterMap() {
-    }
+    private OsmandRegions osmandRegions;
+    private static final Log log = LogFactory.getLog(UtilityToExcludeDuplicatedMaps.class);
     
-    public static boolean checkBiggerMapExist(List<BinaryMapIndexReader> files, List<String> regionNameList, String fileName, OsmandRegions osmandRegions) {
+    public boolean isCurrentMainMap(List<BinaryMapIndexReader> files, List<String> regionNameList, String fileName) throws IOException {
+        osmandRegions = new OsmandRegions();
+        osmandRegions.prepareFile();
         String name = getRegionName(fileName);
         WorldRegion wr = osmandRegions.getRegionDataByDownloadName(name);
         String parentRegionName = wr.getSuperregion().getRegionDownloadName();
@@ -33,15 +38,19 @@ public class FilterMap {
         return true;
     }
     
-    public static void checkBiggerMapExistNative(File file, List<String> regionNameList, String fileName, OsmandRegions osmandRegions,
-                                                 List<File> files, TreeSet<String> allFileNames, boolean filterDuplicates) {
-        String name = getRegionName(fileName);
+    public void checkBiggerMapExistNative(File file, List<String> regionNameList,
+                                          List<File> files, TreeSet<String> allFileNames, boolean filterDuplicates) throws IOException {
+        osmandRegions = new OsmandRegions();
+        osmandRegions.prepareFile();
+        String name = getRegionName(file.getName());
         WorldRegion wr = osmandRegions.getRegionDataByDownloadName(name);
         if (wr == null) {
             //check basemap
             boolean basemapPresent = checkMoreGenericMapPresent(allFileNames, file.getName());
             if (filterDuplicates && !basemapPresent) {
                 files.add(file);
+            } else {
+                log.debug("SKIP initializing cause bigger map is present: " + file.getName());
             }
         } else {
             String parentRegionName = wr.getSuperregion().getRegionDownloadName();
@@ -55,7 +64,7 @@ public class FilterMap {
         }
     }
     
-    public static boolean containsBiggerMap(List<String> regionNameList, String parentName) {
+    private boolean containsBiggerMap(List<String> regionNameList, String parentName) {
         for (String name : regionNameList) {
             if (name.equalsIgnoreCase(parentName)) {
                 return true;
@@ -64,7 +73,7 @@ public class FilterMap {
         return false;
     }
     
-    public static void removeSubregionsIfExist(WorldRegion wr, List<String> regionNameList, List<File> files) {
+    private void removeSubregionsIfExist(WorldRegion wr, List<String> regionNameList, List<File> files) {
         for (WorldRegion subr : wr.getSubregions()) {
             String subrName = subr.getRegionDownloadName();
             if (regionNameList.contains(subrName)) {
@@ -74,12 +83,12 @@ public class FilterMap {
         }
     }
     
-    public static String getRegionName(String fileName) {
+    private String getRegionName(String fileName) {
         String name = fileName.split("\\.")[0];
         return name.substring(0, name.length() - 2).toLowerCase();
     }
     
-    private static boolean checkMoreGenericMapPresent(TreeSet<String> allFileNames, String file) {
+    private boolean checkMoreGenericMapPresent(TreeSet<String> allFileNames, String file) {
         String[] splitParts = file.split("_");
         boolean presentBaseFile = false;
         for (int i = 0; i < splitParts.length - 1 && !presentBaseFile; i++) {

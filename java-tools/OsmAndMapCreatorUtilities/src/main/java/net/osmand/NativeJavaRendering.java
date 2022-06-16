@@ -24,7 +24,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import net.osmand.map.OsmandRegions;
+import net.osmand.util.UtilityToExcludeDuplicatedMaps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xml.sax.Attributes;
@@ -48,7 +48,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import resources._R;
 
-import static net.osmand.util.FilterMap.*;
+import static net.osmand.util.UtilityToExcludeDuplicatedMaps.*;
 
 public class NativeJavaRendering extends NativeLibrary {
 
@@ -479,6 +479,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		Map<String, FileIndex> map = new TreeMap<>();
 		File cacheFile = new File(dir, INDEXES_CACHE);
 		CachedOsmandIndexes cache = new CachedOsmandIndexes();
+		UtilityToExcludeDuplicatedMaps excludeDuplicatedMaps = new UtilityToExcludeDuplicatedMaps();
 		if (cacheFile.exists()) {
 			cache.readFromFile(cacheFile, CachedOsmandIndexes.VERSION);
 		}
@@ -498,15 +499,12 @@ public class NativeJavaRendering extends NativeLibrary {
 			List<String> regionNameList = new ArrayList<>();
 			List<File> files = new ArrayList<>();
 			
-			OsmandRegions osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
-			
 			for (File file : filesToUse) {
 				FileIndex fileIndex = cache.getFileIndex(file, true);
 				if (fileIndex != null) {
 					map.put(file.getAbsolutePath(), fileIndex);
 				}
-				checkBiggerMapExistNative(file, regionNameList, file.getName(), osmandRegions, files, allFileNames, filterDuplicates);
+				excludeDuplicatedMaps.checkBiggerMapExistNative(file, regionNameList, files, allFileNames, filterDuplicates);
 			}
 			filesToUse.retainAll(files);
 		}
