@@ -24,6 +24,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.map.OsmandRegions;
 import net.osmand.util.UtilityToExcludeDuplicatedMaps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -496,13 +497,15 @@ public class NativeJavaRendering extends NativeLibrary {
 			
 			List<String> regionNameList = new ArrayList<>();
 			List<File> files = new ArrayList<>();
+			OsmandRegions osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
 			
 			for (File file : filesToUse) {
 				FileIndex fileIndex = cache.getFileIndex(file, true);
 				if (fileIndex != null) {
 					map.put(file.getAbsolutePath(), fileIndex);
 				}
-				excludeDuplicatedMaps.isCurrentMainMapNative(file, regionNameList, files, allFileNames, filterDuplicates);
+				excludeDuplicatedMaps.isCurrentMainMapNative(file, regionNameList, files, allFileNames, filterDuplicates, osmandRegions);
 			}
 			filesToUse.retainAll(files);
 		}

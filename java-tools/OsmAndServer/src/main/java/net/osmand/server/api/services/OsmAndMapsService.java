@@ -805,7 +805,8 @@ public class OsmAndMapsService {
 	
 	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
 		initObfReaders();
-		
+		osmandRegions = new OsmandRegions();
+		osmandRegions.prepareFile();
 		List<BinaryMapIndexReader> files = new ArrayList<>();
 		List<String> regionNameList = new ArrayList<>();
 		UtilityToExcludeDuplicatedMaps excludeDuplicatedMaps = new UtilityToExcludeDuplicatedMaps();
@@ -817,7 +818,7 @@ public class OsmAndMapsService {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						boolean isMainMap = excludeDuplicatedMaps.isCurrentMainMap(files, regionNameList, ref.fileIndex.getFileName());
+						boolean isMainMap = excludeDuplicatedMaps.isCurrentMainMap(files, regionNameList, ref.fileIndex.getFileName(), osmandRegions);
 						if (!isMainMap) {
 							if (ref.reader == null) {
 								long val = System.currentTimeMillis();
