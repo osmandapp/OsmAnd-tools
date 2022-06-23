@@ -25,6 +25,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -47,6 +48,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private static final String NODE_NETWORK_TAG = "node_network_point";
 	private static final String NODE_NETWORK_MULTIPLE_VALUE = "multiple";
 	private static final boolean DELETE_AFTER_38_RELEASE = false;
+	private static final String EMPTY_STRING = "";
 
 	private Map<String, TIntArrayList> socketTypes;
 
@@ -467,8 +469,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		if(tags.containsKey("highway") && entity == EntityType.WAY) {
 			tags = new LinkedHashMap<>(tags);
-			int integrity = calculateIntegrity(tags)[0];
-			int integrity_bicycle_routing = calculateIntegrity(tags)[1];
+			int[] integrityResult = calculateIntegrity(tags);
+			int integrity = integrityResult[0];
+			int integrity_bicycle_routing = integrityResult[1];
 			int max_integrity = 30;
 			int normalised_integrity_brouting = 0;
 			if (integrity_bicycle_routing >= 0) {
@@ -654,32 +657,32 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			return tags;
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
-		String[] countyArray = new String[] { "berkeley", "luc", "herkimer", "montgomery", "guadalupe", "cumberland",
+		String[] countyArray = new String[] { "luc", "herkimer", "montgomery", "guadalupe", "cumberland",
 				"cass", "koochiching", "bergen", "saint lawrence", "schenectady", "log", "sullivan", "wil", "oneida",
-				"le sueur", "way", "tus", "kandiyohi", "beltrami", "becker", "madison", "passaic", "douglas", "clay",
+				"le sueur", "way", "tus", "kandiyohi", "beltrami", "becker", "madison", "passaic", "douglas",
 				"rensselaer", "dutchess", "freeborn", "ful", "crow wing", "hennepin", "orange", "clearwater", "sum",
 				"hubbard", "hol", "otsego", "stearns", "carlton", "itasca", "anoka", "kanabec", "cook", "atlantic",
 				"benton", "saratoga", "albany", "essex", "aitkin", "mah", "isanti", "faribault", "washington",
 				"rockland", "cape_may", "ramsey", "lac qui parle", "warren", "greene", "chisago", "blue earth",
-				"jackson", "ulster", "somerset", "ott", "sussex", "morris", "kittson", "car", "pine", "big stone",
-				"fillmore", "dakota", "monmouth", "col", "grant", "kane", "goodhue", "vin", "med", "putnam",
+				"ulster", "somerset", "ott", "sussex", "morris", "kittson", "car", "pine", "big stone",
+				"fillmore", "dakota", "monmouth", "col", "kane", "goodhue", "vin", "med",
 				"middlesex", "lake", "columbia", "dodge", "hoc", "yellow medicine", "rice", "murray", "per", "steele",
-				"outagamie", "asd", "mercer", "lake of the woods", "mchenry", "fulton", "cottonwood", "carver",
+				"outagamie", "asd", "lake of the woods", "mchenry", "fulton", "cottonwood", "carver",
 				"ocean", "mille lacs", "redwood", "meeker", "winona", "renville", "brown", "swift", "pope", "martin",
 				"delaware", "fay", "houston", "union", "chippewa", "nobles", "lyon", "wright", "sibley", "nicollet",
 				"jef", "watonwan", "schoharie", "mcleod", "chenango", "hudson", "winnipeg", "pipestone", "mrw",
-				"woodbury", "gue", "lincoln", "moe", "preston", "uni", "stevens", "wilkin", "traverse", "leelanau",
+				"woodbury", "gue", "moe", "uni", "stevens", "wilkin", "traverse", "leelanau",
 				"sen", "cook", "woo", "camden", "sta", "lic", "h", "cth", "ath", "burlington", "gonzales", "hamilton",
 				"sauk", "colorado", "westchester", "story", "bel", "pau", "san", "lor", "ozaukee", "jasper", "waupaca",
 				"dane", "belt", "oswego", "erie", "floyd", "bremer", "fond du lac", "sheboygan", "har", "macon",
-				"chickasaw", "boone", "hays", "caldwell", "wya", "cos", "wayne", "shelby", "monona", "harrison",
-				"clayton", "monongalia", "winnebago", "langlade", "hen", "gea", "eri", "chp", "but", "dupage", "ida",
-				"hardin", "buena vista", "hancock", "waushara", "walworth", "shawano", "saint croix", "rock",
+				"chickasaw", "hays", "caldwell", "wya", "cos", "shelby", "monona",
+				"clayton", "winnebago", "langlade", "hen", "gea", "eri", "chp", "but", "dupage", "ida",
+				"hardin", "buena vista", "waushara", "walworth", "shawano", "saint croix", "rock",
 				"portage", "milwaukee", "door", "put", "pre", "por", "odnr", "mei", "jac", "hur", "ham", "gac", "fra",
 				"cli", "ash", "onondaga", "gloucester", "cape may", "charlotte", "waseca", "olmsted", "marquette",
-				"fulton", "champaign", "worth", "sac", "pottawattamie", "polk", "marshall", "lucas", "keokuk",
+				"fulton", "champaign", "worth", "sac", "pottawattamie", "polk", "lucas", "keokuk",
 				"franklin", "cedar", "adams", "escambia", "kent", "santa clara", "chautauqua", "yates", "steuben",
-				"chemung", "tioga", "tompkins", "schuyler", "allegany", "cattaraugus", "broome", "lewis", "jefferson",
+				"chemung", "tioga", "tompkins", "schuyler", "allegany", "cattaraugus", "broome",
 				"livingston" };
 		if(rtags.containsKey("network")) {
 			String network = rtags.get("network");
@@ -693,7 +696,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 						rtags.put("us_state_network", "yes");
 					}
 					if (network.length() > 5) {
-						network = network.substring(0, 5);
 						rtags.put("network", network);
 					}
 				}
@@ -1310,50 +1312,53 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
             precolors.put("bridleway","white");
 	}
 
-	private boolean isColor(String s) {
-		return s.equals("black")
-				|| s.equals("blue")
-				|| s.equals("green")
-				|| s.equals("red")
-				|| s.equals("white")
-				|| s.equals("yellow")
-				|| s.equals("orange")
-				|| s.equals("purple")
-				|| s.equals("brown");
-	}
-
-
 	public Map<String, String> transformOsmcAndColorTags(Map<String, String> tags) {
 		if (tags.containsKey("osmc:symbol")) {
-			tags = new LinkedHashMap<String, String>(tags);
-			// osmc:symbol=black:red:blue_rectangle ->
-			// 1.For backwards compatibility (already done) - osmc_shape=bar, osmc_symbol=black, osmc_symbol_red_blue_name=.
-			// 2.New tags: osmc_waycolor=black, osmc_background=red, osmc_foreground=blue_rectangle, osmc_foreground2,
-			// osmc_text, osmc_textcolor, osmc_stub_name=. ,
+
+			tags = new LinkedHashMap<>(tags);
 			String value = tags.get("osmc:symbol");
-			String[] tokens = value.split(":", 6);
-			osmcBackwardCompatility(tags, tokens);
-			if (tokens != null) {
-				String[] tokensToAdd = tokens;
-				if ((tokens.length == 4 && isColor(tokens[3])) || (tokens.length == 5 && isColor(tokens[4]))) {
-					tokensToAdd = new String[] { tokens[0], tokens[1], tokens.length == 4 ? "" : tokens[2], "",
-							tokens.length == 4 ? tokens[2] : tokens[3], tokens.length == 4 ? tokens[3] : tokens[4] };
+			OsmcSymbol osmcSymbol = new OsmcSymbol(value);
+			osmcSymbol.addOsmcNewTags(tags);
+
+		} else if (tags.containsKey("route") && tags.get("route").equals("hiking")) {
+
+			if (tags.containsKey("ref")) {
+				tags = new LinkedHashMap<>(tags);
+				String ref = tags.get("ref");
+				if (!ref.isEmpty()) {
+					OsmcSymbol osmcSymbol = new OsmcSymbol("white", ref.toUpperCase(), "black");
+					osmcSymbol.addOsmcNewTags(tags);
 				}
-				addOsmcNewTags(tags, tokensToAdd, "");
+			} else if (tags.containsKey("name")) {
+				tags = new LinkedHashMap<>(tags);
+				String name = tags.get("name");
+				int count = name.codePointCount(0, name.length());
+				String text = "";
+				for (int i = 0; i < count; i++) {
+					int codePoint = name.codePointAt(i);
+					if (Character.isUpperCase(codePoint)) {
+						char[] c = Character.toChars(codePoint);
+						text += new String(c);
+					}
+				}
+				if (!text.isEmpty()) {
+					OsmcSymbol osmcSymbol = new OsmcSymbol("white", text, "black");
+					osmcSymbol.addOsmcNewTags(tags);
+				}
 			}
 		}
+
 		if (tags.containsKey("color")) {
-			tags = new LinkedHashMap<String, String>(tags);
+			tags = new LinkedHashMap<>(tags);
 			prepareColorTag(tags, "color");
 		}
 		if (tags.containsKey("colour")) {
-			tags = new LinkedHashMap<String, String>(tags);
+			tags = new LinkedHashMap<>(tags);
 			prepareColorTag(tags, "colour");
 		}
 
 		return tags;
 	}
-
 
 	private static int[] calculateIntegrity(Map<String, String> mp) {
 		int result = 0;
@@ -1551,74 +1556,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return result_array;
 	}
 
-
-	private void addOsmcNewTags(Map<String, String> propogated, String[] tokens, String routeTag) {
-		if (tokens.length > 0) {
-			String wayColor = tokens[0]; // formatColorToPalette(tokens[0], true);
-			propogated.put(routeTag + "osmc_waycolor", wayColor);
-			if (tokens.length > 1) {
-				String bgColor = tokens[1]; // formatColorToPalette(tokens[1], true);
-				propogated.put(routeTag + "osmc_background", bgColor);
-				propogated.put("osmc_stub_name", ".");
-				if (tokens.length > 2) {
-					String shpVl = tokens[2]; // formatColorToPalette(tokens[1], true);
-					propogated.put(routeTag + "osmc_foreground", shpVl);
-					if (tokens.length > 3) {
-						String shp2Vl = tokens[3];
-						propogated.put(routeTag + "osmc_foreground2", shp2Vl);
-						if (tokens.length > 4) {
-							String txtVl = tokens[4];
-							propogated.put(routeTag + "osmc_text", txtVl);
-							propogated.put(routeTag + "osmc_text_symbol", txtVl);
-							if (tokens.length > 5) {
-								String txtcolorVl = tokens[5];
-								propogated.put(routeTag + "osmc_textcolor", txtcolorVl);
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-
-	private void osmcBackwardCompatility(Map<String, String> propogated, String[] tokens) {
-		if (tokens.length > 0) {
-			String wayColor = formatColorToPalette(tokens[0], true);
-			propogated.put("osmc_symbol_" + wayColor, "");
-			propogated.put("osmc_symbol", wayColor);
-			if (tokens.length > 1) {
-				String bgColor = tokens[1];
-				String fgColorPrefix = "";
-				String shape = "";
-				if (tokens.length > 2) {
-					String fgColor = tokens[2];
-					if (precolors.containsKey(fgColor)) {
-						shape = fgColor;
-						fgColor = precolors.get(fgColor);
-					} else if (fgColor.indexOf('_') >= 0) {
-						final int i = fgColor.indexOf('_');
-						shape = fgColor.substring(i + 1).toLowerCase();
-						fgColor = fgColor.substring(0, i);
-					}
-					fgColorPrefix = "_" + fgColor;
-				}
-				String shpValue = "none";
-				if (shape.length() != 0) {
-					shpValue = barValues.contains(shape) ? "bar" : "circle";
-				}
-				propogated.put("osmc_shape", shpValue);
-				String symbol = "osmc_symbol_" + formatColorToPalette(bgColor, true) + fgColorPrefix + "_name";
-				String name = "."; // "\u00A0";
-				// if (tokens.length > 3 && tokens[3].trim().length() > 0) {
-				// name = tokens[3];
-				// }
-
-				propogated.put(symbol, name);
-			}
-		}
-	}
-
 	public static class MapRouteTag {
 		String tag;
 		String value;
@@ -1667,5 +1604,4 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 	}
-
 }

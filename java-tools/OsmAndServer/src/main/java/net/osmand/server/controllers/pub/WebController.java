@@ -15,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,7 +40,6 @@ import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring5.SpringTemplateEngine;
 
 import net.osmand.server.api.services.PollsService;
-import net.osmand.server.api.services.PollsService.PollQuestion;
 
 @Controller
 @RequestMapping(path = { "", "ru", "de" })
@@ -76,9 +74,6 @@ public class WebController {
 		public String targetFile;
 	}
 
-	public WebController() {
-	}
-	
 
 	// TOP LEVEL API (redirects and static files)
 	@RequestMapping(path = { "tile_sources.php", "tile_sources.xml", "tile_sources" }, produces = { "application/xml" })

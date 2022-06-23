@@ -1,4 +1,4 @@
-package net.osmand.util;
+package net.osmand.util.translit;
 
 import net.sourceforge.pinyin4j.PinyinHelper;
 import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType;

@@ -591,12 +591,8 @@ public class UserdataController {
 		}
 		UserFile usf = new PremiumUserFilesRepository.UserFile();
 		long cnt, sum;
-		boolean checkExistingServerMap = type.toLowerCase().equals("file") && name.endsWith(".obf");
+		boolean checkExistingServerMap = checkThatObfFileisOnServer(name, type);
 		if (checkExistingServerMap) {
-			File fp = downloadService.getFilePath(name);
-			if (fp != null) {
-				System.out.println("File is found " + fp.getAbsolutePath());
-			}
 			file = createEmptyMultipartFile(file);
 		}
 		long zipsize = file.getSize();
@@ -630,6 +626,28 @@ public class UserdataController {
 		filesRepository.saveAndFlush(usf);
 
 		return ok();
+	}
+	
+	@GetMapping(value = "/check-file-on-server")
+	@ResponseBody
+	public ResponseEntity<String> upload(@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type) throws IOException {
+		if (checkThatObfFileisOnServer(name, type)) {
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "present")));
+		}
+		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "not-present")));
+	}
+
+	private boolean checkThatObfFileisOnServer(String name, String type) throws IOException {
+		boolean checkExistingServerMap = type.toLowerCase().equals("file") && name.endsWith(".obf");
+		if (checkExistingServerMap) {
+			File fp = downloadService.getFilePath(name);
+			if (fp == null) {
+				LOG.info("File is not found: " + name);
+				checkExistingServerMap = false;
+			}
+		}
+		return checkExistingServerMap;
 	}
 
 	

@@ -82,16 +82,16 @@ public class BinaryInspector {
 //					"-vpoi",
 					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-zoom=6",
+					"-zoom=15",
 					// road
-//					"-latlon=52.55243,13.56753",
-					System.getProperty("maps.dir")+"gpx.obf"
-//					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+//					"-latlon=48.46614,9.16976",
+//					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
+					System.getProperty("maps.dir")+"Place_fixed.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
