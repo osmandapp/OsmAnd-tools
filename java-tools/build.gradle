@@ -12,10 +12,19 @@ subprojects {
 	apply plugin: 'eclipse'
 	apply plugin: 'idea'
 
-
 	group 'net.osmand'
 	version 'master-snapshot'
 	sourceCompatibility = 11
+	eclipse {
+    	   classpath {
+	        file {
+        	    whenMerged {
+                	entries.findAll { it.kind == 'lib' }.each { it.entryAttributes['module'] = 'false' }
+            	    }
+        	}
+    	   }
+	}
+ 
 
 	test {
 		reports {

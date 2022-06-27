@@ -16,7 +16,7 @@ task collectFonts(type: Sync) {
 
 task buildDistribution(type: Zip) {
 	dependsOn jar
-	from(configurations.runtime.allArtifacts.files) {
+	from(configurations.runtimeClasspath.allArtifacts.files) {
 		rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
 	//	into '.'
 	}
@@ -66,28 +66,28 @@ dependencies {
 	// for manifest.mf
 	implementation 'com.belerweb:pinyin4j:2.5.0'
 
-	// runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-aarch64"
-	// runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-armv6"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-amd64"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-armv6"
-	// runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-armv6hf"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-i586"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-macosx-universal"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-solaris-amd64"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-solaris-i586"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-windows-amd64"
-	runtime "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-windows-i586"
+	// implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-aarch64"
+	// implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-android-armv6"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-amd64"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-armv6"
+	// implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-armv6hf"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-linux-i586"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-macosx-universal"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-solaris-amd64"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-solaris-i586"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-windows-amd64"
+	implementation "org.jogamp.gluegen:gluegen-rt:2.3.1:natives-windows-i586"
 
 	// runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-android-aarch64"
 	// runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-android-armv6"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-amd64"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-armv6"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-amd64"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-armv6"
 	// runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-armv6hf"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-i586"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-macosx-universal"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-solaris-amd64"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-solaris-i586"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-windows-amd64"
-	runtime "org.jogamp.jogl:jogl-all:2.3.1:natives-windows-i586"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-linux-i586"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-macosx-universal"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-solaris-amd64"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-solaris-i586"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-windows-amd64"
+	implementation "org.jogamp.jogl:jogl-all:2.3.1:natives-windows-i586"
 	testImplementation 'com.ibm.icu:icu4j:50.1'   
 }

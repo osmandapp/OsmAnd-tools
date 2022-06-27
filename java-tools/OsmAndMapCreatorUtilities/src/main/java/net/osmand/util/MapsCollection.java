@@ -20,15 +20,15 @@ public class MapsCollection {
 	private final List<File> allFiles = new ArrayList<File>();
 	private List<File> filesToUse;
     
-    public MapsCollection(boolean filterDuplicates) throws IOException {
-    	this.filterDuplicates = filterDuplicates;
-    	if(filterDuplicates) {
-    		osmandRegions = new OsmandRegions();
-    		osmandRegions.prepareFile();
-    	} else {
-    		osmandRegions = null;
-    	}
-    }
+	public MapsCollection(boolean filterDuplicates) throws IOException {
+		this.filterDuplicates = filterDuplicates;
+		if (filterDuplicates) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		} else {
+			osmandRegions = null;
+		}
+	}
     
     public void add(File obf) {
     	allFiles.add(obf);
