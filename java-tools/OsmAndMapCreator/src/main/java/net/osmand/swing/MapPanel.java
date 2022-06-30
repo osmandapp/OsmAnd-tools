@@ -428,7 +428,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 //		return (map == null ?  256 : map.getTileSize()) * mapDensity;
 		return 256 * mapDensity;
 	}
-	
+
 	public QuadRect getLatLonBBox() {
 		double xTileLeft = getXTile() - getCenterPointX() / getTileSize();
 		double xTileRight = getXTile() + getCenterPointX() / getTileSize();
@@ -715,7 +715,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				if (loadIfNeeded && cache.get(file) == null) {
 					String urlToLoad = map.getUrlToLoad(x, y, zoom);
 					if (urlToLoad != null) {
-						downloader.requestToDownload(new DownloadRequest(urlToLoad, en, x, y, zoom));
+						downloader.requestToDownload(new DownloadRequest(urlToLoad, en, "", x, y, zoom));
 					}
 				}
 			}
@@ -861,7 +861,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	public int getZoom() {
 		return zoom;
 	}
-	
+
 	public float getMapDensity() {
 		return mapDensity;
 	}
@@ -1019,7 +1019,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 
 
-	
+
 
 	public class MapMouseAdapter extends MouseAdapter {
 		private Point startDragging = null;
