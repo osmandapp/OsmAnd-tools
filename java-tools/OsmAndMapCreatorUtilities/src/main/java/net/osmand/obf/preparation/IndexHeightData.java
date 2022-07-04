@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferShort;
 import java.io.File;
@@ -16,6 +17,14 @@ import javax.imageio.ImageIO;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+
+import com.vividsolutions.jts.awt.ShapeWriter;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.util.AffineTransformation;
 
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
@@ -515,25 +524,30 @@ public class IndexHeightData {
 		System.out.println(lat + " "  +lon + " (lat/lon) -> file " + td.getFileName() + " (y, x in %) " + (float) latDelta + " " + (float) lonDelta);
 	}
 	
-	public static void main(String[] args) throws XmlPullParserException, IOException {
+	public static void main(String[] args) throws XmlPullParserException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+		IndexHeightData hd = new IndexHeightData();
+		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
+		
 //		test(-1.3, -3.1);
-		
-//		simpleTestHeight();
+//		simpleTestHeight(hd);
 //		USE_BILINEAR_INTERPOLATION = false;
-//		simpleTestHeight();
-//		testHeight();
+//		simpleTestHeight(hd);
+//		testHeight(hd);
 		
-//		testFileSmoothness();
-
+		Polygon plg = testFileSmoothness(hd);
+		long tms = System.currentTimeMillis();
+		List<Geometry> lst = generateGridPrecision(plg, 2.7, hd);
+		System.out.println((System.currentTimeMillis() - tms)  + " ms");
+		draw(plg, lst);
 	}
 
-	
 
 
 
-	protected static void testFileSmoothness() throws XmlPullParserException, IOException {
+	protected static Polygon testFileSmoothness(IndexHeightData hd) throws XmlPullParserException, IOException {
 //		File fl = new File("/Users/victorshcherb/osmand/maps/route_laspi.gpx");
 		File fl = new File("/Users/victorshcherb/osmand/route.gpx");
+		List<Coordinate> res = new ArrayList<Coordinate>();
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(new FileReader(fl));
 		int next;
@@ -541,10 +555,8 @@ public class IndexHeightData {
 		List<Float> h = new ArrayList<>();
 		double ele = 0;
 		double SPECIAL_VALUE = -18000;
-		double ROUTE_PRECISION = 0.2;
+		double ROUTE_PRECISION = 150;
 		String name = null;
-		IndexHeightData hd = new IndexHeightData();
-		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
 		while ((next = parser.next()) != XmlPullParser.END_DOCUMENT) {
 			if (next == XmlPullParser.START_TAG) {
 				if (parser.getName().equals("trkpt")) {
@@ -567,51 +579,135 @@ public class IndexHeightData {
 		}
 		
 		float d = 0;
-		for(int i = 0; i < l.size(); i++) {
-			if(i == 0) {
+		int pnt = 0;
+		for (int i = 0; i < l.size(); i++) {
+			if (i == 0) {
+				Coordinate c = new Coordinate(l.get(i).getLongitude(), l.get(i).getLatitude());
+				res.add(c);
 				System.out.println(0 + " " + h.get(0) + " ");
 			} else {
 				LatLon nxt = l.get(i);
 				LatLon prv = l.get(i - 1);
 				double dist = MapUtils.getDistance(prv, nxt);
 				int cf = 1;
-				while(dist / cf > ROUTE_PRECISION) {
+				while (dist / cf > ROUTE_PRECISION) {
 					cf *= 2;
 				}
-				float ph = h.get(i - 1);
 				double plat = prv.getLatitude();
 				double plon = prv.getLongitude();
 				for (int j = 0; j < cf; j++) {
 					double nlat = (nxt.getLatitude() - prv.getLatitude()) / cf + plat;
 					double nlon = (nxt.getLongitude() - prv.getLongitude()) / cf + plon;
-					float ch = (h.get(i) - h.get(i - 1)) / cf + ph;
 					d += MapUtils.getDistance(plat, plon, nlat, nlon);
+					Coordinate c = new Coordinate(nlon, nlat);
+					res.add(c);
 					USE_BILINEAR_INTERPOLATION = true;
 					double blh = hd.getPointHeight(nlat, nlon, null);
 					USE_BILINEAR_INTERPOLATION = false;
 					double bch = hd.getPointHeight(nlat, nlon, null);
+					System.out.println(String.format("%d %.6f %.6f %.2f %.2f", pnt++, nlat, nlon, d, bch, blh));
 					plat = nlat;
 					plon = nlon;
-					ph = ch;
-					System.out.println(d + "\t" + ch + "\t" + bch + "\t" + blh
-						//+"\t"+l.get(i)
-						);
 				}
 			}
-			
 		}
+		
+		Polygon polygon = new GeometryFactory().createPolygon(res.toArray(new Coordinate[res.size()]));
+		return polygon;
+	}
+
+
+
+	private static List<Geometry> generateGridPrecision(Polygon plg, double precision, IndexHeightData hd) {
+		Envelope e = plg.getEnvelopeInternal();
+		GeometryFactory factory = plg.getFactory();
+		int pw = (int) Math.pow(10, precision);
+		int top = (int) Math.ceil((e.getMaxY() * pw));
+		int bottom = (int) Math.floor((e.getMinY() * pw));
+		int left = (int) Math.floor((e.getMinX() * pw));
+		int right = (int) Math.ceil((e.getMaxX() * pw));
+		
+		System.out.println(
+				String.format("Width %d, height %d, Top %.5f, bottom %.5f, left %.5f, right %.5f", 
+						(right - left), (top - bottom), e.getMaxY(), e.getMinY(), e.getMinX(), e.getMaxX()));
+		for(int x = left; x <= right; x++) {
+			for(int y = top; y >= bottom; y--) {
+				double nlon = x / (pw * 1.0);
+				double nlat = y / (pw * 1.0);
+				String fmt = "%." + (int)(Math.ceil(precision)) + "f";
+				System.out.println(
+						String.format(fmt + " " + fmt +" %.2f", nlat, nlon, hd.getPointHeight(nlat, nlon, null)));
+			}
+		}
+		List<Geometry> r = new ArrayList<>();
+		
+		int numVertices = 0;
+		int numPolygons = 0;
+		for(int x = left; x < right; x++) {
+			for(int y = top; y > bottom; y--) {
+				for (int tr = 0; tr < 4; tr++) {
+					Polygon gridCell = genCellTriangle(factory, pw, x, y, tr);
+//					Polygon gridCell = genCell(factory, pw, x, y);
+					if (gridCell.coveredBy(plg)) {
+						r.add(gridCell);
+						// sz += 4;
+						numVertices += 1;
+						numPolygons++;
+					} else {
+						// 1. intersection
+						Geometry intersection = gridCell.intersection(plg);
+						r.add(intersection);
+						if (intersection.getNumPoints() >= 3) {
+							numVertices += (intersection.getNumPoints() - 2);
+							numPolygons++;
+						}
+						// 2. triangulation
+//						DelaunayTriangulationBuilder builder = new DelaunayTriangulationBuilder();
+//						builder.setSites(intersection.getBoundary());
+//						Geometry triangles = builder.getTriangles(plg.getFactory());
+//						System.out.println(intersection + " " + triangles);
+//						for (int i = 0; i < triangles.getNumGeometries(); i++) {
+//							Polygon triangle = (Polygon) triangles.getGeometryN(i);
+//							r.add(triangle);
+//						}
+					}
+				}
+			}
+		}
+		System.out.println("Polygons " + numPolygons + " Min triangles " + numVertices);
+		return r;
+	}
+
+	protected static Polygon genCellTriangle(GeometryFactory factory, int pw, int x, int y, int ind) {
+		List<Coordinate> ln = new ArrayList<Coordinate>();
+		ln.add(new Coordinate((x + 0.5)/ (pw * 1.0), (y - 0.5)/ (pw * 1.0)));
+		// ind == 0: x 0, 1, y 0, 0
+		// ind == 1: x 1, 1, y 0, 1
+		// ind == 2: x 0, 1, y 1, 1
+		// ind == 3: x 0, 0, y 0, 1
+		ln.add(new Coordinate((x + (ind % 2 == 0 ? 0 : (ind == 1 ? 1 : 0))) / (pw * 1.0), (y - (ind % 2 == 1 ? 0 : (ind == 0 ? 0 : 1))) / (pw * 1.0)));
+		ln.add(new Coordinate((x + (ind % 2 == 0 ? 1 : (ind == 1 ? 1 : 0))) / (pw * 1.0), (y - (ind % 2 == 1 ? 1 : (ind == 0 ? 0 : 1))) / (pw * 1.0)));
+		ln.add(new Coordinate((x + 0.5) / (pw * 1.0), (y - 0.5) / (pw * 1.0)));
+		Polygon gridCell = factory.createPolygon(ln.toArray(new Coordinate[ln.size()]));
+		return gridCell;
+	}
+
+	protected static Polygon genCell(GeometryFactory factory, int pw, int x, int y) {
+		List<Coordinate> ln = new ArrayList<Coordinate>();
+		ln.add(new Coordinate(x / (pw * 1.0), y / (pw * 1.0)));
+		ln.add(new Coordinate((x + 1)/ (pw * 1.0), y / (pw * 1.0)));
+		ln.add(new Coordinate((x + 1)/ (pw * 1.0), (y - 1) / (pw * 1.0)));
+		ln.add(new Coordinate(x / (pw * 1.0), (y - 1) / (pw * 1.0)));
+		ln.add(new Coordinate(x / (pw * 1.0), y / (pw * 1.0)));
+		Polygon gridCell = factory.createPolygon(ln.toArray(new Coordinate[ln.size()]));
+		return gridCell;
 	}
 	
-	protected static void simpleTestHeight() {
-		IndexHeightData hd = new IndexHeightData();
-		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
+	protected static void simpleTestHeight(IndexHeightData hd) {
 	    cmp(hd, 44.428722,33.711246, 255);
 	}
 
-	protected static void testHeight() {
-		IndexHeightData hd = new IndexHeightData();
-		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
-		
+	protected static void testHeight(IndexHeightData hd) {
 		cmp(hd, 48.57522, 45.72296, -3);
 		cmp(hd, 56.18137, 40.50929, 116);
 		cmp(hd, 44.3992045, 33.9498114, 129.1);
@@ -657,4 +753,60 @@ public class IndexHeightData {
 	}
 	
 	
+	
+	private static void draw(Polygon plg, List<Geometry> gothers) {
+		int WIDTH = 1200;
+		int HEIGHT = 800;
+		int MARGIN = 250;
+
+		AffineTransformation affine = new AffineTransformation();
+		Envelope e = plg.getEnvelopeInternal();
+		affine.translate(-e.getMinX(), -e.getMaxY());
+		affine.scale((WIDTH - MARGIN) / e.getWidth(), (HEIGHT - MARGIN) / e.getHeight());
+		affine.reflect(1, 0);
+		affine.translate(MARGIN / 2, MARGIN / 2);
+
+		ShapeWriter sw = new ShapeWriter();
+		final Shape[] finalShapes = new Shape[1 + (gothers == null ? 0 : gothers.size())];
+		int ind = 0;
+		finalShapes[ind++] = sw.toShape(affine.transform(plg));
+		if (gothers != null) {
+			for (Geometry g : gothers) {
+//				System.out.println(affine.transform(g));
+				finalShapes[ind++] = sw.toShape(affine.transform(g));
+			}
+		}
+		
+//		JPanel tg = new JPanel() {
+//			private static final long serialVersionUID = -371731683316195900L;
+//
+//			public void paintComponent(Graphics gphcs) {
+//				super.paintComponent(gphcs);
+//				this.setBackground(Color.WHITE);
+//				for(int ind = 0; ind < finalShapes.length; ind++) {
+//					if(ind == 0) {
+//						gphcs.setColor(Color.GRAY );
+//						((Graphics2D) gphcs).fill(finalShapes[ind]);
+//					} else {
+//						gphcs.setColor(Color.BLUE);
+//						((Graphics2D) gphcs).draw(finalShapes[ind]);
+//					}
+//				}
+//			}
+//		};
+//		JFrame frame = new JFrame("Test"); //$NON-NLS-1$
+////		UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+//		Container content = frame.getContentPane();
+//		frame.setFocusable(true);
+//		frame.setBounds(0, 0, WIDTH, HEIGHT);
+//		content.add(tg);
+//		frame.setVisible(true);
+//		frame.addWindowListener(new WindowAdapter() {
+//			@Override
+//			public void windowClosing(WindowEvent e) {
+//				System.exit(0);
+//			}
+//		});
+
+	}
 }
