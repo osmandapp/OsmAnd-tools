@@ -31,11 +31,11 @@ osmand:
 server:
   port: 8080
   servlet.session:
-    persistent: true
     timeout: 7d
-    store-dir: ${osmand.files.location}/session/
-    cookie.same-site: none
     cookie.secure: true
+    cookie.same-site: none
+    # store-dir: ${osmand.files.location}/session/
+    # persistent: true
   tomcat.threads.max: 5
   connection-timeout: 120s
   compression.enabled: true
@@ -115,7 +115,8 @@ logging:
 server:
   port: 8090
   servlet.session.timeout: 7d
-  use-forward-headers: true
+  # use-forward-headers: true
+  forward-headers-strategy: native
   # session.timeout: 18000 #432000 #servlet.session.timeout
   address: 127.0.0.1 #keep it behind proxy
   tomcat:

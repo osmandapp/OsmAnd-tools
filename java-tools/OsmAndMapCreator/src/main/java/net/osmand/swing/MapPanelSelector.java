@@ -115,7 +115,7 @@ public class MapPanelSelector {
 		menu.add(new JLabel("Select route"));
 		Map<RouteKey, GPXFile> routeMap ;
 		NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
-		NetworkRouteSelector routeSelector = new NetworkRouteSelector(DataExtractionSettings.getSettings().getObfReaders(), f);
+		NetworkRouteSelector routeSelector = new NetworkRouteSelector(DataExtractionSettings.getSettings().getObfReaders(), f, null);
 		Collection<RouteKey> routeKeys;
 		if (LOAD_ROUTE_BBOX) {
 			routeMap = routeSelector.getRoutes(panel.getLatLonBBox(), true, null);

@@ -715,7 +715,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				if (loadIfNeeded && cache.get(file) == null) {
 					String urlToLoad = map.getUrlToLoad(x, y, zoom);
 					if (urlToLoad != null) {
-						downloader.requestToDownload(new DownloadRequest(urlToLoad, en, x, y, zoom));
+						downloader.requestToDownload(new DownloadRequest(urlToLoad, en, null, x, y, zoom));
 					}
 				}
 			}

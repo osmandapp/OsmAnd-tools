@@ -166,7 +166,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			mapLogin.setForceHttps(true);
 		}
 		http.exceptionHandling().defaultAuthenticationEntryPointFor(mapLogin, new AntPathRequestMatcher("/mapapi/**"));
-		
+//		http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.ALWAYS));
 		http.rememberMe().tokenValiditySeconds(3600*24*14);
 		http.logout().deleteCookies("JSESSIONID").
 			logoutSuccessUrl("/").logoutRequestMatcher(new AntPathRequestMatcher("/logout")).permitAll();
@@ -213,6 +213,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				ResponseEntity<Map<String, Object>> res = restTemplate.exchange(request, 
 						new ParameterizedTypeReference<Map<String, Object>>() {});
 				if (!res.getStatusCode().is2xxSuccessful()) {
+					LOG.warn("Result status code from github: " + res.getStatusCode().name() + " " + res.getBody());
 					return null;
 				}
 				return res.getBody();
@@ -247,7 +248,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**", configuration);
+		source.registerCorsConfiguration("/**",  configuration);
 		return source;
 	}
 

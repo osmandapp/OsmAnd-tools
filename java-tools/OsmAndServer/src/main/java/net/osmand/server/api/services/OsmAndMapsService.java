@@ -30,6 +30,7 @@ import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
 
+import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -801,30 +802,35 @@ public class OsmAndMapsService {
 		}
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
-
+	
 	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReader> files = new ArrayList<>();
+		MapsCollection mapsCollection = new MapsCollection(true);
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
-			boolean intersects = false;
-			mainLoop: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
+			boolean intersects;
+			fileOverlaps: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
 				for (RoutingSubregion s : rp.getSubregionsList()) {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						if (ref.reader == null) {
-							long val = System.currentTimeMillis();
-							RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-							ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
-							LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms"); 
-						}
-						files.add(ref.reader);
-						break mainLoop;
+						mapsCollection.add(ref.file);
+						break fileOverlaps;
 					}
 				}
 			}
-		};
-		return files.toArray(new BinaryMapIndexReader[files.size()]);
+		}
+		for (File f : mapsCollection.getFilesToUse()) {
+			BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+			if (ref.reader == null) {
+				long val = System.currentTimeMillis();
+				RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+				ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
+				LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+			}
+			files.add(ref.reader);
+		}
+		return files.toArray(new BinaryMapIndexReader[0]);
 	}
 	
 	public synchronized void initObfReaders() throws IOException {
