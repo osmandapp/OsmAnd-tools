@@ -33,9 +33,6 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
-import com.google.gson.JsonObject;
-import net.osmand.live.subscriptions.ReceiptValidationHelper;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,11 +52,13 @@ import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subscriptions;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import net.osmand.live.subscriptions.AmazonIAPHelper;
 import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonSubscription;
 import net.osmand.live.subscriptions.HuaweiIAPHelper;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
+import net.osmand.live.subscriptions.ReceiptValidationHelper;
 import net.osmand.live.subscriptions.UpdateSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;

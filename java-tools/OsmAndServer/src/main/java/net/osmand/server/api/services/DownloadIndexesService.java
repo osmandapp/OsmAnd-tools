@@ -113,8 +113,16 @@ public class DownloadIndexesService  {
 	
 	public File getFilePath(String name) throws IOException {
 		DownloadIndexDocument doc = getIndexesDocument(false, false);
-		int ind = name.indexOf('.');
-		String dwName = name.substring(0, ind) + "_2" + name.substring(ind);
+		// ignore folders for srtm / hillshade / slope
+		if (name.lastIndexOf('/') != -1) {
+			name = name.substring(name.lastIndexOf('/') + 1);
+		}
+		String dwName = name;
+		// add _2 for obf files 
+		if (name.endsWith("obf")) {
+			int ind = name.indexOf('.');
+			dwName = name.substring(0, ind) + "_2" + name.substring(ind);
+		}
 		File file = null;
 		for (DownloadIndex di : doc.getAllMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
