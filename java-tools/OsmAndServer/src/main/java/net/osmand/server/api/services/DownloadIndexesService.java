@@ -117,11 +117,14 @@ public class DownloadIndexesService  {
 		if (name.lastIndexOf('/') != -1) {
 			name = name.substring(name.lastIndexOf('/') + 1);
 		}
-		String dwName = name;
-		// add _2 for obf files 
+		String dwName;
 		if (name.endsWith("obf")) {
+			// add _2 for obf files 
 			int ind = name.indexOf('.');
 			dwName = name.substring(0, ind) + "_2" + name.substring(ind);
+		} else {
+			// replace ' ' as it could be done on device 
+			dwName = name.replace(' ', '_');
 		}
 		File file = null;
 		for (DownloadIndex di : doc.getAllMaps()) {

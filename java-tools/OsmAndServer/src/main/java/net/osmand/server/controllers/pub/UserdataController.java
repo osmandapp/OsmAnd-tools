@@ -711,7 +711,7 @@ public class UserdataController {
 
 	@GetMapping(value = "/check-file-on-server")
 	@ResponseBody
-	public ResponseEntity<String> upload(@RequestParam(name = "name", required = true) String name,
+	public ResponseEntity<String> checkFileOnServer(@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type) throws IOException {
 		if (checkThatObfFileisOnServer(name, type)) {
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "present")));
@@ -720,7 +720,8 @@ public class UserdataController {
 	}
 
 	private boolean checkThatObfFileisOnServer(String name, String type) throws IOException {
-		boolean checkExistingServerMap = type.toLowerCase().equals("file") && name.endsWith(".obf");
+		boolean checkExistingServerMap = type.toLowerCase().equals("file") && (
+				name.endsWith(".obf") || name.endsWith(".sqlite"));
 		if (checkExistingServerMap) {
 			File fp = downloadService.getFilePath(name);
 			if (fp == null) {
