@@ -721,7 +721,7 @@ public class UserdataController {
 
 	private boolean checkThatObfFileisOnServer(String name, String type) throws IOException {
 		boolean checkExistingServerMap = type.toLowerCase().equals("file") && (
-				name.endsWith(".obf") || name.endsWith(".sqlite"));
+				name.endsWith(".obf") || name.endsWith(".sqlitedb"));
 		if (checkExistingServerMap) {
 			File fp = downloadService.getFilePath(name);
 			if (fp == null) {
