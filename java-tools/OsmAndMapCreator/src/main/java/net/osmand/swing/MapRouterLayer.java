@@ -789,17 +789,17 @@ public class MapRouterLayer implements MapPanelLayer {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Entity> entities;
-				if(byNetwork){
+				List<Entity> entities = new ArrayList<>();
+				if (byNetwork) {
 					try {
 						NetworkRouteGpxApproximator gpxApproximator =
 								new NetworkRouteGpxApproximator(getSettings().getObfReaders(), true);
 						gpxApproximator.setGpxFile(selectedGPXFile);
-						entities = gpxApproximator.approximate();
+						calculateResult(entities, gpxApproximator.approximate());
 					} catch (IOException e) {
 						throw new RuntimeException(e);
 					}
-				}else {
+				} else {
 					entities = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
 				}
 				outputPoints(entities);
