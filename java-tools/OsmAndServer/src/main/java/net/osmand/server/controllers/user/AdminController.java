@@ -70,6 +70,7 @@ import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
 import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.api.services.PollsService;
+import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
@@ -111,6 +112,9 @@ public class AdminController {
 
 	@Autowired
 	private EmailRegistryService emailService;
+	
+	@Autowired
+	protected UserSubscriptionService userSubService;
 
 	@Autowired
 	private ApplicationContext appContext;
@@ -216,7 +220,13 @@ public class AdminController {
 				deviceSub.purchaseToken += " (email sent & registered)";
 				emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
 			} else {
-				deviceSub.purchaseToken += " (ERROR: email is already registered)";
+				if(existingUser.orderid == null || userSubService.checkOrderIdPremium(existingUser.orderid) != null) {
+					existingUser.orderid = deviceSub.orderId;
+					usersRepository.saveAndFlush(existingUser);
+					deviceSub.purchaseToken += " (new PRO subscription replaced expired old)";
+				} else {
+					deviceSub.purchaseToken += " (ERROR: user already has PRO subscription)";
+				}
 			}
 		}
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
