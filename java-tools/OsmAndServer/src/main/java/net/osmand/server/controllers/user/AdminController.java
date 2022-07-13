@@ -207,7 +207,7 @@ public class AdminController {
 		deviceSub.purchaseToken = comment;
 		c.add(Calendar.YEAR, 1);
 		deviceSub.expiretime = c.getTime(); 
-		subscriptionsRepository.save(deviceSub);
+		boolean error = false;
 		if (emailSender.isEmail(comment)) {
 			String email = comment;
 			PremiumUser existingUser = usersRepository.findByEmail(email);
@@ -223,11 +223,18 @@ public class AdminController {
 				if(existingUser.orderid == null || userSubService.checkOrderIdPremium(existingUser.orderid) != null) {
 					existingUser.orderid = deviceSub.orderId;
 					usersRepository.saveAndFlush(existingUser);
-					deviceSub.purchaseToken += " (new PRO subscription replaced expired old)";
+					deviceSub.purchaseToken += " (new PRO subscription is updated)";
 				} else {
+					error = true;
 					deviceSub.purchaseToken += " (ERROR: user already has PRO subscription)";
 				}
 			}
+		} else {
+			error = true;
+			deviceSub.purchaseToken += " (ERROR: please enter email only)";
+		}
+		if (!error) {
+			subscriptionsRepository.save(deviceSub);
 		}
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
         return "redirect:info#audience";
