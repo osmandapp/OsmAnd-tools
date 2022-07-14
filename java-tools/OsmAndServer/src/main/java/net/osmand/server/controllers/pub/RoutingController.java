@@ -447,6 +447,10 @@ public class RoutingController {
 			int dir = r.isForwardDirection() ? 1 : -1;
 			if (r.getDescription() != null && r.getDescription().length() > 0) {
 				features.add(new Feature(Geometry.point(r.getStartPoint())).prop("description", r.getDescription()));
+				features.add(new Feature(Geometry.point(r.getStartPoint())).prop("routingTime", r.getRoutingTime()));
+				features.add(new Feature(Geometry.point(r.getStartPoint())).prop("segmentTime", r.getSegmentTime()));
+				features.add(new Feature(Geometry.point(r.getStartPoint())).prop("segmentSpeed", r.getSegmentSpeed()));
+				
 			}
 			for (i = r.getStartPointIndex(); ; i += dir) {
 				if(i != r.getEndPointIndex()) {
