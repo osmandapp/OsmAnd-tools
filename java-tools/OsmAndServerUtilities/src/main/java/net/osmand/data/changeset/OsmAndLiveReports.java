@@ -33,7 +33,7 @@ import com.google.gson.Gson;
 public class OsmAndLiveReports {
 
 	
-	public static final double DEFAULT_APPROXIMATION_DONATION = 500; // eur
+	public static final double DEFAULT_APPROXIMATION_DONATION = 0; // eur
 	public static final double PAYOUT_PERCENT = 0.03; // 3%
 	
 	private static final Log LOG = PlatformUtil.getLog(OsmAndLiveReports.class);
