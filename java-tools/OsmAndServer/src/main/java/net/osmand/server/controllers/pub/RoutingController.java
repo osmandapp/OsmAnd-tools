@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -380,7 +381,8 @@ public class RoutingController {
 	}
 	
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routing(@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode)
+	public ResponseEntity<?> routing(@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode,
+			@RequestParam(required = false) String[] avoidRoads)
 			throws IOException, InterruptedException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig();
@@ -412,7 +414,7 @@ public class RoutingController {
 		if (list.size() >= 2 && !tooLong) {
 			try {
 				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, props, list.get(0), list.get(list.size() - 1),
-						list.subList(1, list.size() - 1));
+						list.subList(1, list.size() - 1), avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads) );
 				if (res != null) {
 					convertResults(resList, features, res);
 				}

@@ -79,6 +79,7 @@ import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.search.SearchUICore;
@@ -565,7 +566,7 @@ public class OsmAndMapsService {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
 		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null);
+		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null);
 		GeocodingUtilities su = new GeocodingUtilities();
 		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
 		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
@@ -590,7 +591,7 @@ public class OsmAndMapsService {
 			return Collections.emptyList();
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, null);
+		RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null);
 		List<RouteSegmentResult> route = approximate(ctx, router, props, polyline);
 		return route;
 	}
@@ -614,7 +615,7 @@ public class OsmAndMapsService {
 	}
 
 	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router, 
-			RoutingServerConfigEntry[] serverEntry) throws IOException {
+			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds) throws IOException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
@@ -652,10 +653,15 @@ public class OsmAndMapsService {
 				serverEntry[0] = entry;
 			}
 		}
-		RoutingConfiguration config = RoutingConfiguration.getDefault().
+		Builder cfgBuilder = RoutingConfiguration.getDefault();
+		if (avoidRoadsIds != null) {
+			for (String s : avoidRoadsIds) {
+				cfgBuilder.addImpassableRoad(Long.parseLong(s));
+			}
+		}
 		// addImpassableRoad(6859437l).
 		// setDirectionPoints(directionPointsFile).
-				build(routeModeKey, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
+		RoutingConfiguration config =  cfgBuilder.build(routeModeKey, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 		config.routeCalculationTime = System.currentTimeMillis();
 		if (paramMode == null) {
 			paramMode = GeneralRouterProfile.CAR == config.router.getProfile() ? RouteCalculationMode.COMPLEX
@@ -668,12 +674,13 @@ public class OsmAndMapsService {
 	}
 	
 	
-	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start, LatLon end, List<LatLon> intermediates)
+	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
+			LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
 			throws IOException, InterruptedException {
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc);
+		RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds);
 		if (rsc[0] != null) {
 			StringBuilder url = new StringBuilder(rsc[0].url);
 			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
