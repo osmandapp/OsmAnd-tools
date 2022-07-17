@@ -654,6 +654,7 @@ public class OsmAndMapsService {
 			}
 		}
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
+		cfgBuilder.clearImpassableRoadLocations();
 		if (avoidRoadsIds != null) {
 			for (String s : avoidRoadsIds) {
 				cfgBuilder.addImpassableRoad(Long.parseLong(s));
