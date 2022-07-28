@@ -29,9 +29,13 @@ else()
 endif()
 
 set(target_specific_sources "")
+set(target_specific_private_definitions "")
 if (CMAKE_TARGET_OS STREQUAL "macosx")
 	set(target_specific_sources ${target_specific_sources}
 		"x11.cpp"
+	)
+	set(target_specific_private_definitions ${target_specific_private_definitions}
+		-DGL_SILENCE_DEPRECATION
 	)
 endif()
 
@@ -55,6 +59,10 @@ if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)
 		OsmAndCore_ResourcesBundle_shared
 		${extra_libraries}
 	)
+	target_compile_definitions(bird
+		PRIVATE
+			${target_specific_private_definitions}
+	)
 endif()
 
 if (TARGET OsmAndCore_static_standalone)
@@ -70,6 +78,10 @@ if (TARGET OsmAndCore_static_standalone)
 	target_link_libraries(bird_standalone
 		OsmAndCore_static_standalone
 		${extra_libraries}
+	)
+	target_compile_definitions(bird
+		PRIVATE
+			${target_specific_private_definitions}
 	)
 	link_entire_static_library(bird_standalone OsmAndCore_ResourcesBundle_static)
 endif()
