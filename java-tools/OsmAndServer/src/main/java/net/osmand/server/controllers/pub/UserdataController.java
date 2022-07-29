@@ -247,10 +247,16 @@ public class UserdataController {
 			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 			if (otherUser != null) {
 				String hideEmail = hideEmail(otherUser.email);
-				return error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-						"user was already signed up as " + hideEmail);
+				List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
+				// check that user already registered at least 1 device (avoid typos in email)
+				if (pud != null && !pud.isEmpty()) {
+					return error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+							"user was already signed up as " + hideEmail);
+				} else {
+					otherUser.orderid = null;
+					usersRepository.saveAndFlush(otherUser);
+				}
 			}
-
 			pu = new PremiumUsersRepository.PremiumUser();
 			pu.email = email;
 			pu.regTime = new Date();
