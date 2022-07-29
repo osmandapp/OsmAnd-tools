@@ -1,6 +1,7 @@
 package net.osmand.server.api.repo;
 
 import java.util.Date;
+import java.util.List;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -23,6 +24,8 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
 	PremiumUserDevice findById(int id);
 	
 	PremiumUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
+	
+	List<PremiumUserDevice> findByUserid(int userid);
 
 
     @Entity
