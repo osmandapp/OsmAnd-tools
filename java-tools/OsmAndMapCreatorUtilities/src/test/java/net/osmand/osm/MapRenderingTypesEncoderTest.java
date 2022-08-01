@@ -58,7 +58,7 @@ public class MapRenderingTypesEncoderTest {
         tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(10).get(OSMC_TAG)));
         //osmc:symbol=red:white: :V:red
         tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(11).get(OSMC_TAG)));
-        //osmc:symbol=yellow::yellow_bar:PR:
+        //osmc:symbol=yellow::yellow_bar:PR: https://www.openstreetmap.org/relation/12548505
         tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(12).get(OSMC_TAG)));
     }
 

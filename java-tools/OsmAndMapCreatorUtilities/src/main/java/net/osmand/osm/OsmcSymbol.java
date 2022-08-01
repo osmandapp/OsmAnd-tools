@@ -1,5 +1,6 @@
 package net.osmand.osm;
 
+import net.osmand.util.Algorithms;
 import org.apache.commons.lang3.ArrayUtils;
 import java.util.ArrayList;
 import java.util.Map;
@@ -14,9 +15,7 @@ public class OsmcSymbol {
 
 	/**
 	 * https://wiki.openstreetmap.org/wiki/Key:osmc:symbol#Examples
-	 * osmc:symbol=yellow::yellow_bar:PR: https://www.openstreetmap.org/relation/12548505
 	 * osmc:symbol=waycolor:background[:foreground][[:foreground2]:text:textcolor]
-	 *
 	 * @param value - value of tag "osmc:symbol"
 	 */
 	public OsmcSymbol(String value) {
@@ -29,7 +28,9 @@ public class OsmcSymbol {
 			if (tokensLength > 1) {
 				if (isBackground(tokens[1])) {
 					//get background
-					background = tokens[1].isEmpty() ? "white" : tokens[1];
+					background = tokens[1];
+				} else if (tokens[1].isEmpty()) {
+					background = "white";
 				} else if (isForeground(tokens[1])) {
 					//get foreground when hasn't background
 					foreground = tokens[1];
@@ -141,7 +142,7 @@ public class OsmcSymbol {
 	}
 
 	private boolean isBackground(String s) {
-		return hasColorPrefix(s) || isColor(s) || s.isEmpty();
+		return hasColorPrefix(s) || isColor(s);
 	}
 
 	private boolean hasColorPrefix(String s) {
@@ -158,10 +159,11 @@ public class OsmcSymbol {
 
 	private void getText(String[] tokens, int textInd) {
 		int afterTextInd = textInd + 1;
-		if (textInd != -1 && afterTextInd < tokens.length && (isColor(tokens[afterTextInd])
-				|| tokens[afterTextInd].isEmpty())) {
-			text = tokens[textInd];
-			textcolor = tokens[afterTextInd];
+		if (textInd != -1 && afterTextInd < tokens.length) {
+			if (isColor(tokens[afterTextInd]) || Algorithms.isEmpty(tokens[afterTextInd])) {
+				text = tokens[textInd];
+				textcolor = tokens[afterTextInd];
+			}
 		}
 	}
 
