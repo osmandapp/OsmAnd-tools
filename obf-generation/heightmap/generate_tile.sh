@@ -9,20 +9,56 @@
 # Fail on any error
 set -e
 
+VERBOSE_PARAM=""
+FILE=""
 SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+TILE_SIZE=32
+POSITIONAL_ARGS=()
 
-DEMS_PATH=$(realpath "$1")
-shift
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -d|--dempath)
+      DEMS_PATH="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -f|--file)
+      FILE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -o|--output)
+      OUTPUT_PATH="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -t|--tilesize)
+      TILESIZE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --verbose)
+      VERBOSE_PARAM="--verbose"
+      shift # past argument with no value
+      ;;
+    -*|--*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1") # save positional arg
+      shift # past argument
+      ;;
+  esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
 echo "DEM files path:       $DEMS_PATH"
-
-OUTPUT_PATH=$(realpath "$1")
-shift
 echo "Output path:          $OUTPUT_PATH"
-
-WORK_PATH="${OUTPUT_PATH}/.tmp"
+WORK_PATH="${OUTPUT_PATH}/.tmp_${FILE}"
 echo "Work directory:       $WORK_PATH"
 
-TILE_SIZE=32
 let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
 echo "Tile size:            $TILE_SIZE"
 echo "Tile size (full):     $TILE_FULL_SIZE"
@@ -42,10 +78,9 @@ else
 fi
 
 # Step 0. Clean output path and recreate it
-if [ -e "${OUTPUT_PATH}" ]; then
-    rm -rf "${OUTPUT_PATH}"
-fi
 mkdir -p "${OUTPUT_PATH}"
+rm -rf "${OUTPUT_PATH}/${FILE}*" || true
+rm -rf "${WORK_PATH}" || true
 mkdir -p "${WORK_PATH}"
 
 # Step 1. Create GDAL VRT to reference all DEM files
@@ -56,7 +91,7 @@ if [ ! -f "$WORK_PATH/heightdbs.vrt" ]; then
         -resolution highest \
         -hidenodata \
         -vrtnodata "0" \
-        "$WORK_PATH/heightdbs.vrt" "$DEMS_PATH"/*)
+        "$WORK_PATH/heightdbs.vrt" "$DEMS_PATH/${FILE}.tif")
 fi
 
 # Step 2. Convert VRT to single giant GeoTIFF file
@@ -97,7 +132,7 @@ mkdir -p "$WORK_PATH/tiles"
     --size=$TILE_SIZE \
     --driver=GTiff \
     --extension=tif \
-    --verbose \
+    $VERBOSE_PARAM \
     "$WORK_PATH/heightdbs_mercator.tif" "$WORK_PATH/tiles")
 
 # Step 5. Generate tiles that overlap each other by 1 heixel
@@ -108,7 +143,7 @@ mkdir -p "$WORK_PATH/overlapped_tiles"
     --driver=GTiff \
     --driver-options="COMPRESS=LZW" \
     --extension=tif \
-    --verbose \
+    $VERBOSE_PARAM \
     "$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles")
 
 # Step 6. Pack overlapped tiles into TileDB
@@ -116,12 +151,12 @@ echo "Packing..."
 mkdir -p "$WORK_PATH/db"
 (cd "$WORK_PATH/db" && \
 "$SRC_PATH/packer.py" \
-    --verbose \
+    $VERBOSE_PARAM \
     "$WORK_PATH/overlapped_tiles" "$WORK_PATH/db")
 
 # Step 7. Copy output
 echo "Publishing..."
-cp -a "$WORK_PATH/db/." "$OUTPUT_PATH"
+mv "$WORK_PATH/db/world.heightmap.sqlite" "${OUTPUT_PATH}/${FILE}.heightmap.sqlite"
 
 # Step 8. Clean up work
 rm -rf "$WORK_PATH"
