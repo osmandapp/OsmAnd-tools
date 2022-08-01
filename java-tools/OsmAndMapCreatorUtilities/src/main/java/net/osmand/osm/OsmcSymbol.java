@@ -1,5 +1,6 @@
 package net.osmand.osm;
 
+import net.osmand.util.Algorithms;
 import org.apache.commons.lang3.ArrayUtils;
 import java.util.ArrayList;
 import java.util.Map;
@@ -28,6 +29,8 @@ public class OsmcSymbol {
 				if (isBackground(tokens[1])) {
 					//get background
 					background = tokens[1];
+				} else if (tokens[1].isEmpty()) {
+					background = "white";
 				} else if (isForeground(tokens[1])) {
 					//get foreground when hasn't background
 					foreground = tokens[1];
@@ -155,9 +158,12 @@ public class OsmcSymbol {
 	}
 
 	private void getText(String[] tokens, int textInd) {
-		if (textInd != -1 && textInd + 1 < tokens.length && isColor(tokens[textInd + 1])) {
-			text = tokens[textInd];
-			textcolor = tokens[textInd + 1];
+		int afterTextInd = textInd + 1;
+		if (textInd != -1 && afterTextInd < tokens.length) {
+			if (isColor(tokens[afterTextInd]) || Algorithms.isEmpty(tokens[afterTextInd])) {
+				text = tokens[textInd];
+				textcolor = tokens[afterTextInd];
+			}
 		}
 	}
 

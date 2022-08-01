@@ -58,6 +58,8 @@ public class MapRenderingTypesEncoderTest {
         tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(10).get(OSMC_TAG)));
         //osmc:symbol=red:white: :V:red
         tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(11).get(OSMC_TAG)));
+        //osmc:symbol=yellow::yellow_bar:PR: https://www.openstreetmap.org/relation/12548505
+        tagsList.add(Map.of(OSMC_TAG, resultTagsList.get(12).get(OSMC_TAG)));
     }
 
     private void createTransformOsmcResult() {
@@ -152,6 +154,14 @@ public class MapRenderingTypesEncoderTest {
                 Map.entry("osmc_stub_name", "."),
                 Map.entry("osmc_text", "V"),
                 Map.entry("osmc_textcolor", "red")
+        ));
+        resultTagsList.add(Map.ofEntries(
+                Map.entry("osmc:symbol", "yellow::yellow_bar:PR:"),
+                Map.entry("osmc_waycolor", "yellow"),
+                Map.entry("osmc_background", "white_2"),
+                Map.entry("osmc_stub_name", "."),
+                Map.entry("osmc_foreground", "yellow_bar_2"),
+                Map.entry("osmc_text", "PR")
         ));
     }
 }
