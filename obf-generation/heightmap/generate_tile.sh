@@ -4,7 +4,7 @@
 # These DBs contain tiles of specified size by zoom levels
 
 # Basic usage is
-# generate.sh /path/to/dem/collection /path/to/output/dir
+# ./generate_tile.sh -d /path/to/dem/collection/ -o /path/to/output/dir/ -f N46E008
 
 # Fail on any error
 set -e
