@@ -77,7 +77,6 @@
 #include <OsmAndCore/Search/AmenitiesInAreaSearch.h>
 #include <OsmAndCore/Search/AddressesByNameSearch.h>
 #include <OsmAndCore/ValueAnimator.h>
-#include <OsmAndCore/Utilities.h>
 #include <OsmAndCore/Search/ReverseGeocoder.h>
 
 bool glutWasInitialized = false;
@@ -120,7 +119,8 @@ QString styleName = "default";
 #define SCREEN_HEIGHT 760
 //#define SCREEN_WIDTH 256
 //#define SCREEN_HEIGHT 256
-
+//#define SCREEN_WIDTH 350
+//#define SCREEN_HEIGHT 760
 
 #if defined(WIN32)
 const bool useGpuWorker = true;
@@ -451,18 +451,18 @@ int main(int argc, char** argv)
         OsmAnd::ReleaseCore();
         return EXIT_FAILURE;
     }
-    animator.reset(new OsmAnd::MapAnimator());
+    animator = std::make_shared<OsmAnd::MapAnimator>();
     animator->setMapRenderer(renderer);
     //////////////////////////////////////////////////////////////////////////
 
     if (dataDirSpecified)
     {
-        resourcesManager.reset(new OsmAnd::ResourcesManager(
+        resourcesManager = std::make_shared<OsmAnd::ResourcesManager>(
             dataDir.absoluteFilePath(QLatin1String("storage")),
             dataDir.absoluteFilePath(QLatin1String("storage_ext")),
             QList<QString>(),
             dataDir.absoluteFilePath(QLatin1String("World_basemap_mini_2.obf")),
-            dataDir.absoluteFilePath(QLatin1String("tmp"))));
+            dataDir.absoluteFilePath(QLatin1String("tmp")));
 
         const auto renderer_ = renderer;
         resourcesManager->localResourcesChangeObservable.attach(0,
@@ -573,6 +573,10 @@ int main(int argc, char** argv)
     viewport.left() = 0;
     viewport.bottom() = SCREEN_HEIGHT;
     viewport.right() = SCREEN_WIDTH;
+//    viewport.top() = static_cast<int>(+0.0f * static_cast<float>(SCREEN_HEIGHT));
+//    viewport.left() = static_cast<int>(+0.0f * static_cast<float>(SCREEN_WIDTH));
+//    viewport.bottom() = static_cast<int>(+1.5f * static_cast<float>(SCREEN_HEIGHT));
+//    viewport.right() = static_cast<int>(+1.0f * static_cast<float>(SCREEN_WIDTH));
     renderer->setWindowSize(OsmAnd::PointI(SCREEN_WIDTH, SCREEN_HEIGHT));
     renderer->setViewport(viewport);
     /*renderer->setTarget(OsmAnd::PointI(
@@ -600,20 +604,30 @@ int main(int argc, char** argv)
 //        )));
 //    renderer->setZoom(12.0f);
 
-    // Kiev
-    renderer->setTarget(OsmAnd::PointI(
-        1255337783,
-        724166131));
-    ////renderer->setZoom(11.0f);
-    renderer->setZoom(8.0f);
+//    // Kiev
+//    renderer->setTarget(OsmAnd::PointI(
+//        1255337783,
+//        724166131));
+//    ////renderer->setZoom(11.0f);
+//    renderer->setZoom(8.0f);
+//
+//    // Synthetic
+//    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+//        45.731606,
+//        36.528217)));
+//    renderer->setZoom(8.0f);
 
-    // Synthetic
+    // Nice
     renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        45.731606,
-        36.528217)));
-    renderer->setZoom(8.0f);
+        43.5804,
+        7.1251)));
+    renderer->setZoom(14.0f);
 
     renderer->setAzimuth(0.0f);
+
+    // Elevation
+    renderer->setElevationAngle(20.0f);
+    renderer->setAzimuth(-30.0f);
 
     auto renderConfig = renderer->getConfiguration();
     renderer->setConfiguration(renderConfig);
@@ -621,7 +635,7 @@ int main(int argc, char** argv)
     if (lastClickedLocationMarker)
         lastClickedLocationMarker->setPosition(renderer->getState().target31);
 
-    bool ok = renderer->initializeRendering();
+    bool ok = renderer->initializeRendering(true);
     assert(ok);
     //////////////////////////////////////////////////////////////////////////
 
@@ -826,7 +840,8 @@ void mouseMotion(int x, int y)
 
         const auto tileSize31 = (1u << (31 - state.zoomLevel));
         auto scale31 = static_cast<double>(tileSize31) /
-            std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCurrentTileSizeOnScreenInPixels();
+            std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)
+                ->getTileSizeOnScreenInPixels();
 
         OsmAnd::PointI newTarget;
         newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
@@ -883,7 +898,9 @@ void keyboardHandler(unsigned char key, int x, int y)
 
     const auto state = renderer->getState();
     const auto wasdZoom = static_cast<int>(
-        state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f));
+        state.zoomLevel + (state.visualZoom >= 1.0f
+                               ? state.visualZoom - 1.0f
+                               : (state.visualZoom - 1.0f) * 2.0f));
     const auto wasdStep = (1 << (31 - wasdZoom));
 
     // ' ' * + - .  0 1 2 3 4 5 6 7 8 9 A D S W [ \\ \x1B ] a b c d e f g h i j k l m n o p q r s t u v w x z
@@ -924,17 +941,19 @@ void keyboardHandler(unsigned char key, int x, int y)
         renderer->setTarget(newTarget);
         return;
     }
+    case 'R':
     case 'r':
     {
         auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.distanceToFog += 1.0f;
+        fogConfiguration.distanceToFog -= (key == 'R' ? 10.0f : 1.0f);
         renderer->setFogConfiguration(fogConfiguration);
         return;
     }
+    case 'F':
     case 'f':
     {
         auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.distanceToFog += 1.0f;
+        fogConfiguration.distanceToFog += (key == 'F' ? 10.0f : 1.0f);
         renderer->setFogConfiguration(fogConfiguration);
         return;
     }
@@ -1321,7 +1340,7 @@ void specialHandler(int key, int x, int y)
         modifiers & GLUT_ACTIVE_SHIFT ? "+" : "-");
 }
 
-void closeHandler(void)
+void closeHandler()
 {
     renderer->releaseRendering(true);
 
@@ -1344,14 +1363,15 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 2)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
-        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
+            binaryMapObjectsProvider = std::make_shared<OsmAnd::ObfMapObjectsProvider>(obfsCollection, obfMapObjectsProviderMode);
+        mapPrimitivesProvider = std::make_shared<OsmAnd::MapPrimitivesProvider>(binaryMapObjectsProvider, primitivizer);
 
         // general
         QHash< QString, QString > settings;
-        settings.insert("appMode", "browse map");
+        settings.insert("baseAppMode", "default");
         //settings.insert("contourLines", "11");
         // settings.insert("osmcTraces", "true");
+//        settings.insert("OSMMapperAssistantFixme", "true");
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1360,12 +1380,12 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 3)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
-        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
+            binaryMapObjectsProvider = std::make_shared<OsmAnd::ObfMapObjectsProvider>(obfsCollection, obfMapObjectsProviderMode);
+        mapPrimitivesProvider = std::make_shared<OsmAnd::MapPrimitivesProvider>(binaryMapObjectsProvider, primitivizer);
 
         // car
         QHash< QString, QString > settings;
-        settings.insert("appMode", "car");
+        settings.insert("baseAppMode", "car");
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1374,12 +1394,12 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 4)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
-        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
+            binaryMapObjectsProvider = std::make_shared<OsmAnd::ObfMapObjectsProvider>(obfsCollection, obfMapObjectsProviderMode);
+        mapPrimitivesProvider = std::make_shared<OsmAnd::MapPrimitivesProvider>(binaryMapObjectsProvider, primitivizer);
 
         // bicycle
         QHash< QString, QString > settings;
-        settings.insert("appMode", "bicycle");
+        settings.insert("baseAppMode", "bicycle");
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1388,12 +1408,12 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 5)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
-        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
+            binaryMapObjectsProvider = std::make_shared<OsmAnd::ObfMapObjectsProvider>(obfsCollection, obfMapObjectsProviderMode);
+        mapPrimitivesProvider = std::make_shared<OsmAnd::MapPrimitivesProvider>(binaryMapObjectsProvider, primitivizer);
 
         // pedestrian
         QHash< QString, QString > settings;
-        settings.insert("appMode", "pedestrian");
+        settings.insert("baseAppMode", "pedestrian");
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1402,7 +1422,7 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 6)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
+            binaryMapObjectsProvider = std::make_shared<OsmAnd::ObfMapObjectsProvider>(obfsCollection, obfMapObjectsProviderMode);
 
         auto tileProvider = new OsmAnd::ObfMapObjectsMetricsLayerProvider(binaryMapObjectsProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
@@ -1410,8 +1430,8 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 7)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
-        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
+            binaryMapObjectsProvider = std::make_shared<OsmAnd::ObfMapObjectsProvider>(obfsCollection, obfMapObjectsProviderMode);
+        mapPrimitivesProvider = std::make_shared<OsmAnd::MapPrimitivesProvider>(binaryMapObjectsProvider, primitivizer);
 
         auto tileProvider = new OsmAnd::MapPrimitivesMetricsLayerProvider(mapPrimitivesProvider);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
@@ -1419,8 +1439,8 @@ void activateProvider(int layerIdx, int idx)
     else if (idx == 8)
     {
         if (!binaryMapObjectsProvider)
-            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
-        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
+            binaryMapObjectsProvider = std::make_shared<OsmAnd::ObfMapObjectsProvider>(obfsCollection, obfMapObjectsProviderMode);
+        mapPrimitivesProvider = std::make_shared<OsmAnd::MapPrimitivesProvider>(binaryMapObjectsProvider, primitivizer);
 
         auto tileProvider = new OsmAnd::MapRasterMetricsLayerProvider(
             std::shared_ptr<OsmAnd::MapRasterLayerProvider>(new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider)));
@@ -1717,6 +1737,36 @@ void displayHandler()
     }
 
     glFlush();
+
+    if (false)
+    {
+        std::array<float, SCREEN_WIDTH * SCREEN_HEIGHT> depthBuffer;
+        glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+        glReadPixels(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_COMPONENT, GL_FLOAT, depthBuffer.data());
+        verifyOpenGL();
+
+        const auto maxDepth = *std::max_element(depthBuffer.cbegin(), depthBuffer.cend());
+        const auto minDepth = *std::min_element(depthBuffer.cbegin(), depthBuffer.cend());
+
+        std::array<OsmAnd::ColorARGB, SCREEN_WIDTH * SCREEN_HEIGHT> visualDepthBuffer;
+        for (auto yRow = 0; yRow < SCREEN_HEIGHT; yRow++)
+        {
+            for (auto xCol = 0; xCol < SCREEN_WIDTH; xCol++)
+            {
+                const auto depthValue = depthBuffer[yRow * SCREEN_WIDTH + xCol];
+                const auto visualDepthValue = static_cast<uint8_t>(std::clamp(depthValue * 255.0f, 0.0f, 255.0f));
+                visualDepthBuffer[yRow * SCREEN_WIDTH + xCol] = OsmAnd::ColorARGB(127, visualDepthValue, 0, 0);
+            }
+        }
+
+        glRasterPos2f(0, 0);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glDrawPixels(SCREEN_WIDTH, SCREEN_HEIGHT, GL_BGRA, GL_UNSIGNED_BYTE, visualDepthBuffer.data());
+        verifyOpenGL();
+
+        glFlush();
+    }
+
     glutSwapBuffers();
 
     if (nSight || gDEBugger || constantRefresh)
