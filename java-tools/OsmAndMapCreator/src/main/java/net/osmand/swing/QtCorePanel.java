@@ -336,7 +336,7 @@ public class QtCorePanel implements GLEventListener {
 		mapRenderer.setWindowSize(new PointI(width, height));
 
 		if (!mapRenderer.isRenderingInitialized()) {
-			if (!mapRenderer.initializeRendering())
+			if (!mapRenderer.initializeRendering(true))
 				System.err.println("Failed to initialize rendering");
 		}
 	}
