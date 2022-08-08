@@ -55,7 +55,7 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Step 0. Clean output path and recreate it
-WORK_PATH="${OUTPUT_PATH}/.tmp_${FILE}"
+WORK_PATH=".tmp_${FILE}"
 rm -rf "${WORK_PATH}" || true
 mkdir -p "${WORK_PATH}"
 OUTPUT_RESULT=${OUTPUT_PATH}/${FILE}.heightmap.sqlite
