@@ -55,7 +55,7 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Step 0. Clean output path and recreate it
-WORK_PATH=".tmp_${FILE}"
+WORK_PATH="./.tmp_${FILE}"
 rm -rf "${WORK_PATH}" || true
 mkdir -p "${WORK_PATH}"
 OUTPUT_RESULT=${OUTPUT_PATH}/${FILE}.heightmap.sqlite
@@ -87,18 +87,16 @@ fi
 # Step 1. Create GDAL VRT to reference all DEM files
 if [ ! -f "$WORK_PATH/heightdbs.vrt" ]; then
     echo "Creating VRT..."
-    (cd "$WORK_PATH" && \
     gdalbuildvrt \
         -resolution highest \
         -hidenodata \
         -vrtnodata "0" \
-        "$WORK_PATH/heightdbs.vrt" "$DEMS_PATH/${FILE}.tif")
+        "$WORK_PATH/heightdbs.vrt" "$DEMS_PATH/${FILE}.tif"
 fi
 
 # Step 2. Convert VRT to single giant GeoTIFF file
 if [ ! -f "$WORK_PATH/heightdbs.tif" ]; then
     echo "Baking giant GeoTIFF..."
-    (cd "$WORK_PATH" && \
     gdal_translate -of GTiff \
         -strict \
         --config GDAL_NUM_THREADS ALL_CPUS \
@@ -107,13 +105,12 @@ if [ ! -f "$WORK_PATH/heightdbs.tif" ]; then
         -co "BIGTIFF=YES" \
         -co "SPARSE_OK=TRUE" \
         -co "TILED=NO" \
-        "$WORK_PATH/heightdbs.vrt" "$WORK_PATH/heightdbs.tif")
+        "$WORK_PATH/heightdbs.vrt" "$WORK_PATH/heightdbs.tif"
 fi
 
 # Step 3. Re-project to Mercator
 if [ ! -f "$WORK_PATH/heightdbs_mercator.tif" ]; then
     echo "Re-projecting..."
-    (cd "$WORK_PATH" && \
     gdalwarp -of GTiff \
         --config GDAL_NUM_THREADS ALL_CPUS \
         -co "COMPRESS=LZW" \
@@ -122,38 +119,33 @@ if [ ! -f "$WORK_PATH/heightdbs_mercator.tif" ]; then
         -t_srs "+init=epsg:3857 +over" \
         -r cubic \
         -multi \
-        "$WORK_PATH/heightdbs.tif" "$WORK_PATH/heightdbs_mercator.tif")
+        "$WORK_PATH/heightdbs.tif" "$WORK_PATH/heightdbs_mercator.tif"
 fi
 
 # Step 4. Slice giant projected GeoTIFF to tiles of specified size and downscale them
 echo "Slicing..."
 mkdir -p "$WORK_PATH/tiles"
-(cd "$WORK_PATH/tiles" && \
 "$SRC_PATH/slicer.py" \
     --size=$TILE_SIZE \
     --driver=GTiff \
     --extension=tif \
     $VERBOSE_PARAM \
-    "$WORK_PATH/heightdbs_mercator.tif" "$WORK_PATH/tiles")
+    "$WORK_PATH/heightdbs_mercator.tif" "$WORK_PATH/tiles"
 
 # Step 5. Generate tiles that overlap each other by 1 heixel
 echo "Overlapping..."
 mkdir -p "$WORK_PATH/overlapped_tiles"
-(cd "$WORK_PATH/overlapped_tiles" && \
 "$SRC_PATH/overlap.py" \
     --driver=GTiff \
     --driver-options="COMPRESS=LZW" \
     --extension=tif \
     $VERBOSE_PARAM \
-    "$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles")
+    "$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles"
 
 # Step 6. Pack overlapped tiles into TileDB
 echo "Packing..."
 mkdir -p "$WORK_PATH/db"
-(cd "$WORK_PATH/db" && \
-"$SRC_PATH/packer.py" \
-    $VERBOSE_PARAM \
-    "$WORK_PATH/overlapped_tiles" "$WORK_PATH/db")
+"$SRC_PATH/packer.py" $VERBOSE_PARAM "$WORK_PATH/overlapped_tiles" "$WORK_PATH/db"
 
 # Step 7. Copy output
 echo "Publishing..."
