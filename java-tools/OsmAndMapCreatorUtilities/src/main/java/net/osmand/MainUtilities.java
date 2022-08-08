@@ -39,7 +39,7 @@ import net.osmand.util.GenerateExtractScript;
 import net.osmand.util.IndexBatchCreator;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.ResourceDeleter;
-import net.osmand.util.SplitHillshadeIntoRegions;
+import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 
@@ -169,7 +169,9 @@ public class MainUtilities {
 			} else if (utl.equals("combine-srtm-into-file")) {
 				CombineSRTMIntoFile.main(subArgsArray);
 			} else if (utl.equals("split-hillshade-into-regions")) {
-				SplitHillshadeIntoRegions.main(subArgsArray);
+				ConvertLargeRasterSqliteIntoRegions.main(subArgsArray);
+			} else if (utl.equals("collect-sqlitedb-into-regions")) {
+				ConvertLargeRasterSqliteIntoRegions.main(subArgsArray);
 			} else if (utl.equals("merge-std-files")) {
 				BinaryMerger.mergeStandardFiles(subArgsArray);
 			} else if (utl.equals("generate-roads")) {
