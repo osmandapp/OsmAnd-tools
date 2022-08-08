@@ -207,7 +207,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 				}
 			}
 		} else {
-			procFile(sqliteFile, targetFile, allTileNames, first);
+			procFile(sqliteFile, targetFile, allTileNames, true);
 		}
 	}
 
