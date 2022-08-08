@@ -168,8 +168,6 @@ public class MainUtilities {
 				IndexUploader.main(subArgsArray);
 			} else if (utl.equals("combine-srtm-into-file")) {
 				CombineSRTMIntoFile.main(subArgsArray);
-			} else if (utl.equals("split-hillshade-into-regions")) {
-				ConvertLargeRasterSqliteIntoRegions.main(subArgsArray);
 			} else if (utl.equals("collect-sqlitedb-into-regions")) {
 				ConvertLargeRasterSqliteIntoRegions.main(subArgsArray);
 			} else if (utl.equals("merge-std-files")) {

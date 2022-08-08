@@ -246,7 +246,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 				Connection newFile = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
 			prepareNewHillshadeFile(newFile, false, MIN_ZOOM, MAX_ZOOM);
 			PreparedStatement ps = sqliteConn
-					.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ? AND s = 0");
+					.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ?");
 			PreparedStatement is = newFile
 					.prepareStatement("INSERT INTO tiles(x, y, z, s, image) VALUES(?, ?, ?, 0, ?)");
 			for (long s : tileNames) {
