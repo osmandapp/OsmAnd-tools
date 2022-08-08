@@ -175,12 +175,14 @@ public class ConvertLargeRasterSqliteIntoRegions {
 					int y = tileY;
 					for (int z = MAX_ZOOM; z >= MIN_ZOOM; z--) {
 						// we will need to merge tiles later
-						String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
-						if (!tileNamesByFile.containsKey(nm)) {
-							tileNamesByFile.put(nm, new TreeSet<>());
+						boolean added = allTileNames.add(pack(x, y, z));
+						if (added) {
+							String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
+							if (!tileNamesByFile.containsKey(nm)) {
+								tileNamesByFile.put(nm, new TreeSet<>());
+							}
+							tileNamesByFile.get(nm).add(pack(x, y, z));
 						}
-						tileNamesByFile.get(nm).add(pack(x, y, z));
-						allTileNames.add(pack(x, y, z));
 						x = x >> 1;
 						y = y >> 1;
 					}
