@@ -54,9 +54,15 @@ done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
+# Step 0. Clean output path and recreate it
+WORK_PATH="${OUTPUT_PATH}/.tmp_${FILE}"
+rm -rf "${WORK_PATH}" || true
+mkdir -p "${WORK_PATH}"
+OUTPUT_RESULT=${OUTPUT_PATH}/${FILE}.heightmap.sqlite
+rm "$OUTPUT_RESULT" || true
+
 echo "DEM files path:       $DEMS_PATH"
 echo "Output path:          $OUTPUT_PATH"
-WORK_PATH="${OUTPUT_PATH}/.tmp_${FILE}"
 echo "Work directory:       $WORK_PATH"
 
 let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
@@ -77,11 +83,6 @@ else
     echo "gdal2tiles:           $GDAL2TILES (added to PYTHONPATH)"
 fi
 
-# Step 0. Clean output path and recreate it
-mkdir -p "${OUTPUT_PATH}"
-rm -rf "${OUTPUT_PATH}/${FILE}*" || true
-rm -rf "${WORK_PATH}" || true
-mkdir -p "${WORK_PATH}"
 
 # Step 1. Create GDAL VRT to reference all DEM files
 if [ ! -f "$WORK_PATH/heightdbs.vrt" ]; then
@@ -156,7 +157,7 @@ mkdir -p "$WORK_PATH/db"
 
 # Step 7. Copy output
 echo "Publishing..."
-mv "$WORK_PATH/db/world.heightmap.sqlite" "${OUTPUT_PATH}/${FILE}.heightmap.sqlite"
+mv "$WORK_PATH/db/world.heightmap.sqlite" "$OUTPUT_RESULT"
 
 # Step 8. Clean up work
 rm -rf "$WORK_PATH"
