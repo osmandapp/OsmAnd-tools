@@ -46,17 +46,22 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		String filter = null; // mauritius
 		String prefix = "Hillshade_";
 		String extension = ".sqlitedb";
+		String regionAttribute = null;
 		for (int i = 2; i < args.length; i++) {
 			if ("--dry-run".equals(args[i])) {
 				dryRun = true;
 			} else if (args[i].startsWith("--prefix=")) {
 				prefix = args[i].substring("--prefix=".length());
 			} else if (args[i].startsWith("--extension=")) {
-				extension= args[i].substring("--extension=".length());
+				extension = args[i].substring("--extension=".length());
 			} else if (args[i].startsWith("--maxzoom=")) {
 				MAX_ZOOM = Integer.parseInt(args[i].substring("--maxzoom=".length()));
 			} else if (args[i].startsWith("--minzoom=")) {
 				MIN_ZOOM = Integer.parseInt(args[i].substring("--minzoom=".length()));
+			} else if (args[i].startsWith("--region-ocbf-attr=")) {
+				// "region_hillshade"
+				regionAttribute = args[i].substring("--region-ocbf-attr=".length());
+				
 			} else if (args[i].startsWith("--filter=")) {
 				filter = args[i].substring("--filter=".length());
 				if (filter.length() == 0) {
@@ -68,7 +73,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		BinaryMapIndexReader fl = or.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
 		MapIndex mapIndex = fl.getMapIndexes().get(0);
-		int hillshade = mapIndex.getRule("region_hillshade", "yes");
+		int regAttr = Algorithms.isEmpty(regionAttribute) ? -1 : mapIndex.getRule(regionAttribute, "yes");
 		int downloadName = mapIndex.getRule("download_name", null);
 		int boundary = mapIndex.getRule("osmand_region", "boundary");
 		int cnt = 1;
@@ -85,8 +90,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 					break;
 				}
 			}
-			System.out.println(fullName);
-			if (rc != null && rc.containsAdditionalType(hillshade)) {
+			if (rc != null && (regAttr == -1 || rc.containsAdditionalType(regAttr))) {
 				String dw = rc.getNameByType(downloadName);
 				System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 				try {
@@ -95,6 +99,8 @@ public class ConvertLargeRasterSqliteIntoRegions {
 					failedCountries.add(fullName);
 					e.printStackTrace();
 				}
+			} else {
+				System.out.println(String.format("Region %s skipped as it doesn't attribute %s = yes. ", fullName, regionAttribute));
 			}
 		}
 		if(!failedCountries.isEmpty()) {
@@ -190,16 +196,18 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		}
 		if (sqliteFile.isDirectory()) {
 			// process by tile
+			boolean first = true;
 			for (Entry<String, Set<Long>> entry : tileNamesByFile.entrySet()) {
 				File sqliteInFile = new File(sqliteFile, entry.getKey() + extension);
 				if (!sqliteInFile.exists()) {
 					System.out.println("Input tile doesn't exist " + sqliteInFile.getName());
 				} else {
-					procFile(sqliteInFile, targetFile, entry.getValue());
+					procFile(sqliteInFile, targetFile, entry.getValue(), first);
+					first = false;
 				}
 			}
 		} else {
-			procFile(sqliteFile, targetFile, allTileNames);
+			procFile(sqliteFile, targetFile, allTileNames, first);
 		}
 	}
 
@@ -233,7 +241,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	}
 	
 
-	private static void procFile(File sqliteFile, final File targetFile, Set<Long> tileNames)
+	private static void procFile(File sqliteFile, final File targetFile, Set<Long> tileNames, boolean initDb)
 			throws IOException, SQLException {
 		File procFile = new File(targetFile.getParentFile(), targetFile.getName() + ".proc");
 		boolean locked = !procFile.createNewFile();
@@ -244,7 +252,9 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		int batch = 0;
 		try (Connection sqliteConn = DBDialect.SQLITE.getDatabaseConnection(sqliteFile.getAbsolutePath(), LOG);
 				Connection newFile = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
-			prepareNewHillshadeFile(newFile, false, MIN_ZOOM, MAX_ZOOM);
+			if (initDb) {
+				prepareNewHillshadeFile(newFile, false, MIN_ZOOM, MAX_ZOOM);
+			}
 			PreparedStatement ps = sqliteConn
 					.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ?");
 			PreparedStatement is = newFile
