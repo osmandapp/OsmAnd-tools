@@ -45,7 +45,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		boolean dryRun = false;
 		String filter = null; // mauritius
 		String prefix = "Hillshade_";
-		String extension = ".sqlite";
+		String extension = ".sqlitedb";
 		for (int i = 2; i < args.length; i++) {
 			if ("--dry-run".equals(args[i])) {
 				dryRun = true;
