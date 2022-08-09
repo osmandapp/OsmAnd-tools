@@ -437,7 +437,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		f1w.write(image);
 		f1w.close();
 		FileOutputStream f2w = new FileOutputStream(f2);
-		f2w.write(image);
+		f2w.write(bsimage);
 		f2w.close();
 		BufferedImage b1 = ImageIO.read(f1);
 		BufferedImage b2 = ImageIO.read(f2);
@@ -446,7 +446,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		for(int i = 0; i < data1.getSize() && i < data2.getSize(); i++) {
 			data1.setElem(i, Math.max(data1.getElem(i), data2.getElem(i)));
 		}
-		ImageIO.write(b1, EXTENSION, fOut);
+		ImageIO.write(b1, MERGE_TILE_FORMAT, fOut);
 		FileInputStream fis = new FileInputStream(fOut);
 		ByteArrayInputStream bis = Algorithms.createByteArrayIS(fis);
 		byte[] res = bis.readAllBytes();
