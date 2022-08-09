@@ -51,6 +51,16 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	private static final int BATCH_SIZE = 100;
 	
 	public static void main(String[] args) throws IOException {
+//		args = new String[] {
+//				System.getProperty("maps.dir") + "srtm-heightmap",
+//				System.getProperty("maps.dir") + "srtm-heightmap",
+//				"--minzoom=9",
+//				"--maxzoom=15",
+//				"--filter=italy_lombardia",
+//				"--extension=.heightmap.sqlite",
+//				"--merge-tile-format=tif",
+//				"--skip-existing=false"
+//		};
 		File sqliteFile = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = false;
@@ -198,9 +208,6 @@ public class ConvertLargeRasterSqliteIntoRegions {
 					for (int z = MAX_ZOOM; z >= MIN_ZOOM; z--) {
 						allTileNames.add(pack(x, y, z));
 						String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
-						if (z == 12 && x == 2161 && y == 1459) {
-							System.out.println("!!! " + nm);
-						}
 						if (!tileNamesByFile.containsKey(nm)) {
 							tileNamesByFile.put(nm, new TreeSet<>());
 						}

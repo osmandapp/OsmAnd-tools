@@ -876,7 +876,7 @@ public class IndexCreator {
 		long time = System.currentTimeMillis();
 		
 		// if(true){ generateRegionsFile(); return;}
-		String rootFolder = "/Users/victorshcherb/osmand/";
+		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
 		settings.indexMap = true;
@@ -890,7 +890,7 @@ public class IndexCreator {
 
 		// settings.zoomWaySmoothness = 2;
 
-		IndexCreator creator = new IndexCreator(new File(rootFolder + "/maps/"), settings); //$NON-NLS-1$
+		IndexCreator creator = new IndexCreator(new File(rootFolder), settings); //$NON-NLS-1$
 
 		// creator.deleteDatabaseIndexes = false;
 		// creator.recreateOnlyBinaryFile = true;
@@ -898,10 +898,10 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "/temp/Diff-end.osm";
-		String file = rootFolder + "/temp/map.osm";
-		// String file = rootFolder + "/repos/resources/test-resources/synthetic_test_rendering.osm";
-		// String file = rootFolder + "/repos/resources/test-resources/turn_lanes_test.osm";
+//		String file = rootFolder + "../temp/Diff-end.osm";
+		String file = rootFolder + "../temp/map.osm";
+		// String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
+		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 
 //		settings.keepOnlyRouteRelationObjects = true;
@@ -912,11 +912,11 @@ public class IndexCreator {
 		
 //		creator.setMapFileName(name + ".travel.obf");
 		
-		creator.setNodesDBFile(new File(rootFolder + "/maps/" + name + ".tmp.odb"));
+		creator.setNodesDBFile(new File(rootFolder + name + ".tmp.odb"));
 
-		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "/repos/resources/poi/poi_types.xml"));
+		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "../repos/resources/poi/poi_types.xml"));
 		MapRenderingTypesEncoder rt = new MapRenderingTypesEncoder(
-				rootFolder + "/repos/resources/obf_creation/rendering_types.xml", new File(file).getName());
+				rootFolder + "../repos/resources/obf_creation/rendering_types.xml", new File(file).getName());
 		// creator.setLastModifiedDate(1504224000000l);
 		creator.generateIndexes(new File(file), new ConsoleProgressImplementation(1), null, zooms, rt, log);
 		// new File(file),
