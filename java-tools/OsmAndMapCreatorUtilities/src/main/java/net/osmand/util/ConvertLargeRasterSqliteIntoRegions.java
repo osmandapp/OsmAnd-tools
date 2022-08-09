@@ -1,15 +1,11 @@
 package net.osmand.util;
 
-import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferShort;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -200,9 +196,11 @@ public class ConvertLargeRasterSqliteIntoRegions {
 					int x = tileX;
 					int y = tileY;
 					for (int z = MAX_ZOOM; z >= MIN_ZOOM; z--) {
-						// we will need to merge tiles later
 						allTileNames.add(pack(x, y, z));
 						String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
+						if (z == 12 && x == 2161 && y == 1459) {
+							System.out.println("!!! " + nm);
+						}
 						if (!tileNamesByFile.containsKey(nm)) {
 							tileNamesByFile.put(nm, new TreeSet<>());
 						}
@@ -309,7 +307,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 							psnew.setInt(1, x);
 							psnew.setInt(2, y);
 							psnew.setInt(3, z);
-							ResultSet rsnew = ps.executeQuery();
+							ResultSet rsnew = psnew.executeQuery();
 							if (!rsnew.next()) {
 								throw new IllegalStateException();
 							}
@@ -321,6 +319,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 								psdel.setInt(3, z);
 								psdel.execute();
 							}
+							
 						} else {
 							image = null;
 						}
