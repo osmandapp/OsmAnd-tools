@@ -1,6 +1,12 @@
 package net.osmand.util;
 
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferShort;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -15,6 +21,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
+import javax.imageio.ImageIO;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
@@ -37,23 +45,27 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	private static final Log LOG = PlatformUtil.getLog(ConvertLargeRasterSqliteIntoRegions.class);
 	private static int MIN_ZOOM = 1;
 	private static int MAX_ZOOM = 11;
+	private static String EXTENSION = ".sqlitedb";
+	private static String MERGE_TILE_FORMAT = ""; // tif
 	private static final int BATCH_SIZE = 100;
-
+	
 	public static void main(String[] args) throws IOException {
 		File sqliteFile = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = false;
 		String filter = null; // mauritius
 		String prefix = "Hillshade_";
-		String extension = ".sqlitedb";
 		String regionAttribute = null;
+		
 		for (int i = 2; i < args.length; i++) {
 			if ("--dry-run".equals(args[i])) {
 				dryRun = true;
 			} else if (args[i].startsWith("--prefix=")) {
 				prefix = args[i].substring("--prefix=".length());
 			} else if (args[i].startsWith("--extension=")) {
-				extension = args[i].substring("--extension=".length());
+				EXTENSION = args[i].substring("--extension=".length());
+			} else if (args[i].startsWith("--merge-tile-format=")) {
+				MERGE_TILE_FORMAT = args[i].substring("--merge-tile-format=".length());
 			} else if (args[i].startsWith("--maxzoom=")) {
 				MAX_ZOOM = Integer.parseInt(args[i].substring("--maxzoom=".length()));
 			} else if (args[i].startsWith("--minzoom=")) {
@@ -94,7 +106,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 				String dw = rc.getNameByType(downloadName);
 				System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 				try {
-					process(rc, lst, dw, sqliteFile, directoryWithTargetFiles, prefix, extension, dryRun);
+					process(rc, lst, dw, sqliteFile, directoryWithTargetFiles, prefix, dryRun);
 				} catch (Exception e) {
 					failedCountries.add(fullName);
 					e.printStackTrace();
@@ -109,9 +121,9 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	}
 
 	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
-			String downloadName, File sqliteFile, File directoryWithTargetFiles, String prefix, String extension, boolean dryRun) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
+			String downloadName, File sqliteFile, File directoryWithTargetFiles, String prefix, boolean dryRun) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		String name = country.getName();
-		String dwName = prefix + Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + extension;
+		String dwName = prefix + Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + EXTENSION;
 		Set<Long> allTileNames = new TreeSet<>();
 		Map<String, Set<Long>> tileNamesByFile = new TreeMap<>();
 		final File targetFile = new File(directoryWithTargetFiles, dwName);
@@ -175,14 +187,12 @@ public class ConvertLargeRasterSqliteIntoRegions {
 					int y = tileY;
 					for (int z = MAX_ZOOM; z >= MIN_ZOOM; z--) {
 						// we will need to merge tiles later
-						boolean added = allTileNames.add(pack(x, y, z));
-						if (added) {
-							String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
-							if (!tileNamesByFile.containsKey(nm)) {
-								tileNamesByFile.put(nm, new TreeSet<>());
-							}
-							tileNamesByFile.get(nm).add(pack(x, y, z));
+						allTileNames.add(pack(x, y, z));
+						String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
+						if (!tileNamesByFile.containsKey(nm)) {
+							tileNamesByFile.put(nm, new TreeSet<>());
 						}
+						tileNamesByFile.get(nm).add(pack(x, y, z));
 						x = x >> 1;
 						y = y >> 1;
 					}
@@ -196,20 +206,21 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		if (dryRun) {
 			return;
 		}
+		Set<Long> addedTileNames = new TreeSet<>();
 		if (sqliteFile.isDirectory()) {
 			// process by tile
 			boolean first = true;
 			for (Entry<String, Set<Long>> entry : tileNamesByFile.entrySet()) {
-				File sqliteInFile = new File(sqliteFile, entry.getKey() + extension);
+				File sqliteInFile = new File(sqliteFile, entry.getKey() + EXTENSION);
 				if (!sqliteInFile.exists()) {
 					System.out.println("Input tile doesn't exist " + sqliteInFile.getName());
 				} else {
-					procFile(sqliteInFile, targetFile, entry.getValue(), first);
+					procFile(sqliteInFile, targetFile, entry.getValue(), first, addedTileNames);
 					first = false;
 				}
 			}
 		} else {
-			procFile(sqliteFile, targetFile, allTileNames, true);
+			procFile(sqliteFile, targetFile, allTileNames, true, addedTileNames);
 		}
 	}
 
@@ -243,7 +254,8 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	}
 	
 
-	private static void procFile(File sqliteFile, final File targetFile, Set<Long> tileNames, boolean initDb)
+	private static void procFile(File sqliteFile, final File targetFile, Set<Long> tileNames, boolean initDb, 
+			Set<Long> addedBeforeTileNames)
 			throws IOException, SQLException {
 		File procFile = new File(targetFile.getParentFile(), targetFile.getName() + ".proc");
 		boolean locked = !procFile.createNewFile();
@@ -259,27 +271,57 @@ public class ConvertLargeRasterSqliteIntoRegions {
 			}
 			PreparedStatement ps = sqliteConn
 					.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ?");
+			PreparedStatement psnew = newFile
+					.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ?");
+			PreparedStatement psdel = newFile
+					.prepareStatement("DELETE FROM tiles WHERE x = ? AND y = ? AND z = ?");
 			PreparedStatement is = newFile
 					.prepareStatement("INSERT INTO tiles(x, y, z, s, image) VALUES(?, ?, ?, 0, ?)");
 			for (long s : tileNames) {
+				boolean added = addedBeforeTileNames.add(s);
 				int x = unpack1(s);
 				int y = unpack2(s);
 				int z = unpack3(s);
 				ps.setInt(1, x);
-				// int yt = (1 << z) - y - 1;
 				ps.setInt(2, y);
 				ps.setInt(3, z);
+				// int yt = (1 << z) - y - 1;
 				ResultSet rs = ps.executeQuery();
 				if (rs.next()) {
 					byte[] image = rs.getBytes(1);
-					is.setInt(1, x);
-					is.setInt(2, y);
-					is.setInt(3, z);
-					is.setBytes(4, image);
-					is.addBatch();
-					if (batch++ >= BATCH_SIZE) {
-						batch = 0;
-						is.executeBatch();
+					if (!added) {
+						// here we merge 2 images
+						if (!Algorithms.isEmpty(MERGE_TILE_FORMAT)) {
+							psnew.setInt(1, x);
+							psnew.setInt(2, y);
+							psnew.setInt(3, z);
+							ResultSet rsnew = ps.executeQuery();
+							if (!rsnew.next()) {
+								throw new IllegalStateException();
+							}
+							image = mergeImages(image, rsnew.getBytes(1));
+							rsnew.close();
+							if (image != null) {
+								psdel.setInt(1, x);
+								psdel.setInt(2, y);
+								psdel.setInt(3, z);
+								psdel.execute();
+							}
+						} else {
+							image = null;
+						}
+					}
+					if (image != null) {
+						is.setInt(1, x);
+						is.setInt(2, y);
+						is.setInt(3, z);
+						is.setBytes(4, image);
+						is.addBatch();
+
+						if (batch++ >= BATCH_SIZE) {
+							batch = 0;
+							is.executeBatch();
+						}
 					}
 				}
 				rs.close();
@@ -291,6 +333,10 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		;
 		procFile.delete();
 	}
+	
+	
+
+	
 
 	private static void prepareNewHillshadeFile(Connection newFile, boolean bigPlanet, int minZoom, int maxZoom) throws SQLException {
 		Statement statement = newFile.createStatement();
@@ -368,5 +414,27 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		}
 	}
 
+	
+	private static byte[] mergeImages(byte[] image, byte[] bsimage) throws IOException {
+		File f1 = new File("_img." + EXTENSION);
+		File f2 = new File("_overlay." + EXTENSION);
+		File fOut = new File("_res." + EXTENSION);
+		BufferedImage b1 = ImageIO.read(f1);
+		BufferedImage b2 = ImageIO.read(f2);
+		DataBufferShort data1 = (DataBufferShort) b1.getRaster().getDataBuffer();
+		DataBufferShort data2 = (DataBufferShort) b2.getRaster().getDataBuffer();
+		for(int i = 0; i < data1.getSize() && i < data2.getSize(); i++) {
+			data1.setElem(i, Math.max(data1.getElem(i), data2.getElem(i)));
+		}
+		ImageIO.write(b1, EXTENSION, fOut);
+		FileInputStream fis = new FileInputStream(fOut);
+		ByteArrayInputStream bis = Algorithms.createByteArrayIS(fis);
+		byte[] res = bis.readAllBytes();
+		fis.close();
+		f1.delete();
+		f2.delete();
+		fOut.delete();
+		return res;
+	}
 
 }
