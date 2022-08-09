@@ -45,6 +45,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	private static final Log LOG = PlatformUtil.getLog(ConvertLargeRasterSqliteIntoRegions.class);
 	private static int MIN_ZOOM = 1;
 	private static int MAX_ZOOM = 11;
+	private static boolean SKIP_EXISTING = true;
 	private static String EXTENSION = ".sqlitedb";
 	private static String MERGE_TILE_FORMAT = ""; // tif
 	private static final int BATCH_SIZE = 100;
@@ -62,6 +63,8 @@ public class ConvertLargeRasterSqliteIntoRegions {
 				dryRun = true;
 			} else if (args[i].startsWith("--prefix=")) {
 				prefix = args[i].substring("--prefix=".length());
+			} else if (args[i].startsWith("--skip-existing=")) {
+				SKIP_EXISTING = Boolean.parseBoolean(args[i].substring("--skip-existing=".length()));
 			} else if (args[i].startsWith("--extension=")) {
 				EXTENSION = args[i].substring("--extension=".length());
 			} else if (args[i].startsWith("--merge-tile-format=")) {
@@ -127,7 +130,10 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		Set<Long> allTileNames = new TreeSet<>();
 		Map<String, Set<Long>> tileNamesByFile = new TreeMap<>();
 		final File targetFile = new File(directoryWithTargetFiles, dwName);
-		if(targetFile.exists()) {
+		if (!SKIP_EXISTING) {
+			targetFile.delete();
+		}
+		if (targetFile.exists()) {
 			System.out.println("Already processed "+ name);
 			return;
 		}
