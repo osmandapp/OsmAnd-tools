@@ -430,9 +430,9 @@ public class ConvertLargeRasterSqliteIntoRegions {
 
 	
 	private static byte[] mergeImages(byte[] image, byte[] bsimage) throws IOException {
-		File f1 = new File("_img." + EXTENSION);
-		File f2 = new File("_overlay." + EXTENSION);
-		File fOut = new File("_res." + EXTENSION);
+		File f1 = new File("_img." + MERGE_TILE_FORMAT);
+		File f2 = new File("_overlay." + MERGE_TILE_FORMAT);
+		File fOut = new File("_res." + MERGE_TILE_FORMAT);
 		FileOutputStream f1w = new FileOutputStream(f1);
 		f1w.write(image);
 		f1w.close();
