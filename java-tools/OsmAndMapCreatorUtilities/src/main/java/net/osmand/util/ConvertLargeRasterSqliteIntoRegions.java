@@ -45,6 +45,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 
 public class ConvertLargeRasterSqliteIntoRegions {
+	private static final String LOCK_EXTENSION = ".proc";
 	private static final Log LOG = PlatformUtil.getLog(ConvertLargeRasterSqliteIntoRegions.class);
 	private static int MIN_ZOOM = 1;
 	private static int MAX_ZOOM = 11;
@@ -134,7 +135,11 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		Map<String, Set<Long>> tileNamesByFile = new TreeMap<>();
 		final File targetFile = new File(directoryWithTargetFiles, dwName);
 		if (!SKIP_EXISTING) {
-			targetFile.delete();
+			File lockFile = new File(directoryWithTargetFiles, dwName + LOCK_EXTENSION);
+			lockFile.delete();
+			if (!lockFile.exists()) {
+				targetFile.delete();
+			}
 		}
 		if (targetFile.exists()) {
 			System.out.println("Already processed "+ name);
@@ -266,7 +271,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	private static void procFile(File sqliteFile, final File targetFile, Set<Long> tileNames, boolean initDb, 
 			Set<Long> addedBeforeTileNames)
 			throws IOException, SQLException {
-		File procFile = new File(targetFile.getParentFile(), targetFile.getName() + ".proc");
+		File procFile = new File(targetFile.getParentFile(), targetFile.getName() + LOCK_EXTENSION);
 		boolean locked = !procFile.createNewFile();
 		if (locked) {
 			System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
