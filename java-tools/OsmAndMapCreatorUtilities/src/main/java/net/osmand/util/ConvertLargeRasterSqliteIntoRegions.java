@@ -1,10 +1,13 @@
 package net.osmand.util;
 
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBuffer;
+import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferShort;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
@@ -49,6 +52,17 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	private static String EXTENSION = ".sqlitedb";
 	private static String MERGE_TILE_FORMAT = ""; // tif
 	private static final int BATCH_SIZE = 100;
+	
+	
+//	public static void main(String[] args) throws IOException {
+//		MERGE_TILE_FORMAT = "png";
+//		byte[] b1 = Algorithms.readBytesFromInputStream(new FileInputStream(fld + "338_11.png"));
+//		byte[] b2 = Algorithms.readBytesFromInputStream(new FileInputStream(fld + "338_10.png"));
+//		byte[] mg = mergePngImages(b1, b2);
+//		FileOutputStream fous = new FileOutputStream(fld + "338_mg.png");
+//		Algorithms.streamCopy(new ByteArrayInputStream(mg), fous);
+//		fous.close();
+//	}
 	
 	public static void main(String[] args) throws IOException {
 //		args = new String[] {
@@ -318,7 +332,11 @@ public class ConvertLargeRasterSqliteIntoRegions {
 							if (!rsnew.next()) {
 								throw new IllegalStateException();
 							}
-							image = mergeImages(image, rsnew.getBytes(1));
+							if (MERGE_TILE_FORMAT.equalsIgnoreCase("tif")) {
+								image = mergeTifImages(image, rsnew.getBytes(1));
+							} else {
+								image = mergePngImages(image, rsnew.getBytes(1));
+							}
 							rsnew.close();
 							if (image != null) {
 								psdel.setInt(1, x);
@@ -435,7 +453,37 @@ public class ConvertLargeRasterSqliteIntoRegions {
 	}
 
 	
-	private static byte[] mergeImages(byte[] image, byte[] bsimage) throws IOException {
+	private static byte[] mergePngImages(byte[] image, byte[] bsimage) throws IOException {
+		File f1 = new File("_img." + MERGE_TILE_FORMAT);
+		File f2 = new File("_overlay." + MERGE_TILE_FORMAT);
+		File fOut = new File("_res." + MERGE_TILE_FORMAT);
+		FileOutputStream f1w = new FileOutputStream(f1);
+		f1w.write(image);
+		f1w.close();
+		FileOutputStream f2w = new FileOutputStream(f2);
+		f2w.write(bsimage);
+		f2w.close();
+		BufferedImage b1 = ImageIO.read(f1);
+		BufferedImage b2 = ImageIO.read(f2);
+		DataBufferByte data1 = (DataBufferByte) b1.getRaster().getDataBuffer();
+		DataBufferByte data2 = (DataBufferByte) b2.getRaster().getDataBuffer();
+		for(int i = 0; i < data1.getSize() && i < data2.getSize(); i++) {
+			int e1 = data1.getElem(i);
+			int e2 = data2.getElem(i);
+			data1.setElem(i, Math.max(e1, e2));
+		}
+		ImageIO.write(b1, MERGE_TILE_FORMAT, fOut);
+		FileInputStream fis = new FileInputStream(fOut);
+		ByteArrayInputStream bis = Algorithms.createByteArrayIS(fis);
+		byte[] res = bis.readAllBytes();
+		fis.close();
+		f1.delete();
+		f2.delete();
+		fOut.delete();
+		return res;
+	}
+	
+	private static byte[] mergeTifImages(byte[] image, byte[] bsimage) throws IOException {
 		File f1 = new File("_img." + MERGE_TILE_FORMAT);
 		File f2 = new File("_overlay." + MERGE_TILE_FORMAT);
 		File fOut = new File("_res." + MERGE_TILE_FORMAT);
