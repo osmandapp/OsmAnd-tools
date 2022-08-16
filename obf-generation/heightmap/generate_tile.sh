@@ -10,7 +10,8 @@
 set -e
 
 VERBOSE_PARAM=""
-SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SRC_PATH=$(dirname "$0")
+#SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TILE_SIZE=32
 POSITIONAL_ARGS=()
 
@@ -75,6 +76,7 @@ rm "$OUTPUT_RESULT" || true
 echo "DEM files path:       $DEMS_PATH"
 echo "Output path:          $OUTPUT_PATH"
 echo "Work directory:       $WORK_PATH"
+echo "Source directory:     $SRC_PATH"
 
 let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
 echo "Tile:                 $TILE"
