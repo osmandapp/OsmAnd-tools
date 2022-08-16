@@ -330,21 +330,21 @@ public class ConvertLargeRasterSqliteIntoRegions {
 							psnew.setInt(3, z);
 							ResultSet rsnew = psnew.executeQuery();
 							if (!rsnew.next()) {
-								throw new IllegalStateException();
-							}
-							if (MERGE_TILE_FORMAT.equalsIgnoreCase("tif")) {
-								image = mergeTifImages(image, rsnew.getBytes(1));
+								image = null;
 							} else {
-								image = mergePngImages(image, rsnew.getBytes(1));
+								if (MERGE_TILE_FORMAT.equalsIgnoreCase("tif")) {
+									image = mergeTifImages(image, rsnew.getBytes(1));
+								} else {
+									image = mergePngImages(image, rsnew.getBytes(1));
+								}
+								rsnew.close();
+								if (image != null) {
+									psdel.setInt(1, x);
+									psdel.setInt(2, y);
+									psdel.setInt(3, z);
+									psdel.execute();
+								}
 							}
-							rsnew.close();
-							if (image != null) {
-								psdel.setInt(1, x);
-								psdel.setInt(2, y);
-								psdel.setInt(3, z);
-								psdel.execute();
-							}
-							
 						} else {
 							image = null;
 						}
