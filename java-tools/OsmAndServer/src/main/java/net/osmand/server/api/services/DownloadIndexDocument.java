@@ -59,6 +59,9 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "hillshade")
 	private List<DownloadIndex> hillshade = new ArrayList<>();
 	
+	@XmlElement(name = "heightmap")
+	private List<DownloadIndex> heightmap = new ArrayList<>();
+	
 	@XmlElement(name = "slope")
 	private List<DownloadIndex> slope = new ArrayList<>();
 	
@@ -69,6 +72,7 @@ public class DownloadIndexDocument {
 		sortMaps(srtmFeetMaps);
 		sortMaps(slope);
 		sortMaps(hillshade);
+		sortMaps(heightmap);
 		sortMaps(inapps);
 		sortMaps(voices);
 		sortMaps(fonts);
@@ -85,6 +89,7 @@ public class DownloadIndexDocument {
 		indx.addAll(srtmMaps);
 		indx.addAll(srtmFeetMaps);
 		indx.addAll(slope);
+		indx.addAll(heightmap);
 		indx.addAll(hillshade);
 		indx.addAll(depths);
 		indx.addAll(wikimaps);
@@ -154,6 +159,10 @@ public class DownloadIndexDocument {
 	
 	public List<DownloadIndex> getSlope() {
 		return slope;
+	}
+	
+	public List<DownloadIndex> getHeightmap() {
+		return heightmap;
 	}
 
 	@XmlAttribute

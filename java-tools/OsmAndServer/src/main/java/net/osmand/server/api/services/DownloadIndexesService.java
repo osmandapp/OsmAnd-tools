@@ -108,6 +108,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getSrtmFeetMaps(), rootFolder, DownloadType.SRTM_MAP.getPath(), DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
 		loadIndexesFromDir(doc.getHillshade(), rootFolder, DownloadType.HILLSHADE);
 		loadIndexesFromDir(doc.getSlope(), rootFolder, DownloadType.SLOPE);
+		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.HEIGHTMAP);
 		return doc;
 	}
 	
@@ -302,7 +303,8 @@ public class DownloadIndexesService  {
 	    WIKIVOYAGE("wikivoyage") ,
 	    TRAVEL("travel") ,
 	    ROAD_MAP("road-indexes") ,
-	    HILLSHADE("hillshade") ,
+	    HILLSHADE("hillshade"),
+	    HEIGHTMAP("heightmap"),
 	    SLOPE("slope") ,
 	    SRTM_MAP("srtm-countries") ;
 
@@ -321,6 +323,7 @@ public class DownloadIndexesService  {
 		public boolean acceptFile(File f) {
 			switch (this) {
 			case WIKIVOYAGE:
+			case HEIGHTMAP:
 				return f.getName().endsWith(".sqlite");
 			case TRAVEL:
 				return f.getName().endsWith(".travel.obf.zip") || f.getName().endsWith(".travel.obf");
@@ -360,6 +363,8 @@ public class DownloadIndexesService  {
 				return String.format("Travel for %s", regionName);
 			case WIKIVOYAGE:
 				return String.format("Wikivoyage for %s", regionName);
+			case HEIGHTMAP:
+				return String.format("%s", regionName);
 			case HILLSHADE:
 				return String.format("%s", regionName);
 			case SLOPE:
