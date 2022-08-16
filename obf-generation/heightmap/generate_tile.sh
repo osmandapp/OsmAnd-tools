@@ -104,7 +104,7 @@ if [ ! -f "allheighttiles.vrt" ]; then
         -resolution highest \
         -hidenodata \
         -vrtnodata "0" \
-        "allheighttiles.vrt" "$DEMS_PATH"
+        "allheighttiles.vrt" "$DEMS_PATH/*"
 fi
 
 # Step 2. Convert VRT to single giant GeoTIFF file
