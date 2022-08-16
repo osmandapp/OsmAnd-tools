@@ -311,7 +311,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 			PreparedStatement is = newFile
 					.prepareStatement("INSERT INTO tiles(x, y, z, s, image) VALUES(?, ?, ?, 0, ?)");
 			for (long s : tileNames) {
-				boolean added = addedBeforeTileNames.add(s);
+				boolean addedBefore = addedBeforeTileNames.contains(s);
 				int x = unpack1(s);
 				int y = unpack2(s);
 				int z = unpack3(s);
@@ -322,7 +322,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 				ResultSet rs = ps.executeQuery();
 				if (rs.next()) {
 					byte[] image = rs.getBytes(1);
-					if (!added) {
+					if (addedBefore) {
 						// here we merge 2 images
 						if (!Algorithms.isEmpty(MERGE_TILE_FORMAT)) {
 							psnew.setInt(1, x);
@@ -330,20 +330,24 @@ public class ConvertLargeRasterSqliteIntoRegions {
 							psnew.setInt(3, z);
 							ResultSet rsnew = psnew.executeQuery();
 							if (!rsnew.next()) {
-								image = null;
+								batch = 0;
+								is.executeBatch();
+								rsnew = psnew.executeQuery();
+							}
+							if (!rsnew.next()) {
+								throw new IllegalStateException();
+							}
+							if (MERGE_TILE_FORMAT.equalsIgnoreCase("tif")) {
+								image = mergeTifImages(image, rsnew.getBytes(1));
 							} else {
-								if (MERGE_TILE_FORMAT.equalsIgnoreCase("tif")) {
-									image = mergeTifImages(image, rsnew.getBytes(1));
-								} else {
-									image = mergePngImages(image, rsnew.getBytes(1));
-								}
-								rsnew.close();
-								if (image != null) {
-									psdel.setInt(1, x);
-									psdel.setInt(2, y);
-									psdel.setInt(3, z);
-									psdel.execute();
-								}
+								image = mergePngImages(image, rsnew.getBytes(1));
+							}
+							rsnew.close();
+							if (image != null) {
+								psdel.setInt(1, x);
+								psdel.setInt(2, y);
+								psdel.setInt(3, z);
+								psdel.execute();
 							}
 						} else {
 							image = null;
@@ -355,6 +359,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 						is.setInt(3, z);
 						is.setBytes(4, image);
 						is.addBatch();
+						addedBeforeTileNames.add(s);
 
 						if (batch++ >= BATCH_SIZE) {
 							batch = 0;
