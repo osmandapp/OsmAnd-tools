@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash
 
 # This script is used to retile DEM files into SQLite databases by country.
 # These DBs contain tiles of specified size by zoom levels
@@ -103,7 +103,7 @@ if [ ! -f "allheighttiles.vrt" ]; then
         -resolution highest \
         -hidenodata \
         -vrtnodata "0" \
-        "allheighttiles.vrt" "$DEMS_PATH/*"
+        "allheighttiles.vrt" "$DEMS_PATH"/*
 fi
 
 # Step 2. Convert VRT to single giant GeoTIFF file
