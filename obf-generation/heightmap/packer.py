@@ -150,6 +150,7 @@ class OsmAndHeightMapPacker(object):
         db.commit()
 
         # Insert files as blobs in database
+        c = db.cursor()
         for tmsTileX, tmsTileY, zoom, tileFilename in self.inputTiles:
             maxTileIndex = 2**zoom - 1
             tileX = tmsTileX
@@ -163,7 +164,7 @@ class OsmAndHeightMapPacker(object):
                     tileFilename,
                 ))
 
-            c = db.cursor()
+            
             with open(tileFilename, "rb") as tileFile:
                 c.execute(
                     """
