@@ -114,7 +114,7 @@ if [ ! -f "$WORK_PATH/heightdbs.tif" ]; then
     echo "Baking Tile GeoTIFF..."
     gdal_translate -of GTiff \
         -strict \
-        -projwin $(($LAT - $DELTA)) $(($LAT + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - 1 - $DELTA)) \
+        -projwin $(($LON - $DELTA)) $(($LAT + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - 1 - $DELTA)) \
         -mo "AREA_OR_POINT=POINT" \
         -ot Int16 \
         -co "COMPRESS=LZW" \
