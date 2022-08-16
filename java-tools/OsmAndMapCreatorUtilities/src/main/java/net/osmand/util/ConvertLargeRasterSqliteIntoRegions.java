@@ -1,13 +1,11 @@
 package net.osmand.util;
 
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferShort;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
@@ -142,7 +140,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 				System.out.println(String.format("Region %s skipped as it doesn't attribute %s = yes. ", fullName, regionAttribute));
 			}
 		}
-		if(!failedCountries.isEmpty()) {
+		if (!failedCountries.isEmpty()) {
 			throw new IllegalStateException("Failed countries " + failedCountries);
 		}
 	}
@@ -298,42 +296,38 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		}
 		int batch = 0;
 		try (Connection sqliteConn = DBDialect.SQLITE.getDatabaseConnection(sqliteFile.getAbsolutePath(), LOG);
-				Connection newFile = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
+				Connection targetConn = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
 			if (initDb) {
-				prepareNewHillshadeFile(newFile, false, MIN_ZOOM, MAX_ZOOM);
+				prepareNewHillshadeFile(targetConn, false, MIN_ZOOM, MAX_ZOOM);
 			}
-			PreparedStatement ps = sqliteConn
+			PreparedStatement psselsource = sqliteConn
 					.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ?");
-			PreparedStatement psnew = newFile
+			PreparedStatement psselnew = targetConn
 					.prepareStatement("SELECT image FROM tiles WHERE x = ? AND y = ? AND z = ?");
-			PreparedStatement psdel = newFile
+			PreparedStatement psdelnew = targetConn
 					.prepareStatement("DELETE FROM tiles WHERE x = ? AND y = ? AND z = ?");
-			PreparedStatement is = newFile
+			PreparedStatement psinsnew = targetConn
 					.prepareStatement("INSERT INTO tiles(x, y, z, s, image) VALUES(?, ?, ?, 0, ?)");
+//			targetConn.createStatement().executeQuery("SELECT count(*) FROM tiles where z = 9 and x = 270 and y = 182").getInt(1);
 			for (long s : tileNames) {
 				boolean addedBefore = addedBeforeTileNames.contains(s);
 				int x = unpack1(s);
 				int y = unpack2(s);
 				int z = unpack3(s);
-				ps.setInt(1, x);
-				ps.setInt(2, y);
-				ps.setInt(3, z);
+				psselsource.setInt(1, x);
+				psselsource.setInt(2, y);
+				psselsource.setInt(3, z);
 				// int yt = (1 << z) - y - 1;
-				ResultSet rs = ps.executeQuery();
+				ResultSet rs = psselsource.executeQuery();
 				if (rs.next()) {
 					byte[] image = rs.getBytes(1);
 					if (addedBefore) {
 						// here we merge 2 images
 						if (!Algorithms.isEmpty(MERGE_TILE_FORMAT)) {
-							psnew.setInt(1, x);
-							psnew.setInt(2, y);
-							psnew.setInt(3, z);
-							ResultSet rsnew = psnew.executeQuery();
-							if (!rsnew.next()) {
-								batch = 0;
-								is.executeBatch();
-								rsnew = psnew.executeQuery();
-							}
+							psselnew.setInt(1, x);
+							psselnew.setInt(2, y);
+							psselnew.setInt(3, z);
+							ResultSet rsnew = psselnew.executeQuery();
 							if (!rsnew.next()) {
 								throw new IllegalStateException();
 							}
@@ -344,34 +338,34 @@ public class ConvertLargeRasterSqliteIntoRegions {
 							}
 							rsnew.close();
 							if (image != null) {
-								psdel.setInt(1, x);
-								psdel.setInt(2, y);
-								psdel.setInt(3, z);
-								psdel.execute();
+								psdelnew.setInt(1, x);
+								psdelnew.setInt(2, y);
+								psdelnew.setInt(3, z);
+								psdelnew.execute();
 							}
 						} else {
 							image = null;
 						}
 					}
 					if (image != null) {
-						is.setInt(1, x);
-						is.setInt(2, y);
-						is.setInt(3, z);
-						is.setBytes(4, image);
-						is.addBatch();
+						psinsnew.setInt(1, x);
+						psinsnew.setInt(2, y);
+						psinsnew.setInt(3, z);
+						psinsnew.setBytes(4, image);
+						psinsnew.addBatch();
 						addedBeforeTileNames.add(s);
 
 						if (batch++ >= BATCH_SIZE) {
 							batch = 0;
-							is.executeBatch();
+							psinsnew.executeBatch();
 						}
 					}
 				}
 				rs.close();
 			}
-			is.executeBatch();
-			is.close();
-			ps.close();
+			psinsnew.executeBatch();
+			psinsnew.close();
+			psselsource.close();
 		}
 		;
 		procFile.delete();
