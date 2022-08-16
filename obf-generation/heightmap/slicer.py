@@ -167,6 +167,11 @@ class OsmAndHeightMapSlicer(object):
                     print("\t BoundsC( input): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInInput[0], tileBoundsInInput[1], tileBoundsInInput[2], tileBoundsInInput[3]))
                     print("\t BoundsC(output): l=%s, t=%s, w=%s, h=%s" % (tileBoundsInOutput[0], tileBoundsInOutput[1], tileBoundsInOutput[2], tileBoundsInOutput[3]))
 
+                if tileBoundsInInput[2] == 0 or tileBoundsInInput[3] == 0:
+                    if self.options.verbose:
+                        print("Skipping base tile TMS %sx%s@%s cause it has 0 dimensions" % (tileX, tileY, self.baseZoom))
+                    continue
+
                 # Create target dataset
                 sourceDataset = self.memDriver.Create('', tileSourceSize[0], tileSourceSize[1], 1, self.inputBand.DataType)
 
@@ -225,7 +230,8 @@ class OsmAndHeightMapSlicer(object):
 
                     # Skip if this tile already exists
                     if os.path.exists(outputTileFile):
-                        print("Skipping overview tile TMS %sx%s@%s" % (tileX, tileY, self.baseZoom))
+                        if self.options.verbose:
+                            print("Skipping overview tile TMS %sx%s@%s" % (tileX, tileY, self.baseZoom))
                         continue
 
                     if self.options.verbose:
@@ -247,6 +253,9 @@ class OsmAndHeightMapSlicer(object):
                                 continue
 
                             upperTileFile = os.path.join(self.outputDir, str(zoom+1), str(yzTileX), "%s.%s" % (yzTileY, self.options.extension))
+                            # tile was 0 width probably
+                            if not os.path.exists(upperTileFile):
+                                continue
                             upperTileDataset = gdal.Open(upperTileFile, gdal.GA_ReadOnly)
 
                             col = yzTileX
