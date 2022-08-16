@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xe
 
 # This script is used to retile DEM files into SQLite databases by country.
 # These DBs contain tiles of specified size by zoom levels
@@ -10,7 +10,6 @@
 set -e
 
 VERBOSE_PARAM=""
-FILE=""
 SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TILE_SIZE=32
 POSITIONAL_ARGS=()
@@ -70,7 +69,7 @@ TILE=${LATL}$(printf "%02d" $LAT)${LONL}$(printf "%03d" $LON)
 WORK_PATH="./.tmp_${TILE}"
 rm -rf "${WORK_PATH}" || true
 mkdir -p "${WORK_PATH}"
-OUTPUT_RESULT=${OUTPUT_PATH}/${FILE}.heightmap.sqlite
+OUTPUT_RESULT=${OUTPUT_PATH}/${TILE}.heightmap.sqlite
 rm "$OUTPUT_RESULT" || true
 
 echo "DEM files path:       $DEMS_PATH"
