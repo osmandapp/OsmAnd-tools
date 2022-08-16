@@ -61,6 +61,7 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
+import net.osmand.data.RotatedTileBox;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -414,17 +415,15 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
  		}
 	}
 
-
-
-	public double getXTile(){
+	public double getXTile() {
 		return MapUtils.getTileNumberX(zoom, longitude);
 	}
 
-	public double getYTile(){
+	public double getYTile() {
 		return MapUtils.getTileNumberY(zoom, latitude);
 	}
 
-	public double getTileSize(){
+	public double getTileSize() {
 //		return (map == null ?  256 : map.getTileSize()) * mapDensity;
 		return 256 * mapDensity;
 	}
@@ -442,24 +441,35 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		return qr;
 	}
 
+	public QuadRect getLatLonPoiBBox(int x, int y) {
+		RotatedTileBox.RotatedTileBoxBuilder bld = new RotatedTileBox.RotatedTileBoxBuilder();
+		RotatedTileBox rotatedTileBox = bld.setPixelDimensions(getWidth(), getHeight()).setLocation(latitude, longitude)
+				.setZoom(zoom).build();
+		rotatedTileBox.setMapDensity(mapDensity);
+		int searchRadius = (int) ((rotatedTileBox.getDefaultRadiusPoi()) * 1.5);
+		LatLon minLatLon = rotatedTileBox.getLatLonFromPixel(x - searchRadius, y - searchRadius);
+		LatLon maxLatLon = rotatedTileBox.getLatLonFromPixel(x + searchRadius, y + searchRadius);
+		return new QuadRect(minLatLon.getLongitude(), minLatLon.getLatitude(), maxLatLon.getLongitude(),
+				maxLatLon.getLatitude());
+	}
 
-	public int getMapXForPoint(double longitude){
-		double tileX = MapUtils.getTileNumberX(zoom , longitude);
+	public int getMapXForPoint(double longitude) {
+		double tileX = MapUtils.getTileNumberX(zoom, longitude);
 		return (int) ((tileX - getXTile()) * getTileSize() + getCenterPointX());
 	}
 
 	public double getCenterPointX() {
-		return getWidth() / 2;
+		return getWidth() / 2.0;
 	}
 
 
-	public int getMapYForPoint(double latitude){
-		double tileY = MapUtils.getTileNumberY(zoom , latitude);
+	public int getMapYForPoint(double latitude) {
+		double tileY = MapUtils.getTileNumberY(zoom, latitude);
 		return (int) ((tileY - getYTile()) * getTileSize() + getCenterPointY());
 	}
 
 	public double getCenterPointY() {
-		return getHeight() / 2;
+		return getHeight() / 2.0;
 	}
 
 	public NativeJavaRendering getNativeLibrary() {
