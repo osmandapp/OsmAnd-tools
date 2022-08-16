@@ -22,8 +22,13 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    -f|--file)
-      FILE="$2"
+    -lat)
+      LAT="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -lon)
+      LON="$2"
       shift # past argument
       shift # past value
       ;;
@@ -53,9 +58,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+if [ -z "$LAT" ] || [ -z "$LON" ]; then
+   echo "Please specify -lat LAT -lon LON to process the tile"
+   exit 1;
+fi
+LATL='N'; if (( LAT < 0 )); then LATL='S'; LAT=$(( - $LAT)); fi
+LONL='E'; if (( LON < 0 )); then LONL='W'; LON=$(( - $LON)); fi
+TILE=${LATL}$(printf "%02d" $LAT)${LONL}$(printf "%03d" $LON)
 
 # Step 0. Clean output path and recreate it
-WORK_PATH="./.tmp_${FILE}"
+WORK_PATH="./.tmp_${TILE}"
 rm -rf "${WORK_PATH}" || true
 mkdir -p "${WORK_PATH}"
 OUTPUT_RESULT=${OUTPUT_PATH}/${FILE}.heightmap.sqlite
@@ -66,6 +78,7 @@ echo "Output path:          $OUTPUT_PATH"
 echo "Work directory:       $WORK_PATH"
 
 let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
+echo "Tile:                 $TILE"
 echo "Tile size:            $TILE_SIZE"
 echo "Tile size (full):     $TILE_FULL_SIZE"
 
@@ -85,36 +98,38 @@ fi
 
 
 # Step 1. Create GDAL VRT to reference all DEM files
-if [ ! -f "$WORK_PATH/heightdbs.vrt" ]; then
+if [ ! -f "allheighttiles.vrt" ]; then
     echo "Creating VRT..."
     gdalbuildvrt \
         -resolution highest \
         -hidenodata \
         -vrtnodata "0" \
-        "$WORK_PATH/heightdbs.vrt" "$DEMS_PATH/${FILE}.tif"
+        "allheighttiles.vrt" "$DEMS_PATH"
 fi
 
 # Step 2. Convert VRT to single giant GeoTIFF file
+DELTA=0.1
 if [ ! -f "$WORK_PATH/heightdbs.tif" ]; then
-    echo "Baking giant GeoTIFF..."
+    echo "Baking Tile GeoTIFF..."
     gdal_translate -of GTiff \
         -strict \
-        --config GDAL_NUM_THREADS ALL_CPUS \
+        -projwin $(($LAT - $DELTA)) $(($LAT + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - 1 - $DELTA)) \
         -mo "AREA_OR_POINT=POINT" \
+        -ot Int16 \
         -co "COMPRESS=LZW" \
         -co "BIGTIFF=YES" \
         -co "SPARSE_OK=TRUE" \
         -co "TILED=NO" \
-        "$WORK_PATH/heightdbs.vrt" "$WORK_PATH/heightdbs.tif"
+        "allheighttiles.vrt" "$WORK_PATH/heightdbs.tif"
 fi
 
 # Step 3. Re-project to Mercator
 if [ ! -f "$WORK_PATH/heightdbs_mercator.tif" ]; then
     echo "Re-projecting..."
     gdalwarp -of GTiff \
-        --config GDAL_NUM_THREADS ALL_CPUS \
         -co "COMPRESS=LZW" \
         -co "BIGTIFF=YES" \
+        -ot Int16 \
         -co "SPARSE_OK=TRUE" \
         -t_srs "+init=epsg:3857 +over" \
         -r cubic \
