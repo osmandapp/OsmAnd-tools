@@ -1,5 +1,5 @@
-#!/bin/bash
-
+#!/bin/zsh
+# zsh to do simple math
 # This script is used to retile DEM files into SQLite databases by country.
 # These DBs contain tiles of specified size by zoom levels
 
