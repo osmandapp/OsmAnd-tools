@@ -219,11 +219,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 					int y = tileY;
 					for (int z = MAX_ZOOM; z >= MIN_ZOOM; z--) {
 						allTileNames.add(pack(x, y, z));
-						String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
-						if (!tileNamesByFile.containsKey(nm)) {
-							tileNamesByFile.put(nm, new TreeSet<>());
-						}
-						tileNamesByFile.get(nm).add(pack(x, y, z));
+						addByTile(tileNamesByFile, x, y, z);
 						x = x >> 1;
 						y = y >> 1;
 					}
@@ -253,6 +249,25 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		} else {
 			procFile(sqliteFile, targetFile, allTileNames, true, addedTileNames);
 		}
+	}
+
+	private static void addByTile(Map<String, Set<Long>> tileNamesByFile, int x, int y, int z) {
+		int tlat = (int) Math.floor(MapUtils.getLatitudeFromTile(z, y));
+		int blat = (int) Math.floor(MapUtils.getLatitudeFromTile(z, y + 1));
+		int llon = (int) Math.floor(MapUtils.getLongitudeFromTile(z, x));
+		int rlon = (int) Math.floor(MapUtils.getLongitudeFromTile(z, x+1));
+		for(int lat = tlat; lat >= blat; lat--) {
+			for(int lon = llon; lon <= rlon; lon++) { 
+//				String nm = getTileName((int) (tlat / 2 + blat / 2), (int) (llon / 2 + rlon / 2));
+				String nm = getTileName(lat, lon);
+				if (!tileNamesByFile.containsKey(nm)) {
+					tileNamesByFile.put(nm, new TreeSet<>());
+				}
+				tileNamesByFile.get(nm).add(pack(x, y, z));
+			}
+		}
+		
+		
 	}
 
 	private static String getTileName(int lt, int ln) {
