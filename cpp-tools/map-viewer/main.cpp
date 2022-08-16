@@ -1515,7 +1515,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 15.5f * 26;
+        auto h1 = 15.5f * 30;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1571,6 +1571,21 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("visual zoom (+ shift)  : %1 + %2").arg(state.visualZoom).arg(state.visualZoomShift)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("camera latitude        : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().y)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("camera longitude       : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().x)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("camera height (meters) : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraHeight())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
