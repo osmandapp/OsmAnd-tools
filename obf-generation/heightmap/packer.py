@@ -84,7 +84,7 @@ class OsmAndHeightMapPacker(object):
     # -------------------------------------------------------------------------
     def packTilesInDBs(self):
         dbFileName = os.path.join(self.outputDir, "world.heightmap.sqlite")
-
+        dbinsert = 0
         # Create database
         if os.path.exists(dbFileName):
             os.unlink(dbFileName)
@@ -174,9 +174,12 @@ class OsmAndHeightMapPacker(object):
                         image
                     ) VALUES (?, ?, ?, ?)
                     """, (tileX, tileY, zoom, sqlite3.Binary(tileFile.read())))
+                dbinsert = dbinsert + 1
+            if dbinsert > 100:
+                dbinsert = 0
                 db.commit()
-
         # Release database
+        db.commit()
         db.close()
         del db
 
