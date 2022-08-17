@@ -418,6 +418,7 @@ public class DownloadIndexesService  {
 		SRTM,
 		HILLSHADE,
 		SLOPE,
+		HEIGHTMAP,
 		OSMLIVE,
 		MAIN,
 		WIKI,

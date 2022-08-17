@@ -226,6 +226,10 @@ public class DownloadIndexController {
 		return isContainAndEqual("slope", params); 
 	}
 	
+	private boolean isHeightmap(MultiValueMap<String, String> params) {
+		return isContainAndEqual("heightmap", params); 
+	}
+	
 	private boolean isRoad(MultiValueMap<String, String> params) {
 		return isContainAndEqual("road", params); 
 	}
@@ -270,6 +274,8 @@ public class DownloadIndexController {
 				host = servers.getServer(DownloadServerSpecialty.SRTM);
 			} else if(isSlope(params)) {
 				host = servers.getServer(DownloadServerSpecialty.SLOPE);
+			} else if(isHeightmap(params)) {
+				host = servers.getServer(DownloadServerSpecialty.HEIGHTMAP);
 			} else if(isHillshade(params)) {
 				host = servers.getServer(DownloadServerSpecialty.HILLSHADE);
 			} else if(isLiveMaps(params)) {
