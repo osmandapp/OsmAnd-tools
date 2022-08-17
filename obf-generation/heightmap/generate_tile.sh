@@ -12,13 +12,23 @@ set -e
 VERBOSE_PARAM=""
 SRC_PATH=$(dirname "$0")
 #SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TILE_SIZE=32
 POSITIONAL_ARGS=()
-
+TYPE=heightmap
+PROCESSES="${PROCESSES:-2}"
 while [[ $# -gt 0 ]]; do
   case $1 in
     -d|--dempath)
       DEMS_PATH="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -c|--color)
+      COLOR_SCHEME="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -t|--type)
+      TYPE="$2"
       shift # past argument
       shift # past value
       ;;
@@ -37,7 +47,12 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    -t|--tilesize)
+    -p|--processes)
+      PROCESSES="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --tilesize)
       TILESIZE="$2"
       shift # past argument
       shift # past value
@@ -57,6 +72,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [ -z "$TILE_SIZE" ]; then
+  TILE_SIZE=256
+  if [[  "$TYPE" == "heightmap" ]]; then TILE_SIZE=32; fi
+fi
+
+
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 if [ -z "$LAT" ] || [ -z "$LON" ]; then
    echo "Please specify -lat LAT -lon LON to process the tile"
@@ -67,12 +88,15 @@ LONL='E'; if (( LON < 0 )); then LONL='W'; LON=$(( - $LON)); fi
 TILE=${LATL}$(printf "%02d" $LAT)${LONL}$(printf "%03d" $LON)
 
 # Step 0. Clean output path and recreate it
-WORK_PATH="./.tmp_${TILE}"
+WORK_PATH="./.tmp_${TILE}_${TYPE}"
 rm -rf "${WORK_PATH}" || true
 mkdir -p "${WORK_PATH}"
-OUTPUT_RESULT=${OUTPUT_PATH}/${TILE}.heightmap.sqlite
+
+EXTENSION="sqlitedb"; if [[  "$TYPE" == "heightmap" ]]; then EXTENSION="heightmap.sqlite"; fi
+OUTPUT_RESULT=${OUTPUT_PATH}/${TILE}.${EXTENSION}
 rm "$OUTPUT_RESULT" || true
 
+echo "Type file:            $Type"
 echo "DEM files path:       $DEMS_PATH"
 echo "Output path:          $OUTPUT_PATH"
 echo "Work directory:       $WORK_PATH"
@@ -99,73 +123,90 @@ fi
 
 
 # Step 1. Create GDAL VRT to reference all DEM files
-if [ ! -f "allheighttiles.vrt" ]; then
+if [ ! -f "allheighttiles_$TYPE.vrt" ]; then
     echo "Creating VRT..."
+    NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
     gdalbuildvrt \
         -resolution highest \
         -hidenodata \
-        -vrtnodata "0" \
-        "allheighttiles.vrt" "$DEMS_PATH"/*
+        -vrtnodata "$NODATA" \
+        "allheighttiles_$TYPE.vrt" "$DEMS_PATH"/*
 fi
 
 # Step 2. Convert VRT to single giant GeoTIFF file
 DELTA=0.1
-if [ ! -f "$WORK_PATH/heightdbs.tif" ]; then
+if [ ! -f "$WORK_PATH/${TYPE}_grid.tif" ]; then
     echo "Baking Tile GeoTIFF..."
-    gdal_translate -of GTiff \
-        -strict \
+    gdal_translate -of GTiff -strict \
         -projwin $(($LON - $DELTA)) $(($LAT + 1 + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - $DELTA)) \
-        -mo "AREA_OR_POINT=POINT" \
-        -ot Int16 \
-        -co "COMPRESS=LZW" \
-        -co "BIGTIFF=YES" \
-        -co "SPARSE_OK=TRUE" \
-        -co "TILED=NO" \
-        "allheighttiles.vrt" "$WORK_PATH/heightdbs.tif"
+        -mo "AREA_OR_POINT=POINT" -ot Int16 -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
+        "allheighttiles_$TYPE.vrt" "$WORK_PATH/${TYPE}_grid.tif"
 fi
 
+
+if [[  "$TYPE" == "heightmap" ]]; then
 # Step 3. Re-project to Mercator
-if [ ! -f "$WORK_PATH/heightdbs_mercator.tif" ]; then
-    echo "Re-projecting..."
-    gdalwarp -of GTiff \
-        -co "COMPRESS=LZW" \
-        -co "BIGTIFF=YES" \
-        -ot Int16 \
-        -co "SPARSE_OK=TRUE" \
-        -t_srs "+init=epsg:3857 +over" \
-        -r cubic \
-        -multi \
-        "$WORK_PATH/heightdbs.tif" "$WORK_PATH/heightdbs_mercator.tif"
+    if [ ! -f "$WORK_PATH/${TYPE}_mercator.tif" ]; then
+      echo "Re-projecting..."
+      gdalwarp -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -ot Int16 -co "SPARSE_OK=TRUE" \
+        -t_srs "+init=epsg:3857 +over" -r cubic -multi \
+        "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/${TYPE}_mercator.tif"
+    fi
+    # Step 4. Slice giant projected GeoTIFF to tiles of specified size and downscale them
+    echo "Slicing..."
+    mkdir -p "$WORK_PATH/rawtiles"
+    "$SRC_PATH/slicer.py" --size=$TILE_SIZE --driver=GTiff --extension=tif $VERBOSE_PARAM \
+        "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/tiles"
+
+    # Step 5. Generate tiles that overlap each other by 1 heixel
+    echo "Overlapping..."
+    mkdir -p "$WORK_PATH/tiles"
+    "$SRC_PATH/overlap.py" --driver=GTiff --driver-options="COMPRESS=LZW" --extension=tif $VERBOSE_PARAM \
+        "$WORK_PATH/tiles" "$WORK_PATH/tiles"
+else
+    echo "Calculating base slope..."
+    gdaldem slope          -co "COMPRESS=LZW" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_slope.tif"
+
+    if [ "$TYPE" = "composite" ] || [ "$TYPE" = "hillshade" ]; then
+      COLOR_SCHEME="${COLOR_SCHEME:-hillshade_alpha}"
+      ZOOM_RANGE=4-12
+      TARGET_FILE=hillshade.tif
+      echo "Calculating base hillshade..."
+      gdaldem hillshade -z 2 -co "COMPRESS=LZW" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_hillshade.tif"
+	    gdaldem color-relief -co "COMPRESS=LZW" "$WORK_PATH/base_slope.tif" "$SRC_PATH/color/color_slope.txt" "$WORK_PATH/base_hillshade_slope.tif"
+    
+      # merge composite hillshade / slope
+      echo "Calculate composite hillshade..."
+      composite -quiet -compose Multiply "$WORK_PATH/base_hillshade.tif" "$WORK_PATH/base_hillshade_slope.tif" "$WORK_PATH/pre_composite_hillshade.tif"
+      convert -level 28%x70% "$WORK_PATH/pre_composite_hillshade.tif" "$WORK_PATH/pre_composite_convert.tif"
+      "$SRC_PATH/gdalcopyproj.py" "$WORK_PATH/base_hillshade.tif" "$WORK_PATH/pre_composite_convert.tif"
+      rm "$WORK_PATH/base_composite_hillshade.tif" || true
+      gdalwarp -of GTiff -ot Int16 -co "COMPRESS=LZW" "$WORK_PATH/pre_composite_convert.tif" "$WORK_PATH/base_composite_hillshade.tif"
+
+      # hillshade
+      echo "Calculating hillshade..."
+      gdaldem color-relief -alpha "$WORK_PATH/base_composite_hillshade.tif" "$SRC_PATH/color/$COLOR_SCHEME.txt" "$WORK_PATH/hillshade-color.tif" -co "COMPRESS=LZW" 
+      gdal_translate -b 1 -b 4 -colorinterp_1 gray "$WORK_PATH/hillshade-color.tif" "$WORK_PATH/hillshade.tif" -co "COMPRESS=LZW"
+
+    elif [ "$TYPE" = "slopes" ]; then
+      COLOR_SCHEME="${COLOR_SCHEME:-slopes_main}"
+      ZOOM_RANGE=4-11
+      TARGET_FILE=slope.tif
+      echo "Calculating slope..."
+      gdaldem color-relief -alpha "$WORK_PATH/base_slope.tif" "$SRC_PATH/color/$COLOR_SCHEME.txt" "$WORK_PATH/slope.tif" -co "COMPRESS=LZW"  
+    fi
+    echo "Split into tiles with $PROCESSES procesess "
+    gdal2tiles.py --processes $PROCESSES  -z $ZOOM_RANGE "$WORK_PATH/$TARGET_FILE" "$WORK_PATH/tiles/"
 fi
-
-# Step 4. Slice giant projected GeoTIFF to tiles of specified size and downscale them
-echo "Slicing..."
-mkdir -p "$WORK_PATH/tiles"
-"$SRC_PATH/slicer.py" \
-    --size=$TILE_SIZE \
-    --driver=GTiff \
-    --extension=tif \
-    $VERBOSE_PARAM \
-    "$WORK_PATH/heightdbs_mercator.tif" "$WORK_PATH/tiles"
-
-# Step 5. Generate tiles that overlap each other by 1 heixel
-echo "Overlapping..."
-mkdir -p "$WORK_PATH/overlapped_tiles"
-"$SRC_PATH/overlap.py" \
-    --driver=GTiff \
-    --driver-options="COMPRESS=LZW" \
-    --extension=tif \
-    $VERBOSE_PARAM \
-    "$WORK_PATH/tiles" "$WORK_PATH/overlapped_tiles"
 
 # Step 6. Pack overlapped tiles into TileDB
 echo "Packing..."
 mkdir -p "$WORK_PATH/db"
-"$SRC_PATH/packer.py" $VERBOSE_PARAM "$WORK_PATH/overlapped_tiles" "$WORK_PATH/db"
+"$SRC_PATH/packer.py" $VERBOSE_PARAM "$WORK_PATH/tiles" "$WORK_PATH/db"
 
 # Step 7. Copy output
 echo "Publishing..."
-mv "$WORK_PATH/db/world.heightmap.sqlite" "$OUTPUT_RESULT"
+mv "$WORK_PATH/db/tiles.sqlite" "$OUTPUT_RESULT"
 
 # Step 8. Clean up work
 rm -rf "$WORK_PATH"

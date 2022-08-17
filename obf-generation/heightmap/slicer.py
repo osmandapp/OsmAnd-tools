@@ -133,7 +133,8 @@ class OsmAndHeightMapSlicer(object):
 
                 # Skip if this tile already exists
                 if os.path.exists(outputTileFile):
-                    print("Skipping base tile TMS %sx%s@%s" % (tileX, tileY, self.baseZoom))
+                    if self.options.verbose:
+                        print("Skipping base tile TMS %sx%s@%s" % (tileX, tileY, self.baseZoom))
                     continue
 
                 if self.options.verbose:

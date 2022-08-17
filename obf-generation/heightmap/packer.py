@@ -62,7 +62,8 @@ class OsmAndHeightMapPacker(object):
         # Collect all input files
         for zoomDir in os.listdir(self.inputPath):
             zoomPath = os.path.join(self.inputPath, zoomDir)
-
+            if not os.path.isdir(zoomPath):
+                continue
             zoom = int(zoomDir)
             if zoom < self.minZoom:
                 self.minZoom = zoom
@@ -71,9 +72,7 @@ class OsmAndHeightMapPacker(object):
 
             for xTilesDir in os.listdir(zoomPath):
                 xTilesPath = os.path.join(zoomPath, xTilesDir)
-
                 tmsTileX = int(xTilesDir)
-
                 for yTileFile in os.listdir(xTilesPath):
                     tilePath = os.path.join(xTilesPath, yTileFile)
 
@@ -83,7 +82,7 @@ class OsmAndHeightMapPacker(object):
 
     # -------------------------------------------------------------------------
     def packTilesInDBs(self):
-        dbFileName = os.path.join(self.outputDir, "world.heightmap.sqlite")
+        dbFileName = os.path.join(self.outputDir, "tiles.sqlite")
         dbinsert = 0
         # Create database
         if os.path.exists(dbFileName):
