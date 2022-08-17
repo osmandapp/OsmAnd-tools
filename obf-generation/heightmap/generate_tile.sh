@@ -89,12 +89,16 @@ TILE=${LATL}$(printf "%02d" $LAT)${LONL}$(printf "%03d" $LON)
 
 # Step 0. Clean output path and recreate it
 WORK_PATH="./.tmp_${TILE}_${TYPE}"
-rm -rf "${WORK_PATH}" || true
+if [ -d "${WORK_PATH}" ]; then
+  rm -rf "${WORK_PATH}"
+fi
 mkdir -p "${WORK_PATH}"
 
 EXTENSION="sqlitedb"; if [[  "$TYPE" == "heightmap" ]]; then EXTENSION="heightmap.sqlite"; fi
 OUTPUT_RESULT=${OUTPUT_PATH}/${TILE}.${EXTENSION}
-rm "$OUTPUT_RESULT" || true
+if [ -f "$OUTPUT_RESULT" ]; then
+  rm "$OUTPUT_RESULT"
+fi
 
 echo "Type file:            $Type"
 echo "DEM files path:       $DEMS_PATH"
@@ -102,10 +106,10 @@ echo "Output path:          $OUTPUT_PATH"
 echo "Work directory:       $WORK_PATH"
 echo "Source directory:     $SRC_PATH"
 
-let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
+# let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
 echo "Tile:                 $TILE"
 echo "Tile size:            $TILE_SIZE"
-echo "Tile size (full):     $TILE_FULL_SIZE"
+# echo "Tile size (full):     $TILE_FULL_SIZE"
 
 GDAL2TILES=`which gdal2tiles.py`
 GDAL2TILES_PATH=$(dirname "$GDAL2TILES")
@@ -180,7 +184,6 @@ else
       composite -quiet -compose Multiply "$WORK_PATH/base_hillshade.tif" "$WORK_PATH/base_hillshade_slope.tif" "$WORK_PATH/pre_composite_hillshade.tif"
       convert -level 28%x70% "$WORK_PATH/pre_composite_hillshade.tif" "$WORK_PATH/pre_composite_convert.tif"
       "$SRC_PATH/gdalcopyproj.py" "$WORK_PATH/base_hillshade.tif" "$WORK_PATH/pre_composite_convert.tif"
-      rm "$WORK_PATH/base_composite_hillshade.tif" || true
       gdalwarp -of GTiff -ot Int16 -co "COMPRESS=LZW" "$WORK_PATH/pre_composite_convert.tif" "$WORK_PATH/base_composite_hillshade.tif"
 
       # hillshade
