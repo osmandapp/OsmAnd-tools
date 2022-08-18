@@ -250,7 +250,9 @@ public class GpxController {
 			GPXSessionFile sessionFile = new GPXSessionFile();
 			ctx.files.add(sessionFile);
 			gpxFile.path = file.getOriginalFilename();
-
+			if (gpxFile.metadata != null) {
+				sessionFile.metadata = gpxFile.metadata;
+			}
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
 			sessionFile.size = fileSizeMb;
