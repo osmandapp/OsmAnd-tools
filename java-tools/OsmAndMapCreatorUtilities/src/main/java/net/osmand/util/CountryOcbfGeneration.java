@@ -154,9 +154,12 @@ public class CountryOcbfGeneration {
 		public boolean wiki;
 		public boolean roads ;
 		public boolean hillshade ;
+		public boolean slope;
+		public boolean heightmap;
 		public boolean srtm ;
 
 		public long timestampToUpdate;
+		
 
 		public CountryRegion getParent() {
 			return parent;
@@ -470,7 +473,7 @@ public class CountryOcbfGeneration {
 		 		addTag(serializer, "region_" + tg, r.getAdditionalTag(tg));
 			}
 		}
-		if(r.map || r.roads || r.wiki || r.srtm || r.hillshade) {
+		if (r.map || r.roads || r.wiki || r.srtm || r.hillshade || r.slope || r.heightmap) {
 			line += " download=" + r.getDownloadName();
 			addTag(serializer, "download_name", r.getDownloadName());
 			addTag(serializer, "region_prefix", r.getDownloadPrefix());
@@ -479,21 +482,29 @@ public class CountryOcbfGeneration {
 				line += " map=yes";
 				addTag(serializer, "region_map", "yes");
 			}
-			if(r.wiki) {
+			if (r.wiki) {
 				line += " wiki=yes";
 				addTag(serializer, "region_wiki", "yes");
 			}
-			if(r.roads) {
+			if (r.roads) {
 				line += " roads=yes";
 				addTag(serializer, "region_roads", "yes");
 			}
-			if(r.srtm) {
+			if (r.srtm) {
 				line += " srtm=yes";
 				addTag(serializer, "region_srtm", "yes");
 			}
-			if(r.hillshade) {
+			if (r.hillshade) {
 				line += " hillshade=yes";
 				addTag(serializer, "region_hillshade", "yes");
+			}
+			if (r.slope) {
+				line += " slope=yes";
+				addTag(serializer, "region_slope", "yes");
+			}
+			if (r.heightmap) {
+				line += " heightmap=yes";
+				addTag(serializer, "region_heightmap", "yes");
 			}
 		}
 		if(r.translate == null) {
@@ -634,10 +645,20 @@ public class CountryOcbfGeneration {
 		for(String tg : CountryRegion.tagsPropagate) {
 			reg.additionalTags.put(tg, attrs.get(tg));
 		}
-		if(attrs.containsKey("hillshade")) {
+		if (attrs.containsKey("hillshade")) {
 			reg.hillshade = parseBoolean(attrs.get("hillshade"));
 		} else {
 			reg.hillshade = type == null || type.equals("hillshade");
+		}
+		if (attrs.containsKey("heightmap")) {
+			reg.heightmap = parseBoolean(attrs.get("heightmap"));
+		} else {
+			reg.heightmap = type == null || type.equals("heightmap");
+		}
+		if (attrs.containsKey("slope")) {
+			reg.slope = parseBoolean(attrs.get("slope"));
+		} else {
+			reg.slope = type == null || type.equals("slope");
 		}
 		if(attrs.containsKey("srtm")) {
 			reg.srtm = parseBoolean(attrs.get("srtm"));
