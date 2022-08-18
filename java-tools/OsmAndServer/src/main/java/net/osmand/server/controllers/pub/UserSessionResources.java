@@ -9,6 +9,7 @@ import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionListener;
 
+import net.osmand.GPXUtilities;
 import org.springframework.stereotype.Component;
 
 import net.osmand.GPXUtilities.GPXTrackAnalysis;
@@ -23,6 +24,7 @@ public class UserSessionResources implements HttpSessionListener {
 		transient File file;
 		double size;
 		GPXTrackAnalysis analysis;
+		GPXUtilities.Metadata metadata;
 		GPXTrackAnalysis srtmAnalysis;
 	}
 	

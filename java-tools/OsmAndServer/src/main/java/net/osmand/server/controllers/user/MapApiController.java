@@ -53,6 +53,7 @@ public class MapApiController {
 
 	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
+	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
 	private static final long ANALYSIS_RERUN = 1645061114000l; // 17-02-2022
@@ -190,6 +191,9 @@ public class MapApiController {
 							GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
 							if (gpxFile != null) {
 								analysis = getAnalysis(uf, gpxFile);
+								if (gpxFile.metadata != null) {
+									uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
+								}
 							}
 						}
 					} catch (RuntimeException e) {
