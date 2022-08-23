@@ -17,6 +17,7 @@ import javax.swing.AbstractAction;
 import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 
+import net.osmand.data.QuadRect;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
@@ -42,7 +43,8 @@ import net.osmand.util.MapUtils;
 
 public class MapPanelSelector {
 	protected static final Log log = PlatformUtil.getLog(MapPanelSelector.class);
-	private static final boolean LOAD_ROUTE_BBOX = false;
+	private static final boolean LOAD_ROUTE_BBOX = true;
+	private static final boolean LOAD_ROUTE_POI_RADIUS_BBOX = false;
 	private final MapPanel panel;
 	private MapSelectionArea mapSelectionArea;
 	private ThreadPoolExecutor threadPool;
@@ -78,7 +80,7 @@ public class MapPanelSelector {
 					List<RouteKey> keys = RouteType.getRouteKeys(o);
 					if (keys.size() > 0) {
 						try {
-							createMenu(o).show(panel, e.getX(), e.getY());
+							createMenu(o, e.getX(), e.getY()).show(panel, e.getX(), e.getY());
 						} catch (IOException e1) {
 							log.error(e1.getMessage(), e1);
 						}
@@ -109,16 +111,18 @@ public class MapPanelSelector {
 		panel.setPoints(points);
 		panel.repaint();
 	}
-	
-	private JPopupMenu createMenu(RenderedObject renderedObject) throws IOException {
+
+	private JPopupMenu createMenu(RenderedObject renderedObject, int x, int y) throws IOException {
 		JPopupMenu menu = new JPopupMenu();
 		menu.add(new JLabel("Select route"));
-		Map<RouteKey, GPXFile> routeMap ;
+		Map<RouteKey, GPXFile> routeMap;
 		NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
-		NetworkRouteSelector routeSelector = new NetworkRouteSelector(DataExtractionSettings.getSettings().getObfReaders(), f, null, false);
+		NetworkRouteSelector routeSelector = new NetworkRouteSelector(
+				DataExtractionSettings.getSettings().getObfReaders(), f, null);
 		Collection<RouteKey> routeKeys;
+		QuadRect latLonBBox = LOAD_ROUTE_POI_RADIUS_BBOX ? panel.getLatLonPoiBBox(x, y) : panel.getLatLonBBox();
 		if (LOAD_ROUTE_BBOX) {
-			routeMap = routeSelector.getRoutes(panel.getLatLonBBox(), true, null);
+			routeMap = routeSelector.getRoutes(latLonBBox, false, null);
 			routeKeys = routeMap.keySet();
 		} else {
 			routeMap = null;
@@ -137,7 +141,7 @@ public class MapPanelSelector {
 							if (routeMap == null || routeMap.get(routeKey) == null) {
 								System.out.println("Start loading " + routeKey.set);
 								if (LOAD_ROUTE_BBOX) {
-									Map<RouteKey, GPXFile> res = routeSelector.getRoutes(panel.getLatLonBBox(), true, routeKey);
+									Map<RouteKey, GPXFile> res = routeSelector.getRoutes(latLonBBox, true, routeKey);
 									routes = Collections.singletonMap(routeKey, res.get(routeKey));
 								} else {
 									f.keyFilter = Collections.singleton(routeKey);
