@@ -250,12 +250,45 @@ public class GpxController {
 			GPXSessionFile sessionFile = new GPXSessionFile();
 			ctx.files.add(sessionFile);
 			gpxFile.path = file.getOriginalFilename();
-			if (gpxFile.metadata != null) {
-				sessionFile.metadata = gpxFile.metadata;
-			}
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
 			sessionFile.size = fileSizeMb;
+			cleanupFromNan(analysis);
+			sessionFile.analysis = analysis;
+			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+			GPXTrackAnalysis srtmAnalysis = null;
+			if (srtmGpx != null) {
+				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+			}
+			sessionFile.srtmAnalysis = srtmAnalysis;
+			if (srtmAnalysis != null) {
+				cleanupFromNan(srtmAnalysis);
+			}
+			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
+		}
+	}
+	
+	@PostMapping(path = {"/get-gpx-analysis"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getGpxInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                         HttpServletRequest request, HttpSession httpSession) throws IOException {
+		
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		InputStream is = file.getInputStream();
+		FileOutputStream fous = new FileOutputStream(tmpGpx);
+		Algorithms.streamCopy(is, fous);
+		is.close();
+		fous.close();
+		
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
+		if (gpxFile.error != null) {
+			return ResponseEntity.badRequest().body("Error reading gpx!");
+		} else {
+			GPXSessionFile sessionFile = new GPXSessionFile();
+			gpxFile.path = file.getOriginalFilename();
+			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			sessionFile.file = tmpGpx;
+			sessionFile.size = file.getSize() / (double) (1 << 20);
 			cleanupFromNan(analysis);
 			sessionFile.analysis = analysis;
 			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
