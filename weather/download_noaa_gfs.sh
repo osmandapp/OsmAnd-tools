@@ -75,9 +75,17 @@ get_raw_files() {
         ( cd $DATE; wget -nv -N --no-if-modified-since $file_link_indx --timeout=900 )
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
-        ( cd $DATE; wget -nv -N --no-if-modified-since $file_link --timeout=900 )
-        rm $filetime.gt || true
-        ln -s $DATE/${filename} $filetime.gt
+        
+        for i in ${!BANDS[@]}; do
+            cd $DATE
+            local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
+            local start_index=$( echo $indexes | awk -F " " '{print $1}' )
+            local end_index=$( echo $indexes | awk -F " " '{print $2}' )
+            curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filename}
+            rm ${BANDS_NAMES[$i]}_$filetime.gt || true
+            ln -s $DATE/${BANDS_NAMES[$i]}_${filename} ${BANDS_NAMES[$i]}_${filetime}.gt
+        done
+
         cd ..;
     done
 }
@@ -85,15 +93,13 @@ get_raw_files() {
 generate_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
-        band_numbers=""
-        for i in ${!BANDS[@]}; do
-            local b_num=$(cat $WFILE.idx | grep "${BANDS[$i]}" | awk 'NR==1{print $1}' | awk -F ":" '{print $1}')
-            band_numbers="$band_numbers -b $b_num"
-        done
+        local idx_file_path=$WFILE
+        for i in ${!BANDS_NAMES[@]}; do
+            idx_file_path="${idx_file_path/"${BANDS_NAMES[$i]}_"/}"
+        done    
         mkdir -p $TIFF_FOLDER/
-        local BS=$(basename $WFILE)
-        local FILE_NAME="${BS%%.*}"
-        gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
+
+        gdal_translate $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
 
         mkdir -p $TIFF_FOLDER/${FILE_NAME}/
