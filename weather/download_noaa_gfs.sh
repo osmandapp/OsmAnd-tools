@@ -75,7 +75,7 @@ get_raw_files() {
         ( cd $DATE; wget -nv -N --no-if-modified-since $file_link_indx --timeout=900 )
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
-        
+
         for i in ${!BANDS[@]}; do
             cd $DATE
             local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
@@ -123,7 +123,7 @@ generate_bands_tiff() {
 # 1. cleanup old files to not process them
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
-cleanuptimestamp
+# cleanuptimestamp
 
 # 2. download raw files and generate tiffs
 get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
