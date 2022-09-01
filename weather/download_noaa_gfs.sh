@@ -81,6 +81,7 @@ get_raw_files() {
 
         # if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
+            sleep 5
         # fi
 
         rm $filetime.gt.idx || true
@@ -96,6 +97,7 @@ get_raw_files() {
                 local start_index=$( echo $indexes | awk -F " " '{print $1}' )
                 local end_index=$( echo $indexes | awk -F " " '{print $2}' )
                 curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
+                sleep 1
             # fi
             cd ..
             rm ${BANDS_NAMES[$i]}_$filetime.gt || true
