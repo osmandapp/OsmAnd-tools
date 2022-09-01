@@ -79,9 +79,9 @@ get_raw_files() {
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
 
-        if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
+        # if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
-        fi
+        # fi
 
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
@@ -91,21 +91,23 @@ get_raw_files() {
 
         for i in ${!BANDS[@]}; do
             cd $DATE
-            if [[ $( should_download_file "${BANDS_NAMES[$i]}_$filename" "$file_link" ) -eq 1 ]]; then
+            # if [[ $( should_download_file "${BANDS_NAMES[$i]}_$filename" "$file_link" ) -eq 1 ]]; then
                 local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
                 local start_index=$( echo $indexes | awk -F " " '{print $1}' )
                 local end_index=$( echo $indexes | awk -F " " '{print $2}' )
                 curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
-            fi
+            # fi
             cd ..
             rm ${BANDS_NAMES[$i]}_$filetime.gt || true
             ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt
 
-             # TODO delete
-            return
+            # TODO delete
+            # return
         done
 
         cd ..;
+        # TODO delete
+        # return
     done
 }
          
