@@ -107,7 +107,7 @@ generate_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
         local FILE_NAME="${${WFILE}//"raw/"}"
-        FILE_NAME="${${FILE_NAME}//".gt"}"
+        FILE_NAME="${FILE_NAME//".gt"}"
         mkdir -p $TIFF_FOLDER/
 
         gdal_translate $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
