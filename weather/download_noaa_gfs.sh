@@ -106,7 +106,7 @@ get_raw_files() {
 generate_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
-        local FILE_NAME="${${WFILE}//"raw/"}"
+        local FILE_NAME="${WFILE//"raw/"}"
         FILE_NAME="${FILE_NAME//".gt"}"
         mkdir -p $TIFF_FOLDER/
 
