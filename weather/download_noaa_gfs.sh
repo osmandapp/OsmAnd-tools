@@ -107,7 +107,7 @@ get_raw_files() {
 
         cd ..;
         # TODO delete
-        return
+        # return
     done
 }
          
