@@ -34,22 +34,42 @@ fi
 # Round down HOURS to 0/6/12/18
 RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
 
+
+# custom retry
+wait_if_blocked() {
+    local url=$1
+
+    local server_response1=$(curl -s -I $url | head -1)
+    if [[ $server_response1 =~ "HTTP/2 403" ]]; then
+        
+        sleep 60
+        local server_response2=$(curl -s -I --header $url | head -1)
+        if [[ $server_response2 =~ "HTTP/2 403" ]]; then
+            
+            sleep 300
+            local server_response3=$(curl -s -I --header $url | head -1)
+            if [[ $server_response3 =~ "HTTP/2 403" ]]; then
+                 sleep 3600
+            fi
+        fi
+    fi  
+}
+
 should_download_file() {
     local filename=$1
     local url=$2
+
+    wait_if_blocked $url
 
     if [[ -f $filename ]]; then
         # File is already dowlnloaded
         disk_file_modified_time="$(TZ=UMT0 date -r ${filename} +'%a, %d %b %Y %H:%M:%S GMT')"
         local server_response=$(curl -s -I --header "If-Modified-Since: $disk_file_modified_time" $file_link_indx | head -1)
-    
-        if [[ $server_file_modified_time_response =~ "HTTP/2 304" ]]; then
+
+        if [[ $server_response =~ "HTTP/2 304" ]]; then
             # Server don't have update for this file. Don't need to download it.
             echo 0
             return
-        elif [[ $server_file_modified_time_response =~ "HTTP/2 403" ]]; then
-            # Server is blocking. Let's wait a bit
-            sleep 60
         fi  
     fi
     echo 1
@@ -151,8 +171,8 @@ wait
 # get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
-# generate_bands_tiff
+generate_bands_tiff
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
-# # #rm -rf $DW_FOLDER/
+#rm -rf $DW_FOLDER/
