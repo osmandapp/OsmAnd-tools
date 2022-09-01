@@ -96,7 +96,7 @@ get_raw_files() {
             fi
             cd ..
             rm ${BANDS_NAMES[$i]}_$filetime.gt || true
-            ln -s $DATE/${BANDS_NAMES[$i]}_${filename} ${BANDS_NAMES[$i]}_${filetime}.gt
+            ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt
         done
 
         cd ..;
