@@ -162,9 +162,9 @@ rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
 
 # 2. download raw files and generate tiffs
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+# wait
 # generate_bands_tiff
 
 # 3. redownload what's missing again (double check)
@@ -173,6 +173,6 @@ wait
 # wait
 generate_bands_tiff
 
-find . -type f -mmin +${MINUTES_TO_KEEP} -delete
-find . -type d -empty -delete
+# find . -type f -mmin +${MINUTES_TO_KEEP} -delete
+# find . -type d -empty -delete
 #rm -rf $DW_FOLDER/
