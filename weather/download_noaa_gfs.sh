@@ -169,8 +169,8 @@ generate_bands_tiff() {
 }
 
 # TODO: delete
-# rm -rf $DW_FOLDER/* || true
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+rm -rf $DW_FOLDER/* || true
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 generate_bands_tiff
 
 
