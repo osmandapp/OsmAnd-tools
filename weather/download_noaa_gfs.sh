@@ -83,7 +83,7 @@ get_raw_files() {
             echo "Downloading index: ${filename}.idx"
             ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
             ln -s $DATE/${filename}.idx $filetime.gt.idx
-            sleep 2
+            sleep 5
         else 
             echo "Skipping index: ${filename}.idx"   
         fi
