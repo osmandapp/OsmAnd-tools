@@ -72,7 +72,8 @@ get_raw_files() {
         fi
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        ( cd $DATE; wget -nv -N --no-if-modified-since $file_link_indx --timeout=900 )
+        ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
+
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
 
@@ -131,13 +132,13 @@ get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 # generate_bands_tiff
 
-# 3. redownload what's missing again (double check)
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
+# # 3. redownload what's missing again (double check)
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+# wait
 
-generate_bands_tiff
+# generate_bands_tiff
 
-find . -type f -mmin +${MINUTES_TO_KEEP} -delete
-find . -type d -empty -delete
-#rm -rf $DW_FOLDER/
+# find . -type f -mmin +${MINUTES_TO_KEEP} -delete
+# find . -type d -empty -delete
+# #rm -rf $DW_FOLDER/
