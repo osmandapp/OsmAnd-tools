@@ -87,7 +87,7 @@ get_raw_files() {
         ln -s $DATE/${filename}.idx $filetime.gt.idx
         
         # TODO delete
-        return
+        # return
 
         for i in ${!BANDS[@]}; do
             cd $DATE
@@ -107,7 +107,7 @@ get_raw_files() {
 
         cd ..;
         # TODO delete
-        # return
+        return
     done
 }
          
