@@ -41,12 +41,15 @@ should_download_file() {
     if [[ -f $filename ]]; then
         # File is already dowlnloaded
         disk_file_modified_time="$(TZ=UMT0 date -r ${filename} +'%a, %d %b %Y %H:%M:%S GMT')"
-        local server_file_modified_time_response=$(curl -s -I --header "If-Modified-Since: $disk_file_modified_time" $file_link_indx | head -1)
+        local server_response=$(curl -s -I --header "If-Modified-Since: $disk_file_modified_time" $file_link_indx | head -1)
     
         if [[ $server_file_modified_time_response =~ "HTTP/2 304" ]]; then
             # Server don't have update for this file. Don't need to download it.
             echo 0
             return
+        elif [[ $server_file_modified_time_response =~ "HTTP/2 403" ]]; then
+            # Server is blocking. Let's wait a bit
+            sleep 60
         fi  
     fi
     echo 1
@@ -83,10 +86,10 @@ get_raw_files() {
             echo "Downloading index: ${filename}.idx"
             ( cd $DATE; curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 $file_link_indx --output ${filename}.idx )
             ln -s $DATE/${filename}.idx $filetime.gt.idx
-            sleep 5
         else 
             echo "Skipping index: ${filename}.idx"   
         fi
+        sleep 5
 
         for i in ${!BANDS[@]}; do
             if [[ $( should_download_file "$DATE/${BANDS_NAMES[$i]}_$filetime" "$file_link" ) -eq 1 ]]; then
@@ -97,11 +100,11 @@ get_raw_files() {
                 local end_index=$( echo $indexes | awk -F " " '{print $2}' )
                 curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
                 cd ..
-                ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt
-                sleep 2
+                ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
             else   
                 echo "Skipping file: ${BANDS_NAMES[$i]}_${filetime}"
             fi
+            sleep 2
         done
         cd ..;
     done
