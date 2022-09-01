@@ -34,16 +34,22 @@ fi
 # Round down HOURS to 0/6/12/18
 RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
 
-cleanuptimestamp() {
-    local procfile=$DATE/${FILE_PREFIX}${RNDHOURS}${FILE_NAME}
-    local prevprocfile=$(cat $DW_FOLDER/timestamp.proc)
-    if [[ "$prevprocfile" != "$procfile" ]]; then 
-        if [[ ! -z "$prevprocfile" ]]; then
-            rm $DW_FOLDER/$prevprocfile* || true
-        fi
-        echo $procfile > $DW_FOLDER/timestamp.proc
-    fi
+should_download_file() {
+    local filename=$1
+    local url=$2
 
+    if [[ -f $filename ]]; then
+        # File is already dowlnloaded
+        disk_file_modified_time="$(TZ=UMT0 date -r ${filename} +'%a, %d %b %Y %H:%M:%S GMT')"
+        local server_file_modified_time_response=$(curl -s -I --header "If-Modified-Since: $disk_file_modified_time" $file_link_indx | head -1)
+    
+        if [[ $server_file_modified_time_response =~ "HTTP/2 304" ]]; then
+            # Server don't have update for this file. Don't need to download it.
+            echo 0
+            return
+        fi  
+    fi
+    echo 1
 }
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
@@ -72,17 +78,23 @@ get_raw_files() {
         fi
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
+
+        if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
+            ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
+        fi
 
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
 
         for i in ${!BANDS[@]}; do
             cd $DATE
-            local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
-            local start_index=$( echo $indexes | awk -F " " '{print $1}' )
-            local end_index=$( echo $indexes | awk -F " " '{print $2}' )
-            curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filename}
+            if [[ $( should_download_file "${BANDS_NAMES[$i]}_$filename" "$file_link" ) -eq 1 ]]; then
+                echo "!!! Download"
+                local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
+                local start_index=$( echo $indexes | awk -F " " '{print $1}' )
+                local end_index=$( echo $indexes | awk -F " " '{print $2}' )
+                curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filename}
+            fi
             cd ..
             rm ${BANDS_NAMES[$i]}_$filetime.gt || true
             ln -s $DATE/${BANDS_NAMES[$i]}_${filename} ${BANDS_NAMES[$i]}_${filetime}.gt
@@ -124,7 +136,6 @@ generate_bands_tiff() {
 # 1. cleanup old files to not process them
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
-# cleanuptimestamp
 
 # 2. download raw files and generate tiffs
 get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
@@ -137,7 +148,7 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 &
 get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 
-# generate_bands_tiff
+generate_bands_tiff
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
