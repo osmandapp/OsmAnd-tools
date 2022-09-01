@@ -79,23 +79,23 @@ get_raw_files() {
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
 
-        # if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
+        if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
-            sleep 5
-        # fi
+            sleep 2
+        fi
 
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
 
         for i in ${!BANDS[@]}; do
             cd $DATE
-            # if [[ $( should_download_file "${BANDS_NAMES[$i]}_$filename" "$file_link" ) -eq 1 ]]; then
+            if [[ $( should_download_file "${BANDS_NAMES[$i]}_$filename" "$file_link" ) -eq 1 ]]; then
                 local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
                 local start_index=$( echo $indexes | awk -F " " '{print $1}' )
                 local end_index=$( echo $indexes | awk -F " " '{print $2}' )
                 curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
-                sleep 1
-            # fi
+                sleep 2
+            fi
             cd ..
             rm ${BANDS_NAMES[$i]}_$filetime.gt || true
             ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt
@@ -133,26 +133,21 @@ generate_bands_tiff() {
 }
 
 # 1. cleanup old files to not process them
-# rm $DW_FOLDER/*.gt || true
-# rm $DW_FOLDER/*.gt.idx || true
-
-# Todo delete
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
-# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
+rm $DW_FOLDER/*.gt || true
+rm $DW_FOLDER/*.gt.idx || true
 
 # # 2. download raw files and generate tiffs
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-# wait
-# # generate_bands_tiff
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+wait
+# generate_bands_tiff
 
 # # 3. redownload what's missing again (double check)
 # get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
-
 generate_bands_tiff
 
-# find . -type f -mmin +${MINUTES_TO_KEEP} -delete
-# find . -type d -empty -delete
+find . -type f -mmin +${MINUTES_TO_KEEP} -delete
+find . -type d -empty -delete
 # # #rm -rf $DW_FOLDER/
