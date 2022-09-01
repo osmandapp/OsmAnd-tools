@@ -89,11 +89,10 @@ get_raw_files() {
         for i in ${!BANDS[@]}; do
             cd $DATE
             if [[ $( should_download_file "${BANDS_NAMES[$i]}_$filename" "$file_link" ) -eq 1 ]]; then
-                echo "!!! Download"
                 local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
                 local start_index=$( echo $indexes | awk -F " " '{print $1}' )
                 local end_index=$( echo $indexes | awk -F " " '{print $2}' )
-                curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filename}
+                curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
             fi
             cd ..
             rm ${BANDS_NAMES[$i]}_$filetime.gt || true
@@ -107,10 +106,8 @@ get_raw_files() {
 generate_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
-        local idx_file_path=$WFILE
-        for i in ${!BANDS_NAMES[@]}; do
-            idx_file_path="${idx_file_path/"${BANDS_NAMES[$i]}_"/}"
-        done    
+        local FILE_NAME="${${WFILE}//"raw/"}"
+        FILE_NAME="${${FILE_NAME}//".gt"}"
         mkdir -p $TIFF_FOLDER/
 
         gdal_translate $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
