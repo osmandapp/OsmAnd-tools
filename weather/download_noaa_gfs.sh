@@ -25,7 +25,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 if [[ $OS =~ "Darwin" ]]; then
-    HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
+    HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')
     DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
 else
     HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
@@ -82,6 +82,7 @@ get_raw_files() {
             local start_index=$( echo $indexes | awk -F " " '{print $1}' )
             local end_index=$( echo $indexes | awk -F " " '{print $2}' )
             curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filename}
+            cd ..
             rm ${BANDS_NAMES[$i]}_$filetime.gt || true
             ln -s $DATE/${BANDS_NAMES[$i]}_${filename} ${BANDS_NAMES[$i]}_${filetime}.gt
         done
