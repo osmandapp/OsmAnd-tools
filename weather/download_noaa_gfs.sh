@@ -127,6 +127,10 @@ get_raw_files() {
             sleep 2
         done
         cd ..;
+        
+        # TODO delete
+        return
+        
     done
 }
          
@@ -158,13 +162,13 @@ generate_bands_tiff() {
 }
 
 # TODO: delete
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+rm -rf $DW_FOLDER/* || true
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
 
 # 1. cleanup old files to not process them
-# rm $DW_FOLDER/*.gt || true
-# rm $DW_FOLDER/*.gt.idx || true
+# rm -rf $DW_FOLDER/* || true
 
 # 2. download raw files and generate tiffs
 # get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
