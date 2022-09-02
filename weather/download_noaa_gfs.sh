@@ -115,7 +115,7 @@ get_raw_files() {
         else 
             echo "Skipping index: ${filename}.idx"   
         fi
-        sleep 1
+        sleep 2
 
         for i in ${!BANDS[@]}; do
             if [[ $( should_download_file "$DATE/${BANDS_NAMES[$i]}_$filetime" "$file_link" ) -eq 1 ]]; then
@@ -131,7 +131,7 @@ get_raw_files() {
             else   
                 echo "Skipping file: ${BANDS_NAMES[$i]}_${filetime}"
             fi
-            sleep 1
+            sleep 2
         done
         cd ..;
 
