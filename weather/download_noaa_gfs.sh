@@ -103,8 +103,24 @@ get_raw_files() {
         else
             filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
+
+        echo "!!!!"
+        echo "path: $DW_FOLDER/$DATE"
+        pwd
+        ls
+
         mkdir -p "$DW_FOLDER/$DATE"
+
+        echo "!!"
+        ls
+
+          echo "------"
+
         cd $DW_FOLDER; 
+
+        pwd
+        touch dw.txt
+        cd $DATE
 
         if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             echo "Downloading index: ${filename}.idx"
