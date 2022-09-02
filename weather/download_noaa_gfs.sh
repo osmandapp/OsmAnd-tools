@@ -128,6 +128,10 @@ get_raw_files() {
             sleep 2
         done
         cd ..;
+
+        # TODO: Delete
+        return
+
     done
 }
          
