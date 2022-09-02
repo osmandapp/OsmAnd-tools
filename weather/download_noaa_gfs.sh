@@ -81,6 +81,9 @@ get_raw_files() {
     echo "============================ get_raw_files() ======================================="
     cd $THIS_LOCATION
     mkdir -p $DW_FOLDER/
+
+    return
+
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
@@ -251,9 +254,9 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-generate_bands_tiff
-join_tiff_files
-split_tiles
+# generate_bands_tiff
+# join_tiff_files
+# split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
