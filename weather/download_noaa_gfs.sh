@@ -254,10 +254,10 @@ split_tiles() {
 # echo "=============================================="
 
 # TODO delete after test
-rm -rf $DW_FOLDER/
-rm -rf $TIFF_FOLDER/
-rm -rf $TIFF_TEMP_FOLDER/
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+# rm -rf $DW_FOLDER/
+# rm -rf $TIFF_FOLDER/
+# rm -rf $TIFF_TEMP_FOLDER/
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
 # 1. cleanup old files to not process them
@@ -274,7 +274,7 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-# generate_bands_tiff
+generate_bands_tiff
 # join_tiff_files
 # split_tiles
 
