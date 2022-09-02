@@ -15,6 +15,7 @@ HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-180}
 
 DW_FOLDER=raw
 TIFF_FOLDER=tiff
+TIFF_TEMP_FOLDER=tiff_temp
 SPLIT_ZOOM_TIFF=4
 
 OS=$(uname -a)
@@ -131,6 +132,9 @@ get_raw_files() {
 }
          
 generate_bands_tiff() {
+    mkdir -p $TIFF_FOLDER/
+    mkdir -p $TIFF_TEMP_FOLDER/
+
     for WFILE in ${DW_FOLDER}/*.gt
     do
         local FILE_NAME=$WFILE
@@ -143,44 +147,77 @@ generate_bands_tiff() {
             FILE_NAME="${FILE_NAME//".gt"}"
         fi
 
-        mkdir -p $TIFF_FOLDER/
-        gdal_translate $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
-        MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
+        local FOLDER_NAME=$FILE_NAME
+        for i in ${!BANDS_NAMES[@]}; do
+            FOLDER_NAME="${FOLDER_NAME//"${BANDS_NAMES[$i]}_"}"
+        done
 
-        mkdir -p $TIFF_FOLDER/${FILE_NAME}/
-        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 $TIFF_FOLDER/${FILE_NAME}.tiff $TIFF_FOLDER/${FILE_NAME}/
-        # generate subgeotiffs into folder
-        # 1440*720 / (48*48) = 450
-        find $TIFF_FOLDER/${FILE_NAME}/ -name "*.gz" -delete
-        find $TIFF_FOLDER/${FILE_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
-        # for (( x=0; x< $MAXVALUE; x++ )); do
-            # for (( y=0; y< $MAXVALUE; y++ )); do
-                #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
-                # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
-            # done
-        # done
-        rm $TIFF_FOLDER/${FILE_NAME}.tiff.gz || true
-        gzip --keep $TIFF_FOLDER/${FILE_NAME}.tiff
+        mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
+        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff
     done
 }
 
+join_tiff_files() {
+    cd $TIFF_TEMP_FOLDER
+    for CHANNELS_FOLDER in *
+    do
+        echo "CHANNELS_FOLDER: $CHANNELS_FOLDER"
+        cd $CHANNELS_FOLDER
+        gdalbuildvrt bigtiff.vrt *.tiff -separate 
+        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
+        cd ..
+    done
+    cd ..
+}
+
+split_tiles() {
+    cd $TIFF_FOLDER
+    for JOINED_TIFF_NAME in *.tiff
+    do
+        JOINED_TIFF_NAME="${JOINED_TIFF_NAME//".tiff"}"
+        echo "JOINED_TIFF_NAME: $JOINED_TIFF_NAME"
+
+        MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
+        mkdir -p ${JOINED_TIFF_NAME}
+
+        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/  
+        
+        # generate subgeotiffs into folder
+        # 1440*720 / (48*48) = 450
+        find $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/ -name "*.gz" -delete
+        find $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
+        # # for (( x=0; x< $MAXVALUE; x++ )); do
+        #     # for (( y=0; y< $MAXVALUE; y++ )); do
+        #         #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
+        #         # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
+        #     # done
+        # # done
+        rm $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff.gz || true
+        gzip --keep $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff
+
+    done
+    cd ..
+}
 
 
 # 1. cleanup old files to not process them
-rm -rf $DW_FOLDER/* || true
+# rm -rf $DW_FOLDER/* || true
 
 # 2. download raw files and generate tiffs
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+# wait
 # generate_bands_tiff
 
 # 3. redownload what's missing again (double check)
 # get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
-generate_bands_tiff
 
-find . -type f -mmin +${MINUTES_TO_KEEP} -delete
-find . -type d -empty -delete
+generate_bands_tiff
+join_tiff_files
+split_tiles
+
+# find . -type f -mmin +${MINUTES_TO_KEEP} -delete
+# find . -type d -empty -delete
 #rm -rf $DW_FOLDER/
