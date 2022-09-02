@@ -231,6 +231,16 @@ split_tiles() {
     cd ..
 }
 
+
+cd $THIS_LOCATION
+echo "=============================================="
+ls $DW_FOLDER
+echo "=============================================="
+ls $TIFF_TEMP_FOLDER
+echo "=============================================="
+ls $TIFF_FOLDER
+echo "=============================================="
+
 # TODO delete after test
 # rm -rf $DW_FOLDER/
 # rm -rf $TIFF_FOLDER/
@@ -252,9 +262,9 @@ split_tiles() {
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-generate_bands_tiff
-join_tiff_files
-split_tiles
+# generate_bands_tiff
+# join_tiff_files
+# split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
@@ -263,9 +273,10 @@ split_tiles
 
 
 cd $THIS_LOCATION
-echo "======================================="
+echo "=============================================="
 ls $DW_FOLDER
-echo "======================================="
+echo "=============================================="
 ls $TIFF_TEMP_FOLDER
-echo "======================================="
+echo "=============================================="
 ls $TIFF_FOLDER
+echo "=============================================="
