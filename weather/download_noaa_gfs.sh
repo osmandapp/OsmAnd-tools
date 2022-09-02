@@ -190,9 +190,9 @@ join_tiff_files() {
     echo "-----------------------"
 
     # for CHANNELS_FOLDER in *
+    # for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER/*
 
     cd $TIFF_TEMP_FOLDER
-    # for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER/*
     for CHANNELS_FOLDER in *
     do
         # cd $TIFF_TEMP_FOLDER
@@ -200,7 +200,7 @@ join_tiff_files() {
         echo "CHANNELS_FOLDER: $CHANNELS_FOLDER"
         cd $CHANNELS_FOLDER
 
-        return
+        # return
 
         # Create channels list in correct order
         touch settings.txt
@@ -214,6 +214,9 @@ join_tiff_files() {
         cd ..
     done
     cd ..
+
+    echo "!!"
+    pwd
 }
 
 split_tiles() {
