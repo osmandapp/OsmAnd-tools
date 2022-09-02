@@ -78,6 +78,9 @@ should_download_file() {
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
+
+    mkdir -p $DW_FOLDER/
+
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
