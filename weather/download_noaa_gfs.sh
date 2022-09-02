@@ -80,12 +80,12 @@ should_download_file() {
 get_raw_files() {
     echo "============================ get_raw_files() ======================================="
     cd $THIS_LOCATION
+    mkdir -p $DW_FOLDER/
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
-    mkdir -p $DW_FOLDER/
     for (( c=${HOURS_START}; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
         local h=$c
@@ -231,9 +231,9 @@ split_tiles() {
 }
 
 # TODO delete after test
-rm -rf $DW_FOLDER/
-rm -rf $TIFF_FOLDER/
-rm -rf $TIFF_TEMP_FOLDER/
+# rm -rf $DW_FOLDER/
+# rm -rf $TIFF_FOLDER/
+# rm -rf $TIFF_TEMP_FOLDER/
 get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
@@ -252,8 +252,8 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # wait
 
 generate_bands_tiff
-# join_tiff_files
-# split_tiles
+join_tiff_files
+split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
