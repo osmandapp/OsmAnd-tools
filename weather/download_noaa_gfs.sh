@@ -220,7 +220,7 @@ split_tiles() {
 
 
 # # Debug short case:
-$DEBUG_M0DE=1
+DEBUG_M0DE=1
 # rm -rf $DW_FOLDER/
 # rm -rf $TIFF_FOLDER/
 # rm -rf $TIFF_TEMP_FOLDER/
