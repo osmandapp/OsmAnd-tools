@@ -104,17 +104,23 @@ get_raw_files() {
             filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
 
-        echo "!!!!"
+        echo "!!!!!!!!!!!!"
         echo "path: $DW_FOLDER/$DATE"
         pwd
         ls
 
         mkdir -p "$DW_FOLDER/$DATE"
 
-        echo "!!"
+        echo "!!--"
         ls
 
-          echo "------"
+        echo "!! raw--"
+
+        cd raw
+        ls
+        cd ..
+
+        echo "------"
 
         cd $DW_FOLDER; 
 
