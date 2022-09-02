@@ -214,9 +214,6 @@ join_tiff_files() {
         cd ..
     done
     cd ..
-
-    echo "!!"
-    pwd
 }
 
 split_tiles() {
@@ -281,8 +278,8 @@ split_tiles() {
 # wait
 
 # generate_bands_tiff
-join_tiff_files
-# split_tiles
+# join_tiff_files
+split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
