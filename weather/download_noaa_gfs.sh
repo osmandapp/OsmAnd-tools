@@ -106,7 +106,7 @@ get_raw_files() {
 
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        cd $DATE
+        # cd $DATE
 
         if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             echo "Downloading index: ${filename}.idx"
