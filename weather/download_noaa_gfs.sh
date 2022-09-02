@@ -79,11 +79,7 @@ should_download_file() {
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
     echo "============================ get_raw_files() ======================================="
-    # cd $THIS_LOCATION
     mkdir -p $DW_FOLDER/
-
-    return
-
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
@@ -149,7 +145,7 @@ generate_bands_tiff() {
    
     pwd
     
-    cd $THIS_LOCATION
+    # cd $THIS_LOCATION
     mkdir -p $TIFF_FOLDER/
     mkdir -p $TIFF_TEMP_FOLDER/
 
@@ -184,7 +180,7 @@ generate_bands_tiff() {
 
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
-    cd $THIS_LOCATION/$TIFF_TEMP_FOLDER
+    cd $TIFF_TEMP_FOLDER
 
     echo "-----------------------"
     pwd
@@ -193,7 +189,7 @@ join_tiff_files() {
     echo "-----------------------"
     # for CHANNELS_FOLDER in *
 
-    cd $THIS_LOCATION
+    # cd $THIS_LOCATION
     for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER/*
     do
         cd $TIFF_TEMP_FOLDER
@@ -219,7 +215,7 @@ join_tiff_files() {
 
 split_tiles() {
     echo "=============================== split_tiles() ======================================="
-    cd $THIS_LOCATION/$TIFF_FOLDER
+    cd $TIFF_FOLDER
     for JOINED_TIFF_NAME in *.tiff
     do
         JOINED_TIFF_NAME="${JOINED_TIFF_NAME//".tiff"}"
@@ -298,7 +294,7 @@ echo "=============================================="
 # echo "=============================================="
 ls $DW_FOLDER
 echo "=============================================="
-# ls $TIFF_TEMP_FOLDER
-# echo "=============================================="
-# ls $TIFF_FOLDER
-# echo "=============================================="
+ls $TIFF_TEMP_FOLDER
+echo "=============================================="
+ls $TIFF_FOLDER
+echo "=============================================="
