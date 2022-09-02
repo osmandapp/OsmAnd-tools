@@ -108,8 +108,8 @@ get_raw_files() {
 
         if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             echo "Downloading index: ${filename}.idx"
-            # ( cd $DATE; curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 $file_link_indx --output ${filename}.idx )
-            ( cd $DATE; curl $file_link_indx --output ${filename}.idx )
+            ( cd $DATE; curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 $file_link_indx --output ${filename}.idx )
+            # ( cd $DATE; curl $file_link_indx --output ${filename}.idx )
             ln -s $DATE/${filename}.idx $filetime.gt.idx
         else 
             echo "Skipping index: ${filename}.idx"   
@@ -123,8 +123,8 @@ get_raw_files() {
                 local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
                 local start_index=$( echo $indexes | awk -F " " '{print $1}' )
                 local end_index=$( echo $indexes | awk -F " " '{print $2}' )
-                # curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
-                curl --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
+                curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
+                # curl --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
                 cd ..
                 ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
             else   
@@ -141,6 +141,7 @@ get_raw_files() {
 }
          
 generate_bands_tiff() {
+    cd $THIS_LOCATION
     mkdir -p $TIFF_FOLDER/
     mkdir -p $TIFF_TEMP_FOLDER/
 
@@ -167,20 +168,28 @@ generate_bands_tiff() {
 }
 
 join_tiff_files() {
-    cd $TIFF_TEMP_FOLDER
+    cd $THIS_LOCATION/$TIFF_TEMP_FOLDER
     for CHANNELS_FOLDER in *
     do
         echo "CHANNELS_FOLDER: $CHANNELS_FOLDER"
         cd $CHANNELS_FOLDER
-        gdalbuildvrt bigtiff.vrt *.tiff -separate 
+
+        # Create channels list in correct order
+        touch settings.txt
+        for i in ${!BANDS_NAMES[@]}; do
+            echo "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
+        done
+
+        gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
+        rm settings.txt
         cd ..
     done
     cd ..
 }
 
 split_tiles() {
-    cd $TIFF_FOLDER
+    cd $THIS_LOCATION/$TIFF_FOLDER
     for JOINED_TIFF_NAME in *.tiff
     do
         JOINED_TIFF_NAME="${JOINED_TIFF_NAME//".tiff"}"
@@ -190,16 +199,16 @@ split_tiles() {
         mkdir -p ${JOINED_TIFF_NAME}
  
         "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/  
-        # # generate subgeotiffs into folder
-        # # 1440*720 / (48*48) = 450
+        # generate subgeotiffs into folder
+        # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
         find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;    
-        # # # for (( x=0; x< $MAXVALUE; x++ )); do
-        # #     # for (( y=0; y< $MAXVALUE; y++ )); do
-        # #         #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
-        # #         # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
-        # #     # done
-        # # # done
+        # # for (( x=0; x< $MAXVALUE; x++ )); do
+        #     # for (( y=0; y< $MAXVALUE; y++ )); do
+        #         #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
+        #         # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
+        #     # done
+        # # done
 
         rm ${JOINED_TIFF_NAME}.tiff.gz || true
         gzip --keep ${JOINED_TIFF_NAME}.tiff
@@ -209,6 +218,8 @@ split_tiles() {
 }
 
 # TODO delete after test
+rm -rf $DW_FOLDER/
+rm -rf $TIFF_TEMP_FOLDER/
 get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
@@ -233,3 +244,4 @@ split_tiles
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
 #rm -rf $DW_FOLDER/
+# rm -rf $TIFF_TEMP_FOLDER/
