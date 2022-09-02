@@ -79,8 +79,11 @@ should_download_file() {
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
     echo "============================ get_raw_files() ======================================="
-    cd $THIS_LOCATION
+    # cd $THIS_LOCATION
     mkdir -p $DW_FOLDER/
+
+    return
+
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
@@ -255,10 +258,10 @@ split_tiles() {
 # echo "=============================================="
 
 # TODO delete after test
-# rm -rf $DW_FOLDER/
-# rm -rf $TIFF_FOLDER/
-# rm -rf $TIFF_TEMP_FOLDER/
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+rm -rf $DW_FOLDER/
+rm -rf $TIFF_FOLDER/
+rm -rf $TIFF_TEMP_FOLDER/
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
 # 1. cleanup old files to not process them
@@ -289,10 +292,10 @@ echo "=============================================="
 pwd
 ls
 echo "=============================================="
-cd $THIS_LOCATION
-pwd
-ls
-echo "=============================================="
+# cd $THIS_LOCATION
+# pwd
+# ls
+# echo "=============================================="
 ls $DW_FOLDER
 echo "=============================================="
 # ls $TIFF_TEMP_FOLDER
