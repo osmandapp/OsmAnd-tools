@@ -106,7 +106,6 @@ get_raw_files() {
 
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        # cd $DATE
 
         if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             echo "Downloading index: ${filename}.idx"
@@ -233,10 +232,10 @@ split_tiles() {
 }
 
 # TODO delete after test
-rm -rf $DW_FOLDER/
-rm -rf $TIFF_FOLDER/
-rm -rf $TIFF_TEMP_FOLDER/
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+# rm -rf $DW_FOLDER/
+# rm -rf $TIFF_FOLDER/
+# rm -rf $TIFF_TEMP_FOLDER/
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
 # 1. cleanup old files to not process them
@@ -253,9 +252,9 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-# generate_bands_tiff
-# join_tiff_files
-# split_tiles
+generate_bands_tiff
+join_tiff_files
+split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
