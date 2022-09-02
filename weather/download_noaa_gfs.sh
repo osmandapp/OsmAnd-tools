@@ -78,7 +78,8 @@ should_download_file() {
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
-    echo "================= get_raw_files() ======================"
+    echo "============================ get_raw_files() ======================================="
+    cd $THIS_LOCATION
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
@@ -140,13 +141,20 @@ get_raw_files() {
 }
          
 generate_bands_tiff() {
-    echo "================= generate_bands_tiff() ======================"
+    echo "============================= generate_bands_tiff() ==================================="
+   
+    pwd
+    
     cd $THIS_LOCATION
     mkdir -p $TIFF_FOLDER/
     mkdir -p $TIFF_TEMP_FOLDER/
 
+    pwd
+
     for WFILE in ${DW_FOLDER}/*.gt
     do
+        echo $WFILE
+
         local FILE_NAME=$WFILE
         if [[ $OS =~ "Darwin" ]]; then
             FILE_NAME="${FILE_NAME//"raw"}"
@@ -162,13 +170,16 @@ generate_bands_tiff() {
             FOLDER_NAME="${FOLDER_NAME//"${BANDS_NAMES[$i]}_"}"
         done
 
+        echo "1:  $TIFF_TEMP_FOLDER/$FOLDER_NAME"
+        echo "2:  $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff"
+
         mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
         gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff
     done
 }
 
 join_tiff_files() {
-    echo "================= join_tiff_files() ======================"
+    echo "============================ join_tiff_files() ===================================="
     cd $THIS_LOCATION/$TIFF_TEMP_FOLDER
     for CHANNELS_FOLDER in *
     do
@@ -190,7 +201,7 @@ join_tiff_files() {
 }
 
 split_tiles() {
-    echo "================= split_tiles() ======================"
+    echo "=============================== split_tiles() ======================================="
     cd $THIS_LOCATION/$TIFF_FOLDER
     for JOINED_TIFF_NAME in *.tiff
     do
@@ -221,6 +232,7 @@ split_tiles() {
 
 # TODO delete after test
 rm -rf $DW_FOLDER/
+rm -rf $TIFF_FOLDER/
 rm -rf $TIFF_TEMP_FOLDER/
 get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
@@ -240,8 +252,8 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # wait
 
 generate_bands_tiff
-join_tiff_files
-split_tiles
+# join_tiff_files
+# split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
