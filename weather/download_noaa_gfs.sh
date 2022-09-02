@@ -142,19 +142,10 @@ get_raw_files() {
          
 generate_bands_tiff() {
     echo "============================= generate_bands_tiff() ==================================="
-   
-    pwd
-    
-    # cd $THIS_LOCATION
     mkdir -p $TIFF_FOLDER/
     mkdir -p $TIFF_TEMP_FOLDER/
-
-    pwd
-
     for WFILE in ${DW_FOLDER}/*.gt
     do
-        echo $WFILE
-
         local FILE_NAME=$WFILE
         if [[ $OS =~ "Darwin" ]]; then
             FILE_NAME="${FILE_NAME//"raw"}"
@@ -170,9 +161,6 @@ generate_bands_tiff() {
             FOLDER_NAME="${FOLDER_NAME//"${BANDS_NAMES[$i]}_"}"
         done
 
-        echo "1:  $TIFF_TEMP_FOLDER/$FOLDER_NAME"
-        echo "2:  $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff"
-
         mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
         gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff
     done
@@ -180,27 +168,10 @@ generate_bands_tiff() {
 
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
-    # cd $TIFF_TEMP_FOLDER
-
-    echo "-----------------------"
-    pwd
-    ls
-    echo "-----------------------"
-    ls $TIFF_TEMP_FOLDER
-    echo "-----------------------"
-
-    # for CHANNELS_FOLDER in *
-    # for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER/*
-
     cd $TIFF_TEMP_FOLDER
     for CHANNELS_FOLDER in *
     do
-        # cd $TIFF_TEMP_FOLDER
-
-        echo "CHANNELS_FOLDER: $CHANNELS_FOLDER"
         cd $CHANNELS_FOLDER
-
-        # return
 
         # Create channels list in correct order
         touch settings.txt
@@ -247,20 +218,11 @@ split_tiles() {
 }
 
 
-# cd $THIS_LOCATION
-# echo "=============================================="
-# ls $DW_FOLDER
-# echo "=============================================="
-# ls $TIFF_TEMP_FOLDER
-# echo "=============================================="
-# ls $TIFF_FOLDER
-# echo "=============================================="
-
 # TODO delete after test
-# rm -rf $DW_FOLDER/
-# rm -rf $TIFF_FOLDER/
-# rm -rf $TIFF_TEMP_FOLDER/
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+rm -rf $DW_FOLDER/
+rm -rf $TIFF_FOLDER/
+rm -rf $TIFF_TEMP_FOLDER/
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
 # 1. cleanup old files to not process them
@@ -277,8 +239,8 @@ split_tiles() {
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-# generate_bands_tiff
-# join_tiff_files
+generate_bands_tiff
+join_tiff_files
 split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
@@ -300,4 +262,6 @@ echo "=============================================="
 ls $TIFF_TEMP_FOLDER
 echo "=============================================="
 ls $TIFF_FOLDER
+echo "=============================================="
+ls $TIFF_FOLDER/20220902_0600
 echo "=============================================="
