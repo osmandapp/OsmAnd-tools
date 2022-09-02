@@ -185,14 +185,17 @@ join_tiff_files() {
     echo "-----------------------"
     pwd
     ls
-
     echo "-----------------------"
+    ls $TIFF_TEMP_FOLDER
+    echo "-----------------------"
+
     # for CHANNELS_FOLDER in *
 
-    # cd $THIS_LOCATION
-    for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER/*
+    # cd $TIFF_TEMP_FOLDER
+    # for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER/*
+    for CHANNELS_FOLDER in *
     do
-        cd $TIFF_TEMP_FOLDER
+        # cd $TIFF_TEMP_FOLDER
 
         echo "CHANNELS_FOLDER: $CHANNELS_FOLDER"
         cd $CHANNELS_FOLDER
