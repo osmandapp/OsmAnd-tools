@@ -183,13 +183,18 @@ join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
     cd $THIS_LOCATION/$TIFF_TEMP_FOLDER
 
+    echo "-----------------------"
     pwd
     ls
+
+    echo "-----------------------"
 
     for CHANNELS_FOLDER in *
     do
         echo "CHANNELS_FOLDER: $CHANNELS_FOLDER"
         cd $CHANNELS_FOLDER
+
+        return
 
         # Create channels list in correct order
         touch settings.txt
