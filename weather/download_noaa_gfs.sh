@@ -78,14 +78,13 @@ should_download_file() {
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
-
-    mkdir -p $DW_FOLDER/
-
+    echo "================= get_raw_files() ======================"
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
     DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
     local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
+    mkdir -p $DW_FOLDER/
     for (( c=${HOURS_START}; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
         local h=$c
@@ -141,6 +140,7 @@ get_raw_files() {
 }
          
 generate_bands_tiff() {
+    echo "================= generate_bands_tiff() ======================"
     cd $THIS_LOCATION
     mkdir -p $TIFF_FOLDER/
     mkdir -p $TIFF_TEMP_FOLDER/
@@ -168,6 +168,7 @@ generate_bands_tiff() {
 }
 
 join_tiff_files() {
+    echo "================= join_tiff_files() ======================"
     cd $THIS_LOCATION/$TIFF_TEMP_FOLDER
     for CHANNELS_FOLDER in *
     do
@@ -189,6 +190,7 @@ join_tiff_files() {
 }
 
 split_tiles() {
+    echo "================= split_tiles() ======================"
     cd $THIS_LOCATION/$TIFF_FOLDER
     for JOINED_TIFF_NAME in *.tiff
     do
