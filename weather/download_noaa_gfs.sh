@@ -182,6 +182,10 @@ generate_bands_tiff() {
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
     cd $THIS_LOCATION/$TIFF_TEMP_FOLDER
+
+    pwd
+    ls
+
     for CHANNELS_FOLDER in *
     do
         echo "CHANNELS_FOLDER: $CHANNELS_FOLDER"
@@ -263,7 +267,7 @@ echo "=============================================="
 # wait
 
 # generate_bands_tiff
-# join_tiff_files
+join_tiff_files
 # split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
