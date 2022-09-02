@@ -180,7 +180,7 @@ generate_bands_tiff() {
 
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
-    cd $TIFF_TEMP_FOLDER
+    # cd $TIFF_TEMP_FOLDER
 
     echo "-----------------------"
     pwd
