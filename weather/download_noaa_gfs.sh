@@ -189,27 +189,39 @@ split_tiles() {
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
         mkdir -p ${JOINED_TIFF_NAME}
 
-        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/  
+        pwd
+
+        # "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/  
+        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/  
         
-        # generate subgeotiffs into folder
-        # 1440*720 / (48*48) = 450
-        find $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/ -name "*.gz" -delete
-        find $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
-        # # for (( x=0; x< $MAXVALUE; x++ )); do
-        #     # for (( y=0; y< $MAXVALUE; y++ )); do
-        #         #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
-        #         # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
-        #     # done
-        # # done
-        rm $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff.gz || true
-        gzip --keep $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff
+
+
+        # # generate subgeotiffs into folder
+        # # 1440*720 / (48*48) = 450
+
+        # find $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/ -name "*.gz" -delete
+        # find $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
+        find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
+        find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
+        
+        # # # for (( x=0; x< $MAXVALUE; x++ )); do
+        # #     # for (( y=0; y< $MAXVALUE; y++ )); do
+        # #         #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
+        # #         # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
+        # #     # done
+        # # # done
+
+        # rm $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff.gz || true
+        # gzip --keep $THIS_LOCATION/$TIFF_FOLDER/${JOINED_TIFF_NAME}.tiff
+        rm ${JOINED_TIFF_NAME}.tiff.gz || true
+        gzip --keep ${JOINED_TIFF_NAME}.tiff
 
     done
     cd ..
 }
 
 # TODO delete
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 
 
 # 1. cleanup old files to not process them
@@ -226,8 +238,8 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-generate_bands_tiff
-join_tiff_files
+# generate_bands_tiff
+# join_tiff_files
 split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
