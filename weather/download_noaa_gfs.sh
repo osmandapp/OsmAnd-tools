@@ -274,8 +274,8 @@ split_tiles() {
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-generate_bands_tiff
-# join_tiff_files
+# generate_bands_tiff
+join_tiff_files
 # split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
