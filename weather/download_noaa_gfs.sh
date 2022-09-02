@@ -203,6 +203,9 @@ split_tiles() {
     cd ..
 }
 
+# TODO delete
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+
 
 # 1. cleanup old files to not process them
 # rm -rf $DW_FOLDER/* || true
