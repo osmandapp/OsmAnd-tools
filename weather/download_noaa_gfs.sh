@@ -182,6 +182,7 @@ join_tiff_files() {
 
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
+        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface"
         rm settings.txt
         cd ..
     done
@@ -196,8 +197,8 @@ split_tiles() {
         JOINED_TIFF_NAME="${JOINED_TIFF_NAME//".tiff"}"
         echo "JOINED_TIFF_NAME: $JOINED_TIFF_NAME"
 
-        MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
         mkdir -p ${JOINED_TIFF_NAME}
+        MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
  
         "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/  
         # generate subgeotiffs into folder
@@ -213,7 +214,6 @@ split_tiles() {
 
         rm ${JOINED_TIFF_NAME}.tiff.gz || true
         gzip --keep ${JOINED_TIFF_NAME}.tiff
-
     done
     cd ..
 }
@@ -245,6 +245,7 @@ wait
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
+# 4. generate tiff tiles
 generate_bands_tiff
 join_tiff_files
 split_tiles
