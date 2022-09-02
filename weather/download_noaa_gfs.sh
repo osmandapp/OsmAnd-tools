@@ -17,6 +17,7 @@ DW_FOLDER=raw
 TIFF_FOLDER=tiff
 TIFF_TEMP_FOLDER=tiff_temp
 SPLIT_ZOOM_TIFF=4
+DEBUG_M0DE=0
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
@@ -134,9 +135,9 @@ get_raw_files() {
         done
         cd ..;
 
-        # TODO: delete after test
-        return
-
+        if [[ $DEBUG_M0DE == 1 ]]; then
+            return
+        fi    
     done
 }
          
@@ -219,14 +220,17 @@ split_tiles() {
 
 
 # # Debug short case:
+$DEBUG_M0DE = 1
 # rm -rf $DW_FOLDER/
 # rm -rf $TIFF_FOLDER/
 # rm -rf $TIFF_TEMP_FOLDER/
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # generate_bands_tiff
 # join_tiff_files
 # split_tiles
+return
 
+echo "!!! WRONG ======================================="
 
 # 1. cleanup old files to not process them
 rm -rf $DW_FOLDER/* || true
