@@ -81,9 +81,6 @@ get_raw_files() {
     echo "============================ get_raw_files() ======================================="
     cd $THIS_LOCATION
     mkdir -p $DW_FOLDER/
-
-    return
-
     HOURS_START=$1
     HOURS_ALL=$2
     HOURS_INC=$3
