@@ -191,7 +191,7 @@ join_tiff_files() {
     # for CHANNELS_FOLDER in *
 
     cd $THIS_LOCATION
-    for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER*
+    for CHANNELS_FOLDER in $TIFF_TEMP_FOLDER/*
     do
         cd $TIFF_TEMP_FOLDER
 
