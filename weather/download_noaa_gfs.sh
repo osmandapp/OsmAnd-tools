@@ -245,8 +245,8 @@ split_tiles() {
 # get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 # wait
 
-# 4. generate tiff tiles
-generate_bands_tiff
+# # 4. generate tiff tiles
+# generate_bands_tiff
 join_tiff_files
 split_tiles
 
