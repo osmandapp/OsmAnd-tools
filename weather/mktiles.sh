@@ -15,6 +15,19 @@ PARALLEL_TO_TILES=2
 
 generate_tiles() {
     rm *.O.tiff || true
+
+
+    # TODO: delete after test
+    echo "pwd --------------------------"
+    pwd
+    echo "ls --------------------------"
+    ls
+    echo "ls TIFF_FOLDER --------------------------"
+    cd $TIFF_FOLDER
+    ls
+    return
+    
+
     for WFILE in ${TIFF_FOLDER}/*.tiff
     do
         BS=$(basename $WFILE)
