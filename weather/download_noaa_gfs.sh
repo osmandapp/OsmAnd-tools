@@ -182,7 +182,9 @@ join_tiff_files() {
 
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
-        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface"
+
+        # TODO: why it works on tile server and don't wonk on build?
+        # python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface"
         rm settings.txt
         cd ..
     done
