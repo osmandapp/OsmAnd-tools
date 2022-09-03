@@ -112,10 +112,10 @@ get_raw_files() {
             ( cd $DATE; curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 $file_link_indx --output ${filename}.idx )
             # ( cd $DATE; curl $file_link_indx --output ${filename}.idx )
             ln -s $DATE/${filename}.idx $filetime.gt.idx
+            sleep 2
         else 
             echo "Skipping index: ${filename}.idx"   
         fi
-        sleep 2
 
         for i in ${!BANDS[@]}; do
             if [[ $( should_download_file "$DATE/${BANDS_NAMES[$i]}_$filetime" "$file_link" ) -eq 1 ]]; then
@@ -128,10 +128,10 @@ get_raw_files() {
                 # curl --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
                 cd ..
                 ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
+                sleep 2
             else   
                 echo "Skipping file: ${BANDS_NAMES[$i]}_${filetime}"
             fi
-            sleep 2
         done
         cd ..;
 
@@ -241,9 +241,9 @@ get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 
 # 3. redownload what's missing again (double check)
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-# wait
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+wait
 
 # 4. generate tiff tiles
 generate_bands_tiff
