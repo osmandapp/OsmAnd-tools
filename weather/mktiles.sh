@@ -15,7 +15,7 @@ PARALLEL_TO_TILES=2
 
 generate_tiles() {
     rm *.O.tiff || true
-    for WFILE in ${TIFF_FOLDER}/*.gt
+    for WFILE in ${TIFF_FOLDER}/*.tiff
     do
         BS=$(basename $WFILE)
         ## generate gdal2tiles fo a given band with given rasterization
