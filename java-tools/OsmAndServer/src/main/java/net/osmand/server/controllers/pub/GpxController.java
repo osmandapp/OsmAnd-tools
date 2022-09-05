@@ -305,17 +305,19 @@ public class GpxController {
 		}
 	}
     
-    @PostMapping(path = {"/get-track-data"}, produces = "application/json")
+    @PostMapping(path = {"/process-track-data"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getGpxInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+    public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
                                              HttpSession httpSession) throws IOException {
         
         File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		
         InputStream is = file.getInputStream();
         FileOutputStream fous = new FileOutputStream(tmpGpx);
         Algorithms.streamCopy(is, fous);
         is.close();
         fous.close();
+	    session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
         
         GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
         
@@ -355,7 +357,7 @@ public class GpxController {
                 }
                 
                 tracks.forEach(track -> {
-                    WebGpxData.Track t = new WebGpxData.Track(track, analysis);
+                    WebGpxData.Track t = new WebGpxData.Track(track);
                     gpxData.tracks.add(t);
                 });
             }
