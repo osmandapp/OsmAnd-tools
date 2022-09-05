@@ -13,7 +13,7 @@ def set_band_descriptions(filepath, bands):
         if rb is not None:
             rb.SetDescription(desc)
         else:
-            print("Error set_band_descriptions.py:  " + filepath + "  don't have band to update:  " + desc)    
+            print("ERROR set_band_descriptions.py:  " + filepath + "  don't have band to update:  " + desc)    
     del ds
 
 

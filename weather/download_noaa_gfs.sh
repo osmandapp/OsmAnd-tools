@@ -172,13 +172,25 @@ join_tiff_files() {
     cd $TIFF_TEMP_FOLDER
     for CHANNELS_FOLDER in *
     do
+        local ALL_CHANNEL_FILES_EXISTS=1
         cd $CHANNELS_FOLDER
 
         # Create channels list in correct order
         touch settings.txt
         for i in ${!BANDS_NAMES[@]}; do
+
+            if [ ! -f "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
+                $ALL_CHANNEL_FILES_EXISTS=0
+                break
+            fi
+
             echo "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
         done
+
+        if [ ALL_CHANNEL_FILES_EXISTS == 0 ]; then
+            echo "ERROR join_tiff_files:  ${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
+            continue
+        fi
 
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
