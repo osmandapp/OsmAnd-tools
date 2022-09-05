@@ -25,7 +25,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 if [[ $OS =~ "Darwin" ]]; then
-    HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')]
+    HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')
     DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
 else
     HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
@@ -72,12 +72,22 @@ get_raw_files() {
         fi
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
-        ( cd $DATE; wget -nv -N --no-if-modified-since $file_link_indx --timeout=900 )
+        ( cd $DATE; curl -s $file_link_indx --output ${filename}.idx )
+
         rm $filetime.gt.idx || true
         ln -s $DATE/${filename}.idx $filetime.gt.idx
-        ( cd $DATE; wget -nv -N --no-if-modified-since $file_link --timeout=900 )
-        rm $filetime.gt || true
-        ln -s $DATE/${filename} $filetime.gt
+
+        for i in ${!BANDS[@]}; do
+            cd $DATE
+            local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
+            local start_index=$( echo $indexes | awk -F " " '{print $1}' )
+            local end_index=$( echo $indexes | awk -F " " '{print $2}' )
+            curl -s --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filename}
+            cd ..
+            rm ${BANDS_NAMES[$i]}_$filetime.gt || true
+            ln -s $DATE/${BANDS_NAMES[$i]}_${filename} ${BANDS_NAMES[$i]}_${filetime}.gt
+        done
+
         cd ..;
     done
 }
@@ -85,15 +95,13 @@ get_raw_files() {
 generate_bands_tiff() {
     for WFILE in ${DW_FOLDER}/*.gt
     do
-        band_numbers=""
-        for i in ${!BANDS[@]}; do
-            local b_num=$(cat $WFILE.idx | grep "${BANDS[$i]}" | awk 'NR==1{print $1}' | awk -F ":" '{print $1}')
-            band_numbers="$band_numbers -b $b_num"
-        done
+        local idx_file_path=$WFILE
+        for i in ${!BANDS_NAMES[@]}; do
+            idx_file_path="${idx_file_path/"${BANDS_NAMES[$i]}_"/}"
+        done    
         mkdir -p $TIFF_FOLDER/
-        local BS=$(basename $WFILE)
-        local FILE_NAME="${BS%%.*}"
-        gdal_translate $band_numbers -mask "none" $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
+
+        gdal_translate $WFILE $TIFF_FOLDER/${FILE_NAME}.tiff
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
 
         mkdir -p $TIFF_FOLDER/${FILE_NAME}/
@@ -116,7 +124,7 @@ generate_bands_tiff() {
 # 1. cleanup old files to not process them
 rm $DW_FOLDER/*.gt || true
 rm $DW_FOLDER/*.gt.idx || true
-cleanuptimestamp
+# cleanuptimestamp
 
 # 2. download raw files and generate tiffs
 get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
@@ -129,8 +137,8 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 &
 get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 
-generate_bands_tiff
+# generate_bands_tiff
 
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
-#rm -rf $DW_FOLDER/
+# #rm -rf $DW_FOLDER/
