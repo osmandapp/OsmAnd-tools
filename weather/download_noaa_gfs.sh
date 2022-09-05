@@ -110,7 +110,6 @@ get_raw_files() {
         if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
             echo "Downloading index: ${filename}.idx"
             ( cd $DATE; curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 $file_link_indx --output ${filename}.idx )
-            # ( cd $DATE; curl $file_link_indx --output ${filename}.idx )
             ln -s $DATE/${filename}.idx $filetime.gt.idx
             sleep 2
         else 
@@ -125,7 +124,6 @@ get_raw_files() {
                 local start_index=$( echo $indexes | awk -F " " '{print $1}' )
                 local end_index=$( echo $indexes | awk -F " " '{print $2}' )
                 curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
-                # curl --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
                 cd ..
                 ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
                 sleep 2
@@ -178,12 +176,10 @@ join_tiff_files() {
         # Create channels list in correct order
         touch settings.txt
         for i in ${!BANDS_NAMES[@]}; do
-
             if [ ! -f "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
                 $ALL_CHANNEL_FILES_EXISTS=0
                 break
             fi
-
             echo "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
         done
 
