@@ -231,15 +231,15 @@ split_tiles() {
 
 
 
-# 1. cleanup old files to not process them
-rm -rf $DW_FOLDER/* || true
-rm -rf $TIFF_TEMP_FOLDER/* || true
-rm -rf $TIFF_FOLDER/* || true
+# # 1. cleanup old files to not process them
+# rm -rf $DW_FOLDER/* || true
+# rm -rf $TIFF_TEMP_FOLDER/* || true
+# rm -rf $TIFF_FOLDER/* || true
 
-# 2. download raw files and generate tiffs
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
+# # 2. download raw files and generate tiffs
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+# wait
 
 # # 3. redownload what's missing again (double check)
 # get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
@@ -247,7 +247,7 @@ wait
 # wait
 
 # # 4. generate tiff tiles
-# generate_bands_tiff
+generate_bands_tiff
 # join_tiff_files
 # split_tiles
 
