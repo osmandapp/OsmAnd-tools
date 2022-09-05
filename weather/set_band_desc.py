@@ -1,6 +1,7 @@
 import sys
 from osgeo import gdal
 
+
 def set_band_descriptions(filepath, bands):
     """
     filepath: path/virtual path/uri to raster
@@ -11,7 +12,10 @@ def set_band_descriptions(filepath, bands):
         rb = ds.GetRasterBand(band)
         if rb is not None:
             rb.SetDescription(desc)
+        else:
+            print("Error set_band_descriptions.py:  " + filepath + "  don't have band to update:  " + desc)    
     del ds
+
 
 if __name__ == '__main__':
     filepath = sys.argv[1]
