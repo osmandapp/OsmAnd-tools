@@ -182,9 +182,7 @@ join_tiff_files() {
 
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
-
-        # TODO: why it works on tile server and don't wonk on build?
-        # python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface"
+        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface"
         rm settings.txt
         cd ..
     done
@@ -222,37 +220,37 @@ split_tiles() {
 
 
 # # Debug short case:
-# DEBUG_M0DE=1
-# rm -rf $DW_FOLDER/
-# rm -rf $TIFF_FOLDER/
-# rm -rf $TIFF_TEMP_FOLDER/
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
-# generate_bands_tiff
-# join_tiff_files
-# split_tiles
-
-
-
-# # 1. cleanup old files to not process them
-rm -rf $DW_FOLDER/* || true
-rm -rf $TIFF_TEMP_FOLDER/* || true
-
-# # 2. download raw files and generate tiffs
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
-
-# # 3. redownload what's missing again (double check)
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
-
-# # 4. generate tiff tiles
+DEBUG_M0DE=1
+rm -rf $DW_FOLDER/
+rm -rf $TIFF_FOLDER/
+rm -rf $TIFF_TEMP_FOLDER/
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 generate_bands_tiff
 join_tiff_files
 split_tiles
 
-find . -type f -mmin +${MINUTES_TO_KEEP} -delete
-find . -type d -empty -delete
+
+
+# # # 1. cleanup old files to not process them
 # rm -rf $DW_FOLDER/* || true
-rm -rf $TIFF_TEMP_FOLDER/* || true
+# rm -rf $TIFF_TEMP_FOLDER/* || true
+
+# # # 2. download raw files and generate tiffs
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+# wait
+
+# # # 3. redownload what's missing again (double check)
+# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+# wait
+
+# # # 4. generate tiff tiles
+# generate_bands_tiff
+# join_tiff_files
+# split_tiles
+
+# find . -type f -mmin +${MINUTES_TO_KEEP} -delete
+# find . -type d -empty -delete
+# # rm -rf $DW_FOLDER/* || true
+# rm -rf $TIFF_TEMP_FOLDER/* || true

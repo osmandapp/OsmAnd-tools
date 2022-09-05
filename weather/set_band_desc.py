@@ -9,7 +9,8 @@ def set_band_descriptions(filepath, bands):
     ds = gdal.Open(filepath, gdal.GA_Update)
     for band, desc in bands:
         rb = ds.GetRasterBand(band)
-        rb.SetDescription(desc)
+        if rb is not None:
+            rb.SetDescription(desc)
     del ds
 
 if __name__ == '__main__':
