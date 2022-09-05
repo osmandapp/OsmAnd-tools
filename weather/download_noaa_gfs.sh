@@ -5,8 +5,8 @@ PROVIDER=${PROVIDER:-"gfs"}
 LAYER=${LAYER:-"atmos"}
 # usually 4 hours is enough to get freshest files 
 DELAY_HOURS=${DELAY_HOURS:-4}
-BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
-BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip")
+BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
 FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
 FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
 MINUTES_TO_KEEP=${MINUTES_TO_KEEP:-1800} # 30 hours
@@ -190,7 +190,7 @@ join_tiff_files() {
 
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
-        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface"
+        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface" 6 "UGRD:planetary boundary" 7 "VGRD:planetary boundary"
         rm settings.txt
         cd ..
     done
