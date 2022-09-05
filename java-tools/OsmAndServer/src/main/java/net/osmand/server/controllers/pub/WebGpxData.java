@@ -111,7 +111,9 @@ public class WebGpxData {
                     if (k.equals("trkpt_idx")) {
                         geometry = new Geometry();
                     }
-                    info.put(k, v);
+                    if (k.equals("profile")) {
+                        info.put(k, v);
+                    }
                 });
             }
             ext = point;
@@ -131,7 +133,7 @@ public class WebGpxData {
             route.points.forEach(p -> {
                 WebGpxData.Point point = new WebGpxData.Point(p, -1, null);
                 if (point.geometry != null) {
-                    int ind = Integer.parseInt(point.info.get("trkpt_idx"));
+                    int ind = Integer.parseInt(point.ext.getExtensionsToRead().get("trkpt_idx"));
                     if (prevInd.get() == 0 && prevInd.get() == ind) {
                         prevInd.set(ind);
                     } else {
