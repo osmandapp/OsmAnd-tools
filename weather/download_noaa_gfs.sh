@@ -236,10 +236,10 @@ rm -rf $DW_FOLDER/* || true
 rm -rf $TIFF_TEMP_FOLDER/* || true
 rm -rf $TIFF_FOLDER/* || true
 
-# # 2. download raw files and generate tiffs
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-# get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-# wait
+# 2. download raw files and generate tiffs
+get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
+get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
+wait
 
 # # 3. redownload what's missing again (double check)
 # get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
