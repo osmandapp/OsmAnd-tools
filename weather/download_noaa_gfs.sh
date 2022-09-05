@@ -260,8 +260,8 @@ split_tiles() {
 
 # # 4. generate tiff tiles
 # generate_bands_tiff
-join_tiff_files
-# split_tiles
+# join_tiff_files
+split_tiles
 
 # find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 # find . -type d -empty -delete
