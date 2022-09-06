@@ -225,7 +225,7 @@ generate_bands_tiff() {
         done
 
         mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
-        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff -ot Float32
+        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff -ot Float32 -stats
     done
 }
 
@@ -257,7 +257,7 @@ join_tiff_files() {
         # Create "Virtual Tiff" with layers order from settings.txt
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         # Create joined tiff from "Virtual Tiff"
-        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32
+        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32 -stats
         # Write tiff layers names
         python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC:entire atmosphere"  2 "TMP:2 m above ground"  3 "PRMSL:mean sea level" 4 "GUST:surface"  5 "PRATE:surface" 6 "UGRD:planetary boundary" 7 "VGRD:planetary boundary"
         rm settings.txt
