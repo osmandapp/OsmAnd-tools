@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.pub;
 
 import net.osmand.GPXUtilities;
+import net.osmand.util.MapUtils;
 
 import java.util.*;
 
@@ -46,8 +47,7 @@ public class WebGpxData {
                         int length = Integer.parseInt(rs.length);
                         endInd = endInd + (length - 1);
                         for (int i = startInd; i <= endInd; i++) {
-                            int indexSeg = track.segments.indexOf(seg);
-                            segment.points.add(new Point(seg.points.get(i), i, indexSeg));
+                            segment.points.add(new Point(seg.points.get(i)));
                         }
                         segments.add(segment);
                         startInd = startInd + (length - 1);
@@ -55,7 +55,7 @@ public class WebGpxData {
                 } else {
                     seg.points.forEach(point -> {
                         int index = seg.points.indexOf(point);
-                        Point p = new Point(point, index, track.segments.indexOf(seg));
+                        Point p = new Point(point);
                         if (track.segments.size() > 1 && index == seg.points.size() - 1 && track.segments.indexOf(seg) != track.segments.size() - 1) {
                             p.info.put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
                         }
@@ -115,8 +115,8 @@ public class WebGpxData {
         Geometry geometry;
         GPXUtilities.WptPt ext;
         
-        public Point(GPXUtilities.WptPt point, int index, int indexSeg) {
-            id = index * (indexSeg + 1);
+        public Point(GPXUtilities.WptPt point) {
+            id = Integer.parseInt(createID());
             info = new HashMap<>();
             info.put("lat", String.valueOf(point.lat));
             info.put("lng", String.valueOf(point.lon));
@@ -136,6 +136,13 @@ public class WebGpxData {
             ext = point;
         }
         
+    }
+    
+    private static long idCounter = 0;
+    
+    public static synchronized String createID()
+    {
+        return String.valueOf(idCounter++);
     }
     
     static class Geometry {
@@ -158,45 +165,71 @@ public class WebGpxData {
             } else {
                 trackPoints = gpxData.tracks.get(gpxFile.routes.indexOf(route)).points;
             }
-            int prevInd = -1;
+            int prevTrkPointInd = -1;
             for (GPXUtilities.WptPt p : route.points) {
-                WebGpxData.Point point = new WebGpxData.Point(p, route.points.indexOf(p), gpxFile.routes.indexOf(route));
-                if (point.geometry != null) {
-                    int ind = Integer.parseInt(point.ext.getExtensionsToRead().get("trkpt_idx"));
-                    if (ind != 0) {
-                        if (!trackSegments.isEmpty()) {
-                            List<Segment> segs = new ArrayList<>();
-                            int pointsLength = 0;
-                            for (WebGpxData.Segment s : trackSegments) {
-                                if (pointsLength < ind - 1) {
-                                    pointsLength += s.points.size() - 1;
-                                    segs.add(s);
-                                } else {
-                                    point.geometry.segments = segs;
-                                    routePoints.add(point);
-                                    break;
-                                }
-                            }
-                        } else {
-                            for (WebGpxData.Point pt : trackPoints) {
-                                int pointInd = trackPoints.indexOf(pt);
-                                if (pointInd >= prevInd && pointInd <= ind) {
-                                    if (point.geometry.points == null) {
-                                        point.geometry.points = new ArrayList<>();
-                                    }
-                                    point.geometry.points.add(pt);
-                                }
-                            }
-                            prevInd = ind;
-                            routePoints.add(point);
-                        }
-                    } else {
-                        routePoints.add(point);
-                    }
+                WebGpxData.Point routePoint = new WebGpxData.Point(p);
+                int currTrkPointInd;
+                if (routePoint.geometry != null) {
+                    currTrkPointInd = Integer.parseInt(routePoint.ext.getExtensionsToRead().get("trkpt_idx"));
+                } else {
+                    routePoint.geometry = new Geometry();
+                    currTrkPointInd = findNearestPoint(trackPoints, routePoint);
                 }
+                prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints, trackSegments);
             }
             gpxData.tracks.get(gpxFile.routes.indexOf(route)).points = routePoints;
             gpxData.tracks.get(gpxFile.routes.indexOf(route)).segments = null;
         });
+    }
+    
+    static int findNearestPoint(List<WebGpxData.Point> trackPoints, WebGpxData.Point routePoint) {
+        double minDist = -1;
+        int res = -1;
+        
+        for (Point tp : trackPoints) {
+            double currentDist = MapUtils.getDistance(Double.parseDouble(routePoint.info.get("lat")), Double.parseDouble(routePoint.info.get("lng")),
+                    Double.parseDouble(tp.info.get("lat")), Double.parseDouble(tp.info.get("lng")));
+            if (minDist == -1) {
+                minDist = currentDist;
+            } else if (currentDist < minDist) {
+                minDist = currentDist;
+                res = trackPoints.indexOf(tp);
+            }
+        }
+        return res;
+    }
+    
+    static int addTrkptToRoutePoint(int currTrkPointInd, int prevTrkPointInd, WebGpxData.Point routePoint, List<WebGpxData.Point> trackPoints, List<WebGpxData.Point> routePoints, List<WebGpxData.Segment> trackSegments) {
+        if (currTrkPointInd != 0) {
+            if (!trackSegments.isEmpty()) {
+                List<Segment> segs = new ArrayList<>();
+                int pointsLength = 0;
+                for (WebGpxData.Segment s : trackSegments) {
+                    if (pointsLength < currTrkPointInd - 1) {
+                        pointsLength += s.points.size() - 1;
+                        segs.add(s);
+                    } else {
+                        routePoint.geometry.segments = segs;
+                        routePoints.add(routePoint);
+                        break;
+                    }
+                }
+            } else {
+                for (WebGpxData.Point pt : trackPoints) {
+                    int pointInd = trackPoints.indexOf(pt);
+                    if (pointInd >= prevTrkPointInd && pointInd <= currTrkPointInd) {
+                        if (routePoint.geometry.points == null) {
+                            routePoint.geometry.points = new ArrayList<>();
+                        }
+                        routePoint.geometry.points.add(pt);
+                    }
+                }
+                prevTrkPointInd = currTrkPointInd;
+                routePoints.add(routePoint);
+            }
+        } else {
+            routePoints.add(routePoint);
+        }
+        return prevTrkPointInd;
     }
 }
