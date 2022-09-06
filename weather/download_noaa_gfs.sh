@@ -50,6 +50,9 @@ should_download_file() {
             # Server don't have update for this file. Don't need to download it.
             echo 0
             return
+        elif [[ $server_response =~ "HTTP/2 403" ]]; then   
+            # We're blocked by server. Wait a bit and continue download
+            sleep 60
         fi  
     fi
     echo 1
@@ -85,8 +88,8 @@ download_with_retry() {
     fi
 
     if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Error: ${filename} not downloaded! Wait 5 sec and retry."
-        sleep 5
+        echo "Download Error: ${filename} not downloaded! Wait 10 sec and retry."
+        sleep 10
         echo "Download try 2: ${filename}"
         download $filename $url $start_byte_offset $end_byte_offset
     else 
@@ -95,7 +98,7 @@ download_with_retry() {
     fi
 
     if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Error: ${filename} not downloaded! Wait 1 min and retry."
+        echo "Download Error: ${filename} not downloaded! Wait 1 min and retry."
         sleep 60
         echo "Download try 3: ${filename}"
         download $filename $url $start_byte_offset $end_byte_offset
@@ -104,7 +107,7 @@ download_with_retry() {
     fi
 
     if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Error: ${filename} not downloaded! Wait 5 min and retry."
+        echo "Download Error: ${filename} not downloaded! Wait 5 min and retry."
         sleep 300
         echo "Download try 4: ${filename}"
         download $filename $url $start_byte_offset $end_byte_offset
@@ -113,7 +116,7 @@ download_with_retry() {
     fi
 
     if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Error: ${filename} not downloaded! Wait 10 min and retry."
+        echo "Download Error: ${filename} not downloaded! Wait 10 min and retry."
         sleep 600
         echo "Download try 5: ${filename}"
         download $filename $url $start_byte_offset $end_byte_offset
@@ -122,7 +125,7 @@ download_with_retry() {
     fi
 
     if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Error: ${filename} not downloaded! Wait 1 hour and retry."
+        echo "Download Error: ${filename} not downloaded! Wait 1 hour and retry."
         sleep 600
         echo "Download try 6: ${filename}"
         download $filename $url $start_byte_offset $end_byte_offset
@@ -131,7 +134,7 @@ download_with_retry() {
     fi
     
     if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Error: ${filename} still not downloaded!"
+        echo "Fatal Download Error: ${filename} still not downloaded!"
     fi
 
     return
@@ -246,7 +249,7 @@ join_tiff_files() {
         done
 
         if [ $ALL_CHANNEL_FILES_EXISTS == 0 ]; then
-            echo "ERROR join_tiff_files:  ${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
+            echo "Joining Error:  ${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
             cd ..
             continue
         fi
