@@ -37,31 +37,9 @@ fi
 RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
 
 
-# custom retry
-wait_if_blocked() {
-    local url=$1
-
-    local server_response1=$(curl -s -I $url | head -1)
-    if [[ $server_response1 =~ "HTTP/2 403" ]]; then
-        
-        sleep 60
-        local server_response2=$(curl -s -I --header $url | head -1)
-        if [[ $server_response2 =~ "HTTP/2 403" ]]; then
-            
-            sleep 300
-            local server_response3=$(curl -s -I --header $url | head -1)
-            if [[ $server_response3 =~ "HTTP/2 403" ]]; then
-                 sleep 3600
-            fi
-        fi
-    fi  
-}
-
 should_download_file() {
     local filename=$1
     local url=$2
-
-    wait_if_blocked $url
 
     if [[ -f $filename ]]; then
         # File is already dowlnloaded
@@ -76,6 +54,97 @@ should_download_file() {
     fi
     echo 1
 }
+
+
+download() {
+    local filename=$1
+    local url=$2
+    local start_byte_offset=$3
+    local end_byte_offset=$4
+    if [ -z "$start_byte_offset" ] && [ -z "$end_byte_offset" ]; then
+        curl -s $url --output ${filename}
+    else
+        curl -s --range $start_byte_offset-$end_byte_offset $url --output ${filename}
+    fi
+}
+
+
+# custom download with retry and result checking
+download_with_retry() {
+    local filename=$1
+    local url=$2
+    local start_byte_offset=$3
+    local end_byte_offset=$4
+
+    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
+        echo "Download try 1: ${filename}"
+        download $filename $url $start_byte_offset $end_byte_offset
+    else 
+        echo "Skip downloading: ${filename}"   
+        return
+    fi
+
+    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
+        echo "Error: ${filename} not downloaded! Wait 5 sec and retry."
+        sleep 5
+        echo "Download try 2: ${filename}"
+        download $filename $url $start_byte_offset $end_byte_offset
+    else 
+        echo "Downloading success: ${filename}"   
+        return    
+    fi
+
+    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
+        echo "Error: ${filename} not downloaded! Wait 1 min and retry."
+        sleep 60
+        echo "Download try 3: ${filename}"
+        download $filename $url $start_byte_offset $end_byte_offset
+    else 
+        return    
+    fi
+
+    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
+        echo "Error: ${filename} not downloaded! Wait 5 min and retry."
+        sleep 300
+        echo "Download try 4: ${filename}"
+        download $filename $url $start_byte_offset $end_byte_offset
+    else 
+        return    
+    fi
+
+    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
+        echo "Error: ${filename} not downloaded! Wait 10 min and retry."
+        sleep 600
+        echo "Download try 5: ${filename}"
+        download $filename $url $start_byte_offset $end_byte_offset
+    else 
+        return    
+    fi
+
+    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
+        echo "Error: ${filename} not downloaded! Wait 1 hour and retry."
+        sleep 600
+        echo "Download try 6: ${filename}"
+        download $filename $url $start_byte_offset $end_byte_offset
+    else 
+        return    
+    fi
+    
+    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
+        echo "Error: ${filename} still not downloaded!"
+    fi
+
+    return
+}
+
+create_link_if_needed() {
+    local file_path=$1
+    local link_path=$2
+    if [ ! -f "$link_path" ]; then
+        ln -s $file_path $link_path 
+    fi
+}
+
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
 get_raw_files() {
@@ -107,29 +176,20 @@ get_raw_files() {
         mkdir -p "$DW_FOLDER/$DATE"
         cd $DW_FOLDER; 
 
-        if [[ $( should_download_file "$DATE/$filename.idx" "$file_link_indx" ) -eq 1 ]]; then
-            echo "Downloading index: ${filename}.idx"
-            ( cd $DATE; curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 $file_link_indx --output ${filename}.idx )
-            ln -s $DATE/${filename}.idx $filetime.gt.idx
-            sleep 2
-        else 
-            echo "Skipping index: ${filename}.idx"   
-        fi
+        # Download index file
+        download_with_retry "$DATE/$filename.idx" "$file_link_indx"
+        create_link_if_needed $DATE/${filename}.idx $filetime.gt.idx
 
+        # Download channels data by 
         for i in ${!BANDS[@]}; do
-            if [[ $( should_download_file "$DATE/${BANDS_NAMES[$i]}_$filetime" "$file_link" ) -eq 1 ]]; then
-                echo "Downloading file: ${BANDS_NAMES[$i]}_${filetime}"
-                cd $DATE
-                local indexes=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
-                local start_index=$( echo $indexes | awk -F " " '{print $1}' )
-                local end_index=$( echo $indexes | awk -F " " '{print $2}' )
-                curl -s --retry 3 --connect-timeout 60 --retry-max-time 300 --range $start_index-$end_index $file_link --output ${BANDS_NAMES[$i]}_${filetime}
-                cd ..
-                ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
-                sleep 2
-            else   
-                echo "Skipping file: ${BANDS_NAMES[$i]}_${filetime}"
-            fi
+            cd $DATE
+            local channel_index_lines=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
+            local start_byte_offset=$( echo $channel_index_lines | awk -F " " '{print $1}' )
+            local end_byte_offset=$( echo $channel_index_lines | awk -F " " '{print $2}' )     
+            download_with_retry "${BANDS_NAMES[$i]}_$filetime" "$file_link" $start_byte_offset $end_byte_offset
+            cd ..
+            create_link_if_needed $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
+            # ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
         done
         cd ..;
 
@@ -138,7 +198,8 @@ get_raw_files() {
         fi    
     done
 }
-         
+
+
 generate_bands_tiff() {
     echo "============================= generate_bands_tiff() ==================================="
     mkdir -p $TIFF_FOLDER/
@@ -161,9 +222,10 @@ generate_bands_tiff() {
         done
 
         mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
-        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff
+        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff -ot Float32
     done
 }
+
 
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
@@ -177,25 +239,30 @@ join_tiff_files() {
         touch settings.txt
         for i in ${!BANDS_NAMES[@]}; do
             if [ ! -f "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
-                $ALL_CHANNEL_FILES_EXISTS=0
+                ALL_CHANNEL_FILES_EXISTS=0
                 break
             fi
             echo "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
         done
 
-        if [ ALL_CHANNEL_FILES_EXISTS == 0 ]; then
+        if [ $ALL_CHANNEL_FILES_EXISTS == 0 ]; then
             echo "ERROR join_tiff_files:  ${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
+            cd ..
             continue
         fi
 
+        # Create "Virtual Tiff" with layers order from settings.txt
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
-        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff
+        # Create joined tiff from "Virtual Tiff"
+        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32
+        # Write tiff layers names
         python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface" 6 "UGRD:planetary boundary" 7 "VGRD:planetary boundary"
         rm settings.txt
         cd ..
     done
     cd ..
 }
+
 
 split_tiles() {
     echo "=============================== split_tiles() ======================================="
@@ -249,17 +316,14 @@ get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 &
 get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
 wait
 
-# 3. redownload what's missing again (double check)
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
-
-# 4. generate tiff tiles
+# 3. generate tiff tiles
 generate_bands_tiff
 join_tiff_files
 split_tiles
 
+# 4. cleanup new temp files
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
-# rm -rf $DW_FOLDER/* || true
 rm -rf $TIFF_TEMP_FOLDER/* || true
+# rm -rf $DW_FOLDER/* || true
+
