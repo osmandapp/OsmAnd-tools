@@ -327,3 +327,4 @@ find . -type d -empty -delete
 rm -rf $TIFF_TEMP_FOLDER/* || true
 # rm -rf $DW_FOLDER/* || true
 
+echo "DONE!"
