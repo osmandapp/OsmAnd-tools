@@ -4,8 +4,8 @@ THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TIFF_FOLDER=tiff
 DW_FOLDER=raw
 
-BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
-BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip")
+BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
 
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=3
