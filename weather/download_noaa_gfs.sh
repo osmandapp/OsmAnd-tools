@@ -259,7 +259,7 @@ join_tiff_files() {
         # Create joined tiff from "Virtual Tiff"
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32
         # Write tiff layers names
-        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC entire atmosphere"  2 "TMP2 m above ground"  3 "PRMSL mean sea level" 4 "GUST surface"  5 "PRATE surface" 6 "UGRD:planetary boundary" 7 "VGRD:planetary boundary"
+        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC:entire atmosphere"  2 "TMP:2 m above ground"  3 "PRMSL:mean sea level" 4 "GUST:surface"  5 "PRATE:surface" 6 "UGRD:planetary boundary" 7 "VGRD:planetary boundary"
         rm settings.txt
         cd ..
     done
@@ -312,7 +312,6 @@ split_tiles() {
 # 1. cleanup old files to not process them
 rm -rf $DW_FOLDER/* || true
 rm -rf $TIFF_TEMP_FOLDER/* || true
-rm -rf $TIFF_FOLDER/* || true
 
 # 2. download raw files and generate tiffs
 get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
@@ -328,6 +327,6 @@ split_tiles
 find . -type f -mmin +${MINUTES_TO_KEEP} -delete
 find . -type d -empty -delete
 rm -rf $TIFF_TEMP_FOLDER/* || true
-# rm -rf $DW_FOLDER/* || true
+rm -rf $DW_FOLDER/* || true
 
 echo "DONE!"
