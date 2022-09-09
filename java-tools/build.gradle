@@ -24,7 +24,7 @@ subprojects {
         	}
     	   }
 	}
- 
+
 
 	test {
 		reports {
@@ -34,7 +34,7 @@ subprojects {
 	}
 
 	task fatJar(type: Jar) {
-		
+
 		manifest.from jar.manifest
 		dependsOn configurations.runtimeClasspath
 		if(project.hasProperty('mainClassAttribute')) {
@@ -43,7 +43,7 @@ subprojects {
 		archiveName "${project.name}.jar"
 		from {
 			configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-		} 
+		}
 		{
 			exclude "META-INF/*.SF"
 			exclude "META-INF/*.DSA"
@@ -53,10 +53,16 @@ subprojects {
 	}
 
 
-	repositories {
-		mavenCentral()
-		jcenter()
-		google()
-		
-	}
+    repositories {
+        maven {
+            url "https://maven.geotoolkit.org"
+        }
+        maven {
+            url "https://maven.geo-solutions.it/"
+        }
+        mavenCentral()
+        jcenter()
+        google()
+
+    }
 }
