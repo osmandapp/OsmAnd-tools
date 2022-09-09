@@ -1,7 +1,7 @@
 package net.osmand.obf.preparation;
 
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferDouble;
+import java.awt.image.DataBufferFloat;
 import java.io.File;
 import java.io.IOException;
 
@@ -11,33 +11,33 @@ public class IndexWeatherData {
 	public static final int NEAREST_NEIGHBOOR_INTERPOLATION = 0;
 	public static final int BILINEAR_INTERPOLATION = 1;
 	public static final int BICUBIC_INTERPOLATION = 2;
-	public static int INTERPOLATION = BICUBIC_INTERPOLATION; 
-	
-	
+	public static int INTERPOLATION = BICUBIC_INTERPOLATION;
+
+
 	public static final double INEXISTENT_VALUE = Double.MIN_VALUE;
 	// 1440, 721 - -180.125, 90.125 - 179.8750000, -90.1250000
 	public static final int REF_WIDTH = 1440;
 	public static final int REF_HEIGHT = 721;
-	
+
 	public static class WeatherTiff {
-		
+
 		// it could vary base on files
 		public double ORIGIN_LON = -180.125;
 		public double ORIGIN_LAT = 90.125;
 		public double PX_SIZE_LON = 0.25;
 		public double PX_SIZE_LAT = -0.25;
-		
+
 		public final File file;
-		private DataBufferDouble data;
+        private DataBufferFloat data;
 		private int height;
 		private int width;
 		private int bands;
-		
+
 		public WeatherTiff(File file) throws IOException {
 			this.file = file;
 			readFile(file);
 		}
-		
+
 		public int getBands() {
 			return bands;
 		}
@@ -49,7 +49,7 @@ public class IndexWeatherData {
 				img = ImageIO.read(file);
 				width = img.getWidth();
 				height = img.getHeight();
-				data = (DataBufferDouble) img.getRaster().getDataBuffer();
+                data = (DataBufferFloat) img.getRaster().getDataBuffer();
 				bands = data.getSize() / width / height;
 			}
 			return img;
@@ -64,7 +64,7 @@ public class IndexWeatherData {
 			}
 			return getValue(band, x, y, null);
 		}
-		
+
 		public double getValue(int band, double x, double y, double[] array) {
 			if (data == null) {
 				return INEXISTENT_VALUE;
@@ -78,7 +78,7 @@ public class IndexWeatherData {
 			}
 			// System.out.println(" --- " + (h1 - h2) + " " + h1 + " " + h2);
 		}
-		
+
 		protected double nearestNeighboor(int band, double x, double y) {
 			int px = (int) Math.round(x);
 			int py = (int) Math.round(y);
@@ -105,12 +105,12 @@ public class IndexWeatherData {
 			}
 			return data.getElemDouble(ind) ;
 		}
-		
+
 		protected double bilinearInterpolation(int band, double x, double y, double[] array) {
 			int px = (int) Math.ceil(x);
 			int py = (int) Math.ceil(y);
 			if(array == null) {
-				array = new double[4]; 
+				array = new double[4];
 			}
 			array[0] = getElem(band, px - 1, py - 1);
 			array[1] = getElem(band, px, py - 1);
@@ -121,21 +121,21 @@ public class IndexWeatherData {
 			// 1.1 x  -> px = 2, cx = 0.1
 			// 1.99 y ->  py = 2, cy = 0.99
 			// array[2] -> maximize
-			
-			double h = (1 - cx) * (1 - cy) * array[0] + 
-					         cx * (1 - cy) * array[1] + 
-					   (1 - cx) * cy       * array[2] + 
+
+			double h = (1 - cx) * (1 - cy) * array[0] +
+					         cx * (1 - cy) * array[1] +
+					   (1 - cx) * cy       * array[2] +
 					         cx * cy       * array[3];
 			return h;
 		}
-		
+
 		protected double bicubicInterpolation(int band, double ix, double iy, double[] cf) {
 			int px = (int) Math.floor(ix);
 			int py = (int) Math.floor(iy);
 			double x = ix - px;
 			double y = iy - py;
 			if(cf == null) {
-				cf = new double[16]; 
+				cf = new double[16];
 			}
 			for (int i = 0; i < cf.length; i++) {
 				cf[i] = 0;
@@ -166,8 +166,10 @@ public class IndexWeatherData {
 	}
 
 	public static void main(String[] args) throws IOException {
-		readWeatherData("/Users/victorshcherb/osmand/maps/weather/", 
-				"20220206_%02d00.tiff", 8, 23, 1);
+        readWeatherData("/Users/nnngrach/Downloads/Weather_results/8_09/new/tiff/", "20220908_0000.tiff", 8, 23, 1);
+
+//		readWeatherData("/Users/victorshcherb/osmand/maps/weather/",
+//				"20220206_%02d00.tiff", 8, 23, 1);
 	}
 
 	private static void readWeatherData(String folder, String fmt, int min, int max, int step) throws IOException {
