@@ -28,16 +28,16 @@ public class IndexWeatherData {
 		public double PX_SIZE_LAT = -0.25;
 
 		public final File file;
-        private DataBufferFloat data;
+		private DataBufferFloat data;
 		private int height;
 		private int width;
 		private int bands;
-
+		
 		public WeatherTiff(File file) throws IOException {
 			this.file = file;
 			readFile(file);
 		}
-
+		
 		public int getBands() {
 			return bands;
 		}
@@ -49,7 +49,7 @@ public class IndexWeatherData {
 				img = ImageIO.read(file);
 				width = img.getWidth();
 				height = img.getHeight();
-                data = (DataBufferFloat) img.getRaster().getDataBuffer();
+				data = (DataBufferFloat) img.getRaster().getDataBuffer();
 				bands = data.getSize() / width / height;
 			}
 			return img;
@@ -64,7 +64,7 @@ public class IndexWeatherData {
 			}
 			return getValue(band, x, y, null);
 		}
-
+		
 		public double getValue(int band, double x, double y, double[] array) {
 			if (data == null) {
 				return INEXISTENT_VALUE;
@@ -78,7 +78,7 @@ public class IndexWeatherData {
 			}
 			// System.out.println(" --- " + (h1 - h2) + " " + h1 + " " + h2);
 		}
-
+		
 		protected double nearestNeighboor(int band, double x, double y) {
 			int px = (int) Math.round(x);
 			int py = (int) Math.round(y);
@@ -105,7 +105,7 @@ public class IndexWeatherData {
 			}
 			return data.getElemDouble(ind) ;
 		}
-
+		
 		protected double bilinearInterpolation(int band, double x, double y, double[] array) {
 			int px = (int) Math.ceil(x);
 			int py = (int) Math.ceil(y);
@@ -121,14 +121,14 @@ public class IndexWeatherData {
 			// 1.1 x  -> px = 2, cx = 0.1
 			// 1.99 y ->  py = 2, cy = 0.99
 			// array[2] -> maximize
-
+			
 			double h = (1 - cx) * (1 - cy) * array[0] +
 					         cx * (1 - cy) * array[1] +
 					   (1 - cx) * cy       * array[2] +
 					         cx * cy       * array[3];
 			return h;
 		}
-
+		
 		protected double bicubicInterpolation(int band, double ix, double iy, double[] cf) {
 			int px = (int) Math.floor(ix);
 			int py = (int) Math.floor(iy);

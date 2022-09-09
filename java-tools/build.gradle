@@ -16,13 +16,13 @@ subprojects {
 	version 'master-snapshot'
 	sourceCompatibility = 11
 	eclipse {
-    	   classpath {
-	        file {
-        	    whenMerged {
-                	entries.findAll { it.kind == 'lib' }.each { it.entryAttributes['module'] = 'false' }
-            	    }
-        	}
-    	   }
+			classpath {
+				file {
+					whenMerged {
+						entries.findAll { it.kind == 'lib' }.each { it.entryAttributes['module'] = 'false' }
+					}
+			}
+		}
 	}
 
 
@@ -43,7 +43,7 @@ subprojects {
 		archiveName "${project.name}.jar"
 		from {
 			configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-		}
+		} 
 		{
 			exclude "META-INF/*.SF"
 			exclude "META-INF/*.DSA"
@@ -53,16 +53,15 @@ subprojects {
 	}
 
 
-    repositories {
-        maven {
-            url "https://maven.geotoolkit.org"
-        }
-        maven {
-            url "https://maven.geo-solutions.it/"
-        }
-        mavenCentral()
-        jcenter()
-        google()
-
-    }
+	repositories {
+		maven {
+			url "https://maven.geotoolkit.org"
+		}
+		maven {
+			url "https://maven.geo-solutions.it/"
+		}
+		mavenCentral()
+		jcenter()
+		google()
+	}
 }
