@@ -299,9 +299,9 @@ split_tiles() {
 
 # # Debug short case:
 # DEBUG_M0DE=1
-# rm -rf $DW_FOLDER/
-# rm -rf $TIFF_FOLDER/
-# rm -rf $TIFF_TEMP_FOLDER/
+# rm -rf $DW_FOLDER/* || true
+# rm -rf $TIFF_FOLDER/* || true
+# rm -rf $TIFF_TEMP_FOLDER/* || true
 # get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
 # generate_bands_tiff
 # join_tiff_files
