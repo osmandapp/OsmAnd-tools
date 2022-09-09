@@ -1,7 +1,7 @@
 package net.osmand.obf.preparation;
 
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferDouble;
+import java.awt.image.DataBufferFloat;
 import java.io.File;
 import java.io.IOException;
 
@@ -28,7 +28,7 @@ public class IndexWeatherData {
 		public double PX_SIZE_LAT = -0.25;
 		
 		public final File file;
-		private DataBufferDouble data;
+		private DataBufferFloat data;
 		private int height;
 		private int width;
 		private int bands;
