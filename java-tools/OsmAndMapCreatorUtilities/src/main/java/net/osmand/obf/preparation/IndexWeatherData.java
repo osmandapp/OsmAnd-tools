@@ -166,10 +166,8 @@ public class IndexWeatherData {
 	}
 
 	public static void main(String[] args) throws IOException {
-        readWeatherData("/Users/nnngrach/Downloads/Weather_results/8_09/new/tiff/", "20220908_0000.tiff", 8, 23, 1);
-
-//		readWeatherData("/Users/victorshcherb/osmand/maps/weather/",
-//				"20220206_%02d00.tiff", 8, 23, 1);
+		readWeatherData("/Users/victorshcherb/osmand/maps/weather/",
+				"20220206_%02d00.tiff", 8, 23, 1);
 	}
 
 	private static void readWeatherData(String folder, String fmt, int min, int max, int step) throws IOException {
