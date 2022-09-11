@@ -1,18 +1,9 @@
 package net.osmand.server.controllers.pub;
 
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -29,6 +20,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpEntity;
@@ -38,13 +30,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -82,6 +68,8 @@ public class GpxController {
     public static final int MAX_SIZE_FILES_AUTH = 100;
 
 	Gson gson = new Gson();
+	
+	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 	
 	@Autowired
 	UserSessionResources session;
@@ -304,71 +292,88 @@ public class GpxController {
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
 	}
-    
-    @PostMapping(path = {"/process-track-data"}, produces = "application/json")
-    @ResponseBody
-    public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
-                                             HttpSession httpSession) throws IOException {
-        
-        File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+	
+	@PostMapping(path = {"/process-track-data"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                               HttpSession httpSession) throws IOException {
 		
-        InputStream is = file.getInputStream();
-        FileOutputStream fous = new FileOutputStream(tmpGpx);
-        Algorithms.streamCopy(is, fous);
-        is.close();
-        fous.close();
-	    session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
-        
-        GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
-        
-        if (gpxFile.error != null) {
-            return ResponseEntity.badRequest().body("Error reading gpx!");
-        } else {
-            
-            GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-            cleanupFromNan(analysis);
-            GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
-            GPXTrackAnalysis srtmAnalysis = null;
-            if (srtmGpx != null) {
-                srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
-            }
-            if (srtmAnalysis != null) {
-                cleanupFromNan(srtmAnalysis);
-            }
-            
-            WebGpxData.TrackData gpxData = new WebGpxData.TrackData();
-            
-            gpxData.analysis = analysis;
-            gpxData.srtmAnalysis = srtmAnalysis;
-            
-            gpxData.metaData = new WebGpxData.MetaData(gpxFile.metadata);
-            List<WptPt> points = gpxFile.getPoints();
-            if (points != null) {
-                gpxData.wpts = new ArrayList<>();
-                points.forEach(wpt -> gpxData.wpts.add(new WebGpxData.Wpt(wpt)));
-            }
-            
-            if (!gpxFile.tracks.isEmpty()) {
-                gpxData.tracks = new ArrayList<>();
-                List<Track> tracks = gpxFile.tracks.stream().filter(t -> !t.generalTrack).collect(Collectors.toList());
-                
-                if (!gpxFile.routes.isEmpty() && tracks.size() != gpxFile.routes.size()) {
-                    return ResponseEntity.badRequest().body("Error reading gpx!");
-                }
-                
-                tracks.forEach(track -> {
-                    WebGpxData.Track t = new WebGpxData.Track(track);
-                    gpxData.tracks.add(t);
-                });
-            }
-            
-            if (!gpxFile.routes.isEmpty()) {
-                WebGpxData.addRoutePoints(gpxFile, gpxData);
-            }
-            
-            return ResponseEntity.ok(new GsonBuilder().serializeSpecialFloatingPointValues().create().toJson(Map.of("gpx_data", gpxData)));
-        }
-    }
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		
+		InputStream is = file.getInputStream();
+		FileOutputStream fous = new FileOutputStream(tmpGpx);
+		Algorithms.streamCopy(is, fous);
+		is.close();
+		fous.close();
+		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
+		
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
+		
+		if (gpxFile.error != null) {
+			return ResponseEntity.badRequest().body("Error reading gpx!");
+		} else {
+			WebGpxData.TrackData gpxData = new WebGpxData.TrackData();
+			
+			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
+			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+			
+			gpxData.analysis = WebGpxData.getTrackAnalysis(analysis, srtmAnalysis);
+			gpxData.metaData = new WebGpxData.MetaData(gpxFile.metadata);
+			gpxData.wpts = WebGpxData.getWpts(gpxFile);
+			gpxData.tracks = WebGpxData.getTracks(gpxFile);
+			gpxData.ext = gpxFile.extensions;
+			
+			if (!gpxData.tracks.isEmpty()) {
+				WebGpxData.addSrtmEle(gpxData.tracks, srtmAnalysis);
+				WebGpxData.addDistance(gpxData.tracks, analysis);
+			}
+			
+			if (!gpxFile.routes.isEmpty()) {
+				WebGpxData.addRoutePoints(gpxFile, gpxData);
+			}
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
+		}
+	}
+	
+	private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
+		GPXTrackAnalysis analysis = null;
+		if (!isSrtm) {
+			analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			cleanupFromNan(analysis);
+		} else {
+			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+			GPXTrackAnalysis srtmAnalysis = null;
+			if (srtmGpx != null) {
+				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+			}
+			if (srtmAnalysis != null) {
+				cleanupFromNan(srtmAnalysis);
+			}
+		}
+		return analysis;
+	}
+	
+	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
+	                                                         HttpSession httpSession) throws IOException {
+		WebGpxData.TrackData trackData = new Gson().fromJson(data, WebGpxData.TrackData.class);
+		
+		GPXFile gpxFile = WebGpxData.createGpxFileFromTrackData(trackData);
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		InputStreamResource resource = new InputStreamResource(new FileInputStream(tmpGpx));
+		Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+		if (exception != null) {
+			return ResponseEntity.badRequest().body(resource);
+		}
+		
+		String fileName = gpxFile.metadata.name != null ? gpxFile.metadata.name : tmpGpx.getName();
+		
+		return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName)
+				.contentType(MediaType.APPLICATION_XML)
+				.body(resource);
+	}
     
     private double getCommonMaxSizeFiles() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
