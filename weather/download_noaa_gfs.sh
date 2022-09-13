@@ -214,7 +214,7 @@ get_raw_gfs_files() {
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
-        if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then   
+        if [[ -f "$FILETIME.index" ]]; then   
             for i in ${!GFS_BANDS[@]}; do
                 # Parse from index file start and end byte offset for needed band
                 local CHANNEL_INDEX_LINES=$( cat ${FILETIME}.index | grep -A 1 "${GFS_BANDS[$i]}" | awk -F ":" '{print $2}' )
