@@ -1,7 +1,8 @@
-package net.osmand.server.controllers.pub;
+package net.osmand.server.webgpx;
 
 import net.osmand.GPXUtilities;
 import net.osmand.util.MapUtils;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -9,136 +10,9 @@ import java.util.stream.Collectors;
 import static net.osmand.GPXUtilities.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
-public class WebGpxData {
-    
-    WebGpxData() {
-    }
-    
-    public static class TrackData {
-        public MetaData metaData;
-        public List<Wpt> wpts;
-        public List<Track> tracks;
-        public Map<String, Object> analysis;
-        public Map<String, String> ext;
-    }
-    
-    public static class MetaData {
-        public String name;
-        public String desc;
-        public GPXUtilities.Metadata ext;
-        
-        public MetaData(GPXUtilities.Metadata data) {
-            if (data != null) {
-                if (data.desc != null) {
-                    desc = data.desc;
-                    data.desc = null;
-                }
-                ext = data;
-            }
-        }
-    }
-    
-    public static class Wpt {
-        public GPXUtilities.WptPt ext;
-        
-        public Wpt(GPXUtilities.WptPt point) {
-            if (point != null)
-                ext = point;
-        }
-    }
-    
-    public static class Track {
-        public List<Point> points;
-        public GPXUtilities.Track ext;
-        
-        public Track(GPXUtilities.Track track) {
-            points = new ArrayList<>();
-            track.segments.forEach(seg -> {
-                List<Point> pointsSeg = new ArrayList<>();
-                seg.points.forEach(point -> {
-                    int index = seg.points.indexOf(point);
-                    Point p = new Point(point);
-                    if (track.segments.size() > 1 && index == seg.points.size() - 1 && track.segments.indexOf(seg) != track.segments.size() - 1) {
-                        p.profile = GAP_PROFILE_TYPE;
-                    }
-                    pointsSeg.add(p);
-                });
-                int startInd = 0;
-                if (!seg.routeSegments.isEmpty()) {
-                    for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
-                        RouteSegment segment = new RouteSegment();
-                        segment.ext = rs;
-                        segment.routeTypes = seg.routeTypes;
-                        int length = Integer.parseInt(rs.length);
-                        pointsSeg.get(startInd).segment = segment;
-                        startInd = startInd + (length - 1);
-                    }
-                }
-                points.addAll(pointsSeg);
-            });
-            
-            if (!points.isEmpty()) {
-                track.segments = null;
-            }
-            ext = track;
-        }
-    }
-    
-    public static class Point {
-        
-        public double lat;
-        public double lng;
-        public double ele = Double.NaN;
-        public double srtmEle = Double.NaN;
-        public double distance;
-        public String profile;
-        public List<Point> geometry;
-        public transient int geometrySize;
-        public RouteSegment segment; // on each turn point
-        public GPXUtilities.WptPt ext;
-        
-        public Point(GPXUtilities.WptPt point) {
-            if (!Double.isNaN(point.lat)) {
-                lat = point.lat;
-                point.lat = Double.NaN;
-            }
-            
-            if (!Double.isNaN(point.lon)) {
-                lng = point.lon;
-                point.lon = Double.NaN;
-            }
-            
-            if (!Double.isNaN(point.ele)) {
-                ele = point.ele;
-                point.ele = Double.NaN;
-            }
-            
-            Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<String, String> e = it.next();
-                if (e.getKey().equals(TRKPT_INDEX_EXTENSION)) {
-                    geometry = new ArrayList<>();
-                    geometrySize = Integer.parseInt(e.getValue());
-                    it.remove();
-                } else {
-                    geometrySize = -1;
-                }
-                if (e.getKey().equals(PROFILE_TYPE_EXTENSION)) {
-                    profile = e.getValue();
-                    it.remove();
-                }
-            }
-            ext = point;
-        }
-        
-    }
-    
-    public static class RouteSegment {
-        GPXUtilities.RouteSegment ext;
-        List<GPXUtilities.RouteType> routeTypes;
-    }
-    
-    static void addRoutePoints(GPXUtilities.GPXFile gpxFile, WebGpxData.TrackData gpxData) {
+@Component
+public class WebGpxParser {
+    public void addRoutePoints(GPXUtilities.GPXFile gpxFile, WebGpxData.TrackData gpxData) {
         gpxFile.routes.forEach(route -> {
             List<WebGpxData.Point> routePoints = new ArrayList<>();
             List<WebGpxData.Point> trackPoints = gpxData.tracks.get(gpxFile.routes.indexOf(route)).points;
@@ -158,10 +32,10 @@ public class WebGpxData {
         });
     }
     
-    static int findNearestPoint(List<WebGpxData.Point> trackPoints, WebGpxData.Point routePoint) {
+    public int findNearestPoint(List<WebGpxData.Point> trackPoints, WebGpxData.Point routePoint) {
         double minDist = -1;
         int res = -1;
-        for (Point tp : trackPoints) {
+        for (WebGpxData.Point tp : trackPoints) {
             double currentDist = MapUtils.getDistance(routePoint.lat, routePoint.lng, tp.lat, tp.lng);
             if (minDist == -1) {
                 minDist = currentDist;
@@ -173,7 +47,7 @@ public class WebGpxData {
         return res;
     }
     
-    static int addTrkptToRoutePoint(int currTrkPointInd, int prevTrkPointInd, WebGpxData.Point routePoint, List<WebGpxData.Point> trackPoints, List<WebGpxData.Point> routePoints) {
+    public int addTrkptToRoutePoint(int currTrkPointInd, int prevTrkPointInd, WebGpxData.Point routePoint, List<WebGpxData.Point> trackPoints, List<WebGpxData.Point> routePoints) {
         if (currTrkPointInd != 0) {
             for (WebGpxData.Point pt : trackPoints) {
                 int pointInd = trackPoints.indexOf(pt);
@@ -192,7 +66,7 @@ public class WebGpxData {
         return prevTrkPointInd;
     }
     
-    static void addSrtmEle(List<Track> tracks, GPXUtilities.GPXTrackAnalysis srtmAnalysis) {
+    public void addSrtmEle(List<WebGpxData.Track> tracks, GPXUtilities.GPXTrackAnalysis srtmAnalysis) {
         if (srtmAnalysis != null) {
             tracks.forEach(track -> track.points.forEach(point -> {
                 if (point.geometry != null) {
@@ -204,7 +78,7 @@ public class WebGpxData {
         }
     }
     
-    static void addDistance(List<Track> tracks, GPXUtilities.GPXTrackAnalysis analysis) {
+    public void addDistance(List<WebGpxData.Track> tracks, GPXUtilities.GPXTrackAnalysis analysis) {
         if (analysis != null && !analysis.elevationData.isEmpty()) {
             tracks.forEach(track -> track.points.forEach(point -> {
                 if (point.geometry != null) {
@@ -216,7 +90,7 @@ public class WebGpxData {
         }
     }
     
-    static Map<String, Object> getTrackAnalysis(GPXUtilities.GPXTrackAnalysis analysis, GPXUtilities.GPXTrackAnalysis srtmAnalysis) {
+    public Map<String, Object> getTrackAnalysis(GPXUtilities.GPXTrackAnalysis analysis, GPXUtilities.GPXTrackAnalysis srtmAnalysis) {
         if (analysis != null) {
             Map<String, Object> res = new HashMap<>();
             res.put("totalDistance", analysis.totalDistance);
@@ -245,7 +119,7 @@ public class WebGpxData {
         return Collections.emptyMap();
     }
     
-    static List<WebGpxData.Wpt> getWpts(GPXUtilities.GPXFile gpxFile) {
+    public List<WebGpxData.Wpt> getWpts(GPXUtilities.GPXFile gpxFile) {
         List<GPXUtilities.WptPt> points = gpxFile.getPoints();
         if (points != null) {
             List<WebGpxData.Wpt> res = new ArrayList<>();
@@ -255,7 +129,7 @@ public class WebGpxData {
         return Collections.emptyList();
     }
     
-    static List<WebGpxData.Track> getTracks(GPXUtilities.GPXFile gpxFile) {
+    public List<WebGpxData.Track> getTracks(GPXUtilities.GPXFile gpxFile) {
         if (!gpxFile.tracks.isEmpty()) {
             List<WebGpxData.Track> res = new ArrayList<>();
             List<GPXUtilities.Track> tracks = gpxFile.tracks.stream().filter(t -> !t.generalTrack).collect(Collectors.toList());
@@ -271,7 +145,7 @@ public class WebGpxData {
         return Collections.emptyList();
     }
     
-    static GPXUtilities.GPXFile createGpxFileFromTrackData(WebGpxData.TrackData trackData) {
+    public GPXUtilities.GPXFile createGpxFileFromTrackData(WebGpxData.TrackData trackData) {
         GPXUtilities.GPXFile gpxFile = new GPXUtilities.GPXFile(OSMAND_ROUTER_V2);
         if (trackData.metaData != null) {
             gpxFile.metadata = trackData.metaData.ext;
@@ -290,9 +164,9 @@ public class WebGpxData {
                 List<GPXUtilities.TrkSegment> segments = new ArrayList<>();
                 if (t.points.get(0).geometry != null) {
                     GPXUtilities.Route route = new GPXUtilities.Route();
-                    List<Point> trkPoints = new ArrayList<>();
+                    List<WebGpxData.Point> trkPoints = new ArrayList<>();
                     for (int i = 0; i < t.points.size(); i++) {
-                        Point point = t.points.get(i);
+                        WebGpxData.Point point = t.points.get(i);
                         GPXUtilities.WptPt routePoint = point.ext;
                         routePoint.lat = point.lat;
                         routePoint.lon = point.lng;
@@ -319,10 +193,10 @@ public class WebGpxData {
         return gpxFile;
     }
     
-    private static void addSegmentsToTrack(List<Point> points, List<GPXUtilities.TrkSegment> segments) {
+    private void addSegmentsToTrack(List<WebGpxData.Point> points, List<GPXUtilities.TrkSegment> segments) {
         GPXUtilities.TrkSegment segment = new GPXUtilities.TrkSegment();
         boolean isNanEle = isNanEle(points);
-        for (Point point : points) {
+        for (WebGpxData.Point point : points) {
             GPXUtilities.WptPt filePoint = point.ext;
             if (filePoint.hdop == -1) {
                 filePoint.hdop = Double.NaN;
@@ -354,7 +228,7 @@ public class WebGpxData {
         segments.add(segment);
     }
     
-    private static boolean isNanEle(List<Point> points) {
+    private boolean isNanEle(List<WebGpxData.Point> points) {
         return points.get(0).ele == 99999;
     }
 }

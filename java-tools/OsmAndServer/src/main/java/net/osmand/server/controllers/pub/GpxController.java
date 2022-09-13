@@ -15,6 +15,8 @@ import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.GsonBuilder;
+import net.osmand.server.webgpx.WebGpxData;
+import net.osmand.server.webgpx.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +72,9 @@ public class GpxController {
 	Gson gson = new Gson();
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	
+	@Autowired
+	WebGpxParser webGpxParser;
 	
 	@Autowired
 	UserSessionResources session;
@@ -317,19 +322,19 @@ public class GpxController {
 			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
 			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
 			
-			gpxData.analysis = WebGpxData.getTrackAnalysis(analysis, srtmAnalysis);
+			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
 			gpxData.metaData = new WebGpxData.MetaData(gpxFile.metadata);
-			gpxData.wpts = WebGpxData.getWpts(gpxFile);
-			gpxData.tracks = WebGpxData.getTracks(gpxFile);
+			gpxData.wpts = webGpxParser.getWpts(gpxFile);
+			gpxData.tracks = webGpxParser.getTracks(gpxFile);
 			gpxData.ext = gpxFile.extensions;
 			
 			if (!gpxData.tracks.isEmpty()) {
-				WebGpxData.addSrtmEle(gpxData.tracks, srtmAnalysis);
-				WebGpxData.addDistance(gpxData.tracks, analysis);
+				webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
+				webGpxParser.addDistance(gpxData.tracks, analysis);
 			}
 			
 			if (!gpxFile.routes.isEmpty()) {
-				WebGpxData.addRoutePoints(gpxFile, gpxData);
+				webGpxParser.addRoutePoints(gpxFile, gpxData);
 			}
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
@@ -359,7 +364,7 @@ public class GpxController {
 	                                                         HttpSession httpSession) throws IOException {
 		WebGpxData.TrackData trackData = new Gson().fromJson(data, WebGpxData.TrackData.class);
 		
-		GPXFile gpxFile = WebGpxData.createGpxFileFromTrackData(trackData);
+		GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
 		InputStreamResource resource = new InputStreamResource(new FileInputStream(tmpGpx));
 		Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
