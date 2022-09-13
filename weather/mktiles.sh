@@ -1,11 +1,14 @@
 #!/bin/bash -xe
 THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-TIFF_FOLDER=tiff
-DW_FOLDER=raw
-
-BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
+ROOT_FOLDER=$(pwd)
+GFS="gfs"
+ECMWD="ecmwf"
+TIFF_FOLDER="tiff"
+GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
+ECMWD_BANDS=("Temperature" "Pressure" "10 metre u-velocity" "10 metre v-velocity" "Total precipitation")
+ECMWD_BANDS_NAMES=("2t" "msl" "10u" "10v" "tp")
 
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=3
@@ -14,6 +17,17 @@ PARALLEL_TO_TILES=2
 
 
 generate_tiles() {
+    MODE=$1
+    local BANDS_NAMES=()
+    local BANDS_DESCRIPTIONS=()
+    if [[ $MODE =~ "$GFS" ]]; then
+        BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
+    elif [[ $MODE =~ "$ECMWD" ]]; then
+        BANDS_NAMES=("${ECMWD_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${ECMWD_BANDS[@]}")  
+    fi
+
     rm *.O.tiff || true
     for WFILE in ${TIFF_FOLDER}/*.tiff
     do
@@ -45,10 +59,28 @@ generate_tiles() {
 }
 
 
-# 0. html to test data
+# **************
+# GFS Provider
+# **************
+
+echo "============================ GFS Provider ======================================="
+cd $GFS
+# html to test data
 cp "${THIS_LOCATION}/browser.html" .
 cp -r "${THIS_LOCATION}/script" .
 cp -r "${THIS_LOCATION}/css" .
+# generating tiles
+generate_tiles $GFS
 
-# 1. generate tiles
-generate_tiles
+
+# **************
+# ECMWD Provider
+# **************
+
+echo "============================ ECMWD Provider ======================================="
+cd ..
+cd $ECMWD
+cp "${THIS_LOCATION}/browser.html" .
+cp -r "${THIS_LOCATION}/script" .
+cp -r "${THIS_LOCATION}/css" .
+generate_tiles $ECMWD

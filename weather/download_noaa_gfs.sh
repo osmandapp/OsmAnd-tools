@@ -478,7 +478,7 @@ clean_temp_files_on_finish
 
 
 # *************
-# GPS Provider
+# GFS Provider
 # *************
 
 cd "$ROOT_FOLDER/$GFS"
