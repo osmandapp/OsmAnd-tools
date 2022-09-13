@@ -1,23 +1,20 @@
 #!/bin/bash -xe
 THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-BASE_URL=${BASE_URL:-"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"}
-PROVIDER=${PROVIDER:-"gfs"}
-LAYER=${LAYER:-"atmos"}
-# usually 4 hours is enough to get freshest files 
-DELAY_HOURS=${DELAY_HOURS:-4}
-BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
-FILE_PREFIX=${FILE_PREFIX:-"gfs.t"}
-FILE_NAME=${FILE_NAME:-"z.pgrb2.0p25.f"}
-MINUTES_TO_KEEP=${MINUTES_TO_KEEP:-1800} # 30 hours
+ROOT_FOLDER=$(pwd)
+GFS="gfs"
+ECMWD="ecmwf"
+DOWNLOAD_FOLDER="raw"
+TIFF_FOLDER="tiff"
+TIFF_TEMP_FOLDER="tiff_temp"
+
+GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
+ECMWD_BANDS=("Temperature" "Pressure" "10 metre u-velocity" "10 metre v-velocity" "Total precipitation")
+ECMWD_BANDS_NAMES=("2t" "msl" "10u" "10v" "tp")
+
+MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-1800} # 30 hours
 HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
 HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-180}
-
-DW_FOLDER=raw
-TIFF_FOLDER=tiff
-TIFF_TEMP_FOLDER=tiff_temp
-SPLIT_ZOOM_TIFF=4
-DEBUG_M0DE=0
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
@@ -26,174 +23,215 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-if [[ $OS =~ "Darwin" ]]; then
-    HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')
-    DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
-else
-    HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
-    DATE=$(date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
-fi
-# Round down HOURS to 0/6/12/18
-RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
+DEBUG_M0DE=0
+
+
+setup_folders_on_start() {
+    mkdir -p "$ROOT_FOLDER/$GFS"
+    mkdir -p "$ROOT_FOLDER/$ECMWD"
+    mkdir -p "$DOWNLOAD_FOLDER/"
+    mkdir -p "$TIFF_FOLDER/"
+    mkdir -p "$TIFF_TEMP_FOLDER/"
+
+    rm -rf $DOWNLOAD_FOLDER/* || true
+    rm -rf $TIFF_TEMP_FOLDER/* || true
+    if [[ $DEBUG_M0DE == 1 ]]; then
+        rm -rf $TIFF_FOLDER/* || true 
+    fi  
+}
+
+
+clean_temp_files_on_finish() {
+    if [[ $DEBUG_M0DE != 1 ]]; then
+        rm -rf $TIFF_TEMP_FOLDER/* || true
+        rm -rf $DOWNLOAD_FOLDER/* || true
+    fi
+    # Delete outdated tiff files if needed
+    find . -type f -mmin +${MINUTES_TO_KEEP_TIFF_FILES} -delete
+    find . -type d -empty -delete 
+}
 
 
 should_download_file() {
-    local filename=$1
-    local url=$2
+    local FILENAME=$1
+    local URL=$2
 
-    if [[ -f $filename ]]; then
+    if [[ -f $FILENAME ]]; then
         # File is already dowlnloaded
-        disk_file_modified_time="$(TZ=UMT0 date -r ${filename} +'%a, %d %b %Y %H:%M:%S GMT')"
-        local server_response=$(curl -s -I --header "If-Modified-Since: $disk_file_modified_time" $file_link_indx | head -1)
+        local DISK_FILE_MODIFIED_TIME="$(TZ=UMT0 date -r ${FILENAME} +'%a, %d %b %Y %H:%M:%S GMT')"
+        local SERVER_RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
 
-        if [[ $server_response =~ "HTTP/2 304" ]]; then
+        if [[ $SERVER_RESPONSE =~ "304" ]]; then
             # Server don't have update for this file. Don't need to download it.
             echo 0
             return
-        elif [[ $server_response =~ "HTTP/2 403" ]]; then   
+        elif [[ $SERVER_RESPONSE =~ "403" ]]; then   
             # We're blocked by server. Wait a bit and continue download
             sleep 60
+        elif [[ $SERVER_RESPONSE =~ "404" ]]; then   
+            echo 0
+            return
         fi  
+    elif [[ $(curl -s -I $URL | head -1) =~ "404"  ]]; then   
+        # File not found. Skip 
+        echo 0
+        return
     fi
     echo 1
 }
 
 
 download() {
-    local filename=$1
-    local url=$2
-    local start_byte_offset=$3
-    local end_byte_offset=$4
-    if [ -z "$start_byte_offset" ] && [ -z "$end_byte_offset" ]; then
-        curl -s $url --output ${filename}
+    local FILENAME=$1
+    local URL=$2
+    local START_BYTE_OFFSET=$3
+    local END_BYTE_OFFSET=$4
+    if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
+        # download whole file
+        # curl -s -k $URL --output ${FILENAME} --http1.1  || sleep 1
+        curl -k $URL --output ${FILENAME} --http1.1  || sleep 1
     else
-        curl -s --range $start_byte_offset-$end_byte_offset $url --output ${filename}
+        # download part file by byte offset
+        # curl -s -k --range $START_BYTE_OFFSET-$END_BYTE_OFFSET $URL --output ${FILENAME} --http1.1 || sleep 1
+        curl -k --range $START_BYTE_OFFSET-$END_BYTE_OFFSET $URL --output ${FILENAME} --http1.1 || sleep 1
     fi
 }
 
 
-# custom download with retry and result checking
+# Custom download with retry and result checking.
+# It's need because of too regular interupts or blockings from weather server.
 download_with_retry() {
-    local filename=$1
-    local url=$2
-    local start_byte_offset=$3
-    local end_byte_offset=$4
+    local FILENAME=$1
+    local URL=$2
+    local START_BYTE_OFFSET=$3
+    local END_BYTE_OFFSET=$4
 
-    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Download try 1: ${filename}"
-        download $filename $url $start_byte_offset $end_byte_offset
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Download try 1: ${FILENAME}"
+        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
-        echo "Skip downloading: ${filename}"   
+        echo "Skip downloading: ${FILENAME}"   
         return
     fi
 
-    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Download Error: ${filename} not downloaded! Wait 10 sec and retry."
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Download Error: ${FILENAME} not downloaded! Wait 10 sec and retry."
         sleep 10
-        echo "Download try 2: ${filename}"
-        download $filename $url $start_byte_offset $end_byte_offset
+        echo "Download try 2: ${FILENAME}"
+        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
-        echo "Downloading success: ${filename}"   
+        echo "Downloading success: ${FILENAME}"   
         return    
     fi
 
-    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Download Error: ${filename} not downloaded! Wait 1 min and retry."
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Download Error: ${FILENAME} not downloaded! Wait 1 min and retry."
         sleep 60
-        echo "Download try 3: ${filename}"
-        download $filename $url $start_byte_offset $end_byte_offset
+        echo "Download try 3: ${FILENAME}"
+        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
         return    
     fi
 
-    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Download Error: ${filename} not downloaded! Wait 5 min and retry."
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Download Error: ${FILENAME} not downloaded! Wait 5 min and retry."
         sleep 300
-        echo "Download try 4: ${filename}"
-        download $filename $url $start_byte_offset $end_byte_offset
+        echo "Download try 4: ${FILENAME}"
+        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
         return    
     fi
 
-    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Download Error: ${filename} not downloaded! Wait 10 min and retry."
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Download Error: ${FILENAME} not downloaded! Wait 10 min and retry."
         sleep 600
-        echo "Download try 5: ${filename}"
-        download $filename $url $start_byte_offset $end_byte_offset
+        echo "Download try 5: ${FILENAME}"
+        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
         return    
     fi
 
-    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Download Error: ${filename} not downloaded! Wait 1 hour and retry."
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Download Error: ${FILENAME} not downloaded! Wait 1 hour and retry."
         sleep 600
-        echo "Download try 6: ${filename}"
-        download $filename $url $start_byte_offset $end_byte_offset
+        echo "Download try 6: ${FILENAME}"
+        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
         return    
     fi
     
-    if [[ $( should_download_file "$filename" "$url" ) -eq 1 ]]; then
-        echo "Fatal Download Error: ${filename} still not downloaded!"
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Fatal Download Error: ${FILENAME} still not downloaded!"
     fi
 
     return
 }
 
-create_link_if_needed() {
-    local file_path=$1
-    local link_path=$2
-    if [ ! -f "$link_path" ]; then
-        ln -s $file_path $link_path 
+
+get_raw_gfs_files() {
+    echo "============================ get_raw_gfs_files() ======================================="
+    local HOURS_START=$1
+    local HOURS_ALL=$2
+    local HOURS_INC=$3
+    local LAYER=${LAYER:-"atmos"}
+
+    # Prepare all time parameters for url:
+    # (usually 4 hours offset is enough to get freshest files)
+    local DELAY_HOURS=${DELAY_HOURS:-4}
+    if [[ $OS =~ "Darwin" ]]; then
+        HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')
+        DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
+    else
+        HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
+        DATE=$(date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
     fi
-}
+    # Round down HOURS to 0/6/12/18
+    local RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
+    local URL_BASE="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${RNDHOURS}/$LAYER/"
 
 
-#https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-get_raw_files() {
-    echo "============================ get_raw_files() ======================================="
-    mkdir -p $DW_FOLDER/
-    HOURS_START=$1
-    HOURS_ALL=$2
-    HOURS_INC=$3
-    DOWNLOAD_URL="${BASE_URL}${PROVIDER}.${DATE}"
-    local url="$DOWNLOAD_URL/${RNDHOURS}/$LAYER/"
     for (( c=${HOURS_START}; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
-        local h=$c
+        local FORECAST_HOURS_OFFSET=$c
         if [ $c -lt 10 ]; then
-            h="00$h"
+            FORECAST_HOURS_OFFSET="00$FORECAST_HOURS_OFFSET"
         elif [ $c -lt 100 ]; then
-            h="0$h"
+            FORECAST_HOURS_OFFSET="0$FORECAST_HOURS_OFFSET"
         fi
-        local filename="${FILE_PREFIX}${RNDHOURS}${FILE_NAME}${h}"
-        local file_link="${url}${filename}"
-        local file_link_indx="${url}${filename}.idx"
-        local filetime=""
+        local FILENAME="gfs.t${RNDHOURS}z.pgrb2.0p25.f${FORECAST_HOURS_OFFSET}"
+        local FILE_INDEX_URL="${URL_BASE}${FILENAME}.idx"
+        local FILE_DATA_URL="${URL_BASE}${FILENAME}"
+        local FILETIME=""
         if [[ $OS =~ "Darwin" ]]; then
-            filetime=$(date -ju -v+${c}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${DATE} ${RNDHOURS}00")
+            FILETIME=$(date -ju -v+${c}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${DATE} ${RNDHOURS}00")
         else
-            filetime=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
+            FILETIME=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
 
-        mkdir -p "$DW_FOLDER/$DATE"
-        cd $DW_FOLDER; 
 
         # Download index file
-        download_with_retry "$DATE/$filename.idx" "$file_link_indx"
-        create_link_if_needed $DATE/${filename}.idx $filetime.gt.idx
+        cd $DOWNLOAD_FOLDER; 
+        download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
-        # Download channels data by 
-        for i in ${!BANDS[@]}; do
-            cd $DATE
-            local channel_index_lines=$( cat ${filename}.idx | grep -A 1 "${BANDS[$i]}" | awk -F ":" '{print $2}' )
-            local start_byte_offset=$( echo $channel_index_lines | awk -F " " '{print $1}' )
-            local end_byte_offset=$( echo $channel_index_lines | awk -F " " '{print $2}' )     
-            download_with_retry "${BANDS_NAMES[$i]}_$filetime" "$file_link" $start_byte_offset $end_byte_offset
-            cd ..
-            create_link_if_needed $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
-            # ln -s $DATE/${BANDS_NAMES[$i]}_${filetime} ${BANDS_NAMES[$i]}_${filetime}.gt 
-        done
+        # Download needed bands forecast data
+        if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then   
+            for i in ${!GFS_BANDS[@]}; do
+                # Parse from index file start and end byte offset for needed band
+                local CHANNEL_INDEX_LINES=$( cat ${FILETIME}.index | grep -A 1 "${GFS_BANDS[$i]}" | awk -F ":" '{print $2}' )
+                local START_BYTE_OFFSET=$( echo $CHANNEL_INDEX_LINES | awk -F " " '{print $1}' )
+                local END_BYTE_OFFSET=$( echo $CHANNEL_INDEX_LINES | awk -F " " '{print $2}' ) 
+
+                # Make partial download for needed band data only  
+                # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
+                download_with_retry "${GFS_BANDS_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
+
+                # Generate tiff for downloaded band
+                mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
+                gdal_translate "${GFS_BANDS_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats
+            done
+        else
+            echo "Error: Index file not downloaded. Skip downloading weather data."
+        fi    
         cd ..;
 
         if [[ $DEBUG_M0DE == 1 ]]; then
@@ -205,9 +243,7 @@ get_raw_files() {
 
 generate_bands_tiff() {
     echo "============================= generate_bands_tiff() ==================================="
-    mkdir -p $TIFF_FOLDER/
-    mkdir -p $TIFF_TEMP_FOLDER/
-    for WFILE in ${DW_FOLDER}/*.gt
+    for WFILE in ${DOWNLOAD_FOLDER}/*.gt
     do
         local FILE_NAME=$WFILE
         if [[ $OS =~ "Darwin" ]]; then
@@ -220,8 +256,8 @@ generate_bands_tiff() {
         fi
 
         local FOLDER_NAME=$FILE_NAME
-        for i in ${!BANDS_NAMES[@]}; do
-            FOLDER_NAME="${FOLDER_NAME//"${BANDS_NAMES[$i]}_"}"
+        for i in ${!GFS_BANDS_NAMES[@]}; do
+            FOLDER_NAME="${FOLDER_NAME//"${GFS_BANDS_NAMES[$i]}_"}"
         done
 
         mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
@@ -232,6 +268,18 @@ generate_bands_tiff() {
 
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
+    MODE=$1
+    local BANDS_NAMES=()
+    local BANDS_DESCRIPTIONS=()
+    if [[ $MODE =~ "$GFS" ]]; then
+        BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
+    elif [[ $MODE =~ "$ECMWD" ]]; then
+        BANDS_NAMES=("${ECMWD_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${ECMWD_BANDS[@]}")  
+    fi
+
+    mkdir -p $TIFF_FOLDER/
     cd $TIFF_TEMP_FOLDER
     for CHANNELS_FOLDER in *
     do
@@ -258,9 +306,21 @@ join_tiff_files() {
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         # Create joined tiff from "Virtual Tiff"
         gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32 -stats
-        # Write tiff layers names
-        python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff 1 "TCDC:entire atmosphere"  2 "TMP:2 m above ground"  3 "PRMSL:mean sea level" 4 "GUST:surface"  5 "PRATE:surface" 6 "UGRD:planetary boundary" 7 "VGRD:planetary boundary"
+        
+        # # Write tiff layers names
+        local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff '
+        for i in ${!BANDS_DESCRIPTIONS[@]}; do
+            NUMBER=$(( $i + 1))
+            DESCRIPTION="${BANDS_DESCRIPTIONS[$i]}"
+            BANDS_RENAMING_COMMAND+=$NUMBER
+            BANDS_RENAMING_COMMAND+=' "'
+            BANDS_RENAMING_COMMAND+=$DESCRIPTION
+            BANDS_RENAMING_COMMAND+='" '
+        done
+        eval $BANDS_RENAMING_COMMAND
+
         rm settings.txt
+        rm bigtiff.vrt
         cd ..
     done
     cd ..
@@ -270,6 +330,7 @@ join_tiff_files() {
 split_tiles() {
     echo "=============================== split_tiles() ======================================="
     cd $TIFF_FOLDER
+    local SPLIT_ZOOM_TIFF=4
     for JOINED_TIFF_NAME in *.tiff
     do
         JOINED_TIFF_NAME="${JOINED_TIFF_NAME//".tiff"}"
@@ -283,12 +344,6 @@ split_tiles() {
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
         find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;    
-        # # for (( x=0; x< $MAXVALUE; x++ )); do
-        #     # for (( y=0; y< $MAXVALUE; y++ )); do
-        #         #local filename=${SPLIT_ZOOM_TIFF}_${x}_${y}.tiff
-        #         # gdal_translate  -srcwin TODO $TIFF_FOLDER/${BS}.tiff $TIFF_FOLDER/${BS}/$filename
-        #     # done
-        # # done
 
         rm ${JOINED_TIFF_NAME}.tiff.gz || true
         gzip --keep ${JOINED_TIFF_NAME}.tiff
@@ -297,36 +352,132 @@ split_tiles() {
 }
 
 
-# # Debug short case:
+find_latest_ecmwf_forecat_date() {
+    local LATEST_FORECAST_DATE=""
+    local LATEST_FORECAST_RND_TIME=""
+    local HOURS_INCREMENT=12
+    local MAX_HOURS_SEARCHING=5*24
+
+    for (( HOURS_OFFSET=0; HOURS_OFFSET<=${MAX_HOURS_SEARCHING}; HOURS_OFFSET+=${HOURS_INCREMENT} ))
+    do
+        local SEARCHING_DATE=$(date -u -v-$(($HOURS_OFFSET))H '+%Y%m%d')
+        local SEARCHING_HOURS=$(date -u -v-$(($HOURS_OFFSET))H '+%H')
+        local SEARCHING_RND_HOURS="00"
+        if [[ $SEARCHING_HOURS > 11 ]]; then
+            SEARCHING_RND_HOURS="12"
+        fi 
+
+        # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.index
+        # https://data.ecmwf.int/forecasts/20220909/12z/0p4-beta/oper/20220909000000-0h-oper-fc.index
+        local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE"000000-0h-oper-fc.index"
+        local HEAD_RESPONSE=$(curl -s -I $CHECKING_FILE_URL | head -1)
+        # echo "Checking ECMWD forecast file: $HEAD_RESPONSE   $CHECKING_FILE_URL" 
+
+        if [[ $HEAD_RESPONSE =~ "200" ]]; then
+            # echo "Found latest ECMWD forecast: $CHECKING_FILE_URL"
+            LATEST_FORECAST_DATE=$SEARCHING_DATE
+            LATEST_FORECAST_RND_TIME=$SEARCHING_RND_HOURS
+            break
+        fi
+    done
+
+    if [[ $LATEST_FORECAST_DATE == "" ]]; then
+        # echo "ERROR: ECMWD not fonded"
+        echo "Error"
+        return
+    fi
+
+    echo "$LATEST_FORECAST_DATE $LATEST_FORECAST_RND_TIME"
+    return 
+}
+
+
+get_raw_ecmwf_files() {
+    echo "============================ get_raw_ecmwf_files() ======================================="
+
+    # Find latest forecast date and time (00 or 12)
+    local LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date)
+    if [[ $LATEST_FORECAST_SEARCH_RESULT == "Error" ]]; then
+        return
+    fi
+    local LATEST_FORECAST_DATE=$( echo $LATEST_FORECAST_SEARCH_RESULT | awk -F " " '{print $1}' )
+    local LATEST_FORECAST_RND_TIME=$( echo $LATEST_FORECAST_SEARCH_RESULT | awk -F " " '{print $2}' )
+
+    # Download forecast files
+    local MAX_FORECAST_HOURS=240
+    local FORECAST_INCREMENT_HOURS=3
+    for (( FORECAST_HOUR=0; FORECAST_HOUR<=${MAX_FORECAST_HOURS}; FORECAST_HOUR+=${FORECAST_INCREMENT_HOURS} ))
+    do
+        local FILETIME=""
+        if [[ $OS =~ "Darwin" ]]; then
+            FILETIME=$(date -ju -v+${FORECAST_HOUR}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${LATEST_FORECAST_DATE} ${LATEST_FORECAST_RND_TIME}00")
+        else
+            FILETIME=$(date -d "${LATEST_FORECAST_DATE} ${LATEST_FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
+        fi
+        local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$LATEST_FORECAST_DATE"/"$LATEST_FORECAST_RND_TIME"z/0p4-beta/oper/"$LATEST_FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
+
+        # Download index file
+        local INDEX_FILE_URL="$FORECAST_URL_BASE.index"
+        download_with_retry "$DOWNLOAD_FOLDER/$FILETIME.index" "$INDEX_FILE_URL"
+
+        # Download needed bands forecast data
+        if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then   
+            for i in ${!ECMWD_BANDS_NAMES[@]}; do
+                # Parse from index file start and end byte offset for needed band
+                local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWD_BANDS_NAMES[$i]}" )
+                local BYTE_START=$( echo $CHANNEL_LINE | awk -F "offset" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
+                local BYTE_LENGTH=$( echo $CHANNEL_LINE | awk -F "length" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
+                local BYTE_END=$(($BYTE_START + $BYTE_LENGTH)) 
+
+                # Make partial download for needed band data only
+                # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
+                local SAVING_FILENAME="${ECMWD_BANDS_NAMES[$i]}_$FILETIME"
+                download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
+
+                # Generate tiff for downloaded band
+                mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
+                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats
+            done
+        else
+            echo "Error: Index file not downloaded. Skip downloading weather data."
+        fi
+
+        if [[ $DEBUG_M0DE == 1 ]]; then
+            return
+        fi    
+    done
+}
+
+
+
+# # Uncomment for fast debug mode
 # DEBUG_M0DE=1
-# rm -rf $DW_FOLDER/* || true
-# rm -rf $TIFF_FOLDER/* || true
-# rm -rf $TIFF_TEMP_FOLDER/* || true
-# get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1
-# generate_bands_tiff
-# join_tiff_files
-# split_tiles
 
 
+# *************
+# ECMWD Provider
+# *************
 
-# 1. cleanup old files to not process them
-rm -rf $DW_FOLDER/* || true
-rm -rf $TIFF_TEMP_FOLDER/* || true
-
-# 2. download raw files and generate tiffs
-get_raw_files 0 $HOURS_1H_TO_DOWNLOAD 1 & 
-get_raw_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3 &
-wait
-
-# 3. generate tiff tiles
-generate_bands_tiff
-join_tiff_files
+cd "$ROOT_FOLDER/$ECMWD"
+setup_folders_on_start
+get_raw_ecmwf_files
+join_tiff_files $ECMWD
 split_tiles
+clean_temp_files_on_finish
 
-# 4. cleanup new temp files
-find . -type f -mmin +${MINUTES_TO_KEEP} -delete
-find . -type d -empty -delete
-rm -rf $TIFF_TEMP_FOLDER/* || true
-rm -rf $DW_FOLDER/* || true
+
+
+# *************
+# GPS Provider
+# *************
+
+cd "$ROOT_FOLDER/$GFS"
+setup_folders_on_start
+get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
+get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
+join_tiff_files $GFS
+split_tiles
+clean_temp_files_on_finish
+
 
 echo "DONE!"
