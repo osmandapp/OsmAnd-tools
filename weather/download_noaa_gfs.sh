@@ -288,11 +288,15 @@ join_tiff_files() {
     cd $TIFF_TEMP_FOLDER
     for CHANNELS_FOLDER in *
     do
-        local ALL_CHANNEL_FILES_EXISTS=1
+        if [ ! -d "$CHANNELS_FOLDER" ]; then
+            echo "Directory $CHANNELS_FOLDER not exist. Skip"
+            continue
+        fi
         cd $CHANNELS_FOLDER
 
         # Create channels list in correct order
         touch settings.txt
+        local ALL_CHANNEL_FILES_EXISTS=1
         for i in ${!BANDS_NAMES[@]}; do
             if [ ! -f "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
                 ALL_CHANNEL_FILES_EXISTS=0
