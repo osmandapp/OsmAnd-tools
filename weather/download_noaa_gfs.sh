@@ -272,10 +272,10 @@ join_tiff_files() {
     MODE=$1
     local BANDS_NAMES=()
     local BANDS_DESCRIPTIONS=()
-    if [[ $MODE =~ "$GFS" ]]; then
+    if [[ $MODE == "$GFS" ]]; then
         BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
         BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
-    elif [[ $MODE =~ "$ECMWF" ]]; then
+    elif [[ $MODE == "$ECMWF" ]]; then
         BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")  
         BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")  
     fi
@@ -464,7 +464,7 @@ get_raw_ecmwf_files() {
 # DEBUG_M0DE=1
 
 
-if [[ $SCRIPT_PROVIDER_MODE =~ $GFS ]]; then
+if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
     cd "$ROOT_FOLDER/$GFS"
     setup_folders_on_start
     get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
@@ -472,7 +472,7 @@ if [[ $SCRIPT_PROVIDER_MODE =~ $GFS ]]; then
     join_tiff_files $GFS
     split_tiles
     clean_temp_files_on_finish
-elif [[ $SCRIPT_PROVIDER_MODE =~ $ECMWF ]]; then
+elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
     cd "$ROOT_FOLDER/$ECMWF"
     setup_folders_on_start
 
