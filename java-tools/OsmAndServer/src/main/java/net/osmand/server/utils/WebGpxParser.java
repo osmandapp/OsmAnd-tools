@@ -32,6 +32,10 @@ public class WebGpxParser {
                     desc = data.desc;
                     data.desc = null;
                 }
+                if (data.name != null) {
+                    name = data.name;
+                    data.name = null;
+                }
                 ext = data;
             }
         }
