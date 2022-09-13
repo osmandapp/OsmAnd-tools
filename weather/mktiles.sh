@@ -71,7 +71,6 @@ if [[ $SCRIPT_PROVIDER_MODE =~ $GFS ]]; then
     generate_tiles $GFS
 elif [[ $SCRIPT_PROVIDER_MODE =~ $ECMWF ]]; then
     echo "============================ ECMWF Provider tile making ======================================="
-    cd ..
     cd $ECMWF
     cp "${THIS_LOCATION}/browser.html" .
     cp -r "${THIS_LOCATION}/script" .
