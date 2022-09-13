@@ -486,7 +486,7 @@ DEBUG_M0DE=1
 cd "$ROOT_FOLDER/$GFS"
 setup_folders_on_start
 get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
-get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
+# get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
 join_tiff_files $GFS
 split_tiles
 # clean_temp_files_on_finish
