@@ -15,8 +15,7 @@ import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.GsonBuilder;
-import net.osmand.server.webgpx.WebGpxData;
-import net.osmand.server.webgpx.WebGpxParser;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -317,13 +316,13 @@ public class GpxController {
 		if (gpxFile.error != null) {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
 		} else {
-			WebGpxData.TrackData gpxData = new WebGpxData.TrackData();
+			WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
 			
 			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
 			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
 			
 			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
-			gpxData.metaData = new WebGpxData.MetaData(gpxFile.metadata);
+			gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
 			gpxData.wpts = webGpxParser.getWpts(gpxFile);
 			gpxData.tracks = webGpxParser.getTracks(gpxFile);
 			gpxData.ext = gpxFile.extensions;
@@ -362,7 +361,7 @@ public class GpxController {
 	@ResponseBody
 	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
 	                                                         HttpSession httpSession) throws IOException {
-		WebGpxData.TrackData trackData = new Gson().fromJson(data, WebGpxData.TrackData.class);
+		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
 		
 		GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
