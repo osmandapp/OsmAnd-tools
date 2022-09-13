@@ -410,8 +410,12 @@ get_raw_ecmwf_files() {
     do
         local FILETIME=""
         if [[ $OS =~ "Darwin" ]]; then
+            # TODO: delete
+            echo "$OS == Darwin"
             FILETIME=$(date -ju -v+${FORECAST_HOUR}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${LATEST_FORECAST_DATE} ${LATEST_FORECAST_RND_TIME}00")
         else
+            # TODO: delete
+            echo "$OS != Darwin"
             FILETIME=$(date -d "${LATEST_FORECAST_DATE} ${LATEST_FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
         fi
         local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$LATEST_FORECAST_DATE"/"$LATEST_FORECAST_RND_TIME"z/0p4-beta/oper/"$LATEST_FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
@@ -461,23 +465,23 @@ get_raw_ecmwf_files() {
 cd "$ROOT_FOLDER/$ECMWD"
 setup_folders_on_start
 get_raw_ecmwf_files
-join_tiff_files $ECMWD
-split_tiles
-clean_temp_files_on_finish
+# join_tiff_files $ECMWD
+# split_tiles
+# clean_temp_files_on_finish
 
 
 
-# *************
-# GPS Provider
-# *************
+# # *************
+# # GPS Provider
+# # *************
 
-cd "$ROOT_FOLDER/$GFS"
-setup_folders_on_start
-get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
-get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
-join_tiff_files $GFS
-split_tiles
-clean_temp_files_on_finish
+# cd "$ROOT_FOLDER/$GFS"
+# setup_folders_on_start
+# get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
+# get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
+# join_tiff_files $GFS
+# split_tiles
+# clean_temp_files_on_finish
 
 
 echo "DONE!"
