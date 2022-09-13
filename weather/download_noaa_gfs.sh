@@ -1,16 +1,17 @@
 #!/bin/bash -xe
+SCRIPT_PROVIDER_MODE=$1
 THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_FOLDER=$(pwd)
 GFS="gfs"
-ECMWD="ecmwf"
+ECMWF="ecmwf"
 DOWNLOAD_FOLDER="raw"
 TIFF_FOLDER="tiff"
 TIFF_TEMP_FOLDER="tiff_temp"
 
 GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
-ECMWD_BANDS=("Temperature" "Pressure" "10 metre u-velocity" "10 metre v-velocity" "Total precipitation")
-ECMWD_BANDS_NAMES=("2t" "msl" "10u" "10v" "tp")
+ECMWF_BANDS=("Temperature" "Pressure" "10 metre u-velocity" "10 metre v-velocity" "Total precipitation")
+ECMWF_BANDS_NAMES=("2t" "msl" "10u" "10v" "tp")
 
 MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-1800} # 30 hours
 HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
@@ -28,7 +29,7 @@ DEBUG_M0DE=0
 
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
-    mkdir -p "$ROOT_FOLDER/$ECMWD"
+    mkdir -p "$ROOT_FOLDER/$ECMWF"
     mkdir -p "$DOWNLOAD_FOLDER/"
     mkdir -p "$TIFF_FOLDER/"
     mkdir -p "$TIFF_TEMP_FOLDER/"
@@ -272,9 +273,9 @@ join_tiff_files() {
     if [[ $MODE =~ "$GFS" ]]; then
         BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
         BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
-    elif [[ $MODE =~ "$ECMWD" ]]; then
-        BANDS_NAMES=("${ECMWD_BANDS_NAMES[@]}")  
-        BANDS_DESCRIPTIONS=("${ECMWD_BANDS[@]}")  
+    elif [[ $MODE =~ "$ECMWF" ]]; then
+        BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")  
     fi
 
     mkdir -p $TIFF_FOLDER/
@@ -377,10 +378,10 @@ find_latest_ecmwf_forecat_date() {
         # https://data.ecmwf.int/forecasts/20220909/12z/0p4-beta/oper/20220909000000-0h-oper-fc.index
         local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE"000000-0h-oper-fc.index"
         local HEAD_RESPONSE=$(curl -s -I $CHECKING_FILE_URL | head -1)
-        # echo "Checking ECMWD forecast file: $HEAD_RESPONSE   $CHECKING_FILE_URL" 
+        # echo "Checking ECMWF forecast file: $HEAD_RESPONSE   $CHECKING_FILE_URL" 
 
         if [[ $HEAD_RESPONSE =~ "200" ]]; then
-            # echo "Found latest ECMWD forecast: $CHECKING_FILE_URL"
+            # echo "Found latest ECMWF forecast: $CHECKING_FILE_URL"
             LATEST_FORECAST_DATE=$SEARCHING_DATE
             LATEST_FORECAST_RND_TIME=$SEARCHING_RND_HOURS
             break
@@ -388,7 +389,7 @@ find_latest_ecmwf_forecat_date() {
     done
 
     if [[ $LATEST_FORECAST_DATE == "" ]]; then
-        # echo "ERROR: ECMWD not fonded"
+        # echo "ERROR: ECMWF not fonded"
         echo "Error"
         return
     fi
@@ -432,16 +433,16 @@ get_raw_ecmwf_files() {
 
         # Download needed bands forecast data
         if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then   
-            for i in ${!ECMWD_BANDS_NAMES[@]}; do
+            for i in ${!ECMWF_BANDS_NAMES[@]}; do
                 # Parse from index file start and end byte offset for needed band
-                local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWD_BANDS_NAMES[$i]}" )
+                local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_NAMES[$i]}" )
                 local BYTE_START=$( echo $CHANNEL_LINE | awk -F "offset" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
                 local BYTE_LENGTH=$( echo $CHANNEL_LINE | awk -F "length" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
                 local BYTE_END=$(($BYTE_START + $BYTE_LENGTH)) 
 
                 # Make partial download for needed band data only
                 # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
-                local SAVING_FILENAME="${ECMWD_BANDS_NAMES[$i]}_$FILETIME"
+                local SAVING_FILENAME="${ECMWF_BANDS_NAMES[$i]}_$FILETIME"
                 download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
 
                 # Generate tiff for downloaded band
@@ -464,30 +465,19 @@ get_raw_ecmwf_files() {
 # DEBUG_M0DE=1
 
 
-# **************
-# ECMWD Provider
-# **************
-
-cd "$ROOT_FOLDER/$ECMWD"
-setup_folders_on_start
-get_raw_ecmwf_files
-join_tiff_files $ECMWD
-split_tiles
-clean_temp_files_on_finish
-
-
-
-# *************
-# GFS Provider
-# *************
-
-cd "$ROOT_FOLDER/$GFS"
-setup_folders_on_start
-get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
-get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
-join_tiff_files $GFS
-split_tiles
-clean_temp_files_on_finish
-
-
-echo "DONE!"
+if [[ $SCRIPT_PROVIDER_MODE =~ $GFS ]]; then
+    cd "$ROOT_FOLDER/$GFS"
+    setup_folders_on_start
+    get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
+    get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
+    join_tiff_files $GFS
+    split_tiles
+    clean_temp_files_on_finish
+elif [[ $SCRIPT_PROVIDER_MODE =~ $ECMWF ]]; then
+    cd "$ROOT_FOLDER/$ECMWF"
+    setup_folders_on_start
+    get_raw_ecmwf_files
+    join_tiff_files $ECMWF
+    split_tiles
+    clean_temp_files_on_finish
+fi

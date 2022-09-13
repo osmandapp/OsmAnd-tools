@@ -1,14 +1,15 @@
 #!/bin/bash -xe
+SCRIPT_PROVIDER_MODE=$1
 THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 ROOT_FOLDER=$(pwd)
 GFS="gfs"
-ECMWD="ecmwf"
+ECMWF="ecmwf"
 TIFF_FOLDER="tiff"
 GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
-ECMWD_BANDS=("Temperature" "Pressure" "10 metre u-velocity" "10 metre v-velocity" "Total precipitation")
-ECMWD_BANDS_NAMES=("2t" "msl" "10u" "10v" "tp")
+ECMWF_BANDS=("Temperature" "Pressure" "10 metre u-velocity" "10 metre v-velocity" "Total precipitation")
+ECMWF_BANDS_NAMES=("2t" "msl" "10u" "10v" "tp")
 
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=3
@@ -23,9 +24,9 @@ generate_tiles() {
     if [[ $MODE =~ "$GFS" ]]; then
         BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
         BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
-    elif [[ $MODE =~ "$ECMWD" ]]; then
-        BANDS_NAMES=("${ECMWD_BANDS_NAMES[@]}")  
-        BANDS_DESCRIPTIONS=("${ECMWD_BANDS[@]}")  
+    elif [[ $MODE =~ "$ECMWF" ]]; then
+        BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")  
     fi
 
     rm *.O.tiff || true
@@ -59,28 +60,21 @@ generate_tiles() {
 }
 
 
-# **************
-# GFS Provider
-# **************
-
-echo "============================ GFS Provider ======================================="
-cd $GFS
-# html to test data
-cp "${THIS_LOCATION}/browser.html" .
-cp -r "${THIS_LOCATION}/script" .
-cp -r "${THIS_LOCATION}/css" .
-# generating tiles
-generate_tiles $GFS
-
-
-# **************
-# ECMWD Provider
-# **************
-
-echo "============================ ECMWD Provider ======================================="
-cd ..
-cd $ECMWD
-cp "${THIS_LOCATION}/browser.html" .
-cp -r "${THIS_LOCATION}/script" .
-cp -r "${THIS_LOCATION}/css" .
-generate_tiles $ECMWD
+if [[ $SCRIPT_PROVIDER_MODE =~ $GFS ]]; then
+    echo "============================ GFS Provider tile making ======================================="
+    cd $GFS
+    # html to test data
+    cp "${THIS_LOCATION}/browser.html" .
+    cp -r "${THIS_LOCATION}/script" .
+    cp -r "${THIS_LOCATION}/css" .
+    # generating tiles
+    generate_tiles $GFS
+elif [[ $SCRIPT_PROVIDER_MODE =~ $ECMWF ]]; then
+    echo "============================ ECMWF Provider tile making ======================================="
+    cd ..
+    cd $ECMWF
+    cp "${THIS_LOCATION}/browser.html" .
+    cp -r "${THIS_LOCATION}/script" .
+    cp -r "${THIS_LOCATION}/css" .
+    generate_tiles $ECMWF
+fi
