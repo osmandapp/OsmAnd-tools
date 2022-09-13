@@ -121,7 +121,7 @@ download_with_retry() {
         echo "Download try 2: ${FILENAME}"
         download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
-        echo "Downloading success: ${FILENAME}"   
+        echo "Downloading success with try 1: ${FILENAME}"   
         return    
     fi
 
@@ -131,6 +131,7 @@ download_with_retry() {
         echo "Download try 3: ${FILENAME}"
         download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
+        echo "Downloading success with try 2: ${FILENAME}"   
         return    
     fi
 
@@ -140,6 +141,7 @@ download_with_retry() {
         echo "Download try 4: ${FILENAME}"
         download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
+        echo "Downloading success with try 3: ${FILENAME}"   
         return    
     fi
 
@@ -149,6 +151,7 @@ download_with_retry() {
         echo "Download try 5: ${FILENAME}"
         download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
+        echo "Downloading success with try 4: ${FILENAME}"   
         return    
     fi
 
@@ -158,6 +161,7 @@ download_with_retry() {
         echo "Download try 6: ${FILENAME}"
         download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
+        echo "Downloading success with try 5: ${FILENAME}"   
         return    
     fi
     
