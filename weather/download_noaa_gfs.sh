@@ -7,6 +7,8 @@ ECMWF="ecmwf"
 DOWNLOAD_FOLDER="raw"
 TIFF_FOLDER="tiff"
 TIFF_TEMP_FOLDER="tiff_temp"
+FULL_MODE='full_mode'
+LATEST_MODE='lstest_mode'
 
 GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
@@ -352,8 +354,9 @@ split_tiles() {
 
 
 find_latest_ecmwf_forecat_date() {
-    local LATEST_FORECAST_DATE=""
-    local LATEST_FORECAST_RND_TIME=""
+    local SEARCH_MODE=$1
+    local FORECAST_DATE=""
+    local FORECAST_RND_TIME=""
     local HOURS_INCREMENT=12
     local MAX_HOURS_SEARCHING=5*24
 
@@ -374,27 +377,29 @@ find_latest_ecmwf_forecat_date() {
             SEARCHING_RND_HOURS="12"
         fi 
 
+        local CHECKING_FORECAST_TIME="0"
+        if [[ $SEARCH_MODE =~ $FULL_MODE ]]; then
+            CHECKING_FORECAST_TIME="240"
+        fi
+
         # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.index
         # https://data.ecmwf.int/forecasts/20220909/12z/0p4-beta/oper/20220909000000-0h-oper-fc.index
-        local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE"000000-0h-oper-fc.index"
+        local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE"000000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
         local HEAD_RESPONSE=$(curl -s -I $CHECKING_FILE_URL | head -1)
-        # echo "Checking ECMWF forecast file: $HEAD_RESPONSE   $CHECKING_FILE_URL" 
 
         if [[ $HEAD_RESPONSE =~ "200" ]]; then
-            # echo "Found latest ECMWF forecast: $CHECKING_FILE_URL"
-            LATEST_FORECAST_DATE=$SEARCHING_DATE
-            LATEST_FORECAST_RND_TIME=$SEARCHING_RND_HOURS
+            FORECAST_DATE=$SEARCHING_DATE
+            FORECAST_RND_TIME=$SEARCHING_RND_HOURS
             break
         fi
     done
 
-    if [[ $LATEST_FORECAST_DATE == "" ]]; then
-        # echo "ERROR: ECMWF not fonded"
+    if [[ $FORECAST_DATE == "" ]]; then
         echo "Error"
         return
     fi
 
-    echo "$LATEST_FORECAST_DATE $LATEST_FORECAST_RND_TIME"
+    echo "$FORECAST_DATE $FORECAST_RND_TIME"
     return 
 }
 
@@ -402,13 +407,11 @@ find_latest_ecmwf_forecat_date() {
 get_raw_ecmwf_files() {
     echo "============================ get_raw_ecmwf_files() ======================================="
 
-    # Find latest forecast date and time (00 or 12)
-    local LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date)
-    if [[ $LATEST_FORECAST_SEARCH_RESULT == "Error" ]]; then
+    if [[ $1 == "Error" ]]; then
         return
     fi
-    local LATEST_FORECAST_DATE=$( echo $LATEST_FORECAST_SEARCH_RESULT | awk -F " " '{print $1}' )
-    local LATEST_FORECAST_RND_TIME=$( echo $LATEST_FORECAST_SEARCH_RESULT | awk -F " " '{print $2}' )
+    local FORECAST_DATE=$1
+    local FORECAST_RND_TIME=$2
 
     # Download forecast files
     local MAX_FORECAST_HOURS=240
@@ -417,15 +420,11 @@ get_raw_ecmwf_files() {
     do
         local FILETIME=""
         if [[ $OS =~ "Darwin" ]]; then
-            # TODO: delete
-            echo "$OS == Darwin"
-            FILETIME=$(date -ju -v+${FORECAST_HOUR}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${LATEST_FORECAST_DATE} ${LATEST_FORECAST_RND_TIME}00")
+            FILETIME=$(date -ju -v+${FORECAST_HOUR}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${FORECAST_DATE} ${FORECAST_RND_TIME}00")
         else
-            # TODO: delete
-            echo "$OS != Darwin"
-            FILETIME=$(date -d "${LATEST_FORECAST_DATE} ${LATEST_FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
+            FILETIME=$(date -d "${FORECAST_DATE} ${FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
         fi
-        local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$LATEST_FORECAST_DATE"/"$LATEST_FORECAST_RND_TIME"z/0p4-beta/oper/"$LATEST_FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
+        local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/0p4-beta/oper/"$FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
 
         # Download index file
         local INDEX_FILE_URL="$FORECAST_URL_BASE.index"
@@ -476,7 +475,18 @@ if [[ $SCRIPT_PROVIDER_MODE =~ $GFS ]]; then
 elif [[ $SCRIPT_PROVIDER_MODE =~ $ECMWF ]]; then
     cd "$ROOT_FOLDER/$ECMWF"
     setup_folders_on_start
-    get_raw_ecmwf_files
+
+    # Find and download latest full forecast (from 0h to 240h)
+    FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
+    get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
+
+    # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
+    # Overrite "yesterday's" full forecatst with all existing "today's" files. If it needed.
+    LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
+    if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
+        get_raw_ecmwf_files $LATEST_FORECAST_SEARCH_RESULT
+    fi
+
     join_tiff_files $ECMWF
     split_tiles
     clean_temp_files_on_finish
