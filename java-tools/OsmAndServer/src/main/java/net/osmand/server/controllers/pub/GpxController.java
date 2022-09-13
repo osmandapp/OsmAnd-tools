@@ -343,16 +343,14 @@ public class GpxController {
 		GPXTrackAnalysis analysis = null;
 		if (!isSrtm) {
 			analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-			cleanupFromNan(analysis);
 		} else {
 			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
-			GPXTrackAnalysis srtmAnalysis = null;
 			if (srtmGpx != null) {
-				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+				analysis = srtmGpx.getAnalysis(System.currentTimeMillis());
 			}
-			if (srtmAnalysis != null) {
-				cleanupFromNan(srtmAnalysis);
-			}
+		}
+		if (analysis != null) {
+			cleanupFromNan(analysis);
 		}
 		return analysis;
 	}
