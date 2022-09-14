@@ -8,8 +8,8 @@ ECMWF="ecmwf"
 TIFF_FOLDER="tiff"
 GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
-ECMWF_BANDS=("Temperature" "Pressure" "10 metre u-velocity" "10 metre v-velocity" "Total precipitation")
-ECMWF_BANDS_NAMES=("2t" "msl" "10u" "10v" "tp")
+ECMWF_BANDS=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+ECMWF_BANDS_NAMES=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v" )
 
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=3
