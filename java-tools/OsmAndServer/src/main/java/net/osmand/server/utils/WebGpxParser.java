@@ -233,7 +233,7 @@ public class WebGpxParser {
             res.put("avgElevation", analysis.avgElevation);
             res.put("maxElevation", analysis.maxElevation);
             res.put("hasSpeedData", analysis.hasSpeedData);
-            res.put("minSpeed ", analysis.minSpeed);
+            res.put("minSpeed", analysis.minSpeed);
             res.put("avgSpeed", analysis.avgSpeed);
             res.put("maxSpeed", analysis.maxSpeed);
             
