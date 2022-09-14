@@ -327,9 +327,9 @@ public class GpxController {
 			if (!gpxFile.routes.isEmpty()) {
 				webGpxParser.addRoutePoints(gpxFile, gpxData);
 			}
-			
-			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
-			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+			GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(tmpGpx);
+			GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
+			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFileForAnalyse, true);
 			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
 			
 			if (!gpxData.tracks.isEmpty()) {
