@@ -16,6 +16,7 @@ import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.GsonBuilder;
 import net.osmand.server.utils.WebGpxParser;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -318,23 +319,24 @@ public class GpxController {
 		} else {
 			WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
 			
-			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
-			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
-			
-			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
 			gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
 			gpxData.wpts = webGpxParser.getWpts(gpxFile);
 			gpxData.tracks = webGpxParser.getTracks(gpxFile);
 			gpxData.ext = gpxFile.extensions;
+			
+			if (!gpxFile.routes.isEmpty()) {
+				webGpxParser.addRoutePoints(gpxFile, gpxData);
+			}
+			
+			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
+			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
 			
 			if (!gpxData.tracks.isEmpty()) {
 				webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
 				webGpxParser.addDistance(gpxData.tracks, analysis);
 			}
 			
-			if (!gpxFile.routes.isEmpty()) {
-				webGpxParser.addRoutePoints(gpxFile, gpxData);
-			}
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
 	}
