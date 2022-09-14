@@ -79,10 +79,6 @@ public class WebGpxParser {
                 }
                 points.addAll(pointsSeg);
             });
-            
-            if (!points.isEmpty()) {
-                track.segments = null;
-            }
             ext = track;
         }
     }
