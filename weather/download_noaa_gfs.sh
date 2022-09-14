@@ -10,10 +10,12 @@ TIFF_TEMP_FOLDER="tiff_temp"
 FULL_MODE='full_mode'
 LATEST_MODE='lstest_mode'
 
-GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
-ECMWF_BANDS=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-ECMWF_BANDS_NAMES=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
+GFS_BANDS_FULL_NAMES=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+GFS_BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
+
+ECMWF_BANDS_FULL_NAMES=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+ECMWF_BANDS_SHORT_NAMES_ORIG=("2t" "msl" "tp" "10u" "10v")
+ECMWF_BANDS_SHORT_NAMES_SAVING=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
 
 MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-1800} # 30 hours
 HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
@@ -220,19 +222,19 @@ get_raw_gfs_files() {
 
         # Download needed bands forecast data
         if [[ -f "$FILETIME.index" ]]; then   
-            for i in ${!GFS_BANDS[@]}; do
+            for i in ${!GFS_BANDS_FULL_NAMES[@]}; do
                 # Parse from index file start and end byte offset for needed band
-                local CHANNEL_INDEX_LINES=$( cat ${FILETIME}.index | grep -A 1 "${GFS_BANDS[$i]}" | awk -F ":" '{print $2}' )
+                local CHANNEL_INDEX_LINES=$( cat ${FILETIME}.index | grep -A 1 "${GFS_BANDS_FULL_NAMES[$i]}" | awk -F ":" '{print $2}' )
                 local START_BYTE_OFFSET=$( echo $CHANNEL_INDEX_LINES | awk -F " " '{print $1}' )
                 local END_BYTE_OFFSET=$( echo $CHANNEL_INDEX_LINES | awk -F " " '{print $2}' ) 
 
                 # Make partial download for needed band data only  
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-                download_with_retry "${GFS_BANDS_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
+                download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 # Generate tiff for downloaded band
                 mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
-                gdal_translate "${GFS_BANDS_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats | sleep 1
+                gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats | sleep 1
             done
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
@@ -261,8 +263,8 @@ generate_bands_tiff() {
         fi
 
         local FOLDER_NAME=$FILE_NAME
-        for i in ${!GFS_BANDS_NAMES[@]}; do
-            FOLDER_NAME="${FOLDER_NAME//"${GFS_BANDS_NAMES[$i]}_"}"
+        for i in ${!GFS_BANDS_SHORT_NAMES[@]}; do
+            FOLDER_NAME="${FOLDER_NAME//"${GFS_BANDS_SHORT_NAMES[$i]}_"}"
         done
 
         mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
@@ -274,14 +276,14 @@ generate_bands_tiff() {
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
     MODE=$1
-    local BANDS_NAMES=()
+    local BANDS_SHORT_NAMES=()
     local BANDS_DESCRIPTIONS=()
     if [[ $MODE == "$GFS" ]]; then
-        BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
-        BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
+        BANDS_SHORT_NAMES=("${GFS_BANDS_SHORT_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${GFS_BANDS_FULL_NAMES[@]}")  
     elif [[ $MODE == "$ECMWF" ]]; then
-        BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")  
-        BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")  
+        BANDS_SHORT_NAMES=("${ECMWF_BANDS_SHORT_NAMES_SAVING[@]}")  
+        BANDS_DESCRIPTIONS=("${ECMWF_BANDS_FULL_NAMES[@]}")  
     fi
 
     mkdir -p $TIFF_FOLDER/
@@ -297,16 +299,16 @@ join_tiff_files() {
         # Create channels list in correct order
         touch settings.txt
         local ALL_CHANNEL_FILES_EXISTS=1
-        for i in ${!BANDS_NAMES[@]}; do
-            if [ ! -f "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
+        for i in ${!BANDS_SHORT_NAMES[@]}; do
+            if [ ! -f "${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
                 ALL_CHANNEL_FILES_EXISTS=0
                 break
             fi
-            echo "${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
+            echo "${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
         done
 
         if [ $ALL_CHANNEL_FILES_EXISTS == 0 ]; then
-            echo "Joining Error:  ${BANDS_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
+            echo "Joining Error:  ${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
             cd ..
             continue
         fi
@@ -440,16 +442,16 @@ get_raw_ecmwf_files() {
 
         # Download needed bands forecast data
         if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then   
-            for i in ${!ECMWF_BANDS_NAMES[@]}; do
+            for i in ${!ECMWF_BANDS_SHORT_NAMES_ORIG[@]}; do
                 # Parse from index file start and end byte offset for needed band
-                local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_NAMES[$i]}" )
+                local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}" )
                 local BYTE_START=$( echo $CHANNEL_LINE | awk -F "offset" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
                 local BYTE_LENGTH=$( echo $CHANNEL_LINE | awk -F "length" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
                 local BYTE_END=$(($BYTE_START + $BYTE_LENGTH)) 
 
                 # Make partial download for needed band data only
                 # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
-                local SAVING_FILENAME="${ECMWF_BANDS_NAMES[$i]}_$FILETIME"
+                local SAVING_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$FILETIME"
                 download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
 
                 # Generate tiff for downloaded band
