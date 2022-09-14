@@ -16,6 +16,7 @@ import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.GsonBuilder;
 import net.osmand.server.utils.WebGpxParser;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -319,7 +320,7 @@ public class GpxController {
 			WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
 			
 			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
-			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+			GPXTrackAnalysis srtmAnalysis = getAnalysis(SerializationUtils.clone(gpxFile), true);
 			
 			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
 			gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
