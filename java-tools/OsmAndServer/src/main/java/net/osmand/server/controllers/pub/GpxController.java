@@ -324,13 +324,18 @@ public class GpxController {
 			gpxData.tracks = webGpxParser.getTracks(gpxFile);
 			gpxData.ext = gpxFile.extensions;
 			
-			if (!gpxFile.routes.isEmpty()) {
-				webGpxParser.addRoutePoints(gpxFile, gpxData);
-			}
-			
 			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
 			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
 			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
+			
+			if (!gpxData.tracks.isEmpty()) {
+				webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
+				webGpxParser.addDistance(gpxData.tracks, analysis);
+			}
+			
+			if (!gpxFile.routes.isEmpty()) {
+				webGpxParser.addRoutePoints(gpxFile, gpxData);
+			}
 			
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
