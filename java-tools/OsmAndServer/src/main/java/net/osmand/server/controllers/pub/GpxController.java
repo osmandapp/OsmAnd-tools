@@ -319,14 +319,14 @@ public class GpxController {
 		} else {
 			WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
 			
-			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
-			GPXTrackAnalysis srtmAnalysis = getAnalysis(SerializationUtils.clone(gpxFile), true);
-			
-			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
 			gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
 			gpxData.wpts = webGpxParser.getWpts(gpxFile);
 			gpxData.tracks = webGpxParser.getTracks(gpxFile);
 			gpxData.ext = gpxFile.extensions;
+			
+			GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
+			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
 			
 			if (!gpxData.tracks.isEmpty()) {
 				webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
