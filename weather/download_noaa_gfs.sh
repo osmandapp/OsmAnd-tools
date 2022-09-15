@@ -383,7 +383,7 @@ find_latest_ecmwf_forecat_date() {
         fi
 
         local SEARCHING_RND_HOURS="00"
-        if [[ $SEARCHING_HOURS > 11 ]]; then
+        if [[ $SEARCHING_HOURS -gt 11 ]]; then
             SEARCHING_RND_HOURS="12"
         fi 
 
@@ -394,7 +394,7 @@ find_latest_ecmwf_forecat_date() {
 
         # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.index
         # https://data.ecmwf.int/forecasts/20220909/12z/0p4-beta/oper/20220909000000-0h-oper-fc.index
-        local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE"000000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
+        local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE$SEARCHING_RND_HOURS"0000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
         local HEAD_RESPONSE=$(curl -s -I $CHECKING_FILE_URL | head -1)
 
         if [[ $HEAD_RESPONSE =~ "200" ]]; then
