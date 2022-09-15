@@ -16,15 +16,15 @@ subprojects {
 	version 'master-snapshot'
 	sourceCompatibility = 11
 	eclipse {
-    	   classpath {
-	        file {
-        	    whenMerged {
-                	entries.findAll { it.kind == 'lib' }.each { it.entryAttributes['module'] = 'false' }
-            	    }
-        	}
-    	   }
+			classpath {
+				file {
+					whenMerged {
+						entries.findAll { it.kind == 'lib' }.each { it.entryAttributes['module'] = 'false' }
+					}
+			}
+		}
 	}
- 
+
 
 	test {
 		reports {
@@ -34,7 +34,7 @@ subprojects {
 	}
 
 	task fatJar(type: Jar) {
-		
+
 		manifest.from jar.manifest
 		dependsOn configurations.runtimeClasspath
 		if(project.hasProperty('mainClassAttribute')) {
@@ -54,9 +54,14 @@ subprojects {
 
 
 	repositories {
+		maven {
+			url "https://maven.geotoolkit.org"
+		}
+		maven {
+			url "https://maven.geo-solutions.it/"
+		}
 		mavenCentral()
 		jcenter()
 		google()
-		
 	}
 }

@@ -1,7 +1,7 @@
 package net.osmand.obf.preparation;
 
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferDouble;
+import java.awt.image.DataBufferFloat;
 import java.io.File;
 import java.io.IOException;
 
@@ -11,24 +11,24 @@ public class IndexWeatherData {
 	public static final int NEAREST_NEIGHBOOR_INTERPOLATION = 0;
 	public static final int BILINEAR_INTERPOLATION = 1;
 	public static final int BICUBIC_INTERPOLATION = 2;
-	public static int INTERPOLATION = BICUBIC_INTERPOLATION; 
-	
-	
+	public static int INTERPOLATION = BICUBIC_INTERPOLATION;
+
+
 	public static final double INEXISTENT_VALUE = Double.MIN_VALUE;
 	// 1440, 721 - -180.125, 90.125 - 179.8750000, -90.1250000
 	public static final int REF_WIDTH = 1440;
 	public static final int REF_HEIGHT = 721;
-	
+
 	public static class WeatherTiff {
-		
+
 		// it could vary base on files
 		public double ORIGIN_LON = -180.125;
 		public double ORIGIN_LAT = 90.125;
 		public double PX_SIZE_LON = 0.25;
 		public double PX_SIZE_LAT = -0.25;
-		
+
 		public final File file;
-		private DataBufferDouble data;
+		private DataBufferFloat data;
 		private int height;
 		private int width;
 		private int bands;
@@ -49,7 +49,7 @@ public class IndexWeatherData {
 				img = ImageIO.read(file);
 				width = img.getWidth();
 				height = img.getHeight();
-				data = (DataBufferDouble) img.getRaster().getDataBuffer();
+				data = (DataBufferFloat) img.getRaster().getDataBuffer();
 				bands = data.getSize() / width / height;
 			}
 			return img;
@@ -110,7 +110,7 @@ public class IndexWeatherData {
 			int px = (int) Math.ceil(x);
 			int py = (int) Math.ceil(y);
 			if(array == null) {
-				array = new double[4]; 
+				array = new double[4];
 			}
 			array[0] = getElem(band, px - 1, py - 1);
 			array[1] = getElem(band, px, py - 1);
@@ -122,9 +122,9 @@ public class IndexWeatherData {
 			// 1.99 y ->  py = 2, cy = 0.99
 			// array[2] -> maximize
 			
-			double h = (1 - cx) * (1 - cy) * array[0] + 
-					         cx * (1 - cy) * array[1] + 
-					   (1 - cx) * cy       * array[2] + 
+			double h = (1 - cx) * (1 - cy) * array[0] +
+					         cx * (1 - cy) * array[1] +
+					   (1 - cx) * cy       * array[2] +
 					         cx * cy       * array[3];
 			return h;
 		}
@@ -135,7 +135,7 @@ public class IndexWeatherData {
 			double x = ix - px;
 			double y = iy - py;
 			if(cf == null) {
-				cf = new double[16]; 
+				cf = new double[16];
 			}
 			for (int i = 0; i < cf.length; i++) {
 				cf[i] = 0;
@@ -166,7 +166,7 @@ public class IndexWeatherData {
 	}
 
 	public static void main(String[] args) throws IOException {
-		readWeatherData("/Users/victorshcherb/osmand/maps/weather/", 
+		readWeatherData("/Users/victorshcherb/osmand/maps/weather/",
 				"20220206_%02d00.tiff", 8, 23, 1);
 	}
 

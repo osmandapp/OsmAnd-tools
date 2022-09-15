@@ -1,18 +1,9 @@
 package net.osmand.server.controllers.pub;
 
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -23,11 +14,15 @@ import javax.validation.constraints.NotNull;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import com.google.gson.GsonBuilder;
+import net.osmand.server.utils.WebGpxParser;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpEntity;
@@ -37,13 +32,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -81,6 +70,11 @@ public class GpxController {
     public static final int MAX_SIZE_FILES_AUTH = 100;
 
 	Gson gson = new Gson();
+	
+	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	
+	@Autowired
+	WebGpxParser webGpxParser;
 	
 	@Autowired
 	UserSessionResources session;
@@ -250,7 +244,6 @@ public class GpxController {
 			GPXSessionFile sessionFile = new GPXSessionFile();
 			ctx.files.add(sessionFile);
 			gpxFile.path = file.getOriginalFilename();
-
 			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
 			sessionFile.size = fileSizeMb;
@@ -267,6 +260,123 @@ public class GpxController {
 			}
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
+	}
+	
+	@PostMapping(path = {"/get-gpx-analysis"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getGpxInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                         HttpServletRequest request, HttpSession httpSession) throws IOException {
+		
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		InputStream is = file.getInputStream();
+		FileOutputStream fous = new FileOutputStream(tmpGpx);
+		Algorithms.streamCopy(is, fous);
+		is.close();
+		fous.close();
+		
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
+		if (gpxFile.error != null) {
+			return ResponseEntity.badRequest().body("Error reading gpx!");
+		} else {
+			GPXSessionFile sessionFile = new GPXSessionFile();
+			gpxFile.path = file.getOriginalFilename();
+			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			sessionFile.file = tmpGpx;
+			sessionFile.size = file.getSize() / (double) (1 << 20);
+			cleanupFromNan(analysis);
+			sessionFile.analysis = analysis;
+			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+			GPXTrackAnalysis srtmAnalysis = null;
+			if (srtmGpx != null) {
+				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+			}
+			sessionFile.srtmAnalysis = srtmAnalysis;
+			if (srtmAnalysis != null) {
+				cleanupFromNan(srtmAnalysis);
+			}
+			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
+		}
+	}
+	
+	@PostMapping(path = {"/process-track-data"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                               HttpSession httpSession) throws IOException {
+		
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		
+		InputStream is = file.getInputStream();
+		FileOutputStream fous = new FileOutputStream(tmpGpx);
+		Algorithms.streamCopy(is, fous);
+		is.close();
+		fous.close();
+		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
+		
+		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
+		
+		if (gpxFile.error != null) {
+			return ResponseEntity.badRequest().body("Error reading gpx!");
+		} else {
+			WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
+			
+			gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
+			gpxData.wpts = webGpxParser.getWpts(gpxFile);
+			gpxData.tracks = webGpxParser.getTracks(gpxFile);
+			gpxData.ext = gpxFile.extensions;
+			
+			if (!gpxFile.routes.isEmpty()) {
+				webGpxParser.addRoutePoints(gpxFile, gpxData);
+			}
+			GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(tmpGpx);
+			GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
+			GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFileForAnalyse, true);
+			gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
+			
+			if (!gpxData.tracks.isEmpty()) {
+				webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
+				webGpxParser.addDistance(gpxData.tracks, analysis);
+			}
+			
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
+		}
+	}
+	
+	private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
+		GPXTrackAnalysis analysis = null;
+		if (!isSrtm) {
+			analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+		} else {
+			GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+			if (srtmGpx != null) {
+				analysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+			}
+		}
+		if (analysis != null) {
+			cleanupFromNan(analysis);
+		}
+		return analysis;
+	}
+	
+	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
+	                                                         HttpSession httpSession) throws IOException {
+		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		
+		GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		InputStreamResource resource = new InputStreamResource(new FileInputStream(tmpGpx));
+		Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+		if (exception != null) {
+			return ResponseEntity.badRequest().body(resource);
+		}
+		
+		String fileName = gpxFile.metadata.name != null ? gpxFile.metadata.name : tmpGpx.getName();
+		
+		return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName)
+				.contentType(MediaType.APPLICATION_XML)
+				.body(resource);
 	}
     
     private double getCommonMaxSizeFiles() {
