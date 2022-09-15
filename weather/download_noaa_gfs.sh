@@ -93,10 +93,10 @@ download() {
     local END_BYTE_OFFSET=$4
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
-        curl -k $URL --output ${FILENAME} --http1.1  || sleep 1
+        curl -k $URL --output ${FILENAME} --http1.1   || echo "Error of CURL with downloading $URl"
     else
         # download part file by byte offset
-        curl -k --range $START_BYTE_OFFSET-$END_BYTE_OFFSET $URL --output ${FILENAME} --http1.1 || sleep 1
+        curl -k --range $START_BYTE_OFFSET-$END_BYTE_OFFSET $URL --output ${FILENAME} --http1.1  || echo "Error of CURL with partial downloading $URl"
     fi
 }
 
@@ -234,7 +234,7 @@ get_raw_gfs_files() {
 
                 # Generate tiff for downloaded band
                 mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
-                gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats | sleep 1
+                gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
             done
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
@@ -268,7 +268,7 @@ generate_bands_tiff() {
         done
 
         mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
-        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff -ot Float32 -stats | sleep 1
+        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff -ot Float32 -stats  || echo "Error of gdal_translate"
     done
 }
 
@@ -316,7 +316,7 @@ join_tiff_files() {
         # Create "Virtual Tiff" with layers order from settings.txt
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         # Create joined tiff from "Virtual Tiff"
-        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32 -stats | sleep 1
+        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32 -stats  || echo "Error of gdal_translate"
         
         # # Write tiff layers names
         local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff '
@@ -456,7 +456,7 @@ get_raw_ecmwf_files() {
 
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
-                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats | sleep 1
+                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
             done
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
@@ -486,7 +486,7 @@ elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
     cd "$ROOT_FOLDER/$ECMWF"
     setup_folders_on_start
 
-    # Find and download latest full forecast (from 0h to 240h)
+    Find and download latest full forecast (from 0h to 240h)
     FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
 
