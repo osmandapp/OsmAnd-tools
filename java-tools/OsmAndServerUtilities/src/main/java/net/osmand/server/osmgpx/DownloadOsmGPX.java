@@ -325,7 +325,7 @@ public class DownloadOsmGPX {
 			String type = hs == null || hs.size() == 0 ? "" : hs.get(0);
 			inputStream = httpFileConn.getInputStream();
 			boolean zip = name != null && name.endsWith(".zip");
-			if (type.equals("application/x-gzip")) {
+			if (type.equals("application/x-gzip") || type.equals("application/gzip")) {
 				GZIPInputStream gzipIs = new GZIPInputStream(inputStream);
 				if (zip) {
 					return parseZip(gzipIs);
