@@ -291,7 +291,7 @@ join_tiff_files() {
     for CHANNELS_FOLDER in *
     do
         if [ ! -d "$CHANNELS_FOLDER" ]; then
-            echo "Directory $CHANNELS_FOLDER not exist. Skip"
+            echo "Error: Directory $CHANNELS_FOLDER not exist. Skip"
             continue
         fi
         cd $CHANNELS_FOLDER
@@ -344,6 +344,11 @@ split_tiles() {
     local SPLIT_ZOOM_TIFF=4
     for JOINED_TIFF_NAME in *.tiff
     do
+        if [ ! -d "$JOINED_TIFF_NAME" ]; then
+            echo "Error: File $JOINED_TIFF_NAME not exist. Skip"
+            continue
+        fi
+
         JOINED_TIFF_NAME="${JOINED_TIFF_NAME//".tiff"}"
         echo "JOINED_TIFF_NAME: $JOINED_TIFF_NAME"
 
@@ -376,7 +381,7 @@ find_latest_ecmwf_forecat_date() {
         local SEARCHING_HOURS=""
         if [[ $OS =~ "Darwin" ]]; then
             SEARCHING_DATE=$(date -u -v-$(($HOURS_OFFSET))H '+%Y%m%d')
-            SEARCHING_HOURS=$(date -u -v-$(($HOURS_OFFSET))H '+%H')
+            SEARCHING_HOURS=$(date -u -v-$(($HOURS_OFFSET))H '+%-H')
         else
             SEARCHING_DATE=$(date -u '+%Y%m%d' -d "-${HOURS_OFFSET} hours")
             SEARCHING_HOURS=$(date -u '+%-H' -d "-${HOURS_OFFSET} hours")
@@ -486,7 +491,7 @@ elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
     cd "$ROOT_FOLDER/$ECMWF"
     setup_folders_on_start
 
-    Find and download latest full forecast (from 0h to 240h)
+    # Find and download latest full forecast (from 0h to 240h)
     FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
 
