@@ -344,7 +344,7 @@ split_tiles() {
     local SPLIT_ZOOM_TIFF=4
     for JOINED_TIFF_NAME in *.tiff
     do
-        if [ ! -d "$JOINED_TIFF_NAME" ]; then
+        if [ ! -f "$JOINED_TIFF_NAME" ]; then
             echo "Error: File $JOINED_TIFF_NAME not exist. Skip"
             continue
         fi
