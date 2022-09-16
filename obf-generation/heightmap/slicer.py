@@ -170,7 +170,11 @@ class OsmAndHeightMapSlicer(object):
 
                 if tileBoundsInInput[2] == 0 or tileBoundsInInput[3] == 0:
                     if self.options.verbose:
-                        print("Skipping base tile TMS %sx%s@%s cause it has 0 dimensions" % (tileX, tileY, self.baseZoom))
+                        print("Skipping base tile TMS %sx%s@%s cause it has 0 dimensions in source" % (tileX, tileY, self.baseZoom))
+                    continue
+                if tileBoundsInOutput[2] == 0 or tileBoundsInOutput[3] == 0:
+                    if self.options.verbose:
+                        print("Skipping base tile TMS %sx%s@%s cause it has 0 dimensions in target" % (tileX, tileY, self.baseZoom))
                     continue
 
                 # Create target dataset
