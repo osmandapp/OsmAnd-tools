@@ -30,6 +30,11 @@ import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
 
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.OSMSettings;
+import net.osmand.osm.edit.Way;
+import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -864,6 +869,89 @@ public class OsmAndMapsService {
 				}
 			}
 			cacheFiles.writeToFile(cacheFile);
+		}
+	}
+	
+	public void convertRouteSegmentResultToLatLon(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+		LatLon last = null;
+		for (RouteSegmentResult r : res) {
+			int i;
+			int dir = r.isForwardDirection() ? 1 : -1;
+			if (r.getDescription() != null && r.getDescription().length() > 0) {
+				RoutingController.Feature f = new RoutingController.Feature(RoutingController.Geometry.point(r.getStartPoint()));
+				f.prop("description", r.getDescription()).prop("routingTime", r.getRoutingTime())
+						.prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
+						.prop("roadId", r.getObject().getId());
+				features.add(f);
+			}
+			for (i = r.getStartPointIndex(); ; i += dir) {
+				if (i != r.getEndPointIndex()) {
+					resList.add(r.getPoint(i));
+				} else {
+					last = r.getPoint(i);
+					break;
+				}
+			}
+		}
+		if (last != null) {
+			resList.add(last);
+		}
+	}
+	
+	public void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute) {
+		RouteSegmentResult prevSegm = null;
+		for (RouteSegmentResult segm : searchRoute) {
+			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
+			Way way = new Way(-1);
+//					String name = String.format("time %.2f ", s.getSegmentTime());
+			String name = segm.getDescription();
+			if(segm.getTurnType() != null) {
+				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
+			}
+//					String name = String.format("beg %.2f end %.2f ", s.getBearingBegin(), s.getBearingEnd());
+			way.putTag(OSMSettings.OSMTagKey.NAME.getValue(),name);
+			if (prevSegm != null
+					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
+				net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevSegm.getEndPoint().getLatitude(), prevSegm.getEndPoint().getLongitude(), -1);
+				res.add(pp);
+				pp.putTag("colour", "blue");
+				net.osmand.osm.edit.Node pn = new net.osmand.osm.edit.Node(segm.getStartPoint().getLatitude(), segm.getStartPoint().getLongitude() , -1);
+				pn.putTag("colour", "red");
+				res.add(pn);
+				System.out.println(String.format("Not connected road '%f m' (%.5f/%.5f -> %.5f/%.5f) [%d: %s -> %d: %s]",
+						MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()),
+						pp.getLatLon().getLatitude(), pp.getLatLon().getLongitude(), pn.getLatLon().getLatitude(), pn.getLatLon().getLongitude(),
+						segm.getStartPointIndex(), segm.getObject(), prevSegm.getStartPointIndex(), prevSegm.getObject() ));
+			}
+			boolean plus = segm.getStartPointIndex() < segm.getEndPointIndex();
+			int ind = segm.getStartPointIndex();
+			while (true) {
+				LatLon l = segm.getPoint(ind);
+				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
+				
+				int[] pointTypes = segm.getObject().getPointTypes(ind);
+				if (pointTypes != null && pointTypes.length == 1) {
+					BinaryMapRouteReaderAdapter.RouteTypeRule rtr = segm.getObject().region.quickGetEncodingRule(pointTypes[0]);
+					if (rtr == null || !rtr.getTag().equals("osmand_dp")) {
+						// skip all intermediate added points (should no be visual difference)
+						way.addNode(n);
+					}
+				} else {
+					way.addNode(n);
+				}
+				if (ind == segm.getEndPointIndex()) {
+					break;
+				}
+				if (plus) {
+					ind++;
+				} else {
+					ind--;
+				}
+			}
+			if (way.getNodes().size() > 0) {
+				res.add(way);
+			}
+			prevSegm = segm;
 		}
 	}
 

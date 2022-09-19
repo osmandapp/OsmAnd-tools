@@ -1,9 +1,23 @@
 package net.osmand.server.utils;
 
 import net.osmand.GPXUtilities;
+import net.osmand.Location;
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
+import net.osmand.binary.RouteDataBundle;
+import net.osmand.binary.StringBundle;
+import net.osmand.data.LatLon;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Way;
+import net.osmand.router.RouteDataResources;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.controllers.pub.RoutingController;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -12,6 +26,9 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 @Component
 public class WebGpxParser {
+    
+    @Autowired
+    OsmAndMapsService osmAndMapsService;
     
     public static class TrackData {
         public MetaData metaData;
@@ -50,7 +67,7 @@ public class WebGpxParser {
         }
     }
     
-    public static class Track {
+    public class Track {
         public List<Point> points;
         public GPXUtilities.Track ext;
         
@@ -66,17 +83,7 @@ public class WebGpxParser {
                     }
                     pointsSeg.add(p);
                 });
-                int startInd = 0;
-                if (!seg.routeSegments.isEmpty()) {
-                    for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
-                        RouteSegment segment = new RouteSegment();
-                        segment.ext = rs;
-                        segment.routeTypes = seg.routeTypes;
-                        int length = Integer.parseInt(rs.length);
-                        pointsSeg.get(startInd).segment = segment;
-                        startInd = startInd + (length - 1);
-                    }
-                }
+                addPointRouteSegment(seg, pointsSeg);
                 points.addAll(pointsSeg);
             });
             
@@ -139,6 +146,20 @@ public class WebGpxParser {
     public static class RouteSegment {
         public GPXUtilities.RouteSegment ext;
         public List<GPXUtilities.RouteType> routeTypes;
+    }
+    
+    public void addPointRouteSegment(TrkSegment seg, List<Point> points) {
+        int startInd = 0;
+        if (!seg.routeSegments.isEmpty()) {
+            for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
+                RouteSegment segment = new RouteSegment();
+                segment.ext = rs;
+                segment.routeTypes = seg.routeTypes;
+                int length = Integer.parseInt(rs.length);
+                points.get(startInd).segment = segment;
+                startInd = startInd + (length - 1);
+            }
+        }
     }
     
     public void addRoutePoints(GPXUtilities.GPXFile gpxFile, TrackData gpxData) {
@@ -359,5 +380,103 @@ public class WebGpxParser {
     
     private boolean isNanEle(List<Point> points) {
         return points.get(0).ele == 99999;
+    }
+    
+    public TrkSegment generateRouteSegments(List<RouteSegmentResult> route) {
+        TrkSegment trkSegment = new TrkSegment();
+        List<Entity> es = new ArrayList<>();
+        osmAndMapsService.calculateResult(es, route);
+        List<Location> locations = new ArrayList<>();
+        for (Entity ent : es) {
+            if (ent instanceof Way) {
+                for (net.osmand.osm.edit.Node node : ((Way) ent).getNodes()) {
+                    locations.add(new Location("", node.getLatitude(), node.getLongitude()));
+                }
+            }
+        }
+        RouteDataResources resources = new RouteDataResources(locations);
+        List<StringBundle> routeItems = new ArrayList<>();
+        if (!Algorithms.isEmpty(route)) {
+            for (RouteSegmentResult sr : route) {
+                sr.collectTypes(resources);
+            }
+            for (RouteSegmentResult sr : route) {
+                sr.collectNames(resources);
+            }
+            
+            for (RouteSegmentResult sr : route) {
+                RouteDataBundle itemBundle = new RouteDataBundle(resources);
+                sr.writeToBundle(itemBundle);
+                routeItems.add(itemBundle);
+            }
+        }
+        List<StringBundle> typeList = new ArrayList<>();
+        Map<BinaryMapRouteReaderAdapter.RouteTypeRule, Integer> rules = resources.getRules();
+        for (BinaryMapRouteReaderAdapter.RouteTypeRule rule : rules.keySet()) {
+            RouteDataBundle typeBundle = new RouteDataBundle(resources);
+            rule.writeToBundle(typeBundle);
+            typeList.add(typeBundle);
+        }
+        
+        if (locations.isEmpty()) {
+            return trkSegment;
+        }
+        
+        List<GPXUtilities.RouteSegment> routeSegments = new ArrayList<>();
+        for (StringBundle item : routeItems) {
+            routeSegments.add(GPXUtilities.RouteSegment.fromStringBundle(item));
+        }
+        trkSegment.routeSegments = routeSegments;
+        
+        List<RouteType> routeTypes = new ArrayList<>();
+        for (StringBundle item : typeList) {
+            routeTypes.add(RouteType.fromStringBundle(item));
+        }
+        trkSegment.routeTypes = routeTypes;
+        
+        return trkSegment;
+    }
+    
+    public List<WebGpxParser.Point> getNewGeometry(WebGpxParser.Point start, WebGpxParser.Point end) throws IOException, InterruptedException {
+        
+        LatLon startLatLon = new LatLon(start.lat, start.lng);
+        LatLon endLatLon = new LatLon(end.lat, end.lng);
+        
+        Map<String, Object> props = new TreeMap<>();
+        List<RouteSegmentResult> routeSegmentResult = osmAndMapsService.routing(start.profile, props, startLatLon,
+                endLatLon, Collections.emptyList(), Collections.emptyList());
+        
+        List<WebGpxParser.Point> pointsRes = new ArrayList<>();
+        
+        if (routeSegmentResult != null) {
+            List<LatLon> resLatLon = new ArrayList<>();
+            List<RoutingController.Feature> features = new ArrayList<>();
+            osmAndMapsService.convertRouteSegmentResultToLatLon(resLatLon, features, routeSegmentResult);
+            RoutingController.Feature route = new RoutingController.Feature(RoutingController.Geometry.lineString(resLatLon));
+            route.properties = props;
+            features.add(0, route);
+            for (RoutingController.Feature feature : features) {
+                if (feature.geometry.coordinates instanceof double[][]) {
+                    for (double[] coord : (double[][]) feature.geometry.coordinates) {
+                        GPXUtilities.WptPt p = new WptPt();
+                        p.lat = coord[1];
+                        p.lon = coord[0];
+                        pointsRes.add(new WebGpxParser.Point(p));
+                    }
+                }
+            }
+        }
+        
+        if (!pointsRes.isEmpty()) {
+            addPointRouteSegment(generateRouteSegments(routeSegmentResult), pointsRes);
+        }
+    
+        for (int i = 1; i < pointsRes.size(); i++) {
+            Point curr = pointsRes.get(i);
+            Point prev = pointsRes.get(i - 1);
+            pointsRes.get(i).distance = (float) MapUtils.getDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+        }
+        
+        return pointsRes;
     }
 }

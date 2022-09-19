@@ -15,8 +15,10 @@ import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.GsonBuilder;
+import net.osmand.data.LatLon;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.utils.WebGpxParser;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +77,9 @@ public class GpxController {
 	
 	@Autowired
 	WebGpxParser webGpxParser;
+	
+	@Autowired
+	OsmAndMapsService osmAndMapsService;
 	
 	@Autowired
 	UserSessionResources session;
@@ -339,6 +344,18 @@ public class GpxController {
 			
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
+	}
+	
+	@PostMapping(path = {"/get-track-points-between-two-route-points"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getTrackPointsBetweenTwoRoutePoints(@RequestBody List<String> points) throws IOException, InterruptedException {
+		
+		WebGpxParser.Point start = new Gson().fromJson(points.get(0), WebGpxParser.Point.class);
+		WebGpxParser.Point end = new Gson().fromJson(points.get(1), WebGpxParser.Point.class);
+		
+		List<WebGpxParser.Point> trackPointsRes = webGpxParser.getNewGeometry(start, end);
+		
+		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 	}
 	
 	private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
