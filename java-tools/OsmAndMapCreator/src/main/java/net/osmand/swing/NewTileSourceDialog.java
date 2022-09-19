@@ -185,7 +185,7 @@ public class NewTileSourceDialog extends JDialog {
 			return false;
 		}
 		String url = templateUrl.getText();
-		if(!url.contains("{$x}") || !url.contains("{$y}") || !url.contains("{$z}")){ //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+		if(!url.contains("{bbox}") && (!url.contains("{$x}") || !url.contains("{$y}") || !url.contains("{$z}"))){ //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 			JOptionPane.showMessageDialog(this, Messages.getString("NewTileSourceDialog.SPECIFY.ALL.PLACEHLDRS") , Messages.getString("NewTileSourceDialog.ERROR.CREATING.NEW.TILE.SRC"), JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$ //$NON-NLS-2$
 			return false;
 		}
