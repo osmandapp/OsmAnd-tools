@@ -157,7 +157,9 @@ public class WebGpxParser {
                 segment.routeTypes = seg.routeTypes;
                 int length = Integer.parseInt(rs.length);
                 points.get(startInd).segment = segment;
-                points.get(startInd).ext.speed = Double.parseDouble(rs.speed);
+                for (int i = startInd; i < startInd + (length - 1); i++ ) {
+                    points.get(i).ext.speed = Double.parseDouble(rs.speed);
+                }
                 startInd = startInd + (length - 1);
             }
         }
