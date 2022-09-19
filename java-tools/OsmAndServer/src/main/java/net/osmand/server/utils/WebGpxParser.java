@@ -11,7 +11,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.RouteDataResources;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -446,32 +445,31 @@ public class WebGpxParser {
         LatLon endLatLon = new LatLon(end.lat, end.lng);
         
         Map<String, Object> props = new TreeMap<>();
-        List<RouteSegmentResult> routeSegmentResult = osmAndMapsService.routing(start.profile, props, startLatLon,
+        List<RouteSegmentResult> routeSegmentResults = osmAndMapsService.routing(start.profile, props, startLatLon,
                 endLatLon, Collections.emptyList(), Collections.emptyList());
         
         List<WebGpxParser.Point> pointsRes = new ArrayList<>();
-        
-        if (routeSegmentResult != null) {
-            List<LatLon> resLatLon = new ArrayList<>();
-            List<RoutingController.Feature> features = new ArrayList<>();
-            osmAndMapsService.convertRouteSegmentResultToLatLon(resLatLon, features, routeSegmentResult);
-            RoutingController.Feature route = new RoutingController.Feature(RoutingController.Geometry.lineString(resLatLon));
-            route.properties = props;
-            features.add(0, route);
-            for (RoutingController.Feature feature : features) {
-                if (feature.geometry.coordinates instanceof double[][]) {
-                    for (double[] coord : (double[][]) feature.geometry.coordinates) {
-                        GPXUtilities.WptPt p = new WptPt();
-                        p.lat = coord[1];
-                        p.lon = coord[0];
-                        pointsRes.add(new WebGpxParser.Point(p));
+        if (routeSegmentResults != null) {
+            for (RouteSegmentResult r : routeSegmentResults) {
+                float[] heightArray = r.getObject().calculateHeightArray();
+                int stInd = r.getStartPointIndex();
+                int endInd = r.getEndPointIndex();
+                while (stInd != endInd) {
+                    LatLon point = r.getPoint(stInd);
+                    WptPt pt = new WptPt();
+                    if (heightArray != null && heightArray.length > stInd * 2 + 1) {
+                        pt.ele = heightArray[stInd * 2 + 1];
                     }
+                    pt.lat = point.getLatitude();
+                    pt.lon = point.getLongitude();
+                    pointsRes.add(new WebGpxParser.Point(pt));
+                    stInd += ((stInd < endInd) ? 1 : -1);
                 }
             }
         }
         
         if (!pointsRes.isEmpty()) {
-            addPointRouteSegment(generateRouteSegments(routeSegmentResult), pointsRes);
+            addPointRouteSegment(generateRouteSegments(routeSegmentResults), pointsRes);
         }
     
         for (int i = 1; i < pointsRes.size(); i++) {
