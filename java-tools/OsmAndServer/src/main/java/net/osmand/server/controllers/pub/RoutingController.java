@@ -282,7 +282,7 @@ public class RoutingController {
 			Map<String, Object> props = new TreeMap<>();
 			try {
 				List<RouteSegmentResult> res = osmAndMapsService.gpxApproximation(routeMode, props, gpxFile);
-				osmAndMapsService.convertRouteSegmentResultToLatLon(resList, features, res);
+				convertResults(resList, features, res);
 			} catch (IOException e) {
 				LOGGER.error(e.getMessage(), e);
 			} catch (InterruptedException e) {
@@ -416,7 +416,7 @@ public class RoutingController {
 				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, props, list.get(0), list.get(list.size() - 1),
 						list.subList(1, list.size() - 1), avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads) );
 				if (res != null) {
-					osmAndMapsService.convertRouteSegmentResultToLatLon(resList, features, res);
+					convertResults(resList, features, res);
 				}
 			} catch (IOException e) {
 				LOGGER.error(e.getMessage(), e);
@@ -441,7 +441,34 @@ public class RoutingController {
 
 		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 	}
-
+	
+	private void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
+		LatLon last = null;
+		for (RouteSegmentResult r : res) {
+			int i;
+			int dir = r.isForwardDirection() ? 1 : -1;
+			if (r.getDescription() != null && r.getDescription().length() > 0) {
+				Feature f = new Feature(Geometry.point(r.getStartPoint()));
+				f.prop("description", r.getDescription()).prop("routingTime", r.getRoutingTime())
+						.prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
+						.prop("roadId", r.getObject().getId());
+				features.add(f);
+				
+			}
+			for (i = r.getStartPointIndex(); ; i += dir) {
+				if(i != r.getEndPointIndex()) {
+					resList.add(r.getPoint(i));
+				} else {
+					last = r.getPoint(i);
+					break;
+				}
+			}
+		}
+		if (last != null) {
+			resList.add(last);
+		}
+	}
+	
 	private void calculateStraightLine(List<LatLon> list) {
 		for (int i = 1; i < list.size();) {
 			if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {

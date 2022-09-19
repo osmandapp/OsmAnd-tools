@@ -468,7 +468,7 @@ public class WebGpxParser {
             }
         }
         
-        if (!pointsRes.isEmpty()) {
+        if (!pointsRes.isEmpty() && (start.segment != null || end.segment != null)) {
             addPointRouteSegment(generateRouteSegments(routeSegmentResults), pointsRes);
         }
     
