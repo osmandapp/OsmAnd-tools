@@ -34,7 +34,6 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings;
 import net.osmand.osm.edit.Way;
-import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -872,32 +871,6 @@ public class OsmAndMapsService {
 		}
 	}
 	
-	
-	public void convertRouteSegmentResultToLatLon(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
-		LatLon last = null;
-		for (RouteSegmentResult r : res) {
-			int i;
-			int dir = r.isForwardDirection() ? 1 : -1;
-			if (r.getDescription() != null && r.getDescription().length() > 0) {
-				RoutingController.Feature f = new RoutingController.Feature(RoutingController.Geometry.point(r.getStartPoint()));
-				f.prop("description", r.getDescription()).prop("routingTime", r.getRoutingTime())
-						.prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
-						.prop("roadId", r.getObject().getId());
-				features.add(f);
-			}
-			for (i = r.getStartPointIndex(); ; i += dir) {
-				if (i != r.getEndPointIndex()) {
-					resList.add(r.getPoint(i));
-				} else {
-					last = r.getPoint(i);
-					break;
-				}
-			}
-		}
-		if (last != null) {
-			resList.add(last);
-		}
-	}
 	
 	public void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute) {
 		RouteSegmentResult prevSegm = null;
