@@ -156,9 +156,6 @@ public class WebGpxParser {
                 segment.routeTypes = seg.routeTypes;
                 int length = Integer.parseInt(rs.length);
                 points.get(startInd).segment = segment;
-                for (int i = startInd; i < startInd + (length - 1); i++) {
-                    points.get(i).ext.speed = Double.parseDouble(rs.speed);
-                }
                 startInd = startInd + (length - 1);
             }
         }
@@ -461,7 +458,7 @@ public class WebGpxParser {
         }
         
         boolean hasRouting = start.segment != null || end.segment != null;
-        boolean hasSpeed = start.ext.speed != 0.0 || end.ext.speed != 0.0;
+        boolean hasSpeed = start.ext.speed != 0 || end.ext.speed != 0;
         
         TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
         if (!pointsRes.isEmpty() && hasRouting) {
