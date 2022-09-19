@@ -441,7 +441,6 @@ public class RoutingController {
 
 		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 	}
-	
 	private void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
 		LatLon last = null;
 		for (RouteSegmentResult r : res) {
@@ -468,7 +467,6 @@ public class RoutingController {
 			resList.add(last);
 		}
 	}
-	
 	private void calculateStraightLine(List<LatLon> list) {
 		for (int i = 1; i < list.size();) {
 			if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {
