@@ -156,7 +156,7 @@ public class WebGpxParser {
                 segment.routeTypes = seg.routeTypes;
                 int length = Integer.parseInt(rs.length);
                 points.get(startInd).segment = segment;
-                for (int i = startInd; i < startInd + (length - 1); i++ ) {
+                for (int i = startInd; i < startInd + (length - 1); i++) {
                     points.get(i).ext.speed = Double.parseDouble(rs.speed);
                 }
                 startInd = startInd + (length - 1);
@@ -384,18 +384,8 @@ public class WebGpxParser {
         return points.get(0).ele == 99999;
     }
     
-    public TrkSegment generateRouteSegments(List<RouteSegmentResult> route) {
+    public TrkSegment generateRouteSegments(List<RouteSegmentResult> route, List<Location> locations) {
         TrkSegment trkSegment = new TrkSegment();
-        List<Entity> es = new ArrayList<>();
-        osmAndMapsService.calculateResult(es, route);
-        List<Location> locations = new ArrayList<>();
-        for (Entity ent : es) {
-            if (ent instanceof Way) {
-                for (net.osmand.osm.edit.Node node : ((Way) ent).getNodes()) {
-                    locations.add(new Location("", node.getLatitude(), node.getLongitude()));
-                }
-            }
-        }
         RouteDataResources resources = new RouteDataResources(locations);
         List<StringBundle> routeItems = new ArrayList<>();
         if (!Algorithms.isEmpty(route)) {
@@ -449,6 +439,7 @@ public class WebGpxParser {
                 endLatLon, Collections.emptyList(), Collections.emptyList());
         
         List<WebGpxParser.Point> pointsRes = new ArrayList<>();
+        List<Location> locations = new ArrayList<>();
         if (routeSegmentResults != null) {
             for (RouteSegmentResult r : routeSegmentResults) {
                 float[] heightArray = r.getObject().calculateHeightArray();
@@ -456,6 +447,7 @@ public class WebGpxParser {
                 int endInd = r.getEndPointIndex();
                 while (stInd != endInd) {
                     LatLon point = r.getPoint(stInd);
+                    locations.add(new Location("", point.getLatitude(), point.getLongitude()));
                     WptPt pt = new WptPt();
                     if (heightArray != null && heightArray.length > stInd * 2 + 1) {
                         pt.ele = heightArray[stInd * 2 + 1];
@@ -468,10 +460,19 @@ public class WebGpxParser {
             }
         }
         
-        if (!pointsRes.isEmpty() && (start.segment != null || end.segment != null)) {
-            addPointRouteSegment(generateRouteSegments(routeSegmentResults), pointsRes);
+        boolean hasRouting = start.segment != null || end.segment != null;
+        boolean hasSpeed = start.ext.speed != 0.0 || end.ext.speed != 0.0;
+        
+        TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
+        if (!pointsRes.isEmpty() && hasRouting) {
+            addPointRouteSegment(seg, pointsRes);
         }
-    
+        
+        if (!pointsRes.isEmpty() && hasSpeed) {
+            addSpeed(seg, pointsRes);
+        }
+        
+        
         for (int i = 1; i < pointsRes.size(); i++) {
             Point curr = pointsRes.get(i);
             Point prev = pointsRes.get(i - 1);
@@ -479,5 +480,18 @@ public class WebGpxParser {
         }
         
         return pointsRes;
+    }
+    
+    public void addSpeed(TrkSegment seg, List<WebGpxParser.Point> pointsRes) {
+        int startInd = 0;
+        if (!seg.routeSegments.isEmpty()) {
+            for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
+                int length = Integer.parseInt(rs.length);
+                for (int i = startInd; i < startInd + (length - 1); i++) {
+                    pointsRes.get(i).ext.speed = Double.parseDouble(rs.speed);
+                }
+                startInd = startInd + (length - 1);
+            }
+        }
     }
 }
