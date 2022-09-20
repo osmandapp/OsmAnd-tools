@@ -23,23 +23,17 @@ public class RoutingService {
     @Autowired
     OsmAndMapsService osmAndMapsService;
     
-    public List<WebGpxParser.Point> updateRouteBetweenPoints(WebGpxParser.Point start, WebGpxParser.Point end) throws IOException, InterruptedException {
-        LatLon startLatLon = new LatLon(start.lat, start.lng);
-        LatLon endLatLon = new LatLon(end.lat, end.lng);
-        
+    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon,
+                                                             String routeMode, boolean hasSpeed, boolean hasRouting) throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
-        List<RouteSegmentResult> routeSegmentResults = osmAndMapsService.routing(start.profile, props, startLatLon,
+        List<RouteSegmentResult> routeSegmentResults = osmAndMapsService.routing(routeMode, props, startLatLon,
                 endLatLon, Collections.emptyList(), Collections.emptyList());
         
         List<WebGpxParser.Point> pointsRes = getPoints(routeSegmentResults, locations);
         
         if (!pointsRes.isEmpty()) {
             GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
-    
-            boolean hasRouting = start.segment != null || end.segment != null;
-            boolean hasSpeed = start.ext.speed != 0 || end.ext.speed != 0;
-            
             if (hasRouting) {
                 addRouteSegmentsToPoints(seg, pointsRes);
             }

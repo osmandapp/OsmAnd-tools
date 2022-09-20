@@ -449,12 +449,16 @@ public class RoutingController {
 	
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> updateRouteBetweenPoints(@RequestBody List<String> points) throws IOException, InterruptedException {
+	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start,
+	                                                       @RequestParam String end,
+	                                                       @RequestParam String routeMode,
+	                                                       @RequestParam boolean hasSpeed,
+	                                                       @RequestParam boolean hasRouting) throws IOException, InterruptedException {
 		
-		WebGpxParser.Point start = new Gson().fromJson(points.get(0), WebGpxParser.Point.class);
-		WebGpxParser.Point end = new Gson().fromJson(points.get(1), WebGpxParser.Point.class);
+		LatLon startPoint = new Gson().fromJson(start, LatLon.class);
+		LatLon endPoint = new Gson().fromJson(end, LatLon.class);
 		
-		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(start, end);
+		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasSpeed, hasRouting);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 	}
