@@ -454,14 +454,12 @@ public class RoutingController {
 	                                                       @RequestParam String routeMode,
 	                                                       @RequestParam boolean hasSpeed,
 	                                                       @RequestParam boolean hasRouting) throws IOException, InterruptedException {
-		
-		LatLon startPoint = new Gson().fromJson(start, LatLon.class);
-		LatLon endPoint = new Gson().fromJson(end, LatLon.class);
-		
+		LatLon startPoint = gson.fromJson(start, LatLon.class);
+		LatLon endPoint = gson.fromJson(end, LatLon.class);
 		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasSpeed, hasRouting);
-		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 	}
+    
 	private void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
 		LatLon last = null;
 		for (RouteSegmentResult r : res) {
