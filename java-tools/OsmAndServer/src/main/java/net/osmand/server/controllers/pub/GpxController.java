@@ -15,8 +15,10 @@ import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.GsonBuilder;
+import net.osmand.data.LatLon;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.utils.WebGpxParser;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +77,9 @@ public class GpxController {
 	
 	@Autowired
 	WebGpxParser webGpxParser;
+	
+	@Autowired
+	OsmAndMapsService osmAndMapsService;
 	
 	@Autowired
 	UserSessionResources session;
