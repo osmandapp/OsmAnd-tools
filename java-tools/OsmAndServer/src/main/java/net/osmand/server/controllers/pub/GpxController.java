@@ -346,18 +346,6 @@ public class GpxController {
 		}
 	}
 	
-	@PostMapping(path = {"/get-track-points-between-two-route-points"}, produces = "application/json")
-	@ResponseBody
-	public ResponseEntity<String> getTrackPointsBetweenTwoRoutePoints(@RequestBody List<String> points) throws IOException, InterruptedException {
-		
-		WebGpxParser.Point start = new Gson().fromJson(points.get(0), WebGpxParser.Point.class);
-		WebGpxParser.Point end = new Gson().fromJson(points.get(1), WebGpxParser.Point.class);
-		
-		List<WebGpxParser.Point> trackPointsRes = webGpxParser.getNewGeometry(start, end);
-		
-		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
-	}
-	
 	private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
 		GPXTrackAnalysis analysis = null;
 		if (!isSrtm) {
