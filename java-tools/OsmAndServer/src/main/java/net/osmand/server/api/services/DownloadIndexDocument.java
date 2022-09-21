@@ -28,14 +28,14 @@ public class DownloadIndexDocument {
 
 	@XmlElement(name = "inapp")
 	private List<DownloadIndex> inapps = new ArrayList<>();
-
+	
 	@XmlElement(name = "fonts")
 	private List<DownloadIndex> fonts = new ArrayList<>();
 
 	@XmlElement(name = "region")
 	private List<DownloadIndex> voices = new ArrayList<>();
 
-	@XmlElement(name = "inapp")
+	@XmlElement(name = "depth")
 	private List<DownloadIndex> depths = new ArrayList<>();
 
 	@XmlElement(name = "wiki")
@@ -92,6 +92,7 @@ public class DownloadIndexDocument {
 		indx.addAll(heightmap);
 		indx.addAll(hillshade);
 		indx.addAll(depths);
+		indx.addAll(inapps);
 		indx.addAll(wikimaps);
 		indx.addAll(wikivoyages);
 		indx.addAll(travel);

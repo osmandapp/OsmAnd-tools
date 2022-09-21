@@ -100,6 +100,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getVoices(), rootFolder, DownloadType.VOICE);
 		loadIndexesFromDir(doc.getFonts(), rootFolder, DownloadType.FONTS);
 		loadIndexesFromDir(doc.getInapps(), rootFolder, DownloadType.DEPTH);
+		loadIndexesFromDir(doc.getDepths(), rootFolder, DownloadType.DEPTHMAP);
 		loadIndexesFromDir(doc.getWikimaps(), rootFolder, DownloadType.WIKIMAP);
 		loadIndexesFromDir(doc.getTravelGuides(), rootFolder, DownloadType.TRAVEL);
 		loadIndexesFromDir(doc.getWikivoyages(), rootFolder, DownloadType.WIKIVOYAGE);
@@ -298,6 +299,7 @@ public class DownloadIndexesService  {
 	    MAP("indexes"),
 	    VOICE("indexes") ,
 	    DEPTH("indexes/inapp/depth") ,
+	    DEPTHMAP("depth") ,
 	    FONTS("indexes/fonts") ,
 	    WIKIMAP("wiki") ,
 	    WIKIVOYAGE("wikivoyage") ,
@@ -331,6 +333,7 @@ public class DownloadIndexesService  {
 			case ROAD_MAP:
 			case WIKIMAP:
 			case DEPTH:
+			case DEPTHMAP:
 			case SRTM_MAP:
 				return f.getName().endsWith(".obf.zip") || f.getName().endsWith(".obf") || f.getName().endsWith(".extra.zip");
 			case HILLSHADE:
@@ -355,7 +358,8 @@ public class DownloadIndexesService  {
 			case WIKIMAP:
 				return String.format("Wikipedia POI data for %s", regionName);
 			case DEPTH:
-				return String.format("Depth contours for %s", regionName);
+			case DEPTHMAP:
+				return String.format("Depth maps for %s", regionName);
 			case SRTM_MAP:
 				String suf = ext.contains("srtmf") ? "feet" : "meters";
 				return String.format("Contour lines (%s) for %s", suf, regionName);
