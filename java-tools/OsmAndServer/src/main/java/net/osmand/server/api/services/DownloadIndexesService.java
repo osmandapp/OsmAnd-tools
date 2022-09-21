@@ -424,6 +424,7 @@ public class DownloadIndexesService  {
 		SLOPE,
 		HEIGHTMAP,
 		OSMLIVE,
+		DEPTH,
 		MAIN,
 		WIKI,
 		ROADS
