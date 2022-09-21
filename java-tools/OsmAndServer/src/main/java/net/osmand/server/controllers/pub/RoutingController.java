@@ -16,16 +16,16 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import com.google.gson.GsonBuilder;
+import net.osmand.server.api.services.RoutingService;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -61,7 +61,12 @@ public class RoutingController {
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 	
+	@Autowired
+	RoutingService routingService;
+	
 	Gson gson = new Gson();
+	
+	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
 	private ResponseEntity<?> errorConfig() {
 		VectorTileServerConfig config = osmAndMapsService.getConfig();
@@ -441,7 +446,20 @@ public class RoutingController {
 
 		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 	}
-
+	
+	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start,
+	                                                       @RequestParam String end,
+	                                                       @RequestParam String routeMode,
+	                                                       @RequestParam boolean hasSpeed,
+	                                                       @RequestParam boolean hasRouting) throws IOException, InterruptedException {
+		LatLon startPoint = gson.fromJson(start, LatLon.class);
+		LatLon endPoint = gson.fromJson(end, LatLon.class);
+		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasSpeed, hasRouting);
+		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
+	}
+    
 	private void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
 		LatLon last = null;
 		for (RouteSegmentResult r : res) {
@@ -468,7 +486,6 @@ public class RoutingController {
 			resList.add(last);
 		}
 	}
-
 	private void calculateStraightLine(List<LatLon> list) {
 		for (int i = 1; i < list.size();) {
 			if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {

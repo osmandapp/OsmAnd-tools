@@ -866,7 +866,7 @@ public class OsmAndMapsService {
 			cacheFiles.writeToFile(cacheFile);
 		}
 	}
-
+	
 	public OsmandRegions getOsmandRegions() {
 		return osmandRegions;
 	}

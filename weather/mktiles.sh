@@ -1,22 +1,67 @@
 #!/bin/bash -xe
+SCRIPT_PROVIDER_MODE=$1
 THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-TIFF_FOLDER=tiff
-DW_FOLDER=raw
-
-BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface")
-BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip")
+ROOT_FOLDER=$(pwd)
+GFS="gfs"
+ECMWF="ecmwf"
+TIFF_FOLDER="tiff"
+GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
+ECMWF_BANDS=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+ECMWF_BANDS_NAMES=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
 
 TILES_FOLDER=tiles
 TILES_ZOOM_GEN=3
 TILES_ZOOM_RES=5
 PARALLEL_TO_TILES=2
+OS=$(uname -a)
 
 
 generate_tiles() {
+    MODE=$1
+    local BANDS_NAMES=()
+    local BANDS_DESCRIPTIONS=()
+    if [[ $MODE =~ "$GFS" ]]; then
+        BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
+    elif [[ $MODE =~ "$ECMWF" ]]; then
+        BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")  
+        BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")  
+    fi
+
     rm *.O.tiff || true
     for WFILE in ${TIFF_FOLDER}/*.tiff
     do
+        local FILE_NAME=$WFILE
+        local TIMESTAMP_NOW=0
+        local TIMESTAMP_FILE_FORECAST_DATE=0
+        if [[ $OS =~ "Darwin" ]]; then
+            FILE_NAME="${FILE_NAME//".tiff"}"
+            FILE_NAME="${FILE_NAME//"tiff"}"  
+            FILE_NAME="${FILE_NAME:1}"
+
+            TIMESTAMP_NOW=$(date "+%s")
+            TIMESTAMP_FILE_FORECAST_DATE=$(date -jf "%Y%m%d_%H00" "${FILE_NAME}" "+%s")
+            
+        else
+            FILE_NAME="${FILE_NAME//"tiff/"}"
+            FILE_NAME="${FILE_NAME//".tiff"}"
+
+            local DATE_PART=${FILE_NAME:0:8}
+            local HOURS_PART=${FILE_NAME:9:2}
+            TIMESTAMP_NOW=$(date +%s)
+            TIMESTAMP_FILE_FORECAST_DATE=$(date -d "${DATE_PART} ${HOURS_PART}00" '+%s')
+        fi
+
+        # Don't run script for outdatet yesterday's files
+        local DAYS_DIFFERECE=$(( ($TIMESTAMP_NOW - $TIMESTAMP_FILE_FORECAST_DATE) / (24 * 3600) ))
+        if [[ $DAYS_DIFFERECE -ge 1 ]]; then
+            echo "Skip"
+            echo "Skip: file is outdated  $WFILE"
+            continue
+        fi 
+
         BS=$(basename $WFILE)
         ## generate gdal2tiles fo a given band with given rasterization
         local FILE_NAME="${BS%%.*}"
@@ -45,10 +90,20 @@ generate_tiles() {
 }
 
 
-# 0. html to test data
-cp "${THIS_LOCATION}/browser.html" .
-cp -r "${THIS_LOCATION}/script" .
-cp -r "${THIS_LOCATION}/css" .
-
-# 1. generate tiles
-generate_tiles
+if [[ $SCRIPT_PROVIDER_MODE =~ $GFS ]]; then
+    echo "============================ GFS Provider tile making ======================================="
+    cd $GFS
+    # html to test data
+    cp "${THIS_LOCATION}/browser.html" .
+    cp -r "${THIS_LOCATION}/script" .
+    cp -r "${THIS_LOCATION}/css" .
+    # generating tiles
+    generate_tiles $GFS
+elif [[ $SCRIPT_PROVIDER_MODE =~ $ECMWF ]]; then
+    echo "============================ ECMWF Provider tile making ======================================="
+    cd $ECMWF
+    cp "${THIS_LOCATION}/browser.html" .
+    cp -r "${THIS_LOCATION}/script" .
+    cp -r "${THIS_LOCATION}/css" .
+    generate_tiles $ECMWF
+fi

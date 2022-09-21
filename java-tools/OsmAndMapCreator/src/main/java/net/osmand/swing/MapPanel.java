@@ -193,7 +193,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	public MapPanel(File fileWithTiles) {
 		mapPanelSelector = new MapPanelSelector(this);
 		ImageIO.setUseCache(false);
-		downloader.setNoHttps(true);
 
 		tilesLocation = fileWithTiles;
 		loadSettingsLocation();

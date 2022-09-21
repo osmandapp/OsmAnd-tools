@@ -1,7 +1,9 @@
 package net.osmand.server.utils;
 
 import net.osmand.GPXUtilities;
+import net.osmand.server.api.services.RoutingService;
 import net.osmand.util.MapUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -12,6 +14,9 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 @Component
 public class WebGpxParser {
+    
+    @Autowired
+    RoutingService routingService;
     
     public static class TrackData {
         public MetaData metaData;
@@ -50,7 +55,7 @@ public class WebGpxParser {
         }
     }
     
-    public static class Track {
+    public class Track {
         public List<Point> points;
         public GPXUtilities.Track ext;
         
@@ -66,17 +71,7 @@ public class WebGpxParser {
                     }
                     pointsSeg.add(p);
                 });
-                int startInd = 0;
-                if (!seg.routeSegments.isEmpty()) {
-                    for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
-                        RouteSegment segment = new RouteSegment();
-                        segment.ext = rs;
-                        segment.routeTypes = seg.routeTypes;
-                        int length = Integer.parseInt(rs.length);
-                        pointsSeg.get(startInd).segment = segment;
-                        startInd = startInd + (length - 1);
-                    }
-                }
+                routingService.addRouteSegmentsToPoints(seg, pointsSeg);
                 points.addAll(pointsSeg);
             });
             
