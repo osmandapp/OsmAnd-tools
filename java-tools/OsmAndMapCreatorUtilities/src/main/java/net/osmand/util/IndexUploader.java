@@ -130,10 +130,12 @@ public class IndexUploader {
 	private UploadCredentials uploadCredentials = new DummyCredentials();
 	private FileFilter fileFilter = new FileFilter();
 	private FileFilter deleteFileFilter = null;
+	
 	private boolean roadProcess;
 	private boolean wikiProcess;
 	private boolean srtmProcess;
 	private boolean travelProcess;
+	private boolean depthProcess;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -218,6 +220,9 @@ public class IndexUploader {
 				start++;
 			} else if (args[start].startsWith("--travel")) {
 				travelProcess = true;
+				start++;
+			} else if (args[start].startsWith("--depth")) {
+				depthProcess = true;
 				start++;
 			}
 		} while (p != start);
@@ -408,31 +413,34 @@ public class IndexUploader {
 
 	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException, RTreeException {
 		String fileName = mainFile.getName();
-		boolean srtmFile = mainFile.getName().contains(".srtm") || mainFile.getName().contains(".srtmf");
-		boolean roadFile = mainFile.getName().contains(".road");
-		boolean wikiFile = mainFile.getName().contains(".wiki");
-		boolean travelFile = mainFile.getName().contains(".travel");
-		boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
-		boolean regionFile = !srtmFile && !roadFile && !wikiFile && !worldFile && !travelFile;
-		if (srtmFile != this.srtmProcess) {
-			return null;
+		if (fileName.contains(".srtm") || fileName.contains(".srtmf")) {
+			if (!this.srtmProcess) {
+				return null;
+			}
+		} else if (fileName.contains(".road")) {
+			if (!this.roadProcess) {
+				return null;
+			}
+		} else if (fileName.contains(".wiki")) {
+			if (!this.wikiProcess) {
+				return null;
+			}
+		} else if (fileName.contains(".travel")) {
+			if (!this.travelProcess) {
+				return null;
+			}
+		} else if (fileName.contains(".depth")) {
+			if (!this.depthProcess) {
+				return null;
+			}
+		} else {
+			boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
+			if (!worldFile && !fileName.contains("_ext_")) {
+				extractRoadOnlyFile(mainFile, new File(mainFile.getParentFile(), fileName
+						.replace(IndexConstants.BINARY_MAP_INDEX_EXT, IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
+			}
 		}
-		if (roadFile != this.roadProcess) {
-			return null;
-		}
-		if (wikiFile != this.wikiProcess) {
-			return null;
-		}
-		if (travelFile != this.travelProcess) {
-			return null;
-		}
-		if (regionFile && !fileName.contains("_ext_")) {
-			extractRoadOnlyFile(
-					mainFile,
-					new File(mainFile.getParentFile(), fileName.replace(IndexConstants.BINARY_MAP_INDEX_EXT,
-							IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
-		}
-
+		
 		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)
 				|| fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
 			RandomAccessFile raf = null;
@@ -670,6 +678,8 @@ public class IndexUploader {
 			summary = "Contour lines " + (fileName.contains(".srtmf") ? "feet " : "meters ");
 		} else if (fileName.contains(".travel")){
 			summary = "Travel guide" + summary;
+		} else if (fileName.contains(".depth")){
+			summary = "Depth" + summary;
 		} else if (fileName.contains("_wiki.")) {
 			summary = "Wikipedia" + summary;
 		} else {
