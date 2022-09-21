@@ -186,6 +186,9 @@ public class DownloadIndexController {
 		if (params.containsKey("slope")) {
 			return getFileAsResource("slope", filename);
 		}
+		if (params.containsKey("heightmap")) {
+			return getFileAsResource("heightmap", filename);
+		}
 		if (params.containsKey("depth")) {
 			return getFileAsResource("depth", filename);
 		}
@@ -233,8 +236,8 @@ public class DownloadIndexController {
 		return isContainAndEqual("heightmap", params); 
 	}
 	
-	private boolean isDepthmap(MultiValueMap<String, String> params) {
-		return isContainAndEqual("depthmap", params); 
+	private boolean isDepth(MultiValueMap<String, String> params) {
+		return isContainAndEqual("depth", params); 
 	}
 	
 	private boolean isRoad(MultiValueMap<String, String> params) {
@@ -283,7 +286,7 @@ public class DownloadIndexController {
 				host = servers.getServer(DownloadServerSpecialty.SLOPE);
 			} else if(isHeightmap(params)) {
 				host = servers.getServer(DownloadServerSpecialty.HEIGHTMAP);
-			} else if(isDepthmap(params)) {
+			} else if(isDepth(params)) {
 				host = servers.getServer(DownloadServerSpecialty.DEPTH);
 			} else if(isHillshade(params)) {
 				host = servers.getServer(DownloadServerSpecialty.HILLSHADE);
