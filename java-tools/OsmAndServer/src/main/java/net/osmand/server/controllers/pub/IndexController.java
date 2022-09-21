@@ -162,6 +162,7 @@ public class IndexController {
 		model.addAttribute("wikivoyage", doc.getWikivoyages());
 		model.addAttribute("travel", doc.getTravelGuides());
 		model.addAttribute("hillshade", doc.getHillshade());
+		model.addAttribute("depth", doc.getDepths());
 		model.addAttribute("slope", doc.getSlope());
 		model.addAttribute("heightmap", doc.getHeightmap());
         return "pub/indexes";
