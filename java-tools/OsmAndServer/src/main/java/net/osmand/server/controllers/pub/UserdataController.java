@@ -3,13 +3,7 @@ package net.osmand.server.controllers.pub;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -433,6 +427,68 @@ public class UserdataController {
 			}
 		};
 	}
+	
+	@PostMapping(value = "/upload-gpx-file")
+	@ResponseBody
+	public ResponseEntity<String> uploadGpxFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                            @RequestParam String name,
+	                                            @RequestParam String type,
+	                                            @RequestParam String login) throws IOException {
+		PremiumUser user = usersRepository.findByEmail(login);
+		ResponseEntity<String> error = validateUser(user);
+		if (error != null) {
+			return error;
+		}
+		
+		PremiumUserDevice device = devicesRepository.findByDeviceid(TOKEN_DEVICE_WEB);
+		
+		UserFile usf = new PremiumUserFilesRepository.UserFile();
+		long cnt;
+		long sum;
+		boolean checkExistingServerMap = checkThatObfFileisOnServer(name, type);
+		if (checkExistingServerMap) {
+			file = createEmptyMultipartFile(file);
+		}
+		
+		try {
+			InputStreamReader inputStreamReader = new InputStreamReader(file.getInputStream());
+			sum = 0;
+			while ((cnt = inputStreamReader.read()) >= 0) {
+				sum += cnt;
+			}
+		} catch (IOException e) {
+			return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
+		}
+		usf.name = name;
+		usf.type = type;
+		usf.updatetime = new Date();
+		usf.userid = user.id;
+		usf.deviceid = device.id;
+		usf.filesize = sum;
+		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
+		
+		filesRepository.saveAndFlush(usf);
+		
+		return ok();
+	}
+	
+	private ResponseEntity<String> validateUser(PremiumUser user) {
+		if (user == null) {
+			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
+		}
+		String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
+		if (errorMsg != null) {
+			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
+					"Subscription is not valid any more: " + errorMsg);
+		}
+		UserFilesResults res = generateFiles(user.id, null, null, false, false);
+		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
+			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
+					"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
+							+ " MB. Please contact support in order to investigate possible solutions.");
+		}
+		return null;
+	}
 
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	@ResponseBody
@@ -449,20 +505,11 @@ public class UserdataController {
 			return tokenNotValid();
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
-		if (pu == null) {
-			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
+		ResponseEntity<String> error = validateUser(pu);
+		if (error != null) {
+			return error;
 		}
-		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-		if (errorMsg != null) {
-			return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
-					"Subscription is not valid any more: " + errorMsg);
-		}
-		UserFilesResults res = generateFiles(dev.userid, null, null, false, false);
-		if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
-			return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
-					"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
-							+ " MB. Please contact support in order to investigate possible solutions.");
-		}
+		
 		UserFile usf = new PremiumUserFilesRepository.UserFile();
 		long cnt, sum;
 		boolean checkExistingServerMap = checkThatObfFileisOnServer(name, type);
