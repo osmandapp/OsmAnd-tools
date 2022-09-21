@@ -186,6 +186,9 @@ public class DownloadIndexController {
 		if (params.containsKey("slope")) {
 			return getFileAsResource("slope", filename);
 		}
+		if (params.containsKey("depth")) {
+			return getFileAsResource("depth", filename);
+		}
 		if (params.containsKey("inapp")) {
 			String type = params.getFirst("inapp");
 			return getFileAsResource("indexes/inapp/"+type, filename);
