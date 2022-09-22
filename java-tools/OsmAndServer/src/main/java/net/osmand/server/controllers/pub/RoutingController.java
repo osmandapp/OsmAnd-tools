@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import javax.validation.Valid;
@@ -52,8 +51,6 @@ import net.osmand.util.MapUtils;
 @Controller
 @RequestMapping("/routing")
 public class RoutingController {
-	
-	private static final int DISTANCE_MID_POINT = 25000;
 	private static final int MAX_DISTANCE = 1000000;
 
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
@@ -77,7 +74,7 @@ public class RoutingController {
 	
 	public static class FeatureCollection {
 		public String type = "FeatureCollection";
-		public List<Feature> features = new ArrayList<RoutingController.Feature>();
+		public List<Feature> features = new ArrayList<>();
 		
 		public FeatureCollection(Feature... features) {
 			this.features.addAll(Arrays.asList(features));
@@ -101,7 +98,6 @@ public class RoutingController {
 	
 	public static class Geometry {
 		public final String type;
-		public Map<String, Object> properties = new LinkedHashMap<>();
 		public Object coordinates;
 		
 		public Geometry(String type) {
@@ -125,10 +121,10 @@ public class RoutingController {
 		}
 	}
 	
-	protected static class RoutingMode {
+	public static class RoutingMode {
 		public String key;
 		public String name;
-		public Map<String, RoutingParameter> params = new LinkedHashMap<String, RoutingParameter>();
+		public Map<String, RoutingParameter> params = new LinkedHashMap<>();
 
 		public RoutingMode(String key) {
 			this.key = key;
@@ -136,7 +132,7 @@ public class RoutingController {
 		}
 	}
 	
-	protected static class RoutingParameter {
+	public static class RoutingParameter {
 		public String key;
 		public String label;
 		public String description;
@@ -168,7 +164,7 @@ public class RoutingController {
 	
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
-		Map<String, RoutingMode> routers = new LinkedHashMap<String, RoutingMode>();
+		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development", 
 				"[Dev] C++ routing", true);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
@@ -192,12 +188,12 @@ public class RoutingController {
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
-						fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+						routingService.fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
-					fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+					routingService.fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 				}
 			}
 		}
@@ -210,68 +206,6 @@ public class RoutingController {
 		return ResponseEntity.ok(gson.toJson(routers));
 	}
 
-	private void fillRoutingModeParams(RoutingParameter nativeRouting, RoutingParameter nativeTrack, RoutingParameter calcMode,
-	                                   RoutingParameter shortWay, Entry<String, GeneralRouter> e, RoutingMode rm) {
-		List<RoutingParameter> rps = new ArrayList<>();
-		rps.add(shortWay);
-		for (Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
-			GeneralRouter.RoutingParameter pm = epm.getValue();
-			String[] profiles = pm.getProfiles();
-			if (profiles != null) {
-				boolean accept = false;
-				for (String profile : profiles) {
-					if ("default".equals(profile) && rm.key.equals(e.getKey()) || rm.key.equals(profile)) {
-						accept = true;
-						break;
-					}
-				}
-				if (!accept) {
-					continue;
-				}
-			}
-			RoutingParameter rp = new RoutingParameter(pm.getId(), pm.getName(), pm.getDescription(),
-					pm.getGroup(), pm.getType().name().toLowerCase());
-			if (pm.getId().equals("short_way")) {
-				continue;
-			}
-			if (pm.getId().startsWith("avoid")) {
-				rp.section = "Avoid";
-			} else if (pm.getId().startsWith("allow") || pm.getId().startsWith("prefer")) {
-				rp.section = "Allow";
-			} else if (pm.getGroup() != null) {
-				rp.section = Algorithms.capitalizeFirstLetter(pm.getGroup().replace('_', ' '));
-			}
-			if (pm.getType() == RoutingParameterType.BOOLEAN) {
-				rp.value = pm.getDefaultBoolean();
-			} else {
-				if (pm.getType() == RoutingParameterType.NUMERIC) {
-					rp.value = 0;
-				} else {
-					rp.value = "";
-				}
-				rp.valueDescriptions = pm.getPossibleValueDescriptions();
-				rp.values = pm.getPossibleValues();
-			}
-			int lastIndex = -1;
-			for (int i = 0; i < rps.size(); i++) {
-				if (Algorithms.objectEquals(rp.section, rps.get(i).section)) {
-					lastIndex = i;
-				}
-			}
-			if (lastIndex != -1 && !Algorithms.isEmpty(rp.section)) {
-				rps.add(lastIndex + 1, rp);
-			} else {
-				rps.add(rp);
-			}
-		}
-		for (RoutingParameter rp : rps) {
-			rm.params.put(rp.key, rp);
-		}
-		rm.params.put(nativeRouting.key, nativeRouting);
-		rm.params.put(nativeTrack.key, nativeTrack);
-		rm.params.put(calcMode.key, calcMode);
-	}
-
 	@PostMapping(path = {"/gpx-approximate"}, produces = "application/json")
 	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                        @RequestParam(defaultValue = "car") String routeMode) throws IOException {
@@ -282,17 +216,13 @@ public class RoutingController {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
 		} else {
 			gpxFile.path = file.getOriginalFilename();
-			List<LatLon> resList = new ArrayList<LatLon>();
-			List<Feature> features = new ArrayList<Feature>();
+			List<LatLon> resList = new ArrayList<>();
+			List<Feature> features = new ArrayList<>();
 			Map<String, Object> props = new TreeMap<>();
 			try {
 				List<RouteSegmentResult> res = osmAndMapsService.gpxApproximation(routeMode, props, gpxFile);
-				convertResults(resList, features, res);
-			} catch (IOException e) {
-				LOGGER.error(e.getMessage(), e);
-			} catch (InterruptedException e) {
-				LOGGER.error(e.getMessage(), e);
-			} catch (RuntimeException e) {
+				routingService.convertResults(resList, features, res);
+			} catch (IOException | InterruptedException | RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);
 			}
 			Feature route = new Feature(Geometry.lineString(resList));
@@ -309,7 +239,7 @@ public class RoutingController {
 		}
 		try {
 			List<GeocodingResult> lst = osmAndMapsService.geocoding(lat, lon);
-			List<Feature> features = new ArrayList<Feature>();
+			List<Feature> features = new ArrayList<>();
 			int i = 0;
 			for (GeocodingResult rr : lst) {
 				i++;
@@ -317,13 +247,7 @@ public class RoutingController {
 						i + ". " + rr.toString()));
 			}
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
-		} catch (IOException e) {
-			LOGGER.error(e.getMessage(), e);
-			throw e;
-		} catch (InterruptedException e) {
-			LOGGER.error(e.getMessage(), e);
-			throw e;
-		} catch (RuntimeException e) {
+		} catch (IOException | InterruptedException | RuntimeException e) {
 			LOGGER.error(e.getMessage(), e);
 			throw e;
 		}
@@ -337,7 +261,7 @@ public class RoutingController {
 		}
 		try {
 			List<SearchResult> res = osmAndMapsService.search(lat, lon, search);
-			List<Feature> features = new ArrayList<Feature>();
+			List<Feature> features = new ArrayList<>();
 			int pos = 0;
 			int posLoc = 0;
 			for (SearchResult sr : res) {
@@ -373,13 +297,7 @@ public class RoutingController {
 				}
 			}
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
-		} catch (IOException e) {
-			LOGGER.error(e.getMessage(), e);
-			throw e;
-		} catch (InterruptedException e) {
-			LOGGER.error(e.getMessage(), e);
-			throw e;
-		} catch (RuntimeException e) {
+		} catch (IOException | InterruptedException | RuntimeException e) {
 			LOGGER.error(e.getMessage(), e);
 			throw e;
 		}
@@ -392,7 +310,7 @@ public class RoutingController {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig();
 		}
-		List<LatLon> list = new ArrayList<LatLon>();
+		List<LatLon> list = new ArrayList<>();
 		double lat = 0;
 		int k = 0;
 		boolean tooLong = false;
@@ -405,7 +323,7 @@ public class RoutingController {
 					lat = vl;
 				} else {
 					LatLon pnt = new LatLon(lat, vl);
-					if (list.size() > 0) {
+					if (!list.isEmpty()) {
 						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > MAX_DISTANCE;
 					}
 					list.add(pnt);
@@ -413,27 +331,23 @@ public class RoutingController {
 				}
 			}
 		}
-		List<LatLon> resList = new ArrayList<LatLon>();
-		List<Feature> features = new ArrayList<Feature>();
+		List<LatLon> resList = new ArrayList<>();
+		List<Feature> features = new ArrayList<>();
 		Map<String, Object> props = new TreeMap<>();
 		if (list.size() >= 2 && !tooLong) {
 			try {
 				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, props, list.get(0), list.get(list.size() - 1),
 						list.subList(1, list.size() - 1), avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads) );
 				if (res != null) {
-					convertResults(resList, features, res);
+					routingService.convertResults(resList, features, res);
 				}
-			} catch (IOException e) {
-				LOGGER.error(e.getMessage(), e);
-			} catch (InterruptedException e) {
-				LOGGER.error(e.getMessage(), e);
-			} catch (RuntimeException e) {
+			} catch (IOException | InterruptedException | RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);
 			}
 		}
-		if (resList.size() == 0) {
-			resList = new ArrayList<LatLon>(list);
-			calculateStraightLine(resList);
+		if (resList.isEmpty()) {
+			resList = new ArrayList<>(list);
+			routingService.calculateStraightLine(resList);
 			float dist = 0;
 			for (int i = 1; i < resList.size(); i++) {
 				dist += MapUtils.getDistance(resList.get(i - 1), resList.get(i));
@@ -459,43 +373,4 @@ public class RoutingController {
 		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasSpeed, hasRouting);
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 	}
-    
-	private void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
-		LatLon last = null;
-		for (RouteSegmentResult r : res) {
-			int i;
-			int dir = r.isForwardDirection() ? 1 : -1;
-			if (r.getDescription() != null && r.getDescription().length() > 0) {
-				Feature f = new Feature(Geometry.point(r.getStartPoint()));
-				f.prop("description", r.getDescription()).prop("routingTime", r.getRoutingTime())
-						.prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
-						.prop("roadId", r.getObject().getId());
-				features.add(f);
-				
-			}
-			for (i = r.getStartPointIndex(); ; i += dir) {
-				if(i != r.getEndPointIndex()) {
-					resList.add(r.getPoint(i));
-				} else {
-					last = r.getPoint(i);
-					break;
-				}
-			}
-		}
-		if (last != null) {
-			resList.add(last);
-		}
-	}
-	private void calculateStraightLine(List<LatLon> list) {
-		for (int i = 1; i < list.size();) {
-			if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {
-				LatLon midPoint = MapUtils.calculateMidPoint(list.get(i - 1), list.get(i));
-				list.add(i, midPoint);
-			} else {
-				i++;
-			}
-		}
-	}
-
-
 }
