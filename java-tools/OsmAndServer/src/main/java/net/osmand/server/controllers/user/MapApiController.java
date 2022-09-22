@@ -5,13 +5,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
+import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -26,12 +34,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -47,6 +50,10 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import org.springframework.web.multipart.MultipartFile;
+
+import static net.osmand.server.api.services.UserdataService.ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD;
+import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 @Controller
 @RequestMapping("/mapapi")
@@ -73,7 +80,17 @@ public class MapApiController {
 	AuthenticationManager authManager;
 	
 	@Autowired
+	PremiumUsersRepository usersRepository;
+	
+	@Autowired
 	UserdataService userdataService;
+	
+	@Autowired
+	protected StorageService storageService;
+	
+	@Autowired
+	protected PremiumUserFilesRepository filesRepository;
+	
 	
 	Gson gson = new Gson();
 
@@ -134,7 +151,7 @@ public class MapApiController {
 	@ResponseBody
 	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
 			throws ServletException, IOException {
-		ResponseEntity<String> res = userdataController.webUserActivate(us.username, us.token, us.password);
+		ResponseEntity<String> res = userdataService.webUserActivate(us.username, us.token, us.password);
 		if (res.getStatusCodeValue() < 300) {
 			request.logout();
 			request.login(us.username, us.password);
@@ -154,12 +171,45 @@ public class MapApiController {
 	@ResponseBody
 	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
 			throws ServletException, IOException {
-		return userdataController.webUserRegister(us.username);
+		return userdataService.webUserRegister(us.username);
+	}
+	
+	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
+		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
+			return ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
+		}
+		return null;
 	}
 	
 	private ResponseEntity<String> tokenNotValid() {
 	    return new ResponseEntity<String>("Unauthorized", HttpStatus.UNAUTHORIZED);
 
+	}
+	
+	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
+	@ResponseBody
+	public ResponseEntity<String> uploadFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                     @RequestParam String name, @RequestParam String type) throws IOException {
+		// This could be slow series of checks (token, user, subscription, amount of space):
+		// probably it's better to support multiple file upload without these checks
+		PremiumUserDevice dev = checkUser();
+		
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		ResponseEntity<String> validateError = userdataService.validateUser(pu);
+		if (validateError != null) {
+			return validateError;
+		}
+		
+		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, null);
+		if (uploadError != null) {
+			return uploadError;
+		}
+		
+		return okStatus();
 	}
 	
 	@GetMapping(value = "/list-files")
@@ -168,11 +218,11 @@ public class MapApiController {
 			@RequestParam(name = "name", required = false) String name,
 			@RequestParam(name = "type", required = false) String type,
 			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions) throws IOException, SQLException {
-		PremiumUserDevice dev = userdataService.checkUser();
+		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		UserFilesResults res = userdataController.generateFiles(dev.userid, name, type, allVersions, true);
+		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, true);
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			if (nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details)) {
@@ -182,7 +232,7 @@ public class MapApiController {
 				if (uf != null) {
 					try {
 						InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
-								: userdataController.getInputStream(uf);
+								: userdataService.getInputStream(uf);
 						if (in != null) {
 							GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
 							if (gpxFile != null) {
@@ -230,7 +280,7 @@ public class MapApiController {
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
-		PremiumUserDevice dev = userdataService.checkUser();
+		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			ResponseEntity<String> error = tokenNotValid();
 			if (error != null) {
@@ -239,7 +289,7 @@ public class MapApiController {
 				return;
 			}
 		}
-		userdataController.getFile(response, request, name, type, updatetime, dev);
+		userdataService.getFile(response, request, name, type, updatetime, dev);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -249,15 +299,15 @@ public class MapApiController {
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
-		PremiumUserDevice dev = userdataService.checkUser();
+		PremiumUserDevice dev = checkUser();
 		InputStream bin = null;
 		try {
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
-			UserFile userFile = userdataController.getUserFile(name, type, updatetime, dev);
+			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(ANALYSIS))));
 			}
-			bin = userdataController.getInputStream(dev, error, userFile);
+			bin = userdataService.getInputStream(dev, error, userFile);
 			ResponseEntity<String> err = error[0];
 			if (err != null) {
 				response.setStatus(err.getStatusCodeValue());
@@ -310,16 +360,16 @@ public class MapApiController {
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = userdataService.checkUser();
+		PremiumUserDevice dev = checkUser();
 		InputStream bin = null;
 		try {
 			@SuppressWarnings("unchecked")
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
-			UserFile userFile = userdataController.getUserFile(name, type, updatetime, dev);
+			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(SRTM_ANALYSIS))));
 			}
-			bin = userdataController.getInputStream(dev, error, userFile);
+			bin = userdataService.getInputStream(dev, error, userFile);
 			ResponseEntity<String> err = error[0];
 			if (err != null) {
 				response.setStatus(err.getStatusCodeValue());

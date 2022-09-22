@@ -26,8 +26,6 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
 	PremiumUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
 	
 	List<PremiumUserDevice> findByUserid(int userid);
-    
-    PremiumUserDevice findByDeviceid(String deviceid);
 
 
     @Entity
