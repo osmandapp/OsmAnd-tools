@@ -12,6 +12,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.api.services.UserdataService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +71,9 @@ public class MapApiController {
 	
 	@Autowired
 	AuthenticationManager authManager;
+	
+	@Autowired
+	UserdataService userdataService;
 	
 	Gson gson = new Gson();
 
@@ -157,14 +161,6 @@ public class MapApiController {
 	    return new ResponseEntity<String>("Unauthorized", HttpStatus.UNAUTHORIZED);
 
 	}
-
-	private PremiumUserDevice checkUser() {
-		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-		if (user instanceof OsmAndProUser) {
-			return ((OsmAndProUser) user).getUserDevice();
-		}
-		return null;
-	}
 	
 	@GetMapping(value = "/list-files")
 	@ResponseBody
@@ -172,7 +168,7 @@ public class MapApiController {
 			@RequestParam(name = "name", required = false) String name,
 			@RequestParam(name = "type", required = false) String type,
 			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions) throws IOException, SQLException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return tokenNotValid();
 		}
@@ -234,7 +230,7 @@ public class MapApiController {
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			ResponseEntity<String> error = tokenNotValid();
 			if (error != null) {
@@ -253,7 +249,7 @@ public class MapApiController {
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		InputStream bin = null;
 		try {
 			ResponseEntity<String>[] error = new ResponseEntity[] { null };
@@ -314,7 +310,7 @@ public class MapApiController {
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
 			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		InputStream bin = null;
 		try {
 			@SuppressWarnings("unchecked")

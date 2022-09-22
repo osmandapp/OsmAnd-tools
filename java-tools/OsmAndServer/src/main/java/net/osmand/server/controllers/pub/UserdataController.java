@@ -27,6 +27,7 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,10 +52,6 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
-import net.osmand.server.api.services.DownloadIndexesService;
-import net.osmand.server.api.services.EmailSenderService;
-import net.osmand.server.api.services.StorageService;
-import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.util.Algorithms;
 
 @RestController
@@ -109,6 +106,9 @@ public class UserdataController {
 
 	@Autowired
 	EmailSenderService emailSender;
+	
+	@Autowired
+	UserdataService userdataService;
 
 
 	// @PersistenceContext
@@ -495,12 +495,18 @@ public class UserdataController {
 	public ResponseEntity<String> upload(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken,
+			@RequestParam(name = "deviceid", required = false) Integer deviceId,
+			@RequestParam(name = "accessToken", required = false) String accessToken,
 			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
 		// probably it's better to support multiple file upload without these checks
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		PremiumUserDevice dev;
+		if (deviceId != null && accessToken != null) {
+			dev = checkToken(deviceId, accessToken);
+		} else {
+			dev = userdataService.checkUser();
+		}
+		
 		if (dev == null) {
 			return tokenNotValid();
 		}
@@ -511,7 +517,8 @@ public class UserdataController {
 		}
 		
 		UserFile usf = new PremiumUserFilesRepository.UserFile();
-		long cnt, sum;
+		long cnt;
+		long sum;
 		boolean checkExistingServerMap = checkThatObfFileisOnServer(name, type);
 		if (checkExistingServerMap) {
 			file = createEmptyMultipartFile(file);
@@ -531,15 +538,12 @@ public class UserdataController {
 		usf.type = type;
 		usf.updatetime = new Date();
 		usf.userid = dev.userid;
-		usf.deviceid = deviceId;
+		usf.deviceid = deviceId != null ? deviceId : dev.id;
 		usf.filesize = sum;
 		usf.zipfilesize = zipsize;
 		if (clienttime != null) {
-			usf.clienttime = new Date(clienttime.longValue());
+			usf.clienttime = new Date(clienttime);
 		}
-		// Session session = entityManager.unwrap(Session.class);
-		// Blob blob = session.getLobHelper().createBlob(file.getInputStream(), file.getSize());
-		// usf.data = blob;
 		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
 		if (storageService.storeLocally()) {
 			usf.data = file.getBytes();

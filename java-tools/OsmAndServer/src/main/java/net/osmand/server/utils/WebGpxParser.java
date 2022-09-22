@@ -135,14 +135,14 @@ public class WebGpxParser {
         gpxFile.routes.forEach(route -> {
             List<Point> routePoints = new ArrayList<>();
             List<Point> trackPoints = gpxData.tracks.get(gpxFile.routes.indexOf(route)).points;
-            int prevTrkPointInd = -1;
+            int prevTrkPointInd = 0;
             for (GPXUtilities.WptPt p : route.points) {
                 Point routePoint = new Point(p);
                 int currTrkPointInd;
                 if (routePoint.geometrySize == -1) {
                     currTrkPointInd = findNearestPoint(trackPoints, routePoint);
                 } else {
-                    currTrkPointInd = routePoint.geometrySize;
+                    currTrkPointInd = prevTrkPointInd + routePoint.geometrySize;
                 }
                 
                 prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
