@@ -428,50 +428,6 @@ public class UserdataController {
 		};
 	}
 	
-	@PostMapping(value = "/upload-gpx-file")
-	@ResponseBody
-	public ResponseEntity<String> uploadGpxFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
-	                                            @RequestParam String name,
-	                                            @RequestParam String type,
-	                                            @RequestParam String login) throws IOException {
-		PremiumUser user = usersRepository.findByEmail(login);
-		ResponseEntity<String> error = validateUser(user);
-		if (error != null) {
-			return error;
-		}
-		
-		PremiumUserDevice device = devicesRepository.findByDeviceid(TOKEN_DEVICE_WEB);
-		
-		UserFile usf = new PremiumUserFilesRepository.UserFile();
-		long cnt;
-		long sum;
-		boolean checkExistingServerMap = checkThatObfFileisOnServer(name, type);
-		if (checkExistingServerMap) {
-			file = createEmptyMultipartFile(file);
-		}
-		
-		try {
-			InputStreamReader inputStreamReader = new InputStreamReader(file.getInputStream());
-			sum = 0;
-			while ((cnt = inputStreamReader.read()) >= 0) {
-				sum += cnt;
-			}
-		} catch (IOException e) {
-			return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
-		}
-		usf.name = name;
-		usf.type = type;
-		usf.updatetime = new Date();
-		usf.userid = user.id;
-		usf.deviceid = device.id;
-		usf.filesize = sum;
-		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
-		
-		filesRepository.saveAndFlush(usf);
-		
-		return ok();
-	}
-	
 	private ResponseEntity<String> validateUser(PremiumUser user) {
 		if (user == null) {
 			return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
