@@ -30,6 +30,7 @@ import java.util.zip.GZIPOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import net.osmand.server.api.repo.OsmRecipientsRepository;
+import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,18 +60,10 @@ import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
-import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
-import net.osmand.server.api.services.EmailRegistryService;
-import net.osmand.server.api.services.EmailSenderService;
-import net.osmand.server.api.services.IpLocationService;
-import net.osmand.server.api.services.LogsAccessService;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
-import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
-import net.osmand.server.api.services.PollsService;
-import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
@@ -94,6 +87,9 @@ public class AdminController {
 
 	@Autowired
 	private WebController web;
+	
+	@Autowired
+	UserdataService userdataService;
 
 	@Autowired
 	private ReportsController reports;
@@ -256,7 +252,7 @@ public class AdminController {
 					deviceSub = ls.get(0);
 				}
 				if (deviceSub != null) {
-					UserFilesResults ufs = userDataController.generateFiles(pu.id, null, null, true, false);
+					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, null, true, false);
 					ufs.allFiles.clear();
 					ufs.uniqueFiles.clear();
 					deviceSub.payload = gson.toJson(ufs);
