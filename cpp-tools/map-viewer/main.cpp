@@ -840,8 +840,7 @@ void mouseMotion(int x, int y)
 
         const auto tileSize31 = (1u << (31 - state.zoomLevel));
         auto scale31 = static_cast<double>(tileSize31) /
-            std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)
-                ->getTileSizeOnScreenInPixels();
+            renderer->getTileSizeOnScreenInPixels();
 
         OsmAnd::PointI newTarget;
         newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
