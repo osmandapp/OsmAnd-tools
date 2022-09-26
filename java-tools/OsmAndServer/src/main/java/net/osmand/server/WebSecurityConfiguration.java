@@ -12,6 +12,7 @@ import java.util.TreeSet;
 
 import javax.servlet.http.HttpServletRequest;
 
+import net.osmand.server.api.services.UserdataService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,8 +83,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     
     @Autowired
 	protected PremiumUserDevicesRepository devicesRepository;
-    
-    
+	
+	@Autowired
+	UserdataService userdataService;
     
     
     
@@ -114,7 +116,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 					throw new UsernameNotFoundException(username);
 				}
 				PremiumUserDevice pud = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
-						UserdataController.TOKEN_DEVICE_WEB);
+						userdataService.TOKEN_DEVICE_WEB);
 				if (pud == null) {
 					throw new UsernameNotFoundException(username);
 				}

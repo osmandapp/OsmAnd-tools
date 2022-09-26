@@ -1,9 +1,7 @@
 package net.osmand.server.utils;
 
 import net.osmand.GPXUtilities;
-import net.osmand.server.api.services.RoutingService;
 import net.osmand.util.MapUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -14,9 +12,6 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 @Component
 public class WebGpxParser {
-    
-    @Autowired
-    RoutingService routingService;
     
     public static class TrackData {
         public MetaData metaData;
@@ -71,7 +66,7 @@ public class WebGpxParser {
                     }
                     pointsSeg.add(p);
                 });
-                routingService.addRouteSegmentsToPoints(seg, pointsSeg);
+                addRouteSegmentsToPoints(seg, pointsSeg);
                 points.addAll(pointsSeg);
             });
             
@@ -140,14 +135,14 @@ public class WebGpxParser {
         gpxFile.routes.forEach(route -> {
             List<Point> routePoints = new ArrayList<>();
             List<Point> trackPoints = gpxData.tracks.get(gpxFile.routes.indexOf(route)).points;
-            int prevTrkPointInd = -1;
+            int prevTrkPointInd = 0;
             for (GPXUtilities.WptPt p : route.points) {
                 Point routePoint = new Point(p);
                 int currTrkPointInd;
                 if (routePoint.geometrySize == -1) {
                     currTrkPointInd = findNearestPoint(trackPoints, routePoint);
                 } else {
-                    currTrkPointInd = routePoint.geometrySize;
+                    currTrkPointInd = prevTrkPointInd + routePoint.geometrySize;
                 }
                 
                 prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
@@ -354,5 +349,19 @@ public class WebGpxParser {
     
     private boolean isNanEle(List<Point> points) {
         return points.get(0).ele == 99999;
+    }
+    
+    public void addRouteSegmentsToPoints(GPXUtilities.TrkSegment seg, List<WebGpxParser.Point> points) {
+        int startInd = 0;
+        if (!seg.routeSegments.isEmpty()) {
+            for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
+                WebGpxParser.RouteSegment segment = new WebGpxParser.RouteSegment();
+                segment.ext = rs;
+                segment.routeTypes = seg.routeTypes;
+                int length = Integer.parseInt(rs.length);
+                points.get(startInd).segment = segment;
+                startInd = startInd + (length - 1);
+            }
+        }
     }
 }

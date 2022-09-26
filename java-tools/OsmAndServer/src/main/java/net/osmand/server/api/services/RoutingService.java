@@ -6,8 +6,10 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataBundle;
 import net.osmand.binary.StringBundle;
 import net.osmand.data.LatLon;
+import net.osmand.router.GeneralRouter;
 import net.osmand.router.RouteDataResources;
 import net.osmand.router.RouteSegmentResult;
+import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -20,8 +22,12 @@ import java.util.*;
 @Service
 public class RoutingService {
     
+    private static final int DISTANCE_MID_POINT = 25000;
     @Autowired
     OsmAndMapsService osmAndMapsService;
+    
+    @Autowired
+    WebGpxParser webGpxParser;
     
     public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon,
                                                              String routeMode, boolean hasSpeed, boolean hasRouting) throws IOException, InterruptedException {
@@ -35,7 +41,7 @@ public class RoutingService {
         if (!pointsRes.isEmpty()) {
             GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
             if (hasRouting) {
-                addRouteSegmentsToPoints(seg, pointsRes);
+                webGpxParser.addRouteSegmentsToPoints(seg, pointsRes);
             }
             if (hasSpeed) {
                 addSpeed(seg, pointsRes);
@@ -45,17 +51,103 @@ public class RoutingService {
         return pointsRes;
     }
     
-    public void addRouteSegmentsToPoints(GPXUtilities.TrkSegment seg, List<WebGpxParser.Point> points) {
-        int startInd = 0;
-        if (!seg.routeSegments.isEmpty()) {
-            for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
-                WebGpxParser.RouteSegment segment = new WebGpxParser.RouteSegment();
-                segment.ext = rs;
-                segment.routeTypes = seg.routeTypes;
-                int length = Integer.parseInt(rs.length);
-                points.get(startInd).segment = segment;
-                startInd = startInd + (length - 1);
+    public void fillRoutingModeParams(RoutingController.RoutingParameter nativeRouting, RoutingController.RoutingParameter nativeTrack, RoutingController.RoutingParameter calcMode,
+                                       RoutingController.RoutingParameter shortWay, Map.Entry<String, GeneralRouter> e, RoutingController.RoutingMode rm) {
+        List<RoutingController.RoutingParameter> rps = new ArrayList<>();
+        rps.add(shortWay);
+        for (Map.Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
+            GeneralRouter.RoutingParameter pm = epm.getValue();
+            String[] profiles = pm.getProfiles();
+            if (profiles != null) {
+                boolean accept = false;
+                for (String profile : profiles) {
+                    if ("default".equals(profile) && rm.key.equals(e.getKey()) || rm.key.equals(profile)) {
+                        accept = true;
+                        break;
+                    }
+                }
+                if (!accept) {
+                    continue;
+                }
             }
+            RoutingController.RoutingParameter rp = new RoutingController.RoutingParameter(pm.getId(), pm.getName(), pm.getDescription(),
+                    pm.getGroup(), pm.getType().name().toLowerCase());
+            if (pm.getId().equals("short_way")) {
+                continue;
+            }
+            if (pm.getId().startsWith("avoid")) {
+                rp.section = "Avoid";
+            } else if (pm.getId().startsWith("allow") || pm.getId().startsWith("prefer")) {
+                rp.section = "Allow";
+            } else if (pm.getGroup() != null) {
+                rp.section = Algorithms.capitalizeFirstLetter(pm.getGroup().replace('_', ' '));
+            }
+            if (pm.getType() == GeneralRouter.RoutingParameterType.BOOLEAN) {
+                rp.value = pm.getDefaultBoolean();
+            } else {
+                if (pm.getType() == GeneralRouter.RoutingParameterType.NUMERIC) {
+                    rp.value = 0;
+                } else {
+                    rp.value = "";
+                }
+                rp.valueDescriptions = pm.getPossibleValueDescriptions();
+                rp.values = pm.getPossibleValues();
+            }
+            int lastIndex = -1;
+            for (int i = 0; i < rps.size(); i++) {
+                if (Algorithms.objectEquals(rp.section, rps.get(i).section)) {
+                    lastIndex = i;
+                }
+            }
+            if (lastIndex != -1 && !Algorithms.isEmpty(rp.section)) {
+                rps.add(lastIndex + 1, rp);
+            } else {
+                rps.add(rp);
+            }
+        }
+        for (RoutingController.RoutingParameter rp : rps) {
+            rm.params.put(rp.key, rp);
+        }
+        rm.params.put(nativeRouting.key, nativeRouting);
+        rm.params.put(nativeTrack.key, nativeTrack);
+        rm.params.put(calcMode.key, calcMode);
+    }
+    
+    public void calculateStraightLine(List<LatLon> list) {
+        for (int i = 1; i < list.size();) {
+            if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {
+                LatLon midPoint = MapUtils.calculateMidPoint(list.get(i - 1), list.get(i));
+                list.add(i, midPoint);
+            } else {
+                i++;
+            }
+        }
+    }
+    
+    public void convertResults(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+        LatLon last = null;
+        for (RouteSegmentResult r : res) {
+            int i;
+            int dir = r.isForwardDirection() ? 1 : -1;
+            if (r.getDescription() != null && r.getDescription().length() > 0) {
+                RoutingController.Feature f = new RoutingController.Feature(RoutingController.Geometry.point(r.getStartPoint()));
+                f.prop("description", r.getDescription()).prop("routingTime", r.getRoutingTime())
+                        .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
+                        .prop("roadId", r.getObject().getId());
+                features.add(f);
+                
+            }
+            for (i = r.getStartPointIndex(); ; i += dir) {
+                if(i != r.getEndPointIndex()) {
+                    resList.add(r.getPoint(i));
+                } else {
+                    last = r.getPoint(i);
+                    break;
+                }
+            }
+        }
+        if (last != null) {
+            resList.add(last);
         }
     }
     
