@@ -103,7 +103,6 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getDepths(), rootFolder, DownloadType.DEPTHMAP);
 		loadIndexesFromDir(doc.getWikimaps(), rootFolder, DownloadType.WIKIMAP);
 		loadIndexesFromDir(doc.getTravelGuides(), rootFolder, DownloadType.TRAVEL);
-		loadIndexesFromDir(doc.getWikivoyages(), rootFolder, DownloadType.WIKIVOYAGE);
 		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, DownloadType.ROAD_MAP);
 		loadIndexesFromDir(doc.getSrtmMaps(), rootFolder, DownloadType.SRTM_MAP.getPath(), DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_MAP_INDEX_EXT);
 		loadIndexesFromDir(doc.getSrtmFeetMaps(), rootFolder, DownloadType.SRTM_MAP.getPath(), DownloadType.SRTM_MAP, IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
@@ -302,7 +301,6 @@ public class DownloadIndexesService  {
 	    DEPTHMAP("depth") ,
 	    FONTS("indexes/fonts") ,
 	    WIKIMAP("wiki") ,
-	    WIKIVOYAGE("wikivoyage") ,
 	    TRAVEL("travel") ,
 	    ROAD_MAP("road-indexes") ,
 	    HILLSHADE("hillshade"),
@@ -324,7 +322,6 @@ public class DownloadIndexesService  {
 
 		public boolean acceptFile(File f) {
 			switch (this) {
-			case WIKIVOYAGE:
 			case HEIGHTMAP:
 				return f.getName().endsWith(".sqlite");
 			case TRAVEL:
@@ -365,8 +362,6 @@ public class DownloadIndexesService  {
 				return String.format("Contour lines (%s) for %s", suf, regionName);
 			case TRAVEL:
 				return String.format("Travel for %s", regionName);
-			case WIKIVOYAGE:
-				return String.format("Wikivoyage for %s", regionName);
 			case HEIGHTMAP:
 				return String.format("%s", regionName);
 			case HILLSHADE:

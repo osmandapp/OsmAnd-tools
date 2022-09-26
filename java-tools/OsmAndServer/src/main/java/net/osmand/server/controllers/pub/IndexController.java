@@ -21,9 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletResponse;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -159,7 +156,6 @@ public class IndexController {
 		doc.sortMaps(srtms);
 		model.addAttribute("srtmcountry", srtms);
 		model.addAttribute("wiki", doc.getWikimaps());
-		model.addAttribute("wikivoyage", doc.getWikivoyages());
 		model.addAttribute("travel", doc.getTravelGuides());
 		model.addAttribute("hillshade", doc.getHillshade());
 		model.addAttribute("depth", doc.getDepths());

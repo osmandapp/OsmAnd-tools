@@ -41,9 +41,6 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "wiki")
 	private List<DownloadIndex> wikimaps = new ArrayList<>();
 
-	@XmlElement(name = "wikivoyage")
-	private List<DownloadIndex> wikivoyages = new ArrayList<>();
-	
 	@XmlElement(name = "travel")
 	private List<DownloadIndex> travel = new ArrayList<>();
 
@@ -78,7 +75,6 @@ public class DownloadIndexDocument {
 		sortMaps(fonts);
 		sortMaps(depths);
 		sortMaps(wikimaps);
-		sortMaps(wikivoyages);
 		sortMaps(travel);
 	}
 	
@@ -94,7 +90,6 @@ public class DownloadIndexDocument {
 		indx.addAll(depths);
 		indx.addAll(inapps);
 		indx.addAll(wikimaps);
-		indx.addAll(wikivoyages);
 		indx.addAll(travel);
 		return indx;
 	}
@@ -134,9 +129,6 @@ public class DownloadIndexDocument {
 		return wikimaps;
 	}
 
-	public List<DownloadIndex> getWikivoyages() {
-		return wikivoyages;
-	}
 	
 	public List<DownloadIndex> getTravelGuides() {
 		return travel;
