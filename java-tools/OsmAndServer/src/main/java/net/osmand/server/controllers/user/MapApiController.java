@@ -212,6 +212,28 @@ public class MapApiController {
 		return okStatus();
 	}
 	
+	@PostMapping(value = "/delete-file")
+	@ResponseBody
+	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		} else {
+			UserFile usf = new PremiumUserFilesRepository.UserFile();
+			usf.name = name;
+			usf.type = type;
+			usf.updatetime = new Date();
+			usf.userid = dev.userid;
+			usf.deviceid = dev.id;
+			usf.data = null;
+			usf.filesize = -1l;
+			usf.zipfilesize = -1l;
+			
+			filesRepository.saveAndFlush(usf);
+			return userdataService.ok();
+		}
+	}
+	
 	@GetMapping(value = "/list-files")
 	@ResponseBody
 	public ResponseEntity<String> listFiles(
