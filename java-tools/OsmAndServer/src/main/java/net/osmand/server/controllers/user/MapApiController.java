@@ -212,6 +212,17 @@ public class MapApiController {
 		return okStatus();
 	}
 	
+	@PostMapping(value = "/delete-file")
+	@ResponseBody
+	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		userdataService.deleteFile(name, type, null, null, dev);
+		return userdataService.ok();
+	}
+	
 	@GetMapping(value = "/list-files")
 	@ResponseBody
 	public ResponseEntity<String> listFiles(
