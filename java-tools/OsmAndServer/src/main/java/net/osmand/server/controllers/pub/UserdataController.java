@@ -215,19 +215,7 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		UserFile usf = new PremiumUserFilesRepository.UserFile();
-		usf.name = name;
-		usf.type = type;
-		usf.updatetime = new Date();
-		usf.userid = dev.userid;
-		usf.deviceid = deviceId;
-		usf.data = null;
-		usf.filesize = -1l;
-		usf.zipfilesize = -1l;
-		if (clienttime != null) {
-			usf.clienttime = new Date(clienttime.longValue());
-		}
-		filesRepository.saveAndFlush(usf);
+		userdataService.deleteFile(name, type, deviceId, clienttime, dev);
 		return userdataService.ok();
 	}
 
