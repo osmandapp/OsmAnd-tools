@@ -206,7 +206,7 @@ public class UserdataService {
     }
     
     public ResponseEntity<String> uploadFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                             String name, String type, long updatetime) throws IOException {
+                                             String name, String type, Long clienttime) throws IOException {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
         long cnt;
         long sum;
@@ -227,7 +227,10 @@ public class UserdataService {
         }
         usf.name = name;
         usf.type = type;
-        usf.updatetime = new Date(updatetime);
+        usf.updatetime = new Date();
+		if (clienttime != null) {
+			usf.clienttime = new Date(clienttime);
+		}
         usf.userid = dev.userid;
         usf.deviceid = dev.id;
         usf.filesize = sum;
