@@ -36,7 +36,7 @@ public class ReceiptValidationService {
 	public final static int NO_SUBSCRIPTIONS_FOUND_STATUS = 110;
 	public final static int INCONSISTENT_RECEIPT_STATUS = 200;
 	public final static int USER_NOT_FOUND_STATUS = 300;
-	
+
 
 	@NonNull
 	public Map<String, Object> validateReceipt(@NonNull JsonObject receiptObj, @NonNull List<Map<String, String>> activeSubscriptions) {
@@ -87,6 +87,9 @@ public class ReceiptValidationService {
 			if (status == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST && !sandbox) {
 				return loadReceiptJsonObject(receipt, true);
 			}
+			if (sandbox) {
+			    LOGGER.info("RECEIPT VALIDATE:" + responseObj.toString());
+            }
 			return responseObj;
 
 		}
