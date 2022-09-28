@@ -87,9 +87,6 @@ public class ReceiptValidationService {
 			if (status == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST && !sandbox) {
 				return loadReceiptJsonObject(receipt, true);
 			}
-			if (sandbox) {
-			    LOGGER.info("RECEIPT VALIDATE:" + responseObj.toString());
-            }
 			return responseObj;
 
 		}
