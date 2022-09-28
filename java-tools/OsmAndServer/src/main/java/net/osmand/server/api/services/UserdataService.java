@@ -449,4 +449,20 @@ public class UserdataService {
     public ResponseEntity<String> tokenNotValid() {
         return error(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
     }
+    
+    public void deleteFile(String name, String type, Integer deviceId, Long clienttime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+        usf.name = name;
+        usf.type = type;
+        usf.updatetime = new Date();
+        usf.userid = dev.userid;
+        usf.deviceid = deviceId != null ? deviceId : dev.id;
+        usf.data = null;
+        usf.filesize = -1L;
+        usf.zipfilesize = -1L;
+        if (clienttime != null) {
+            usf.clienttime = new Date(clienttime);
+        }
+        filesRepository.saveAndFlush(usf);
+    }
 }
