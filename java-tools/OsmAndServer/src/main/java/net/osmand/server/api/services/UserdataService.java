@@ -9,7 +9,6 @@ import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -207,7 +206,7 @@ public class UserdataService {
     }
     
     public ResponseEntity<String> uploadFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                             String name, String type, Integer deviceId) throws IOException {
+                                             String name, String type, long updatetime) throws IOException {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
         long cnt;
         long sum;
@@ -228,9 +227,9 @@ public class UserdataService {
         }
         usf.name = name;
         usf.type = type;
-        usf.updatetime = new Date();
+        usf.updatetime = new Date(updatetime);
         usf.userid = dev.userid;
-        usf.deviceid = deviceId != null ? deviceId : dev.id;
+        usf.deviceid = dev.id;
         usf.filesize = sum;
         usf.zipfilesize = zipsize;
         usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);

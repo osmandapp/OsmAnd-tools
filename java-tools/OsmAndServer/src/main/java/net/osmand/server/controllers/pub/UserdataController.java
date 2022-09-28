@@ -249,7 +249,7 @@ public class UserdataController {
 						new Date(updatetime));
 			}
 			if (fl == null) {
-				return userdataService.error(userdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+				return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 			}
 			storageService.deleteFile(fl.storage,userdataService.userFolder(fl), userdataService.storageFileName(fl));
 			filesRepository.delete(fl);
@@ -262,7 +262,7 @@ public class UserdataController {
 	public ResponseEntity<String> upload(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "deviceid", required = false) Integer deviceId,
+			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = false) String accessToken,
 			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
@@ -278,7 +278,7 @@ public class UserdataController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, deviceId);
+		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, clienttime);
 		if (uploadError != null) {
 			return uploadError;
 		}

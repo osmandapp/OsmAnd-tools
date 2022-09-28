@@ -204,7 +204,7 @@ public class MapApiController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, null);
+		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
 		if (uploadError != null) {
 			return uploadError;
 		}
