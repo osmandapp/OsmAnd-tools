@@ -14,6 +14,16 @@ task collectFonts(type: Sync) {
 	into "fonts/"	
 }
 
+
+task downloadCoreJni(type: Download)  {
+        src 'https://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
+        dest 'lib-gl/OsmAndCore_jni.jar'
+        onlyIfModified true
+}
+
+// https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCoreWithJNI_standalone.so lib-native/
+// https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCore_ResourcesBundle_shared.so lib-native/
+
 task buildDistribution(type: Zip) {
 	dependsOn jar
 	from(configurations.runtimeClasspath.allArtifacts.files) {
@@ -44,7 +54,7 @@ task buildDistribution(type: Zip) {
 }
 
 compileJava {
-	dependsOn collectFonts
+	dependsOn collectFonts, downloadCoreJni
 }
 
 dependencies {
