@@ -1,10 +1,9 @@
 package net.osmand.server.api.services;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.net.URL;
+import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,6 +44,8 @@ public class DownloadIndexesService  {
 
 	private static final String INDEX_FILE = "indexes.xml";
 	private static final String DOWNLOAD_SETTINGS = "api/settings.json";
+	private static final String INDEX_FILE_EXTERNAL_URL = "index-source.info";
+    private static final String EXTERNAL_URL = "public-api-indexes/";
 	
 	@Value("${osmand.files.location}")
     private String pathToDownloadFiles;
@@ -204,21 +205,57 @@ public class DownloadIndexesService  {
 		if(files == null || files.length == 0) {
 			return;
 		}
+		if (files.length > 0 && files[0].getName().equals(INDEX_FILE_EXTERNAL_URL))
+        {
+            try {
+                String host;
+                BufferedReader bufferreader = new BufferedReader(new FileReader(files[0]));
+                while ((host = bufferreader.readLine()) != null) {
+                    URL url = new URL("https://" + host + "/" + EXTERNAL_URL + subPath);
+                    InputStreamReader reader = new InputStreamReader(url.openStream());
+                    ExternalSource [] externalSources = gson.fromJson(reader, ExternalSource[].class);
+                    if (externalSources.length > 0) {
+                        boolean areFilesAdded = false;
+                        for (ExternalSource source : externalSources) {
+                            //do not read external zip files, otherwise it will be too long by remote connection
+                            if (source.type.equals("file") && type.acceptFileName(source.name) && !isZip(source.name)) {
+                                DownloadIndex di = new DownloadIndex();
+                                di.setType(type);
+                                String name = source.name;
+                                int extInd = name.indexOf('.');
+                                String ext = name.substring(extInd + 1);
+                                formatName(name, extInd);
+                                di.setName(name);
+                                di.setSize(source.size);
+                                di.setContainerSize(source.size);
+                                di.setTimestamp(source.getTimestamp());
+                                di.setDate(source.getTimestamp());
+                                di.setContentSize(source.size);
+                                di.setTargetsize(source.size);
+                                di.setDescription(type.getDefaultTitle(name, ext));
+                                list.add(di);
+                                areFilesAdded = true;
+                            }
+                        }
+                        if (areFilesAdded) {
+                            break;
+                        }
+                    }
+                    //will continue if was not find any files in this host (server)
+                }
+            } catch (IOException e) {
+                LOGGER.error("LOAD EXTERNAL INDEXES: " + e.getMessage(), e.getCause());
+            }
+            return;
+        }
 		for (File lf : files) {
 			if (filterFiles != null && !lf.getName().contains(filterFiles)) {
 				continue;
-			} else if (type.acceptFile(lf)) {
+			} else if (type.acceptFileName(lf.getName())) {
 				String name = lf.getName();
-				int extInd = name.indexOf('.');
-				String ext = name.substring(extInd + 1);
-				name = name.substring(0, extInd);
-				if (name.endsWith("_ext_2")) {
-					name = name.replace("_ext_2", "");
-				}
-				if (name.endsWith("_2")) {
-					name = name.replace("_2", "");
-				}
-				name = name.replace('_', ' ');
+                int extInd = name.indexOf('.');
+                String ext = name.substring(extInd + 1);
+				formatName(name, extInd);
 				DownloadIndex di = new DownloadIndex();
 				di.setType(type);
 				di.setName(lf.getName());
@@ -278,6 +315,10 @@ public class DownloadIndexesService  {
 		return file.getName().endsWith(".zip");
 	}
 
+    private boolean isZip(String fileName) {
+        return fileName.endsWith(".zip");
+    }
+
 	private void generateIndexesFile(DownloadIndexDocument doc, File file, long start) {
 		try {
 			JAXBContext jc = JAXBContext.newInstance(DownloadIndexDocument.class);
@@ -320,32 +361,31 @@ public class DownloadIndexesService  {
 		}
 
 
-		public boolean acceptFile(File f) {
-			switch (this) {
-			case HEIGHTMAP:
-				return f.getName().endsWith(".sqlite");
-			case TRAVEL:
-				return f.getName().endsWith(".travel.obf.zip") || f.getName().endsWith(".travel.obf");
-			case MAP:
-			case ROAD_MAP:
-			case WIKIMAP:
-			case DEPTH:
-			case DEPTHMAP:
-			case SRTM_MAP:
-				return f.getName().endsWith(".obf.zip") || f.getName().endsWith(".obf") || f.getName().endsWith(".extra.zip");
-			case HILLSHADE:
-			case SLOPE:
-				return f.getName().endsWith(".sqlitedb");
-			case FONTS:
-				return f.getName().endsWith(".otf.zip");
-			case VOICE:
-				return f.getName().endsWith(".voice.zip");
-				
-			}
-			return false;
-		}
-	    
-		
+        public boolean acceptFileName(String fileName) {
+            switch (this) {
+                case HEIGHTMAP:
+                    return fileName.endsWith(".sqlite");
+                case TRAVEL:
+                    return fileName.endsWith(".travel.obf.zip") || fileName.endsWith(".travel.obf");
+                case MAP:
+                case ROAD_MAP:
+                case WIKIMAP:
+                case DEPTH:
+                case DEPTHMAP:
+                case SRTM_MAP:
+                    return fileName.endsWith(".obf.zip") || fileName.endsWith(".obf") || fileName.endsWith(".extra.zip");
+                case HILLSHADE:
+                case SLOPE:
+                    return fileName.endsWith(".sqlitedb");
+                case FONTS:
+                    return fileName.endsWith(".otf.zip");
+                case VOICE:
+                    return fileName.endsWith(".voice.zip");
+            }
+            return false;
+        }
+
+
 		public String getDefaultTitle(String regionName, String ext) {
 			switch (this) {
 			case MAP:
@@ -507,4 +547,66 @@ public class DownloadIndexesService  {
 			throw new IOException(ex);
 		}
 	}
+
+	private void formatName(String name, int extInd) {
+        name = name.substring(0, extInd);
+        if (name.endsWith("_ext_2")) {
+            name = name.replace("_ext_2", "");
+        }
+        if (name.endsWith("_2")) {
+            name = name.replace("_2", "");
+        }
+        name = name.replace('_', ' ');
+    }
+
+    public static class ExternalSource implements Serializable {
+	    private String name;
+	    private String type;
+	    private String mtime;
+	    private long size;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getMtime() {
+            return mtime;
+        }
+
+        public void setMtime(String mtime) {
+            this.mtime = mtime;
+        }
+
+        public long getSize() {
+            return size;
+        }
+
+        public void setSize(long size) {
+            this.size = size;
+        }
+
+        public long getTimestamp() {
+            //example Wed, 31 Aug 2022 11:53:18 GMT
+            DateFormat format = new SimpleDateFormat("EEE, d MMM yyyy hh:mm:ss zzz");
+            try {
+                Date date = format.parse(mtime);
+                return date.getTime();
+            } catch (ParseException e) {
+                LOGGER.error("LOAD EXTERNAL INDEXES, problem parse of date: \"" + mtime + "\"" + e.getMessage(), e.getCause());
+            }
+            return -1;
+        }
+    }
 }
