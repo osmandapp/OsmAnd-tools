@@ -1,6 +1,8 @@
 package net.osmand;
 
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -287,7 +289,21 @@ public class MainUtilities {
 
 	private static void generateObf(List<String> subArgs, IndexCreatorSettings settings) throws IOException, SQLException,
 			InterruptedException, XmlPullParserException {
-		File fileToGen = new File(subArgs.get(0));
+		String fl = subArgs.get(0);
+		File fileToGen = new File(fl);
+		if (fl.startsWith("http://") || fl.startsWith("https://")) {
+			URL fu = new URL(fl);
+			HttpURLConnection connection = (HttpURLConnection) fu.openConnection();
+			long lastModified = connection.getLastModified();
+			String fileName = new File(fu.getFile()).getName();
+			System.out.print(String.format("Downloading file %s from %s", fileName, fu));
+			FileOutputStream fous = new FileOutputStream(fileName);
+			Algorithms.streamCopy(connection.getInputStream(), fous);
+			fous.close();
+			fileToGen = new File(fileName);
+			fileToGen.setLastModified(lastModified);
+			System.out.print(String.format("File %s downloaded.", fileName));
+		}
 		IndexCreator ic = new IndexCreator(new File("."), settings);
 		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE, 
 				settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE);
