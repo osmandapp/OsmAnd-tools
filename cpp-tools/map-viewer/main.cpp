@@ -1574,12 +1574,12 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("camera latitude        : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().y)));
+            QString("camera latitude        : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().latitude)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("camera longitude       : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().x)));
+            QString("camera longitude       : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().longitude)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
