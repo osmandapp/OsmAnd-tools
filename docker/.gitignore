@@ -1,2 +1,5 @@
 OsmAndMapCreator
 OsmAndMapCreator-main.zip
+*.pbf
+*.ocbf
+*.obf

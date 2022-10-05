@@ -296,13 +296,13 @@ public class MainUtilities {
 			HttpURLConnection connection = (HttpURLConnection) fu.openConnection();
 			long lastModified = connection.getLastModified();
 			String fileName = new File(fu.getFile()).getName();
-			System.out.print(String.format("Downloading file %s from %s", fileName, fu));
+			System.out.println(String.format("Downloading file %s from %s", fileName, fu));
 			FileOutputStream fous = new FileOutputStream(fileName);
 			Algorithms.streamCopy(connection.getInputStream(), fous);
 			fous.close();
 			fileToGen = new File(fileName);
 			fileToGen.setLastModified(lastModified);
-			System.out.print(String.format("File %s downloaded.", fileName));
+			System.out.println(String.format("File %s downloaded.", fileName));
 		}
 		IndexCreator ic = new IndexCreator(new File("."), settings);
 		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE, 
