@@ -413,26 +413,16 @@ public class IndexUploader {
 
 	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException, RTreeException {
 		String fileName = mainFile.getName();
-		if (fileName.contains(".srtm") || fileName.contains(".srtmf")) {
-			if (!this.srtmProcess) {
-				return null;
-			}
-		} else if (fileName.contains(".road")) {
-			if (!this.roadProcess) {
-				return null;
-			}
-		} else if (fileName.contains(".wiki")) {
-			if (!this.wikiProcess) {
-				return null;
-			}
-		} else if (fileName.contains(".travel")) {
-			if (!this.travelProcess) {
-				return null;
-			}
-		} else if (fileName.contains(".depth")) {
-			if (!this.depthProcess) {
-				return null;
-			}
+		if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
+			return null;
+		} else if (fileName.contains(".road") != this.roadProcess) {
+			return null;
+		} else if (fileName.contains(".wiki") != this.wikiProcess) {
+			return null;
+		} else if (fileName.contains(".travel") != this.travelProcess) {
+			return null;
+		} else if (fileName.contains(".depth") != this.depthProcess) {
+			return null;
 		} else {
 			boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
 			if (!worldFile && !fileName.contains("_ext_")) {
