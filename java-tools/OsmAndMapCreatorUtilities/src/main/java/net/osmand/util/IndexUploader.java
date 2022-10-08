@@ -370,7 +370,14 @@ public class IndexUploader {
 						}
 					}
 					try {
-						String description = checkfileAndGetDescription(mainFile, directory);
+						if (mapsProcess) {
+							boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
+							if (!worldFile && !fileName.contains("_ext_")) {
+								extractRoadOnlyFile(mainFile, new File(directory, fileName.replace(IndexConstants.BINARY_MAP_INDEX_EXT,
+										IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
+							}
+						}
+						String description = checkfileAndGetDescription(mainFile);
 						timestampCreated = mainFile.lastModified();
 						if (description == null) {
 							log.info("Skip file empty description " + f.getName());
@@ -439,16 +446,8 @@ public class IndexUploader {
 		}
 	}
 
-	private String checkfileAndGetDescription(File mainFile, File indexesDir) throws OneFileException, IOException, RTreeException {
+	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException, RTreeException {
 		String fileName = mainFile.getName();
-		 
-		if(mapsProcess) {
-			boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
-			if (!worldFile && !fileName.contains("_ext_")) {
-				extractRoadOnlyFile(mainFile, new File(indexesDir, fileName
-						.replace(IndexConstants.BINARY_MAP_INDEX_EXT, IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
-			}
-		}
 		
 		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
 			RandomAccessFile raf = null;
