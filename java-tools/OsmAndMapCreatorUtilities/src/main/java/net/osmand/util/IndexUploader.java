@@ -771,9 +771,11 @@ public class IndexUploader {
 			// do not upload small files
 		}
 		try {
-			log.info("Upload index " + fileName + " (log file: " + logFileName + ")" );
+			log.info("Uploading index " + fileName + " (log file: " + logFileName + ")" );
 			boolean uploaded = uploadFileToServer(toUpload, summary, uc);
-				
+			if (!uploaded) {
+				log.info("Upload failed");
+			}
 			// remove source file if file was split
 			if (uploaded && targetDirectory != null && !targetDirectory.equals(directory)) {
 				File toBackup = new File(targetDirectory, fileName);
@@ -787,6 +789,7 @@ public class IndexUploader {
 					logFileUploaded.delete();
 					logFile.renameTo(logFileUploaded);
 				}
+				log.info("Upload succesful, saving backup to " + toBackup.getAbsolutePath());
 				if (!toUpload.renameTo(toBackup)) {
 					FileOutputStream fout = new FileOutputStream(toBackup);
 					FileInputStream fin = new FileInputStream(toUpload);
