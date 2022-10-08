@@ -136,6 +136,7 @@ public class IndexUploader {
 	private boolean srtmProcess;
 	private boolean travelProcess;
 	private boolean depthProcess;
+	private boolean mapsProcess;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -225,6 +226,7 @@ public class IndexUploader {
 				depthProcess = true;
 				start++;
 			} else if (args[start].startsWith("--maps")) {
+				mapsProcess = true;
 				start++;
 			}
 		} while (p != start);
@@ -339,7 +341,24 @@ public class IndexUploader {
 						log.info("File skipped because timestamp was not changed " + f.getName());
 						continue;
 					}
+					String fileName = f.getName();
 					log.info("Process file " + f.getName());
+					boolean skip = false;
+					if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
+						skip = true;
+					} else if (fileName.contains(".road") != this.roadProcess) {
+						skip = true;
+					} else if (fileName.contains(".wiki") != this.wikiProcess) {
+						skip = true;
+					} else if (fileName.contains(".travel") != this.travelProcess) {
+						skip = true;
+					} else if (fileName.contains(".depth") != this.depthProcess) {
+						skip = true;
+					}
+					if (skip) {
+						log.info("Skip file: " + f.getName());
+						continue;
+					}
 					File unzippedFolder = unzip(f);
 					File mainFile = unzippedFolder;
 					if (unzippedFolder.isDirectory()) {
@@ -350,12 +369,11 @@ public class IndexUploader {
 							}
 						}
 					}
-					boolean skip = false;
 					try {
 						String description = checkfileAndGetDescription(mainFile, directory);
 						timestampCreated = mainFile.lastModified();
 						if (description == null) {
-							log.info("Skip file " + f.getName());
+							log.info("Skip file empty description " + f.getName());
 							skip = true;
 						} else {
 							File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
@@ -423,17 +441,8 @@ public class IndexUploader {
 
 	private String checkfileAndGetDescription(File mainFile, File indexesDir) throws OneFileException, IOException, RTreeException {
 		String fileName = mainFile.getName();
-		if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
-			return null;
-		} else if (fileName.contains(".road") != this.roadProcess) {
-			return null;
-		} else if (fileName.contains(".wiki") != this.wikiProcess) {
-			return null;
-		} else if (fileName.contains(".travel") != this.travelProcess) {
-			return null;
-		} else if (fileName.contains(".depth") != this.depthProcess) {
-			return null;
-		} else {
+		 
+		if(mapsProcess) {
 			boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
 			if (!worldFile && !fileName.contains("_ext_")) {
 				extractRoadOnlyFile(mainFile, new File(indexesDir, fileName
@@ -441,8 +450,7 @@ public class IndexUploader {
 			}
 		}
 		
-		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)
-				|| fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT_ZIP)) {
+		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
 			RandomAccessFile raf = null;
 			try {
 				raf = new RandomAccessFile(mainFile, "r");
