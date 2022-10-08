@@ -44,6 +44,9 @@ import net.osmand.util.ResourceDeleter;
 import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
@@ -310,8 +313,55 @@ public class MainUtilities {
 		ic.setLastModifiedDate(fileToGen.lastModified());
 		String regionName = fileToGen.getName();
 		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(settings.renderingTypesFile, regionName);
-		ic.generateIndexes(fileToGen, new ConsoleProgressImplementation(), null, MapZooms.getDefault(),
-				types, log);
+		File res = ic.generateIndexes(fileToGen, new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types, log);
+		for(int i = 1; i < subArgs.size(); i++) {
+			String arg = subArgs.get(i);
+			if (arg.equals("--upload") && i < subArgs.size() - 1) {
+				String targetDir = subArgs.get(i + 1);
+				uploadFile(res, targetDir);
+				break;
+			}
+		}
+	}
+
+	private static void uploadFile(File res, String targetDir) throws IOException {
+		if (targetDir.startsWith("s3://")) {
+			// s3://osmand-maps-gen/2022-10/
+			S3Client client = S3Client.builder().build();
+			String url = targetDir.substring("s3://".length());
+			int i = url.indexOf('/');
+			String bucket = url.substring(0, i);
+			String key = url.substring(i + 1);
+			if (key.endsWith("/")) {
+				key += res.getName();
+			}
+			PutObjectRequest request = PutObjectRequest.builder().
+					contentLength(res.length()).
+					bucket(bucket).
+					key(key).
+					build();
+			client.putObject(request, RequestBody.fromFile(res));
+//			S3Waiter waiter = client.waiter();
+//	        HeadObjectRequest requestWait = HeadObjectRequest.builder().bucket(bucketName).key(key).build();
+//	        WaiterResponse<HeadObjectResponse> waiterResponse = waiter.waitUntilObjectExists(requestWait);
+//	        waiterResponse.matched().response().ifPresent(System.out::println);
+		} else {
+			File targetFile = new File(targetDir);
+			if (targetDir.endsWith("/")) {
+				targetFile.mkdirs();
+				targetFile = new File(targetDir, res.getName());
+			}
+
+			if (!res.renameTo(targetFile)) {
+				FileOutputStream fout = new FileOutputStream(targetFile);
+				FileInputStream fin = new FileInputStream(res);
+				Algorithms.streamCopy(fin, fout);
+				fin.close();
+				fout.close();
+			}
+		}
+		System.out.println("File " + res.getName() + " was uploaded to "  + targetDir);     
+
 	}
 
 	private static void printSynopsys() {

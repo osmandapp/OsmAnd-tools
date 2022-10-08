@@ -39,8 +39,9 @@ dependencies {
 		// xmlpull
 		// xml-apis
 		// xwiki...rendering-xml
-        exclude module:'gnu.trove.osmand'
-    }
+           exclude module:'gnu.trove.osmand'
+        }
+
 	testImplementation project(':OsmAnd-java')
 	//testImplementation files(project(':OsmAnd-java').sourceSets.test.output.classesDirs.filter {  } )
 //	testImplementation files(project(':OsmAnd-java').sourceSets.test.output.classesDirs.filter { include '**/*.class' } )
@@ -50,6 +51,9 @@ dependencies {
 	implementation 'com.google.code.findbugs:jsr305:3.0.2'
 	implementation 'com.google.code.gson:gson:2.8.2'
 	implementation 'org.xerial:sqlite-jdbc:3.7.2'
+       
+	 implementation platform('software.amazon.awssdk:bom:2.15.0')
+        implementation 'software.amazon.awssdk:s3'
 
 	implementation 'org.apache.commons:commons-compress:1.17'
 	implementation 'commons-codec:commons-codec:1.11'

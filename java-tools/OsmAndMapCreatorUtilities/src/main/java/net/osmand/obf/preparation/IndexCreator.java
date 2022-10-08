@@ -532,14 +532,14 @@ public class IndexCreator {
 		}
 	}
 
-	public void generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
+	public File generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false,
+		return generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false,
 				false);
 	}
 
-	public void generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
+	public File generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds,
 			boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 
@@ -755,6 +755,7 @@ public class IndexCreator {
 				e.printStackTrace();
 			}
 		}
+		return mapFile;
 	}
 
 	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc)
