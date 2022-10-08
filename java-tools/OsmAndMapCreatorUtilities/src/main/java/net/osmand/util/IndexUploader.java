@@ -224,6 +224,8 @@ public class IndexUploader {
 			} else if (args[start].startsWith("--depth")) {
 				depthProcess = true;
 				start++;
+			} else if (args[start].startsWith("--maps")) {
+				start++;
 			}
 		} while (p != start);
 		if (fileFilter != null) {
