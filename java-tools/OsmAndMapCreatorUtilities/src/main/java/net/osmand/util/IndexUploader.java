@@ -342,9 +342,17 @@ public class IndexUploader {
 					log.info("Process file " + f.getName());
 					File unzippedFolder = unzip(f);
 					File mainFile = unzippedFolder;
+					if (unzippedFolder.isDirectory()) {
+						for (File tf : unzippedFolder.listFiles()) {
+							if (tf.getName().endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
+								mainFile = tf;
+								break;
+							}
+						}
+					}
 					boolean skip = false;
 					try {
-						String description = checkfileAndGetDescription(mainFile);
+						String description = checkfileAndGetDescription(mainFile, directory);
 						timestampCreated = mainFile.lastModified();
 						if (description == null) {
 							log.info("Skip file " + f.getName());
@@ -413,7 +421,7 @@ public class IndexUploader {
 		}
 	}
 
-	private String checkfileAndGetDescription(File mainFile) throws OneFileException, IOException, RTreeException {
+	private String checkfileAndGetDescription(File mainFile, File indexesDir) throws OneFileException, IOException, RTreeException {
 		String fileName = mainFile.getName();
 		if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
 			return null;
@@ -428,7 +436,7 @@ public class IndexUploader {
 		} else {
 			boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
 			if (!worldFile && !fileName.contains("_ext_")) {
-				extractRoadOnlyFile(mainFile, new File(mainFile.getParentFile(), fileName
+				extractRoadOnlyFile(mainFile, new File(indexesDir, fileName
 						.replace(IndexConstants.BINARY_MAP_INDEX_EXT, IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
 			}
 		}
