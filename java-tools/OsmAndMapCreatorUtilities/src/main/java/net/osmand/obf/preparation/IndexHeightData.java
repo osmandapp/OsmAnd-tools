@@ -4,8 +4,11 @@ import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferShort;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,7 +35,12 @@ import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 public class IndexHeightData {
 	private static final double MINIMAL_DISTANCE = 0;
@@ -40,7 +48,8 @@ public class IndexHeightData {
 	private static final int MAXIMUM_LOADED_DATA = 200; 
 	private static boolean USE_BILINEAR_INTERPOLATION = false;
 
-	private File srtmData;
+	private String srtmDataUrl;
+	private File srtmWorkingDir;
 	
 	public static final String ELE_ASC_START = "osmand_ele_start";
 	public static final String ELE_ASC_END = "osmand_ele_end";
@@ -54,7 +63,7 @@ public class IndexHeightData {
 	
 	private Map<Integer, TileData> map = new HashMap<Integer, TileData>();
 
-	private Log log = PlatformUtil.getLog(IndexHeightData.class);
+	private static final Log log = PlatformUtil.getLog(IndexHeightData.class);
 	
 	private static class TileData {
 		DataBufferShort data;
@@ -68,9 +77,9 @@ public class IndexHeightData {
 			
 		}
 		
-		public File loadData(File folder) throws IOException {
+		public File loadData(String srtmDataUrl, File workDir) throws IOException {
 			dataLoaded = true;
-			File f = getFile(folder);
+			File f = loadFile(getFileName() + ".tif", srtmDataUrl, workDir);
 			BufferedImage img;
 			if (f.exists()) {
 				img = ImageIO.read(f);
@@ -82,11 +91,6 @@ public class IndexHeightData {
 			return f;
 		}
 		
-		private File getFile(File folder) {
-			String nd = getFileName();
-			File f = new File(folder, nd +".tif");
-			return f;
-		}
 
 		private String getFileName() {
 			int ln = (id >> 10) - 180;
@@ -448,8 +452,9 @@ public class IndexHeightData {
 	
 	
 	
-	public void setSrtmData(File srtmData) {
-		this.srtmData = srtmData;
+	public void setSrtmData(String srtmData, File workingDir) {
+		this.srtmDataUrl = srtmData;
+		this.srtmWorkingDir = workingDir;
 	}
 	
 	public double getPointHeight(double lat, double lon) {
@@ -487,7 +492,7 @@ public class IndexHeightData {
 		if (!tileData.dataLoaded) {
 			try {
 				log.info(String.format("SRTM: Load srtm data %d: %d %d", id, (int) lt, (int) ln));
-				File missingFile = tileData.loadData(srtmData);
+				File missingFile = tileData.loadData(srtmDataUrl, srtmWorkingDir);
 				if (fileName != null && fileName.length > 0) {
 					fileName[0] = missingFile;
 				}
@@ -499,6 +504,50 @@ public class IndexHeightData {
 		return tileData.getHeight(lonDelta, latDelta, neighboors);
 	}
 	
+	private static File loadFile(String fl, String folderURL, File workDir) {
+		if(folderURL.startsWith("http://") || folderURL.startsWith("https://")) {
+			File res = new File(workDir, fl);
+			
+			try {
+				InputStream is = new URL(folderURL + fl).openStream();
+				FileOutputStream fous = new FileOutputStream(res);
+				Algorithms.streamCopy(is, fous);
+				is.close();
+				fous.close();
+			} catch (IOException | RuntimeException e) {
+				log.warn(String.format("Couldn't access height data %s at %s", fl, folderURL));
+			}
+			return res;
+		} else if(folderURL.startsWith("s3://")) {
+			String url = folderURL + fl;
+			File res = new File(workDir, fl);
+			
+			int i = url.indexOf('/');
+			String bucket = url.substring(0, i);
+			String key = url.substring(i + 1);
+			if (key.endsWith("/")) {
+				key += res.getName();
+			}
+			try {
+				S3Client client = S3Client.builder().build();
+
+				GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
+				ResponseInputStream<GetObjectResponse> obj = client.getObject(request);
+				FileOutputStream fous = new FileOutputStream(res);
+				Algorithms.streamCopy(obj, fous);
+				obj.close();
+				fous.close();
+			} catch (IOException | RuntimeException e) {
+				log.warn(String.format("Couldn't access height data %s at %s", fl, folderURL));
+			}
+			return res;
+		} else {
+			return new File(folderURL, fl);
+		}
+	}
+
+
+
 	public static int getTileId(int lat, int lon) {
 		int ln = (int) (lon + 180);
 		int lt = (int) (lat  + 90);
@@ -526,7 +575,7 @@ public class IndexHeightData {
 	
 	public static void main(String[] args) throws XmlPullParserException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
 		IndexHeightData hd = new IndexHeightData();
-		hd.setSrtmData(new File("/Users/victorshcherb/osmand/maps/srtm/"));
+		hd.setSrtmData("/Users/victorshcherb/osmand/maps/srtm/", null);
 		
 //		test(-1.3, -3.1);
 //		simpleTestHeight(hd);

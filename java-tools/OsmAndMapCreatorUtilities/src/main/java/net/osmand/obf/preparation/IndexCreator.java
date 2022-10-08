@@ -96,7 +96,7 @@ public class IndexCreator {
 		this.workingDir = workingDir;
 		this.settings = settings;
 		if (settings.srtmDataFolder == null && new File(workingDir, "srtm").exists()) {
-			settings.srtmDataFolder = new File(workingDir, "srtm");
+			settings.srtmDataFolder = new File(workingDir, "srtm").getAbsolutePath();
 		}
 		if (settings.srtmDataFolder != null) {
 			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("TIFF");
@@ -104,7 +104,7 @@ public class IndexCreator {
 				System.out.println("Tiff reader: " + readers.next());
 			}
 			heightData = new IndexHeightData();
-			heightData.setSrtmData(settings.srtmDataFolder);
+			heightData.setSrtmData(settings.srtmDataFolder, workingDir);
 		}
 	}
 

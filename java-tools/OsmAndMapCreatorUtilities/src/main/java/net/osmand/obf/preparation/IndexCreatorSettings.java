@@ -24,8 +24,8 @@ public class IndexCreatorSettings {
 	// zoom smoothness for low level roads
 	public int zoomWaySmoothness = 2;
 	
-	// srtm data folder to amend roads with height profile
-	public File srtmDataFolder;
+	// srtm data folder to amend roads with height profile (could be s3://, https:// url)
+	public String srtmDataFolder;
 	
 	// gtfs data for public transport
 	public File gtfsData;
