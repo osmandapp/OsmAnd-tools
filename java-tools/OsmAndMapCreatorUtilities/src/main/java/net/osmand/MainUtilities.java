@@ -227,7 +227,7 @@ public class MainUtilities {
 				settings.processInRam = true;
 				it.remove();
 			} else if (s.startsWith("--srtm=")) {
-				settings.srtmDataFolder = s.substring(s.indexOf('=') + 1);
+				settings.srtmDataFolderUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
 			} else if (s.startsWith("--rendering-types=")) {
 				settings.renderingTypesFile = s.substring(s.indexOf('=') + 1);

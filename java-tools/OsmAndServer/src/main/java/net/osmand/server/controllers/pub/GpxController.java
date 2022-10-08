@@ -467,7 +467,7 @@ public class GpxController {
 				return null;
 			}
 			IndexHeightData hd = new IndexHeightData();
-			hd.setSrtmData(srtmFolder);
+			hd.setSrtmData(srtmFolder.getAbsolutePath(), srtmFolder);
 			for (Track tr : gpxFile.tracks) {
 				for (TrkSegment s : tr.segments) {
 					for (int i = 0; i < s.points.size(); i++) {

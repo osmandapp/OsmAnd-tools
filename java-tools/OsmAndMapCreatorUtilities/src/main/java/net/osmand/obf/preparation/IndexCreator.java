@@ -95,16 +95,16 @@ public class IndexCreator {
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
 		this.settings = settings;
-		if (settings.srtmDataFolder == null && new File(workingDir, "srtm").exists()) {
-			settings.srtmDataFolder = new File(workingDir, "srtm").getAbsolutePath();
+		if (settings.srtmDataFolderUrl == null && new File(workingDir, "srtm").exists()) {
+			settings.srtmDataFolderUrl = new File(workingDir, "srtm").getAbsolutePath();
 		}
-		if (settings.srtmDataFolder != null) {
+		if (settings.srtmDataFolderUrl != null) {
 			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("TIFF");
 			while (readers.hasNext()) {
 				System.out.println("Tiff reader: " + readers.next());
 			}
 			heightData = new IndexHeightData();
-			heightData.setSrtmData(settings.srtmDataFolder, workingDir);
+			heightData.setSrtmData(settings.srtmDataFolderUrl, workingDir);
 		}
 	}
 

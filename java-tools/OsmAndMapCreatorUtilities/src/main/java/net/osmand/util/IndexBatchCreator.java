@@ -520,7 +520,7 @@ public class IndexBatchCreator {
 				}
 			} else {
 				if (srtmDir != null && (rdata == null || rdata.indexSRTM)) {
-					settings.srtmDataFolder = srtmDir;
+					settings.srtmDataFolderUrl = srtmDir.getAbsolutePath();
 				}
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir, settings);
