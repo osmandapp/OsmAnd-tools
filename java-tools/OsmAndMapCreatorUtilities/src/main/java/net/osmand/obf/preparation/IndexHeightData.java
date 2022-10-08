@@ -515,22 +515,17 @@ public class IndexHeightData {
 				is.close();
 				fous.close();
 			} catch (IOException | RuntimeException e) {
-				log.warn(String.format("Couldn't access height data %s at %s", fl, folderURL));
+				log.warn(String.format("Couldn't access height data %s at %s: %s", fl, folderURL, e.getMessage()), e);
 			}
 			return res;
 		} else if(folderURL.startsWith("s3://")) {
-			String url = folderURL + fl;
+			String url = folderURL.substring("s3://".length()) + fl;
 			File res = new File(workDir, fl);
-			
 			int i = url.indexOf('/');
 			String bucket = url.substring(0, i);
 			String key = url.substring(i + 1);
-			if (key.endsWith("/")) {
-				key += res.getName();
-			}
 			try {
 				S3Client client = S3Client.builder().build();
-
 				GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
 				ResponseInputStream<GetObjectResponse> obj = client.getObject(request);
 				FileOutputStream fous = new FileOutputStream(res);
@@ -538,7 +533,7 @@ public class IndexHeightData {
 				obj.close();
 				fous.close();
 			} catch (IOException | RuntimeException e) {
-				log.warn(String.format("Couldn't access height data %s at %s", fl, folderURL));
+				log.warn(String.format("Couldn't access height data %s at %s: %s", fl, folderURL, e.getMessage()), e);
 			}
 			return res;
 		} else {
