@@ -258,11 +258,11 @@ public class IndexBatchCreator {
 								RegionSpecificData dt = new RegionSpecificData();
 								dt.downloadName = cr.getDownloadName();
 								if (!Algorithms.isEmpty(filterStartWith)
-										&& !filterStartWith.toLowerCase().startsWith(dt.downloadName.toLowerCase())) {
+										&& !dt.downloadName.toLowerCase().startsWith(filterStartWith.toLowerCase())) {
 									continue;
 								}
 								if (!Algorithms.isEmpty(filterContains)
-										&& !filterContains.toLowerCase().contains(dt.downloadName.toLowerCase())) {
+										&& !dt.downloadName.toLowerCase().contains(filterContains.toLowerCase())) {
 									continue;
 								}
 								countries.regionNames.put(dt.downloadName, dt);
