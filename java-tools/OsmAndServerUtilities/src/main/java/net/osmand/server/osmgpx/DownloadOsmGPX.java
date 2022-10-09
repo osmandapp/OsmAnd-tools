@@ -81,6 +81,9 @@ public class DownloadOsmGPX {
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
 	
+	private static final int HTTP_TIMEOUT = 5000;
+	private static final int MAX_RETRY_TIMEOUT = 2;
+	
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
@@ -316,7 +319,7 @@ public class DownloadOsmGPX {
 	
 	private String downloadGpx(long id, String name)
 			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException {
-		HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data");
+		HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data", MAX_RETRY_TIMEOUT);
 		// content-type: application/x-bzip2
 		// content-type: application/x-gzip
 		InputStream inputStream = null;
@@ -385,7 +388,7 @@ public class DownloadOsmGPX {
 					Thread.sleep(FETCH_INTERVAL_SLEEP);
 				}
 				maxId = r.id;
-				HttpsURLConnection httpConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + r.id + "/details");
+				HttpsURLConnection httpConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + r.id + "/details", MAX_RETRY_TIMEOUT);
 				StringBuilder sb = Algorithms.readFromInputStream(httpConn.getInputStream());
 				r = parseGPXFiles(new StringReader(sb.toString()), null);
 				wgpx.ps.setString(1, r.description);
@@ -474,7 +477,7 @@ public class DownloadOsmGPX {
 		int emptyFetch = 0;
 		for (long id = ID_INIT; id < ID_END; id++) {
 			String url = MAIN_GPX_API_ENDPOINT + id + "/details";
-			HttpsURLConnection httpConn = getHttpConnection(url);
+			HttpsURLConnection httpConn = getHttpConnection(url, MAX_RETRY_TIMEOUT);
 			int responseCode = httpConn.getResponseCode();
 			if (responseCode == 404 || responseCode == 403) {
 				// skip non-accessible id && forgotten
@@ -647,41 +650,54 @@ public class DownloadOsmGPX {
 
 
 
-	private HttpsURLConnection getHttpConnection(String url)
+	private HttpsURLConnection getHttpConnection(String url, int retry)
 			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException {
-		if (!sslInit) {
-			SSLContext ctx = SSLContext.getInstance("TLS");
-			ctx.init(new KeyManager[0], new X509TrustManager[] { new X509TrustManager() {
-				@Override
-				public X509Certificate[] getAcceptedIssuers() {
-					return null;
-				}
+		HttpsURLConnection con;
+		try {
+			if (!sslInit) {
+				SSLContext ctx = SSLContext.getInstance("TLS");
+				ctx.init(new KeyManager[0], new X509TrustManager[] { new X509TrustManager() {
+					@Override
+					public X509Certificate[] getAcceptedIssuers() {
+						return null;
+					}
 
-				@Override
-				public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
-				}
+					@Override
+					public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
+					}
 
-				@Override
-				public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
-				}
-			} }, new SecureRandom());
-			SSLContext.setDefault(ctx);
-			sslInit = true;
+					@Override
+					public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
+					}
+				} }, new SecureRandom());
+				SSLContext.setDefault(ctx);
+				sslInit = true;
+			}
+			String name = System.getenv("OSM_USER");
+			String pwd = System.getenv("OSM_PASSWORD");
+			
+			con = (HttpsURLConnection) new URL(url).openConnection();
+			con.setConnectTimeout(HTTP_TIMEOUT);
+			if (name != null && pwd != null) {
+				con.setRequestProperty("Authorization", "Basic " + Base64.encode(name + ":" + pwd));
+			}
+
+			con.setHostnameVerifier(new HostnameVerifier() {
+			    @Override
+			    public boolean verify(String arg0, SSLSession arg1) {
+			        return true;
+			    }
+			});
+			
+			con.getResponseCode();
+			return con;
+		} catch (IOException e) {
+			if (retry > 0) {
+				return getHttpConnection(url, retry - 1);
+			} else {
+				throw e;
+			}
 		}
-        String name = System.getenv("OSM_USER");
-        String pwd = System.getenv("OSM_PASSWORD");
-        HttpsURLConnection con = (HttpsURLConnection) new URL(url).openConnection();
-		if (name != null && pwd != null) {
-			con.setRequestProperty("Authorization", "Basic " + Base64.encode(name + ":" + pwd));
-		}
-
-		con.setHostnameVerifier(new HostnameVerifier() {
-            @Override
-            public boolean verify(String arg0, SSLSession arg1) {
-                return true;
-            }
-        });
-		return con;
 	}
 
 
