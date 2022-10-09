@@ -6,9 +6,9 @@
 
 	 <process directory_for_osm_files=".work/osm" directory_for_index_files="/var/lib/jenkins/indexes" directory_for_generation=".work"
 		skipExistingIndexesAt="/var/lib/jenkins/indexes/uploaded"	
-		>
+		indexPOI="true" indexMap="true" indexRouting="true" indexTransport="true" indexAddress="true" 
+		directory_for_srtm_files="/home/relief-data/srtm/">
 		<!-- not supported yet for AWS -->
-		<!-- indexPOI="true" indexMap="true" indexRouting="true" indexTransport="true" indexAddress="true" directory_for_srtm_files="/home/relief-data/srtm/" -->			
 		<aws>
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
