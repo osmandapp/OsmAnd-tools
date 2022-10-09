@@ -67,7 +67,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 public class IndexBatchCreator {
 
 	private static final int INMEM_LIMIT = 2000;
-	private static final long TIMEOUT_TO_CHECK_AWS = 30000;
+	private static final long TIMEOUT_TO_CHECK_AWS = 15000;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 
@@ -357,33 +357,48 @@ public class IndexBatchCreator {
 
 
 	private void waitAwsJobsToFinish() {
+		log.info(String.format("Waiting %d aws jobs to complete...", awsPendingGenerations.size()));
+		int phash = 0;
 		while (awsPendingGenerations.size() > 0) {
 			Map<String, JobDetail> awsStatus = new LinkedHashMap<>();
-			log.info(String.format("Pending %d aws jobs...", awsPendingGenerations.size()));
-			List<String> jobIds = new ArrayList<String>(); 
-			for(AwsPendingGeneration p : awsPendingGenerations) {
+			List<String> jobIds = new ArrayList<String>();
+			for (AwsPendingGeneration p : awsPendingGenerations) {
 				jobIds.add(p.response.jobId());
 				if (jobIds.size() > 50) {
 					getJobStatus(jobIds, awsStatus);
 					jobIds.clear();
 				}
 			}
-			getJobStatus(jobIds,awsStatus );
-			
+			getJobStatus(jobIds, awsStatus);
 			Iterator<AwsPendingGeneration> it = awsPendingGenerations.iterator();
+			int finished = 0;
+			int readytorun = 0;
+			int running = 0;
+			int starting = 0;
 			while (it.hasNext()) {
 				AwsPendingGeneration gen = it.next();
 				JobDetail status = awsStatus.get(gen.response.jobId());
-				if(status == null) {
+				if (status == null) {
 					continue;
 				}
 				JobStatus js = JobStatus.fromValue(status.statusAsString());
-				if (js == JobStatus.SUCCEEDED) {
+				if (js == JobStatus.RUNNABLE) {
+					readytorun++;
+				} else if (js == JobStatus.RUNNING) {
+					running++;
+				} else if (js == JobStatus.STARTING) {
+					starting++;
+				} else if (js == JobStatus.SUCCEEDED) {
+					finished++;
 					try {
 						S3Client client = S3Client.builder().build();
-						int i = gen.s3Url.indexOf('/');
-						String bucket = gen.s3Url.substring(0, i);
-						String key = gen.s3Url.substring(i + 1);
+						String s3url = gen.s3Url;
+						if (s3url.startsWith("s3://")) {
+							s3url = s3url.substring("s3://".length());
+						}
+						int i = s3url.indexOf('/');
+						String bucket = s3url.substring(0, i);
+						String key = s3url.substring(i + 1);
 						GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
 						ResponseInputStream<GetObjectResponse> obj = client.getObject(request);
 						FileOutputStream fous = new FileOutputStream(new File(indexDirFiles, gen.targetFileName));
@@ -392,15 +407,22 @@ public class IndexBatchCreator {
 						fous.close();
 						it.remove();
 					} catch (Exception e) {
-						log.error("Error retrieving result from S3:" + e.getMessage(), e);
+						log.error(String.format("Error retrieving result from S3 %s: %s", gen.s3Url, e.getMessage()), e);
 					}
 				} else if (js == JobStatus.FAILED) {
 					// gen.failedDetail = status;
+					finished++;
 					it.remove();
 					awsFailedGenerations.add(gen);
 					log.error(String.format("! Failed generation %s, job id %s: %s", gen.targetFileName, status.jobId(),
 							status.statusReason()));
 				}
+			}
+			int hash = awsPendingGenerations.size() + readytorun * 7 + starting * 11 + running * 17 + finished * 41;
+			if (phash != hash) {
+				log.info(String.format("Pending %d aws jobs: ready to run %d, starting %d running %d, finished %d ...",
+						awsPendingGenerations.size(), readytorun, starting, running, finished));
+				phash = hash;
 			}
 			try {
 				Thread.sleep(TIMEOUT_TO_CHECK_AWS);
