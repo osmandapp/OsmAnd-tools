@@ -52,8 +52,9 @@ dependencies {
 	implementation 'com.google.code.gson:gson:2.8.2'
 	implementation 'org.xerial:sqlite-jdbc:3.7.2'
        
-	 implementation platform('software.amazon.awssdk:bom:2.15.0')
+	implementation platform('software.amazon.awssdk:bom:2.15.0')
         implementation 'software.amazon.awssdk:s3'
+        implementation 'software.amazon.awssdk:batch'
 
 	implementation 'org.apache.commons:commons-compress:1.17'
 	implementation 'commons-codec:commons-codec:1.11'

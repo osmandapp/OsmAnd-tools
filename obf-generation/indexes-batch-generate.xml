@@ -26,6 +26,7 @@
 	</regions>
 <!--
 		<regions skip="true" siteToDownload="" region_prefix="" region_suffix="">
+			<regionsList url="" filterStartsWith="" filterContains="" />
 			<region name="..." downloadName="..." indexSRTM="true" index="address,transport,map,poi,routing"/>
 		</regions>
 		<regions skip="true" siteToDownload="" region_prefix="" region_suffix="">

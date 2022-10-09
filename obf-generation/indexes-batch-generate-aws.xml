@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <batch_process>
 	<!-- not supported yet for AWS -->
-    <!-- 
 	<process_attributes mapZooms="" renderingTypesFile="" zoomWaySmoothness="2" 
 		osmDbDialect="sqlite_in_memory" mapDbDialect="sqlite_in_memory"/>
-	-->
+
 	 <process directory_for_osm_files=".work/osm" directory_for_index_files="/var/lib/jenkins/indexes" directory_for_generation=".work"
 		skipExistingIndexesAt="/var/lib/jenkins/indexes/uploaded"	
 		>
@@ -12,19 +11,20 @@
 		<!-- indexPOI="true" indexMap="true" indexRouting="true" indexTransport="true" indexAddress="true" directory_for_srtm_files="/home/relief-data/srtm/" -->			
 		<aws>
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="5">
-				<parameters upload="s3://osmand-maps-gen/{1}/{0}_2.obf" 
-						map="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
+				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
+				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
 			</job>
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="10">
-				<parameters upload="s3://osmand-maps-gen/{1}/{0}_2.obf"
-						map="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
+				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
+				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
 			</job>
 			
 		</aws>
 	</process>
 	
 	<regions siteToDownload="/home/osm-planet/osm-extract/{0}/{0}.pbf" >
-		<regionsList url="https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml"/>
+		<regionsList url="https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml"
+				filterContains="andorra"/>
 	</regions>
 
 </batch_process> 

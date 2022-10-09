@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -21,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -49,6 +51,11 @@ import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 import rtree.RTree;
+import software.amazon.awssdk.core.client.builder.SdkDefaultClientBuilder;
+import software.amazon.awssdk.services.batch.BatchClient;
+import software.amazon.awssdk.services.batch.BatchClientBuilder;
+import software.amazon.awssdk.services.batch.model.SubmitJobRequest;
+import software.amazon.awssdk.services.batch.model.SubmitJobResponse;
 
 
 public class IndexBatchCreator {
@@ -65,6 +72,14 @@ public class IndexBatchCreator {
 		String nameSuffix = "";
 		Map<String, RegionSpecificData> regionNames = new LinkedHashMap<String, RegionSpecificData>();
 		String siteToDownload = "";
+	}
+	
+	private static class AwsJobDefinition {
+		Map<String, String> params = new LinkedHashMap<>();
+		String name;
+		String queue;
+		String definition;
+		int sizeUpToMB = -1;
 	}
 
 	private static class RegionSpecificData {
@@ -86,7 +101,8 @@ public class IndexBatchCreator {
 	File osmDirFiles;
 	File indexDirFiles;
 	File workDir;
-	File srtmDir;
+	String srtmDir;
+	List<AwsJobDefinition> awsJobs = new ArrayList<IndexBatchCreator.AwsJobDefinition>();
 
 	boolean indexPOI = false;
 	boolean indexTransport = false;
@@ -163,10 +179,7 @@ public class IndexBatchCreator {
 		}
 		osmDirFiles = new File(dir);
 
-		dir = process.getAttribute("directory_for_srtm_files");
-		if (dir != null && new File(dir).exists()) {
-			srtmDir = new File(dir);
-		}
+		srtmDir = process.getAttribute("directory_for_srtm_files");
 
 		dir = process.getAttribute("directory_for_index_files");
 		if (dir == null || !new File(dir).exists()) {
@@ -180,6 +193,27 @@ public class IndexBatchCreator {
 			workDir = new File(dir);
 		}
 
+		NodeList awsl = process.getElementsByTagName("aws");
+		for (int j = 0; j < awsl.getLength(); j++) {
+			Element aws = (Element) awsl.item(j);
+			NodeList jobs = aws.getElementsByTagName("job");
+			for (int k = 0; k < jobs.getLength(); k++) {
+				Element jbe = (Element) jobs.item(k);
+				AwsJobDefinition jd = new AwsJobDefinition();
+				jd.definition = jbe.getAttribute("definition");
+				jd.name = jbe.getAttribute("name");
+				jd.queue = jbe.getAttribute("queue");
+				if (!Algorithms.isEmpty(jbe.getAttribute("sizeUpToMB"))) {
+					jd.sizeUpToMB = Integer.parseInt(jbe.getAttribute("sizeUpToMB"));
+				}
+				NodeList params = jbe.getElementsByTagName("parameter");
+				for (int l = 0; l < params.getLength(); l++) {
+					Element jbep = (Element) params.item(l);
+					jd.params.put(jbep.getAttribute("k"), jbep.getAttribute("v"));
+				}
+				jd.name = jbe.getAttribute("name");
+			}
+		}
 		List<RegionCountries> countriesToDownload = new ArrayList<RegionCountries>();
 		parseCountriesToDownload(doc, countriesToDownload);
 		return countriesToDownload;
@@ -208,7 +242,10 @@ public class IndexBatchCreator {
 				for (int j = 0; j < nRegionsList.getLength(); j++) {
 					Element nregionList = (Element) nRegionsList.item(j);
 					String url = nregionList.getAttribute("url");
+					
 					if (url != null) {
+						String filterStartWith = nregionList.getAttribute("filterStartsWith");
+						String filterContains = nregionList.getAttribute("filterContains");
 						CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 						CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(new URL(url).openStream());
 						Iterator<CountryRegion> it = regionStructure.iterator();
@@ -217,7 +254,15 @@ public class IndexBatchCreator {
 							if (cr.map && !cr.jointMap) {
 								RegionSpecificData dt = new RegionSpecificData();
 								dt.downloadName = cr.getDownloadName();
-								countries.regionNames.put(cr.getDownloadName(), dt);
+								if (!Algorithms.isEmpty(filterStartWith)
+										&& !filterStartWith.toLowerCase().startsWith(dt.downloadName.toLowerCase())) {
+									continue;
+								}
+								if (!Algorithms.isEmpty(filterContains)
+										&& !filterContains.toLowerCase().contains(dt.downloadName.toLowerCase())) {
+									continue;
+								}
+								countries.regionNames.put(dt.downloadName, dt);
 							}
 						}
 					}
@@ -275,7 +320,7 @@ public class IndexBatchCreator {
 
 	public void runBatch(List<RegionCountries> countriesToDownload ){
 		Set<String> alreadyGeneratedFiles = new LinkedHashSet<String>();
-		if(!countriesToDownload.isEmpty()){
+		if (!countriesToDownload.isEmpty()) {
 			downloadFilesAndGenerateIndex(countriesToDownload, alreadyGeneratedFiles);
 		}
 		generatedIndexes(alreadyGeneratedFiles);
@@ -283,18 +328,19 @@ public class IndexBatchCreator {
 
 
 
-	protected void downloadFilesAndGenerateIndex(List<RegionCountries> countriesToDownload, Set<String> alreadyGeneratedFiles){
+	protected void downloadFilesAndGenerateIndex(List<RegionCountries> countriesToDownload,
+			Set<String> alreadyGeneratedFiles) {
 		// clean before downloading
-//		for(File f : osmDirFiles.listFiles()){
-//			log.info("Delete old file " + f.getName());  //$NON-NLS-1$
-//			f.delete();
-//		}
+		// for(File f : osmDirFiles.listFiles()){
+		// log.info("Delete old file " + f.getName()); //$NON-NLS-1$
+		// f.delete();
+		// }
 
-		for(RegionCountries regionCountries : countriesToDownload){
+		for (RegionCountries regionCountries : countriesToDownload) {
 			String prefix = regionCountries.namePrefix;
 			String site = regionCountries.siteToDownload;
 			String suffix = regionCountries.nameSuffix;
-			for(String name : regionCountries.regionNames.keySet()){
+			for (String name : regionCountries.regionNames.keySet()) {
 				RegionSpecificData regionSpecificData = regionCountries.regionNames.get(name);
 				name = name.toLowerCase();
 				String url = MessageFormat.format(site, regionSpecificData.downloadName);
@@ -302,15 +348,15 @@ public class IndexBatchCreator {
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
 				if (skipExistingIndexes != null) {
-					File bmif = new File(skipExistingIndexes, fileName + "_" + IndexConstants.BINARY_MAP_VERSION
-							+ IndexConstants.BINARY_MAP_INDEX_EXT);
+					File bmif = new File(skipExistingIndexes,
+							fileName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT);
 					File bmifz = new File(skipExistingIndexes, bmif.getName() + ".zip");
 					if (bmif.exists() || bmifz.exists()) {
 						continue;
 					}
 				}
 				log.warn("----------- Check " + fileName + " " + url + " ----------");
-				File toSave = downloadFile(url,  fileName);
+				File toSave = downloadFile(url, fileName);
 				if (toSave != null) {
 					generateIndex(toSave, regionName, regionSpecificData, alreadyGeneratedFiles);
 				}
@@ -319,13 +365,13 @@ public class IndexBatchCreator {
 	}
 
 	protected File downloadFile(String url, String regionName) {
-		if(!url.startsWith("http")) {
+		if (!url.startsWith("http")) {
 			return new File(url);
 		}
 		String ext = ".osm";
-		if(url.endsWith(".osm.bz2")){
+		if (url.endsWith(".osm.bz2")) {
 			ext = ".osm.bz2";
-		} else if(url.endsWith(".pbf")){
+		} else if (url.endsWith(".pbf")) {
 			ext = ".osm.pbf";
 		}
 		File toIndex = null;
@@ -335,7 +381,7 @@ public class IndexBatchCreator {
 		} else {
 			toIndex = wgetDownload(url, saveTo);
 		}
-		if(toIndex == null) {
+		if (toIndex == null) {
 			saveTo.delete();
 		}
 		return toIndex;
@@ -444,25 +490,62 @@ public class IndexBatchCreator {
 
 
 
-	protected void generateIndex(File file, String rName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
+	protected void generateIndex(File file, String regionName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
+		String fileMapName = file.getName();
+		int i = file.getName().indexOf('.');
+		if (i > -1) {
+			fileMapName = Algorithms.capitalizeFirstLetterAndLowercase(file.getName().substring(0, i));
+		}
+		log.warn("-------------------------------------------");
+		log.warn("----------- Generate " + file.getName() + "\n\n\n");
+		if (Algorithms.isEmpty(regionName)) {
+			regionName = fileMapName;
+		} else {
+			regionName = Algorithms.capitalizeFirstLetterAndLowercase(regionName);
+		}
+		String targetMapFileName = fileMapName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+		for (AwsJobDefinition jd : awsJobs) {
+			if (file.length() < jd.sizeUpToMB * 1024 * 1024) {
+				generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
+				return;
+			}
+		}
+		generateLocalIndex(file, regionName, targetMapFileName, rdata, alreadyGeneratedFiles);
+	}
+	
+	
+	private void generateAwsIndex(AwsJobDefinition jd, File file, String targetFileName,
+			RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
+		String fileParam = file.getName().substring(0, file.getName().indexOf('.'));
+		String currentMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
+		String name = MessageFormat.format(jd.name, fileParam, currentMonth);
+		String queue = MessageFormat.format(jd.queue, fileParam, currentMonth);
+		String definition = MessageFormat.format(jd.definition, fileParam, currentMonth);
+		alreadyGeneratedFiles.add(file.getName());
+		BatchClient client = BatchClient.builder().build();
+		SubmitJobRequest.Builder pr = SubmitJobRequest.builder().jobName(name).jobQueue(queue)
+				.jobDefinition(definition);
+		LinkedHashMap<String, String> pms = new LinkedHashMap<>();
+		Iterator<Entry<String, String>> it = jd.params.entrySet().iterator();
+		while (it.hasNext()) {
+			Entry<String, String> e = it.next();
+			pms.put(e.getKey(), MessageFormat.format(e.getValue(), fileParam, currentMonth));
+		}
+		pr.parameters(pms);
+		SubmitJobRequest req = pr.build();
+		System.out.println("Submit aws request: " + req);
+		SubmitJobResponse response = client.submitJob(req);
+		// TODO wait response
+		System.out.println(response);
+	}
+
+	protected void generateLocalIndex(File file, String regionName, String mapFileName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		try {
 			// be independent of previous results
 			RTree.clearCache();
 
-			String regionName = file.getName();
-			log.warn("-------------------------------------------");
-			log.warn("----------- Generate " + file.getName() + "\n\n\n");
-			int i = file.getName().indexOf('.');
-			if (i > -1) {
-				regionName = Algorithms.capitalizeFirstLetterAndLowercase(file.getName().substring(0, i));
-			}
-			if(Algorithms.isEmpty(rName)){
-				rName = regionName;
-			} else {
-				rName = Algorithms.capitalizeFirstLetterAndLowercase(rName);
-			}
 			DBDialect osmDb = this.osmDbDialect;
-			if(file.length() / 1024 / 1024 > INMEM_LIMIT && osmDb == DBDialect.SQLITE_IN_MEMORY) {
+			if (file.length() / 1024 / 1024 > INMEM_LIMIT && osmDb == DBDialect.SQLITE_IN_MEMORY) {
 				log.warn("Switching SQLITE in memory dialect to SQLITE");
 				osmDb = DBDialect.SQLITE;
 			}
@@ -476,8 +559,6 @@ public class IndexBatchCreator {
 				file.delete();
 				return;
 			}
-			
-			
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = indMap;
 			settings.indexAddress = indAddr;
@@ -487,27 +568,26 @@ public class IndexBatchCreator {
 			if(zoomWaySmoothness != null){
 				settings.zoomWaySmoothness = zoomWaySmoothness;
 			}
-			boolean worldMaps = rName.toLowerCase().contains("world") ;
+			boolean worldMaps = regionName.toLowerCase().contains("world") ;
 			if (worldMaps) {
-				if (rName.toLowerCase().contains("basemap")) {
+				if (regionName.toLowerCase().contains("basemap")) {
 					return;
 				}
-				if (rName.toLowerCase().contains("seamarks")) {
+				if (regionName.toLowerCase().contains("seamarks")) {
 					settings.keepOnlySeaObjects = true;
 					settings.indexTransport = false;
 					settings.indexAddress = false;
 				}
 			} else {
-				if (srtmDir != null && (rdata == null || rdata.indexSRTM)) {
-					settings.srtmDataFolderUrl = srtmDir.getAbsolutePath();
+				if (!Algorithms.isEmpty(srtmDir) && (rdata == null || rdata.indexSRTM)) {
+					settings.srtmDataFolderUrl = srtmDir;
 				}
 			}
 			IndexCreator indexCreator = new IndexCreator(workDir, settings);
 			
 			indexCreator.setDialects(osmDb, osmDb);
 			indexCreator.setLastModifiedDate(file.lastModified());
-			indexCreator.setRegionName(rName);
-			String mapFileName = regionName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+			indexCreator.setRegionName(regionName);
 			indexCreator.setMapFileName(mapFileName);
 			try {
 				alreadyGeneratedFiles.add(file.getName());
@@ -548,7 +628,7 @@ public class IndexBatchCreator {
 				}
 				File generated = new File(workDir, mapFileName);
 				File dest = new File(indexDirFiles, generated.getName());
-				if(!generated.renameTo(dest)) {
+				if (!generated.renameTo(dest)) {
 					FileOutputStream fout = new FileOutputStream(dest);
 					FileInputStream fin = new FileInputStream(generated);
 					Algorithms.streamCopy(fin, fout);
