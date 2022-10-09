@@ -51,20 +51,28 @@ import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 import rtree.RTree;
-import software.amazon.awssdk.core.client.builder.SdkDefaultClientBuilder;
+import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.batch.BatchClient;
-import software.amazon.awssdk.services.batch.BatchClientBuilder;
+import software.amazon.awssdk.services.batch.model.DescribeJobsRequest;
+import software.amazon.awssdk.services.batch.model.DescribeJobsResponse;
+import software.amazon.awssdk.services.batch.model.JobDetail;
+import software.amazon.awssdk.services.batch.model.JobStatus;
 import software.amazon.awssdk.services.batch.model.SubmitJobRequest;
 import software.amazon.awssdk.services.batch.model.SubmitJobResponse;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 
 public class IndexBatchCreator {
 
 	private static final int INMEM_LIMIT = 2000;
+	private static final long TIMEOUT_TO_CHECK_AWS = 30000;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 
 	public static final String GEN_LOG_EXT = ".gen.log";
+
 
 
 	public static class RegionCountries {
@@ -91,6 +99,12 @@ public class IndexBatchCreator {
 		public boolean indexMap = true;
 		public boolean indexRouting = true;
 	}
+	
+	private static class AwsPendingGeneration {
+		SubmitJobResponse response;
+		String s3Url;
+		String targetFileName;
+	}
 
 
 	// process atributtes
@@ -102,8 +116,11 @@ public class IndexBatchCreator {
 	File indexDirFiles;
 	File workDir;
 	String srtmDir;
-	List<AwsJobDefinition> awsJobs = new ArrayList<IndexBatchCreator.AwsJobDefinition>();
-
+	
+	List<AwsJobDefinition> awsJobQueues = new ArrayList<>();
+	List<AwsPendingGeneration> awsPendingGenerations = new ArrayList<>();
+	List<AwsPendingGeneration> awsFailedGenerations = new ArrayList<>();
+	
 	boolean indexPOI = false;
 	boolean indexTransport = false;
 	boolean indexAddress = false;
@@ -114,6 +131,7 @@ public class IndexBatchCreator {
 
 	private DBDialect osmDbDialect;
 	private String renderingTypesFile;
+
 
 	public static void main(String[] args) {
 		IndexBatchCreator creator = new IndexBatchCreator();
@@ -212,7 +230,7 @@ public class IndexBatchCreator {
 					jd.params.put(jbep.getAttribute("k"), jbep.getAttribute("v"));
 				}
 				jd.name = jbe.getAttribute("name");
-				awsJobs.add(jd);
+				awsJobQueues.add(jd);
 			}
 		}
 		List<RegionCountries> countriesToDownload = new ArrayList<RegionCountries>();
@@ -323,15 +341,87 @@ public class IndexBatchCreator {
 		}
 	}
 
-	public void runBatch(List<RegionCountries> countriesToDownload ){
+	public void runBatch(List<RegionCountries> countriesToDownload) {
 		Set<String> alreadyGeneratedFiles = new LinkedHashSet<String>();
 		if (!countriesToDownload.isEmpty()) {
 			downloadFilesAndGenerateIndex(countriesToDownload, alreadyGeneratedFiles);
 		}
-		generatedIndexes(alreadyGeneratedFiles);
+		generateLocalFolderIndexes(alreadyGeneratedFiles);
+		waitAwsJobsToFinish();
+		log.info("GENERATING INDEXES FINISHED ");
+		if (awsFailedGenerations.size() > 0) {
+			throw new IllegalStateException("There are " + awsFailedGenerations.size() + " failed generations");
+		}
 	}
 
 
+
+	private void waitAwsJobsToFinish() {
+		while (awsPendingGenerations.size() > 0) {
+			Map<String, JobDetail> awsStatus = new LinkedHashMap<>();
+			log.info(String.format("Pending %d aws jobs...", awsPendingGenerations.size()));
+			List<String> jobIds = new ArrayList<String>(); 
+			for(AwsPendingGeneration p : awsPendingGenerations) {
+				jobIds.add(p.response.jobId());
+				if (jobIds.size() > 50) {
+					getJobStatus(jobIds, awsStatus);
+					jobIds.clear();
+				}
+			}
+			getJobStatus(jobIds,awsStatus );
+			
+			Iterator<AwsPendingGeneration> it = awsPendingGenerations.iterator();
+			while (it.hasNext()) {
+				AwsPendingGeneration gen = it.next();
+				JobDetail status = awsStatus.get(gen.response.jobId());
+				if(status == null) {
+					continue;
+				}
+				JobStatus js = JobStatus.fromValue(status.statusAsString());
+				if (js == JobStatus.SUCCEEDED) {
+					try {
+						S3Client client = S3Client.builder().build();
+						int i = gen.s3Url.indexOf('/');
+						String bucket = gen.s3Url.substring(0, i);
+						String key = gen.s3Url.substring(i + 1);
+						GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
+						ResponseInputStream<GetObjectResponse> obj = client.getObject(request);
+						FileOutputStream fous = new FileOutputStream(new File(indexDirFiles, gen.targetFileName));
+						Algorithms.streamCopy(obj, fous);
+						obj.close();
+						fous.close();
+						it.remove();
+					} catch (Exception e) {
+						log.error("Error retrieving result from S3:" + e.getMessage(), e);
+					}
+				} else if (js == JobStatus.FAILED) {
+					// gen.failedDetail = status;
+					it.remove();
+					awsFailedGenerations.add(gen);
+					log.error(String.format("! Failed generation %s, job id %s: %s", gen.targetFileName, status.jobId(),
+							status.statusReason()));
+				}
+			}
+			try {
+				Thread.sleep(TIMEOUT_TO_CHECK_AWS);
+			} catch (InterruptedException e) {
+			}
+		}
+
+	}
+
+	private void getJobStatus(List<String> jobIds, Map<String, JobDetail> awsStatus) {
+		try {
+			BatchClient client = BatchClient.builder().build();
+			DescribeJobsResponse response = client.describeJobs(DescribeJobsRequest.builder().jobs(jobIds).build());
+			for (JobDetail jd : response.jobs()) {
+				awsStatus.put(jd.jobId(), jd);
+			}
+		} catch (Exception e) {
+			log.error("Error retrieving status for batch jobs:" + e.getMessage(), e);
+		}
+
+	}
 
 	protected void downloadFilesAndGenerateIndex(List<RegionCountries> countriesToDownload,
 			Set<String> alreadyGeneratedFiles) {
@@ -473,7 +563,7 @@ public class IndexBatchCreator {
 		}
 	}
 
-	protected void generatedIndexes(Set<String> alreadyGeneratedFiles) {
+	protected void generateLocalFolderIndexes(Set<String> alreadyGeneratedFiles) {
 		for (File f : getSortedFiles(osmDirFiles)) {
 			if (alreadyGeneratedFiles.contains(f.getName())) {
 				continue;
@@ -492,7 +582,6 @@ public class IndexBatchCreator {
 				generateIndex(f, null, null, alreadyGeneratedFiles);
 			}
 		}
-		log.info("GENERATING INDEXES FINISHED ");
 	}
 
 
@@ -511,7 +600,7 @@ public class IndexBatchCreator {
 			regionName = Algorithms.capitalizeFirstLetterAndLowercase(regionName);
 		}
 		String targetMapFileName = fileMapName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
-		for (AwsJobDefinition jd : awsJobs) {
+		for (AwsJobDefinition jd : awsJobQueues) {
 			if (jd.sizeUpToMB < 0 || file.length() < jd.sizeUpToMB * 1024 * 1024) {
 				generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
 				return;
@@ -534,16 +623,26 @@ public class IndexBatchCreator {
 				.jobDefinition(definition);
 		LinkedHashMap<String, String> pms = new LinkedHashMap<>();
 		Iterator<Entry<String, String>> it = jd.params.entrySet().iterator();
+		String uploadedS3File = null;
 		while (it.hasNext()) {
 			Entry<String, String> e = it.next();
-			pms.put(e.getKey(), MessageFormat.format(e.getValue(), fileParam, currentMonth));
+			String vl = MessageFormat.format(e.getValue(), fileParam, currentMonth);
+			pms.put(e.getKey(), vl);
+			if(e.getKey().equals("upload")) {
+				uploadedS3File = vl;
+			}
 		}
 		pr.parameters(pms);
 		SubmitJobRequest req = pr.build();
-		System.out.println("Submit aws request: " + req);
-		SubmitJobResponse response = client.submitJob(req);
-		// TODO wait response
-		System.out.println(response);
+		log.info("Submit aws request: " + req );
+		AwsPendingGeneration p = new AwsPendingGeneration();
+		p.response = client.submitJob(req);
+		p.s3Url = uploadedS3File;
+		p.targetFileName = targetFileName;
+		log.info("Got response: " + p.response);
+		if (p.s3Url != null) {
+			awsPendingGenerations.add(p);
+		}
 	}
 
 	protected void generateLocalIndex(File file, String regionName, String mapFileName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
@@ -562,8 +661,7 @@ public class IndexBatchCreator {
 			final boolean indMap = indexMap && (rdata == null || rdata.indexMap);
 			final boolean indRouting = indexRouting && (rdata == null || rdata.indexRouting);
 			if(!indAddr && !indPoi && !indTransport && !indMap && !indRouting) {
-				log.warn("! Skip country because nothing to index !");
-				file.delete();
+				log.warn("! Skip country " + file.getName() + " because nothing to index !");
 				return;
 			}
 			IndexCreatorSettings settings = new IndexCreatorSettings();
