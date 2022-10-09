@@ -47,8 +47,8 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = System.getProperty("maps.dir") + "Andorra_europe.obf";
-			args[1] = System.getProperty("maps.dir") + "Andorra_europe_2.obf";
+			args[0] = System.getProperty("maps.dir") + "Iran_bushehr_asia.obf";
+			args[1] = System.getProperty("maps.dir") + "Iran_bushehr_asia_2.obf";
 			args[2] = "stdout";
 //			args[2] = "19_07_29_20_30_diff.obf";
 //			args[3] = "19_07_29_20_30_diff.osm.gz";
@@ -120,6 +120,9 @@ public class ObfDiffGenerator {
 		TLongObjectHashMap<TransportStop> endStopData = cleanStopsAndAdjustId(fEnd.getTransportStops());
 		if (endStopData == null) {
 			return;
+		}
+		if (print) {
+			System.out.println("Compare transport data");
 		}
 		TLongObjectHashMap<TransportStop> endStopDataDeleted = new TLongObjectHashMap<>();
 		// Walk through all stops and drop non changed. If stop was deleted - mark it and add to the result.
@@ -372,7 +375,7 @@ public class ObfDiffGenerator {
 		for (MapZoomPair mz : fStart.getZooms()) {
 			TLongObjectHashMap<BinaryMapDataObject> startData = fStart.get(mz);
 			TLongObjectHashMap<BinaryMapDataObject> endData = fEnd.get(mz);
-			if(print) {
+			if (print) {
 				System.out.println("Compare map " + mz);
 			}
 			if (endData == null) {
@@ -467,6 +470,9 @@ public class ObfDiffGenerator {
 		TLongObjectHashMap<RouteDataObject> endData = fEnd.getRoutingData();
 		if (endData == null) {
 			return;
+		}
+		if (print) {
+			System.out.println("Compare route data");
 		}
 		for (Long idx : startData.keys()) {
 			RouteDataObject objE = endData.get(idx);
