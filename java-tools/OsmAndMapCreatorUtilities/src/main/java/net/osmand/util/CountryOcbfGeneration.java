@@ -29,7 +29,6 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.xml.sax.SAXException;

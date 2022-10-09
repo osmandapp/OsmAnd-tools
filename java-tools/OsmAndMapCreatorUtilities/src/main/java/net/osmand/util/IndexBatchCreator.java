@@ -36,6 +36,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.IndexConstants;
 import net.osmand.MapCreatorVersion;
@@ -98,7 +99,6 @@ public class IndexBatchCreator {
 	private DBDialect osmDbDialect;
 	private String renderingTypesFile;
 
-	@SuppressWarnings("resource")
 	public static void main(String[] args) {
 		IndexBatchCreator creator = new IndexBatchCreator();
 		if (args == null || args.length == 0) {
@@ -109,51 +109,15 @@ public class IndexBatchCreator {
 		}
 		String name = args[0];
 		InputStream stream;
-		InputStream regionsStream = null;
-		String internalRegionsList = null;
 		try {
 			stream = new FileInputStream(name);
 		} catch (FileNotFoundException e) {
 			throw new IllegalArgumentException("XML configuration file not found : " + name, e);
 		}
-		if (args.length > 1) {
-			if (args[1].startsWith("internal:")) {
-				internalRegionsList = args[1].substring("internal:".length());
-			} else {
-				try {
-					File regionsFile = new File(args[1]);
-					regionsStream = new FileInputStream(regionsFile);
-				} catch (FileNotFoundException e) {
-					throw new IllegalArgumentException("Please specify xml-file with regions to download", e);
-				}
-			}
-		}
 
 		try {
-			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(stream);
-			Document regions = null;
-			if (regionsStream != null) {
-				name = args[1];
-				regions = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(regionsStream);
-			}
-			List<RegionCountries> countriesToDownload = creator.setupProcess(doc, regions);
-			if (internalRegionsList != null) {
-				RegionCountries rc = new RegionCountries();
-				// rc.siteToDownload = "http://builder.osmand.net/osm-extract/{0}/{0}.pbf";
-				rc.siteToDownload = "/home/osm-planet/osm-extract/{0}/{0}.pbf";
-				CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
-				CountryRegion regionStructure = ocbfGeneration.parseDefaultOsmAndRegionStructure();
-				Iterator<CountryRegion> it = regionStructure.iterator();
-				while (it.hasNext()) {
-					CountryRegion cr = it.next();
-					if (cr.map && !cr.jointMap) {
-						RegionSpecificData dt = new RegionSpecificData();
-						dt.downloadName = cr.getDownloadName();
-						rc.regionNames.put(cr.getDownloadName(), dt);
-					}
-				}
-				countriesToDownload.add(rc);
-			}
+			Document params = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(stream);
+			List<RegionCountries> countriesToDownload = creator.setupProcess(params);
 			creator.runBatch(countriesToDownload);
 		} catch (Exception e) {
 			System.out.println("XML configuration file could not be read from " + name);
@@ -164,8 +128,8 @@ public class IndexBatchCreator {
 		}
 	}
 
-	public List<RegionCountries> setupProcess(Document doc, Document regions)
-			throws SAXException, IOException, ParserConfigurationException {
+	public List<RegionCountries> setupProcess(Document doc)
+			throws SAXException, IOException, ParserConfigurationException, XmlPullParserException {
 		NodeList list = doc.getElementsByTagName("process");
 		if (list.getLength() != 1) {
 			throw new IllegalArgumentException("You should specify exactly 1 process element!");
@@ -218,39 +182,54 @@ public class IndexBatchCreator {
 
 		List<RegionCountries> countriesToDownload = new ArrayList<RegionCountries>();
 		parseCountriesToDownload(doc, countriesToDownload);
-		if (regions != null) {
-			parseCountriesToDownload(regions, countriesToDownload);
-		}
-
 		return countriesToDownload;
 	}
 
-	private void parseCountriesToDownload(Document doc, List<RegionCountries> countriesToDownload) {
+	private void parseCountriesToDownload(Document doc, List<RegionCountries> countriesToDownload) throws IOException, XmlPullParserException {
 		NodeList regions = doc.getElementsByTagName("regions");
-		for(int i=0; i< regions.getLength(); i++){
+		for (int i = 0; i < regions.getLength(); i++) {
 			Element el = (Element) regions.item(i);
-			if(!Boolean.parseBoolean(el.getAttribute("skip"))){
+			if (!Boolean.parseBoolean(el.getAttribute("skip"))) {
 				RegionCountries countries = new RegionCountries();
 				countries.siteToDownload = el.getAttribute("siteToDownload");
-				if(countries.siteToDownload == null){
+				if (countries.siteToDownload == null) {
 					continue;
 				}
 				countries.namePrefix = el.getAttribute("region_prefix");
-				if(countries.namePrefix == null){
+				if (countries.namePrefix == null) {
 					countries.namePrefix = "";
 				}
 				countries.nameSuffix = el.getAttribute("region_suffix");
-				if(countries.nameSuffix == null){
+				if (countries.nameSuffix == null) {
 					countries.nameSuffix = "";
 				}
+				
+				NodeList nRegionsList = el.getElementsByTagName("regionList");
+				for (int j = 0; j < nRegionsList.getLength(); j++) {
+					Element nregionList = (Element) nRegionsList.item(j);
+					String url = nregionList.getAttribute("url");
+					if (url != null) {
+						CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
+						CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(new URL(url).openStream());
+						Iterator<CountryRegion> it = regionStructure.iterator();
+						while (it.hasNext()) {
+							CountryRegion cr = it.next();
+							if (cr.map && !cr.jointMap) {
+								RegionSpecificData dt = new RegionSpecificData();
+								dt.downloadName = cr.getDownloadName();
+								countries.regionNames.put(cr.getDownloadName(), dt);
+							}
+						}
+					}
+				}
 				NodeList ncountries = el.getElementsByTagName("region");
-				log.info("Region to download " +countries.siteToDownload);
+				log.info("Region to download " + countries.siteToDownload);
 				for (int j = 0; j < ncountries.getLength(); j++) {
 					Element ncountry = (Element) ncountries.item(j);
 					String name = ncountry.getAttribute("name");
 					RegionSpecificData data = new RegionSpecificData();
-					data.indexSRTM = ncountry.getAttribute("indexSRTM") == null || 
-							ncountry.getAttribute("indexSRTM").equalsIgnoreCase("true");
+					data.indexSRTM = ncountry.getAttribute("indexSRTM") == null
+							|| ncountry.getAttribute("indexSRTM").equalsIgnoreCase("true");
 					String index = ncountry.getAttribute("index");
 					if (index != null && index.length() > 0) {
 						data.indexAddress = index.contains("address");

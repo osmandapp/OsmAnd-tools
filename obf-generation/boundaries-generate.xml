@@ -20,4 +20,12 @@
 			 Defaultly enabled parameter of wget is: &-&-read-timeout=5 that prevents hanging of download from  cloudmade/geofabrik server  
 		-->					
 	</process>
+	<!--
+		<regions skip="true" siteToDownload="" region_prefix="" region_suffix="">
+			<region name="..." downloadName="..." indexSRTM="true" index="address,transport,map,poi,routing"/>
+		</regions>
+		<regions skip="true" siteToDownload="" region_prefix="" region_suffix="">
+			....
+		</regions>
+	-->
 </batch_process> 

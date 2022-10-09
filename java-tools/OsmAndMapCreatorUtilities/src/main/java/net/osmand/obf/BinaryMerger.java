@@ -4,6 +4,7 @@ package net.osmand.obf;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
 
+import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
@@ -130,7 +131,8 @@ public class BinaryMerger {
 				}
 				List<CountryRegion> list = cr.getChildren();
 				List<String> sargs = new ArrayList<String>();
-				String ext = "_2" + (mapFiles ? ".obf" : ".road.obf");
+				String ext = "_" + IndexConstants.BINARY_MAP_VERSION
+						+ (mapFiles ? IndexConstants.BINARY_MAP_INDEX_EXT : IndexConstants.BINARY_ROAD_MAP_INDEX_EXT);
 				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + ext;
 				File targetFile = new File(pathToPutJointFiles, targetFileName);
 				if (skipExisting && targetFile.exists()) {
