@@ -242,16 +242,19 @@ public class IndexBatchCreator {
 				for (int j = 0; j < nRegionsList.getLength(); j++) {
 					Element nregionList = (Element) nRegionsList.item(j);
 					String url = nregionList.getAttribute("url");
-					
 					if (url != null) {
 						String filterStartWith = nregionList.getAttribute("filterStartsWith");
 						String filterContains = nregionList.getAttribute("filterContains");
 						CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
+						log.warn("Download region list from " + url);
 						CountryRegion regionStructure = ocbfGeneration.parseRegionStructure(new URL(url).openStream());
 						Iterator<CountryRegion> it = regionStructure.iterator();
+						int total = 0;
+						int before = countries.regionNames.size();
 						while (it.hasNext()) {
 							CountryRegion cr = it.next();
 							if (cr.map && !cr.jointMap) {
+								total ++;
 								RegionSpecificData dt = new RegionSpecificData();
 								dt.downloadName = cr.getDownloadName();
 								if (!Algorithms.isEmpty(filterStartWith)
@@ -265,6 +268,7 @@ public class IndexBatchCreator {
 								countries.regionNames.put(dt.downloadName, dt);
 							}
 						}
+						log.warn(String.format("Accepted %d from %d", countries.regionNames.size() - before, total));
 					}
 				}
 				NodeList ncountries = el.getElementsByTagName("region");
@@ -347,6 +351,8 @@ public class IndexBatchCreator {
 
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
+				log.warn("----------- Check existing " + fileName);
+
 				if (skipExistingIndexes != null) {
 					File bmif = new File(skipExistingIndexes,
 							fileName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT);
@@ -355,7 +361,7 @@ public class IndexBatchCreator {
 						continue;
 					}
 				}
-				log.warn("----------- Check " + fileName + " " + url + " ----------");
+				log.warn("----------- Get " + fileName + " " + url + " ----------");
 				File toSave = downloadFile(url, fileName);
 				if (toSave != null) {
 					generateIndex(toSave, regionName, regionSpecificData, alreadyGeneratedFiles);
