@@ -212,6 +212,7 @@ public class IndexBatchCreator {
 					jd.params.put(jbep.getAttribute("k"), jbep.getAttribute("v"));
 				}
 				jd.name = jbe.getAttribute("name");
+				awsJobs.add(jd);
 			}
 		}
 		List<RegionCountries> countriesToDownload = new ArrayList<RegionCountries>();
