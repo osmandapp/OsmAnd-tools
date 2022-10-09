@@ -10,11 +10,11 @@
 		<!-- not supported yet for AWS -->
 		<!-- indexPOI="true" indexMap="true" indexRouting="true" indexTransport="true" indexAddress="true" directory_for_srtm_files="/home/relief-data/srtm/" -->			
 		<aws>
-			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="5">
+			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
 			</job>
-			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="10">
+			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="500">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
 			</job>

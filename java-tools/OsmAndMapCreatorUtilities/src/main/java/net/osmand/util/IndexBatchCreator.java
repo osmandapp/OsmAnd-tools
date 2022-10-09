@@ -505,7 +505,7 @@ public class IndexBatchCreator {
 		}
 		String targetMapFileName = fileMapName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 		for (AwsJobDefinition jd : awsJobs) {
-			if (file.length() < jd.sizeUpToMB * 1024 * 1024) {
+			if (jd.sizeUpToMB < 0 || file.length() < jd.sizeUpToMB * 1024 * 1024) {
 				generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
 				return;
 			}
