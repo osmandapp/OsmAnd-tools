@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import net.osmand.Collator;
 import net.osmand.OsmAndCollator;
@@ -76,15 +77,15 @@ public class BinaryComparator {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.compare(new String[]{
-					System.getProperty("maps.dir") + "Ukraine_europe_2_all.road.obf",
-					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf",
+					System.getProperty("maps.dir") + "Andorra_europe_2.obf",
+					System.getProperty("maps.dir") + "Andorra_europe.obf",
 //					"--cities", "--city-names",
 //					"--streets", "--street-names",
 //					"--buildings", "--intersections",
 					"--poi",
 					"--poi-details",
 					"--unique-1", "--unique-2",
-					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
+//					"--osm=" + System.getProperty("maps.dir") + "compare.osm"
 			});
 		} else {
 			in.compare(args);
@@ -193,11 +194,11 @@ public class BinaryComparator {
 		}
 		if (!Algorithms.objectEquals(a0.getAdditionalInfoKeys(), a1.getAdditionalInfoKeys())) {
 			printMapObject(POI_DETAILS, a0,
-					"Amenity info is not equal " + a0.getAdditionalInfoKeys() + " <> " + a1.getAdditionalInfoKeys());
+					"Amenity info key is not equal " + a0.getAdditionalInfoKeys() + " <> " + a1.getAdditionalInfoKeys());
 		}
-		if (!Algorithms.objectEquals(a0.getAdditionalInfoValues(false), a1.getAdditionalInfoValues(false))) {
+		if (!Algorithms.objectEquals(new TreeSet<String>(a0.getAdditionalInfoValues(false)), new TreeSet<String>(a1.getAdditionalInfoValues(false)))) {
 			printMapObject(POI_DETAILS, a0,
-					"Amenity info is not equal " + a0.getAdditionalInfoKeys() + " <> " + a1.getAdditionalInfoKeys());
+					"Amenity info is not equal " + a0.getAdditionalInfoValues(false) + " <> " + a1.getAdditionalInfoValues(false));
 		}
 		if (!Algorithms.objectEquals(a0.getNamesMap(true), a1.getNamesMap(true))) {
 			printMapObject(POI_DETAILS, a0,
