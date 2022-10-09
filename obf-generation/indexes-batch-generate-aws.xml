@@ -23,7 +23,7 @@
 	</process>
 	
 	<regions siteToDownload="/home/osm-planet/osm-extract/{0}/{0}.pbf" >
-		<regionsList url="https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml"
+		<regionList url="https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml"
 				filterContains="andorra"/>
 	</regions>
 
