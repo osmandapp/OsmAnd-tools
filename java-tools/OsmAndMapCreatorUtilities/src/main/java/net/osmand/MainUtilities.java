@@ -23,6 +23,7 @@ import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.obf.preparation.OceanTilesCreator;
 import net.osmand.osm.FilterOsmByTags;
 import net.osmand.osm.MapPoiTypes;
@@ -226,6 +227,9 @@ public class MainUtilities {
 			} else if (s.equals("--ram-process")) {
 				settings.processInRam = true;
 				it.remove();
+			} else if (s.startsWith("--max-height-tiles-in-ram=")) {
+				settings.maxHeightTilesInRam = Integer.parseInt(s.substring(s.indexOf('=') + 1));
+				it.remove();
 			} else if (s.startsWith("--srtm=")) {
 				settings.srtmDataFolderUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
@@ -306,6 +310,9 @@ public class MainUtilities {
 			fileToGen = new File(fileName);
 			fileToGen.setLastModified(lastModified);
 			System.out.println(String.format("File %s downloaded.", fileName));
+		}
+		if (settings.maxHeightTilesInRam > 0) {
+			IndexHeightData.MAXIMUM_LOADED_DATA = settings.maxHeightTilesInRam;
 		}
 		IndexCreator ic = new IndexCreator(new File("."), settings);
 		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE, 

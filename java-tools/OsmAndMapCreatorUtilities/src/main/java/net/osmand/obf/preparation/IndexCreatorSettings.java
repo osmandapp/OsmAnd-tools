@@ -17,6 +17,9 @@ public class IndexCreatorSettings {
 	
 	// use Sqlite in RAM instead of normal Sqlite (speeds up process but takes a lot of RAM)  
 	public boolean processInRam;
+	
+	// maximum tiles to use in RAM
+	public int maxHeightTilesInRam = -1;
 
 	// generate low level roads and maps
 	public boolean generateLowLevel = true;

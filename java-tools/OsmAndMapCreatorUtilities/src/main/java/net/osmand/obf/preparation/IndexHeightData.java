@@ -43,9 +43,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 public class IndexHeightData {
+	public static int MAXIMUM_LOADED_DATA = 150; 
 	private static final double MINIMAL_DISTANCE = 0;
 	private static final int HEIGHT_ACCURACY = 4;
-	private static final int MAXIMUM_LOADED_DATA = 200; 
 	private static boolean USE_BILINEAR_INTERPOLATION = false;
 
 	private String srtmDataUrl;
