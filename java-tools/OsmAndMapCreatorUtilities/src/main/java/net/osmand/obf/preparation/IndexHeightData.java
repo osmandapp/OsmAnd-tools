@@ -11,7 +11,10 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -71,6 +74,8 @@ public class IndexHeightData {
 		private boolean dataLoaded;
 		private int height;
 		private int width;
+		public int accessed;
+		public int loaded;
 		
 		private TileData(int id) {
 			this.id = id;
@@ -485,16 +490,13 @@ public class IndexHeightData {
 		int id = getTileId(lt, ln);
 		TileData tileData = map.get(id);
 		if (tileData == null) {
-			if (MAXIMUM_LOADED_DATA != -1 && map.size() >= MAXIMUM_LOADED_DATA) {
-				log.info(String.format("SRTM: GC srtm data %d.", map.size()));
-				map.clear();
-				System.gc();
-			}
 			tileData = new TileData(id);
 			map.put(id, tileData);
 		}
 		if (!tileData.dataLoaded) {
+			gcTiles();
 			try {
+				tileData.loaded++;
 				log.info(String.format("SRTM: Load srtm data %d: %d %d", id, (int) lt, (int) ln));
 				File missingFile = tileData.loadData(srtmDataUrl, srtmWorkingDir);
 				if (fileName != null && fileName.length > 0) {
@@ -504,8 +506,43 @@ public class IndexHeightData {
 				log.error(e.getMessage(), e);
 			}
 		}
+		tileData.accessed++;
 		
 		return tileData.getHeight(lonDelta, latDelta, neighboors);
+	}
+
+
+
+	private void gcTiles() {
+		List<TileData> lst = new ArrayList<>(map.values());
+		Iterator<TileData> it = lst.iterator();
+		while (it.hasNext()) {
+			if (!it.next().dataLoaded) {
+				it.remove();
+			}
+		}
+		if (MAXIMUM_LOADED_DATA != -1 && lst.size() >= MAXIMUM_LOADED_DATA) {
+			int toGC = MAXIMUM_LOADED_DATA / 2;
+			log.info(String.format("SRTM: GC srtm data %d of %d (total %d).", toGC, lst.size(), map.size()));
+			// sort that more accessed are not gc
+			Collections.sort(lst, new Comparator<TileData>() {
+
+				@Override
+				public int compare(TileData o1, TileData o2) {
+					return -Integer.compare(o1.accessed + 100 * o1.loaded, o2.accessed + 100 * o2.loaded);
+				}
+			});
+			for (int i = 0; i < lst.size(); i++) {
+				TileData tile = lst.get(i);
+				if (i > toGC) {
+					// unload
+					tile.dataLoaded = false;
+					tile.data = null;
+				}
+				tile.accessed = 0;
+			}
+			System.gc();
+		}
 	}
 	
 	private static File loadFile(String fl, String folderURL, File workDir) {
