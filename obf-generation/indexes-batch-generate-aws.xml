@@ -14,7 +14,7 @@
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
 			</job>
-			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="500">
+			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="600">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
 			</job>
