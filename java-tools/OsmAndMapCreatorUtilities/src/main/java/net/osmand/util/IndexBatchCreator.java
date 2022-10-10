@@ -133,7 +133,7 @@ public class IndexBatchCreator {
 	private String renderingTypesFile;
 
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 		IndexBatchCreator creator = new IndexBatchCreator();
 		if (args == null || args.length == 0) {
 			System.out
@@ -148,18 +148,18 @@ public class IndexBatchCreator {
 		} catch (FileNotFoundException e) {
 			throw new IllegalArgumentException("XML configuration file not found : " + name, e);
 		}
-
+		List<RegionCountries> countriesToProcess  = null;
 		try {
 			Document params = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(stream);
-			List<RegionCountries> countriesToDownload = creator.setupProcess(params);
-			creator.runBatch(countriesToDownload);
+			countriesToProcess = creator.setupProcess(params);
 		} catch (Exception e) {
 			System.out.println("XML configuration file could not be read from " + name);
-			e.printStackTrace();
-			log.error("XML configuration file could not be read from " + name, e);
+			log.error("XML configuration file could not be read from " + name + ": " + e.getMessage(), e);
+			throw e;
 		} finally {
 			safeClose(stream, "Error closing stream for " + name);
 		}
+		creator.runBatch(countriesToProcess);
 	}
 
 	public List<RegionCountries> setupProcess(Document doc)
