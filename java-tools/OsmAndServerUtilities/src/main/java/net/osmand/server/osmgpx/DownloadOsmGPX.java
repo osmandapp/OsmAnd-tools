@@ -82,7 +82,8 @@ public class DownloadOsmGPX {
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
 	
 	private static final int HTTP_TIMEOUT = 5000;
-	private static final int MAX_RETRY_TIMEOUT = 2;
+	private static final int MAX_RETRY_TIMEOUT = 5;
+	private static final int RETRY_TIMEOUT = 15000;
 	
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
@@ -693,6 +694,11 @@ public class DownloadOsmGPX {
 			return con;
 		} catch (IOException e) {
 			if (retry > 0) {
+				try {
+					Thread.sleep(RETRY_TIMEOUT);
+				} catch (InterruptedException e1) {
+					e1.printStackTrace();
+				}
 				return getHttpConnection(url, retry - 1);
 			} else {
 				throw e;
