@@ -272,18 +272,23 @@ public class IndexBatchCreator {
 						int before = countries.regionNames.size();
 						while (it.hasNext()) {
 							CountryRegion cr = it.next();
+							if (cr.getDownloadName().contains("_basemap")) {
+								// skip basemap
+								continue;
+							}
+
 							if (cr.map && !cr.jointMap) {
-								total ++;
-								RegionSpecificData dt = new RegionSpecificData();
-								dt.downloadName = cr.getDownloadName();
-								if (!Algorithms.isEmpty(filterStartWith)
-										&& !dt.downloadName.toLowerCase().startsWith(filterStartWith.toLowerCase())) {
+								total++;
+								if (!Algorithms.isEmpty(filterStartWith) && !cr.getDownloadName().toLowerCase()
+										.startsWith(filterStartWith.toLowerCase())) {
 									continue;
 								}
 								if (!Algorithms.isEmpty(filterContains)
-										&& !dt.downloadName.toLowerCase().contains(filterContains.toLowerCase())) {
+										&& !cr.getDownloadName().toLowerCase().contains(filterContains.toLowerCase())) {
 									continue;
 								}
+								RegionSpecificData dt = new RegionSpecificData();
+								dt.downloadName = cr.getDownloadName();
 								countries.regionNames.put(dt.downloadName, dt);
 							}
 						}

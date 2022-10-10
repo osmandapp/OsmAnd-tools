@@ -86,6 +86,10 @@ public class IndexHeightData {
 				width = img.getWidth();
 				height = img.getHeight();
 				data = (DataBufferShort) img.getRaster().getDataBuffer();
+				// remove all downloaded files to save disk space
+				if (!srtmDataUrl.startsWith("/") && !srtmDataUrl.startsWith(".")) {
+					f.delete();
+				}
 				return null;
 			}
 			return f;
@@ -505,9 +509,9 @@ public class IndexHeightData {
 	}
 	
 	private static File loadFile(String fl, String folderURL, File workDir) {
-		if(folderURL.startsWith("http://") || folderURL.startsWith("https://")) {
+		if (folderURL.startsWith("http://") || folderURL.startsWith("https://")) {
 			File res = new File(workDir, fl);
-			
+
 			try {
 				InputStream is = new URL(folderURL + fl).openStream();
 				FileOutputStream fous = new FileOutputStream(res);
