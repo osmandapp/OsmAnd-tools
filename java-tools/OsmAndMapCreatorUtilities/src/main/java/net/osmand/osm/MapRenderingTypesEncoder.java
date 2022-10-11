@@ -782,7 +782,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	protected List<EntityConvert> getApplicableConverts(Map<String, String> tags, EntityType entity,
 			EntityConvertType filterTransform, EntityConvertApplyType filterProcessingType) {
 		List<EntityConvert> listToConvert = null;
-		for(Map.Entry<String, String> e : tags.entrySet()) {
+		for (Map.Entry<String, String> e : tags.entrySet()) {
 			List<EntityConvert> list = convertTags.get(e.getKey());
 			if (list != null) {
 				for (EntityConvert ec : list) {
@@ -935,8 +935,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected boolean checkConvert(Map<String, String> tags, EntityConvert ec, EntityType entity) {
-		if(ec.applyTo != null) {
-			if(!ec.applyTo.contains(entity)) {
+		if (ec.applyTo != null) {
+			if (!ec.applyTo.contains(entity)) {
 				return false;
 			}
 		}
@@ -970,68 +970,68 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifTags) {
+		for (TagValuePattern ift : ec.ifTags) {
 			String val = tags.get(ift.tag);
-			if(!checkConvertValue(ift, val)) {
+			if (!checkConvertValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotTags) {
+		for (TagValuePattern ift : ec.ifNotTags) {
 			String val = tags.get(ift.tag);
-			if(checkConvertValue(ift, val)) {
+			if (checkConvertValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifStartsTags) {
+		for (TagValuePattern ift : ec.ifStartsTags) {
 			String val = tags.get(ift.tag);
-			if(!checkStartsWithValue(ift, val)) {
+			if (!checkStartsWithValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotStartsTags) {
+		for (TagValuePattern ift : ec.ifNotStartsTags) {
 			String val = tags.get(ift.tag);
-			if(checkStartsWithValue(ift, val)) {
+			if (checkStartsWithValue(ift, val)) {
 				return false;
 			}
 		}
 
-		for(TagValuePattern ift : ec.ifEndsTags) {
+		for (TagValuePattern ift : ec.ifEndsTags) {
 			String val = tags.get(ift.tag);
-			if(!checkEndsWithValue(ift, val)) {
+			if (!checkEndsWithValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotEndsTags) {
+		for (TagValuePattern ift : ec.ifNotEndsTags) {
 			String val = tags.get(ift.tag);
-			if(checkEndsWithValue(ift, val)) {
+			if (checkEndsWithValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifContainsTags) {
+		for (TagValuePattern ift : ec.ifContainsTags) {
 			String val = tags.get(ift.tag);
-			if(!checkContainsValue(ift, val)) {
+			if (!checkContainsValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotContainsTags) {
+		for (TagValuePattern ift : ec.ifNotContainsTags) {
 			String val = tags.get(ift.tag);
-			if(checkContainsValue(ift, val)) {
+			if (checkContainsValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifTagsNotLess) {
+		for (TagValuePattern ift : ec.ifTagsNotLess) {
 			String val = tags.get(ift.tag);
 			double nt = Double.parseDouble(ift.value);
 			long vl = Algorithms.parseLongSilently(val, 0);
-			if(vl < nt) {
+			if (vl < nt) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifTagsLess) {
+		for (TagValuePattern ift : ec.ifTagsLess) {
 			String val = tags.get(ift.tag);
 			double nt = Double.parseDouble(ift.value);
 			long vl = Algorithms.parseLongSilently(val, 0);
-			if(vl >= nt) {
+			if (vl >= nt) {
 				return false;
 			}
 		}
