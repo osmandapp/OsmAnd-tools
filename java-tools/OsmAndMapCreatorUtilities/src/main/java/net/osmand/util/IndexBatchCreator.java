@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -88,6 +89,7 @@ public class IndexBatchCreator {
 		String queue;
 		String definition;
 		int sizeUpToMB = -1;
+		Set<String> excludedRegions = new TreeSet<>();
 	}
 
 	private static class RegionSpecificData {
@@ -105,6 +107,13 @@ public class IndexBatchCreator {
 		String s3Url;
 		String targetFileName;
 	}
+	
+	private static class LocalPendingGeneration {
+		public String mapFileName;
+		public File file;
+		public String regionName;
+		public RegionSpecificData rdata;
+	}
 
 
 	// process atributtes
@@ -117,9 +126,16 @@ public class IndexBatchCreator {
 	File workDir;
 	String srtmDir;
 	
+
+	List<LocalPendingGeneration> localPendingGenerations = new ArrayList<>();
+	
 	List<AwsJobDefinition> awsJobQueues = new ArrayList<>();
+	// aws gen block
 	List<AwsPendingGeneration> awsPendingGenerations = new ArrayList<>();
 	List<AwsPendingGeneration> awsFailedGenerations = new ArrayList<>();
+	int awsStatushash = 0;
+	int awsSucceeded = 0;
+	int awsFailed = 0;
 	
 	boolean indexPOI = false;
 	boolean indexTransport = false;
@@ -228,6 +244,13 @@ public class IndexBatchCreator {
 				for (int l = 0; l < params.getLength(); l++) {
 					Element jbep = (Element) params.item(l);
 					jd.params.put(jbep.getAttribute("k"), jbep.getAttribute("v"));
+				}
+				NodeList filters = jbe.getElementsByTagName("filter");
+				for (int l = 0; l < filters.getLength(); l++) {
+					Element f = (Element) filters.item(l);
+					if (!Algorithms.isEmpty(f.getAttribute("exclude"))) {
+						jd.excludedRegions.add(f.getAttribute("exclude").toLowerCase());
+					}
 				}
 				jd.name = jbe.getAttribute("name");
 				awsJobQueues.add(jd);
@@ -351,8 +374,21 @@ public class IndexBatchCreator {
 		if (!countriesToDownload.isEmpty()) {
 			downloadFilesAndGenerateIndex(countriesToDownload, alreadyGeneratedFiles);
 		}
+		// run check in parallel
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS * 4);
+			}
+		}).start();
 		generateLocalFolderIndexes(alreadyGeneratedFiles);
-		waitAwsJobsToFinish();
+		log.info("Generate local " + localPendingGenerations.size() + " maps");
+		for (LocalPendingGeneration lp : localPendingGenerations) {
+			generateLocalIndex(lp.file, lp.regionName, lp.mapFileName, lp.rdata, alreadyGeneratedFiles);
+		}
+		
+		
+		waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS);
 		log.info("GENERATING INDEXES FINISHED ");
 		if (awsFailedGenerations.size() > 0) {
 			throw new IllegalStateException("There are " + awsFailedGenerations.size() + " failed generations");
@@ -361,81 +397,81 @@ public class IndexBatchCreator {
 
 
 
-	private void waitAwsJobsToFinish() {
+	private void waitAwsJobsToFinish(long timeout) {
 		log.info(String.format("Waiting %d aws jobs to complete...", awsPendingGenerations.size()));
-		int phash = 0;
-		int succeeded = 0;
-		int failed = 0;
 		while (awsPendingGenerations.size() > 0) {
-			Map<String, JobDetail> awsStatus = new LinkedHashMap<>();
-			List<String> jobIds = new ArrayList<String>();
-			for (AwsPendingGeneration p : awsPendingGenerations) {
-				jobIds.add(p.response.jobId());
-				if (jobIds.size() > 50) {
-					getJobStatus(jobIds, awsStatus);
-					jobIds.clear();
-				}
-			}
-			getJobStatus(jobIds, awsStatus);
-			Iterator<AwsPendingGeneration> it = awsPendingGenerations.iterator();
-			int readytorun = 0;
-			int running = 0;
-			int starting = 0;
-			while (it.hasNext()) {
-				AwsPendingGeneration gen = it.next();
-				JobDetail status = awsStatus.get(gen.response.jobId());
-				if (status == null) {
-					continue;
-				}
-				JobStatus js = JobStatus.fromValue(status.statusAsString());
-				if (js == JobStatus.RUNNABLE) {
-					readytorun++;
-				} else if (js == JobStatus.RUNNING) {
-					running++;
-				} else if (js == JobStatus.STARTING) {
-					starting++;
-				} else if (js == JobStatus.SUCCEEDED) {
-					succeeded++;
-					try {
-						S3Client client = S3Client.builder().build();
-						String s3url = gen.s3Url;
-						if (s3url.startsWith("s3://")) {
-							s3url = s3url.substring("s3://".length());
-						}
-						int i = s3url.indexOf('/');
-						String bucket = s3url.substring(0, i);
-						String key = s3url.substring(i + 1);
-						GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
-						ResponseInputStream<GetObjectResponse> obj = client.getObject(request);
-						FileOutputStream fous = new FileOutputStream(new File(indexDirFiles, gen.targetFileName));
-						Algorithms.streamCopy(obj, fous);
-						obj.close();
-						fous.close();
-						it.remove();
-					} catch (Exception e) {
-						log.error(String.format("Error retrieving result from S3 %s: %s", gen.s3Url, e.getMessage()), e);
-					}
-				} else if (js == JobStatus.FAILED) {
-					// gen.failedDetail = status;
-					failed++;
-					it.remove();
-					awsFailedGenerations.add(gen);
-					log.error(String.format("! Failed generation %s, job id %s: %s", gen.targetFileName, status.jobId(),
-							status.statusReason()));
-				}
-			}
-			int hash = awsPendingGenerations.size() + readytorun * 7 + starting * 11 + running * 17 + succeeded * 41 + failed * 107;
-			if (phash != hash) {
-				log.info(String.format("Pending %d aws jobs: ready to run %d, starting %d running %d - succeeded %d, failed %d ...",
-						awsPendingGenerations.size(), readytorun, starting, running, succeeded, failed));
-				phash = hash;
-			}
+			waitAwsJobsIteration();
 			try {
-				Thread.sleep(TIMEOUT_TO_CHECK_AWS);
+				Thread.sleep(timeout);
 			} catch (InterruptedException e) {
 			}
 		}
+	}
 
+	private synchronized void waitAwsJobsIteration() {
+		Map<String, JobDetail> awsStatus = new LinkedHashMap<>();
+		List<String> jobIds = new ArrayList<String>();
+		for (AwsPendingGeneration p : awsPendingGenerations) {
+			jobIds.add(p.response.jobId());
+			if (jobIds.size() > 50) {
+				getJobStatus(jobIds, awsStatus);
+				jobIds.clear();
+			}
+		}
+		getJobStatus(jobIds, awsStatus);
+		Iterator<AwsPendingGeneration> it = awsPendingGenerations.iterator();
+		int readytorun = 0;
+		int running = 0;
+		int starting = 0;
+		while (it.hasNext()) {
+			AwsPendingGeneration gen = it.next();
+			JobDetail status = awsStatus.get(gen.response.jobId());
+			if (status == null) {
+				continue;
+			}
+			JobStatus js = JobStatus.fromValue(status.statusAsString());
+			if (js == JobStatus.RUNNABLE) {
+				readytorun++;
+			} else if (js == JobStatus.RUNNING) {
+				running++;
+			} else if (js == JobStatus.STARTING) {
+				starting++;
+			} else if (js == JobStatus.SUCCEEDED) {
+				awsSucceeded++;
+				try {
+					S3Client client = S3Client.builder().build();
+					String s3url = gen.s3Url;
+					if (s3url.startsWith("s3://")) {
+						s3url = s3url.substring("s3://".length());
+					}
+					int i = s3url.indexOf('/');
+					String bucket = s3url.substring(0, i);
+					String key = s3url.substring(i + 1);
+					GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
+					ResponseInputStream<GetObjectResponse> obj = client.getObject(request);
+					FileOutputStream fous = new FileOutputStream(new File(indexDirFiles, gen.targetFileName));
+					Algorithms.streamCopy(obj, fous);
+					obj.close();
+					fous.close();
+					it.remove();
+				} catch (Exception e) {
+					log.error(String.format("Error retrieving result from S3 %s: %s", gen.s3Url, e.getMessage()), e);
+				}
+			} else if (js == JobStatus.FAILED) {
+				// gen.failedDetail = status;
+				awsFailed++;
+				it.remove();
+				awsFailedGenerations.add(gen);
+				log.error(String.format("! Failed generation %s, job id %s: %s", gen.targetFileName, status.jobId(),
+						status.statusReason()));
+			}
+		}
+		int hash = awsPendingGenerations.size() + readytorun * 7 + starting * 11 + running * 17 + awsSucceeded * 41 + awsFailed * 107;
+		if (awsStatushash != hash) {
+			log.info(String.format("Pending %d aws jobs: ready to run %d, starting %d running %d - succeeded %d, failed %d ...",
+					awsPendingGenerations.size(), readytorun, starting, running, awsSucceeded, awsFailed));
+			awsStatushash = hash;
+		}
 	}
 
 	private void getJobStatus(List<String> jobIds, Map<String, JobDetail> awsStatus) {
@@ -470,8 +506,7 @@ public class IndexBatchCreator {
 
 				String regionName = prefix + name;
 				String fileName = Algorithms.capitalizeFirstLetterAndLowercase(prefix + name + suffix);
-				log.warn("----------- Check existing " + fileName);
-
+//				log.warn("----------- Check existing " + fileName);
 				if (skipExistingIndexes != null) {
 					File bmif = new File(skipExistingIndexes,
 							fileName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT);
@@ -614,14 +649,12 @@ public class IndexBatchCreator {
 
 
 
-	protected void generateIndex(File file, String regionName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
+	protected boolean generateIndex(File file, String regionName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		String fileMapName = file.getName();
 		int i = file.getName().indexOf('.');
 		if (i > -1) {
 			fileMapName = Algorithms.capitalizeFirstLetterAndLowercase(file.getName().substring(0, i));
 		}
-		log.warn("-------------------------------------------");
-		log.warn("----------- Generate " + file.getName() + "\n\n\n");
 		if (Algorithms.isEmpty(regionName)) {
 			regionName = fileMapName;
 		} else {
@@ -629,12 +662,26 @@ public class IndexBatchCreator {
 		}
 		String targetMapFileName = fileMapName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 		for (AwsJobDefinition jd : awsJobQueues) {
-			if (jd.sizeUpToMB < 0 || file.length() < jd.sizeUpToMB * 1024 * 1024) {
-				generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
-				return;
+			if (jd.sizeUpToMB > 0 && file.length() > jd.sizeUpToMB * 1024 * 1024) {
+				continue;
 			}
+			if (jd.excludedRegions.contains(fileMapName.toLowerCase())) {
+				continue;
+			}
+			log.warn("-------------------------------------------");
+			log.warn("----------- Generate on AWS " + file.getName() + "\n\n\n");
+			generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
+			return true;
 		}
-		generateLocalIndex(file, regionName, targetMapFileName, rdata, alreadyGeneratedFiles);
+		log.warn("-------------------------------------------");
+		log.warn("----------- Scheduled on local " + file.getName() + "\n\n\n");
+		LocalPendingGeneration lp = new LocalPendingGeneration();
+		lp.file = file;
+		lp.regionName = regionName;
+		lp.mapFileName = targetMapFileName;
+		lp.rdata = rdata;
+		localPendingGenerations.add(lp);
+		return false;
 	}
 	
 	
