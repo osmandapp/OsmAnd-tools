@@ -58,8 +58,7 @@ public enum DBDialect {
 				log.error("Illegal configuration", e);
 				throw new IllegalStateException(e);
 			}
-			Connection connection = DriverManager.getConnection("jdbc:sqlite:" + (DBDialect.SQLITE_IN_MEMORY == this? ":memory:":
-					fileName));
+			Connection connection = DriverManager.getConnection("jdbc:sqlite:" + (DBDialect.SQLITE_IN_MEMORY == this? ":memory:": fileName));
 			Statement statement = connection.createStatement();
 			statement.executeUpdate("PRAGMA synchronous = 0");
 			//no journaling, saves some I/O access, but database can go corrupt
@@ -70,7 +69,10 @@ public enum DBDialect {
 			//statement.executeUpdate("PRAGMA cache_size = 10000"); cache size could be probably contraproductive on slower disks?
 			statement.close();
 			try {
-				log.info(String.format("SQLITE running in %s mode", SQLiteJDBCLoader.isNativeMode() ? "native" : "pure-java"));
+				log.info(String.format("Access sqlite %s running in %s mode %s ",
+						fileName.substring(fileName.lastIndexOf('/') + 1),
+						SQLiteJDBCLoader.isNativeMode() ? "native" : "pure-java",
+						DBDialect.SQLITE_IN_MEMORY == this ? "in memory" : "using disk"));
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
