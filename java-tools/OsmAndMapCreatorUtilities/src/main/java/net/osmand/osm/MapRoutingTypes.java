@@ -132,7 +132,7 @@ public class MapRoutingTypes {
 	}
 
 	private boolean contains(Set<String> s, String tag, String value) {
-		if(s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)){
+		if (s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)) {
 			return true;
 		}
 		return false;
@@ -149,15 +149,23 @@ public class MapRoutingTypes {
 
 
 
-	private boolean startsWith(Set<String> s, String tag, String value) {
-		if (s.contains(tag) || s.contains(tag + TAG_DELIMETER + value)) {
+	private boolean startsWith(Set<String> setOfTags, String tag, String value) {
+		if (setOfTags.contains(tag) || setOfTags.contains(tag + TAG_DELIMETER + value)) {
 			return true;
 		}
-		for(String st : s) {
-			if(tag.startsWith(st+":")) {
+		// Fast version is below
+		// for (String st : setOfTags) {
+		// 	if (tag.startsWith(st + ":")) {
+		//	 return true;
+		// 	}
+		// }
+		int ind = -1;
+		while ((ind = tag.indexOf(':', ind + 1)) != -1) {
+			if (setOfTags.contains(tag.substring(0, ind))) {
 				return true;
 			}
 		}
+
 		return false;
 	}
 
@@ -192,26 +200,28 @@ public class MapRoutingTypes {
 		}
 		outTypes.clear();
 		names.clear();
-		for(Entry<String, String> es : tags.entrySet()) {
+		for (Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
-			if(!testNonParseableRules(tag, value)){
+			if (!testNonParseableRules(tag, value)) {
 				continue;
 			}
-			String tvl = getMap(TAGS_TO_REPLACE, tag.toLowerCase(), value.toLowerCase());
-			if(tvl != null) {
+			// don't use lowercase to speedup
+			String tvl = getMap(TAGS_TO_REPLACE, tag, value);
+			if (tvl != null) {
 				int i = tvl.indexOf(TAG_DELIMETER);
 				tag = tvl.substring(0, i);
 				value = tvl.substring(i + 1);
 			}
-            if(TAGS_TEXT.contains(tag) || startsWith(TAGS_TEXT, tag, value)) {
-            	if(validateType(tag, value)) {
-            		names.put(registerRule(tag, null), value);
-            	}
-            } else if(contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value) || getMap(TAGS_TO_REPLACE, tag, value) != null) {
-            	if(validateType(tag, value)) {
-            		outTypes.add(registerRule(tag, value).id);
-            	}
+			if (TAGS_TEXT.contains(tag) || startsWith(TAGS_TEXT, tag, value)) {
+				if (validateType(tag, value)) {
+					names.put(registerRule(tag, null), value);
+				}
+			} else if (contains(TAGS_TO_ACCEPT, tag, value) || startsWith(TAGS_TO_SAVE, tag, value)
+					|| getMap(TAGS_TO_REPLACE, tag, value) != null) {
+				if (validateType(tag, value)) {
+					outTypes.add(registerRule(tag, value).id);
+				}
 			}
 		}
 		return true;
