@@ -6,6 +6,9 @@ OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator
 export JAVA_OPTS="-Xms512M -Xmx24014M"
 chmod +x $OSMAND_MAP_CREATOR_PATH/utilities.sh
 SRTM_DIR="/home/relief-data/srtm/"
+# File to store processed timestamp as oneline: 2022-10-12 18:00
+TIMESTAMP_FILE=/home/osmlive/.proc_diff_timestamp
+# TIMESTAMP_FILE=.timestamp
 
 QUERY_LOW_EMMISIONS_ZONE="[timeout:3600][maxsize:160000000];
     relation[\"boundary\"=\"low_emission_zone\"];
@@ -56,8 +59,8 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
                 ${BASENAME}_before.obf ${BASENAME}_after.obf ${BASENAME}_diff.obf $DIFF_FILE
 
             echo "### 3. Split files : $(date -u)"
-            DATE_NAME=${BASENAME:0:8}
-            TIME_NAME=${BASENAME:9:12}
+            DATE_NAME=${BASENAME:0:8} #22_10_11
+            TIME_NAME=${BASENAME:9:12} #20_30
             $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME"
             
             gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
@@ -66,6 +69,9 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             rm -r *.osm || true
             rm -r *.rtree* || true
             rm -r *.obf || true
+
+            # 2022-10-12 18:00
+            echo "20${DATE_NAME//_/-} ${TIME_NAME//_/:}" > $TIMESTAMP_FILE
         fi 
     done
 done
