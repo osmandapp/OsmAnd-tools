@@ -1,7 +1,7 @@
 #!/bin/bash
 # GIT History could be found at https://github.com/osmandapp/OsmAnd-misc/blob/master/osm-live/generate_hourly_osmand_diff.sh
 
-RESULT_DIR="/home/osmlive/_diff"
+RESULT_DIR="/home/osmlive"
 OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator
 export JAVA_OPTS="-Xms512M -Xmx24014M"
 chmod +x $OSMAND_MAP_CREATOR_PATH/utilities.sh
@@ -17,7 +17,7 @@ if ! test "`find $LOW_EMMISION_ZONE_FILE -mmin -1440`"; then
     echo "$QUERY_LOW_EMMISIONS_ZONE" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  | gzip > $LOW_EMMISION_ZONE_FILE
 fi
 
-for DATE_DIR in $(find $RESULT_DIR -maxdepth 1  -type d | sort ); do
+for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
     COUNT_OBF_FILES=$(find $DATE_DIR -maxdepth 1 -type f  -name "*.obf.gz" | wc -l)
     if [ ! -d $DATE_DIR/src ]; then
         continue;
@@ -58,13 +58,12 @@ for DATE_DIR in $(find $RESULT_DIR -maxdepth 1  -type d | sort ); do
             echo "### 3. Split files : $(date -u)"
             DATE_NAME=${BASENAME:0:8}
             TIME_NAME=${BASENAME:9:12}
-            echo "TODO uncomment"
-            echo $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf \
+            $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf \
                 ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME"
 
             rm -r *.osm || true
             rm -r *.rtree* || true
-            #rm -r *.obf || true
+            rm -r *.obf || true
         fi 
     done
 done
