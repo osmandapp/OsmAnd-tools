@@ -1,6 +1,13 @@
 #!/bin/bash -xe
 # GIT History could be found athttps://github.com/osmandapp/OsmAnd-misc/blob/master/osm-live/generate_hourly_osmand_diff.sh
 
+# For local test
+# How to generate files locally:
+# 1. Create .proc_timestamp in RESULT_DIR with date/time: "2020-12-30 10:10"
+# 2. Execute this script
+# 3. Stop when osm is done
+#REMOTE_SSH_STRING="ssh jenkins@builder.osmand.net"
+
 RESULT_DIR="/home/osmlive/"
 # CURRENT_SEC=$(date -u "+%s")
 START="$(cat $RESULT_DIR/.proc_timestamp)"
@@ -137,9 +144,11 @@ while true; do
   TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}.after.osm.gz
   TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}.diff.osm.gz
 
+  rm *.osm
   # NEXT ITERATION
   START_DAY=$NSTART_DAY
   START_TIME=$NSTART_TIME
+  
 
   echo "$NSTART_DAY $NSTART_TIME" > "${RESULT_DIR}.proc_timestamp"
 done
