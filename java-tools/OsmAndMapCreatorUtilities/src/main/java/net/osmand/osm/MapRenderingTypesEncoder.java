@@ -25,7 +25,6 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -48,7 +47,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private static final String NODE_NETWORK_TAG = "node_network_point";
 	private static final String NODE_NETWORK_MULTIPLE_VALUE = "multiple";
 	private static final boolean DELETE_AFTER_38_RELEASE = false;
-	private static final String EMPTY_STRING = "";
 
 	private Map<String, TIntArrayList> socketTypes;
 
@@ -782,17 +780,30 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected List<EntityConvert> getApplicableConverts(Map<String, String> tags, EntityType entity,
-			EntityConvertType filter, EntityConvertApplyType appFilter) {
+			EntityConvertType filterTransform, EntityConvertApplyType filterProcessingType) {
 		List<EntityConvert> listToConvert = null;
-		for(Map.Entry<String, String> e : tags.entrySet()) {
+		for (Map.Entry<String, String> e : tags.entrySet()) {
 			List<EntityConvert> list = convertTags.get(e.getKey());
 			if (list != null) {
 				for (EntityConvert ec : list) {
-					if (checkConvertValue(ec.fromTag, e.getValue())) {
+					String skipMsg = null;
+					if (skipMsg == null && ec.type != filterTransform) {
+						skipMsg = " transform " + filterTransform + "!= " + ec.type + ";";
+					}
+					if (skipMsg == null && !ec.applyToType.contains(filterProcessingType)) {
+						skipMsg = " appFilter " + ec.applyToType + ";";
+					}
+					if (skipMsg == null && !checkConvertValue(ec.fromTag, e.getValue())) {
+						skipMsg = " value mismatch " + e.getValue();
+					}
+					if (skipMsg != null) {
+						if (ec.verbose) {
+							log.info("Skip entity convert from '" + ec.fromTag + "' to " + tags + " in " + filterProcessingType + skipMsg);
+						}
+					} else {
 						String verbose = null;
-						if(ec.verbose) {
-							verbose = "Apply entity convert from '"+ec.fromTag+"' to " + tags + " in " +
-									appFilter;
+						if (ec.verbose) {
+							verbose = "Apply entity convert from '" + ec.fromTag + "' to " + tags + " in " + filterProcessingType;
 						}
 						if (ec.type == EntityConvertType.TAG_COMBINE) {
 							if (ec.fromTagList.size() > 0) {
@@ -807,7 +818,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 								}
 								if (!tagPresent) {
 									if (verbose != null) {
-										verbose = " - has failed due to tags are not contain any +'"+tagListVerbose+"' for combine";
+										verbose = " - has failed due to tags are not contain any +'" + tagListVerbose
+												+ "' for combine";
 										log.info(verbose);
 									}
 									break;
@@ -820,8 +832,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 								break;
 							}
 						}
-						if (checkConvert(tags, ec, entity) && ec.type == filter &&
-								ec.applyToType.contains(appFilter)) {
+						if (checkConvert(tags, ec, entity)) {
 							if (listToConvert == null) {
 								listToConvert = new ArrayList<EntityConvert>();
 							}
@@ -831,20 +842,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 							}
 						} else {
 							if (verbose != null) {
-								verbose += " - has failed due to ";
-								if(!checkConvert(tags, ec, entity)) {
-									verbose += "if conditions;";
-								}
-								if(ec.type != filter ) {
-									verbose += " transform " + filter + "!= " + ec.type + ";";
-								}
-								if(!ec.applyToType.contains(appFilter)) {
-									verbose += " appFilter "+appFilter+";";
-								}
-
+								verbose += " - has failed due to if conditions";
 							}
 						}
-						if(verbose != null) {
+						if (verbose != null) {
 							log.info(verbose);
 						}
 					}
@@ -934,8 +935,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	protected boolean checkConvert(Map<String, String> tags, EntityConvert ec, EntityType entity) {
-		if(ec.applyTo != null) {
-			if(!ec.applyTo.contains(entity)) {
+		if (ec.applyTo != null) {
+			if (!ec.applyTo.contains(entity)) {
 				return false;
 			}
 		}
@@ -969,68 +970,68 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifTags) {
+		for (TagValuePattern ift : ec.ifTags) {
 			String val = tags.get(ift.tag);
-			if(!checkConvertValue(ift, val)) {
+			if (!checkConvertValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotTags) {
+		for (TagValuePattern ift : ec.ifNotTags) {
 			String val = tags.get(ift.tag);
-			if(checkConvertValue(ift, val)) {
+			if (checkConvertValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifStartsTags) {
+		for (TagValuePattern ift : ec.ifStartsTags) {
 			String val = tags.get(ift.tag);
-			if(!checkStartsWithValue(ift, val)) {
+			if (!checkStartsWithValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotStartsTags) {
+		for (TagValuePattern ift : ec.ifNotStartsTags) {
 			String val = tags.get(ift.tag);
-			if(checkStartsWithValue(ift, val)) {
+			if (checkStartsWithValue(ift, val)) {
 				return false;
 			}
 		}
 
-		for(TagValuePattern ift : ec.ifEndsTags) {
+		for (TagValuePattern ift : ec.ifEndsTags) {
 			String val = tags.get(ift.tag);
-			if(!checkEndsWithValue(ift, val)) {
+			if (!checkEndsWithValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotEndsTags) {
+		for (TagValuePattern ift : ec.ifNotEndsTags) {
 			String val = tags.get(ift.tag);
-			if(checkEndsWithValue(ift, val)) {
+			if (checkEndsWithValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifContainsTags) {
+		for (TagValuePattern ift : ec.ifContainsTags) {
 			String val = tags.get(ift.tag);
-			if(!checkContainsValue(ift, val)) {
+			if (!checkContainsValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifNotContainsTags) {
+		for (TagValuePattern ift : ec.ifNotContainsTags) {
 			String val = tags.get(ift.tag);
-			if(checkContainsValue(ift, val)) {
+			if (checkContainsValue(ift, val)) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifTagsNotLess) {
+		for (TagValuePattern ift : ec.ifTagsNotLess) {
 			String val = tags.get(ift.tag);
 			double nt = Double.parseDouble(ift.value);
 			long vl = Algorithms.parseLongSilently(val, 0);
-			if(vl < nt) {
+			if (vl < nt) {
 				return false;
 			}
 		}
-		for(TagValuePattern ift : ec.ifTagsLess) {
+		for (TagValuePattern ift : ec.ifTagsLess) {
 			String val = tags.get(ift.tag);
 			double nt = Double.parseDouble(ift.value);
 			long vl = Algorithms.parseLongSilently(val, 0);
-			if(vl >= nt) {
+			if (vl >= nt) {
 				return false;
 			}
 		}
@@ -1040,20 +1041,28 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 
 	private boolean checkConvertValue(TagValuePattern fromTag, String value) {
-		if(value == null ) {
+		if (value == null) {
 			return false;
 		}
-		if(fromTag.value == null) {
+		if (fromTag.value == null) {
 			return true;
+		}
+		if (fromTag.value.equals(value)) {
+			// fast check 1
+			return true;
+		}
+		if(fromTag.value.length() != value.length()) {
+			// fast check 2
+			return false;
 		}
 		return fromTag.value.toLowerCase().equals(value.toLowerCase());
 	}
 
 	private boolean checkStartsWithValue(TagValuePattern fromTag, String value) {
-		if(value == null) {
+		if (value == null) {
 			return false;
 		}
-		if(fromTag.value == null) {
+		if (fromTag.value == null) {
 			return true;
 		}
 		return value.toLowerCase().startsWith(fromTag.value.toLowerCase());

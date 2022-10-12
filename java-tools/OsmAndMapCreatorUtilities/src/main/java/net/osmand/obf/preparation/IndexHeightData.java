@@ -517,7 +517,7 @@ public class IndexHeightData {
 		List<TileData> lst = new ArrayList<>(map.values());
 		Iterator<TileData> it = lst.iterator();
 		while (it.hasNext()) {
-			if (!it.next().dataLoaded) {
+			if (it.next().data == null) {
 				it.remove();
 			}
 		}
