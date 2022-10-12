@@ -27,7 +27,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         continue;
     fi
 
-    echo "!!! Process " $DATE_DIR $COUNT_OBF_FILES $COUNT_OSM_FILES
+    echo "###  Process " $DATE_DIR $COUNT_OBF_FILES $COUNT_OSM_FILES
     for DIFF_FILE in $(ls $DATE_DIR/src/*_diff.osm.gz); do
         # cut _diff.osm.gz
         BASENAME=$(basename $DIFF_FILE);
@@ -58,8 +58,10 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             echo "### 3. Split files : $(date -u)"
             DATE_NAME=${BASENAME:0:8}
             TIME_NAME=${BASENAME:9:12}
-            ~$OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf \
-                ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME"
+            $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME"
+            
+            gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
+            touch -r $DIFF_FILE $DATE_DIR/${BASENAME}.obf.gz
 
             rm -r *.osm || true
             rm -r *.rtree* || true
