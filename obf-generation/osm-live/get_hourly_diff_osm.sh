@@ -136,13 +136,14 @@ while true; do
     exit 1;
   fi
 
-  gzip -c $FILENAME_START.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}.before.osm.gz &
-  gzip -c $FILENAME_END.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}.after.osm.gz &
-  gzip -c $FILENAME_CHANGE.osm > $FINAL_FOLDER/src/${FILENAME_DIFF}.diff.osm.gz &
-  
-  TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}.before.osm.gz
-  TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}.after.osm.gz
-  TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}.diff.osm.gz
+  gzip -c $FILENAME_START.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before.osm.gz &
+  gzip -c $FILENAME_END.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after.osm.gz &
+  gzip -c $FILENAME_CHANGE.osm > $FINAL_FOLDER/src/${FILENAME_DIFF}_diff.osm.gz &
+  wait;
+
+  TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}_before.osm.gz
+  TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}_after.osm.gz
+  TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}_diff.osm.gz
 
   rm *.osm
   # NEXT ITERATION
