@@ -3,29 +3,38 @@ package net.osmand.obf.preparation;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.util.*;
 
+import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.router.*;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
-import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
-import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
-import net.osmand.router.RoutingContext;
 import net.osmand.router.RoutingContext.RoutingSubregionTile;
-import net.osmand.router.VehicleRouter;
 import net.osmand.util.MapUtils;
+import org.apache.commons.logging.Log;
+
+
+//This map generation step adds roads to the Base routing to improve it.
+// NEW_IMPROVE_BASE_ROUTING_ALGORITHM:
+//1. Using the findAllBaseRoadIntersections() we get a map of base points.
+//2. After using the getRoadsForImproveBaseRouting() we find all the roads from Normal routing to add to Base routing.
+// 2.1 In this method there is a loop over the base points.
+// 2.2 For each point, the method getPointsForFindDisconnectedRoads() return neighboring points from tile 14 zoom.
+// 2.3 After using method findDisconnectedBasePoints() and using Dijkstra's algorithm, we find all points to which a route hasn't been built.
+// 2.4 For each disconnected point using method findConnectedRoads() (with Dijkstra's algorithm) we find roads from Normal routing to which connected start point with disconnected point.
+// 2.5 If roads were found, we remove base roads duplicates from result and return.
 
 public class ImproveRoadConnectivity {
 	private static final boolean TRACE = false;
 	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
+	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
 
 	public static void main(String[] args) throws IOException {
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
@@ -112,11 +121,11 @@ public class ImproveRoadConnectivity {
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
 		TLongHashSet beginIsolated = new TLongHashSet();
 		TLongHashSet endIsolated = new TLongHashSet();
-		System.out.print("Start found roads in Normal routing for added to Base routing!");
+		log.info("Start found roads in Normal routing for added to Base routing!");
 		for (int k = 0; k < pointsToCheck.length; k++) {
 			int pers = k * 100/pointsToCheck.length;
 			if (pers % 5 == 0 && pers != (k - 1) * 100/pointsToCheck.length) {
-				System.out.print("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
+				log.info("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
 			}
 			long point = pointsToCheck[k];
 			if (all.get(point).size() == 1) {
@@ -181,7 +190,7 @@ public class ImproveRoadConnectivity {
 			if(setToRemove != null) {
 				setToRemove.addAll(beginIsolated);
 			}
-			System.out.println("All objects in base file " + mapOfObjectToCheck.size() + " to keep isolated " + (begSize + endSize - 2 * intersectionSize) +
+			log.info("All objects in base file " + mapOfObjectToCheck.size() + " to keep isolated " + (begSize + endSize - 2 * intersectionSize) +
 					" to add " + toAdd.size() + " to remove " + beginIsolated.size());
 		}
 		
