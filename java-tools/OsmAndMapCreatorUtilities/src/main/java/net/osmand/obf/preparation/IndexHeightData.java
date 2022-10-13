@@ -87,7 +87,12 @@ public class IndexHeightData {
 			File f = loadFile(getFileName() + ".tif", srtmDataUrl, workDir);
 			BufferedImage img;
 			if (f.exists()) {
-				img = ImageIO.read(f);
+				try {
+					img = ImageIO.read(f);
+				} catch (Exception e) {
+					log.error("Error reading tif file " + getFileName() + " " + e.getMessage(), e);
+					return null;
+				}
 				width = img.getWidth();
 				height = img.getHeight();
 				data = (DataBufferShort) img.getRaster().getDataBuffer();
