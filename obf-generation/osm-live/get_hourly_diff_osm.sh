@@ -38,13 +38,13 @@ while true; do
 
   if [ -z "$PERIOD" ]; then
     PERIOD_SEC=$PERIOD_1_SEC;
-    if (( $DB_SEC > $START_SEC + $PERIOD_5_SEC + 60 )); then
+    if (( $DB_SEC > $START_SEC + $PERIOD_5_SEC + 30 )); then
       PERIOD_SEC=$PERIOD_5_SEC;
-    elif (( $DB_SEC > $START_SEC + $PERIOD_4_SEC + 60 )); then
+    elif (( $DB_SEC > $START_SEC + $PERIOD_4_SEC + 30 )); then
       PERIOD_SEC=$PERIOD_4_SEC;
-    elif (( $DB_SEC > $START_SEC + $PERIOD_3_SEC + 60 )); then
+    elif (( $DB_SEC > $START_SEC + $PERIOD_3_SEC + 30 )); then
       PERIOD_SEC=$PERIOD_3_SEC;
-    elif (( $DB_SEC > $START_SEC + $PERIOD_2_SEC + 60 )); then
+    elif (( $DB_SEC > $START_SEC + $PERIOD_2_SEC + 30 )); then
       PERIOD_SEC=$PERIOD_2_SEC;
     fi
   else 
