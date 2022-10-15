@@ -121,9 +121,10 @@ while true; do
   echo -e "$QUERY_START" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query > $FILENAME_START.osm &
   echo -e "$QUERY_END" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_END.osm &
   echo "$QUERY_DIFF" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_CHANGE.osm  &
+  wait
   END_T=$(date -u "+%H:%M")
   echo "$START_DATE -> $END_DATE - $END_T ($START_T)" >> $DATE_LOG_FILE
-  wait
+
   #######################
 
   # 1.1 checks
