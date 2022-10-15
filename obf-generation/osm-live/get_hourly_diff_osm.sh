@@ -16,6 +16,7 @@ START_ARRAY=($START)
 START_DAY=${START_ARRAY[0]}
 START_TIME=${START_ARRAY[1]}
 DATE_LOG_FILE=date.log
+DB_DELAY=15
 
 PERIOD_1_SEC=600; #300 disable 5 min 
 PERIOD_2_SEC=600;
@@ -38,13 +39,13 @@ while true; do
 
   if [ -z "$PERIOD" ]; then
     PERIOD_SEC=$PERIOD_1_SEC;
-    if (( $DB_SEC > $START_SEC + $PERIOD_5_SEC + 30 )); then
+    if (( $DB_SEC > $START_SEC + $PERIOD_5_SEC + $DB_DELAY )); then
       PERIOD_SEC=$PERIOD_5_SEC;
-    elif (( $DB_SEC > $START_SEC + $PERIOD_4_SEC + 30 )); then
+    elif (( $DB_SEC > $START_SEC + $PERIOD_4_SEC + $DB_DELAY )); then
       PERIOD_SEC=$PERIOD_4_SEC;
-    elif (( $DB_SEC > $START_SEC + $PERIOD_3_SEC + 30 )); then
+    elif (( $DB_SEC > $START_SEC + $PERIOD_3_SEC + $DB_DELAY )); then
       PERIOD_SEC=$PERIOD_3_SEC;
-    elif (( $DB_SEC > $START_SEC + $PERIOD_2_SEC + 30 )); then
+    elif (( $DB_SEC > $START_SEC + $PERIOD_2_SEC + $DB_DELAY )); then
       PERIOD_SEC=$PERIOD_2_SEC;
     fi
   else 
@@ -61,7 +62,7 @@ while true; do
   END_DATE="${NSTART_DAY}T${NSTART_TIME}:00Z"
   END_SEC=$(date -u --date="$END_DATE" "+%s")
   # give 60 seconds delay to wait for overpass to finish internal ops
-  if (( $END_SEC > $DB_SEC - 60 )); then
+  if (( $END_SEC > $DB_SEC - $DB_DELAY )); then
     echo "END date $END_DATE is in the future of database!!!"
     exit 0;
   fi;
