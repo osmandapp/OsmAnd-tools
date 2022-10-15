@@ -116,10 +116,13 @@ while true; do
 
   #######################
   echo # 1. Query rich diffs - 2 in parallel
-  echo "$START_DATE - $END_DATE query data: $(date -u)" >> $DATE_LOG_FILE
+  START_T=$(date -u "+%H:%M")
+
   echo -e "$QUERY_START" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query > $FILENAME_START.osm &
   echo -e "$QUERY_END" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_END.osm &
   echo "$QUERY_DIFF" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_CHANGE.osm  &
+  END_T=$(date -u "+%H:%M")
+  echo "$START_DATE -> $END_DATE - $END_T ($START_T)" >> $DATE_LOG_FILE
   wait
   #######################
 
