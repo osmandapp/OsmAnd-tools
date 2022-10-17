@@ -943,17 +943,13 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'R':
     case 'r':
     {
-        auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.distanceToFog -= (key == 'R' ? 10.0f : 1.0f);
-        renderer->setFogConfiguration(fogConfiguration);
+        renderer->setVisibleDistance(state.visibleDistance + (key == 'R' ? 10.0f : 1.0f));
         return;
     }
     case 'F':
     case 'f':
     {
-        auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.distanceToFog += (key == 'F' ? 10.0f : 1.0f);
-        renderer->setFogConfiguration(fogConfiguration);
+        renderer->setVisibleDistance(state.visibleDistance - (key == 'F' ? 10.0f : 1.0f));
         return;
     }
     case 'x':
@@ -1030,32 +1026,16 @@ void keyboardHandler(unsigned char key, int x, int y)
         }
         return;
     }
+    case 'T':
     case 't':
     {
-        auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.density += 0.01f;
-        renderer->setFogConfiguration(fogConfiguration);
+        renderer->setDetailedDistance(state.detailedDistance + (key == 'T' ? 10.0f : 1.0f));
         return;
     }
+    case 'G':
     case 'g':
     {
-        auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.density -= 0.01f;
-        renderer->setFogConfiguration(fogConfiguration);
-        return;
-    }
-    case 'u':
-    {
-        auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.originFactor += 0.01f;
-        renderer->setFogConfiguration(fogConfiguration);
-        return;
-    }
-    case 'j':
-    {
-        auto fogConfiguration = state.fogConfiguration;
-        fogConfiguration.originFactor -= 0.01f;
-        renderer->setFogConfiguration(fogConfiguration);
+        renderer->setDetailedDistance(state.detailedDistance - (key == 'G' ? 10.0f : 1.0f));
         return;
     }
     case 'i':
@@ -1514,7 +1494,7 @@ void displayHandler()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         auto w = 390;
-        auto h1 = 15.5f * 30;
+        auto h1 = 15.5f * 31;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1539,7 +1519,12 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog distance (keys r,f): %1").arg(state.fogConfiguration.distanceToFog)));
+            QString("visible distance (f,r) : %1").arg(state.visibleDistance)));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("detailed distance (g,t): %1").arg(state.detailedDistance)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
@@ -1589,7 +1574,17 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("visible tiles          : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getVisibleTilesCount())));
+            QString("visible tiles          : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getAllTilesCount())));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("high-detailed tiles    : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getVisibleTilesCount())));
+        verifyOpenGL();
+
+        glRasterPos2f(8, t - 16 * (++line));
+        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
+            QString("detail levels          : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getDetailLevelsCount())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
@@ -1615,16 +1610,6 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString(" -> z (key alt+E)      : %1").arg(state.elevationConfiguration.visualizationZ)));
-        verifyOpenGL();
-
-        glRasterPos2f(8, t - 16 * (++line));
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog density (keys t,g) : %1").arg(state.fogConfiguration.density)));
-        verifyOpenGL();
-
-        glRasterPos2f(8, t - 16 * (++line));
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("fog origin F (keys u,j): %1").arg(state.fogConfiguration.originFactor)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
