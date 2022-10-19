@@ -1,6 +1,14 @@
 package net.osmand.server.api.services;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Serializable;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -113,7 +121,7 @@ public class DownloadIndexesService  {
 		return doc;
 	}
 	
-	public File getFilePath(String name) throws IOException {
+	public String getFilePathUrl(String name) throws IOException {
 		DownloadIndexDocument doc = getIndexesDocument(false, false);
 		// ignore folders for srtm / hillshade / slope
 		if (name.lastIndexOf('/') != -1) {
@@ -128,10 +136,9 @@ public class DownloadIndexesService  {
 			// replace ' ' as it could be done on device 
 			dwName = name.replace(' ', '_');
 		}
-		File file = null;
 		for (DownloadIndex di : doc.getAllMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
-				file = new File(pathToDownloadFiles, dwName + ".zip");
+				File file = new File(pathToDownloadFiles, dwName + ".zip");
 				if (!file.exists()) {
 					file = new File(pathToDownloadFiles, di.getDownloadType().getPath() + "/" + dwName + ".zip");
 				}
@@ -141,11 +148,36 @@ public class DownloadIndexesService  {
 				if (!file.exists()) {
 					file = new File(pathToDownloadFiles, di.getDownloadType().getPath() + "/" + dwName);
 				}
-				break;
+				if (file.exists()) {
+					return file.getAbsolutePath();
+				}
+				DownloadProperties servers = getSettings();
+				DownloadServerSpecialty sp = DownloadServerSpecialty.getSpecialtyByDownloadType(di.getDownloadType());
+				if (sp != null) {
+					String host = servers.getServer(sp);
+					if (host != null && Algorithms.isEmpty(host)) {
+						try {
+							String pm = "";
+							if (sp.httpParams.length > 0) {
+								pm = "&" + sp.httpParams[0] + "=yes";
+							}
+							String urlRaw = "https://" + host + "/download?file=" + di.getName() + pm;
+							URL url = new URL(urlRaw);
+							HttpURLConnection con = (HttpURLConnection) url.openConnection();
+							con.setRequestMethod("HEAD");
+							con.setDoOutput(false);
+							int code = con.getResponseCode();
+							con.disconnect();
+							if (code >= 200 && code < 400) {
+								return urlRaw;
+							}
+						} catch (IOException e) {
+							LOGGER.error("Error checking existing index: " + e.getMessage(), e);
+						}
+						return null;
+					}
+				}
 			}
-		}
-		if (file != null && file.exists()) {
-			return file;
 		}
 		return null;
 	}
@@ -205,8 +237,7 @@ public class DownloadIndexesService  {
 		if(files == null || files.length == 0) {
 			return;
 		}
-		if (files.length > 0 && files[0].getName().equals(INDEX_FILE_EXTERNAL_URL))
-        {
+		if (files.length > 0 && files[0].getName().equals(INDEX_FILE_EXTERNAL_URL)) {
             try {
                 String host;
                 BufferedReader bufferreader = new BufferedReader(new FileReader(files[0]));
@@ -217,7 +248,7 @@ public class DownloadIndexesService  {
                     if (externalSources.length > 0) {
                         boolean areFilesAdded = false;
                         for (ExternalSource source : externalSources) {
-                            //do not read external zip files, otherwise it will be too long by remote connection
+                            // do not read external zip files, otherwise it will be too long by remote connection
                             if (source.type.equals("file") && type.acceptFileName(source.name) && !isZip(source.name)) {
                                 DownloadIndex di = new DownloadIndex();
                                 di.setType(type);
@@ -241,8 +272,9 @@ public class DownloadIndexesService  {
                             break;
                         }
                     }
-                    //will continue if was not find any files in this host (server)
+                    // will continue if was not find any files in this host (server)
                 }
+                bufferreader.close();
             } catch (IOException e) {
                 LOGGER.error("LOAD EXTERNAL INDEXES: " + e.getMessage(), e.getCause());
             }
@@ -454,15 +486,42 @@ public class DownloadIndexesService  {
 	}
 	
 	public enum DownloadServerSpecialty {
-		SRTM,
-		HILLSHADE,
-		SLOPE,
-		HEIGHTMAP,
-		OSMLIVE,
-		DEPTH,
-		MAIN,
-		WIKI,
-		ROADS
+		MAIN(new String[0], DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
+		SRTM("srtmcountry", DownloadType.SRTM_MAP),
+		HILLSHADE("hillshade", DownloadType.HILLSHADE),
+		SLOPE("slope", DownloadType.SLOPE),
+		HEIGHTMAP("heightmap", DownloadType.HEIGHTMAP),
+		OSMLIVE(new String[] {"aosmc", "osmc"}, DownloadType.MAP),
+		DEPTH("depth", DownloadType.DEPTH, DownloadType.DEPTHMAP),
+		WIKI(new String[] {"wikivoyage", "wiki", "travel"}, DownloadType.WIKIMAP, DownloadType.TRAVEL),
+		ROADS("road", DownloadType.ROAD_MAP);
+		
+		public final DownloadType[] types;
+		public final String[] httpParams;
+
+		DownloadServerSpecialty(String httpParam, DownloadType... tp) {
+			this.httpParams = new String[] {httpParam};
+			this.types = tp;
+		}
+		
+		DownloadServerSpecialty(String[] httpParams, DownloadType... tp) {
+			this.httpParams = httpParams;
+			this.types = tp;
+		}
+		
+		public static DownloadServerSpecialty getSpecialtyByDownloadType(DownloadType c) {
+			for(DownloadServerSpecialty s : values())  {
+				if(s.types == null) {
+					continue;
+				}
+				for(DownloadType t : s.types) {
+					if(t == c) {
+						return s;
+					}
+				}
+			}
+			return null;
+		}
 		
 	}
 	
@@ -559,7 +618,7 @@ public class DownloadIndexesService  {
         name = name.replace('_', ' ');
     }
 
-    public static class ExternalSource implements Serializable {
+    public static class ExternalSource {
 	    private String name;
 	    private String type;
 	    private String mtime;

@@ -220,40 +220,7 @@ public class DownloadIndexController {
 		return isContainAndEqual(param, "yes", params);
 	}
 
-	private boolean isSrtm(MultiValueMap<String, String> params) {
-		return isContainAndEqual("srtmcountry", params); 
-	}
 	
-	private boolean isHillshade(MultiValueMap<String, String> params) {
-		return isContainAndEqual("hillshade", params); 
-	}
-	
-	private boolean isSlope(MultiValueMap<String, String> params) {
-		return isContainAndEqual("slope", params); 
-	}
-	
-	private boolean isHeightmap(MultiValueMap<String, String> params) {
-		return isContainAndEqual("heightmap", params); 
-	}
-	
-	private boolean isDepth(MultiValueMap<String, String> params) {
-		return isContainAndEqual("depth", params); 
-	}
-	
-	private boolean isRoad(MultiValueMap<String, String> params) {
-		return isContainAndEqual("road", params); 
-	}
-	
-	private boolean isWiki(MultiValueMap<String, String> params) {
-		return isContainAndEqual("wikivoyage", params) || isContainAndEqual("wiki", params) || isContainAndEqual("travel", params); 
-	}
-	
-	private boolean isLiveMaps(MultiValueMap<String, String> params) {
-		return isContainAndEqual("aosmc", params) || isContainAndEqual("osmc", params);
-	}
-	
-
-
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.GET)
 	@ResponseBody
 	public void downloadIndex(@RequestParam MultiValueMap<String, String> params,
@@ -280,34 +247,27 @@ public class DownloadIndexController {
 				}
 			}
 			String host = null;
-			if (isSrtm(params)) {
-				host = servers.getServer(DownloadServerSpecialty.SRTM);
-			} else if(isSlope(params)) {
-				host = servers.getServer(DownloadServerSpecialty.SLOPE);
-			} else if(isHeightmap(params)) {
-				host = servers.getServer(DownloadServerSpecialty.HEIGHTMAP);
-			} else if(isDepth(params)) {
-				host = servers.getServer(DownloadServerSpecialty.DEPTH);
-			} else if(isHillshade(params)) {
-				host = servers.getServer(DownloadServerSpecialty.HILLSHADE);
-			} else if(isLiveMaps(params)) {
-				host = servers.getServer(DownloadServerSpecialty.OSMLIVE);
-			} else if(isWiki(params)) {
-				host = servers.getServer(DownloadServerSpecialty.WIKI);
-			} else if(isRoad(params)) {
-				host = servers.getServer(DownloadServerSpecialty.ROADS);
-			
-			} else {
+			for (DownloadServerSpecialty dss : DownloadServerSpecialty.values()) {
+				for (String httpParam : dss.httpParams) {
+					if (isContainAndEqual(httpParam, params)) {
+						host = servers.getServer(dss);
+						if (host != null) {
+							break;
+						}
+					}
+				}
+			}
+			if (host == null) {
 				host = servers.getServer(DownloadServerSpecialty.MAIN);
 			}
-			if(host != null) {
+			if (host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
 			} else {
 				self = true;
 			}
 		}
-		if(self) {
+		if (self) {
 			handleDownload(findFileResource(params), headers, resp);
 		}
 

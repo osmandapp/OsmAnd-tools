@@ -1,11 +1,34 @@
 package net.osmand.server.api.services;
 
-import com.google.gson.Gson;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.controllers.pub.UserdataController;
-import net.osmand.util.Algorithms;
+import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,17 +39,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.*;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import com.google.gson.Gson;
 
-import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.util.Algorithms;
 
 @Service
 public class UserdataService {
@@ -135,7 +154,7 @@ public class UserdataService {
         boolean checkExistingServerMap = type.toLowerCase().equals("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb"));
         if (checkExistingServerMap) {
-            File fp = downloadService.getFilePath(name);
+            String fp = downloadService.getFilePathUrl(name);
             if (fp == null) {
                 LOG.info("File is not found: " + name);
                 checkExistingServerMap = false;
@@ -347,6 +366,7 @@ public class UserdataService {
     public void getFile(HttpServletResponse response, HttpServletRequest request, String name, String type,
                         Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
         InputStream bin = null;
+        File fileToDelete = null;
         try {
             @SuppressWarnings("unchecked")
             ResponseEntity<String>[] error = new ResponseEntity[]{null};
@@ -355,11 +375,24 @@ public class UserdataService {
             boolean gzin = true, gzout;
             if (userFile.filesize < 1000 && checkExistingServerMap) {
                 // file is not stored here
-                File fp = downloadService.getFilePath(name);
-                if (fp != null) {
-                    gzin = false;
-                    bin = getGzipInputStreamFromFile(fp, ".obf");
+				String fileUrl = downloadService.getFilePathUrl(name);
+				if (fileUrl != null) {
+					File fp = new File(fileUrl);
+					if (fileUrl.startsWith("https://") || fileUrl.startsWith("http://")) {
+						fp = File.createTempFile("backup_dw", name);
+						fileToDelete = fp;
+						FileOutputStream fous = new FileOutputStream(fp);
+						URL url = new URL(fileUrl);
+						InputStream is = url.openStream();
+						Algorithms.streamCopy(is, fous);
+						fous.close();
+                	}
+                	if (fp != null) {
+                        gzin = false;
+                        bin = getGzipInputStreamFromFile(fp, ".obf");
+                    }	
                 }
+                
                 if (bin == null) {
                     error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
                 }
@@ -390,13 +423,16 @@ public class UserdataService {
             OutputStream ous = gzout && !gzin ? new GZIPOutputStream(response.getOutputStream()) : response.getOutputStream();
             while ((r = bin.read(buf)) != -1) {
                 ous.write(buf, 0, r);
-            }
-            ous.close();
-        } finally {
-            if (bin != null) {
-                bin.close();
-            }
-        }
+			}
+			ous.close();
+		} finally {
+			if (bin != null) {
+				bin.close();
+			}
+			if (fileToDelete != null) {
+				fileToDelete.delete();
+			}
+		}
     }
     
     private InputStream getGzipInputStreamFromFile(File fp, String ext) throws IOException {
