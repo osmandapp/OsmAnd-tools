@@ -64,6 +64,7 @@ public class IndexCreatorSettings {
 	
 	public boolean keepOnlyRouteRelationObjects;
 	
+    public boolean indexByProximity = true;
 	
 
 	public String getString(String key) {
