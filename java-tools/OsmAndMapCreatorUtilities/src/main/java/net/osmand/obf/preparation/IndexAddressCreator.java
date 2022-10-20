@@ -709,7 +709,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city) throws SQLException {
-		String cityPart = findCityPart(location, city);
+		String cityPart;
+        if (settings.indexByProximity) {
+            cityPart = findCityPart(location, city);
+        else {
+            cityPart = city.getName(); 
+        }
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
 		if (foundStreet == null) {
 			// by default write city with cityPart of the city
