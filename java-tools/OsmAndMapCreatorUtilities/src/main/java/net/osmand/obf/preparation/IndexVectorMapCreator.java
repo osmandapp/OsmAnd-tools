@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import net.osmand.data.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -32,10 +33,6 @@ import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
-import net.osmand.data.LatLon;
-import net.osmand.data.Multipolygon;
-import net.osmand.data.MultipolygonBuilder;
-import net.osmand.data.Ring;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
@@ -745,7 +742,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				node.copyTags(e);
 				node.removeTag("natural");
 				Map<String, String> nodeTags = node.getTags();
-				EntityId eid = EntityId.valueOf(node);
+				EntityId eid = EntityId.valueOf(e);
 				assignedId = assignIdBasedOnOriginalSplit(eid);
 				for (int level = 0; level < mapZooms.size(); level++) {
 					processMainEntity(node, originalId, assignedId, level, nodeTags);
