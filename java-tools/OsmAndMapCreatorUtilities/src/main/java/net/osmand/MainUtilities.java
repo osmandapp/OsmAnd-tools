@@ -124,6 +124,16 @@ public class MainUtilities {
 				settings.indexRouting = true;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
+			} else if (utl.equals("generate-obf-no-address-ump")) {
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexMap = true;
+				settings.indexAddress = false;
+				settings.indexPOI = true;
+				settings.indexTransport = true;
+				settings.indexRouting = true;
+                settings.indexByProximity = false;
+				parseIndexCreatorArgs(subArgs, settings);
+				generateObf(subArgs, settings);
 			} else if (utl.equals("convert-gpx-to-obf")) {
 				OsmGpxWriteContext.generateObfFromGpx(subArgs);
 			} else if (utl.equals("generate-map")) {
