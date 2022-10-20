@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import net.osmand.data.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -32,10 +33,6 @@ import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
-import net.osmand.data.LatLon;
-import net.osmand.data.Multipolygon;
-import net.osmand.data.MultipolygonBuilder;
-import net.osmand.data.Ring;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
@@ -734,6 +731,21 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					for (int level = 0; level < mapZooms.size(); level++) {
 						processMainEntity(e, originalId, assignedId, level, stags);
 					}
+				}
+			}
+
+			//create center node for island/islet with coastline
+			if (e instanceof Way && tags.size() > 2 && "coastline".equals(tags.get("natural"))
+					&& ("island".equals(tags.get("place")) || "islet".equals(tags.get("place")))) {
+				QuadRect bbox = ((Way) e).getLatLonBBox();
+				Node node = new Node(bbox.centerY(), bbox.centerX(), e.getId());
+				node.copyTags(e);
+				node.removeTag("natural");
+				Map<String, String> nodeTags = node.getTags();
+				EntityId eid = EntityId.valueOf(e);
+				assignedId = assignIdBasedOnOriginalSplit(eid);
+				for (int level = 0; level < mapZooms.size(); level++) {
+					processMainEntity(node, originalId, assignedId, level, nodeTags);
 				}
 			}
 		}
