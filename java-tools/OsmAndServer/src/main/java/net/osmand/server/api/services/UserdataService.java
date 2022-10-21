@@ -373,13 +373,16 @@ public class UserdataService {
 			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
 			String existingServerMapUrl = type.toLowerCase().equals("file") ? downloadService.getFilePathUrl(name)
 					: null;
-			LOG.info(name + " " + existingServerMapUrl);
 			boolean gzin = true, gzout;
 			if (existingServerMapUrl != null) {
 				// file is not stored here
 				File fp = new File(existingServerMapUrl);
 				if (existingServerMapUrl.startsWith("https://") || existingServerMapUrl.startsWith("http://")) {
-					fp = File.createTempFile("backup_dw", name);
+					String bname = name;
+					if (bname.lastIndexOf('/') != -1) {
+						bname = bname.substring(bname.lastIndexOf('/') + 1);
+					}
+					fp = File.createTempFile("backup_", bname);
 					fileToDelete = fp;
 					FileOutputStream fous = new FileOutputStream(fp);
 					URL url = new URL(existingServerMapUrl);
