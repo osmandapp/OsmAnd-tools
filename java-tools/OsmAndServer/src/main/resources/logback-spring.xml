@@ -31,7 +31,6 @@
 			</rollingPolicy>
 		</appender>
  		-->
- 		<logger name="org.hibernate.SQL" level="DEBUG" />
  		
  		<appender name="FILE_ERROR" class="ch.qos.logback.core.FileAppender">
         	<file>/var/log/osmand-server-logs/error.log</file>
