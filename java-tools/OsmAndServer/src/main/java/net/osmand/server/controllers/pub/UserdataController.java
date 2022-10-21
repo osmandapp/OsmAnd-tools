@@ -98,7 +98,7 @@ public class UserdataController {
 	
 	@PostMapping(value = "/revalidate-user-common-server-files")
 	@ResponseBody
-	public String invalidateUser(@RequestParam(required = true) int userId) throws IOException {
+	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
 		UserFilesResults res = userdataService.generateFiles(userId, null, null, false, false);
 		Iterator<UserFileNoData> it = res.uniqueFiles.iterator();
 		StringBuilder sb = new StringBuilder();
@@ -110,23 +110,23 @@ public class UserdataController {
 				boolean upd = false;
 				if (ufnd.zipSize > 1000) {
 					ufnd.zipSize = 40;
-					sb.append("Update zip size.");
+					sb.append(" Update zip size.");
 					upd = true;
 				}
 				if (ufnd.filesize < scf.di.getContentSize() / 3) {
 					ufnd.filesize = scf.di.getContentSize();
-					sb.append("Update file size to " + scf.di.getContentSize());
+					sb.append(" Update file size to " + scf.di.getContentSize());
 					upd = true;
 				}
 				if (upd) {
 					userdataService.updateFileSize(ufnd);
-					sb.append("Saved.");
+					sb.append(" Saved.");
 				}
 				sb.append("<br>\n");
 			}
 		}
 		
-		return sb.toString();
+		return ResponseEntity.ok(sb.toString());
 	}
 
 	@GetMapping(value = "/user-validate-sub")
