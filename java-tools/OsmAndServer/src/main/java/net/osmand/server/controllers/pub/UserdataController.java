@@ -96,7 +96,7 @@ public class UserdataController {
 		return null;
 	}
 	
-	@GetMapping(value = "/revalidate-user-common-server-files")
+	@PostMapping(value = "/revalidate-user-common-server-files")
 	@ResponseBody
 	public String invalidateUser(@RequestParam(required = true) int userId) throws IOException {
 		UserFilesResults res = userdataService.generateFiles(userId, null, null, false, false);
@@ -105,8 +105,8 @@ public class UserdataController {
 		while (it.hasNext()) {
 			UserFileNoData ufnd = it.next();
 			ServerCommonFile scf = userdataService.checkThatObfFileisOnServer(ufnd.name, ufnd.type);
-			if(scf != null) {
-				sb.append(ufnd.name + ". ");
+			if (scf != null && ufnd.zipSize > 0) {
+				sb.append(" - ").append(ufnd.name + ". ");
 				boolean upd = false;
 				if (ufnd.zipSize > 1000) {
 					ufnd.zipSize = 40;
@@ -126,8 +126,9 @@ public class UserdataController {
 					uf.zipfilesize = ufnd.zipSize;
 					uf.filesize = ufnd.filesize;
 					filesRepository.saveAndFlush(uf);
+					sb.append("Saved.");
 				}
-				sb.append("\n");
+				sb.append("<br>");
 			}
 		}
 		
