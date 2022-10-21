@@ -10,7 +10,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -44,6 +43,7 @@ import com.google.gson.Gson;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.util.Algorithms;
 
@@ -150,20 +150,16 @@ public class UserdataService {
         return res;
     }
     
-    public boolean checkThatObfFileisOnServer(String name, String type) throws IOException {
+    public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.toLowerCase().equals("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb"));
         if (checkExistingServerMap) {
-            String fp = downloadService.getFilePathUrl(name);
-            if (fp == null) {
-                LOG.info("File is not found: " + name);
-                checkExistingServerMap = false;
-            }
+            return downloadService.getServerGlobalFile(name);
         }
-        return checkExistingServerMap;
+        return null;
     }
     
-    public MultipartFile createEmptyMultipartFile(MultipartFile file) {
+    public MultipartFile createEmptyMultipartFile(MultipartFile file, String name) {
         return new MultipartFile() {
             
             @Override
@@ -207,7 +203,7 @@ public class UserdataService {
             
             @Override
             public byte[] getBytes() throws IOException {
-                byte[] bytes = "{\"type\":\"obf\"}".getBytes();
+				byte[] bytes = ("{\"type\":\"link\",\"name\":\"" + name + "\"}").getBytes();
                 ByteArrayOutputStream bous = new ByteArrayOutputStream();
                 GZIPOutputStream gz = new GZIPOutputStream(bous);
                 Algorithms.streamCopy(new ByteArrayInputStream(bytes), gz);
@@ -229,9 +225,9 @@ public class UserdataService {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
         long cnt;
         long sum;
-        boolean checkExistingServerMap = checkThatObfFileisOnServer(name, type);
-        if (checkExistingServerMap) {
-            file = createEmptyMultipartFile(file);
+        ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
+        if (serverCommonFile != null) {
+            file = createEmptyMultipartFile(file, name);
         }
         long zipsize = file.getSize();
         try {
@@ -252,7 +248,7 @@ public class UserdataService {
 		}
         usf.userid = dev.userid;
         usf.deviceid = dev.id;
-        usf.filesize = sum;
+        usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
         usf.zipfilesize = zipsize;
         usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
         if (storageService.storeLocally()) {
@@ -371,13 +367,12 @@ public class UserdataService {
             @SuppressWarnings("unchecked")
             ResponseEntity<String>[] error = new ResponseEntity[]{null};
 			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
-			String existingServerMapUrl = type.toLowerCase().equals("file") ? downloadService.getFilePathUrl(name)
-					: null;
+			ServerCommonFile scf = checkThatObfFileisOnServer(name, type); 
 			boolean gzin = true, gzout;
-			if (existingServerMapUrl != null) {
+			if (scf != null) {
 				// file is not stored here
-				File fp = new File(existingServerMapUrl);
-				if (existingServerMapUrl.startsWith("https://") || existingServerMapUrl.startsWith("http://")) {
+				File fp = scf.file;
+				if (scf.url != null) {
 					String bname = name;
 					if (bname.lastIndexOf('/') != -1) {
 						bname = bname.substring(bname.lastIndexOf('/') + 1);
@@ -385,8 +380,7 @@ public class UserdataService {
 					fp = File.createTempFile("backup_", bname);
 					fileToDelete = fp;
 					FileOutputStream fous = new FileOutputStream(fp);
-					URL url = new URL(existingServerMapUrl);
-					InputStream is = url.openStream();
+					InputStream is = scf.url.openStream();
 					Algorithms.streamCopy(is, fous);
 					fous.close();
 				}

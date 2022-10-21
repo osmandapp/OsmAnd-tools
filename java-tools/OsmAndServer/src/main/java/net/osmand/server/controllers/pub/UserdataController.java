@@ -6,6 +6,7 @@ import java.io.*;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -17,6 +18,8 @@ import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
 import net.osmand.server.api.services.*;
+import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,6 +94,44 @@ public class UserdataController {
 			return d;
 		}
 		return null;
+	}
+	
+	@GetMapping(value = "/revalidate-user-common-server-files")
+	@ResponseBody
+	public String invalidateUser(@RequestParam(required = true) int userId) throws IOException {
+		UserFilesResults res = userdataService.generateFiles(userId, null, null, false, false);
+		Iterator<UserFileNoData> it = res.uniqueFiles.iterator();
+		StringBuilder sb = new StringBuilder();
+		while (it.hasNext()) {
+			UserFileNoData ufnd = it.next();
+			ServerCommonFile scf = userdataService.checkThatObfFileisOnServer(ufnd.name, ufnd.type);
+			if(scf != null) {
+				sb.append(ufnd.name + ". ");
+				boolean upd = false;
+				if (ufnd.zipSize > 1000) {
+					ufnd.zipSize = 40;
+					sb.append("Update zip size.");
+					upd = true;
+				}
+				if (ufnd.filesize < scf.di.getContentSize() / 3) {
+					ufnd.filesize = scf.di.getContentSize();
+					sb.append("Update file size to " + scf.di.getContentSize());
+					upd = true;
+				}
+				if (upd) {
+					UserFile uf = filesRepository.getById(ufnd.id);
+					if (uf.data != null && uf.data.length > 10000) {
+						throw new UnsupportedOperationException();
+					}
+					uf.zipfilesize = ufnd.zipSize;
+					uf.filesize = ufnd.filesize;
+					filesRepository.save(uf);
+				}
+				sb.append("\n");
+			}
+		}
+		
+		return sb.toString();
 	}
 
 	@GetMapping(value = "/user-validate-sub")
@@ -278,7 +319,7 @@ public class UserdataController {
 	@ResponseBody
 	public ResponseEntity<String> checkFileOnServer(@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type) throws IOException {
-		if (userdataService.checkThatObfFileisOnServer(name, type)) {
+		if (userdataService.checkThatObfFileisOnServer(name, type) != null) {
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "present")));
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "not-present")));
