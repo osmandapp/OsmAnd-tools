@@ -136,6 +136,8 @@ public class DownloadIndexesService  {
 			// replace ' ' as it could be done on device 
 			dwName = name.replace(' ', '_');
 		}
+		LOGGER.info(dwName	);
+
 		for (DownloadIndex di : doc.getAllMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
 				LOGGER.info(di.getName());
@@ -157,7 +159,7 @@ public class DownloadIndexesService  {
 				if (sp != null) {
 					String host = servers.getServer(sp);
 					LOGGER.info(di.getName() + " " + sp + " " + host);
-					if (host != null && Algorithms.isEmpty(host)) {
+					if (!Algorithms.isEmpty(host)) {
 						try {
 							String pm = "";
 							if (sp.httpParams.length > 0) {
