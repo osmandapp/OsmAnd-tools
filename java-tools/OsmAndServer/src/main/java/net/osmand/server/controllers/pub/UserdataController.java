@@ -119,16 +119,10 @@ public class UserdataController {
 					upd = true;
 				}
 				if (upd) {
-					UserFile uf = filesRepository.getById(ufnd.id);
-					if (uf.data != null && uf.data.length > 10000) {
-						throw new UnsupportedOperationException();
-					}
-					uf.zipfilesize = ufnd.zipSize;
-					uf.filesize = ufnd.filesize;
-					filesRepository.saveAndFlush(uf);
+					userdataService.updateFileSize(ufnd);
 					sb.append("Saved.");
 				}
-				sb.append("<br>");
+				sb.append("<br>\n");
 			}
 		}
 		

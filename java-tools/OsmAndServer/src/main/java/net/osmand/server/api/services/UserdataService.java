@@ -42,6 +42,8 @@ import com.google.gson.Gson;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
+import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.controllers.pub.UserdataController;
@@ -496,4 +498,14 @@ public class UserdataService {
         }
         filesRepository.saveAndFlush(usf);
     }
+
+	public void updateFileSize(UserFileNoData ufnd) {
+		UserFile uf = filesRepository.getById(ufnd.id);
+		if (uf.data != null && uf.data.length > 10000) {
+			throw new UnsupportedOperationException();
+		}
+		uf.zipfilesize = ufnd.zipSize;
+		uf.filesize = ufnd.filesize;
+		filesRepository.saveAndFlush(uf);
+	}
 }
