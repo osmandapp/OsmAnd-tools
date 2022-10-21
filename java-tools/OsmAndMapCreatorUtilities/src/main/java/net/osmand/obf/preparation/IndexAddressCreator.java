@@ -1284,10 +1284,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		name = stripBraces(name);
 
 		for (int i = 0; i <= name.length(); i++) {
-			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
-					name.charAt(i) != '\'' && !(name.charAt(i) == '-'
+			boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'
 					&& ((i + 1 < name.length() && Character.isDigit(name.charAt(i + 1)))
-					|| (i - 1 >= 0 && Character.isDigit(name.charAt(i - 1))))))) {
+					|| (i - 1 >= 0 && Character.isDigit(name.charAt(i - 1))));
+			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
+					name.charAt(i) != '\'' && !isHyphenNearNumber)) {
 				if (prev != -1) {
 					String substr = name.substring(prev, i);
 					namesToAdd.add(substr.toLowerCase());
