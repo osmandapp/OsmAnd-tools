@@ -138,6 +138,7 @@ public class DownloadIndexesService  {
 		}
 		for (DownloadIndex di : doc.getAllMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
+				LOGGER.info(di.getName());
 				File file = new File(pathToDownloadFiles, dwName + ".zip");
 				if (!file.exists()) {
 					file = new File(pathToDownloadFiles, di.getDownloadType().getPath() + "/" + dwName + ".zip");
@@ -155,6 +156,7 @@ public class DownloadIndexesService  {
 				DownloadServerSpecialty sp = DownloadServerSpecialty.getSpecialtyByDownloadType(di.getDownloadType());
 				if (sp != null) {
 					String host = servers.getServer(sp);
+					LOGGER.info(di.getName() + " " + sp + " " + host);
 					if (host != null && Algorithms.isEmpty(host)) {
 						try {
 							String pm = "";
@@ -162,6 +164,7 @@ public class DownloadIndexesService  {
 								pm = "&" + sp.httpParams[0] + "=yes";
 							}
 							String urlRaw = "https://" + host + "/download?file=" + di.getName() + pm;
+							LOGGER.info(di.getName() + " " + sp + " " + urlRaw);
 							URL url = new URL(urlRaw);
 							HttpURLConnection con = (HttpURLConnection) url.openConnection();
 							con.setRequestMethod("HEAD");

@@ -373,6 +373,7 @@ public class UserdataService {
 			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
 			String existingServerMapUrl = type.toLowerCase().equals("file") ? downloadService.getFilePathUrl(name)
 					: null;
+			LOG.info(name + " " + existingServerMapUrl);
 			boolean gzin = true, gzout;
 			if (existingServerMapUrl != null) {
 				// file is not stored here
