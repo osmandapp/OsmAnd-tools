@@ -371,7 +371,8 @@ public class UserdataService {
             @SuppressWarnings("unchecked")
             ResponseEntity<String>[] error = new ResponseEntity[]{null};
 			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
-			String existingServerMapUrl = downloadService.getFilePathUrl(name);
+			String existingServerMapUrl = type.toLowerCase().equals("file") ? downloadService.getFilePathUrl(name)
+					: null;
 			boolean gzin = true, gzout;
 			if (existingServerMapUrl != null) {
 				// file is not stored here
