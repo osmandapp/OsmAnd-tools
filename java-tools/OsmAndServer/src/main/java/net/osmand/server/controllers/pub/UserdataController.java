@@ -125,7 +125,7 @@ public class UserdataController {
 					}
 					uf.zipfilesize = ufnd.zipSize;
 					uf.filesize = ufnd.filesize;
-					filesRepository.save(uf);
+					filesRepository.saveAndFlush(uf);
 				}
 				sb.append("\n");
 			}
