@@ -370,35 +370,28 @@ public class UserdataService {
         try {
             @SuppressWarnings("unchecked")
             ResponseEntity<String>[] error = new ResponseEntity[]{null};
-            PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
-            boolean checkExistingServerMap = type.toLowerCase().equals("file") && name.endsWith(".obf");
-            boolean gzin = true, gzout;
-            if (userFile.filesize < 1000 && checkExistingServerMap) {
-                // file is not stored here
-				String fileUrl = downloadService.getFilePathUrl(name);
-				if (fileUrl != null) {
-					File fp = new File(fileUrl);
-					if (fileUrl.startsWith("https://") || fileUrl.startsWith("http://")) {
-						fp = File.createTempFile("backup_dw", name);
-						fileToDelete = fp;
-						FileOutputStream fous = new FileOutputStream(fp);
-						URL url = new URL(fileUrl);
-						InputStream is = url.openStream();
-						Algorithms.streamCopy(is, fous);
-						fous.close();
-                	}
-                	if (fp != null) {
-                        gzin = false;
-                        bin = getGzipInputStreamFromFile(fp, ".obf");
-                    }	
-                }
-                
-                if (bin == null) {
-                    error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-                }
-            } else {
-                bin = getInputStream(dev, error, userFile);
-            }
+			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
+			String existingServerMapUrl = downloadService.getFilePathUrl(name);
+			boolean gzin = true, gzout;
+			if (existingServerMapUrl != null) {
+				// file is not stored here
+				File fp = new File(existingServerMapUrl);
+				if (existingServerMapUrl.startsWith("https://") || existingServerMapUrl.startsWith("http://")) {
+					fp = File.createTempFile("backup_dw", name);
+					fileToDelete = fp;
+					FileOutputStream fous = new FileOutputStream(fp);
+					URL url = new URL(existingServerMapUrl);
+					InputStream is = url.openStream();
+					Algorithms.streamCopy(is, fous);
+					fous.close();
+				}
+				if (fp != null) {
+					gzin = false;
+					bin = getGzipInputStreamFromFile(fp, ".obf");
+				}
+			} else {
+				bin = getInputStream(dev, error, userFile);
+			}
             if (error[0] != null) {
                 response.setStatus(error[0].getStatusCodeValue());
                 response.getWriter().write(error[0].getBody());
