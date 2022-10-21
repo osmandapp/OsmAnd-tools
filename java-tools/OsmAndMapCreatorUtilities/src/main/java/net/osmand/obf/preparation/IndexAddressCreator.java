@@ -550,7 +550,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			return null;
 		}
 		name = name.trim();
-		name = name.replace("-", " ");
+//		name = name.replace("-", " ");
 		name = name.replace("’", "'");
 		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
@@ -1286,7 +1286,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		for (int i = 0; i <= name.length(); i++) {
 			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
-					name.charAt(i) != '\'' && name.charAt(i) != '-')) {
+					name.charAt(i) != '\'')) {
 				if (prev != -1) {
 					String substr = name.substring(prev, i);
 					namesToAdd.add(substr.toLowerCase());
