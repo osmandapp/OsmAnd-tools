@@ -502,7 +502,7 @@ public class UserdataService {
 
 	public void updateFileSize(UserFileNoData ufnd) {
 		Optional<UserFile> op = filesRepository.findById(ufnd.id);
-		if(op.isEmpty()) {
+		if (op.isEmpty()) {
 			LOG.error("Couldn't find user file by id: " + ufnd.id);
 			return;
 		}
@@ -510,12 +510,9 @@ public class UserdataService {
 		if (uf.data != null && uf.data.length > 10000) {
 			throw new UnsupportedOperationException();
 		}
-		System.out.println(String.format("User file %d %d %d", uf.id, uf.zipfilesize, uf.filesize));
 		uf.zipfilesize = ufnd.zipSize;
 		uf.filesize = ufnd.filesize;
-		System.out.println(String.format("User file %d %d %d", uf.id, uf.zipfilesize, uf.filesize));
 		filesRepository.saveAndFlush(uf);
 		uf = filesRepository.getById(ufnd.id);
-		System.out.println(String.format("User file %d %d %d", uf.id, uf.zipfilesize, uf.filesize));
 	}
 }

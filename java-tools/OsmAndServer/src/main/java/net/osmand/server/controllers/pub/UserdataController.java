@@ -394,8 +394,8 @@ public class UserdataController {
 	}
 
 	public static class UserFilesResults {
-		public int totalZipSize;
-		public int totalFileSize;
+		public long totalZipSize;
+		public long totalFileSize;
 		public int totalFiles;
 		public int totalFileVersions;
 		public List<UserFileNoData> allFiles;
