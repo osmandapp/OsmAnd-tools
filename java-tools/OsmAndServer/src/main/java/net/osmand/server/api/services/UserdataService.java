@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
@@ -500,7 +501,12 @@ public class UserdataService {
     }
 
 	public void updateFileSize(UserFileNoData ufnd) {
-		UserFile uf = filesRepository.getById(ufnd.id);
+		Optional<UserFile> op = filesRepository.findById(ufnd.id);
+		if(op.isEmpty()) {
+			LOG.error("Couldn't find user file by id: " + ufnd.id);
+			return;
+		}
+		UserFile uf = op.get();
 		if (uf.data != null && uf.data.length > 10000) {
 			throw new UnsupportedOperationException();
 		}
