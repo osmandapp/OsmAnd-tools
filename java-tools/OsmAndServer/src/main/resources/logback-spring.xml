@@ -31,6 +31,7 @@
 			</rollingPolicy>
 		</appender>
  		-->
+ 		
  		<appender name="FILE_ERROR" class="ch.qos.logback.core.FileAppender">
         	<file>/var/log/osmand-server-logs/error.log</file>
         	<append>true</append>

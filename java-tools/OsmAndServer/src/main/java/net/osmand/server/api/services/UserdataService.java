@@ -10,12 +10,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
@@ -43,7 +43,10 @@ import com.google.gson.Gson;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
+import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.util.Algorithms;
 
@@ -150,20 +153,16 @@ public class UserdataService {
         return res;
     }
     
-    public boolean checkThatObfFileisOnServer(String name, String type) throws IOException {
+    public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.toLowerCase().equals("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb"));
         if (checkExistingServerMap) {
-            String fp = downloadService.getFilePathUrl(name);
-            if (fp == null) {
-                LOG.info("File is not found: " + name);
-                checkExistingServerMap = false;
-            }
+            return downloadService.getServerGlobalFile(name);
         }
-        return checkExistingServerMap;
+        return null;
     }
     
-    public MultipartFile createEmptyMultipartFile(MultipartFile file) {
+    public MultipartFile createEmptyMultipartFile(MultipartFile file, String name) {
         return new MultipartFile() {
             
             @Override
@@ -207,7 +206,7 @@ public class UserdataService {
             
             @Override
             public byte[] getBytes() throws IOException {
-                byte[] bytes = "{\"type\":\"obf\"}".getBytes();
+				byte[] bytes = ("{\"type\":\"link\",\"name\":\"" + name + "\"}").getBytes();
                 ByteArrayOutputStream bous = new ByteArrayOutputStream();
                 GZIPOutputStream gz = new GZIPOutputStream(bous);
                 Algorithms.streamCopy(new ByteArrayInputStream(bytes), gz);
@@ -229,9 +228,9 @@ public class UserdataService {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
         long cnt;
         long sum;
-        boolean checkExistingServerMap = checkThatObfFileisOnServer(name, type);
-        if (checkExistingServerMap) {
-            file = createEmptyMultipartFile(file);
+        ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
+        if (serverCommonFile != null) {
+            file = createEmptyMultipartFile(file, name);
         }
         long zipsize = file.getSize();
         try {
@@ -252,7 +251,7 @@ public class UserdataService {
 		}
         usf.userid = dev.userid;
         usf.deviceid = dev.id;
-        usf.filesize = sum;
+        usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
         usf.zipfilesize = zipsize;
         usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
         if (storageService.storeLocally()) {
@@ -370,35 +369,31 @@ public class UserdataService {
         try {
             @SuppressWarnings("unchecked")
             ResponseEntity<String>[] error = new ResponseEntity[]{null};
-            PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
-            boolean checkExistingServerMap = type.toLowerCase().equals("file") && name.endsWith(".obf");
-            boolean gzin = true, gzout;
-            if (userFile.filesize < 1000 && checkExistingServerMap) {
-                // file is not stored here
-				String fileUrl = downloadService.getFilePathUrl(name);
-				if (fileUrl != null) {
-					File fp = new File(fileUrl);
-					if (fileUrl.startsWith("https://") || fileUrl.startsWith("http://")) {
-						fp = File.createTempFile("backup_dw", name);
-						fileToDelete = fp;
-						FileOutputStream fous = new FileOutputStream(fp);
-						URL url = new URL(fileUrl);
-						InputStream is = url.openStream();
-						Algorithms.streamCopy(is, fous);
-						fous.close();
-                	}
-                	if (fp != null) {
-                        gzin = false;
-                        bin = getGzipInputStreamFromFile(fp, ".obf");
-                    }	
-                }
-                
-                if (bin == null) {
-                    error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-                }
-            } else {
-                bin = getInputStream(dev, error, userFile);
-            }
+			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
+			ServerCommonFile scf = checkThatObfFileisOnServer(name, type); 
+			boolean gzin = true, gzout;
+			if (scf != null) {
+				// file is not stored here
+				File fp = scf.file;
+				if (scf.url != null) {
+					String bname = name;
+					if (bname.lastIndexOf('/') != -1) {
+						bname = bname.substring(bname.lastIndexOf('/') + 1);
+					}
+					fp = File.createTempFile("backup_", bname);
+					fileToDelete = fp;
+					FileOutputStream fous = new FileOutputStream(fp);
+					InputStream is = scf.url.openStream();
+					Algorithms.streamCopy(is, fous);
+					fous.close();
+				}
+				if (fp != null) {
+					gzin = false;
+					bin = getGzipInputStreamFromFile(fp, ".obf");
+				}
+			} else {
+				bin = getInputStream(dev, error, userFile);
+			}
             if (error[0] != null) {
                 response.setStatus(error[0].getStatusCodeValue());
                 response.getWriter().write(error[0].getBody());
@@ -504,4 +499,20 @@ public class UserdataService {
         }
         filesRepository.saveAndFlush(usf);
     }
+
+	public void updateFileSize(UserFileNoData ufnd) {
+		Optional<UserFile> op = filesRepository.findById(ufnd.id);
+		if (op.isEmpty()) {
+			LOG.error("Couldn't find user file by id: " + ufnd.id);
+			return;
+		}
+		UserFile uf = op.get();
+		if (uf.data != null && uf.data.length > 10000) {
+			throw new UnsupportedOperationException();
+		}
+		uf.zipfilesize = ufnd.zipSize;
+		uf.filesize = ufnd.filesize;
+		filesRepository.saveAndFlush(uf);
+		uf = filesRepository.getById(ufnd.id);
+	}
 }

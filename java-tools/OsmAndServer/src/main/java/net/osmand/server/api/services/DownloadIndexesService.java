@@ -6,8 +6,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Serializable;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.DateFormat;
@@ -121,7 +121,31 @@ public class DownloadIndexesService  {
 		return doc;
 	}
 	
-	public String getFilePathUrl(String name) throws IOException {
+	public static class ServerCommonFile {
+
+		public final File file;
+		public final URL url;
+		public final DownloadIndex di;
+
+		public ServerCommonFile(File file, DownloadIndex di) {
+			this.file = file;
+			this.di = di;
+			this.url = null;
+		}
+		
+		public ServerCommonFile(URL url, DownloadIndex di) {
+			this.url = url;
+			this.file = null;
+			this.di = di;
+		}
+		
+		
+		public InputStream getInputStream() throws IOException {
+			return url != null ? url.openStream() : new FileInputStream(file);
+		}
+	}
+	
+	public ServerCommonFile getServerGlobalFile(String name) throws IOException {
 		DownloadIndexDocument doc = getIndexesDocument(false, false);
 		// ignore folders for srtm / hillshade / slope
 		if (name.lastIndexOf('/') != -1) {
@@ -136,6 +160,7 @@ public class DownloadIndexesService  {
 			// replace ' ' as it could be done on device 
 			dwName = name.replace(' ', '_');
 		}
+
 		for (DownloadIndex di : doc.getAllMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
 				File file = new File(pathToDownloadFiles, dwName + ".zip");
@@ -149,13 +174,13 @@ public class DownloadIndexesService  {
 					file = new File(pathToDownloadFiles, di.getDownloadType().getPath() + "/" + dwName);
 				}
 				if (file.exists()) {
-					return file.getAbsolutePath();
+					return new ServerCommonFile(file, di);
 				}
 				DownloadProperties servers = getSettings();
 				DownloadServerSpecialty sp = DownloadServerSpecialty.getSpecialtyByDownloadType(di.getDownloadType());
 				if (sp != null) {
 					String host = servers.getServer(sp);
-					if (host != null && Algorithms.isEmpty(host)) {
+					if (!Algorithms.isEmpty(host)) {
 						try {
 							String pm = "";
 							if (sp.httpParams.length > 0) {
@@ -169,7 +194,7 @@ public class DownloadIndexesService  {
 							int code = con.getResponseCode();
 							con.disconnect();
 							if (code >= 200 && code < 400) {
-								return urlRaw;
+								return new ServerCommonFile(url, di);
 							}
 						} catch (IOException e) {
 							LOGGER.error("Error checking existing index: " + e.getMessage(), e);
