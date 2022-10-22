@@ -314,7 +314,8 @@ public class IndexBatchCreator {
 								}
 								RegionSpecificData dt = new RegionSpecificData();
 								dt.downloadName = cr.getDownloadName();
-								countries.regionNames.put(dt.do	}
+								countries.regionNames.put(dt.downloadName, dt);
+                            }
 						}
 						log.warn(String.format("Accepted %d from %d", countries.regionNames.size() - before, total));
 					}
