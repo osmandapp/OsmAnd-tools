@@ -97,8 +97,6 @@ public class UserdataController {
 		return null;
 	}
 	
-	@PostMapping(value = "/revalidate-user-common-server-files")
-	@ResponseBody
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
 		UserFilesResults res = userdataService.generateFiles(userId, null, null, false, false);
 		Iterator<UserFileNoData> it = res.uniqueFiles.iterator();
