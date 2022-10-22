@@ -79,8 +79,11 @@ public class MainUtilities {
 			} else if (utl.equals("generate-region-tags")) {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-obf-files-in-batch")) {
+                IndexBatchCreator.main(subArgsArray);
+            } else if (utl.equals("generate-ump-obf-files-in-batch")) {
+                settings.indexByProximity = false;
 				IndexBatchCreator.main(subArgsArray);
-			} else if (utl.equals("generate-ocean-tile-osm")) {
+            } else if (utl.equals("generate-ocean-tile-osm")) {
 				OceanTilesCreator.createJOSMFile(subArgsArray);
 			} else if (utl.equals("generate-java-style")) {
 				RenderingRulesStoragePrinter.main(subArgsArray);
@@ -122,16 +125,6 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
-				parseIndexCreatorArgs(subArgs, settings);
-				generateObf(subArgs, settings);
-			} else if (utl.equals("generate-obf-no-address-ump")) {
-				IndexCreatorSettings settings = new IndexCreatorSettings();
-				settings.indexMap = true;
-				settings.indexAddress = false;
-				settings.indexPOI = true;
-				settings.indexTransport = true;
-				settings.indexRouting = true;
-                settings.indexByProximity = false;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
 			} else if (utl.equals("convert-gpx-to-obf")) {
