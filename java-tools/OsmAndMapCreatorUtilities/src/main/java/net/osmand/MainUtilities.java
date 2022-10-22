@@ -80,9 +80,6 @@ public class MainUtilities {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-obf-files-in-batch")) {
                 IndexBatchCreator.main(subArgsArray);
-            } else if (utl.equals("generate-ump-obf-files-in-batch")) {
-                settings.indexByProximity = false;
-				IndexBatchCreator.main(subArgsArray);
             } else if (utl.equals("generate-ocean-tile-osm")) {
 				OceanTilesCreator.createJOSMFile(subArgsArray);
 			} else if (utl.equals("generate-java-style")) {
