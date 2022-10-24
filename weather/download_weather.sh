@@ -476,7 +476,7 @@ get_raw_ecmwf_files() {
 
 
 # # Uncomment for fast debug mode
-DEBUG_M0DE=1/
+# DEBUG_M0DE=1
 
 
 if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
