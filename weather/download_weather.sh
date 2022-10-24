@@ -63,7 +63,7 @@ should_download_file() {
 
     if [[ -f $FILENAME ]]; then
         # File is already dowlnloaded
-        local DISK_FILE_MODIFIED_TIME="$(TZ=UMT0 date -r ${FILENAME} +'%a, %d %b %Y %H:%M:%S GMT')"
+        local DISK_FILE_MODIFIED_TIME="$(TZ=GMT date -r ${FILENAME} +'%a, %d %b %Y %H:%M:%S GMT')"
         local SERVER_RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
 
         if [[ $SERVER_RESPONSE =~ "304" ]]; then
@@ -186,11 +186,11 @@ get_raw_gfs_files() {
     # (usually 4 hours offset is enough to get freshest files)
     local DELAY_HOURS=${DELAY_HOURS:-4}
     if [[ $OS =~ "Darwin" ]]; then
-        HOURS=$(date -u -v-${DELAY_HOURS}H '+%-H')
-        DATE=$(date -u -v-${DELAY_HOURS}H '+%Y%m%d')
+        HOURS=$(TZ=GMT date -u -v-${DELAY_HOURS}H '+%-H')
+        DATE=$(TZ=GMT date -u -v-${DELAY_HOURS}H '+%Y%m%d')
     else
-        HOURS=$(date -u '+%-H' -d "-${DELAY_HOURS} hours")
-        DATE=$(date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
+        HOURS=$(TZ=GMT date -u '+%-H' -d "-${DELAY_HOURS} hours")
+        DATE=$(TZ=GMT date -u '+%Y%m%d' -d "-${DELAY_HOURS} hours")
     fi
     # Round down HOURS to 0/6/12/18
     local RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
@@ -210,9 +210,9 @@ get_raw_gfs_files() {
         local FILE_DATA_URL="${URL_BASE}${FILENAME}"
         local FILETIME=""
         if [[ $OS =~ "Darwin" ]]; then
-            FILETIME=$(date -ju -v+${c}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${DATE} ${RNDHOURS}00")
+            FILETIME=$(TZ=GMT date -ju -v+${c}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${DATE} ${RNDHOURS}00")
         else
-            FILETIME=$(date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
+            FILETIME=$(TZ=GMT date -d "${DATE} ${RNDHOURS}00 +${c} hours" '+%Y%m%d_%H%M')
         fi
 
 
@@ -380,11 +380,11 @@ find_latest_ecmwf_forecat_date() {
         local SEARCHING_DATE=""
         local SEARCHING_HOURS=""
         if [[ $OS =~ "Darwin" ]]; then
-            SEARCHING_DATE=$(date -u -v-$(($HOURS_OFFSET))H '+%Y%m%d')
-            SEARCHING_HOURS=$(date -u -v-$(($HOURS_OFFSET))H '+%-H')
+            SEARCHING_DATE=$(TZ=GMT date -u -v-$(($HOURS_OFFSET))H '+%Y%m%d')
+            SEARCHING_HOURS=$(TZ=GMT date -u -v-$(($HOURS_OFFSET))H '+%-H')
         else
-            SEARCHING_DATE=$(date -u '+%Y%m%d' -d "-${HOURS_OFFSET} hours")
-            SEARCHING_HOURS=$(date -u '+%-H' -d "-${HOURS_OFFSET} hours")
+            SEARCHING_DATE=$(TZ=GMT date -u '+%Y%m%d' -d "-${HOURS_OFFSET} hours")
+            SEARCHING_HOURS=$(TZ=GMT date -u '+%-H' -d "-${HOURS_OFFSET} hours")
         fi
 
         local SEARCHING_RND_HOURS="00"
@@ -435,9 +435,9 @@ get_raw_ecmwf_files() {
     do
         local FILETIME=""
         if [[ $OS =~ "Darwin" ]]; then
-            FILETIME=$(date -ju -v+${FORECAST_HOUR}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${FORECAST_DATE} ${FORECAST_RND_TIME}00")
+            FILETIME=$(TZ=GMT date -ju -v+${FORECAST_HOUR}H -f '%Y%m%d %H%M' '+%Y%m%d_%H%M' "${FORECAST_DATE} ${FORECAST_RND_TIME}00")
         else
-            FILETIME=$(date -d "${FORECAST_DATE} ${FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
+            FILETIME=$(TZ=GMT date -d "${FORECAST_DATE} ${FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
         fi
         local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/0p4-beta/oper/"$FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
 
@@ -476,33 +476,33 @@ get_raw_ecmwf_files() {
 
 
 # # Uncomment for fast debug mode
-# DEBUG_M0DE=1
+DEBUG_M0DE=1/
 
 
-if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
+# if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
     cd "$ROOT_FOLDER/$GFS"
     setup_folders_on_start
-    get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
+    # get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
     get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
-    join_tiff_files $GFS
-    split_tiles
-    clean_temp_files_on_finish
-elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
-    cd "$ROOT_FOLDER/$ECMWF"
-    setup_folders_on_start
+    # join_tiff_files $GFS
+    # split_tiles
+    # clean_temp_files_on_finish
+# elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
+#     cd "$ROOT_FOLDER/$ECMWF"
+#     setup_folders_on_start
 
-    # Find and download latest full forecast (from 0h to 240h)
-    FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
-    get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
+#     # Find and download latest full forecast (from 0h to 240h)
+#     FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
+#     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
 
-    # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
-    # Overrite "yesterday's" full forecatst with all existing "today's" files. If it needed.
-    LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
-    if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
-        get_raw_ecmwf_files $LATEST_FORECAST_SEARCH_RESULT
-    fi
+#     # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
+#     # Overrite "yesterday's" full forecatst with all existing "today's" files. If it needed.
+#     LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
+#     if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
+#         get_raw_ecmwf_files $LATEST_FORECAST_SEARCH_RESULT
+#     fi
 
-    join_tiff_files $ECMWF
-    split_tiles
-    clean_temp_files_on_finish
-fi
+#     join_tiff_files $ECMWF
+#     split_tiles
+#     clean_temp_files_on_finish
+# fi
