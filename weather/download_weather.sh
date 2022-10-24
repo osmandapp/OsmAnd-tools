@@ -479,30 +479,30 @@ get_raw_ecmwf_files() {
 DEBUG_M0DE=1/
 
 
-# if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
+if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
     cd "$ROOT_FOLDER/$GFS"
     setup_folders_on_start
-    # get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
+    get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
     get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
-    # join_tiff_files $GFS
-    # split_tiles
-    # clean_temp_files_on_finish
-# elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
-#     cd "$ROOT_FOLDER/$ECMWF"
-#     setup_folders_on_start
+    join_tiff_files $GFS
+    split_tiles
+    clean_temp_files_on_finish
+elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
+    cd "$ROOT_FOLDER/$ECMWF"
+    setup_folders_on_start
 
-#     # Find and download latest full forecast (from 0h to 240h)
-#     FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
-#     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
+    # Find and download latest full forecast (from 0h to 240h)
+    FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
+    get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
 
-#     # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
-#     # Overrite "yesterday's" full forecatst with all existing "today's" files. If it needed.
-#     LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
-#     if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
-#         get_raw_ecmwf_files $LATEST_FORECAST_SEARCH_RESULT
-#     fi
+    # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
+    # Overrite "yesterday's" full forecatst with all existing "today's" files. If it needed.
+    LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
+    if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
+        get_raw_ecmwf_files $LATEST_FORECAST_SEARCH_RESULT
+    fi
 
-#     join_tiff_files $ECMWF
-#     split_tiles
-#     clean_temp_files_on_finish
-# fi
+    join_tiff_files $ECMWF
+    split_tiles
+    clean_temp_files_on_finish
+fi
