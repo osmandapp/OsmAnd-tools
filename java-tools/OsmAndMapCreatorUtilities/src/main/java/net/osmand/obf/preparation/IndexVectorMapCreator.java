@@ -738,6 +738,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 			if (e instanceof Way && tags.size() > 2 && "coastline".equals(tags.get("natural"))
 					&& ("island".equals(tags.get("place")) || "islet".equals(tags.get("place")))) {
 				QuadRect bbox = ((Way) e).getLatLonBBox();
+				if(bbox != null) {
 				Node node = new Node(bbox.centerY(), bbox.centerX(), e.getId());
 				node.copyTags(e);
 				node.removeTag("natural");
@@ -746,6 +747,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 				assignedId = assignIdBasedOnOriginalSplit(eid);
 				for (int level = 0; level < mapZooms.size(); level++) {
 					processMainEntity(node, originalId, assignedId, level, nodeTags);
+				}
 				}
 			}
 		}
