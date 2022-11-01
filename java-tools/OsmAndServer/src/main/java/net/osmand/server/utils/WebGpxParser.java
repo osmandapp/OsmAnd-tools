@@ -142,7 +142,7 @@ public class WebGpxParser {
                 if (routePoint.geometrySize == -1) {
                     currTrkPointInd = findNearestPoint(trackPoints, routePoint);
                 } else {
-                    currTrkPointInd = prevTrkPointInd + routePoint.geometrySize;
+                    currTrkPointInd = routePoint.geometrySize;
                 }
                 
                 prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
