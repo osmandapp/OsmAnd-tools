@@ -135,7 +135,11 @@ public class BinaryMerger {
 						+ (mapFiles ? IndexConstants.BINARY_MAP_INDEX_EXT : IndexConstants.BINARY_ROAD_MAP_INDEX_EXT);
 				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + ext;
 				File targetFile = new File(pathToPutJointFiles, targetFileName);
+				File targetUploadedFile = new File(pathWithGeneratedMapZips, targetFileName + ".zip");
 				if (skipExisting && targetFile.exists()) {
+					continue;
+				}
+				if (skipExisting && targetUploadedFile.exists()) {
 					continue;
 				}
 				sargs.add(targetFileName);
@@ -150,7 +154,12 @@ public class BinaryMerger {
 				log.info("Merge file with arguments: " + sargs);
 				try {
 					in.merger(sargs.toArray(new String[sargs.size()]));
-					new File(targetFileName).renameTo(targetFile);
+					File genFile = new File(targetFileName);
+					boolean moved = genFile.renameTo(targetFile);
+					if (!moved) {
+						Algorithms.fileCopy(genFile, targetFile);
+						genFile.delete();
+					}
 				} catch (IOException | SQLException e) {
 					if (!ignoreFailures) {
 						throw e;
