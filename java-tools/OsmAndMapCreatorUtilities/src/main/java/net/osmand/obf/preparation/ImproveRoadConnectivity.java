@@ -114,7 +114,7 @@ public class ImproveRoadConnectivity {
 			TLongObjectHashMap<List<RouteDataObject>> all,
 			BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(4000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", memoryLimit);
 
 		long[] pointsToCheck = mapOfObjectToCheck.keys();
