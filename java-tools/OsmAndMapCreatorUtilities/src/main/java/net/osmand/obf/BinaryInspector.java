@@ -91,7 +91,7 @@ public class BinaryInspector {
 					// road
 //					"-latlon=48.46614,9.16976",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir")+"World_basemap_mini_2.obf"
+					System.getProperty("maps.dir")+"11_netherlands_noord-holland_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

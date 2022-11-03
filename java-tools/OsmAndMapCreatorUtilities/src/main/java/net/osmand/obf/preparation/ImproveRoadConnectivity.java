@@ -33,12 +33,12 @@ import org.apache.commons.logging.Log;
 
 public class ImproveRoadConnectivity {
 	private static final boolean TRACE = false;
-	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
+	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = false;
 	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
 
 	public static void main(String[] args) throws IOException {
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
-		File fl = new File("/Users/plotva/osmand/Newtestv3.obf");
+		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 		System.out.println("Found roads: " + map.size());
@@ -123,7 +123,7 @@ public class ImproveRoadConnectivity {
 		TLongHashSet endIsolated = new TLongHashSet();
 		log.info("Start found roads in Normal routing for added to Base routing!");
 		for (int k = 0; k < pointsToCheck.length; k++) {
-			int pers = k * 100/pointsToCheck.length;
+			int pers = k * 100 / pointsToCheck.length;
 			if (pers % 5 == 0 && pers != (k - 1) * 100/pointsToCheck.length) {
 				log.info("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
 			}

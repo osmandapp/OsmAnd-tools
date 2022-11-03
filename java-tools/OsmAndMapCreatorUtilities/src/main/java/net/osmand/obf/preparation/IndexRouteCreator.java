@@ -275,10 +275,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				encoded = routeTypes.encodeBaseEntity(tags, outTypes, names) && e.getNodes().size() >= 2;
 				if (encoded) {
 					List<Node> source = e.getNodes();
-					long id = e.getId();
-					List<Node> result = simplifyRouteForBaseSection(source, id);
+					// remove this simplify route for improve base routing (task 11770)
+					// long id = e.getId();
+					// List<Node> result = simplifyRouteForBaseSection(source, id);
 					routeTypes.encodePointTypes(e, pointTypes, pointNames, true);
-					addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes,
+					addWayToIndex(e.getId(), source, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes,
 							pointNames, names);
 					// generalizeWay(e);
 
