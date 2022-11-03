@@ -11,6 +11,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.router.*;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -121,12 +122,14 @@ public class ImproveRoadConnectivity {
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
 		TLongHashSet beginIsolated = new TLongHashSet();
 		TLongHashSet endIsolated = new TLongHashSet();
-		log.info("Start found roads in Normal routing for added to Base routing!");
+		ConsoleProgressImplementation cpi = new ConsoleProgressImplementation();
+		cpi.startTask("Start found roads in Normal routing for added to Base routing", pointsToCheck.length);
 		for (int k = 0; k < pointsToCheck.length; k++) {
-			int pers = k * 100 / pointsToCheck.length;
-			if (pers % 5 == 0 && pers != (k - 1) * 100/pointsToCheck.length) {
-				log.info("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
-			}
+			cpi.progress(1);
+//			int pers = k * 100 / pointsToCheck.length;
+//			if (pers % 5 == 0 && pers != (k - 1) * 100/pointsToCheck.length) {
+//				log.info("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
+//			}
 			long point = pointsToCheck[k];
 			if (all.get(point).size() == 1) {
 				RouteDataObject rdo = all.get(point).get(0);
