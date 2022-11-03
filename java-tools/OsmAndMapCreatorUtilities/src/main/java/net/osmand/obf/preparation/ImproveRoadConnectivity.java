@@ -34,12 +34,12 @@ import org.apache.commons.logging.Log;
 
 public class ImproveRoadConnectivity {
 	private static final boolean TRACE = false;
-	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = false;
+	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
 	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
 
 	public static void main(String[] args) throws IOException {
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
-		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
+		File fl = new File("/Users/plotva/osmand/Newtestv3.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 		System.out.println("Found roads: " + map.size());
@@ -122,14 +122,12 @@ public class ImproveRoadConnectivity {
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
 		TLongHashSet beginIsolated = new TLongHashSet();
 		TLongHashSet endIsolated = new TLongHashSet();
-		ConsoleProgressImplementation cpi = new ConsoleProgressImplementation();
-		cpi.startTask("Start found roads in Normal routing for added to Base routing", pointsToCheck.length);
+		log.info("Start found roads in Normal routing for added to Base routing!");
 		for (int k = 0; k < pointsToCheck.length; k++) {
-			cpi.progress(1);
-//			int pers = k * 100 / pointsToCheck.length;
-//			if (pers % 5 == 0 && pers != (k - 1) * 100/pointsToCheck.length) {
-//				log.info("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
-//			}
+			int pers = k * 100/pointsToCheck.length;
+			if (pers % 5 == 0 && pers != (k - 1) * 100/pointsToCheck.length) {
+				log.info("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
+			}
 			long point = pointsToCheck[k];
 			if (all.get(point).size() == 1) {
 				RouteDataObject rdo = all.get(point).get(0);
@@ -211,8 +209,18 @@ public class ImproveRoadConnectivity {
 	    ctx.loadTileData(startRdo.getPoint31XTile(0), startRdo.getPoint31YTile(0), 14, roadsForCheck);
         
         for (RouteDataObject rdo : roadsForCheck) {
-            addPoint(neighboringPoints, rdo, calcPointId(rdo, 0));
-            addPoint(neighboringPoints, rdo, calcPointId(rdo, rdo.getPointsLength() - 1));
+	        double distStart = MapUtils.getDistance(MapUtils.get31LatitudeY(rdo.pointsY[0]),
+			        MapUtils.get31LongitudeX(rdo.pointsX[0]),
+			        MapUtils.get31LatitudeY(startRdo.pointsY[0]),
+			        MapUtils.get31LongitudeX(startRdo.pointsX[0]));
+	        double distEnd = MapUtils.getDistance(MapUtils.get31LatitudeY(rdo.pointsY[rdo.pointsY.length - 1]),
+			        MapUtils.get31LongitudeX(rdo.pointsX[rdo.pointsY.length - 1]),
+			        MapUtils.get31LatitudeY(startRdo.pointsY[startRdo.pointsY.length - 1]),
+			        MapUtils.get31LongitudeX(startRdo.pointsX[startRdo.pointsY.length - 1]));
+	        if (distStart < 500 || distEnd < 500) {
+		        addPoint(neighboringPoints, rdo, calcPointId(rdo, 0));
+		        addPoint(neighboringPoints, rdo, calcPointId(rdo, rdo.getPointsLength() - 1));
+	        }
         }
         return neighboringPoints;
     }
@@ -329,13 +337,7 @@ public class ImproveRoadConnectivity {
 	    List<RouteDataObject> rdoToAdd = new ArrayList<>();
 		VehicleRouter router = ctx.getRouter();
 		ArrayList<RouteDataObject> next = new ArrayList<>();
-		ctx.loadTileData(initial.getPoint31XTile(0), initial.getPoint31YTile(0), 15, next);
-		for (RouteDataObject n : next) {
-			if (n.id == initial.id) {
-				initial = n;
-				break;
-			}
-		}
+		ctx.loadTileData(initial.getPoint31XTile(0), initial.getPoint31YTile(0), 17, next);
 		queue.add(new RouteSegment(initial, begin ? 1 : initial.getPointsLength() - 2));
 		TLongHashSet visited = new TLongHashSet();
 		while (!queue.isEmpty()) {
