@@ -80,26 +80,26 @@ public class ImproveRoadConnectivity {
 			tiles.addAll(loadTiles);
 		}
 		
-		for(RoutingSubregionTile tile : tiles) {
+		for (RoutingSubregionTile tile : tiles) {
 			ArrayList<RouteDataObject> dataObjects = new ArrayList<>();
 			ctx.loadSubregionTile(tile, false, dataObjects, null);
-			for(RouteDataObject o : dataObjects) {
+			for (RouteDataObject o : dataObjects) {
 				registeredRoadIds.add(o.getId());
 				int len = o.getPointsLength() - 1;
 				double dist = MapUtils.squareRootDist31(o.getPoint31XTile(0), o.getPoint31YTile(0),
 						o.getPoint31XTile(len), o.getPoint31YTile(len));
 				boolean shortFerry = "ferry".equals(o.getRoute()) && dist < 1000;
-				if(shortFerry) {
+				if (shortFerry) {
 					continue;
 				}
 				boolean link = o.getHighway() != null && (o.getHighway().endsWith("link"));
 				long b = calcPointId(o, 0);
 				long e = calcPointId(o, len);
-				if(!link) {
+				if (!link) {
 					addPoint(onlyRoads, o, b);
 					addPoint(onlyRoads, o, e);
 				}
-				for(int i = 0; i < o.getPointsLength(); i++) {
+				for (int i = 0; i < o.getPointsLength(); i++) {
 					addPoint(all, o, calcPointId(o, i));
 				}
 			}
@@ -127,12 +127,12 @@ public class ImproveRoadConnectivity {
 		ConsoleProgressImplementation cpi = new ConsoleProgressImplementation();
 		TLongObjectHashMap<RouteDataObject> pointsToCheck = new TLongObjectHashMap<>();
 		TLongObjectIterator<List<RouteDataObject>> it = mapOfObjectToCheck.iterator();
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			it.advance();
-			if(it.value().size() == 1) {
+			if (it.value().size() == 1) {
 				pointsToCheck.put(it.key(), it.value().get(0));
 			}
-			
+
 		}
 		cpi.startTask("Start found roads in Normal routing for added to Base routing: ", pointsToCheck.size());
 		TLongObjectIterator<RouteDataObject> itn = pointsToCheck.iterator();
