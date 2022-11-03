@@ -34,7 +34,7 @@ import org.apache.commons.logging.Log;
 
 public class ImproveRoadConnectivity {
 	private static final boolean TRACE = false;
-	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
+	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = false;
 	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
 
 	public static void main(String[] args) throws IOException {
