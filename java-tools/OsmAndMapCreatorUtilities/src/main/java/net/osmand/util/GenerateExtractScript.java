@@ -112,7 +112,7 @@ public class GenerateExtractScript {
 							.append(String.format("\"polygon\": { \"%s\" } ", child + "/" + child + ".poly"));
 					bld.append("\n     }");
 				}
-				bld.append("\n}");
+				bld.append("\n]}");
 				System.out.println("Extract " + children.size() + " files from " + file );
 				writeToFile(regionFolder, "extract.json", bld.toString());
 			}
