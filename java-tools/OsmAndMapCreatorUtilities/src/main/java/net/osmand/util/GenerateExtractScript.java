@@ -109,7 +109,8 @@ public class GenerateExtractScript {
 					bld.append("\n        ")
 							.append(String.format("\"output\": \"%s\", ", child + "/" + child + ".pbf"));
 					bld.append("\n        ")
-							.append(String.format("\"polygon\": { \"file_name\" : \"%s\" } ", child + "/" + child + ".poly"));
+							.append(String.format("\"polygon\": { \"file_name\" : \"%s\" } ", 
+									new File(location).getAbsolutePath() + "/" + child + "/" + child + ".poly"));
 					bld.append("\n     }");
 				}
 				bld.append("\n]}");
