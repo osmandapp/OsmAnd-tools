@@ -35,14 +35,15 @@ import org.apache.commons.logging.Log;
 
 public class ImproveRoadConnectivity {
 	private static final boolean TRACE = false;
-	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = false;
+	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
 	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
 
 	public static void main(String[] args) throws IOException {
 		ConsoleProgressImplementation.deltaTimeToPrintMax = 10000;
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
-		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
-//		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
+		File fl = new File("/Users/plotva/work/osmand/maps/Denmark_central-region_europe_2.obf");
+		//File fl = new File("/Users/plotva/work/osmand/maps/China_henan_asia_2.obf");
+		//File fl = new File("/Users/plotva/work/osmand/maps/Newtestv3.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 		System.out.println("Found roads: " + map.size());
@@ -151,9 +152,9 @@ public class ImproveRoadConnectivity {
 				TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(all,
 						point, baseCtx);
 				if (!neighboringPoints.isEmpty()) {
-					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(baseCtx,
+					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(all, baseCtx,
 							point, neighboringPoints);
-					if (disconnectedPoints != null) {
+					if (disconnectedPoints != null && !disconnectedPoints.isEmpty()) {
 						List<RouteDataObject> result = findConnectedRoads(ctx, rdo, isBeginPoint, disconnectedPoints);
 						if (!result.isEmpty()) {
 							for (RouteDataObject obj : result) {
@@ -184,13 +185,15 @@ public class ImproveRoadConnectivity {
 		
 		if (USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
 			//remove base roads duplicates from result
-			List<RouteDataObject> rdos = new ArrayList<>();
-			for (long point : all.keys()) {
-				rdos.addAll(all.get(point));
-			}
-			for (RouteDataObject rdo : rdos) {
-				if (toAdd.contains(rdo.id)) {
-					toAdd.remove(rdo.id);
+			if (!toAdd.isEmpty()) {
+				List<RouteDataObject> rdos = new ArrayList<>();
+				for (long point : all.keys()) {
+					rdos.addAll(all.get(point));
+				}
+				for (RouteDataObject rdo : rdos) {
+					if (toAdd.contains(rdo.id)) {
+						toAdd.remove(rdo.id);
+					}
 				}
 			}
 		} else {
@@ -219,33 +222,67 @@ public class ImproveRoadConnectivity {
 	    ctx.loadTileData(startRdo.getPoint31XTile(0), startRdo.getPoint31YTile(0), 14, roadsForCheck);
         
         for (RouteDataObject rdo : roadsForCheck) {
-            addPoint(neighboringPoints, rdo, calcPointId(rdo, 0));
-            addPoint(neighboringPoints, rdo, calcPointId(rdo, rdo.getPointsLength() - 1));
+	        double distStart = MapUtils.getDistance(MapUtils.get31LatitudeY(rdo.pointsY[0]),
+			        MapUtils.get31LongitudeX(rdo.pointsX[0]),
+			        MapUtils.get31LatitudeY(startRdo.pointsY[0]),
+			        MapUtils.get31LongitudeX(startRdo.pointsX[0]));
+	        double distEnd = MapUtils.getDistance(MapUtils.get31LatitudeY(rdo.pointsY[rdo.pointsY.length - 1]),
+			        MapUtils.get31LongitudeX(rdo.pointsX[rdo.pointsY.length - 1]),
+			        MapUtils.get31LatitudeY(startRdo.pointsY[startRdo.pointsY.length - 1]),
+			        MapUtils.get31LongitudeX(startRdo.pointsX[startRdo.pointsY.length - 1]));
+	        if (distStart < 500 || distEnd < 500) {
+		        addPoint(neighboringPoints, rdo, calcPointId(rdo, 0));
+		        addPoint(neighboringPoints, rdo, calcPointId(rdo, rdo.getPointsLength() - 1));
+	        }
         }
         return neighboringPoints;
     }
     
-    private TLongObjectHashMap<List<RouteDataObject>> findDisconnectedBasePoints(RoutingContext baseCtx, long pointId,
+    private TLongObjectHashMap<List<RouteDataObject>> findDisconnectedBasePoints(TLongObjectHashMap<List<RouteDataObject>> allBaseIntersections,
+                                                                                 RoutingContext baseCtx, long pointId,
                                                                                  TLongObjectHashMap<List<RouteDataObject>> neighboringPoints) {
         TLongObjectHashMap<List<RouteDataObject>> result = new TLongObjectHashMap<>();
         VehicleRouter router = baseCtx.getRouter();
         Map<Long, Double> distFromStarts = new HashMap<>();
-        long[] pointsIds = neighboringPoints.keys();
-        for (long id : pointsIds) {
-            if (id == pointId) {
-                distFromStarts.put(id, 0.0);
-            } else {
-                distFromStarts.put(id, Double.MAX_VALUE);
-            }
-        }
+	
+	    ArrayList<RouteDataObject> roadsForCheck = new ArrayList<>();
+	    RouteDataObject startRdo = allBaseIntersections.get(pointId).get(0);
+		
+		int currentLat = startRdo.getPoint31XTile(0);
+	    int currentLon = startRdo.getPoint31YTile(0);
+		int newLat = MapUtils.get31TileNumberX(MapUtils.get31LongitudeX(currentLat) + 2000/6378137 * 180/Math.PI);
+	    int newLon = MapUtils.get31TileNumberY(MapUtils.get31LatitudeY(currentLon) + 2000/
+			    (6378137*Math.cos(Math.PI*MapUtils.get31LatitudeY(currentLon)/180)) * 180/Math.PI) ;
+
+	    baseCtx.loadTileData(newLat, currentLon, 14, roadsForCheck);
+	    baseCtx.loadTileData(newLat, currentLon, 14, roadsForCheck);
+	    baseCtx.loadTileData(currentLat, newLon, 14, roadsForCheck);
+	    baseCtx.loadTileData(currentLat, newLon, 14, roadsForCheck);
+		
+	    //baseCtx.loadTileData(startRdo.getPoint31XTile(0), startRdo.getPoint31YTile(0), 13, roadsForCheck);
+	
+	    TLongObjectHashMap<List<RouteDataObject>> allPoints = new TLongObjectHashMap<>();
+	    for (RouteDataObject rdo : roadsForCheck) {
+		    addPoint(allPoints, rdo, calcPointId(rdo, 0));
+		    addPoint(allPoints, rdo, calcPointId(rdo, rdo.getPointsLength() - 1));
+	    }
+	
+	    for (long id : allPoints.keys()) {
+		    if (id == pointId) {
+			    distFromStarts.put(id, 0.0);
+		    } else {
+			    distFromStarts.put(id, Double.MAX_VALUE);
+		    }
+	    }
+		
         
-        PriorityQueue<Point> queue = new PriorityQueue<>(neighboringPoints.keys().length, new Point());
+        PriorityQueue<Point> queue = new PriorityQueue<>(allPoints.keys().length, new Point());
         
         queue.add(new Point(pointId, 0));
         TLongHashSet visited = new TLongHashSet();
-        while (visited.size() != neighboringPoints.keys().length - 1) {
+        while (visited.size() != allPoints.keys().length - 1) {
             if (queue.isEmpty()) {
-                for (long id : pointsIds) {
+                for (long id : neighboringPoints.keys()) {
                     if (distFromStarts.get(id) == Double.MAX_VALUE) {
                         result.put(id, neighboringPoints.get(id));
                     }
@@ -254,34 +291,34 @@ public class ImproveRoadConnectivity {
             }
             Point point = queue.poll();
             visited.add(point.pointId);
-            processNeighboringPoints(point, neighboringPoints, router, distFromStarts, queue, visited, pointId);
+            processNeighboringPoints(point, allPoints, router, distFromStarts, queue, visited, pointId);
         }
         return null;
     }
     
-    private void processNeighboringPoints(Point point, TLongObjectHashMap<List<RouteDataObject>> neighboringPoints, VehicleRouter router,
+    private void processNeighboringPoints(Point point, TLongObjectHashMap<List<RouteDataObject>> points, VehicleRouter router,
                                           Map<Long, Double> distFromStarts, PriorityQueue<Point> queue, TLongHashSet visited, long pointId) {
-        List<RouteDataObject> rdos = neighboringPoints.get(point.pointId);
+        List<RouteDataObject> rdos = points.get(point.pointId);
 		if (rdos != null ) {
 			for (RouteDataObject rdo : rdos) {
 				int oneWay = router.isOneWay(rdo);
 				boolean isBegin = calcPointId(rdo, 0) == point.pointId;
 				RouteSegment segment = new RouteSegment(rdo, isBegin ? 0 : rdo.getPointsLength() - 1);
-				boolean startRoad = neighboringPoints.get(pointId).get(0).id == segment.getRoad().id;
+				boolean startRoad = points.get(pointId).get(0).id == segment.getRoad().id;
 				if (startRoad) {
 					oneWay = isBegin ? 1 : -1;
 				}
 				if (oneWay >= 0) {
-					findNextPoint(true, segment, neighboringPoints, distFromStarts, queue, point, visited);
+					findNextPoint(true, segment, points, distFromStarts, queue, point, visited);
 				}
 				if (oneWay <= 0) {
-					findNextPoint(false, segment, neighboringPoints, distFromStarts, queue, point, visited);
+					findNextPoint(false, segment, points, distFromStarts, queue, point, visited);
 				}
 			}
 		}
     }
 	
-	private void findNextPoint(boolean direction, RouteSegment segment, TLongObjectHashMap<List<RouteDataObject>> neighboringPoints, Map<Long, Double> distFromStarts,
+	private void findNextPoint(boolean direction, RouteSegment segment, TLongObjectHashMap<List<RouteDataObject>> points, Map<Long, Double> distFromStarts,
 	                           PriorityQueue<Point> queue, Point point, TLongHashSet visited) {
 		int ind = segment.getSegmentStart();
 		double startLat = (float) MapUtils.get31LongitudeX(segment.getRoad().getPoint31XTile(ind));
@@ -298,7 +335,7 @@ public class ImproveRoadConnectivity {
 			}
 			
 			long foundPointId = calcPointId(segment.getRoad(), ind);
-			if (neighboringPoints.contains(foundPointId) && !visited.contains(foundPointId)) {
+			if (points.contains(foundPointId) && !visited.contains(foundPointId)) {
 				double endLat = (float) MapUtils.get31LongitudeX(segment.getRoad().getPoint31XTile(ind));
 				double endLon = (float) MapUtils.get31LatitudeY(segment.getRoad().getPoint31YTile(ind));
 				double dist = MapUtils.getDistance(startLon, startLat, endLon, endLat) + point.distFromStart;
