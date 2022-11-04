@@ -10,7 +10,6 @@ import java.util.Map;
 
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.util.Algorithms;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 
 public class GenerateExtractScript {
@@ -25,56 +24,60 @@ public class GenerateExtractScript {
 		if (args.length > 1) {
 			repo = args[1];
 		}
-
-		String binaryFolder = "/Users/victorshcherb/bin/";
-		if (args.length > 2) {
-			binaryFolder = args[2];
-		}
-		new GenerateExtractScript().process(location, repo, binaryFolder);
+		new GenerateExtractScript().process(location, repo);
 	}
 
-	private void process(String location, String repo, String binaryFolder) throws IOException, XmlPullParserException {
+	private void process(String location, String repo) throws IOException, XmlPullParserException {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 		CountryRegion regionStructure = ocbfGeneration.parseRegionStructureFromRepo(repo);
 		Map<String, File> polygons = ocbfGeneration.getPolygons(repo);
 		List<CountryRegion> rt = new ArrayList<CountryRegion>();
 		Iterator<CountryRegion> it = regionStructure.iterator();
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			CountryRegion reg = it.next();
-			if(reg.getParent() != null) {
+			if (reg.getParent() != null) {
 				rt.add(reg);
 			}
 		}
 		int md = 0;
 		for (CountryRegion reg : rt) {
-			File countryFolder = new File(location, reg.getDownloadName());
-			File polygonFile = getPolygonFile(polygons, reg, countryFolder, reg.getDownloadName());
+			File regionFolder = new File(location, reg.getDownloadName());
+			String boundary = reg.boundary;
+			if (boundary == null && !Algorithms.isEmpty(reg.getSinglePolyExtract())) {
+				boundary = reg.name;
+			}
+			File polygonFile = null;
+			if (boundary != null) {
+				polygonFile = getPolygonFile(polygons, reg, regionFolder, boundary, reg.getDownloadName());
+			}
 			if (polygonFile == null) {
 				System.err.println("Boundary doesn't exist " + reg.getDownloadName());
 				continue;
 			}
+			if (Algorithms.isEmpty(reg.getSinglePolyExtract()) && (reg.getParent() == null || reg.getParent().boundary == null || 
+					Algorithms.isEmpty(reg.getParent().getSinglePolyExtract()))) {
+				System.err.println("Parent Boundary doesn't exist " + reg.getDownloadName());
+				continue;
+			}
 			int depth = 0;
 			CountryRegion r = reg;
-			while(r.getParent() != null) {
+			while (r.getParent() != null) {
 				depth++;
 				r = r.getParent();
 			}
 			md = Math.max(md, depth);
-			writeToFile(countryFolder, ".depth", depth+"");
-			if(reg.hasMapFiles()) {
-				writeToFile(countryFolder, ".map", "1");
+			writeToFile(regionFolder, ".depth", depth + "");
+			if (reg.hasMapFiles()) {
+				writeToFile(regionFolder, ".map", "1");
 			}
-			System.out.print(reg.getDownloadName());
 			if (reg.getParent() != null) {
-				writeToFile(countryFolder, ".parent", reg.getParent().getDownloadName());
+				writeToFile(regionFolder, ".parent", reg.getParent().getDownloadName());
 			}
-			if (!Algorithms.isEmpty(reg.getSinglePolyExtract()) || reg.getParent().boundary == null) {
-				writeToFile(countryFolder, ".polyextract", reg.getPolyExtract());
-				System.out.println(" - extract from " + reg.getPolyExtract());
+			if (reg.getParent() == null || !Algorithms.isEmpty(reg.getSinglePolyExtract())) {
+				System.out.println(reg.getDownloadName() + " - extract from " + reg.getSinglePolyExtract());
 			} else {
-				System.out.println(" - extract from " + reg.getParent().getDownloadName());
+				System.out.println(reg.getDownloadName() + " - extract from " + reg.getParent().getDownloadName());
 			}
-
 		}
 		// System.out.println("Max depth " + md); // 5
 	}
@@ -88,12 +91,12 @@ public class GenerateExtractScript {
 		fous.close();
 	}
 
-	private File getPolygonFile(Map<String, File> polygons, CountryRegion reg, File countryFolder, String regFile) throws IOException {
-		File file = polygons.get(reg.boundary);
-		if(file != null) {
+	private File getPolygonFile(Map<String, File> polygons, CountryRegion reg, File countryFolder, String boundary, String regFile) throws IOException {
+		File file = polygons.get(boundary);
+		if (file != null) {
 			File polygonFile = new File(countryFolder, regFile + ".poly");
 			countryFolder.mkdirs();
-			if(!polygonFile.exists() || polygonFile.length() != file.length()) {
+			if (!polygonFile.exists() || polygonFile.length() != file.length()) {
 				Algorithms.fileCopy(file, polygonFile);
 			}
 			return polygonFile;
