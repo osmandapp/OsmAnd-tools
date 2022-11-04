@@ -145,7 +145,7 @@ public class CountryOcbfGeneration {
 		public String boundary;
 		public String translate;
 		public String polyExtract;
-
+		public boolean areaExtract;
 
 		public boolean jointMap;
 		public boolean jointRoads;
@@ -158,6 +158,7 @@ public class CountryOcbfGeneration {
 		public boolean srtm ;
 
 		public long timestampToUpdate;
+		
 		
 
 		public CountryRegion getParent() {
@@ -420,6 +421,10 @@ public class CountryOcbfGeneration {
 	private void processRegion(CountryRegion r, Map<String, Set<TranslateEntity>> translates,
 			Map<String, File> polygonFiles, String targetObf, String targetOsmXml, String indent, XmlSerializer serializer)
 					throws IOException {
+		if (r.areaExtract) {
+			// skip helper regions
+			return;
+		}
 		String line = "key=" + r.name;
 		File boundary = null;
 		if (r.boundary != null) {
@@ -636,6 +641,7 @@ public class CountryOcbfGeneration {
 			parent.children.add(reg);
 		}
 		String type = attrs.get("type");
+		reg.areaExtract = "area-extract".equals(type);
 		reg.name = attrs.get("name");
 		reg.setDownloadSuffix(attrs.get("download_suffix"));
 		reg.setDownloadPrefix(attrs.get("download_prefix"));

@@ -4,15 +4,18 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 
 public class GenerateExtractScript {
+
+	private static final String PLANET_CONST = "planet";
 
 	public static void main(String[] args) throws IOException, XmlPullParserException {
 		String location = "/Users/victorshcherb/osmand/temp/osmconvert/";
@@ -31,53 +34,64 @@ public class GenerateExtractScript {
 		CountryOcbfGeneration ocbfGeneration = new CountryOcbfGeneration();
 		CountryRegion regionStructure = ocbfGeneration.parseRegionStructureFromRepo(repo);
 		Map<String, File> polygons = ocbfGeneration.getPolygons(repo);
-		List<CountryRegion> rt = new ArrayList<CountryRegion>();
-		Iterator<CountryRegion> it = regionStructure.iterator();
-		while (it.hasNext()) {
-			CountryRegion reg = it.next();
-			if (reg.getParent() != null) {
-				rt.add(reg);
+		List<CountryRegion> parentRegions = new ArrayList<>();
+		parentRegions.addAll(regionStructure.getChildren());
+		int depth = 1;
+		Set<String> existingParentRegions = new TreeSet<>();
+		existingParentRegions.add(PLANET_CONST);
+		while (!parentRegions.isEmpty()) {
+			List<CountryRegion> children = new ArrayList<>();
+			for (CountryRegion reg : parentRegions) {
+				File regionFolder = new File(location, reg.getDownloadName());
+				String boundary = reg.boundary;
+				if (boundary == null && !Algorithms.isEmpty(reg.getSinglePolyExtract())) {
+					boundary = reg.name;
+				}
+				children.addAll(reg.getChildren());
+				if (reg.getDownloadName().equals(reg.getParent().getDownloadName())) {
+					// case antarctica continent vs region
+					continue;
+				}
+				if (existingParentRegions.contains(reg.getDownloadName())) {
+					throw new IllegalStateException("Already processed " + reg.getDownloadName());
+				}
+				String parentExtract = null;
+				if (!Algorithms.isEmpty(reg.getSinglePolyExtract())) {
+					parentExtract = reg.getSinglePolyExtract();
+				} else if (reg.getParent() != null && (reg.getParent().boundary != null
+						|| !Algorithms.isEmpty(reg.getParent().getSinglePolyExtract()))) {
+					parentExtract = reg.getParent().getDownloadName();
+				}
+				if (reg.getParent().getParent() == null && !PLANET_CONST.equals(reg.getSinglePolyExtract())) {
+					// australia-oceania-all - special case when we extract from subregion
+					parentExtract = PLANET_CONST;
+					boundary = reg.getSinglePolyExtract();
+				}
+				File polygonFile = null;
+				if (boundary != null) {
+					polygonFile = getPolygonFile(polygons, reg, regionFolder, boundary, reg.getDownloadName());
+				}
+				if (polygonFile == null) {
+					System.err.println("WARN: Boundary doesn't exist " + reg.getDownloadName());
+					continue;
+				}
+
+				if (Algorithms.isEmpty(parentExtract) || !existingParentRegions.contains(parentExtract)) {
+					System.err.println("WARN: Parent Boundary doesn't exist " + reg.getDownloadName() + " from " + parentExtract);
+					continue;
+				}
+				writeToFile(regionFolder, ".depth", depth + "");
+				if (reg.hasMapFiles()) {
+					writeToFile(regionFolder, ".map", "1");
+				}
+				if (reg.getParent() != null) {
+					writeToFile(regionFolder, ".parent", parentExtract);
+				}
+				System.out.println(reg.getDownloadName() + " - extract from " + parentExtract + " " + depth);
+				existingParentRegions.add(reg.getDownloadName());
 			}
-		}
-		int md = 0;
-		for (CountryRegion reg : rt) {
-			File regionFolder = new File(location, reg.getDownloadName());
-			String boundary = reg.boundary;
-			if (boundary == null && !Algorithms.isEmpty(reg.getSinglePolyExtract())) {
-				boundary = reg.name;
-			}
-			File polygonFile = null;
-			if (boundary != null) {
-				polygonFile = getPolygonFile(polygons, reg, regionFolder, boundary, reg.getDownloadName());
-			}
-			if (polygonFile == null) {
-				System.err.println("Boundary doesn't exist " + reg.getDownloadName());
-				continue;
-			}
-			if (Algorithms.isEmpty(reg.getSinglePolyExtract()) && (reg.getParent() == null || reg.getParent().boundary == null || 
-					Algorithms.isEmpty(reg.getParent().getSinglePolyExtract()))) {
-				System.err.println("Parent Boundary doesn't exist " + reg.getDownloadName());
-				continue;
-			}
-			int depth = 0;
-			CountryRegion r = reg;
-			while (r.getParent() != null) {
-				depth++;
-				r = r.getParent();
-			}
-			md = Math.max(md, depth);
-			writeToFile(regionFolder, ".depth", depth + "");
-			if (reg.hasMapFiles()) {
-				writeToFile(regionFolder, ".map", "1");
-			}
-			if (reg.getParent() != null) {
-				writeToFile(regionFolder, ".parent", reg.getParent().getDownloadName());
-			}
-			if (reg.getParent() == null || !Algorithms.isEmpty(reg.getSinglePolyExtract())) {
-				System.out.println(reg.getDownloadName() + " - extract from " + reg.getSinglePolyExtract());
-			} else {
-				System.out.println(reg.getDownloadName() + " - extract from " + reg.getParent().getDownloadName());
-			}
+			depth++;
+			parentRegions = children;
 		}
 		// System.out.println("Max depth " + md); // 5
 	}
