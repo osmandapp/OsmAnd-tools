@@ -6,8 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.TreeMap;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -37,8 +36,8 @@ public class GenerateExtractScript {
 		List<CountryRegion> parentRegions = new ArrayList<>();
 		parentRegions.addAll(regionStructure.getChildren());
 		int depth = 1;
-		Set<String> existingParentRegions = new TreeSet<>();
-		existingParentRegions.add(PLANET_CONST);
+		Map<String, List<String>> existingParentRegions = new TreeMap<>();
+		existingParentRegions.put(PLANET_CONST, new ArrayList<String>());
 		while (!parentRegions.isEmpty()) {
 			List<CountryRegion> children = new ArrayList<>();
 			for (CountryRegion reg : parentRegions) {
@@ -52,7 +51,7 @@ public class GenerateExtractScript {
 					// case antarctica continent vs region
 					continue;
 				}
-				if (existingParentRegions.contains(reg.getDownloadName())) {
+				if (existingParentRegions.containsKey(reg.getDownloadName())) {
 					throw new IllegalStateException("Already processed " + reg.getDownloadName());
 				}
 				String parentExtract = null;
@@ -76,7 +75,7 @@ public class GenerateExtractScript {
 					continue;
 				}
 
-				if (Algorithms.isEmpty(parentExtract) || !existingParentRegions.contains(parentExtract)) {
+				if (Algorithms.isEmpty(parentExtract) || !existingParentRegions.containsKey(parentExtract)) {
 					System.err.println("WARN: Parent Boundary doesn't exist " + reg.getDownloadName() + " from " + parentExtract);
 					continue;
 				}
@@ -88,12 +87,38 @@ public class GenerateExtractScript {
 					writeToFile(regionFolder, ".parent", parentExtract);
 				}
 				System.out.println(reg.getDownloadName() + " - extract from " + parentExtract + " " + depth);
-				existingParentRegions.add(reg.getDownloadName());
+				existingParentRegions.get(parentExtract).add(reg.getDownloadName());
+				existingParentRegions.put(reg.getDownloadName(), new ArrayList<String>());
 			}
 			depth++;
 			parentRegions = children;
 		}
-		// System.out.println("Max depth " + md); // 5
+		
+		for (String file : existingParentRegions.keySet()) {
+			List<String> children = existingParentRegions.get(file);
+			if (children.size() > 0) {
+				StringBuilder bld = new StringBuilder();
+				for (String child : children) {
+					if (bld.length() == 0) {
+						bld.append("{").append("\n");
+						bld.append("\n  ").append(String.format(" \"directory\": \"%s\", ", location));
+						bld.append("\n  ").append(String.format(" \"extracts\": [ \n", location));
+					} else {
+						bld.append(",").append("\n");
+					}
+					bld.append("     {");
+					bld.append("\n        ")
+							.append(String.format("\"output\": \"%s\", ", child + "/" + child + ".pbf"));
+					bld.append("\n        ")
+							.append(String.format("\"polygon\": { \"%s\" } ", child + "/" + child + ".poly"));
+					bld.append("\n     }");
+				}
+				bld.append("\n}");
+				System.out.println("Extract " + children.size() + " files from " + file);
+				File regionFolder = file.equals(PLANET_CONST) ? new File(location) : new File(location, file);
+				writeToFile(regionFolder, "extract.json", bld.toString());
+			}
+		}
 	}
 
 	private void writeToFile(File countryFolder, String fn, String cont) throws IOException {
