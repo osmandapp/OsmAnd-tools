@@ -35,9 +35,10 @@ public class GenerateExtractScript {
 		Map<String, File> polygons = ocbfGeneration.getPolygons(repo);
 		List<CountryRegion> parentRegions = new ArrayList<>();
 		parentRegions.addAll(regionStructure.getChildren());
-		int depth = 1;
 		Map<String, List<String>> existingParentRegions = new TreeMap<>();
+		Map<String, Integer> regionsDepths = new TreeMap<>();
 		existingParentRegions.put(PLANET_CONST, new ArrayList<String>());
+		regionsDepths.put(PLANET_CONST, 0);
 		while (!parentRegions.isEmpty()) {
 			List<CountryRegion> children = new ArrayList<>();
 			for (CountryRegion reg : parentRegions) {
@@ -61,11 +62,6 @@ public class GenerateExtractScript {
 						|| !Algorithms.isEmpty(reg.getParent().getSinglePolyExtract()))) {
 					parentExtract = reg.getParent().getDownloadName();
 				}
-				if (reg.getParent().getParent() == null && !PLANET_CONST.equals(reg.getSinglePolyExtract())) {
-					// australia-oceania-all - special case when we extract from subregion
-					parentExtract = PLANET_CONST;
-					boundary = reg.getSinglePolyExtract();
-				}
 				File polygonFile = null;
 				if (boundary != null) {
 					polygonFile = getPolygonFile(polygons, reg, regionFolder, boundary, reg.getDownloadName());
@@ -79,23 +75,26 @@ public class GenerateExtractScript {
 					System.err.println("WARN: Parent Boundary doesn't exist " + reg.getDownloadName() + " from " + parentExtract);
 					continue;
 				}
-				writeToFile(regionFolder, ".depth", depth + "");
 				if (reg.hasMapFiles()) {
 					writeToFile(regionFolder, ".map", "1");
 				}
 				if (reg.getParent() != null) {
 					writeToFile(regionFolder, ".parent", parentExtract);
 				}
-				System.out.println(reg.getDownloadName() + " - extract from " + parentExtract + " " + depth);
 				existingParentRegions.get(parentExtract).add(reg.getDownloadName());
 				existingParentRegions.put(reg.getDownloadName(), new ArrayList<String>());
+				int depth = regionsDepths.get(parentExtract) + 1;
+				regionsDepths.put(reg.getDownloadName(), depth);
+				System.out.println(reg.getDownloadName() + " - extract from " + parentExtract + " " + depth);
+				writeToFile(regionFolder, ".depth", depth + "");
 			}
-			depth++;
 			parentRegions = children;
 		}
 		
 		for (String file : existingParentRegions.keySet()) {
+			File regionFolder = file.equals(PLANET_CONST) ? new File(location) : new File(location, file);
 			List<String> children = existingParentRegions.get(file);
+			
 			if (children.size() > 0) {
 				StringBuilder bld = new StringBuilder();
 				for (String child : children) {
@@ -114,8 +113,7 @@ public class GenerateExtractScript {
 					bld.append("\n     }");
 				}
 				bld.append("\n}");
-				System.out.println("Extract " + children.size() + " files from " + file);
-				File regionFolder = file.equals(PLANET_CONST) ? new File(location) : new File(location, file);
+				System.out.println("Extract " + children.size() + " files from " + file );
 				writeToFile(regionFolder, "extract.json", bld.toString());
 			}
 		}
