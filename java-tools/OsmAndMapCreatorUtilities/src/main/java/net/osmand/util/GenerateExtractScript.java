@@ -15,6 +15,7 @@ import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 public class GenerateExtractScript {
 
 	private static final String PLANET_CONST = "planet";
+	private static final int MAXIMUM_OSMIUM_SPLIT = 20;
 
 	public static void main(String[] args) throws IOException, XmlPullParserException {
 		String location = "/Users/victorshcherb/osmand/temp/osmconvert/";
@@ -75,49 +76,82 @@ public class GenerateExtractScript {
 					System.err.println("WARN: Parent Boundary doesn't exist " + reg.getDownloadName() + " from " + parentExtract);
 					continue;
 				}
-				if (reg.hasMapFiles()) {
-					writeToFile(regionFolder, ".map", "1");
-				}
-				if (reg.getParent() != null) {
-					writeToFile(regionFolder, ".parent", parentExtract);
-				}
+				
 				existingParentRegions.get(parentExtract).add(reg.getDownloadName());
 				existingParentRegions.put(reg.getDownloadName(), new ArrayList<String>());
 				int depth = regionsDepths.get(parentExtract) + 1;
 				regionsDepths.put(reg.getDownloadName(), depth);
+				
 				System.out.println(reg.getDownloadName() + " - extract from " + parentExtract + " " + depth);
 				writeToFile(regionFolder, ".depth", depth + "");
+				if (reg.hasMapFiles()) {
+					writeToFile(regionFolder, ".map", "1");
+				} else {
+					new File(regionFolder, ".map").delete();
+				}
+				writeToFile(regionFolder, ".parent", parentExtract);
+				
 			}
 			parentRegions = children;
 		}
 		
-		for (String file : existingParentRegions.keySet()) {
-			File regionFolder = file.equals(PLANET_CONST) ? new File(location) : new File(location, file);
-			List<String> children = existingParentRegions.get(file);
-			
+		for (String parentRegion : existingParentRegions.keySet()) {
+			List<String> children = existingParentRegions.get(parentRegion);
+			File regionFolder = parentRegion.equals(PLANET_CONST) ? new File(location) : new File(location, parentRegion);
+			// delete older files
+			for (int k = 0; k < 10; k++) {
+				new File(regionFolder, getExtractFileByIndex(k)).delete();
+			}
 			if (children.size() > 0) {
-				StringBuilder bld = new StringBuilder();
-				for (String child : children) {
-					if (bld.length() == 0) {
-						bld.append("{").append("\n");
-						bld.append("\n  ").append(String.format(" \"directory\": \"%s\", ", location));
-						bld.append("\n  ").append(String.format(" \"extracts\": [ \n", location));
-					} else {
-						bld.append(",").append("\n");
+				int indExtract = 0;
+				List<String> sublist = new ArrayList<String>();
+				int buckets = children.size() / MAXIMUM_OSMIUM_SPLIT
+						+ (children.size() % MAXIMUM_OSMIUM_SPLIT == 0 ? 0 : 1);
+				int optimalSize = children.size() / buckets + (children.size() % buckets == 0 ? 0 : 1);
+				for (String c : children) {
+					sublist.add(c);
+					if (sublist.size() == optimalSize) {
+						generateOsmiumExtract(location, parentRegion, children, regionFolder, indExtract++);
+						sublist.clear();
 					}
-					bld.append("     {");
-					bld.append("\n        ")
-							.append(String.format("\"output\": \"%s\", ", child + "/" + child + ".pbf"));
-					bld.append("\n        ")
-							.append(String.format("\"polygon\": { \"file_name\" : \"%s\" } ", 
-									new File(location).getAbsolutePath() + "/" + child + "/" + child + ".poly"));
-					bld.append("\n     }");
 				}
-				bld.append("\n]}");
-				System.out.println("Extract " + children.size() + " files from " + file );
-				writeToFile(regionFolder, "extract.json", bld.toString());
+				if (sublist.size() > 0) {
+					generateOsmiumExtract(location, parentRegion, children, regionFolder, indExtract++);
+				}
 			}
 		}
+	}
+	
+	private String getExtractFileByIndex(int ind) {
+		if (ind == 0) {
+			return "extract.json";
+		}
+		return "extract_" + (ind + 1) + ".json";
+	}
+
+	private void generateOsmiumExtract(String location, String parentRegion, List<String> children, File regionFolder,
+			int ind) throws IOException {
+		String extractFile = getExtractFileByIndex(ind);
+		StringBuilder bld = new StringBuilder();
+		for (String child : children) {
+			if (bld.length() == 0) {
+				bld.append("{").append("\n");
+				bld.append("\n  ").append(String.format(" \"directory\": \"%s\", ", location));
+				bld.append("\n  ").append(String.format(" \"extracts\": [ \n", location));
+			} else {
+				bld.append(",").append("\n");
+			}
+			bld.append("     {");
+			bld.append("\n        ")
+					.append(String.format("\"output\": \"%s\", ", child + "/" + child + ".pbf"));
+			bld.append("\n        ")
+					.append(String.format("\"polygon\": { \"file_name\" : \"%s\" } ", 
+							new File(location).getAbsolutePath() + "/" + child + "/" + child + ".poly"));
+			bld.append("\n     }");
+		}
+		bld.append("\n]}");
+		System.out.println("Extract " + children.size() + " files from " + parentRegion + " " + extractFile);
+		writeToFile(regionFolder, extractFile, bld.toString());
 	}
 
 	private void writeToFile(File countryFolder, String fn, String cont) throws IOException {
