@@ -111,12 +111,12 @@ public class GenerateExtractScript {
 				for (String c : children) {
 					sublist.add(c);
 					if (sublist.size() == optimalSize) {
-						generateOsmiumExtract(location, parentRegion, children, regionFolder, indExtract++);
+						generateOsmiumExtract(location, parentRegion, sublist, regionFolder, indExtract++);
 						sublist.clear();
 					}
 				}
 				if (sublist.size() > 0) {
-					generateOsmiumExtract(location, parentRegion, children, regionFolder, indExtract++);
+					generateOsmiumExtract(location, parentRegion, sublist, regionFolder, indExtract++);
 				}
 			}
 		}
