@@ -37,6 +37,10 @@ public class ImproveRoadConnectivity {
 	private static final boolean TRACE = false;
 	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
 	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
+	
+	private final static int ZOOM_SCAN_DANGLING_ROADS = 15;
+	private final static double DISTANCE_TO_SEARCH_ROUTE_FROM_DANGLING_POINT = 500;
+	private final static int ZOOM_SEARCH_ROUTES_DANGLING_ROADS = 14;
 
 	public static void main(String[] args) throws IOException {
 		ConsoleProgressImplementation.deltaTimeToPrintMax = 10000;
@@ -137,8 +141,16 @@ public class ImproveRoadConnectivity {
 		}
 		cpi.startTask("Start found roads in Normal routing for added to Base routing: ", pointsToCheck.size());
 		TLongObjectIterator<RouteDataObject> itn = pointsToCheck.iterator();
+		int isolatedPoints = 0;
+		int pointsNearbyIsolatedPoints = 0;
+		int pointsToCheckShortRoutes = 0;
+		int shorterRoutesFound = 0;
 		while (itn.hasNext()) {
-			cpi.progress(1);
+			if (cpi.progressAndPrint(1)) {
+				log.info(String.format("Isolated points %d -> nearby points %d -> search shorter routes %d -> found routes %d", isolatedPoints, pointsNearbyIsolatedPoints,
+						pointsToCheckShortRoutes, shorterRoutesFound));
+			}
+			isolatedPoints++;
 			itn.advance();
 			long point = itn.key();
 			RouteDataObject rdo = itn.value();
@@ -149,14 +161,16 @@ public class ImproveRoadConnectivity {
 					RouteCalculationMode.NORMAL);
 
 			if (USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
-				TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(all,
-						point, baseCtx);
+				TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(rdo,
+						baseCtx);
 				if (!neighboringPoints.isEmpty()) {
-					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(all, baseCtx,
-							point, neighboringPoints);
+					pointsNearbyIsolatedPoints += neighboringPoints.size();
+					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(rdo, baseCtx, neighboringPoints);
 					if (disconnectedPoints != null && !disconnectedPoints.isEmpty()) {
+						pointsToCheckShortRoutes += disconnectedPoints.size();
 						List<RouteDataObject> result = findConnectedRoads(ctx, rdo, isBeginPoint, disconnectedPoints);
 						if (!result.isEmpty()) {
+							shorterRoutesFound += result.size();
 							for (RouteDataObject obj : result) {
 								if (!toAdd.contains(obj.id)) {
 									toAdd.put(obj.id, obj);
@@ -211,62 +225,64 @@ public class ImproveRoadConnectivity {
 		return toAdd;
 	}
     
-    private TLongObjectHashMap<List<RouteDataObject>> getPointsForFindDisconnectedRoads(TLongObjectHashMap<List<RouteDataObject>> allBaseIntersections,
-                                                                                        long startPointId, RoutingContext ctx) {
+    private TLongObjectHashMap<List<RouteDataObject>> getPointsForFindDisconnectedRoads(RouteDataObject startRdo, RoutingContext baseCtx) {
         TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = new TLongObjectHashMap<>();
-        RouteDataObject startRdo = allBaseIntersections.get(startPointId).get(0);
-		
-        ArrayList<RouteDataObject> roadsForCheck = new ArrayList<>();
 		
 		//get all road from tile 14 zoom (tileDistanceWidth = 2000m)
-	    ctx.loadTileData(startRdo.getPoint31XTile(0), startRdo.getPoint31YTile(0), 14, roadsForCheck);
+        List<RouteDataObject> roadsForCheck = loadTile(baseCtx, 
+        		startRdo.getPoint31XTile(0), startRdo.getPoint31YTile(0), ZOOM_SCAN_DANGLING_ROADS);
         
         for (RouteDataObject rdo : roadsForCheck) {
-	        double distStart = MapUtils.getDistance(MapUtils.get31LatitudeY(rdo.pointsY[0]),
-			        MapUtils.get31LongitudeX(rdo.pointsX[0]),
-			        MapUtils.get31LatitudeY(startRdo.pointsY[0]),
-			        MapUtils.get31LongitudeX(startRdo.pointsX[0]));
-	        double distEnd = MapUtils.getDistance(MapUtils.get31LatitudeY(rdo.pointsY[rdo.pointsY.length - 1]),
-			        MapUtils.get31LongitudeX(rdo.pointsX[rdo.pointsY.length - 1]),
-			        MapUtils.get31LatitudeY(startRdo.pointsY[startRdo.pointsY.length - 1]),
-			        MapUtils.get31LongitudeX(startRdo.pointsX[startRdo.pointsY.length - 1]));
-	        if (distStart < 500 || distEnd < 500) {
+        	double distStart = MapUtils.squareRootDist31(rdo.pointsX[0], rdo.pointsY[0], startRdo.pointsX[0], startRdo.pointsY[0]);
+        	double distEnd = MapUtils.squareRootDist31(rdo.pointsX[rdo.getPointsLength() - 1], rdo.pointsY[rdo.getPointsLength() - 1], 
+        			startRdo.pointsX[startRdo.getPointsLength() - 1], startRdo.pointsY[startRdo.getPointsLength() - 1]);
+	        if (distStart < DISTANCE_TO_SEARCH_ROUTE_FROM_DANGLING_POINT || distEnd < DISTANCE_TO_SEARCH_ROUTE_FROM_DANGLING_POINT) {
 		        addPoint(neighboringPoints, rdo, calcPointId(rdo, 0));
 		        addPoint(neighboringPoints, rdo, calcPointId(rdo, rdo.getPointsLength() - 1));
 	        }
         }
         return neighboringPoints;
     }
+
+	private List<RouteDataObject> loadTile(RoutingContext ctx, int x, int y, int zoom) {
+        List<RouteDataObject> roadsForCheck = new ArrayList<>();
+        // tile width of zoom on 31 scale
+		int tile = 1 << (31 - zoom);
+        // tile of previous zoom
+        int tilex = x >> (31 - zoom - 1);
+        int tiley = x >> (31 - zoom - 1);
+        int nbx = x + (tilex % 2 == 1 ? tile : -tile);
+        int nby = y + (tiley % 2 == 1 ? tile : -tile);
+	    ctx.loadTileData(x, y, zoom, roadsForCheck);
+	    ctx.loadTileData(nbx, y, zoom, roadsForCheck);
+	    ctx.loadTileData(x, nby, zoom, roadsForCheck);
+	    ctx.loadTileData(nbx, y, zoom, roadsForCheck);
+	    
+	    // TO CHECK
+	    int opx = x - (tilex % 2 == 1 ? tile : -tile);
+        int opy = y - (tiley % 2 == 1 ? tile : -tile);
+		System.out.println(String.format("X: %d, tile %d, neighbor  tile %d, opposite tile %d", x, x >> (31 - zoom),
+				nbx >> (31 - zoom), opx >> (31 - zoom)));
+		System.out.println(String.format("Y: %d, tile %d, neighbor  tile %d, opposite tile %d", y, y >> (31 - zoom),
+				nby >> (31 - zoom), opy >> (31 - zoom)));
+		System.out.println(String.format("Distance %.2f < %.2f!", MapUtils.squareRootDist31(x, y, nbx, nby),
+				MapUtils.squareRootDist31(x, y, opx, opy)));
+	    return roadsForCheck;
+	}
     
-    private TLongObjectHashMap<List<RouteDataObject>> findDisconnectedBasePoints(TLongObjectHashMap<List<RouteDataObject>> allBaseIntersections,
-                                                                                 RoutingContext baseCtx, long pointId,
-                                                                                 TLongObjectHashMap<List<RouteDataObject>> neighboringPoints) {
+    private TLongObjectHashMap<List<RouteDataObject>> findDisconnectedBasePoints(RouteDataObject startRdo, RoutingContext baseCtx, TLongObjectHashMap<List<RouteDataObject>> neighboringPoints) {
         TLongObjectHashMap<List<RouteDataObject>> result = new TLongObjectHashMap<>();
         VehicleRouter router = baseCtx.getRouter();
         Map<Long, Double> distFromStarts = new HashMap<>();
-	
-	    ArrayList<RouteDataObject> roadsForCheck = new ArrayList<>();
-	    RouteDataObject startRdo = allBaseIntersections.get(pointId).get(0);
 		
-		int currentLat = startRdo.getPoint31XTile(0);
-	    int currentLon = startRdo.getPoint31YTile(0);
-		int newLat = MapUtils.get31TileNumberX(MapUtils.get31LongitudeX(currentLat) + 2000/6378137 * 180/Math.PI);
-	    int newLon = MapUtils.get31TileNumberY(MapUtils.get31LatitudeY(currentLon) + 2000/
-			    (6378137*Math.cos(Math.PI*MapUtils.get31LatitudeY(currentLon)/180)) * 180/Math.PI) ;
-
-	    baseCtx.loadTileData(newLat, currentLon, 14, roadsForCheck);
-	    baseCtx.loadTileData(newLat, currentLon, 14, roadsForCheck);
-	    baseCtx.loadTileData(currentLat, newLon, 14, roadsForCheck);
-	    baseCtx.loadTileData(currentLat, newLon, 14, roadsForCheck);
-		
-	    //baseCtx.loadTileData(startRdo.getPoint31XTile(0), startRdo.getPoint31YTile(0), 13, roadsForCheck);
-	
+	    List<RouteDataObject> roadsForCheck = loadTile(baseCtx, startRdo.getPoint31XTile(0), startRdo.getPoint31YTile(0), ZOOM_SEARCH_ROUTES_DANGLING_ROADS);
 	    TLongObjectHashMap<List<RouteDataObject>> allPoints = new TLongObjectHashMap<>();
 	    for (RouteDataObject rdo : roadsForCheck) {
 		    addPoint(allPoints, rdo, calcPointId(rdo, 0));
 		    addPoint(allPoints, rdo, calcPointId(rdo, rdo.getPointsLength() - 1));
 	    }
 	
+	    long pointId = calcPointId(startRdo, 0);
 	    for (long id : allPoints.keys()) {
 		    if (id == pointId) {
 			    distFromStarts.put(id, 0.0);

@@ -53,18 +53,23 @@ public class ConsoleProgressImplementation implements IProgress {
 		this.currentDone += deltaWork;
 		printIfNeeded();
 	}
+	
+	public boolean progressAndPrint(int deltaWork) {
+		this.currentDone += deltaWork;
+		return printIfNeeded();
+	}
 
-	protected  void printIfNeeded() {
+	protected boolean printIfNeeded() {
 		long now = System.currentTimeMillis();
-		if (getCurrentPercent() - lastPercentPrint >= delta || 
-				now - lastTimePrinted  > deltaTimeToPrintMax) {
+		if (getCurrentPercent() - lastPercentPrint >= delta || now - lastTimePrinted > deltaTimeToPrintMax) {
 			this.lastPercentPrint = getCurrentPercent();
-			if(now - lastTimePrinted >= deltaTimeToPrint){
-				log.info(getPrintMessage()); //$NON-NLS-1$
+			if (now - lastTimePrinted >= deltaTimeToPrint) {
+				log.info(getPrintMessage()); // $NON-NLS-1$
 				lastTimePrinted = now;
+				return true;
 			}
-
 		}
+		return false;
 	}
 
 	protected String getPrintMessage() {
