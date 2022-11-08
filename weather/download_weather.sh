@@ -52,8 +52,9 @@ clean_temp_files_on_finish() {
         rm -rf $DOWNLOAD_FOLDER/* || true
     fi
     # Delete outdated tiff files if needed
-    find . -type f -mmin +${MINUTES_TO_KEEP_TIFF_FILES} -delete
-    find . -type d -empty -delete 
+    sleep 5
+    find . -type f -mmin +${MINUTES_TO_KEEP_TIFF_FILES} -delete  || echo "Error: Temp file is already deleted"
+    find . -type d -empty -delete  || echo "Error: Temp file is already deleted"
 }
 
 
