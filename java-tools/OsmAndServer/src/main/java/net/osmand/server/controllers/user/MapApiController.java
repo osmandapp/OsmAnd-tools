@@ -16,7 +16,6 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.gson.GsonBuilder;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
@@ -94,8 +93,6 @@ public class MapApiController {
 	
 	
 	Gson gson = new Gson();
-	
-	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
 	public static class UserPasswordPost {
 		public String username;
@@ -252,12 +249,7 @@ public class MapApiController {
 							if (gpxFile != null) {
 								analysis = getAnalysis(uf, gpxFile);
 								if (gpxFile.metadata != null) {
-									try {
-										uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
-									} catch (IllegalArgumentException e) {
-										LOGGER.warn(nd.name);
-										uf.details.add(METADATA, gsonWithNans.toJsonTree(gpxFile.metadata));
-									}
+									uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
 								}
 							}
 						}
@@ -276,21 +268,7 @@ public class MapApiController {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
 			}
 		}
-		String resJson;
-		try {
-			resJson = gson.toJson(res);
-		} catch (IllegalArgumentException e) {
-			LOGGER.warn(e);
-			for (UserFileNoData nd : res.uniqueFiles) {
-				try {
-					gson.toJson(nd);
-				} catch (IllegalArgumentException i) {
-					LOGGER.warn(nd.name);
-				}
-			}
-			resJson = gsonWithNans.toJson(res);
-		}
-		return ResponseEntity.ok(resJson);
+		return ResponseEntity.ok(gson.toJson(res));
 	}
 
 	private boolean analysisPresent(String tag, UserFile userFile) {
