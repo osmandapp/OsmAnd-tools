@@ -49,7 +49,9 @@ public class ImproveRoadConnectivity {
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
 		//File fl = new File("/Users/plotva/work/osmand/maps/Denmark_central-region_europe_2.obf");
 		//File fl = new File("/Users/plotva/osmand/China_henan_asia.obf");
-		File fl = new File("/Users/plotva/work/osmand/maps/Newtestv3.obf");
+//		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
+		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
+		
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 		System.out.println("Found roads: " + map.size());
@@ -149,10 +151,12 @@ public class ImproveRoadConnectivity {
 		int pointsNearbyIsolatedPoints = 0;
 		int pointsToCheckShortRoutes = 0;
 		int shorterRoutesFound = 0;
+		int[] visitedPoints = new int[1];
 		while (itn.hasNext()) {
 			if (cpi.progressAndPrint(1)) {
-				log.info(String.format("Isolated points %d -> nearby points %d -> search shorter routes %d -> found routes %d", isolatedPoints, pointsNearbyIsolatedPoints,
-						pointsToCheckShortRoutes, shorterRoutesFound));
+				log.info(String.format("Isolated points %d -> nearby points %d (scan %d segments) -> points no base routes %d -> found routes %d", 
+						isolatedPoints, pointsNearbyIsolatedPoints, visitedPoints[0], pointsToCheckShortRoutes,
+						shorterRoutesFound));
 			}
 			isolatedPoints++;
 			itn.advance();
@@ -169,7 +173,8 @@ public class ImproveRoadConnectivity {
 						baseCtx);
 				if (!neighboringPoints.isEmpty()) {
 					pointsNearbyIsolatedPoints += neighboringPoints.size();
-					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(rdo, baseCtx, neighboringPoints);
+					
+					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(rdo, baseCtx, neighboringPoints, visitedPoints);
 					if (disconnectedPoints != null && !disconnectedPoints.isEmpty()) {
 						if (TRACE_IMPROVE) {
 							System.out.println("Start road= " + rdo);
@@ -284,7 +289,8 @@ public class ImproveRoadConnectivity {
 	    return roadsForCheck;
 	}
     
-    private TLongObjectHashMap<List<RouteDataObject>> findDisconnectedBasePoints(RouteDataObject startRdo, RoutingContext baseCtx, TLongObjectHashMap<List<RouteDataObject>> neighboringPoints) {
+    private TLongObjectHashMap<List<RouteDataObject>> findDisconnectedBasePoints(RouteDataObject startRdo, RoutingContext baseCtx,
+    		TLongObjectHashMap<List<RouteDataObject>> neighboringPoints, int[] visitedPoints) {
         TLongObjectHashMap<List<RouteDataObject>> result = new TLongObjectHashMap<>();
         VehicleRouter router = baseCtx.getRouter();
         Map<Long, Double> distFromStarts = new HashMap<>();
@@ -332,6 +338,7 @@ public class ImproveRoadConnectivity {
 			
             Point point = queue.poll();
             visited.add(point.pointId);
+            visitedPoints[0]++;
 			if (neighboringPoints.contains(point.pointId)) {
 				visitedNeighboringPoints.add(point.pointId);
 			}
