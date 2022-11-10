@@ -281,6 +281,13 @@ public class MapApiController {
 			resJson = gson.toJson(res);
 		} catch (IllegalArgumentException e) {
 			LOGGER.warn(e);
+			for (UserFileNoData nd : res.uniqueFiles) {
+				try {
+					gson.toJson(nd);
+				} catch (IllegalArgumentException i) {
+					LOGGER.warn(nd.name);
+				}
+			}
 			resJson = gsonWithNans.toJson(res);
 		}
 		return ResponseEntity.ok(resJson);
