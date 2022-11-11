@@ -284,14 +284,15 @@ public class WebGpxParser {
                 if (t.points.get(0).geometry != null) {
                     GPXUtilities.Route route = new GPXUtilities.Route();
                     List<Point> trkPoints = new ArrayList<>();
+                    int allPoints = 0;
                     for (int i = 0; i < t.points.size(); i++) {
                         Point point = t.points.get(i);
                         GPXUtilities.WptPt routePoint = point.ext;
                         routePoint.lat = point.lat;
                         routePoint.lon = point.lng;
                         routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
-                        int index = point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;
-                        routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(index));
+                        allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;
+                        routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
                         route.points.add(routePoint);
                         trkPoints.addAll(point.geometry);
                     }
