@@ -34,15 +34,22 @@ import org.apache.commons.logging.Log;
 // 2.5 If roads were found, we remove base roads duplicates from result and return.
 
 public class ImproveRoadConnectivity {
-	private static final boolean TRACE = false;
+
+	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
+	
 	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
+	private static final String ROUTING_PROFILE = "car";
+	private static final int DEFAULT_MEMORY_LIMIT = 4000;
+	
+	private static final boolean TRACE = false;
 	private static final boolean TRACE_IMPROVE = false;
 	private static final boolean TRACE_TILES = false;
-	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
+	
 	
 	private static final int ZOOM_SCAN_DANGLING_ROADS = 16;
 	private static final double DISTANCE_TO_SEARCH_ROUTE_FROM_DANGLING_POINT = 500;
 	private static final int ZOOM_SEARCH_ROUTES_DANGLING_ROADS = 13;
+	
 
 	public static void main(String[] args) throws IOException {
 		ConsoleProgressImplementation.deltaTimeToPrintMax = 2000;
@@ -71,10 +78,9 @@ public class ImproveRoadConnectivity {
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(
-				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT,
 				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		RoutingConfiguration config = builder.build("car", memoryLimit);
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit);
 		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
 				RouteCalculationMode.BASE);
 		if (reader.getRoutingIndexes().size() != 1) {
@@ -128,8 +134,9 @@ public class ImproveRoadConnectivity {
 			TLongObjectHashMap<List<RouteDataObject>> all,
 			BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(4000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", memoryLimit);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT,
+				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build(ROUTING_PROFILE, memoryLimit);
 
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
 		TLongHashSet beginIsolated = new TLongHashSet();
