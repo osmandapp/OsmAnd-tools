@@ -55,8 +55,8 @@ public class ImproveRoadConnectivity {
 		ConsoleProgressImplementation.deltaTimeToPrintMax = 2000;
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
 		//File fl = new File("/Users/plotva/work/osmand/maps/Denmark_central-region_europe_2.obf");
-		//File fl = new File("/Users/plotva/osmand/China_henan_asia.obf");
-		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
+		File fl = new File("/Users/plotva/osmand/China_henan_asia.obf");
+		//File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
 //		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
 		
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -137,6 +137,11 @@ public class ImproveRoadConnectivity {
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT,
 				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build(ROUTING_PROFILE, memoryLimit);
+		ImproveRoadsContext ctx = new ImproveRoadsContext();
+		ctx.baseCtx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
+				RouteCalculationMode.BASE);
+		ctx.normalCtx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
+				RouteCalculationMode.NORMAL);
 
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
 		TLongHashSet beginIsolated = new TLongHashSet();
@@ -151,13 +156,12 @@ public class ImproveRoadConnectivity {
 			}
 
 		}
+		
+		//create map with areas connectivity of a graph
+		Map<Long,TLongHashSet> mapWithAreasConnectivity = getAreasConnectivity(mapOfObjectToCheck, pointsToCheck, ctx);
+		
 		cpi.startTask("Start found roads in Normal routing for added to Base routing: ", pointsToCheck.size());
 		TLongObjectIterator<RouteDataObject> itn = pointsToCheck.iterator();
-		ImproveRoadsContext ctx = new ImproveRoadsContext();
-		ctx.baseCtx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
-				RouteCalculationMode.BASE);
-		ctx.normalCtx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
-				RouteCalculationMode.NORMAL);
 		
 		while (itn.hasNext()) {
 			if (cpi.progressAndPrint(1)) {
@@ -239,6 +243,51 @@ public class ImproveRoadConnectivity {
 		}
 		
 		return toAdd;
+	}
+	
+	private Map<Long, TLongHashSet> getAreasConnectivity(TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
+	                                                     TLongObjectHashMap<RouteDataObject> pointsToCheck,
+	                                                     ImproveRoadsContext ctx) {
+		Map<Long, TLongHashSet> resMap = new HashMap<>();
+		PriorityQueue<Point> queue = new PriorityQueue<>(mapOfObjectToCheck.keys().length, new Point());
+		TLongObjectHashMap<List<RouteDataObject>> allPoints = new TLongObjectHashMap<>();
+		
+		for (Object o : mapOfObjectToCheck.values()) {
+			List<RouteDataObject> rdos = (List<RouteDataObject>) o;
+			for (RouteDataObject rdo : rdos) {
+				for (int i = 0; i < rdo.getPointsLength(); i++) {
+					addPoint(allPoints, rdo, calcPointId(rdo, i));
+				}
+			}
+		}
+		
+		for (long pointId : pointsToCheck.keys()) {
+			if (!resMap.containsKey(pointId) || !hasPoint(resMap, pointId)) {
+				queue.add(new Point(pointId, 0));
+				TLongHashSet visited = new TLongHashSet();
+				while (visited.size() != allPoints.keys().length - 1) {
+					if (queue.isEmpty()) {
+						resMap.put(pointId, visited);
+						allPoints.keySet().removeAll(visited);
+						break;
+					}
+					Point point = queue.poll();
+					visited.add(point.pointId);
+					processNeighboringPoints(point, allPoints, ctx.baseCtx.getRouter(), null, queue, visited);
+				}
+			}
+		}
+		return resMap;
+	}
+	
+	private boolean hasPoint(Map<Long,TLongHashSet> map, long pointId) {
+		for (Map.Entry<Long,TLongHashSet> entry : map.entrySet()) {
+			TLongHashSet visited = entry.getValue();
+			if (visited.contains(pointId)) {
+				return true;
+			}
+		}
+		return false;
 	}
     
     private TLongObjectHashMap<List<RouteDataObject>> getPointsForFindDisconnectedRoads(RouteDataObject startRdo, RoutingContext baseCtx) {
@@ -403,15 +452,18 @@ public class ImproveRoadConnectivity {
 			
 			long foundPointId = calcPointId(segment.getRoad(), ind);
 			if (points.contains(foundPointId) && !visited.contains(foundPointId)) {
-				int endLat = segment.getRoad().getPoint31XTile(ind);
-				int endLon = segment.getRoad().getPoint31YTile(ind);
-				double dist = MapUtils.squareRootDist31(endLat, endLon,
-						startLat, startLon);
-				if (dist < distFromStarts.get(foundPointId)) {
-					distFromStarts.replace(calcPointId(segment.getRoad(), ind), dist);
+				if (distFromStarts != null) {
+					int endLat = segment.getRoad().getPoint31XTile(ind);
+					int endLon = segment.getRoad().getPoint31YTile(ind);
+					double dist = MapUtils.squareRootDist31(endLat, endLon,
+							startLat, startLon);
+					if (dist < distFromStarts.get(foundPointId)) {
+						distFromStarts.replace(calcPointId(segment.getRoad(), ind), dist);
+					}
+					queue.add(new Point(foundPointId, distFromStarts.get(foundPointId)));
+				} else {
+					queue.add(new Point(foundPointId, 0));
 				}
-				
-				queue.add(new Point(foundPointId, distFromStarts.get(foundPointId)));
 				break;
 			}
 		}
