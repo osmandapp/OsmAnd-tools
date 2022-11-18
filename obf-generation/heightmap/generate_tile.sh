@@ -160,13 +160,13 @@ if [[  "$TYPE" == "heightmap" ]]; then
     echo "Slicing..."
     mkdir -p "$WORK_PATH/rawtiles"
     "$SRC_PATH/slicer.py" --size=$TILE_SIZE --driver=GTiff --extension=tif $VERBOSE_PARAM \
-        "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/tiles"
+        "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/rawtiles"
 
     # Step 5. Generate tiles that overlap each other by 1 heixel
     echo "Overlapping..."
     mkdir -p "$WORK_PATH/tiles"
     "$SRC_PATH/overlap.py" --driver=GTiff --driver-options="COMPRESS=LZW" --extension=tif $VERBOSE_PARAM \
-        "$WORK_PATH/tiles" "$WORK_PATH/tiles"
+        "$WORK_PATH/rawtiles" "$WORK_PATH/tiles"
 else
     echo "Calculating base slope..."
     gdaldem slope          -co "COMPRESS=LZW" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_slope.tif"
