@@ -158,7 +158,8 @@ public class ImproveRoadConnectivity {
 		}
 		
 		//create map with areas connectivity of a graph
-		Map<Long,TLongHashSet> mapWithAreasConnectivity = getAreasConnectivity(mapOfObjectToCheck, pointsToCheck, ctx);
+		//Map<Long,TLongHashSet> mapWithAreasConnectivity = getAreasConnectivity(mapOfObjectToCheck, pointsToCheck, ctx);
+		//log.info("mapWithAreasConnectivity size = " + mapWithAreasConnectivity.size());
 		
 		cpi.startTask("Start found roads in Normal routing for added to Base routing: ", pointsToCheck.size());
 		TLongObjectIterator<RouteDataObject> itn = pointsToCheck.iterator();
@@ -262,6 +263,14 @@ public class ImproveRoadConnectivity {
 		}
 		
 		for (long pointId : pointsToCheck.keys()) {
+			Map<Long, Double> distFromStarts = new HashMap<>();
+			for (long id : allPoints.keys()) {
+				if (id == pointId) {
+					distFromStarts.put(id, 0.0);
+				} else {
+					distFromStarts.put(id, Double.MAX_VALUE);
+				}
+			}
 			if (!resMap.containsKey(pointId) || !hasPoint(resMap, pointId)) {
 				queue.add(new Point(pointId, 0));
 				TLongHashSet visited = new TLongHashSet();
@@ -273,7 +282,7 @@ public class ImproveRoadConnectivity {
 					}
 					Point point = queue.poll();
 					visited.add(point.pointId);
-					processNeighboringPoints(point, allPoints, ctx.baseCtx.getRouter(), null, queue, visited);
+					processNeighboringPoints(point, allPoints, ctx.baseCtx.getRouter(), distFromStarts, queue, visited);
 				}
 			}
 		}
@@ -436,6 +445,7 @@ public class ImproveRoadConnectivity {
 	private void findNextPoint(boolean direction, RouteSegment segment, TLongObjectHashMap<List<RouteDataObject>> points, Map<Long, Double> distFromStarts,
 	                           PriorityQueue<Point> queue, TLongHashSet visited) {
 		int ind = segment.getSegmentStart();
+		long startPointId = calcPointId(segment.getRoad(), ind);
 		int startLat = segment.getRoad().getPoint31XTile(segment.getSegmentStart());
 		int startLon = segment.getRoad().getPoint31YTile(segment.getSegmentStart());
 		
@@ -453,14 +463,35 @@ public class ImproveRoadConnectivity {
 			long foundPointId = calcPointId(segment.getRoad(), ind);
 			if (points.contains(foundPointId) && !visited.contains(foundPointId)) {
 				if (distFromStarts != null) {
+					double resDist;
 					int endLat = segment.getRoad().getPoint31XTile(ind);
 					int endLon = segment.getRoad().getPoint31YTile(ind);
 					double dist = MapUtils.squareRootDist31(endLat, endLon,
-							startLat, startLon);
-					if (dist < distFromStarts.get(foundPointId)) {
-						distFromStarts.replace(calcPointId(segment.getRoad(), ind), dist);
+							startLat, startLon) + distFromStarts.get(startPointId);
+					
+					boolean hasAlready = false;
+					for (Point p : queue) {
+						if (p.pointId == foundPointId) {
+							hasAlready = true;
+							if (p.distFromStart > dist) {
+								distFromStarts.replace(p.pointId, dist);
+								queue.remove(p);
+								queue.add(new Point(foundPointId, distFromStarts.get(foundPointId)));
+								break;
+							}
+						}
 					}
-					queue.add(new Point(foundPointId, distFromStarts.get(foundPointId)));
+					
+					
+					if (dist < distFromStarts.get(foundPointId)) {
+						resDist = dist;
+						distFromStarts.replace(calcPointId(segment.getRoad(), ind), dist);
+					} else {
+						resDist = distFromStarts.get(foundPointId);
+					}
+					if (resDist < 20000 && !hasAlready) {
+						queue.add(new Point(foundPointId, distFromStarts.get(foundPointId)));
+					}
 				} else {
 					queue.add(new Point(foundPointId, 0));
 				}
