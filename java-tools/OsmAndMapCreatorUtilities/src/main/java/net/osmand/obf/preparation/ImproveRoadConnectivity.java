@@ -55,8 +55,8 @@ public class ImproveRoadConnectivity {
 		ConsoleProgressImplementation.deltaTimeToPrintMax = 2000;
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
 		//File fl = new File("/Users/plotva/work/osmand/maps/Denmark_central-region_europe_2.obf");
-		File fl = new File("/Users/plotva/osmand/China_henan_asia.obf");
-		//File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
+//		File fl = new File("/Users/plotva/osmand/China_henan_asia.obf");
+		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
 //		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
 		
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -95,7 +95,7 @@ public class ImproveRoadConnectivity {
 		}
 		
 		for (RoutingSubregionTile tile : tiles) {
-			ArrayList<RouteDataObject> dataObjects = new ArrayList<>();
+			List<RouteDataObject> dataObjects = new ArrayList<>();
 			ctx.loadSubregionTile(tile, false, dataObjects, null);
 			for (RouteDataObject o : dataObjects) {
 				registeredRoadIds.add(o.getId());
@@ -151,8 +151,10 @@ public class ImproveRoadConnectivity {
 		TLongObjectIterator<List<RouteDataObject>> it = mapOfObjectToCheck.iterator();
 		while (it.hasNext()) {
 			it.advance();
-			if (it.value().size() == 1) {
-				pointsToCheck.put(it.key(), it.value().get(0));
+			long point = it.key();
+			RouteDataObject rdo = it.value().get(0);
+			if (all.get(point).size() == 1) {
+				pointsToCheck.put(point, rdo);
 			}
 
 		}
@@ -177,8 +179,7 @@ public class ImproveRoadConnectivity {
 			boolean isBeginPoint = calcPointId(rdo, 0) == point;
 			
 			if (USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
-				TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(rdo,
-						ctx.baseCtx);
+				TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(rdo, ctx.baseCtx);
 				if (!neighboringPoints.isEmpty()) {
 					ctx.pointsNearbyIsolatedPoints += neighboringPoints.size();
 					
@@ -190,12 +191,11 @@ public class ImproveRoadConnectivity {
 						}
 						ctx.pointsToCheckShortRoutes += disconnectedPoints.size();
 						List<RouteDataObject> result = findConnectedRoads(ctx.normalCtx, rdo, isBeginPoint, disconnectedPoints);
-						if (!result.isEmpty()) {
-							ctx.shorterRoutesFound += result.size();
-							for (RouteDataObject obj : result) {
-								if (!toAdd.contains(obj.id)) {
-									toAdd.put(obj.id, obj);
-								}
+						for (RouteDataObject obj : result) {
+							if (!registeredIds.contains(obj.id)) {
+								toAdd.put(obj.id, obj);
+								log.debug("Attach road " + obj.toString());
+								ctx.shorterRoutesFound++;
 							}
 						}
 					}
@@ -218,20 +218,7 @@ public class ImproveRoadConnectivity {
 			}
 		}
 		
-		if (USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
-			//remove base roads duplicates from result
-			if (!toAdd.isEmpty()) {
-				List<RouteDataObject> rdos = new ArrayList<>();
-				for (long point : all.keys()) {
-					rdos.addAll(all.get(point));
-				}
-				for (RouteDataObject rdo : rdos) {
-					if (toAdd.contains(rdo.id)) {
-						toAdd.remove(rdo.id);
-					}
-				}
-			}
-		} else {
+		if (!USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
 			int begSize = beginIsolated.size();
 			int endSize = endIsolated.size();
 			beginIsolated.retainAll(endIsolated);
@@ -246,15 +233,14 @@ public class ImproveRoadConnectivity {
 		return toAdd;
 	}
 	
-	private Map<Long, TLongHashSet> getAreasConnectivity(TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
+	protected Map<Long, TLongHashSet> getAreasConnectivity(TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
 	                                                     TLongObjectHashMap<RouteDataObject> pointsToCheck,
 	                                                     ImproveRoadsContext ctx) {
 		Map<Long, TLongHashSet> resMap = new HashMap<>();
 		PriorityQueue<Point> queue = new PriorityQueue<>(mapOfObjectToCheck.keys().length, new Point());
 		TLongObjectHashMap<List<RouteDataObject>> allPoints = new TLongObjectHashMap<>();
 		
-		for (Object o : mapOfObjectToCheck.values()) {
-			List<RouteDataObject> rdos = (List<RouteDataObject>) o;
+		for (List<RouteDataObject> rdos : mapOfObjectToCheck.valueCollection()) {
 			for (RouteDataObject rdo : rdos) {
 				for (int i = 0; i < rdo.getPointsLength(); i++) {
 					addPoint(allPoints, rdo, calcPointId(rdo, i));
