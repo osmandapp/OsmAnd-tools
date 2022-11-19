@@ -1,26 +1,40 @@
 package net.osmand.obf.preparation;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
+
+import org.apache.commons.logging.Log;
+
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
-
-import java.io.*;
-import java.util.*;
-
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.router.*;
+import net.osmand.obf.BinaryInspector;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
+import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.router.RoutingContext;
 import net.osmand.router.RoutingContext.RoutingSubregionTile;
+import net.osmand.router.VehicleRouter;
 import net.osmand.util.MapUtils;
-import org.apache.commons.logging.Log;
 
 
 //This map generation step adds roads to the Base routing to improve it.
@@ -42,8 +56,7 @@ public class ImproveRoadConnectivity {
 	private static final int DEFAULT_MEMORY_LIMIT = 4000;
 	
 	private static final boolean TRACE = false;
-	private static final boolean TRACE_IMPROVE = false;
-	private static final boolean TRACE_TILES = false;
+	private static final boolean TRACE_IMPROVE = true;
 	
 	
 	private static final int ZOOM_SCAN_DANGLING_ROADS = 16;
@@ -56,12 +69,28 @@ public class ImproveRoadConnectivity {
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
 		//File fl = new File("/Users/plotva/work/osmand/maps/Denmark_central-region_europe_2.obf");
 //		File fl = new File("/Users/plotva/osmand/China_henan_asia.obf");
-		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
-//		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
+//		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
+		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
 		
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
+		
+		createOSMFile("/Users/victorshcherb/Desktop/test.osm", map.valueCollection());
+		
 		System.out.println("Found roads: " + map.size());
+	}
+
+	private static void createOSMFile(String fous, Collection<RouteDataObject> values) throws IOException {
+		StringBuilder b = new StringBuilder();
+		FileOutputStream osmOut = new FileOutputStream(fous);
+		osmOut.write(("<?xml version='1.0' encoding='UTF-8'?>\n" + "\n<osm version='0.6'>\n").getBytes());
+		for (RouteDataObject obj : values) {
+			b.setLength(0);
+			BinaryInspector.printOsmRouteDetails(obj, b);
+			osmOut.write(b.toString().getBytes());
+		}
+		osmOut.write("\n</osm>".getBytes());
+		osmOut.close();
 	}
 
 	public TLongObjectHashMap<RouteDataObject> collectDisconnectedRoads(BinaryMapIndexReader reader) throws IOException {
@@ -94,11 +123,16 @@ public class ImproveRoadConnectivity {
 			tiles.addAll(loadTiles);
 		}
 		
+		int pnts = 0;
+		int roads = 0;
 		for (RoutingSubregionTile tile : tiles) {
 			List<RouteDataObject> dataObjects = new ArrayList<>();
 			ctx.loadSubregionTile(tile, false, dataObjects, null);
 			for (RouteDataObject o : dataObjects) {
-				registeredRoadIds.add(o.getId());
+				boolean added = registeredRoadIds.add(o.getId());
+				if (!added) {
+					continue;
+				}
 				int len = o.getPointsLength() - 1;
 				double dist = MapUtils.squareRootDist31(o.getPoint31XTile(0), o.getPoint31YTile(0),
 						o.getPoint31XTile(len), o.getPoint31YTile(len));
@@ -106,6 +140,7 @@ public class ImproveRoadConnectivity {
 				if (shortFerry) {
 					continue;
 				}
+				roads++;
 				boolean link = o.getHighway() != null && (o.getHighway().endsWith("link"));
 				long b = calcPointId(o, 0);
 				long e = calcPointId(o, len);
@@ -114,10 +149,12 @@ public class ImproveRoadConnectivity {
 					addPoint(onlyRoads, o, e);
 				}
 				for (int i = 0; i < o.getPointsLength(); i++) {
+					pnts++;
 					addPoint(all, o, calcPointId(o, i));
 				}
 			}
 		}
+		log.info(String.format("In total %d base points, %d base segments", pnts, roads));
 	}
 
 	private void addPoint(TLongObjectHashMap<List<RouteDataObject>> map, RouteDataObject routeDataObject, long pointId) {
@@ -163,7 +200,7 @@ public class ImproveRoadConnectivity {
 		//Map<Long,TLongHashSet> mapWithAreasConnectivity = getAreasConnectivity(mapOfObjectToCheck, pointsToCheck, ctx);
 		//log.info("mapWithAreasConnectivity size = " + mapWithAreasConnectivity.size());
 		
-		cpi.startTask("Start found roads in Normal routing for added to Base routing: ", pointsToCheck.size());
+		cpi.startTask("Start found roads in Normal routing for added to Base routing", pointsToCheck.size());
 		TLongObjectIterator<RouteDataObject> itn = pointsToCheck.iterator();
 		
 		while (itn.hasNext()) {
@@ -177,7 +214,6 @@ public class ImproveRoadConnectivity {
 			long point = itn.key();
 			RouteDataObject rdo = itn.value();
 			boolean isBeginPoint = calcPointId(rdo, 0) == point;
-			
 			if (USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
 				TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(rdo, ctx.baseCtx);
 				if (!neighboringPoints.isEmpty()) {
@@ -186,15 +222,17 @@ public class ImproveRoadConnectivity {
 					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(ctx, rdo, neighboringPoints);
 					if (disconnectedPoints != null && !disconnectedPoints.isEmpty()) {
 						if (TRACE_IMPROVE) {
-							System.out.println("Start road= " + rdo);
-							System.out.println("End road= " + disconnectedPoints.values()[0]);
+							log.info("Start road= " + rdo);
+							log.info("End roads= " + disconnectedPoints.valueCollection());
 						}
 						ctx.pointsToCheckShortRoutes += disconnectedPoints.size();
 						List<RouteDataObject> result = findConnectedRoads(ctx.normalCtx, rdo, isBeginPoint, disconnectedPoints);
 						for (RouteDataObject obj : result) {
 							if (!registeredIds.contains(obj.id)) {
 								toAdd.put(obj.id, obj);
-								log.debug("Attach road " + obj.toString());
+								if (TRACE_IMPROVE) {
+									log.info("Attach road " + obj.toString());
+								}
 								ctx.shorterRoutesFound++;
 							}
 						}
@@ -317,22 +355,6 @@ public class ImproveRoadConnectivity {
 	    ctx.loadTileData(nbx, y, zoom, roadsForCheck);
 	    ctx.loadTileData(x, nby, zoom, roadsForCheck);
 	    ctx.loadTileData(nbx, nby, zoom, roadsForCheck);
-		
-		if (TRACE_TILES) {
-			int opx = x - (tilex % 2 == 1 ? tile : -tile);
-			int opy = y - (tiley % 2 == 1 ? tile : -tile);
-			System.out.printf("X: %d, tile %d, neighbor  tile %d, opposite tile %d%n", x, x >> (31 - zoom),
-					nbx >> (31 - zoom), opx >> (31 - zoom));
-			System.out.printf("Y: %d, tile %d, neighbor  tile %d, opposite tile %d%n", y, y >> (31 - zoom),
-					nby >> (31 - zoom), opy >> (31 - zoom));
-			System.out.printf("Distance %.2f < %.2f!%n",
-					MapUtils.squareRootDist31(x, y,
-							((nbx >> (31 - zoom)) * 2 + 1) << (30 - zoom),
-							((nby >> (31 - zoom)) * 2 + 1) << (30 - zoom)),
-					MapUtils.squareRootDist31(x, y,
-							((opx >> (31 - zoom)) * 2 + 1) << (30 - zoom),
-							((opy >> (31 - zoom)) * 2 + 1) << (30 - zoom)));
-		}
 	    return roadsForCheck;
 	}
     

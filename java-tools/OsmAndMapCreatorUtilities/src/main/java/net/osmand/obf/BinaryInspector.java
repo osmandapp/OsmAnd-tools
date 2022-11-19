@@ -92,6 +92,7 @@ public class BinaryInspector {
 //					"-latlon=48.46614,9.16976",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 					System.getProperty("maps.dir")+"11_netherlands_noord-holland_europe_2.obf"
+					
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1085,7 +1086,7 @@ public class BinaryInspector {
 
 	private static int OSM_ID = 1;
 
-	private void printOsmRouteDetails(RouteDataObject obj, StringBuilder b) {
+	public static void printOsmRouteDetails(RouteDataObject obj, StringBuilder b) {
 		StringBuilder tags = new StringBuilder();
 		int[] types = obj.getTypes();
 		for (int j = 0; j < types.length; j++) {
@@ -1158,7 +1159,7 @@ public class BinaryInspector {
 		}
 	}
 
-	private String quoteName(String name) {
+	private static String quoteName(String name) {
 		if(name == null || name.length() == 0) {
 			return "EMPTY";
 		}
@@ -1256,7 +1257,7 @@ public class BinaryInspector {
 	}
 
 
-	private long printWay(TLongArrayList ids, StringBuilder b, StringBuilder tags) {
+	private static long printWay(TLongArrayList ids, StringBuilder b, StringBuilder tags) {
 		int id = OSM_ID++;
 		b.append("<way id = '" + id + "' version='1'>\n");
 		if (tags != null) {
