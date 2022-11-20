@@ -17,7 +17,7 @@ storage:
 logging:
   file: logs/server.log
   config: classpath:logback-spring.xml
-  pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{4}"
+  pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{10}"
 
 
 osmand:

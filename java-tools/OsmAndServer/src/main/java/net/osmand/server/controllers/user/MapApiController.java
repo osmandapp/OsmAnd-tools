@@ -37,6 +37,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 
 import net.osmand.GPXUtilities;
@@ -93,6 +94,8 @@ public class MapApiController {
 	
 	
 	Gson gson = new Gson();
+	
+	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
 	public static class UserPasswordPost {
 		public String username;
@@ -359,7 +362,7 @@ public class MapApiController {
 //			analysis.speedData.clear();
 //			analysis.elevationData.clear();
 //		}
-		file.details.add(tag, gson.toJsonTree(analysis));
+		file.details.add(tag, gsonWithNans.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
 	}

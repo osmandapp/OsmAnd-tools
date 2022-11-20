@@ -129,7 +129,7 @@ public class MapPanelSelector {
 			routeKeys = RouteType.getRouteKeys(renderedObject);
 		}
 		for (RouteKey routeKey : routeKeys) {
-			menu.add(new AbstractAction(routeKey.set.toString()) {
+			menu.add(new AbstractAction(routeKey.tags.toString()) {
 				private static final long serialVersionUID = 8970133073749840163L;
 
 				@Override
@@ -139,7 +139,7 @@ public class MapPanelSelector {
 							Map<RouteKey, GPXFile> routes;
 							long tms = System.currentTimeMillis();
 							if (routeMap == null || routeMap.get(routeKey) == null) {
-								System.out.println("Start loading " + routeKey.set);
+								System.out.println("Start loading " + routeKey.tags);
 								if (LOAD_ROUTE_BBOX) {
 									Map<RouteKey, GPXFile> res = routeSelector.getRoutes(latLonBBox, true, routeKey);
 									routes = Collections.singletonMap(routeKey, res.get(routeKey));
