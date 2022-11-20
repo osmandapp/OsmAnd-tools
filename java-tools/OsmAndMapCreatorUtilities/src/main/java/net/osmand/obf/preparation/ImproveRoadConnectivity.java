@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -37,21 +38,13 @@ import net.osmand.router.VehicleRouter;
 import net.osmand.util.MapUtils;
 
 
-//This map generation step adds roads to the Base routing to improve it.
-// NEW_IMPROVE_BASE_ROUTING_ALGORITHM:
-//1. Using the findAllBaseRoadIntersections() we get a map of base points.
-//2. After using the connectMissingBaseRoads() we find all the roads from Normal routing to add to Base routing.
-// 2.1 In this method there is a loop over the base points.
-// 2.2 For each point, the method getPointsForFindDisconnectedRoads() return neighboring points from tile 14 zoom.
-// 2.3 After using method findDisconnectedBasePoints() and using Dijkstra's algorithm, we find all points to which a route hasn't been built.
-// 2.4 For each disconnected point using method findConnectedRoads() (with Dijkstra's algorithm) we find roads from Normal routing to which connected start point with disconnected point.
-// 2.5 If roads were found, we remove base roads duplicates from result and return.
+// This map generation step adds roads to the Base routing to improve roads connectivity
 
 public class ImproveRoadConnectivity {
 
 	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
 	
-	private static int IMPROVE_ROUTING_ALGORITHM_VERSION = 0;
+	private static int IMPROVE_ROUTING_ALGORITHM_VERSION = 2;
 	private static final String ROUTING_PROFILE = "car";
 	private static final int DEFAULT_MEMORY_LIMIT = 4000;
 	
@@ -60,6 +53,7 @@ public class ImproveRoadConnectivity {
 	
 	
 	private static final int ZOOM_SCAN_DANGLING_ROADS = 16;
+	private static final int SEARCH_ROUTES_DANGLING_ROADS = 3;
 	private static final double DISTANCE_TO_SEARCH_ROUTE_FROM_DANGLING_POINT = 500;
 	private static final int ZOOM_SEARCH_ROUTES_DANGLING_ROADS = 13;
 
@@ -72,7 +66,7 @@ public class ImproveRoadConnectivity {
 		File fl = new File(System.getProperty("maps.dir") + "Denmark_central-region_europe_2.obf");
 		
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
+		TLongObjectHashMap<RouteDataObject> map = crc.findJointsForDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 		createOSMFile(System.getProperty("maps.dir") + "/test_" + IMPROVE_ROUTING_ALGORITHM_VERSION + ".osm",
 				map.valueCollection());
 		
@@ -92,33 +86,47 @@ public class ImproveRoadConnectivity {
 		osmOut.close();
 	}
 
-	public TLongObjectHashMap<RouteDataObject> collectDisconnectedRoads(BinaryMapIndexReader reader) throws IOException {
+	public TLongObjectHashMap<RouteDataObject> findJointsForDisconnectedRoads(BinaryMapIndexReader reader) throws IOException {
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		Builder builder = RoutingConfiguration.getDefault();
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit);
+		RoutingContext baseCtx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader }, RouteCalculationMode.BASE);
+		RoutingContext normalCtx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader }, RouteCalculationMode.NORMAL);
+
 		TLongObjectHashMap<List<RouteDataObject>> all = new TLongObjectHashMap<>();
 		TLongObjectHashMap<List<RouteDataObject>> onlyRoads = new TLongObjectHashMap<>();
 		TLongHashSet registeredRoadIds = new TLongHashSet();
-		findAllBaseRoadIntersections(reader, all, onlyRoads, registeredRoadIds);
-		return connectMissingBaseRoads(onlyRoads, all, reader, null, registeredRoadIds);
+		findAllBaseRoadIntersections(baseCtx, all, onlyRoads, registeredRoadIds);
+		if (IMPROVE_ROUTING_ALGORITHM_VERSION == 1 || IMPROVE_ROUTING_ALGORITHM_VERSION == 0) {
+			return connectMissingBaseRoads(onlyRoads, all, baseCtx, normalCtx, registeredRoadIds);
+		} else if (IMPROVE_ROUTING_ALGORITHM_VERSION == 2) {
+			List<RouteDataObject> result = makeAreaDisconnectedPoints(baseCtx, normalCtx, all);
+			TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
+			for (RouteDataObject obj : result) {
+//				if (!registeredIds.contains(obj.id)) {
+					toAdd.put(obj.id, obj);
+//				}
+			}
+			return toAdd;
+		}
+		return new TLongObjectHashMap<>();
+		
 	}
 
-	private void findAllBaseRoadIntersections(BinaryMapIndexReader reader,
+	private void findAllBaseRoadIntersections(RoutingContext baseCtx,
 			TLongObjectHashMap<List<RouteDataObject>> all, TLongObjectHashMap<List<RouteDataObject>> onlyRoads,
 			TLongHashSet registeredRoadIds)
 			throws IOException {
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		Builder builder = RoutingConfiguration.getDefault();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT,
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit);
-		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
-				RouteCalculationMode.BASE);
-		if (reader.getRoutingIndexes().size() != 1) {
+		if (baseCtx.getMaps().length != 1) {
 			throw new UnsupportedOperationException();
 		}
+		BinaryMapIndexReader reader = baseCtx.getMaps()[0];
 		RouteRegion reg = reader.getRoutingIndexes().get(0);
 		List<RouteSubregion> baseSubregions = reg.getBaseSubregions();
 		List<RoutingSubregionTile> tiles = new ArrayList<>();
 		for (RouteSubregion s : baseSubregions) {
-			List<RoutingSubregionTile> loadTiles = ctx.loadAllSubregionTiles(reader, s);
+			List<RoutingSubregionTile> loadTiles = baseCtx.loadAllSubregionTiles(reader, s);
 			tiles.addAll(loadTiles);
 		}
 		
@@ -126,7 +134,7 @@ public class ImproveRoadConnectivity {
 		int roads = 0;
 		for (RoutingSubregionTile tile : tiles) {
 			List<RouteDataObject> dataObjects = new ArrayList<>();
-			ctx.loadSubregionTile(tile, false, dataObjects, null);
+			baseCtx.loadSubregionTile(tile, false, dataObjects, null);
 			for (RouteDataObject o : dataObjects) {
 				boolean added = registeredRoadIds.add(o.getId());
 				if (!added) {
@@ -165,21 +173,13 @@ public class ImproveRoadConnectivity {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	private TLongObjectHashMap<RouteDataObject> connectMissingBaseRoads(
 			TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
 			TLongObjectHashMap<List<RouteDataObject>> all,
-			BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
-		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT,
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build(ROUTING_PROFILE, memoryLimit);
+			RoutingContext baseCtx, RoutingContext normalCtx,  TLongHashSet registeredIds) {
 		ImproveRoadsContext ctx = new ImproveRoadsContext();
-		ctx.baseCtx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
-				RouteCalculationMode.BASE);
-		ctx.normalCtx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
-				RouteCalculationMode.NORMAL);
-
+		ctx.baseCtx = baseCtx;
+		ctx.normalCtx = normalCtx;
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
 		TLongHashSet beginIsolated = new TLongHashSet();
 		TLongHashSet endIsolated = new TLongHashSet();
@@ -234,7 +234,6 @@ public class ImproveRoadConnectivity {
 						}
 					}
 				}
-			} else if (IMPROVE_ROUTING_ALGORITHM_VERSION == 2) {
 			} else if (IMPROVE_ROUTING_ALGORITHM_VERSION == 0) {
 				List<RouteDataObject> result = findConnectedRoadsOld(ctx.normalCtx, rdo, isBeginPoint, all);
 				if (result.isEmpty()) {
@@ -258,9 +257,6 @@ public class ImproveRoadConnectivity {
 			int endSize = endIsolated.size();
 			beginIsolated.retainAll(endIsolated);
 			int intersectionSize = beginIsolated.size();
-			if(setToRemove != null) {
-				setToRemove.addAll(beginIsolated);
-			}
 			log.info("All objects in base file " + mapOfObjectToCheck.size() + " to keep isolated " + (begSize + endSize - 2 * intersectionSize) +
 					" to add " + toAdd.size() + " to remove " + beginIsolated.size());
 		}
@@ -269,6 +265,80 @@ public class ImproveRoadConnectivity {
 	}
 	
 	
+	
+	
+	private List<RouteDataObject> makeAreaDisconnectedPoints(RoutingContext baseCtx, RoutingContext normalCtx, TLongObjectHashMap<List<RouteDataObject>> all) {
+		// get all road from tile 14 zoom (tileDistanceWidth = 2000m)
+		
+		TLongObjectIterator<List<RouteDataObject>> pointsIterator = all.iterator();
+		TLongObjectHashMap<RoadClusterTile> clusterTiles = new TLongObjectHashMap<>();
+		RoadClusterTile clusterTile = new RoadClusterTile();
+		while (pointsIterator.hasNext()) {
+			pointsIterator.advance();
+			long pnt = pointsIterator.key();
+			int tileX = (int) (MapUtils.deinterleaveX(pnt) >> (31 - ZOOM_SCAN_DANGLING_ROADS));
+			int tileY = (int) (MapUtils.deinterleaveY(pnt) >> (31 - ZOOM_SCAN_DANGLING_ROADS));
+			long tileId = MapUtils.interleaveBits(tileX, tileY);
+			if (clusterTile.tileId != tileId) {
+				clusterTile = clusterTiles.get(tileId);
+				if (clusterTile == null) {
+					clusterTile = new RoadClusterTile();
+					clusterTile.tileId = tileId;
+					clusterTile.tileX = tileX;
+					clusterTile.tileY = tileY;
+					clusterTiles.put(tileId, clusterTile);
+				}
+			}
+			
+			for (RouteDataObject o : pointsIterator.value()) {
+				clusterTile.addToCluster(o, all);
+				clusterTile.ownedRoads.put(o.getId(), o);
+			}
+		}
+		// 
+		log.info("Add neighboor tiles to make bigger clusters");
+		
+		for (RoadClusterTile tile1 : clusterTiles.valueCollection()) {
+			for (RoadClusterTile tile2 : clusterTiles.valueCollection()) {
+				if (tile1 != tile2 && Math.abs(tile1.tileX - tile2.tileX) <= SEARCH_ROUTES_DANGLING_ROADS
+						&& Math.abs(tile1.tileY - tile2.tileY) <= SEARCH_ROUTES_DANGLING_ROADS) {
+					for (RouteDataObject o : tile2.ownedRoads.valueCollection()) {
+						tile1.addToCluster(o, all);
+					}
+				}
+			}
+		}
+		log.info("Clean up from non-original tile roads");
+		for (RoadClusterTile tile : clusterTiles.valueCollection()) {
+			Iterator<RoadCluster> it = tile.clusters.iterator();
+			while (it.hasNext()) {
+				RoadCluster cluster = it.next();
+				cluster.removeExcept(tile.ownedRoads);
+				if (cluster.roads.size() == 0) {
+					it.remove();
+				}
+			}
+		}
+		
+		// calculate islands
+		List<RouteDataObject> testResults = new ArrayList<>();
+		for (RoadClusterTile tile : clusterTiles.valueCollection()) {
+			int maxSize = 0;
+			for (RoadCluster c : tile.clusters) {
+				maxSize = Math.max(c.roads.size(), maxSize);
+			}
+			for (RoadCluster c : tile.clusters) {
+				if (c.roads.size() != maxSize) {
+					System.out.println(tile.tileId + " " + c.roads.size() + ": " + c.roads);
+					testResults.addAll(c.roads);
+				}
+			}
+		}
+		return testResults;
+		
+//        return Collections.emptyList();
+    }
+
     private TLongObjectHashMap<List<RouteDataObject>> getPointsForFindDisconnectedRoads(RouteDataObject startRdo, RoutingContext baseCtx) {
         TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = new TLongObjectHashMap<>();
 		
@@ -288,18 +358,18 @@ public class ImproveRoadConnectivity {
         return neighboringPoints;
     }
 
-	private List<RouteDataObject> loadTile(RoutingContext ctx, int x, int y, int zoom) {
+	private List<RouteDataObject> loadTile(RoutingContext ctx, int x31, int y31, int zoom) {
         List<RouteDataObject> roadsForCheck = new ArrayList<>();
         // tile width of zoom on 31 scale
-		int tile = 1 << (31 - zoom);
+		int tileWidth31 = 1 << (31 - zoom);
         // tile of previous zoom
-        int tilex = x >> (31 - zoom - 1);
-        int tiley = y >> (31 - zoom - 1);
-        int nbx = x + (tilex % 2 == 1 ? tile : -tile);
-        int nby = y + (tiley % 2 == 1 ? tile : -tile);
-	    ctx.loadTileData(x, y, zoom, roadsForCheck);
-	    ctx.loadTileData(nbx, y, zoom, roadsForCheck);
-	    ctx.loadTileData(x, nby, zoom, roadsForCheck);
+        int tilex = x31 >> (31 - (zoom + 1));
+        int tiley = y31 >> (31 - (zoom + 1));
+        int nbx = x31 + (tilex % 2 == 1 ? tileWidth31 : -tileWidth31);
+        int nby = y31 + (tiley % 2 == 1 ? tileWidth31 : -tileWidth31);
+	    ctx.loadTileData(x31, y31, zoom, roadsForCheck);
+	    ctx.loadTileData(nbx, y31, zoom, roadsForCheck);
+	    ctx.loadTileData(x31, nby, zoom, roadsForCheck);
 	    ctx.loadTileData(nbx, nby, zoom, roadsForCheck);
 	    return roadsForCheck;
 	}
@@ -637,12 +707,91 @@ public class ImproveRoadConnectivity {
 		
 	}
 
-	private long calcPointId(RouteDataObject rdo, int i) {
-		return ((long)rdo.getPoint31XTile(i) << 31L) + rdo.getPoint31YTile(i);
+	private static long calcPointId(RouteDataObject rdo, int i) {
+		return MapUtils.interleaveBits(rdo.getPoint31XTile(i), rdo.getPoint31YTile(i));
 	}
 
 	private long calcPointIdUnique(RouteDataObject rdo, int i) {
 		return (rdo.getId() << 20L) + i;
 	}
+	
+	
+
+	private static class RoadClusterTile {
+		int tileY;
+		int tileX;
+		long tileId;
+		List<RoadCluster> clusters = new ArrayList<RoadCluster>();
+		TLongObjectHashMap<RouteDataObject> ownedRoads = new TLongObjectHashMap<RouteDataObject>();
+		
+		private void addToCluster(RouteDataObject o, TLongObjectHashMap<List<RouteDataObject>> all) {
+			RoadCluster toJoin = joinCluster(null, o);
+			for (int i = 0; i < o.getPointsLength(); i++) {
+				List<RouteDataObject> others = all.get(calcPointId(o, i));
+				for (RouteDataObject connectedRoad : others) {
+					if (connectedRoad.getId() == o.getId()) {
+						continue;
+					}
+					toJoin = joinCluster(toJoin, connectedRoad);
+				}
+			}
+			if (toJoin == null) {
+				toJoin = new RoadCluster(o);
+				clusters.add(toJoin);
+			} else {
+				toJoin.add(o);
+			}
+		}
+		
+		private RoadCluster joinCluster(RoadCluster toJoin, RouteDataObject connectedRoad) {
+			// could be speed up
+			for (int ic = 0; ic < clusters.size(); ic++) {
+				RoadCluster check = clusters.get(ic);
+				if (check.byId.contains(connectedRoad.getId())) {
+					if (toJoin == null || toJoin == check) {
+						toJoin = check;
+					} else {
+						clusters.remove(ic);
+						toJoin.merge(check);
+					}
+					break;
+				}
+			}
+			return toJoin;
+		}
+	}
+	
+	private static class RoadCluster {
+		
+		List<RouteDataObject> roads = new ArrayList<>();
+		TLongObjectHashMap<RouteDataObject> byId = new TLongObjectHashMap<RouteDataObject>();
+		
+		public RoadCluster(RouteDataObject o) {
+			add(o);
+		}
+		
+		private void removeExcept(TLongObjectHashMap<RouteDataObject> toKeep) {
+			for (RouteDataObject r : new ArrayList<>(roads)) {
+				if (!toKeep.containsKey(r.getId())) {
+					byId.remove(r.getId());
+					roads.remove(r);
+				}
+			}
+		}
+
+		private void add(RouteDataObject o) {
+			if (!byId.containsKey(o.getId())) {
+				byId.put(o.getId(), o);
+				roads.add(o);
+			}
+		}
+
+		public void merge(RoadCluster r) {
+			for (RouteDataObject o : r.roads) {
+				add(o);
+			}
+		}
+	}
+	
 }
 

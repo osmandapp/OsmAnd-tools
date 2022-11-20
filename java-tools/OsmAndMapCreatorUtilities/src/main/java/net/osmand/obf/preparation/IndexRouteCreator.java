@@ -704,7 +704,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				writer.preclose();
 				writer.flush();
 
-				// use file to recalulate tree
+				// use file to recalculate tree
 				raf.seek(0);
 				appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf, fl));
 				// repack
@@ -743,7 +743,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	private void appendMissingRoadsForBaseMap(Connection conn, BinaryMapIndexReader reader) throws IOException, SQLException {
-		TLongObjectHashMap<RouteDataObject> map = new ImproveRoadConnectivity().collectDisconnectedRoads(reader);
+		TLongObjectHashMap<RouteDataObject> map = new ImproveRoadConnectivity().findJointsForDisconnectedRoads(reader);
 		// to add
 		PreparedStatement ps = conn.prepareStatement(COPY_BASE);
 		for(RouteDataObject rdo : map.valueCollection()) {
