@@ -28,6 +28,7 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.BinaryInspector;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
@@ -52,7 +53,7 @@ public class ImproveRoadConnectivity {
 	private static final boolean TRACE_IMPROVE = true;
 	
 	
-	private static final int ZOOM_SCAN_DANGLING_ROADS = 16;
+	private static final int ZOOM_SCAN_DANGLING_ROADS = 13;
 	private static final int SEARCH_ROUTES_DANGLING_ROADS = 3;
 	private static final double DISTANCE_TO_SEARCH_ROUTE_FROM_DANGLING_POINT = 500;
 	private static final int ZOOM_SEARCH_ROUTES_DANGLING_ROADS = 13;
@@ -62,8 +63,8 @@ public class ImproveRoadConnectivity {
 	public static void main(String[] args) throws IOException {
 		ConsoleProgressImplementation.deltaTimeToPrintMax = 2000;
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
-//		File fl = new File(System.getProperty("maps.dir") + China_henan_asia_2.obf");
-		File fl = new File(System.getProperty("maps.dir") + "Denmark_central-region_europe_2.obf");
+//		File fl = new File(System.getProperty("maps.dir") + "China_henan_asia.obf");
+		File fl = new File(System.getProperty("maps.dir") + "Denmark_central-region_europe.obf");
 		
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.findJointsForDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
@@ -323,21 +324,66 @@ public class ImproveRoadConnectivity {
 		// calculate islands
 		List<RouteDataObject> testResults = new ArrayList<>();
 		for (RoadClusterTile tile : clusterTiles.valueCollection()) {
-			int maxSize = 0;
-			for (RoadCluster c : tile.clusters) {
-				maxSize = Math.max(c.roads.size(), maxSize);
+			if(tile.clusters.size() <= 1) {
+				// all roads connected
+				continue;
+				
 			}
-			for (RoadCluster c : tile.clusters) {
-				if (c.roads.size() != maxSize) {
-					System.out.println(tile.tileId + " " + c.roads.size() + ": " + c.roads);
-					testResults.addAll(c.roads);
+			// sort clusters by size desc
+			Collections.sort(tile.clusters, new Comparator<RoadCluster>() {
+				@Override
+				public int compare(RoadCluster o1, RoadCluster o2) {
+					return -Integer.compare(o1.roads.size(), o2.roads.size());
 				}
+			});
+			RoadCluster mainCluster = tile.clusters.get(0);
+			for (int i = 1; i < tile.clusters.size(); i++) {
+				RoadCluster c = tile.clusters.get(i);
+				System.out.println(tile.tileId + " " + c.roads.size() + ": " + c.roads);
+//				testResults.addAll(c.roads);
+				RouteDataObject anyRoad = c.roads.get(0);
+				testResults.add(anyRoad);
+				testResults.add(addStraightLine(anyRoad, mainCluster.roads));
 			}
 		}
 		return testResults;
 		
 //        return Collections.emptyList();
     }
+	
+	private static long ID = 1000;
+
+	private RouteDataObject addStraightLine(RouteDataObject a, List<RouteDataObject> roads) {
+		RouteRegion reg = new RouteRegion();
+		reg.initRouteEncodingRule(0, "highway", "service");
+		RouteDataObject targetRoad = null;
+		RouteDataObject rdo = new RouteDataObject(reg);
+		int mini = 0, minj = 0; 
+		double minDist = Double.POSITIVE_INFINITY;
+		for (RouteDataObject road : roads) {
+			if (targetRoad == null) {
+				targetRoad = road;
+			}
+			for (int i = 0; i < a.pointsX.length; i++) {
+				for (int j = 0; j < road.pointsX.length; j++) {
+					double dist = MapUtils.squareRootDist31(a.pointsX[i], a.pointsY[i], road.pointsX[j],
+							road.pointsY[j]);
+					if(minDist > dist) {
+						minDist = dist;
+						targetRoad = road;
+						mini = i;
+						minj = j;
+					}
+				}
+			}
+		}
+
+		rdo.pointsX = new int[] { a.pointsX[mini], targetRoad.pointsX[minj] };
+		rdo.pointsY = new int[] { a.pointsY[mini], targetRoad.pointsY[minj] };
+		rdo.types = new int[] { 0 };
+		rdo.id = ID++;
+		return rdo;
+	}
 
     private TLongObjectHashMap<List<RouteDataObject>> getPointsForFindDisconnectedRoads(RouteDataObject startRdo, RoutingContext baseCtx) {
         TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = new TLongObjectHashMap<>();
