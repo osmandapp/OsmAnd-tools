@@ -290,6 +290,9 @@ public class WebGpxParser {
                         GPXUtilities.WptPt routePoint = point.ext;
                         routePoint.lat = point.lat;
                         routePoint.lon = point.lng;
+                        if (point.ele == 99999) {
+                            routePoint.ele = Double.NaN;
+                        }
                         routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                         allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;
                         routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
@@ -326,9 +329,8 @@ public class WebGpxParser {
             }
             filePoint.lat = point.lat;
             filePoint.lon = point.lng;
-            if (!isNanEle) {
-                filePoint.ele = point.ele;
-            }
+            filePoint.ele = !isNanEle ? point.ele : Double.NaN;
+
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {
                 filePoint.extensions.put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
                 segment.points.add(filePoint);
