@@ -186,56 +186,61 @@ public class ObfDiffGenerator {
 		TLongObjectHashMap<TransportStop> routeDeletedStops = new TLongObjectHashMap<>();
 		TLongHashSet existingRoutes = new TLongHashSet();
 		for (Long routeId : startRouteData.keys()) {
-			existingRoutes.add(routeId);
-			TransportRoute routeS = startRouteData.get(routeId);
-			TransportRoute routeE = endRouteData.get(routeId);
-			routeDeletedStops.clear();
-			if (routeE == null) {
-				EntityId aid = getTransportRouteId(routeS);
-				if (modifiedObjIds != null && !modifiedObjIds.contains(aid)) {
-					// transport route wasn't modified, so we don't need to delete it 
-					continue;
+			try {
+				existingRoutes.add(routeId);
+				TransportRoute routeS = startRouteData.get(routeId);
+				TransportRoute routeE = endRouteData.get(routeId);
+				routeDeletedStops.clear();
+				if (routeE == null) {
+					EntityId aid = getTransportRouteId(routeS);
+					if (modifiedObjIds != null && !modifiedObjIds.contains(aid)) {
+						// transport route wasn't modified, so we don't need to delete it
+						continue;
 //					throw new IllegalStateException("Transport route " + routeId + " is missing in (2): " + routeS);
-				}
-				// mark route as deleted on all stops!
-				for(TransportStop s : routeS.getForwardStops()) {
-					routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
-				}
-				if (print) {
-					System.out.println("Transport route " + routeId + " is missing in (2): " + routeS);
-				}
-			} else {
-				boolean cmp = routeE.compareRoute(routeS);
-				if (!cmp) {
+					}
+					// mark route as deleted on all stops!
+					for (TransportStop s : routeS.getForwardStops()) {
+						routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+					}
 					if (print) {
-						System.out.println("Transport route " + routeId + " is not equal: " + routeS + " != " + routeE);
+						System.out.println("Transport route " + routeId + " is missing in (2): " + routeS);
 					}
-					// mark on all previous stops to be deleted
-					if (routeS != null) {
-						for (TransportStop s : routeS.getForwardStops()) {
-							routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+				} else {
+					boolean cmp = routeE.compareRoute(routeS);
+					if (!cmp) {
+						if (print) {
+							System.out.println(
+									"Transport route " + routeId + " is not equal: " + routeS + " != " + routeE);
 						}
+						// mark on all previous stops to be deleted
+						if (routeS != null) {
+							for (TransportStop s : routeS.getForwardStops()) {
+								routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+							}
+						}
+						// don't mark to delete if it will be added
+						for (TransportStop s : routeE.getForwardStops()) {
+							long stopId = adjustTransportRouteStopIdToId(s.getId());
+							routeDeletedStops.remove(stopId);
+							TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, s, routeId,
+									stopId);
+							originalStop.addRouteId(routeId);
+						}
+
 					}
-					// don't mark to delete if it will be added
-					for(TransportStop s : routeE.getForwardStops()) {
-						long stopId = adjustTransportRouteStopIdToId(s.getId());
-						routeDeletedStops.remove(stopId);
-						TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
-								s, routeId, stopId);
-						originalStop.addRouteId(routeId);
+					if (cmp || print) {
+						endRouteData.remove(routeId);
 					}
-					
 				}
-				if(cmp || print){
-					endRouteData.remove(routeId);
+				for (long stopId : routeDeletedStops.keys()) {
+					TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted,
+							routeDeletedStops.get(stopId), routeId, stopId);
+					originalStop.addDeletedRouteId(routeId);
 				}
+			} catch (RuntimeException e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace();
 			}
-			for(long stopId : routeDeletedStops.keys()) {
-				TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
-						routeDeletedStops.get(stopId), routeId, stopId);
-				originalStop.addDeletedRouteId(routeId);
-			}
-			
 			
 		}
 		
@@ -256,8 +261,8 @@ public class ObfDiffGenerator {
 	private TransportStop checkEndStopData(TLongObjectHashMap<TransportStop> endStopData,
 			TLongObjectHashMap<TransportStop> endStopDataDeleted, TransportStop errorStop,
 			long routeId, long stopId) {
-		if(!endStopData.contains(stopId)) {
-			if(!endStopDataDeleted.contains(stopId)) {
+		if (!endStopData.contains(stopId)) {
+			if (!endStopDataDeleted.contains(stopId)) {
 				throw new IllegalArgumentException(
 						String.format("Missing stop %d for route %d: %s", stopId, routeId / 2, errorStop));
 			}
