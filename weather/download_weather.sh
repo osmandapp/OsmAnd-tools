@@ -67,7 +67,11 @@ should_download_file() {
         local DISK_FILE_MODIFIED_TIME="$(TZ=GMT date -r ${FILENAME} +'%a, %d %b %Y %H:%M:%S GMT')"
         local SERVER_RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
 
-        if [[ $SERVER_RESPONSE =~ "304" ]]; then
+        if [[ $SERVER_RESPONSE =~ "302" ]]; then
+            # Server don't sent header, because file is on another server. Don't need to download it.
+            echo 0
+            return
+        elif [[ $SERVER_RESPONSE =~ "304" ]]; then
             # Server don't have update for this file. Don't need to download it.
             echo 0
             return
