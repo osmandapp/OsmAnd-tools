@@ -68,6 +68,7 @@ should_download_file() {
         local SERVER_RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
 
         if [[ $SERVER_RESPONSE =~ "302" ]]; then
+            local RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL)
             local WHOLE_LAST_MODIFIED_STRING=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | grep "last-modified")
             if [[ $WHOLE_LAST_MODIFIED_STRING =~ $DISK_FILE_MODIFIED_TIME ]]; then
                 # Server don't have update for this file. Don't need to download it.
