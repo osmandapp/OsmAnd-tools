@@ -106,6 +106,10 @@ download() {
     local URL=$2
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
+
+    # TODO: delete it
+    sleep 10 
+
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
         curl -k -L $URL --output ${FILENAME} --http1.1   || echo "Error of CURL with downloading $URl"
