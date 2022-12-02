@@ -84,6 +84,10 @@ should_download_file() {
             echo 0
             return
         fi  
+    elif [[ $(curl -s -I -L $URL | head -1) =~ "404"  ]]; then   
+        # File not found. Skip 
+        echo 0
+        return    
     elif [[ $(curl -s -I -L $URL | head -1) =~ "302"  ]]; then   
         # Maybe server is blocking us and redirectding to Error Html page. Like this:
         # https://www.weather.gov/abusive-user-block 
@@ -92,11 +96,7 @@ should_download_file() {
         echo 1
         return
     fi    
-    elif [[ $(curl -s -I -L $URL | head -1) =~ "404"  ]]; then   
-        # File not found. Skip 
-        echo 0
-        return
-    fi
+    
     echo 1
 }
 
