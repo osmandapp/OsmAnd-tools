@@ -251,12 +251,14 @@ get_raw_gfs_files() {
                     if [[ $( is_file_content_with_html "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ) -eq 1 ]]; then
                         # File is downloaded and is of correct type.
                         # Generate tiff for downloaded band
+                        echo "Partial downloading success. Start gdal_translate"
                         mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
                         gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
                     else
                         echo "Fatal Error: Partial downloaded data contains HTML content."
                         cat "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
-                        break
+                        rm "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
+                        continue
                     fi
                 else
                     echo "Error: Index file not downloaded. Skip downloading weather data."
