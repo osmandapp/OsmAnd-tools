@@ -70,6 +70,7 @@ should_download_file() {
         if [[ $SERVER_RESPONSE =~ "302" ]]; then
             # Maybe server is blocking us and redirectding to Error Html page. Like this:
             # https://www.weather.gov/abusive-user-block
+            sleep 300
             echo 0
             return
         elif [[ $SERVER_RESPONSE =~ "304" ]]; then
@@ -83,6 +84,14 @@ should_download_file() {
             echo 0
             return
         fi  
+    elif [[ $(curl -s -I -L $URL | head -1) =~ "302"  ]]; then   
+        # Maybe server is blocking us and redirectding to Error Html page. Like this:
+        # https://www.weather.gov/abusive-user-block 
+        # Try to wait a bit and download again.
+        # sleep 300
+        echo 1
+        return
+    fi    
     elif [[ $(curl -s -I -L $URL | head -1) =~ "404"  ]]; then   
         # File not found. Skip 
         echo 0
@@ -143,15 +152,15 @@ download_with_retry() {
         return    
     fi
 
-    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-    #     echo "Download Error: ${FILENAME} not downloaded! Wait 5 min and retry."
-    #     sleep 300
-    #     echo "Download try 4: ${FILENAME}"
-    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    # else 
-    #     echo "Downloading success with try 3: ${FILENAME}"   
-    #     return    
-    # fi
+    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+        echo "Download Error: ${FILENAME} not downloaded! Wait 5 min and retry."
+        sleep 300
+        echo "Download try 4: ${FILENAME}"
+        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    else 
+        echo "Downloading success with try 3: ${FILENAME}"   
+        return    
+    fi
 
     # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
     #     echo "Download Error: ${FILENAME} not downloaded! Wait 10 min and retry."
