@@ -68,13 +68,10 @@ should_download_file() {
         local SERVER_RESPONSE=$(curl -s -I -L --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
 
         if [[ $SERVER_RESPONSE =~ "302" ]]; then
-            # local RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL)
-            # local WHOLE_LAST_MODIFIED_STRING=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | grep "last-modified")
-            # if [[ $WHOLE_LAST_MODIFIED_STRING =~ $DISK_FILE_MODIFIED_TIME ]]; then
-            #     # Server don't have update for this file. Don't need to download it.
-                echo 0
-                return
-            # fi     
+            # Maybe server is blocking us and redirectding to Error Html page. Like this:
+            # https://www.weather.gov/abusive-user-block
+            echo 0
+            return
         elif [[ $SERVER_RESPONSE =~ "304" ]]; then
             # Server don't have update for this file. Don't need to download it.
             echo 0
@@ -126,15 +123,15 @@ download_with_retry() {
         return
     fi
 
-    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-        echo "Download Error: ${FILENAME} not downloaded! Wait 10 sec and retry."
-        sleep 10
-        echo "Download try 2: ${FILENAME}"
-        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    else 
-        echo "Downloading success with try 1: ${FILENAME}"   
-        return    
-    fi
+    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+    #     echo "Download Error: ${FILENAME} not downloaded! Wait 10 sec and retry."
+    #     sleep 10
+    #     echo "Download try 2: ${FILENAME}"
+    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    # else 
+    #     echo "Downloading success with try 1: ${FILENAME}"   
+    #     return    
+    # fi
 
     if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
         echo "Download Error: ${FILENAME} not downloaded! Wait 1 min and retry."
@@ -146,35 +143,35 @@ download_with_retry() {
         return    
     fi
 
-    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-        echo "Download Error: ${FILENAME} not downloaded! Wait 5 min and retry."
-        sleep 300
-        echo "Download try 4: ${FILENAME}"
-        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    else 
-        echo "Downloading success with try 3: ${FILENAME}"   
-        return    
-    fi
+    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+    #     echo "Download Error: ${FILENAME} not downloaded! Wait 5 min and retry."
+    #     sleep 300
+    #     echo "Download try 4: ${FILENAME}"
+    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    # else 
+    #     echo "Downloading success with try 3: ${FILENAME}"   
+    #     return    
+    # fi
 
-    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-        echo "Download Error: ${FILENAME} not downloaded! Wait 10 min and retry."
-        sleep 600
-        echo "Download try 5: ${FILENAME}"
-        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    else 
-        echo "Downloading success with try 4: ${FILENAME}"   
-        return    
-    fi
+    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+    #     echo "Download Error: ${FILENAME} not downloaded! Wait 10 min and retry."
+    #     sleep 600
+    #     echo "Download try 5: ${FILENAME}"
+    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    # else 
+    #     echo "Downloading success with try 4: ${FILENAME}"   
+    #     return    
+    # fi
 
-    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-        echo "Download Error: ${FILENAME} not downloaded! Wait 1 hour and retry."
-        sleep 600
-        echo "Download try 6: ${FILENAME}"
-        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    else 
-        echo "Downloading success with try 5: ${FILENAME}"   
-        return    
-    fi
+    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+    #     echo "Download Error: ${FILENAME} not downloaded! Wait 1 hour and retry."
+    #     sleep 600
+    #     echo "Download try 6: ${FILENAME}"
+    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    # else 
+    #     echo "Downloading success with try 5: ${FILENAME}"   
+    #     return    
+    # fi
     
     if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
         echo "Fatal Download Error: ${FILENAME} still not downloaded!"
@@ -241,9 +238,13 @@ get_raw_gfs_files() {
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
-                # Generate tiff for downloaded band
-                mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
-                gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then  
+                    # Generate tiff for downloaded band
+                    mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
+                    gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                else
+                    echo "Error: Index file not downloaded. Skip downloading weather data."
+                fi
             done
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
@@ -485,7 +486,7 @@ get_raw_ecmwf_files() {
 
 
 # # Uncomment for fast debug mode
-# DEBUG_M0DE=1
+DEBUG_M0DE=1
 
 
 if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
