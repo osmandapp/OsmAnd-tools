@@ -255,10 +255,10 @@ get_raw_gfs_files() {
                         mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
                         gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
                     else
-                        echo "Fatal Error: Partial downloaded data contains HTML content."
+                        echo "Fatal Error: Partial downloaded data contains HTML content. May be we are blocked."
                         cat "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
                         rm "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
-                        continue
+                        return
                     fi
                 else
                     echo "Error: Index file not downloaded. Skip downloading weather data."
