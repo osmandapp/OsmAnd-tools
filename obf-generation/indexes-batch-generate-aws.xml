@@ -18,6 +18,7 @@
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
 				<filter exclude="world_seamarks" />
+                <filter exclude="nigeria_africa" />
 				<filter exclude="us_florida_northamerica" />
 				<filter exclude="congo-democratic-republic_africa" />
 				<filter exclude="south-africa_africa" />
