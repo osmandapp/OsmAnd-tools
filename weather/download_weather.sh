@@ -65,7 +65,7 @@ should_download_file() {
     if [[ -f $FILENAME ]]; then
         # File is already dowlnloaded
         local DISK_FILE_MODIFIED_TIME="$(TZ=GMT date -r ${FILENAME} +'%a, %d %b %Y %H:%M:%S GMT')"
-        local SERVER_RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
+        local SERVER_RESPONSE=$(curl -s -I -L --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
 
         if [[ $SERVER_RESPONSE =~ "302" ]]; then
             # local RESPONSE=$(curl -s -I --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL)
@@ -86,7 +86,7 @@ should_download_file() {
             echo 0
             return
         fi  
-    elif [[ $(curl -s -I $URL | head -1) =~ "404"  ]]; then   
+    elif [[ $(curl -s -I -L $URL | head -1) =~ "404"  ]]; then   
         # File not found. Skip 
         echo 0
         return
@@ -102,10 +102,10 @@ download() {
     local END_BYTE_OFFSET=$4
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
-        curl -k $URL --output ${FILENAME} --http1.1   || echo "Error of CURL with downloading $URl"
+        curl -k -L $URL --output ${FILENAME} --http1.1   || echo "Error of CURL with downloading $URl"
     else
         # download part file by byte offset
-        curl -k --range $START_BYTE_OFFSET-$END_BYTE_OFFSET $URL --output ${FILENAME} --http1.1  || echo "Error of CURL with partial downloading $URl"
+        curl -k -L --range $START_BYTE_OFFSET-$END_BYTE_OFFSET $URL --output ${FILENAME} --http1.1  || echo "Error of CURL with partial downloading $URl"
     fi
 }
 
@@ -409,7 +409,7 @@ find_latest_ecmwf_forecat_date() {
         # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.index
         # https://data.ecmwf.int/forecasts/20220909/12z/0p4-beta/oper/20220909000000-0h-oper-fc.index
         local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE$SEARCHING_RND_HOURS"0000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
-        local HEAD_RESPONSE=$(curl -s -I $CHECKING_FILE_URL | head -1)
+        local HEAD_RESPONSE=$(curl -s -I -L $CHECKING_FILE_URL | head -1)
 
         if [[ $HEAD_RESPONSE =~ "200" ]]; then
             FORECAST_DATE=$SEARCHING_DATE
