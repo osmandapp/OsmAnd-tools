@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -108,7 +109,7 @@ public class ImproveRoadConnectivity {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(DEFAULT_MEMORY_LIMIT, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit);
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, new LinkedHashMap<String, String>());
 		RoutingContext baseCtx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader }, RouteCalculationMode.BASE);
 		RoutingContext normalCtx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader }, RouteCalculationMode.NORMAL);
 
@@ -161,7 +162,6 @@ public class ImproveRoadConnectivity {
 				if (!config.router.acceptLine(o)) {
 					continue;
 				}
-				double dist = getRoadDist(o);
 				boolean shortFerry = "ferry".equals(o.getRoute()) && getRoadDist(o) < ALG_01_SHORT_FERRY_DISTANCE;
 				if (shortFerry && IMPROVE_ROUTING_ALGORITHM_VERSION != ALG_2_NAME__FIND_DISCONNECTED_ROADS) {
 					continue;
@@ -300,11 +300,12 @@ public class ImproveRoadConnectivity {
 		TLongObjectIterator<List<RouteDataObject>> pointsIterator = all.iterator();
 		TLongObjectHashMap<RoadClusterTile> clusterTiles = new TLongObjectHashMap<>();
 		RoadClusterTile clusterTile = new RoadClusterTile();
+		// Group by 4 tiles of lower zoom to avoid problem that disconnected segment between tiles
 		while (pointsIterator.hasNext()) {
 			pointsIterator.advance();
 			long pnt = pointsIterator.key();
-			int tileX = (int) (MapUtils.deinterleaveX(pnt) >> (31 - ALG_2_ZOOM_SCAN_DANGLING_ROADS));
-			int tileY = (int) (MapUtils.deinterleaveY(pnt) >> (31 - ALG_2_ZOOM_SCAN_DANGLING_ROADS));
+			int tileX = (int) (MapUtils.deinterleaveX(pnt) >> (31 - ALG_2_ZOOM_SCAN_DANGLING_ROADS - 1));
+			int tileY = (int) (MapUtils.deinterleaveY(pnt) >> (31 - ALG_2_ZOOM_SCAN_DANGLING_ROADS - 1));
 			long tileId = MapUtils.interleaveBits(tileX, tileY);
 			if (clusterTile.tileId != tileId) {
 				clusterTile = clusterTiles.get(tileId);
@@ -324,10 +325,16 @@ public class ImproveRoadConnectivity {
 		}
 
 		log.info("Add neighboor tiles to improve connectivity of clusters");
+		final int jointNB = ALG_2_SEARCH_ROUTES_DANGLING_ROADS * 2;
 		for (RoadClusterTile tile1 : clusterTiles.valueCollection()) {
 			for (RoadClusterTile tile2 : clusterTiles.valueCollection()) {
-				if (tile1 != tile2 && Math.abs(tile1.tileX - tile2.tileX) <= ALG_2_SEARCH_ROUTES_DANGLING_ROADS
-						&& Math.abs(tile1.tileY - tile2.tileY) <= ALG_2_SEARCH_ROUTES_DANGLING_ROADS) {
+				if (tile1 != tile2 
+						&& (tile1.tileX - tile2.tileX <= jointNB && tile2.tileX - tile1.tileX <= jointNB + 1)
+						&& (tile1.tileY - tile2.tileY <= jointNB && tile2.tileY - tile1.tileY <= jointNB + 1)) {
+					if((tile2.tileX - tile1.tileX == 1 || tile2.tileX == tile1.tileX ) &&
+							(tile2.tileY - tile1.tileY == 1 || tile2.tileY == tile1.tileY )) {
+						tile1.neighboorTile.add(tile2);
+					}
 					for (RouteDataObject o : tile2.ownedRoads.valueCollection()) {
 						tile1.addToCluster(o, all);
 					}
@@ -337,10 +344,15 @@ public class ImproveRoadConnectivity {
 		
 		log.info("Clean up clusters from neighboor tile roads");
 		for (RoadClusterTile tile : clusterTiles.valueCollection()) {
+			// collect own roads of supertile (group by 4)
+			TLongObjectHashMap<RouteDataObject> ownedRoads = new TLongObjectHashMap<>(tile.ownedRoads);
+			for (RoadClusterTile n : tile.neighboorTile) {
+				ownedRoads.putAll(n.ownedRoads);
+			}
 			Iterator<RoadCluster> it = tile.clusters.iterator();
 			while (it.hasNext()) {
 				RoadCluster cluster = it.next();
-				cluster.removeExcept(tile.ownedRoads);
+				cluster.removeExcept(ownedRoads);
 				if (cluster.roads.size() == 0) {
 					it.remove();
 				}
@@ -350,10 +362,9 @@ public class ImproveRoadConnectivity {
 		log.info("Find disconnected clusters");
 		List<RouteDataObject> testResults = new ArrayList<>();
 		for (RoadClusterTile tile : clusterTiles.valueCollection()) {
-			if(tile.clusters.size() <= 1) {
+			if (tile.clusters.size() <= 1) {
 				// all roads connected
 				continue;
-				
 			}
 			// sort clusters by size desc
 			Collections.sort(tile.clusters, new Comparator<RoadCluster>() {
@@ -365,7 +376,7 @@ public class ImproveRoadConnectivity {
 			RoadCluster mainCluster = tile.clusters.get(0);
 			for (int i = 1; i < tile.clusters.size(); i++) {
 				RoadCluster c = tile.clusters.get(i);
-				System.out.println(tile.tileId + " " + c.roads.size() + ": " + c.roads);
+				System.out.println(tile.tileId + " " + c.roads.size() + ": " + c.roads + " vs " + mainCluster.roads);
 //				testResults.addAll(c.roads);
 				RouteDataObject anyRoad = c.roads.get(0);
 				if(c.roads.size() == 1 &&  getRoadDist(anyRoad) < ALG_2_IGNORE_SHORT_FULL_ISOLATED_ROADS) {
@@ -796,8 +807,9 @@ public class ImproveRoadConnectivity {
 		int tileY;
 		int tileX;
 		long tileId;
-		List<RoadCluster> clusters = new ArrayList<RoadCluster>();
-		TLongObjectHashMap<RouteDataObject> ownedRoads = new TLongObjectHashMap<RouteDataObject>();
+		List<RoadCluster> clusters = new ArrayList<>();
+		List<RoadClusterTile> neighboorTile = new ArrayList<>();
+		TLongObjectHashMap<RouteDataObject> ownedRoads = new TLongObjectHashMap<>();
 		
 		private void addToCluster(RouteDataObject o, TLongObjectHashMap<List<RouteDataObject>> all) {
 			RoadCluster toJoin = joinCluster(null, o);
