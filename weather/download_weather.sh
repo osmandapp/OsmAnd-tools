@@ -258,7 +258,7 @@ get_raw_gfs_files() {
                         echo "Fatal Error: Partial downloaded data contains HTML content. May be we are blocked."
                         cat "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
                         rm "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
-                        cd ..;
+                        # cd ..;
                         return
                     fi
                 else
