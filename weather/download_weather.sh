@@ -180,6 +180,15 @@ download_with_retry() {
     return
 }
 
+is_file_content_with_html() {
+    local FILENAME=$1
+    if grep -q "<!doctype html>" "$FILENAME"; then
+        echo 0
+    else
+        echo 1    
+    fi
+}
+
 
 get_raw_gfs_files() {
     echo "============================ get_raw_gfs_files() ======================================="
@@ -239,9 +248,16 @@ get_raw_gfs_files() {
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then  
-                    # Generate tiff for downloaded band
-                    mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
-                    gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                    if [[ $( is_file_content_with_html "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ) -eq 1 ]]; then
+                        # File is downloaded and is of correct type.
+                        # Generate tiff for downloaded band
+                        mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
+                        gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                    else
+                        echo "Fatal Error: Partial downloaded data contains HTML content."
+                        cat "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
+                        break
+                    fi
                 else
                     echo "Error: Index file not downloaded. Skip downloading weather data."
                 fi
@@ -486,7 +502,7 @@ get_raw_ecmwf_files() {
 
 
 # # Uncomment for fast debug mode
-DEBUG_M0DE=1
+# DEBUG_M0DE=1
 
 
 if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
