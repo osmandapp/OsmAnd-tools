@@ -107,9 +107,6 @@ download() {
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
 
-    # TODO: delete it
-    sleep 10 
-
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
         curl -k -L $URL --output ${FILENAME} --http1.1   || echo "Error of CURL with downloading $URl"
@@ -136,29 +133,29 @@ download_with_retry() {
         return
     fi
 
-    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-    #     echo "Download Error: ${FILENAME} not downloaded! Wait 10 sec and retry."
-    #     sleep 10
-    #     echo "Download try 2: ${FILENAME}"
-    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    # else 
-    #     echo "Downloading success with try 1: ${FILENAME}"   
-    #     return    
-    # fi
-
     if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
         echo "Download Error: ${FILENAME} not downloaded! Wait 1 min and retry."
         sleep 60
-        echo "Download try 3: ${FILENAME}"
+        echo "Download try 2: ${FILENAME}"
         download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     else 
-        echo "Downloading success with try 2: ${FILENAME}"   
+        echo "Downloading success with try 1: ${FILENAME}"   
         return    
     fi
 
     # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
     #     echo "Download Error: ${FILENAME} not downloaded! Wait 5 min and retry."
     #     sleep 300
+    #     echo "Download try 3: ${FILENAME}"
+    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    # else 
+    #     echo "Downloading success with try 2: ${FILENAME}"   
+    #     return    
+    # fi
+
+    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+    #     echo "Download Error: ${FILENAME} not downloaded! Wait 10 min and retry."
+    #     sleep 600
     #     echo "Download try 4: ${FILENAME}"
     #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     # else 
@@ -167,22 +164,12 @@ download_with_retry() {
     # fi
 
     # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-    #     echo "Download Error: ${FILENAME} not downloaded! Wait 10 min and retry."
+    #     echo "Download Error: ${FILENAME} not downloaded! Wait 1 hour and retry."
     #     sleep 600
     #     echo "Download try 5: ${FILENAME}"
     #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     # else 
     #     echo "Downloading success with try 4: ${FILENAME}"   
-    #     return    
-    # fi
-
-    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-    #     echo "Download Error: ${FILENAME} not downloaded! Wait 1 hour and retry."
-    #     sleep 600
-    #     echo "Download try 6: ${FILENAME}"
-    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    # else 
-    #     echo "Downloading success with try 5: ${FILENAME}"   
     #     return    
     # fi
     
@@ -246,6 +233,7 @@ get_raw_gfs_files() {
 
         # Download index file
         cd $DOWNLOAD_FOLDER; 
+        sleep 5
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
@@ -258,6 +246,7 @@ get_raw_gfs_files() {
 
                 # Make partial download for needed band data only  
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
+                sleep 5
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then  
