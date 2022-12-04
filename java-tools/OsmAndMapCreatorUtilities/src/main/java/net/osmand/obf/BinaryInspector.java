@@ -92,7 +92,6 @@ public class BinaryInspector {
 //					"-latlon=48.46614,9.16976",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 					System.getProperty("maps.dir")+"Map.obf"
-					
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
