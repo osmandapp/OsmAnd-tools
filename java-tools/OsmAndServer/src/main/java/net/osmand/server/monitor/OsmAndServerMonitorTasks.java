@@ -11,8 +11,11 @@ import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
@@ -62,6 +65,13 @@ public class OsmAndServerMonitorTasks {
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
 			 "dl2.osmand.net","dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
+	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
+			"maptile.osmand.net" };
+	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
+			"https://builder.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/",
+			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
+			"https://tile.osmand.net:8080/job/UpdateOsmAndServer/" };
+
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 
 	private static final double PERC = 95;
@@ -92,6 +102,8 @@ public class OsmAndServerMonitorTasks {
 	LiveCheckInfo live = new LiveCheckInfo();
 	// Build Server
 	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
+	// Java servers check
+	JavaServerCheckInfo javaChecks = new JavaServerCheckInfo();
 	// Tile validation
 	double lastResponseTime;
 	// Index map validation
@@ -136,6 +148,61 @@ public class OsmAndServerMonitorTasks {
 			LOG.error(e.getMessage(), e);
 		}
 	}
+	
+	@Scheduled(fixedRate = MINUTE)
+	public void checkOsmAndJavaServers() {
+		if (!enabled) {
+			return;
+		}
+		try {
+			Map<String, String> failed = new LinkedHashMap<String, String>();
+			for (int i = 0; i < JAVA_HOSTS_TO_TEST.length; i++) {
+				boolean error = false;
+				try {
+					URL url = new URL(urlToTestJavaServer(JAVA_HOSTS_TO_TEST[i]));
+					HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+					conn.connect();
+					if (conn.getResponseCode() >= 300) {
+						// error
+						error = true;
+					}
+				} catch (Exception e) {
+					LOG.error(e.getMessage(), e);
+					error = true;
+				}
+				if (error) {
+					failed.put(JAVA_HOSTS_TO_TEST[i], JAVA_HOSTS_TO_RESTART[i]);
+				}
+			}
+			boolean stateChanged = failed.size() != javaChecks.failed.size();
+			javaChecks.failed = failed;
+			javaChecks.lastCheckTimestamp = System.currentTimeMillis();
+			if (telegram != null && stateChanged) {
+				if (failed.size() == 0) {
+					telegram.sendMonitoringAlertMessage("All java servers are up.");
+				} else {
+					StringBuilder sb = new StringBuilder();
+					Iterator<Entry<String, String>> it = failed.entrySet().iterator();
+					while (it.hasNext()) {
+						Entry<String, String> e = it.next();
+						sb.append(String.format(
+								"Java server <a href='%s'>%s</a> is down - <a href='%s'>restart it</a>.\n",
+								urlToTestJavaServer(e.getKey()), e.getKey(), e.getValue()));
+					}
+					telegram.sendMonitoringAlertMessage(sb.toString());
+				}
+			}
+		} catch (Exception e) {
+			if (telegram != null) {
+				telegram.sendMonitoringAlertMessage("Exception while checking the java server status.");
+			}
+			LOG.error(e.getMessage(), e);
+		}
+	}
+
+	private String urlToTestJavaServer(String u) {
+		return "https://" + u + "/api/giveaway-series";
+	}
 
 	@Scheduled(fixedRate = MINUTE)
 	public void checkOsmAndBuildServer() {
@@ -158,7 +225,7 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 			is.close();
-			if(buildServer.jobsFailed == null) {
+			if (buildServer.jobsFailed == null) {
 				buildServer.jobsFailed = jobsFailed;
 			} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
 				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
@@ -187,6 +254,7 @@ public class OsmAndServerMonitorTasks {
 		if(!enabled) {
 			return;
 		}
+		System.setProperty("https.protocols", "TLSv1,TLSv1.1,TLSv1.2");
 		GZIPInputStream gis = null;
 		try {
 			URL url = new URL("https://osmand.net/get_indexes?gzip=true");
@@ -536,8 +604,10 @@ public class OsmAndServerMonitorTasks {
 		} else {
 			msg += "<a href='https://builder.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
 		}
-		for (DownloadTestResult r : downloadTests.values()) {
-			msg += r.fullString() + "\n";
+		for (String host: downloadTests.keySet()) {
+			DownloadTestResult r = downloadTests.get(host);
+			String urlToRestart = javaChecks.failed.get(host);
+			msg += r.fullString(urlToRestart) + "\n";
 		}
 		msg += getTileServerMessage();
 		msg += getOpenPlaceReviewsMessage();
@@ -619,6 +689,11 @@ public class OsmAndServerMonitorTasks {
 		long lastOsmAndLiveDelay = 0;
 		long lastCheckTimestamp = 0;
 	}
+	
+	protected static class JavaServerCheckInfo {
+		Map<String, String> failed = new LinkedHashMap<String, String>();
+		long lastCheckTimestamp = 0;
+	}
 
 	protected static class BuildServerCheckInfo {
 		Set<String> jobsFailed;
@@ -647,13 +722,17 @@ public class OsmAndServerMonitorTasks {
 			return host != null ? host.equals(that.host) : that.host == null;
 		}
 
-		public String fullString() {
+		public String fullString(String urlFailedJava) {
 			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 0.5);
 			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
 			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD + host, 24);
 			String name = host.substring(0, host.indexOf('.'));
+			String status = (lastSuccess ? "OK" : "FAILED");
+			if (urlFailedJava != null) {
+				status = String.format("FAILED. Server - <a href='%s'>restart</a>", urlFailedJava);
+			}
 			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: %5.2f, 3h — %5.2f MBs · 24h — %5.2f MBs",
-					host, name, (lastSuccess ? "OK" : "FAILED"),
+					host, name, status,
 					last.getMean(), speed3Hours.getPercentile(PERC_SMALL),
 					speed24Hours.getPercentile(PERC_SMALL));
 		}
