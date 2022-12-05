@@ -592,6 +592,7 @@ public class OsmAndServerMonitorTasks {
 		checkOsmAndLiveStatus(false);
 		checkOsmAndBuildServer();
 		checkIndexesValidity();
+		checkOsmAndJavaServers();
 		tileDownloadTest();
 
 		return getStatusMessage();
