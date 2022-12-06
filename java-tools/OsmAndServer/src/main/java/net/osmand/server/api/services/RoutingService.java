@@ -153,7 +153,7 @@ public class RoutingService {
     
     private GPXUtilities.TrkSegment generateRouteSegments(List<RouteSegmentResult> route, List<Location> locations) {
         GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
-        RouteDataResources resources = new RouteDataResources(locations);
+        RouteDataResources resources = new RouteDataResources(locations, Collections.emptyList());
         List<StringBundle> routeItems = new ArrayList<>();
         if (!Algorithms.isEmpty(route)) {
             for (RouteSegmentResult sr : route) {
