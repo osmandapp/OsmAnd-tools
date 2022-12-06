@@ -464,7 +464,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						}
 					}
 					String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
-					RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null);
+					RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null, null);
 					GPXFile gpxFile = exporter.exportRoute();
 					JFileChooser fileChooser = new JFileChooser(
 							DataExtractionSettings.getSettings().getDefaultWorkingDir());
