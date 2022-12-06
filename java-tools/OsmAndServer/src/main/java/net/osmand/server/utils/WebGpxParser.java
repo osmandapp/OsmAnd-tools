@@ -42,11 +42,34 @@ public class WebGpxParser {
     }
     
     public static class Wpt {
+        
+        public String name;
+        public String desc;
+        public String address;
         public GPXUtilities.WptPt ext;
         
         public Wpt(GPXUtilities.WptPt point) {
-            if (point != null)
-                ext = point;
+            if (point != null) {
+                if (point.name != null) {
+                    name = point.name;
+                    point.name = null;
+                }
+                if (point.desc != null) {
+                    desc = point.desc;
+                    point.desc = null;
+                }
+                
+                Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
+                
+                while (it.hasNext()) {
+                    Map.Entry<String, String> e = it.next();
+                    if (e.getKey().equals(ADDRESS_EXTENSION)) {
+                        address = e.getValue();
+                        it.remove();
+                    }
+                }
+            }
+            ext = point;
         }
     }
     
@@ -273,7 +296,11 @@ public class WebGpxParser {
         }
         if (trackData.wpts != null) {
             for (Wpt wpt : trackData.wpts) {
-                gpxFile.addPoint(wpt.ext);
+                WptPt point = wpt.ext;
+                point.name = wpt.name;
+                point.desc = wpt.desc;
+                point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
+                gpxFile.addPoint(point);
             }
         }
         
