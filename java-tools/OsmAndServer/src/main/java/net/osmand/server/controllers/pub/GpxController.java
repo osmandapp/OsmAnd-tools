@@ -326,6 +326,7 @@ public class GpxController {
 			
 			gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
 			gpxData.wpts = webGpxParser.getWpts(gpxFile);
+			gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFile);
 			gpxData.tracks = webGpxParser.getTracks(gpxFile);
 			gpxData.ext = gpxFile.extensions;
 			
