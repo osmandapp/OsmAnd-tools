@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import static net.osmand.GPXUtilities.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
+import static net.osmand.util.Algorithms.colorToString;
 
 @Component
 public class WebGpxParser {
@@ -17,6 +18,7 @@ public class WebGpxParser {
         public MetaData metaData;
         public List<Wpt> wpts;
         public List<Track> tracks;
+        public Map<String, PointsGroup> pointsGroups;
         public Map<String, Object> analysis;
         public Map<String, String> ext;
     }
@@ -70,6 +72,27 @@ public class WebGpxParser {
                 }
             }
             ext = point;
+        }
+    }
+    
+    public class PointsGroup {
+        public String color;
+        public final List<Wpt> points = new ArrayList<>();
+        public GPXUtilities.PointsGroup ext;
+        public PointsGroup(GPXUtilities.PointsGroup group) {
+            if (group != null) {
+                if (group.color != 0) {
+                    color = colorToString(group.color);
+                    group.color = 0;
+                }
+                if (!group.points.isEmpty()) {
+                    List<Wpt> res = new ArrayList<>();
+                    group.points.forEach(wpt -> res.add(new Wpt(wpt)));
+                    points.addAll(res);
+                    group.points = Collections.emptyList();
+                }
+            }
+            ext = group;
         }
     }
     
@@ -271,6 +294,19 @@ public class WebGpxParser {
         return Collections.emptyList();
     }
     
+    public Map<String, PointsGroup> getPointsGroups(GPXUtilities.GPXFile gpxFile) {
+        Map<String, GPXUtilities.PointsGroup> pointsGroups = gpxFile.getPointsGroups();
+        Map<String, PointsGroup> res = new LinkedHashMap<>();
+        if (!pointsGroups.isEmpty()) {
+            for (String key : pointsGroups.keySet()) {
+                res.put(key, new PointsGroup(pointsGroups.get(key)));
+            }
+            return res;
+        }
+        
+        return Collections.emptyMap();
+    }
+    
     public List<Track> getTracks(GPXUtilities.GPXFile gpxFile) {
         if (!gpxFile.tracks.isEmpty()) {
             List<Track> res = new ArrayList<>();
@@ -302,6 +338,25 @@ public class WebGpxParser {
                 point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
                 gpxFile.addPoint(point);
             }
+        }
+    
+        if (trackData.pointsGroups != null) {
+            Map<String, GPXUtilities.PointsGroup> res = new LinkedHashMap<>();
+            for (String key : trackData.pointsGroups.keySet()) {
+                PointsGroup dataGroup = trackData.pointsGroups.get(key);
+                GPXUtilities.PointsGroup group = dataGroup.ext;
+                group.color = parseColor(dataGroup.color, 0);
+                List<Wpt> wptsData = dataGroup.points;
+                for (Wpt wpt : wptsData) {
+                    WptPt point = wpt.ext;
+                    point.name = wpt.name;
+                    point.desc = wpt.desc;
+                    point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
+                    group.points.add(point);
+                }
+                res.put(key, group);
+            }
+            gpxFile.setPointsGroups(res);
         }
         
         if (trackData.tracks != null) {
