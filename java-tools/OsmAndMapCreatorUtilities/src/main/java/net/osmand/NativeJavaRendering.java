@@ -127,7 +127,7 @@ public class NativeJavaRendering extends NativeLibrary {
 			public RenderingRulesStorage resolve(String name, RenderingRulesStorageResolver ref) throws XmlPullParserException, IOException {
 				RenderingRulesStorage depends = new RenderingRulesStorage(name, renderingConstants);
 				depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name+".render.xml"),
-							ref);
+							ref, false);
 				return depends;
 			}
 		};
@@ -135,7 +135,8 @@ public class NativeJavaRendering extends NativeLibrary {
 			loadRenderingAttributes(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),
 					renderingConstants);
 			storage = new RenderingRulesStorage("default", renderingConstants);
-			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),resolver);
+			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),
+					resolver, false);
 		} else {
 			InputStream is = null;
 			InputStream is2 = null;
@@ -158,7 +159,7 @@ public class NativeJavaRendering extends NativeLibrary {
 				name = name.substring(name.lastIndexOf('/') + 1);
 			}
 			storage = new RenderingRulesStorage(name, renderingConstants);
-			storage.parseRulesFromXmlInputStream(is2, resolver);
+			storage.parseRulesFromXmlInputStream(is2, resolver, false);
 			is.close();
 			is2.close();
 		}

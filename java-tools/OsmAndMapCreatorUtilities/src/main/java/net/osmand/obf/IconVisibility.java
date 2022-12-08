@@ -225,11 +225,12 @@ public class IconVisibility {
 		is = getInputStream(renderFilePath);
 		final RenderingRulesStorage.RenderingRulesStorageResolver resolver = (name, ref) -> {
 			RenderingRulesStorage depends = new RenderingRulesStorage(name, renderingConstants);
-			depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name + ".render.xml"), ref);
+			depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name + ".render.xml"),
+					ref, false);
 			return depends;
 		};
 		try {
-			storage.parseRulesFromXmlInputStream(is, resolver);
+			storage.parseRulesFromXmlInputStream(is, resolver, false);
 		} catch (XmlPullParserException e) {
 			e.printStackTrace();
 		} finally {
