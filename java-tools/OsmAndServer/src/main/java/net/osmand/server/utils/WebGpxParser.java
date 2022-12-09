@@ -14,6 +14,8 @@ import static net.osmand.util.Algorithms.colorToString;
 @Component
 public class WebGpxParser {
     
+    private static final String COLOR_EXTENSION = "color";
+    
     public static class TrackData {
         public MetaData metaData;
         public List<Wpt> wpts;
@@ -48,6 +50,7 @@ public class WebGpxParser {
         public String name;
         public String desc;
         public String address;
+        public String color;
         public GPXUtilities.WptPt ext;
         
         public Wpt(GPXUtilities.WptPt point) {
@@ -67,6 +70,10 @@ public class WebGpxParser {
                     Map.Entry<String, String> e = it.next();
                     if (e.getKey().equals(ADDRESS_EXTENSION)) {
                         address = e.getValue();
+                        it.remove();
+                    }
+                    if (e.getKey().equals(COLOR_EXTENSION)) {
+                        color = e.getValue();
                         it.remove();
                     }
                 }
@@ -332,11 +339,7 @@ public class WebGpxParser {
         }
         if (trackData.wpts != null) {
             for (Wpt wpt : trackData.wpts) {
-                WptPt point = wpt.ext;
-                point.name = wpt.name;
-                point.desc = wpt.desc;
-                point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
-                gpxFile.addPoint(point);
+                gpxFile.addPoint(updateWpt(wpt));
             }
         }
     
@@ -348,11 +351,7 @@ public class WebGpxParser {
                 group.color = parseColor(dataGroup.color, 0);
                 List<Wpt> wptsData = dataGroup.points;
                 for (Wpt wpt : wptsData) {
-                    WptPt point = wpt.ext;
-                    point.name = wpt.name;
-                    point.desc = wpt.desc;
-                    point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
-                    group.points.add(point);
+                    group.points.add(updateWpt(wpt));
                 }
                 res.put(key, group);
             }
@@ -396,6 +395,15 @@ public class WebGpxParser {
         }
         
         return gpxFile;
+    }
+    
+    private WptPt updateWpt(Wpt wpt) {
+        WptPt point = wpt.ext;
+        point.name = wpt.name;
+        point.desc = wpt.desc;
+        point.extensions.put(COLOR_EXTENSION, String.valueOf(wpt.color));
+        point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
+        return point;
     }
     
     private void addSegmentsToTrack(List<Point> points, List<GPXUtilities.TrkSegment> segments) {
