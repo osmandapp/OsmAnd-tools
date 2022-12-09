@@ -72,7 +72,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				Map.entry("socket:type2:voltage", new TIntArrayList(new int[]{230, 500})),
 				Map.entry("socket:type2_combo:voltage", new TIntArrayList(new int[]{500, 800})),
 				Map.entry("socket:type2_cable:voltage", new TIntArrayList(new int[]{230, 500})),
-				Map.entry("socket:type3:voltage", new TIntArrayList(new int[]{231, 399})),
 				Map.entry("socket:cee_blue:voltage", new TIntArrayList(new int[]{220, 250})),
 				Map.entry("socket:chademo:voltage", new TIntArrayList(new int[]{230, 500})),
 				Map.entry("socket:schuko:voltage", new TIntArrayList(new int[]{220, 240})));
