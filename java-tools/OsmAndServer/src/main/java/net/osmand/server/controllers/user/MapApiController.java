@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
-import java.util.Date;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
@@ -223,6 +222,38 @@ public class MapApiController {
 			return userdataService.tokenNotValid();
 		}
 		userdataService.deleteFile(name, type, null, null, dev);
+		return userdataService.ok();
+	}
+	
+	@PostMapping(value = "/update-file")
+	@ResponseBody
+	public ResponseEntity<String> updateFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                         @RequestParam String name, @RequestParam String type) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		ResponseEntity<String> validateError = userdataService.validateUser(pu);
+		if (validateError != null) {
+			return validateError;
+		}
+		
+		//get last version
+		UserFile currentFile = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+		if (currentFile == null) {
+			return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+		}
+		
+		//add new version
+		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
+		if (uploadError != null) {
+			return uploadError;
+		}
+		//delete last version
+		storageService.deleteFile(currentFile.storage,userdataService.userFolder(currentFile), userdataService.storageFileName(currentFile));
+		filesRepository.delete(currentFile);
+		
 		return userdataService.ok();
 	}
 	
