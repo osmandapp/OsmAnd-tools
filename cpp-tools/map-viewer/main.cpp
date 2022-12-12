@@ -749,7 +749,7 @@ void mouseHandler(int button, int state, int x, int y)
             else if (modifiers & GLUT_ACTIVE_SHIFT)
             {
                 if (favorites)
-                    favorites->createFavoriteLocation(lastClickedLocation31);
+                    favorites->createFavoriteLocation(OsmAnd::Utilities::convert31ToLatLon(lastClickedLocation31));
             }
             else if (modifiers & GLUT_ACTIVE_ALT)
             {
