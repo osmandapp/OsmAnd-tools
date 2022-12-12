@@ -147,15 +147,7 @@ public class UserdataController {
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
 
-    @GetMapping(value = "/user-validate-ios-sub")
-    @ResponseBody
-    public ResponseEntity<String> checkOrderid(@RequestParam(name = "orderid", required = true) String orderid) throws IOException {
-        JsonObject json = userSubService.revalidateiOSSubscription(orderid);
-        if (json.has("error")) {
-            return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, json.get("error").getAsString());
-        }
-        return ResponseEntity.ok(json.toString());
-    }
+    
 
 	@PostMapping(value = "/user-update-orderid")
 	@ResponseBody

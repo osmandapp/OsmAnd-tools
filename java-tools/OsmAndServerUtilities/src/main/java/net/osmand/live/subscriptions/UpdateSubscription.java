@@ -60,7 +60,7 @@ public class UpdateSubscription {
 	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y = ".huawei.annual.pro";
 	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_M = ".huawei.monthly.pro";
 	public static final String OSMAND_PRO_AMAZON_SUBSCRIPTION_PART = ".amazon.pro";
-    public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription";
+	public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription.pro";
 
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
