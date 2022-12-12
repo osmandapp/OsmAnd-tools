@@ -77,7 +77,8 @@ public class UserSubscriptionService {
 					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) &&
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) &&
-					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION)) {
+					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) && 
+					!s.sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
