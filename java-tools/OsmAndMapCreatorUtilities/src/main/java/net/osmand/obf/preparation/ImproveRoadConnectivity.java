@@ -41,8 +41,8 @@ public class ImproveRoadConnectivity {
 	public static void main(String[] args) throws IOException {
 		ConsoleProgressImplementation.deltaTimeToPrintMax = 10000;
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
-		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
-//		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
+//		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
+		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 		System.out.println("Found roads: " + map.size());

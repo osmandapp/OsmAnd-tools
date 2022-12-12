@@ -314,7 +314,12 @@ public class UpdateSubscription {
 			SubscriptionPurchase subscription = null;
 			String reasonToDelete = null;
 			String kind = "";
-			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken);
+			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken, false);
+			if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
+//				kind = "invalid";
+//				reasonToDelete = "receipt from sandbox environment";
+				loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken, true);
+			}
 			if (loadReceipt.result) {
 				JsonObject receiptObj = loadReceipt.response;
 				if (verbose) {
@@ -325,10 +330,6 @@ public class UpdateSubscription {
 					kind = "empty";
 					reasonToDelete = "no purchases purchase format.";
 				}
-			} else if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
-				// sandbox: do not update anymore
-				kind = "invalid";
-				reasonToDelete = "receipt from sandbox environment";
 			} else if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
 				// sandbox: do not update anymore
 				kind = "invalid";

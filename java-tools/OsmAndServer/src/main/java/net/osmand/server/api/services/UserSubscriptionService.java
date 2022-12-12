@@ -66,6 +66,9 @@ public class UserSubscriptionService {
 					s = revalidateHuaweiSubscription(s);
 				} else if (s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION)) {
 					s = revalidateAmazonSubscription(s);
+				} else if (s.sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
+					// TODO Do we need to have iOS here or iOS client calls /user-validate-ios-sub separetely
+//					s = revalidateiOSSubscription(s.orderId)
 				}
 			}
 			if (s.valid == null || !s.valid.booleanValue()) {
@@ -185,7 +188,11 @@ public class UserSubscriptionService {
                 ReceiptValidationHelper receiptValidationHelper = new ReceiptValidationHelper();
                 String purchaseToken = s.purchaseToken;
                 try {
-                    ReceiptValidationHelper.ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken);
+                    ReceiptValidationHelper.ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken, false);
+                    if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
+//                    	errorMsg = "Apple code:" + loadReceipt.error + " This receipt is from the test environment";
+                    	loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken, true);
+                    }
                     if (loadReceipt.result) {
                         JsonObject receiptObj = loadReceipt.response;
                         SubscriptionPurchase subscription = null;
@@ -205,8 +212,6 @@ public class UserSubscriptionService {
                         }
                     } else if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
                         errorMsg = "Apple code:" + loadReceipt.error + " The user account cannot be found or has been deleted";
-                    } else if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
-                        errorMsg = "Apple code:" + loadReceipt.error + " This receipt is from the test environment";
                     } else {
                         errorMsg = "Apple code:" + loadReceipt.error + " See code status https://developer.apple.com/documentation/appstorereceipts/status";
                     }

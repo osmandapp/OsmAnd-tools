@@ -33,6 +33,8 @@ public class ReceiptValidationHelper {
 	public static final String FIELD_LATEST_RECEIPT_INFO = "latest_receipt_info";
 	
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
+	private final static String SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
+
 	public final static String IOS_MAPS_BUNDLE_ID = "net.osmand.maps";
 
 	public final static int NO_RESPONSE_ERROR_CODE = 1100;
@@ -50,14 +52,14 @@ public class ReceiptValidationHelper {
 		public JsonObject response;
 	}
 
-	public ReceiptResult loadReceipt(String receipt) {
+	public ReceiptResult loadReceipt(String receipt, boolean sandbox) {
 		ReceiptResult result = new ReceiptResult();
 
 		JsonObject receiptObj = new JsonObject();
 		receiptObj.addProperty("receipt-data", receipt);
 		receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
 
-		String jsonAnswer = postReceiptJson(receiptObj);
+		String jsonAnswer = postReceiptJson(receiptObj, sandbox);
 		if (jsonAnswer != null) {
 			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
 			JsonElement statusElement = responseObj.get(FIELD_STATUS);
@@ -112,10 +114,10 @@ public class ReceiptValidationHelper {
 		return result;
 	}
 
-	private static String postReceiptJson(JsonObject json) {
+	private static String postReceiptJson(JsonObject json, boolean sandbox) {
 		HttpURLConnection connection = null;
 		try {
-			connection = NetworkUtils.getHttpURLConnection(ReceiptValidationHelper.PRODUCTION_URL);
+			connection = NetworkUtils.getHttpURLConnection(sandbox ? ReceiptValidationHelper.SANDBOX_URL : ReceiptValidationHelper.PRODUCTION_URL);
 			connection.setRequestProperty("Accept-Charset", "UTF-8");
 //			connection.setRequestProperty("User-Agent", "OsmAnd Server 1.0");
 			connection.setConnectTimeout(30000);
