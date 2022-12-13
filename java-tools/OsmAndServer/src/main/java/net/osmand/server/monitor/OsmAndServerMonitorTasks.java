@@ -175,7 +175,7 @@ public class OsmAndServerMonitorTasks {
 	private void sendBroadcastMessage(String string) {
 		if (telegram != null) {
 			telegram.sendBroadcastMessage(string);
-			telegram.sendChannelMessage(publishChannel, string);
+			telegram.sendChannelMessage(publishChannel, "🤖" + string);
 		}
 	}
 
@@ -708,7 +708,7 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 			for(FeedEntry n : newFeed) {
-				String text = String.format("<a href='%s'>%s</a> <b>%s</b>: %s", n.link, n.updated.toString(), n.author, n.title);
+				String text = String.format("🐙<a href='%s'>%s</a> <b>%s</b>: %s", n.link, n.updated.toString(), n.author, n.title);
 				telegram.sendChannelMessage(publishChannel, text);
 			}
 			feed.addAll(newFeed);
