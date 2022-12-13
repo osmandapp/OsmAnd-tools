@@ -107,7 +107,7 @@ public class OsmAndServerMonitorTasks {
 	@Value("${monitoring.changes.publish.channel}")
 	private String publishChannel;
 	
-	private long lastFeedCheckTimestamp = System.currentTimeMillis() - 60000; // last minute 
+	private long lastFeedCheckTimestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 3; // last 3 hours 
 	
 	private List<FeedEntry> feed = new ArrayList<>();
 
@@ -689,7 +689,7 @@ public class OsmAndServerMonitorTasks {
 						formatTime(live30Days.getPercentile(PERC)), formatTime(live30Days.getMean()));
 	}
 	
-	@Scheduled(fixedRate = MINUTE)
+	@Scheduled(fixedRate = 5 * MINUTE)
 	public void checkOsmAndChangesFeed() throws IOException, XmlPullParserException, ParseException {
 		if (!Algorithms.isEmpty(urlChangesFeed)) {
 			List<FeedEntry> newFeed = new ArrayList<>();
