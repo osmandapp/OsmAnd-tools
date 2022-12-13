@@ -99,7 +99,9 @@ spring:
 mapillary.accesstoken: ${MAPILLARY_ACCESS_TOKEN:}
 
 monitoring:
-  enabled: ${ENABLE_MONITORING:false}
+  enabled: false
+  changes.feed: 
+  changes.publish.channel: 
 
 geoip.url: "http://localhost:8081/json/"
 

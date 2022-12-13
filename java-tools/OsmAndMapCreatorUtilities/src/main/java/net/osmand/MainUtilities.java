@@ -1,19 +1,30 @@
 package net.osmand;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import net.osmand.obf.*;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.BinaryComparator;
+import net.osmand.obf.BinaryInspector;
+import net.osmand.obf.BinaryMerger;
+import net.osmand.obf.GenerateRegionTags;
+import net.osmand.obf.IconVisibility;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.diff.AugmentedDiffsInspector;
 import net.osmand.obf.diff.GenerateDailyObf;
 import net.osmand.obf.diff.ObfDiffGenerator;
@@ -36,13 +47,13 @@ import net.osmand.travel.WikivoyageGenOSM;
 import net.osmand.travel.WikivoyageLangPreparation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.CombineSRTMIntoFile;
+import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
 import net.osmand.util.CountryOcbfGeneration;
 import net.osmand.util.FixBasemapRoads;
 import net.osmand.util.GenerateExtractScript;
 import net.osmand.util.IndexBatchCreator;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.ResourceDeleter;
-import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -51,7 +62,6 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
-
 
 	public static void main(String[] args) throws Exception {
 		if (args.length == 0) {

@@ -21,7 +21,10 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 	private static final Log LOG = LogFactory.getLog(OsmAndServerMonitoringBot.class);
 	
 	public interface Sender {
-		public void sendMonitoringAlertMessage(String text);
+		
+		public void sendBroadcastMessage(String text);
+		
+		public void sendChannelMessage(String chatId, String text);
 	}
 	
 	@Autowired
@@ -36,8 +39,14 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 		monitoring.setSender(new Sender() {
 			
 			@Override
-			public void sendMonitoringAlertMessage(String text) {
+			public void sendBroadcastMessage(String text) {
 				sendMonitoringMessage(text);
+			}
+
+			@Override
+			public void sendChannelMessage(String chatId, String text) {
+				sendMonitoringMessage(chatId, text);
+				
 			}
 		});
 	}
@@ -54,21 +63,25 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 		chatRepo.deleteById(chatId);
 	}
 
-	public void sendMonitoringMessage(String text) {
+	private void sendMonitoringMessage(String text) {
+		for (MonitoringChatId id : getMonitoringChatIds()) {
+			sendMonitoringMessage(id.id + "", text);
+		}
+	}
+
+	private void sendMonitoringMessage(String id, String text) {
 		if (!isTokenPresent()) {
 			return;
 		}
-		for (MonitoringChatId id : getMonitoringChatIds()) {
-			SendMessage snd = new SendMessage();
-			snd.setChatId(id.id + "");
-			snd.setText(text);
-			snd.enableHtml(true);
-			try {
-				sendText(snd);
-			} catch (TelegramApiException e) {
-				e.printStackTrace();
-				LOG.error("Error sending update to " + id, e);
-			}
+		SendMessage snd = new SendMessage();
+		snd.setChatId(id);
+		snd.setText(text);
+		snd.enableHtml(true);
+		try {
+			sendText(snd);
+		} catch (TelegramApiException e) {
+			e.printStackTrace();
+			LOG.error("Error sending update to " + id, e);
 		}
 	}
 
