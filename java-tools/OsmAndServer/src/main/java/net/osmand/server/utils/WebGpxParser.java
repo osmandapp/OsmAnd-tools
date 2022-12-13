@@ -51,6 +51,8 @@ public class WebGpxParser {
         public String desc;
         public String address;
         public String color;
+        public String background;
+        public String icon;
         public GPXUtilities.WptPt ext;
         
         public Wpt(GPXUtilities.WptPt point) {
@@ -74,6 +76,14 @@ public class WebGpxParser {
                     }
                     if (e.getKey().equals(COLOR_EXTENSION)) {
                         color = e.getValue();
+                        it.remove();
+                    }
+                    if (e.getKey().equals(BACKGROUND_TYPE_EXTENSION)) {
+                        background = e.getValue();
+                        it.remove();
+                    }
+                    if (e.getKey().equals(ICON_NAME_EXTENSION)) {
+                        icon = e.getValue();
                         it.remove();
                     }
                 }
@@ -403,6 +413,8 @@ public class WebGpxParser {
         point.desc = wpt.desc;
         point.extensions.put(COLOR_EXTENSION, String.valueOf(wpt.color));
         point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
+        point.extensions.put(BACKGROUND_TYPE_EXTENSION, String.valueOf(wpt.background));
+        point.extensions.put(ICON_NAME_EXTENSION, String.valueOf(wpt.icon));
         return point;
     }
     
