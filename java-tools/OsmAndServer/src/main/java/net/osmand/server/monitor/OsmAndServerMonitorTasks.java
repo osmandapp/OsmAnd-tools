@@ -107,7 +107,7 @@ public class OsmAndServerMonitorTasks {
 	@Value("${monitoring.changes.publish.channel}")
 	private String publishChannel;
 	
-	private long lastFeedCheckTimestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 3; // last 3 hours 
+	private long lastFeedCheckTimestamp = System.currentTimeMillis() - 1000 * 60 * 60; // last 1 hour 
 	
 	private List<FeedEntry> feed = new ArrayList<>();
 
@@ -732,6 +732,9 @@ public class OsmAndServerMonitorTasks {
 		} else if(n.title.contains("open")) {
 			emoji = EmojiConstants.OPEN_EMOJI;
 			tags = "#open";
+		} else if(n.title.contains("create")) {
+			emoji = EmojiConstants.CREATE_EMOJI;
+			tags = "#create";
 		} else if(n.title.contains("close")) {
 			emoji = EmojiConstants.CLOSED_EMOJI;
 			tags = "#close";
@@ -745,11 +748,13 @@ public class OsmAndServerMonitorTasks {
 			emoji = EmojiConstants.MERGE_EMOJI;
 			tags = "#merge";
 		} else if(n.title.contains("delete")) {
+			emoji = EmojiConstants.DELETE_EMOJI;
+			tags = "#delete";
 		} 
 		if(n.title.contains("branch")) {
 			tags += " #branch";
 		} else if (n.title.contains("pull request")) {
-			tags += " #pull-request";
+			tags += " #pullrequest";
 		} else if (n.title.contains("issue")) {
 			tags += " #issue";
 		}
