@@ -708,7 +708,7 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 			for(FeedEntry n : newFeed) {
-				String text = String.format(EmojiConstants.GITHUB_EMOJI + "<a href='%s'>%s</a> <b>%s</b>: %s", n.link, n.updated.toString(), n.author, n.title);
+				String text = formatGithubMsg(n);
 				telegram.sendChannelMessage(publishChannel, text);
 			}
 			feed.addAll(newFeed);
@@ -721,6 +721,67 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 	
+	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
+	
+	private String formatGithubMsg(FeedEntry n) {
+		String emoji = EmojiConstants.GITHUB_EMOJI;
+		String tags = "";
+		if(n.title.contains("reopen")) {
+			emoji = EmojiConstants.REOPEN_EMOJI;
+			tags = "#reopen";
+		} else if(n.title.contains("open")) {
+			emoji = EmojiConstants.OPEN_EMOJI;
+			tags = "#open";
+		} else if(n.title.contains("close")) {
+			emoji = EmojiConstants.CLOSED_EMOJI;
+			tags = "#close";
+		} else if(n.title.contains("pushed")) {
+			emoji = EmojiConstants.PUSHED_EMOJI;
+			tags = "#push";
+		} else if(n.title.contains("comment")) {
+			emoji = EmojiConstants.COMMENT_EMOJI;
+			tags = "#comment";
+		} else if(n.title.contains("merge")) {
+			emoji = EmojiConstants.MERGE_EMOJI;
+			tags = "#merge";
+		} else if(n.title.contains("delete")) {
+		} 
+		if(n.title.contains("branch")) {
+			tags += " #branch";
+		} else if (n.title.contains("pull request")) {
+			tags += " #pull-request";
+		} else if (n.title.contains("issue")) {
+			tags += " #issue";
+		}
+
+		int mainIndex = 0;
+		String[] words = n.title.split(" ");
+		for (int i = 0; i < words.length; i++) {
+			if (words[i].startsWith("osmandapp/")) {
+				mainIndex = i;
+				break;
+			}
+		}
+
+		String titlePrefix = "";
+		String titleLink = n.title;
+		String titleSuffix = "";
+		for (int i = 0; i < words.length; i++) {
+			if (i < mainIndex) {
+				titlePrefix += " " + words[i];
+			} else if (i == mainIndex) {
+				titleLink = words[i];
+			} else {
+				titleSuffix += " " + words[i];
+			}
+		}
+		String text = String.format("%s <b>#%s</b>: %s <a href='%s'>%s</a> %s • %s\n%s",
+				emoji, n.author, 
+				titlePrefix.trim(), n.link, titleLink, titleSuffix.trim(), 
+				DATE_FORMAT.format(n.updated), tags.trim());
+		return text;
+	}
+
 	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(new InputStreamReader(new URL(url).openStream()));
