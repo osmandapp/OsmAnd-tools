@@ -53,6 +53,9 @@ public class WebGpxParser {
         public String color;
         public String background;
         public String icon;
+        public double lat;
+        public double lon;
+        public String category;
         public GPXUtilities.WptPt ext;
         
         public Wpt(GPXUtilities.WptPt point) {
@@ -64,6 +67,18 @@ public class WebGpxParser {
                 if (point.desc != null) {
                     desc = point.desc;
                     point.desc = null;
+                }
+                if (point.lat != 0) {
+                    lat = point.lat;
+                    point.lat = 0;
+                }
+                if (point.lon != 0) {
+                    lon = point.lon;
+                    point.lon = 0;
+                }
+                if (point.category != null) {
+                    category = point.category;
+                    point.category = null;
                 }
                 
                 Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
@@ -408,9 +423,15 @@ public class WebGpxParser {
     }
     
     private WptPt updateWpt(Wpt wpt) {
-        WptPt point = wpt.ext;
+        WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
         point.name = wpt.name;
         point.desc = wpt.desc;
+        point.lat = wpt.lat;
+        point.lon = wpt.lon;
+        point.category = wpt.category;
+        if (point.extensions == null) {
+            point.extensions = new LinkedHashMap<>();
+        }
         point.extensions.put(COLOR_EXTENSION, String.valueOf(wpt.color));
         point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
         point.extensions.put(BACKGROUND_TYPE_EXTENSION, String.valueOf(wpt.background));
