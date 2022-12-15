@@ -425,17 +425,27 @@ public class WebGpxParser {
     private WptPt updateWpt(Wpt wpt) {
         WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
         point.name = wpt.name;
-        point.desc = wpt.desc;
+        if (point.desc != null) {
+            point.desc = wpt.desc;
+        }
         point.lat = wpt.lat;
         point.lon = wpt.lon;
         point.category = wpt.category;
         if (point.extensions == null) {
             point.extensions = new LinkedHashMap<>();
         }
-        point.extensions.put(COLOR_EXTENSION, String.valueOf(wpt.color));
-        point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
-        point.extensions.put(BACKGROUND_TYPE_EXTENSION, String.valueOf(wpt.background));
-        point.extensions.put(ICON_NAME_EXTENSION, String.valueOf(wpt.icon));
+        if (wpt.color != null) {
+            point.extensions.put(COLOR_EXTENSION, wpt.color);
+        }
+        if (wpt.address != null) {
+            point.extensions.put(ADDRESS_EXTENSION, wpt.address);
+        }
+        if (wpt.background != null) {
+            point.extensions.put(BACKGROUND_TYPE_EXTENSION, wpt.background);
+        }
+        if (wpt.icon != null) {
+            point.extensions.put(ICON_NAME_EXTENSION, wpt.icon);
+        }
         return point;
     }
     
