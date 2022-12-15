@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
@@ -223,6 +224,28 @@ public class MapApiController {
 		}
 		userdataService.deleteFile(name, type, null, null, dev);
 		return userdataService.ok();
+	}
+	
+	@PostMapping(value = "/delete-file-version")
+	@ResponseBody
+	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type,
+	                                         @RequestParam Long updatetime){
+		UserFile fl = null;
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		} else {
+			if (updatetime != null) {
+				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
+						new Date(updatetime));
+			}
+			if (fl == null) {
+				return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+			}
+			storageService.deleteFile(fl.storage,userdataService.userFolder(fl), userdataService.storageFileName(fl));
+			filesRepository.delete(fl);
+			return userdataService.ok();
+		}
 	}
 	
 	@PostMapping(value = "/update-file")
