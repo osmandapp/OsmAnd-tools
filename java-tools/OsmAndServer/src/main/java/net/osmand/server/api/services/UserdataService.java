@@ -499,6 +499,28 @@ public class UserdataService {
         }
         filesRepository.saveAndFlush(usf);
     }
+    
+    public ResponseEntity<String> deleteFileVersion(Long updatetime, int userid, String fileName, String fileType, UserFile file) {
+        UserFile userFile = file;
+        if (updatetime != null && userFile == null) {
+            userFile = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(userid, fileName, fileType,
+                    new Date(updatetime));
+        }
+        if (userFile == null) {
+            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+        }
+        storageService.deleteFile(userFile.storage, userFolder(userFile), storageFileName(userFile));
+        filesRepository.delete(userFile);
+        return ok();
+    }
+    
+    public PremiumUsersRepository.PremiumUser getUserById(int id) {
+        return usersRepository.findById(id);
+    }
+    
+    public UserFile getLastFileVersion(int id, String fileName, String fileType) {
+        return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(id, fileName, fileType);
+    }
 
 	public void updateFileSize(UserFileNoData ufnd) {
 		Optional<UserFile> op = filesRepository.findById(ufnd.id);

@@ -245,30 +245,20 @@ public class UserdataController {
 		userdataService.deleteFile(name, type, deviceId, clienttime, dev);
 		return userdataService.ok();
 	}
-
+	
 	@PostMapping(value = "/delete-file-version")
 	@ResponseBody
 	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = true) Long updatetime,
-			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
-		UserFile fl = null;
+	                                         @RequestParam(name = "name", required = true) String name,
+	                                         @RequestParam(name = "type", required = true) String type,
+	                                         @RequestParam(name = "updatetime", required = true) Long updatetime,
+	                                         @RequestParam(name = "deviceid", required = true) int deviceId,
+	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		} else {
-			if (updatetime != null) {
-				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-						new Date(updatetime));
-			}
-			if (fl == null) {
-				return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-			}
-			storageService.deleteFile(fl.storage,userdataService.userFolder(fl), userdataService.storageFileName(fl));
-			filesRepository.delete(fl);
-			return userdataService.ok();
+			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
 	}
 

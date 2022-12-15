@@ -228,42 +228,33 @@ public class MapApiController {
 	
 	@PostMapping(value = "/delete-file-version")
 	@ResponseBody
-	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type,
-	                                         @RequestParam Long updatetime){
-		UserFile fl = null;
+	public ResponseEntity<String> deleteFile(@RequestParam String name,
+	                                         @RequestParam String type,
+	                                         @RequestParam Long updatetime) {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		} else {
-			if (updatetime != null) {
-				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-						new Date(updatetime));
-			}
-			if (fl == null) {
-				return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-			}
-			storageService.deleteFile(fl.storage,userdataService.userFolder(fl), userdataService.storageFileName(fl));
-			filesRepository.delete(fl);
-			return userdataService.ok();
+			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
 	}
 	
 	@PostMapping(value = "/update-file")
 	@ResponseBody
 	public ResponseEntity<String> updateFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
-	                                         @RequestParam String name, @RequestParam String type) throws IOException {
+	                                         @RequestParam String name,
+	                                         @RequestParam String type) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		PremiumUsersRepository.PremiumUser pu = userdataService.getUserById(dev.userid);
 		ResponseEntity<String> validateError = userdataService.validateUser(pu);
 		if (validateError != null) {
 			return validateError;
 		}
 		
-		//get last version
-		UserFile currentFile = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
+		UserFile currentFile = userdataService.getLastFileVersion(dev.userid, name, type);
 		if (currentFile == null) {
 			return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 		}
@@ -273,11 +264,8 @@ public class MapApiController {
 		if (uploadError != null) {
 			return uploadError;
 		}
-		//delete last version
-		storageService.deleteFile(currentFile.storage,userdataService.userFolder(currentFile), userdataService.storageFileName(currentFile));
-		filesRepository.delete(currentFile);
 		
-		return userdataService.ok();
+		return userdataService.deleteFileVersion(currentFile.updatetime.getTime(), dev.userid, name, type, currentFile);
 	}
 	
 	@GetMapping(value = "/list-files")
