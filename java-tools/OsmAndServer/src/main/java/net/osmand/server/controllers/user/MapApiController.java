@@ -1,11 +1,8 @@
 package net.osmand.server.controllers.user;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.sql.SQLException;
 import java.util.Collections;
-import java.util.Date;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
@@ -19,8 +16,10 @@ import javax.validation.constraints.NotNull;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,7 +52,6 @@ import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.springframework.web.multipart.MultipartFile;
 
-import static net.osmand.server.api.services.UserdataService.ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 @Controller
@@ -92,6 +90,8 @@ public class MapApiController {
 	@Autowired
 	protected PremiumUserFilesRepository filesRepository;
 	
+	@Autowired
+	protected GpxService gpxService;
 	
 	Gson gson = new Gson();
 	
@@ -207,7 +207,7 @@ public class MapApiController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
+		ResponseEntity<String> uploadError = userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
 		if (uploadError != null) {
 			return uploadError;
 		}
@@ -260,7 +260,7 @@ public class MapApiController {
 		}
 		
 		//add new version
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
+		ResponseEntity<String> uploadError = userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
 		if (uploadError != null) {
 			return uploadError;
 		}
@@ -390,7 +390,7 @@ public class MapApiController {
 		gpxFile.path = file.name;
 		// file.clienttime == null ? 0 : file.clienttime.getTime()
 		GPXTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
-		gpxController.cleanupFromNan(analysis);
+		gpxService.cleanupFromNan(analysis);
 		return analysis;
 	}
 
@@ -436,7 +436,7 @@ public class MapApiController {
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
-			GPXFile srtmGpx = gpxController.calculateSrtmAltitude(gpxFile, null);
+			GPXFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
 			GPXTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(userFile, srtmGpx);
 			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
 				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
@@ -455,5 +455,25 @@ public class MapApiController {
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
 		return okStatus();
+	}
+	
+	@PostMapping(value = "/fav/delete")
+	@ResponseBody
+	public ResponseEntity<String> deleteFav(@RequestBody String data,
+	                                        @RequestParam String fileName,
+	                                        @RequestParam String fileType,
+	                                        @RequestParam String updatetime) throws IOException {
+		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
+		
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		ResponseEntity<String> validateError = userdataService.validateUser(pu);
+		if (validateError != null) {
+			return validateError;
+		}
+		return userdataService.deleteFavorite(wpt, fileName, dev, fileType, updatetime);
 	}
 }

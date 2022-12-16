@@ -8,17 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.validation.Valid;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -178,14 +173,13 @@ public class StorageService {
 		nstorage += "," + storageId;
 		return nstorage; 
 	}
-
-
-	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
+	
+	
+	public String save(String fld, String fileName, long zipsize, InputStream is) throws IOException {
 		for (StorageType s : getAndInitDefaultStorageProviders()) {
-			InputStream is = file.getInputStream();
-			saveFile(fld, fileName, s, is, file.getSize());
+			saveFile(fld, fileName, s, is, zipsize);
 			is.close();
-		}		
+		}
 		return defaultStorage;
 	}
 

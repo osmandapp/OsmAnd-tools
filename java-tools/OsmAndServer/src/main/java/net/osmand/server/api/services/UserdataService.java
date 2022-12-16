@@ -2,14 +2,8 @@ package net.osmand.server.api.services;
 
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -21,14 +15,14 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.zip.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.gson.GsonBuilder;
+import net.osmand.GPXUtilities;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,8 +72,16 @@ public class UserdataService {
     @Autowired
     protected PremiumUserDevicesRepository devicesRepository;
     
-    Gson gson = new Gson();
+    @Autowired
+    WebGpxParser webGpxParser;
     
+    @Autowired
+    protected GpxService gpxService;
+    
+    Gson gson = new Gson();
+    Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+    
+    private static final String ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE = "File is not available";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PREMIUM_USERS = 100;
     public static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
@@ -223,8 +225,8 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
     }
     
-    public ResponseEntity<String> uploadFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                             String name, String type, Long clienttime) throws IOException {
+    public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                                      String name, String type, Long clienttime) throws IOException {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
         long cnt;
         long sum;
@@ -253,7 +255,7 @@ public class UserdataService {
         usf.deviceid = dev.id;
         usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
         usf.zipfilesize = zipsize;
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
+        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipsize, file.getInputStream());
         if (storageService.storeLocally()) {
             usf.data = file.getBytes();
         }
@@ -451,11 +453,11 @@ public class UserdataService {
             error[0] = tokenNotValid();
         } else {
             if (userFile == null) {
-                error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+                error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
             } else if (userFile.data == null) {
                 bin = getInputStream(userFile);
                 if (bin == null) {
-                    error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+                    error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
                 }
             } else {
                 bin = new ByteArrayInputStream(userFile.data);
@@ -507,7 +509,7 @@ public class UserdataService {
                     new Date(updatetime));
         }
         if (userFile == null) {
-            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
+            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         }
         storageService.deleteFile(userFile.storage, userFolder(userFile), storageFileName(userFile));
         filesRepository.delete(userFile);
@@ -537,4 +539,97 @@ public class UserdataService {
 		filesRepository.saveAndFlush(uf);
 		uf = filesRepository.getById(ufnd.id);
 	}
+    
+    public ResponseEntity<String> deleteFavorite(WebGpxParser.Wpt wpt,
+                                                 String fileName,
+                                                 PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                                 String fileType,
+                                                 String updatetime) throws IOException {
+        UserFile currentFile = getLastFileVersion(dev.userid, fileName, fileType);
+        if (currentFile == null) {
+            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+        }
+        
+        if (!Long.toString(currentFile.updatetime.getTime()).equals(updatetime)) {
+            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File was changed");
+        }
+        
+        InputStream in = currentFile.data != null ? new ByteArrayInputStream(currentFile.data) : getInputStream(currentFile);
+        if (in != null) {
+            GPXUtilities.GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+            if (gpxFile.error != null) {
+                return ResponseEntity.badRequest().body("Error reading gpx!");
+            } else {
+                GPXUtilities.WptPt wptPt = webGpxParser.updateWpt(wpt);
+                gpxFile.deleteWptPt(wptPt);
+                File tmpGpx = File.createTempFile(fileName, ".gpx");
+                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+                if (exception != null) {
+                    return ResponseEntity.badRequest().body("Error writing gpx!");
+                }
+                //add new version
+                ResponseEntity<String> uploadError = uploadFile(tmpGpx, dev, fileName, fileType, System.currentTimeMillis());
+                if (uploadError != null) {
+                    return uploadError;
+                }
+                
+                UserFile newFile = getLastFileVersion(dev.userid, fileName, fileType);
+                WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
+                
+                if (trackData != null) {
+                    ResponseEntity<String> response = deleteFileVersion(Long.parseLong(updatetime), dev.userid, fileName, fileType, null);
+                    if (!response.getStatusCode().is2xxSuccessful()) {
+                        return response;
+                    }
+                }
+                
+                return ResponseEntity.ok(gson.toJson(Map.of(
+                        "clienttimems", newFile.clienttime.getTime(),
+                        "updatetimems", newFile.updatetime.getTime(),
+                        "trackData", gsonWithNans.toJson(trackData))));
+            }
+        }
+        return ResponseEntity.badRequest().body("Favorite hasn't been deleted!");
+    }
+    
+    public ResponseEntity<String> uploadFile(File file,
+                                             PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                             String name,
+                                             String type,
+                                             Long clienttime) throws IOException {
+        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+        
+        File fileZip = new File(file.getPath().substring(0, file.getPath().indexOf("gpx")) + "gpx.gz");
+        byte[] buffer = new byte[1024];
+        try (FileInputStream fis = new FileInputStream(file);
+             FileOutputStream fos = new FileOutputStream(fileZip);
+             GZIPOutputStream gos = new GZIPOutputStream(fos)) {
+            int len;
+            while ((len = fis.read(buffer)) != -1) {
+                gos.write(buffer, 0, len);
+            }
+        } catch (Exception e) {
+            return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
+        }
+        
+        long size = file.length();
+        long zipSize = fileZip.length();
+        
+        usf.name = name;
+        usf.type = type;
+        usf.updatetime = new Date();
+        if (clienttime != null) {
+            usf.clienttime = new Date(clienttime);
+        }
+        usf.userid = dev.userid;
+        usf.deviceid = dev.id;
+        usf.filesize = size;
+        usf.zipfilesize = zipSize;
+        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipSize, new FileInputStream(fileZip));
+        if (storageService.storeLocally()) {
+            usf.data = Files.readAllBytes(fileZip.toPath());
+        }
+        filesRepository.saveAndFlush(usf);
+        return null;
+    }
 }

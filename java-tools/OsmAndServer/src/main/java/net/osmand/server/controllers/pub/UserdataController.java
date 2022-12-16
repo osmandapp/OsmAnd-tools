@@ -13,7 +13,6 @@ import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.transaction.Transactional;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
@@ -36,7 +35,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
@@ -283,7 +281,7 @@ public class UserdataController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, clienttime);
+		ResponseEntity<String> uploadError = userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
 		if (uploadError != null) {
 			return uploadError;
 		}

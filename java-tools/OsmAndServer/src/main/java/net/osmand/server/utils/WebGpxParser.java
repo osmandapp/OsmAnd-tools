@@ -422,7 +422,7 @@ public class WebGpxParser {
         return gpxFile;
     }
     
-    private WptPt updateWpt(Wpt wpt) {
+    public WptPt updateWpt(Wpt wpt) {
         WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
         point.name = wpt.name;
         if (point.desc != null) {
