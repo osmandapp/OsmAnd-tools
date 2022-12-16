@@ -107,7 +107,7 @@ public class OsmAndServerMonitorTasks {
 	@Value("${monitoring.changes.publish.channel}")
 	private String publishChannel;
 	
-	private long lastFeedCheckTimestamp = System.currentTimeMillis() - 1000 * 60 * 60; // last 1 hour 
+	private long lastFeedCheckTimestamp; 
 	
 	private List<FeedEntry> feed = new ArrayList<>();
 
@@ -707,9 +707,15 @@ public class OsmAndServerMonitorTasks {
 					newFeed.add(e);
 				}
 			}
-			for(FeedEntry n : newFeed) {
-				String text = formatGithubMsg(n);
-				telegram.sendChannelMessage(publishChannel, text);
+			if (lastFeedCheckTimestamp == 0) {
+				if (newFeed.size() > 0) {
+					FeedEntry last = newFeed.get(newFeed.size() - 1);
+					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
+				}
+			} else {
+				for (FeedEntry n : newFeed) {
+					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
+				}
 			}
 			feed.addAll(newFeed);
 			while (feed.size() > 100) {
