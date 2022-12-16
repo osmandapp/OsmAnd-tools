@@ -576,13 +576,6 @@ public class UserdataService {
                 UserFile newFile = getLastFileVersion(dev.userid, fileName, fileType);
                 WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
                 
-                if (trackData != null) {
-                    ResponseEntity<String> response = deleteFileVersion(Long.parseLong(updatetime), dev.userid, fileName, fileType, null);
-                    if (!response.getStatusCode().is2xxSuccessful()) {
-                        return response;
-                    }
-                }
-                
                 return ResponseEntity.ok(gson.toJson(Map.of(
                         "clienttimems", newFile.clienttime.getTime(),
                         "updatetimems", newFile.updatetime.getTime(),
