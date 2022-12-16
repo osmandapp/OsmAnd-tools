@@ -77,6 +77,7 @@ public class OsmAndServerMonitoringBot extends TelegramLongPollingBot {
 		snd.setChatId(id);
 		snd.setText(text);
 		snd.enableHtml(true);
+		snd.setDisableWebPagePreview(true);
 		try {
 			sendText(snd);
 		} catch (TelegramApiException e) {
