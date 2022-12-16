@@ -502,6 +502,7 @@ public class UserdataService {
         filesRepository.saveAndFlush(usf);
     }
     
+    //delete entry from database!
     public ResponseEntity<String> deleteFileVersion(Long updatetime, int userid, String fileName, String fileType, UserFile file) {
         UserFile userFile = file;
         if (updatetime != null && userFile == null) {
