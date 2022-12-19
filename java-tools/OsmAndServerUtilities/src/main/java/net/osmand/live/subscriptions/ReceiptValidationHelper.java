@@ -68,8 +68,8 @@ public class ReceiptValidationHelper {
 				result.error = status;
 			} else {
 				result.result = true;
-				result.response = responseObj;
 			}
+			result.response = responseObj;
 		} else {
 			result.error = NO_RESPONSE_ERROR_CODE;
 		}
