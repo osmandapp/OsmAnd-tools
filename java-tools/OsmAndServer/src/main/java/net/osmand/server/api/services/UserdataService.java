@@ -102,6 +102,9 @@ public class UserdataService {
     
     public static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
     
+    public static final String ADD_FAVORITE = "add";
+    public static final String DELETE_FAVORITE = "delete";
+    
     protected static final Log LOG = LogFactory.getLog(UserdataController.class);
     
     public ResponseEntity<String> validateUser(PremiumUsersRepository.PremiumUser user) {
@@ -541,11 +544,12 @@ public class UserdataService {
 		uf = filesRepository.getById(ufnd.id);
 	}
     
-    public ResponseEntity<String> deleteFavorite(WebGpxParser.Wpt wpt,
+    public ResponseEntity<String> updateFavorite(WebGpxParser.Wpt wpt,
                                                  String fileName,
                                                  PremiumUserDevicesRepository.PremiumUserDevice dev,
                                                  String fileType,
-                                                 String updatetime) throws IOException {
+                                                 String updatetime,
+                                                 String action) throws IOException {
         UserFile currentFile = getLastFileVersion(dev.userid, fileName, fileType);
         if (currentFile == null) {
             return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
@@ -562,27 +566,32 @@ public class UserdataService {
                 return ResponseEntity.badRequest().body("Error reading gpx!");
             } else {
                 GPXUtilities.WptPt wptPt = webGpxParser.updateWpt(wpt);
-                gpxFile.deleteWptPt(wptPt);
+                
+                if (action.equals(ADD_FAVORITE)) {
+                    gpxFile.addPoint(wptPt);
+                } else if (action.equals(DELETE_FAVORITE)) {
+                    gpxFile.deleteWptPt(wptPt);
+                }
+                //create file
                 File tmpGpx = File.createTempFile(fileName, ".gpx");
                 Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
                 if (exception != null) {
                     return ResponseEntity.badRequest().body("Error writing gpx!");
                 }
-                //add new version
+                //save new version
                 ResponseEntity<String> uploadError = uploadFile(tmpGpx, dev, fileName, fileType, System.currentTimeMillis());
                 if (uploadError != null) {
                     return uploadError;
-                }
-                
-                UserFile newFile = getLastFileVersion(dev.userid, fileName, fileType);
-                WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
-    
-                if (trackData != null) {
+                } else {
+                    //delete prev version
                     ResponseEntity<String> response = deleteFileVersion(Long.parseLong(updatetime), dev.userid, fileName, fileType, null);
                     if (!response.getStatusCode().is2xxSuccessful()) {
                         return response;
                     }
                 }
+    
+                UserFile newFile = getLastFileVersion(dev.userid, fileName, fileType);
+                WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
                 
                 return ResponseEntity.ok(gson.toJson(Map.of(
                         "clienttimems", newFile.clienttime.getTime(),

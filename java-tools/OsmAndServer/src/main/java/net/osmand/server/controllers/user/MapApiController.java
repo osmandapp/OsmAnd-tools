@@ -52,6 +52,8 @@ import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.springframework.web.multipart.MultipartFile;
 
+import static net.osmand.server.api.services.UserdataService.ADD_FAVORITE;
+import static net.osmand.server.api.services.UserdataService.DELETE_FAVORITE;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 @Controller
@@ -474,6 +476,26 @@ public class MapApiController {
 		if (validateError != null) {
 			return validateError;
 		}
-		return userdataService.deleteFavorite(wpt, fileName, dev, fileType, updatetime);
+		return userdataService.updateFavorite(wpt, fileName, dev, fileType, updatetime, DELETE_FAVORITE);
+	}
+	
+	@PostMapping(value = "/fav/add")
+	@ResponseBody
+	public ResponseEntity<String> addFav(@RequestBody String data,
+	                                        @RequestParam String fileName,
+	                                        @RequestParam String fileType,
+	                                        @RequestParam String updatetime) throws IOException {
+		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
+		
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		ResponseEntity<String> validateError = userdataService.validateUser(pu);
+		if (validateError != null) {
+			return validateError;
+		}
+		return userdataService.updateFavorite(wpt, fileName, dev, fileType, updatetime, ADD_FAVORITE);
 	}
 }
