@@ -28,6 +28,7 @@ public class ReceiptValidationHelper {
 	public static final String FIELD_BUNDLE_ID = "bundle_id";
 	public static final String FIELD_PRODUCT_ID = "product_id";
 	public static final String FIELD_ORIGINAL_TRANSACTION_ID = "original_transaction_id";
+	public static final String FIELD_TRANSACTION_ID = "transaction_id";
 	public static final String FIELD_STATUS = "status";
 	public static final String FIELD_RECEIPT = "receipt";
 	public static final String FIELD_LATEST_RECEIPT_INFO = "latest_receipt_info";
@@ -50,6 +51,20 @@ public class ReceiptValidationHelper {
 		public boolean result;
 		public int error;
 		public JsonObject response;
+	}
+	
+	
+	public static void main(String[] args) {
+		// load ios subscription 
+		String prevReceipt = "";
+//		String currReceipt = "";
+		
+		ReceiptValidationHelper helper = new ReceiptValidationHelper();
+		ReceiptResult loadReceipt = helper.loadReceipt(prevReceipt, false);
+		System.out.println(loadReceipt.error + " " + loadReceipt.result + " " + loadReceipt.response);
+		
+//		loadReceipt = helper.loadReceipt(currReceipt, false);
+//		System.out.println(loadReceipt.error + " " + loadReceipt.result + " " + loadReceipt.response);
 	}
 
 	public ReceiptResult loadReceipt(String receipt, boolean sandbox) {
