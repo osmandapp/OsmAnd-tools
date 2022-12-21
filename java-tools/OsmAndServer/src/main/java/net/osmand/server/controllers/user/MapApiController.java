@@ -19,7 +19,6 @@ import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
-import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -427,59 +426,5 @@ public class MapApiController {
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
 		return okStatus();
-	}
-	
-	@PostMapping(value = "/fav/delete")
-	@ResponseBody
-	public ResponseEntity<String> deleteFav(@RequestBody String data,
-	                                        @RequestParam String fileName,
-	                                        @RequestParam String fileType,
-	                                        @RequestParam String updatetime) throws IOException {
-		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
-		
-		PremiumUserDevice dev = checkUser();
-		ResponseEntity<String> validateError = userdataService.validate(dev);
-		if (validateError != null) {
-			return validateError;
-		}
-		
-		return userdataService.addOrDeleteFavorite(wpt, fileName, dev, fileType, updatetime, DELETE_FAVORITE);
-	}
-	
-	@PostMapping(value = "/fav/add")
-	@ResponseBody
-	public ResponseEntity<String> addFav(@RequestBody String data,
-	                                     @RequestParam String fileName,
-	                                     @RequestParam String fileType,
-	                                     @RequestParam String updatetime) throws IOException {
-		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
-		
-		PremiumUserDevice dev = checkUser();
-		ResponseEntity<String> validateError = userdataService.validate(dev);
-		if (validateError != null) {
-			return validateError;
-		}
-		
-		return userdataService.addOrDeleteFavorite(wpt, fileName, dev, fileType, updatetime, ADD_FAVORITE);
-	}
-	
-	@PostMapping(value = "/fav/update")
-	@ResponseBody
-	public ResponseEntity<String> updateFav(@RequestBody String data,
-	                                        @RequestParam String wptName,
-	                                        @RequestParam String oldGroupName,
-	                                        @RequestParam String newGroupName,
-	                                        @RequestParam String oldGroupUpdatetime,
-	                                        @RequestParam String newGroupUpdatetime,
-	                                        @RequestParam String fileType) throws IOException {
-		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
-		
-		PremiumUserDevice dev = checkUser();
-		ResponseEntity<String> validateError = userdataService.validate(dev);
-		if (validateError != null) {
-			return validateError;
-		}
-		
-		return userdataService.updateFavorite(wpt, wptName, oldGroupName, newGroupName, oldGroupUpdatetime, newGroupUpdatetime, dev, fileType);
 	}
 }
