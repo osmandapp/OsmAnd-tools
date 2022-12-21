@@ -52,8 +52,7 @@ import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.springframework.web.multipart.MultipartFile;
 
-import static net.osmand.server.api.services.UserdataService.ADD_FAVORITE;
-import static net.osmand.server.api.services.UserdataService.DELETE_FAVORITE;
+import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 @Controller
@@ -239,35 +238,6 @@ public class MapApiController {
 		} else {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
-	}
-	
-	@PostMapping(value = "/update-file")
-	@ResponseBody
-	public ResponseEntity<String> updateFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
-	                                         @RequestParam String name,
-	                                         @RequestParam String type) throws IOException {
-		PremiumUserDevice dev = checkUser();
-		if (dev == null) {
-			return userdataService.tokenNotValid();
-		}
-		PremiumUsersRepository.PremiumUser pu = userdataService.getUserById(dev.userid);
-		ResponseEntity<String> validateError = userdataService.validateUser(pu);
-		if (validateError != null) {
-			return validateError;
-		}
-		
-		UserFile currentFile = userdataService.getLastFileVersion(dev.userid, name, type);
-		if (currentFile == null) {
-			return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-		}
-		
-		//add new version
-		ResponseEntity<String> uploadError = userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
-		if (uploadError != null) {
-			return uploadError;
-		}
-		
-		return userdataService.deleteFileVersion(currentFile.updatetime.getTime(), dev.userid, name, type, currentFile);
 	}
 	
 	@GetMapping(value = "/list-files")
@@ -468,34 +438,48 @@ public class MapApiController {
 		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
 		
 		PremiumUserDevice dev = checkUser();
-		if (dev == null) {
-			return userdataService.tokenNotValid();
-		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-		ResponseEntity<String> validateError = userdataService.validateUser(pu);
+		ResponseEntity<String> validateError = userdataService.validate(dev);
 		if (validateError != null) {
 			return validateError;
 		}
-		return userdataService.updateFavorite(wpt, fileName, dev, fileType, updatetime, DELETE_FAVORITE);
+		
+		return userdataService.addOrDeleteFavorite(wpt, fileName, dev, fileType, updatetime, DELETE_FAVORITE);
 	}
 	
 	@PostMapping(value = "/fav/add")
 	@ResponseBody
 	public ResponseEntity<String> addFav(@RequestBody String data,
-	                                        @RequestParam String fileName,
-	                                        @RequestParam String fileType,
-	                                        @RequestParam String updatetime) throws IOException {
+	                                     @RequestParam String fileName,
+	                                     @RequestParam String fileType,
+	                                     @RequestParam String updatetime) throws IOException {
 		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
 		
 		PremiumUserDevice dev = checkUser();
-		if (dev == null) {
-			return userdataService.tokenNotValid();
-		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-		ResponseEntity<String> validateError = userdataService.validateUser(pu);
+		ResponseEntity<String> validateError = userdataService.validate(dev);
 		if (validateError != null) {
 			return validateError;
 		}
-		return userdataService.updateFavorite(wpt, fileName, dev, fileType, updatetime, ADD_FAVORITE);
+		
+		return userdataService.addOrDeleteFavorite(wpt, fileName, dev, fileType, updatetime, ADD_FAVORITE);
+	}
+	
+	@PostMapping(value = "/fav/update")
+	@ResponseBody
+	public ResponseEntity<String> updateFav(@RequestBody String data,
+	                                        @RequestParam String wptName,
+	                                        @RequestParam String oldGroupName,
+	                                        @RequestParam String newGroupName,
+	                                        @RequestParam String oldGroupUpdatetime,
+	                                        @RequestParam String newGroupUpdatetime,
+	                                        @RequestParam String fileType) throws IOException {
+		WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
+		
+		PremiumUserDevice dev = checkUser();
+		ResponseEntity<String> validateError = userdataService.validate(dev);
+		if (validateError != null) {
+			return validateError;
+		}
+		
+		return userdataService.updateFavorite(wpt, wptName, oldGroupName, newGroupName, oldGroupUpdatetime, newGroupUpdatetime, dev, fileType);
 	}
 }

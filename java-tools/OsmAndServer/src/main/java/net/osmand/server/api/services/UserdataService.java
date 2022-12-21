@@ -544,62 +544,160 @@ public class UserdataService {
 		uf = filesRepository.getById(ufnd.id);
 	}
     
+    public ResponseEntity<String> addOrDeleteFavorite(WebGpxParser.Wpt wpt,
+                                                      String fileName,
+                                                      PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                                      String fileType,
+                                                      String updatetime,
+                                                      String action) throws IOException {
+        PreparedFavoriteFile preparedFavoriteGroup = prepareFile(fileName, fileType, dev, updatetime);
+        if (preparedFavoriteGroup.error != null) {
+            return preparedFavoriteGroup.error;
+        }
+        GPXUtilities.WptPt wptPt = webGpxParser.updateWpt(wpt);
+        
+        if (action.equals(ADD_FAVORITE)) {
+            preparedFavoriteGroup.file.addPoint(wptPt);
+        } else if (action.equals(DELETE_FAVORITE)) {
+            preparedFavoriteGroup.file.deleteWptPt(wptPt);
+        }
+        
+        File tmpGpx = File.createTempFile(fileName, ".gpx");
+        Exception exception = GPXUtilities.writeGpxFile(tmpGpx, preparedFavoriteGroup.file);
+        if (exception != null) {
+            return ResponseEntity.badRequest().body("Error writing gpx!");
+        }
+        
+        ResponseEntity<String> error = updateFile(tmpGpx, dev, fileName, fileType, updatetime);
+        if (error != null) {
+            return error;
+        }
+        UserFile newFile = getLastFileVersion(dev.userid, fileName, fileType);
+        WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(preparedFavoriteGroup.file, tmpGpx);
+        
+        return ResponseEntity.ok(gson.toJson(Map.of(
+                "clienttimems", newFile.clienttime.getTime(),
+                "updatetimems", newFile.updatetime.getTime(),
+                "trackData", gsonWithNans.toJson(trackData))));
+    }
+    
     public ResponseEntity<String> updateFavorite(WebGpxParser.Wpt wpt,
-                                                 String fileName,
+                                                 String wptName,
+                                                 String oldGroupName,
+                                                 String newGroupName,
+                                                 String oldGroupUpdatetime,
+                                                 String newGroupUpdatetime,
                                                  PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                 String fileType,
-                                                 String updatetime,
-                                                 String action) throws IOException {
-        UserFile currentFile = getLastFileVersion(dev.userid, fileName, fileType);
-        if (currentFile == null) {
-            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+                                                 String fileType) throws IOException {
+        
+        PreparedFavoriteFile preparedNewFavoriteGroup = prepareFile(newGroupName, fileType, dev, newGroupUpdatetime);
+        if (preparedNewFavoriteGroup.error != null) {
+            return preparedNewFavoriteGroup.error;
+        }
+        PreparedFavoriteFile preparedOldFavoriteGroup = null;
+        boolean changeGroup = !oldGroupName.equals(newGroupName);
+        if (changeGroup) {
+            preparedOldFavoriteGroup = prepareFile(oldGroupName, fileType, dev, oldGroupUpdatetime);
+            if (preparedOldFavoriteGroup.error != null) {
+                return preparedOldFavoriteGroup.error;
+            }
         }
         
-        if (!Long.toString(currentFile.updatetime.getTime()).equals(updatetime)) {
-            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File was changed");
+        preparedNewFavoriteGroup.file.updateWptPtWeb(webGpxParser.updateWpt(wpt), wptName);
+        
+        File newTmpGpx = File.createTempFile(newGroupName, ".gpx");
+        File oldTmpGpx = null;
+        Exception exception = GPXUtilities.writeGpxFile(newTmpGpx, preparedNewFavoriteGroup.file);
+        if (exception != null) {
+            return ResponseEntity.badRequest().body("Error writing gpx!");
         }
         
-        InputStream in = currentFile.data != null ? new ByteArrayInputStream(currentFile.data) : getInputStream(currentFile);
-        if (in != null) {
-            GPXUtilities.GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-            if (gpxFile.error != null) {
-                return ResponseEntity.badRequest().body("Error reading gpx!");
-            } else {
-                GPXUtilities.WptPt wptPt = webGpxParser.updateWpt(wpt);
-                
-                if (action.equals(ADD_FAVORITE)) {
-                    gpxFile.addPoint(wptPt);
-                } else if (action.equals(DELETE_FAVORITE)) {
-                    gpxFile.deleteWptPt(wptPt);
-                }
-                //create file
-                File tmpGpx = File.createTempFile(fileName, ".gpx");
-                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+        ResponseEntity<String> error = updateFile(newTmpGpx, dev, newGroupName, fileType, newGroupUpdatetime);
+        if (error != null) {
+            return error;
+        } else {
+            if (changeGroup) {
+                preparedOldFavoriteGroup.file.deleteWptPt(wptName);
+                oldTmpGpx = File.createTempFile(oldGroupName, ".gpx");
+                exception = GPXUtilities.writeGpxFile(oldTmpGpx, preparedOldFavoriteGroup.file);
                 if (exception != null) {
                     return ResponseEntity.badRequest().body("Error writing gpx!");
                 }
-                //save new version
-                ResponseEntity<String> uploadError = uploadFile(tmpGpx, dev, fileName, fileType, System.currentTimeMillis());
-                if (uploadError != null) {
-                    return uploadError;
-                } else {
-                    //delete prev version
-                    ResponseEntity<String> response = deleteFileVersion(Long.parseLong(updatetime), dev.userid, fileName, fileType, null);
-                    if (!response.getStatusCode().is2xxSuccessful()) {
-                        return response;
-                    }
+                error = updateFile(oldTmpGpx, dev, oldGroupName, fileType, oldGroupUpdatetime);
+                if (error != null) {
+                    return error;
                 }
-    
-                UserFile newFile = getLastFileVersion(dev.userid, fileName, fileType);
-                WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
-                
-                return ResponseEntity.ok(gson.toJson(Map.of(
-                        "clienttimems", newFile.clienttime.getTime(),
-                        "updatetimems", newFile.updatetime.getTime(),
-                        "trackData", gsonWithNans.toJson(trackData))));
             }
         }
-        return ResponseEntity.badRequest().body("Favorite hasn't been deleted!");
+        
+        UserFile updatedNewGroupFile = getLastFileVersion(dev.userid, newGroupName, fileType);
+        WebGpxParser.TrackData newGroupTrackData = gpxService.getTrackDataByGpxFile(preparedNewFavoriteGroup.file, newTmpGpx);
+        UserFile updatedOldGroupFile = changeGroup ? getLastFileVersion(dev.userid, oldGroupName, fileType) : null;
+        WebGpxParser.TrackData oldGroupTrackData = changeGroup ? gpxService.getTrackDataByGpxFile(preparedOldFavoriteGroup.file, oldTmpGpx) : null;
+        
+        
+        Map<String, String> res = new java.util.HashMap<>(Map.of(
+                "newGroupClienttimems", String.valueOf(updatedNewGroupFile.clienttime.getTime()),
+                "newGroupUpdatetimems", String.valueOf(updatedNewGroupFile.updatetime.getTime()),
+                "newGroupTrackData", gsonWithNans.toJson(newGroupTrackData)));
+        
+        if (changeGroup) {
+            res.put("oldGroupClienttimems", String.valueOf(updatedOldGroupFile.clienttime.getTime()));
+            res.put("oldGroupUpdatetimems", String.valueOf(updatedOldGroupFile.updatetime.getTime()));
+            res.put("oldGroupTrackData", gsonWithNans.toJson(oldGroupTrackData));
+        }
+        
+        return ResponseEntity.ok(gson.toJson(res));
+    }
+    
+    private ResponseEntity<String> updateFile(File file,
+                                              PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                              String fileName,
+                                              String fileType,
+                                              String updatetime) throws IOException {
+        ResponseEntity<String> uploadError = uploadFile(file, dev, fileName, fileType, System.currentTimeMillis());
+        if (uploadError != null) {
+            return uploadError;
+        }
+        //delete prev version
+        ResponseEntity<String> response = deleteFileVersion(Long.parseLong(updatetime), dev.userid, fileName, fileType, null);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            return response;
+        }
+        return null;
+    }
+    
+    static class PreparedFavoriteFile {
+        GPXUtilities.GPXFile file;
+        ResponseEntity<String> error;
+        
+        PreparedFavoriteFile(GPXUtilities.GPXFile file, ResponseEntity<String> error) {
+            this.file = file;
+            this.error = error;
+        }
+    }
+    
+    private PreparedFavoriteFile prepareFile(String groupName,
+                                             String fileType,
+                                             PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                             String updatetime) throws IOException {
+        UserFile userGroupFile = getLastFileVersion(dev.userid, groupName, fileType);
+        if (userGroupFile == null) {
+            return new PreparedFavoriteFile(null, error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE));
+        }
+        if (!Long.toString(userGroupFile.updatetime.getTime()).equals(updatetime)) {
+            return new PreparedFavoriteFile(null, error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File was changed"));
+        }
+        InputStream in = userGroupFile.data != null ? new ByteArrayInputStream(userGroupFile.data) : getInputStream(userGroupFile);
+        if (in != null) {
+            GPXUtilities.GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+            if (gpxFile.error != null) {
+                return new PreparedFavoriteFile(null, ResponseEntity.badRequest().body("Error reading gpx!"));
+            } else {
+                return new PreparedFavoriteFile(gpxFile, null);
+            }
+        }
+        return new PreparedFavoriteFile(null, ResponseEntity.badRequest().body("Error prepare gpx file!"));
     }
     
     public ResponseEntity<String> uploadFile(File file,
@@ -641,5 +739,13 @@ public class UserdataService {
         }
         filesRepository.saveAndFlush(usf);
         return null;
+    }
+    
+    public ResponseEntity<String> validate(PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        if (dev == null) {
+            return tokenNotValid();
+        }
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        return validateUser(pu);
     }
 }
