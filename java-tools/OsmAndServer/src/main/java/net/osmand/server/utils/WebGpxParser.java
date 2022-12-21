@@ -425,7 +425,7 @@ public class WebGpxParser {
     public WptPt updateWpt(Wpt wpt) {
         WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
         point.name = wpt.name;
-        if (point.desc != null) {
+        if (wpt.desc != null) {
             point.desc = wpt.desc;
         }
         point.lat = wpt.lat;
