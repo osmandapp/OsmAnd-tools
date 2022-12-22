@@ -68,7 +68,6 @@ public class SvgMapLegendGenerator {
 
         // 4 Generate JS code fragments to copy
         HtmlGenerator.generate(configGroups);
-
     }
 
     private static boolean createSvgFile(GroupDTO group, IconDTO icon, String content, boolean isDay) {
@@ -154,9 +153,7 @@ public class SvgMapLegendGenerator {
                 String folderName = resultsFolderPath + group.folderName ;
 
                 for (IconDTO icon : group.icons) {
-                    //todo: delete iconNameDay, iconNameNight. Replace to one iconName;
                     String iconName = group.folderName + "_" + icon.iconName.replace("_day", "");
-
                     content += String.format("        '%s' : '%s/%s',\n", icon.name, group.folderName, iconName);
                 }
                 content += "        }}>\n";
