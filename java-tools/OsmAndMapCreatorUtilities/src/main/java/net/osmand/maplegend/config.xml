@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<groups>
+
+    <group name="Traffic, transportation" foldername="traffic">
+        <icon name="Parking" tag="amenity" value="parking" tag2="" value2="" />
+        <icon name="Private parking" tag="amenity" value="parking" tag2="access" value2="customers" />
+        <icon name="Paid parking" tag="amenity" value="parking" tag2="fee" value2="yes" />
+        <icon name="Multi-storey parking" tag="amenity" value="parking" tag2="parking" value2="multi-storey" />
+        <icon name="Underground parking" tag="amenity" value="parking" tag2="parking" value2="underground" />
+        <icon name="Bicycle parking" tag="amenity" value="bicycle_parking" tag2="" value2="" />
+        <icon name="Motorcycle parking" tag="amenity" value="motorcycle_parking" tag2="" value2="" />
+        <icon name="Taxi parking" tag="amenity" value="taxi" tag2="" value2="" />
+        <icon name="Railway station" tag="railway" value="station" tag2="" value2="" />
+
+    <!--            NOT WORKING NOW-->
+    <!--        <icon name="Disused railway station" tag="disused:railway" value="station" tag2="" value2="" />-->
+    <!--        <icon name="Disused railway station" tag="" value="" tag2="disused:railway" value2="station" />-->
+
+        <icon name="Subway station" tag="railway" value="station" tag2="station" value2="subway" />
+        <icon name="Spaceport" tag="aeroway" value="spaceport" tag2="" value2="" />
+        <icon name="Elevator" tag="highway" value="elevator" tag2="" value2="" />
+        <icon name="Traffic mirror" tag="highway" value="traffic_mirror" tag2="" value2="" />
+        <icon name="Highway services" tag="highway" value="services" tag2="" value2="" />
+
+
+<!--        <icon name="Subway entrance" tag="railway" value="subway_entrance" tag2="" value2="" />-->
+
+    </group>
+
+<!--    <group name="Traffic, transportation" foldername="traffic">-->
+<!--        <icon name="Fuel station" tag="amenity" value="fuel" tag2="" value2="" />-->
+<!--        <icon name="Cinema" tag="amenity" value="cinema" tag2="" value2="" />-->
+<!--    </group>-->
+
+<!--    <group groupname="Tourism and Attractions" foldername="tourism">-->
+<!--        <icon name="Attraction" tag="tourism" value="attraction" tag2="" value2="" />-->
+<!--        <icon name="Fountain" tag="amenity" value="fountain" tag2="" value2="" />-->
+<!--    </group>-->
+
+<!--    <group groupname="Religion" foldername="religion">-->
+<!--        <icon name="Place of worship" tag="amenity" value="place_of_worship" tag2="" value2="" />-->
+<!--        <icon name="Church" tag="amenity" value="place_of_worship" tag2="religion" value2="christian" />-->
+<!--    </group>-->
+
+</groups>

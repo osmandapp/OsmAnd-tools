@@ -1,9 +1,0 @@
-[
-
-{"icon_name" : "tourist/zoo.svg", "icon_shield_hidden" : "False",  "icon_color" : "#FFFFFF", "icon_shield_color" : "#EE6C99", "icon_shield_stroke_color" : "#E72B6C", "background_color" : "#DCE2AA", "background_opacity" : 0.2}, 
-{"icon_name" : "tourist/cinema.svg", "icon_shield_hidden" : "False",  "icon_color" : "#FFFFFF", "icon_shield_color" : "#673A1C", "icon_shield_stroke_color" : "#9F5A2B", "background_color" : "#FFFFF", "background_opacity" : 0}, 
-{"icon_name" : "tourist/cinema3.svg", "icon_shield_hidden" : "False",  "icon_color" : "#FFFFFF", "icon_shield_color" : "#EE6C99", "icon_shield_stroke_color" : "#BA9171", "background_color" : "#AF7A57", "background_opacity" : 0.2}, 
-{"icon_name" : "tourist/fountain.svg", "icon_shield_hidden" : "False",  "icon_color" : "blue", "icon_shield_color" : "white", "icon_shield_stroke_color" : "black", "background_color" : "green", "background_opacity" : 0.2}, 
-{"icon_name" : "tourist/picnic_table.svg", "icon_shield_hidden" : "True",  "icon_color" : "brown", "icon_shield_color" : "white", "icon_shield_stroke_color" : "white", "background_color" : "red", "background_opacity" : 0.2}
-
-]
