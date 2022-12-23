@@ -208,6 +208,10 @@ public class SvgMapLegendGenerator {
         private static String getIcon(String iconName) throws Exception {
             String filePath = iconsFolder + "mx_" + iconName + ".svg";
             SvgDTO iconSvg = parseSvg(filePath);
+
+            // change clip_id from default "clip0", "clip1"...   to  "clip1000", "clip1001"...
+            // for not overwriting shield's clip_id data
+            iconSvg.content = iconSvg.content.replace("clip", "clip100");
             return moveToCenterAndResize(iconSvg, iconSize);
         }
 
