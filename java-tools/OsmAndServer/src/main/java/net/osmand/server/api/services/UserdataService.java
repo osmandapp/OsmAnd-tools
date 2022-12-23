@@ -10,6 +10,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -25,6 +26,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,7 +35,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,6 +45,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
+import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
@@ -253,7 +258,7 @@ public class UserdataService {
         usf.deviceid = dev.id;
         usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
         usf.zipfilesize = zipsize;
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
+        usf.storage = storageService.save(userFolder(usf.userid), storageFileName(usf.type, usf.name, usf.updatetime), file);
         if (storageService.storeLocally()) {
             usf.data = file.getBytes();
         }
@@ -261,19 +266,18 @@ public class UserdataService {
         return null;
     }
     
-    public String userFolder(PremiumUserFilesRepository.UserFile usf) {
-        return USER_FOLDER_PREFIX + usf.userid;
+    public String userFolder(int userid) {
+        return USER_FOLDER_PREFIX + userid;
     }
     
-    public String storageFileName(PremiumUserFilesRepository.UserFile usf) {
-        String fldName = usf.type;
-        String name = usf.name;
+    public String storageFileName(String type, String name, Date updatetime) {
+        String fldName = type;
         if (name.indexOf('/') != -1) {
             int nt = name.lastIndexOf('/');
             fldName += "/" + name.substring(0, nt);
             name = name.substring(nt + 1);
         }
-        return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
+        return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
     
     public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
@@ -416,8 +420,10 @@ public class UserdataService {
             byte[] buf = new byte[BUFFER_SIZE];
             int r;
             OutputStream ous = gzout && !gzin ? new GZIPOutputStream(response.getOutputStream()) : response.getOutputStream();
-            while ((r = bin.read(buf)) != -1) {
-                ous.write(buf, 0, r);
+			if (bin != null) {
+				while ((r = bin.read(buf)) != -1) {
+					ous.write(buf, 0, r);
+				}
 			}
 			ous.close();
 		} finally {
@@ -477,7 +483,11 @@ public class UserdataService {
     }
     
     public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
-        return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
+    }
+    
+    public InputStream getInputStream(PremiumUserFilesRepository.UserFileNoData userFile) {
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
     }
     
     public ResponseEntity<String> tokenNotValid() {
@@ -514,5 +524,74 @@ public class UserdataService {
 		uf.filesize = ufnd.filesize;
 		filesRepository.saveAndFlush(uf);
 		uf = filesRepository.getById(ufnd.id);
+	}
+    
+    public ResponseEntity<String> validate(PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        if (dev == null) {
+            return tokenNotValid();
+        }
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        return validateUser(pu);
+    }
+    
+    public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
+        Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
+            return ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
+        }
+        return null;
+    }
+    
+    
+    public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev, 
+			Set<String> filterTypes, boolean includeDeleted) throws IOException {
+		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
+		Set<String> fileIds = new TreeSet<String>();
+		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
+		String fileName = "Export_" + formatter.format(new Date());
+		File tmpFile = File.createTempFile(fileName, ".osf");
+		ZipOutputStream zs = null;
+		try {
+			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
+			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
+				String fileId = sf.type + "____" + sf.name;
+				if (filterTypes != null && !filterTypes.contains(sf.type.toUpperCase())) {
+					continue;
+				}
+				if (fileIds.add(fileId)) {
+					if (sf.filesize >= 0) {
+						InputStream is = getInputStream(sf);
+						ZipEntry zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
+						zs.putNextEntry(zipEntry);
+						Algorithms.streamCopy(is, zs);
+						zs.closeEntry();
+					} else if (includeDeleted) {
+						// include last version of deleted files
+						fileIds.remove(fileId);
+					}
+				}
+			}
+			zs.flush();
+			zs.finish();
+			zs.close();
+			HttpHeaders responseHeaders = new HttpHeaders();
+			responseHeaders.add("Content-Disposition", "attachment; filename=" + fileName + ".osf");
+			responseHeaders.add("Content-Type", "application/octet-stream");
+			responseHeaders.add("Content-Length", tmpFile.length() + "");
+			FileInputStream fis = new FileInputStream(tmpFile);
+			try {
+				OutputStream ous = response.getOutputStream();
+				Algorithms.streamCopy(fis, ous);
+				ous.close();
+			} finally {
+				fis.close();
+			}
+		} finally {
+			if (zs != null) {
+				zs.finish();
+				zs.close();
+			}
+			tmpFile.delete();
+		}
 	}
 }
