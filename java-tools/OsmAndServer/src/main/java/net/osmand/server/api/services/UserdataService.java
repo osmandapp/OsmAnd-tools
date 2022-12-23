@@ -4,6 +4,9 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -27,6 +30,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -597,5 +604,53 @@ public class UserdataService {
         }
         filesRepository.saveAndFlush(usf);
         return null;
+    }
+    
+    public ResponseEntity<Resource> getBackUp(PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+        List<UserFile> files = filesRepository.findAllByUseridAndTypeOrderByUpdatetimeDesc(dev.userid, "GPX");
+        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
+        Path path = Files.createTempDirectory(String.valueOf(Paths.get("Export_" + formatter.format(new Date()))));
+        for (int i = 0; i < files.size(); i++) {
+            if (i == 0 || !files.get(i).name.equals(files.get(i - 1).name)) {
+                if (files.get(i).data != null) {
+                    File tempFile = new File(path.toString() + File.separatorChar + files.get(i).name);
+                    if (!tempFile.getParentFile().exists()) {
+                        tempFile.getParentFile().mkdirs();
+                    }
+                    FileOutputStream fous = new FileOutputStream(tempFile);
+                    fous.write(files.get(i).data);
+                    fous.close();
+                }
+            }
+        }
+        File fileZip = File.createTempFile("Export_" + formatter.format(new Date()), ".zip");
+        try (ZipOutputStream zs = new ZipOutputStream(Files.newOutputStream(fileZip.toPath()))) {
+            Path pp = Paths.get(String.valueOf(path));
+            Files.walk(pp)
+                    .filter(p -> !Files.isDirectory(p))
+                    .forEach(p -> {
+                        ZipEntry zipEntry = new ZipEntry(pp.relativize(p).toString());
+                        try {
+                            zs.putNextEntry(zipEntry);
+                            Files.copy(p, zs);
+                            zs.closeEntry();
+                        } catch (IOException e) {
+                            LOG.error("Couldn't zip file " + e);
+                        }
+                    });
+            zs.finish();
+        }
+        
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.add("content-disposition", "attachment; filename=" + "Export_" + formatter.format(new Date()) + ".osf");
+        responseHeaders.add("Content-Type", "application/octet-stream");
+        
+        byte[] data = Files.readAllBytes(fileZip.toPath());
+        ByteArrayResource resource = new ByteArrayResource(data);
+        return ResponseEntity.ok()
+                .headers(responseHeaders)
+                .contentLength(data.length)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 }

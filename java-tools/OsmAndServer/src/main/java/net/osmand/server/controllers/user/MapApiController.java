@@ -24,6 +24,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -418,6 +420,16 @@ public class MapApiController {
 				bin.close();
 			}
 		}
+	}
+	
+	@GetMapping(path = {"/get_backUp"})
+	@ResponseBody
+	public HttpEntity<? extends Object> getBackUp() throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		return userdataService.getBackUp(dev);
 	}
 	
 	
