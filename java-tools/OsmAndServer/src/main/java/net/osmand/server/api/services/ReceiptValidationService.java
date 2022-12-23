@@ -51,7 +51,7 @@ public class ReceiptValidationService {
 			return mapStatus(CANNOT_LOAD_RECEIPT_STATUS);
 		}
 	}
-
+	
 	@Nullable
 	public List<InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
 		List<InAppReceipt> result = null;
@@ -106,8 +106,9 @@ public class ReceiptValidationService {
 				for (JsonElement jsonElement : latestReceiptInfoArray) {
 					Map<String, String> subscriptionObj = new HashMap<>();
 					JsonObject receipt = jsonElement.getAsJsonObject();
-					String productId = receipt.get(ReceiptValidationHelper.FIELD_PRODUCT_ID).getAsString();
-					subscriptionObj.put(ReceiptValidationHelper.FIELD_PRODUCT_ID, productId);
+					String productId = addStringField(subscriptionObj, receipt, ReceiptValidationHelper.FIELD_PRODUCT_ID);
+					addStringField(subscriptionObj, receipt, ReceiptValidationHelper.FIELD_ORIGINAL_TRANSACTION_ID);
+					addStringField(subscriptionObj, receipt, ReceiptValidationHelper.FIELD_TRANSACTION_ID);
 					JsonElement expiresDateElement = receipt.get("expires_date_ms");
 					if (expiresDateElement != null) {
 						long expiresDateMs = expiresDateElement.getAsLong();
@@ -137,6 +138,15 @@ public class ReceiptValidationService {
 			result.put("status", INCONSISTENT_RECEIPT_STATUS);
 			return result;
 		}
+	}
+
+	private String addStringField(Map<String, String> subscriptionObj, JsonObject receipt, String FIELD) {
+		String val = "";
+		if (receipt.has(FIELD)) {
+			val = receipt.get(FIELD).getAsString();
+			subscriptionObj.put(FIELD, val);
+		}
+		return val;
 	}
 
 	private HashMap<String, Object> mapStatus(int status) {

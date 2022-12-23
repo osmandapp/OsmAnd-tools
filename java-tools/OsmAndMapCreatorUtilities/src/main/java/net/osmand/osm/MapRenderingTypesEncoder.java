@@ -5,7 +5,6 @@ import gnu.trove.list.array.TIntArrayList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +32,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private static final String HIGH_CHARGING_OUT = "high";
 	private static final String MEDIUM_CHARGING_OUT = "medium";
 	private static final String LOW_CHARGING_OUT = "low";
+	public static final char SOCKET_KEY_DELIMITER = ':';
 	private static Log log = PlatformUtil.getLog(MapRenderingTypesEncoder.class);
 	// stored information to convert from osm tags to int type
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
@@ -61,14 +61,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private void initSocketTypes() {
-		Map<String, TIntArrayList> m = new HashMap<>();
-		m.put("socket:type2:output", new TIntArrayList(new int[] {20, 35}));
-		m.put("socket:type2_combo:output", new TIntArrayList(new int[] {20, 35}));
-		m.put("socket:type3:output", new TIntArrayList(new int[] {10, 20}));
-		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {2, 5}));
-		m.put("socket:chademo:output", new TIntArrayList(new int[] {20, 40}));
-		m.put("socket:schuko:output", new TIntArrayList(new int[] {2, 3}));
-		socketTypes = Collections.unmodifiableMap(m);
+		socketTypes = Map.ofEntries(Map.entry("socket:type2:output", new TIntArrayList(new int[]{20, 35})),
+				Map.entry("socket:type2_combo:output", new TIntArrayList(new int[]{30, 70})),
+				Map.entry("socket:type2_cable:output", new TIntArrayList(new int[]{30, 70})),
+				Map.entry("socket:type3a:output", new TIntArrayList(new int[]{10, 20})),
+				Map.entry("socket:type3c:output", new TIntArrayList(new int[]{10, 20})),
+				Map.entry("socket:cee_blue:output", new TIntArrayList(new int[]{2, 5})),
+				Map.entry("socket:chademo:output", new TIntArrayList(new int[]{30, 70})),
+				Map.entry("socket:schuko:output", new TIntArrayList(new int[]{2, 3})),
+				Map.entry("socket:type2:voltage", new TIntArrayList(new int[]{230, 500})),
+				Map.entry("socket:type2_combo:voltage", new TIntArrayList(new int[]{500, 800})),
+				Map.entry("socket:type2_cable:voltage", new TIntArrayList(new int[]{230, 500})),
+				Map.entry("socket:cee_blue:voltage", new TIntArrayList(new int[]{220, 250})),
+				Map.entry("socket:chademo:voltage", new TIntArrayList(new int[]{230, 500})),
+				Map.entry("socket:schuko:voltage", new TIntArrayList(new int[]{220, 240})));
 	}
 
 	@Override
@@ -81,10 +87,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return rt;
 	}
-
-
-
-
 
 	private MapRulType getMapRuleType(String tag, String val) {
 		return getRuleType(tag, val, false, true);
@@ -401,23 +403,31 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			for (String key : socketTypes.keySet()) {
 				String val = tags.get(key);
 				String socketType = parseSocketType(key);
-				String newKey = "osmand_socket_" + socketType + "_output";
-				if(val != null) {
+				String socketParam = parseSocketParam(key);
+				if (val != null && socketType != null && socketParam != null) {
+					String newKey = "osmand_socket_" + socketType + "_" + socketParam;
 					tags.put(newKey, filterValues(val, socketTypes.get(key)));
 				}
 			}
-
 		}
 		return tags;
 	}
 
-	private String parseSocketType(String string) {
-		int firstColon = string.indexOf(':');
-		int secondColon = string.indexOf(':', firstColon+1);
-		if (firstColon != -1 && secondColon != -1) {
-		    return string.substring(firstColon + 1, secondColon);
+	private String parseSocketParam(String key) {
+		int lastColon = key.lastIndexOf(SOCKET_KEY_DELIMITER);
+		if (lastColon != -1) {
+			return key.substring(lastColon + 1);
 		}
-		return "";
+		return null;
+	}
+
+	private String parseSocketType(String string) {
+		int firstColon = string.indexOf(SOCKET_KEY_DELIMITER);
+		int secondColon = string.indexOf(SOCKET_KEY_DELIMITER, firstColon + 1);
+		if (firstColon != -1 && secondColon != -1) {
+			return string.substring(firstColon + 1, secondColon);
+		}
+		return null;
 	}
 
 	private String filterValues(String val, TIntArrayList limits) {
@@ -464,8 +474,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private Map<String, String> transformIntegrityTags(Map<String, String> tags, EntityType entity,
-			EntityConvertApplyType appType) {
-		if(tags.containsKey("highway") && entity == EntityType.WAY) {
+	                                                   EntityConvertApplyType appType) {
+		if (tags.containsKey("highway") && entity == EntityType.WAY) {
 			tags = new LinkedHashMap<>(tags);
 			int[] integrityResult = calculateIntegrity(tags);
 			int integrity = integrityResult[0];
@@ -474,13 +484,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			int normalised_integrity_brouting = 0;
 			if (integrity_bicycle_routing >= 0) {
 				normalised_integrity_brouting = (integrity_bicycle_routing * 10) / max_integrity;
-			} else normalised_integrity_brouting = -1;
-				int normalised_integrity = (integrity * 10) / max_integrity;
-			if(integrity < 100) {
-				tags.put("osmand_highway_integrity", normalised_integrity +"");
+			} else {
+				normalised_integrity_brouting = -1;
 			}
-			tags.put("osmand_highway_integrity_brouting", normalised_integrity_brouting +"");
-			if(normalised_integrity_brouting > 4 && normalised_integrity_brouting <= 10) {
+			int normalised_integrity = (integrity * 10) / max_integrity;
+			if (integrity < 100) {
+				tags.put("osmand_highway_integrity", normalised_integrity + "");
+			}
+			tags.put("osmand_highway_integrity_brouting", normalised_integrity_brouting + "");
+			if (normalised_integrity_brouting > 4 && normalised_integrity_brouting <= 10) {
 				tags.put("osmand_highway_integrity_brouting_low", "yes");
 			}
 		}
