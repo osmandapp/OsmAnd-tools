@@ -310,7 +310,7 @@ public class SubscriptionController {
 							isEligibleForSubscriptionOffer(inAppReceipts, activeSubscriptions) ? "true" : "false");
 				}
 			}
-			LOG.info(gson.toJson(result));
+//			LOG.info(gson.toJson(result));
 			return ResponseEntity.ok(gson.toJson(result));
 		}
 		return error("Cannot load receipt.");
