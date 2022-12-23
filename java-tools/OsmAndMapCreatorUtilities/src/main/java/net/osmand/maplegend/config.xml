@@ -2,6 +2,25 @@
 
 <groups>
 
+    <group name="Emergency, health" foldername="health">
+
+        <icon name="Hospital" tag="amenity" value="hospital" tag2="" value2="" />
+        <icon name="Pharmacy" tag="amenity" value="pharmacy" tag2="" value2="" />
+        <icon name="Emergency Phone" tag="emergency" value="phone" tag2="" value2="" />
+
+        <icon name="Doctors" tag="amenity" value="doctors" tag2="" value2="" />
+        <icon name="Veterinary" tag="amenity" value="veterinary" tag2="" value2="" />
+        <icon name="Fire station" tag="amenity" value="fire_station" tag2="" value2="" />
+
+        <icon name="Police" tag="amenity" value="police" tag2="" value2="" />
+        <icon name="Dentist" tag="amenity" value="dentist" tag2="" value2="" />
+        <icon name="Social facility" tag="amenity" value="social_facility" tag2="" value2="" />
+
+        <icon name="Ambulance station" tag="emergency" value="ambulance_station" tag2="" value2="" />
+
+    </group>
+
+
     <group name="Traffic, transportation" foldername="traffic">
 
         <icon name="Parking" tag="amenity" value="parking" tag2="" value2="" />
@@ -46,9 +65,7 @@
         <icon name="Elevator" tag="highway" value="elevator" tag2="" value2="" />
         <icon name="Traffic mirror" tag="highway" value="traffic_mirror" tag2="" value2="" />
         <icon name="Highway services" tag="highway" value="services" tag2="" value2="" />
-        
+
     </group>
-
-
 
 </groups>
