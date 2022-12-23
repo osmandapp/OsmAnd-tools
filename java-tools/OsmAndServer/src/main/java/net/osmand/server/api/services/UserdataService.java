@@ -557,7 +557,7 @@ public class UserdataService {
 		Set<String> fileIds = new TreeSet<String>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
 		String fileName = "Export_" + formatter.format(new Date());
-		File tmpFile = File.createTempFile(fileName, ".osf");
+		File tmpFile = File.createTempFile(fileName, ".zip");
 		ZipOutputStream zs = null;
 		try {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
@@ -583,8 +583,8 @@ public class UserdataService {
 			zs.finish();
 			zs.close();
 			HttpHeaders responseHeaders = new HttpHeaders();
-			responseHeaders.add("Content-Disposition", "attachment; filename=" + fileName + ".osf");
-			responseHeaders.add("Content-Type", "application/octet-stream");
+			responseHeaders.add("Content-Disposition", "attachment; filename=" + fileName + ".zip");
+			responseHeaders.add("Content-Type", "application/zip");
 			responseHeaders.add("Content-Length", tmpFile.length() + "");
 			FileInputStream fis = new FileInputStream(tmpFile);
 			try {
