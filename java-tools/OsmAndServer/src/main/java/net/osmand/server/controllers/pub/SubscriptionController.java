@@ -284,7 +284,6 @@ public class SubscriptionController {
 					result.put("eligible_for_subscription_offer", "false");
 					result.put("result", false);
 					result.put("status", NO_SUBSCRIPTIONS_FOUND_STATUS);
-					return ResponseEntity.ok(gson.toJson(result));
 				} else {
 					result.put("eligible_for_introductory_price",
 							isEligibleForIntroductoryPrice(inAppReceipts) ? "true" : "false");
@@ -309,10 +308,10 @@ public class SubscriptionController {
 					result.putAll(validationResult);
 					result.put("eligible_for_subscription_offer",
 							isEligibleForSubscriptionOffer(inAppReceipts, activeSubscriptions) ? "true" : "false");
-
-					return ResponseEntity.ok(gson.toJson(result));
 				}
 			}
+			LOG.info(gson.toJson(result));
+			return ResponseEntity.ok(gson.toJson(result));
 		}
 		return error("Cannot load receipt.");
 	}
