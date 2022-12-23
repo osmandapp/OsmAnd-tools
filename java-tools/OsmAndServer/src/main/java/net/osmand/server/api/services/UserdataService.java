@@ -558,6 +558,8 @@ public class UserdataService {
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
 		String fileName = "Export_" + formatter.format(new Date());
 		File tmpFile = File.createTempFile(fileName, ".zip");
+		response.setHeader("Content-Disposition", "attachment; filename=" + fileName + ".zip");
+		response.setHeader("Content-Type", "application/zip");
 		ZipOutputStream zs = null;
 		try {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
@@ -582,10 +584,7 @@ public class UserdataService {
 			zs.flush();
 			zs.finish();
 			zs.close();
-			HttpHeaders responseHeaders = new HttpHeaders();
-			responseHeaders.add("Content-Disposition", "attachment; filename=" + fileName + ".zip");
-			responseHeaders.add("Content-Type", "application/zip");
-			responseHeaders.add("Content-Length", tmpFile.length() + "");
+			response.setHeader("Content-Length", tmpFile.length() + "");
 			FileInputStream fis = new FileInputStream(tmpFile);
 			try {
 				OutputStream ous = response.getOutputStream();
