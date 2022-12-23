@@ -258,7 +258,7 @@ public class UserdataService {
         usf.deviceid = dev.id;
         usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
         usf.zipfilesize = zipsize;
-        usf.storage = storageService.save(userFolder(usf.userid), storageFileName(usf.type, usf.name, usf.updatetime), file);
+        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
         if (storageService.storeLocally()) {
             usf.data = file.getBytes();
         }
@@ -266,8 +266,16 @@ public class UserdataService {
         return null;
     }
     
+    public String userFolder(UserFile uf) {
+        return userFolder(uf.userid);
+    }
+    
     public String userFolder(int userid) {
         return USER_FOLDER_PREFIX + userid;
+    }
+    
+    public String storageFileName(UserFile uf) {
+        return storageFileName(uf.type, uf.name, uf.updatetime);
     }
     
     public String storageFileName(String type, String name, Date updatetime) {
@@ -483,7 +491,7 @@ public class UserdataService {
     }
     
     public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
-        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
     }
     
     public InputStream getInputStream(PremiumUserFilesRepository.UserFileNoData userFile) {

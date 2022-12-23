@@ -253,8 +253,8 @@ public class MapApiController {
 			return uploadError;
 		}
 		//delete last version
-		storageService.deleteFile(currentFile.storage, userdataService.userFolder(currentFile.userid),
-				userdataService.storageFileName(currentFile.type, currentFile.name, currentFile.updatetime));
+		storageService.deleteFile(currentFile.storage, userdataService.userFolder(currentFile),
+				userdataService.storageFileName(currentFile));
 		filesRepository.delete(currentFile);
 		
 		return userdataService.ok();
