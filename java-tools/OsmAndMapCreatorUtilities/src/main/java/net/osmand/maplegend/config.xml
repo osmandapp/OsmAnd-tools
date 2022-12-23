@@ -42,29 +42,36 @@
         <icon name="Underground parking" tag="amenity" value="parking" tag2="parking" value2="underground" />
         <icon name="Ferry terminal" tag="amenity" value="ferry_terminal" tag2="" value2="" />
         <!--      TODO: add  'Large Airport'  -->
-        <!--      <icon name="Large aerodrome" tag="aerodrome" value="international" tag2="aeroway" value2="aerodrome" />  -->
-        <!--      <icon name="Large aerodrome" tag="aerodrome" value="international" tag2="aerodrome:type" value2="public" />  -->
+        <icon name="Large aerodrome" tag="aeroway" value="aerodrome" tag2="aerodrome" value2="international" />
 
         <icon name="Bicycle parking" tag="amenity" value="bicycle_parking" tag2="" value2="" />
         <icon name="Tram stop" tag="railway" value="tram_stop" tag2="" value2="" />
-        <!--      TODO: add  'Airdrome'  -->
+        <icon name="Aerodrome" tag="aeroway" value="aerodrome" tag2="" value2="" zoom="19" />
 
         <icon name="Motorcycle parking" tag="amenity" value="motorcycle_parking" tag2="" value2="" />
         <icon name="Traffic signals" tag="highway" value="traffic_signals" tag2="" value2="" />
         <icon name="Helipad" tag="aeroway" value="helipad" tag2="" value2="" />
 
-        <!--        Unsorted -->
         <icon name="Taxi parking" tag="amenity" value="taxi" tag2="" value2="" />
-        <icon name="Railway station" tag="railway" value="station" tag2="" value2="" />
-        <!--           TODO:    'Disused railway station' returns incorrect icon. Fix in in styles? &ndash;&gt;-->
-        <!--          <icon name="Disused railway station" tag="disused:railway" value="station" tag2="" value2="" />  -->
-        <!--          <icon name="Disused railway station" tag="" value="" tag2="disused:railway" value2="station" />  -->
+        <icon name="Roundabout" tag="highway" value="mini_roundabout" tag2="" value2="" />
+        <icon name="Gate number in the airport" tag="aeroway" value="gate" tag2="" value2="" />
 
-        <icon name="Subway station" tag="railway" value="station" tag2="station" value2="subway" />
-        <icon name="Spaceport" tag="aeroway" value="spaceport" tag2="" value2="" />
-        <icon name="Elevator" tag="highway" value="elevator" tag2="" value2="" />
-        <icon name="Traffic mirror" tag="highway" value="traffic_mirror" tag2="" value2="" />
-        <icon name="Highway services" tag="highway" value="services" tag2="" value2="" />
+        <icon name="Railway station" tag="railway" value="station" tag2="" value2="" />
+        <icon name="Dead end" tag="noexit" value="yes" tag2="" value2="" />
+        <icon name="Bump" tag="traffic_calming" value="bump" tag2="" value2="" />
+
+
+        <!--        Unsorted -->
+
+<!--        &lt;!&ndash;           TODO:    'Disused railway station' returns incorrect icon. Fix in in styles? &ndash;&gt;&ndash;&gt;-->
+<!--        &lt;!&ndash;          <icon name="Disused railway station" tag="disused:railway" value="station" tag2="" value2="" />  &ndash;&gt;-->
+<!--        &lt;!&ndash;          <icon name="Disused railway station" tag="" value="" tag2="disused:railway" value2="station" />  &ndash;&gt;-->
+
+<!--        <icon name="Subway station" tag="railway" value="station" tag2="station" value2="subway" />-->
+<!--        <icon name="Spaceport" tag="aeroway" value="spaceport" tag2="" value2="" />-->
+<!--        <icon name="Elevator" tag="highway" value="elevator" tag2="" value2="" />-->
+<!--        <icon name="Traffic mirror" tag="highway" value="traffic_mirror" tag2="" value2="" />-->
+<!--        <icon name="Highway services" tag="highway" value="services" tag2="" value2="" />-->
 
     </group>
 

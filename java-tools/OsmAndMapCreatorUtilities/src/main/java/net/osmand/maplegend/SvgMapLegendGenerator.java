@@ -28,6 +28,7 @@ public class SvgMapLegendGenerator {
     static String shieldsFolder = resourcesRepoPath + "/icons/svg/shields/";
     static String iconsFolder = resourcesRepoPath + "/rendering_styles/style-icons/poi-icons-svg/";
 
+    static int defaultZoomLevel = 19; //Most of the icons on this zoom are visible
     static int canvasWidth = 300;
     static int canvasHeight = 35;
     static double shieldSize = 20;
@@ -50,13 +51,12 @@ public class SvgMapLegendGenerator {
             String rendererName = (args.length > 1 && !Algorithms.isEmpty(args[1])) ? args[1] : "default";
             for (GroupDTO group : configGroups) {
                 for (IconDTO icon : group.icons) {
-                    String[] argumentsDay = {rendererName, icon.tag, icon.value, icon.tag2, icon.value2, "false"};
-                    String[] argumentsNight = {rendererName, icon.tag, icon.value, icon.tag2, icon.value2, "true"};
+                    String[] argumentsDay = {rendererName, icon.tag, icon.value, icon.tag2, icon.value2, "false", Integer.toString(icon.zoom)};
+                    String[] argumentsNight = {rendererName, icon.tag, icon.value, icon.tag2, icon.value2, "true", Integer.toString(icon.zoom)};
                     Map<String, String> dayStyle = RendererRulesStorageAmenityFetcher.main(argumentsDay);
                     Map<String, String> nightStyle = RendererRulesStorageAmenityFetcher.main(argumentsNight);
 
-                    if (!Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle.get("iconName")) &&
-                            !Algorithms.isEmpty(dayStyle.get("shieldName")) && !Algorithms.isEmpty(nightStyle.get("shieldName"))) {
+                    if (!Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle.get("iconName"))) {
                         icon.iconSize = Float.valueOf(dayStyle.get("iconSize"));
                         icon.iconName = dayStyle.get("iconName");
                         icon.shieldNameDay = dayStyle.get("shieldName");
@@ -122,6 +122,7 @@ public class SvgMapLegendGenerator {
         String value = null;
         String tag2 = null;
         String value2 = null;
+        int zoom = defaultZoomLevel;  //optional value
 
         String iconName = null;
         String shieldNameNight = null;
@@ -169,6 +170,11 @@ public class SvgMapLegendGenerator {
                         tempIcon.value = parser.getAttributeValue("", "value");
                         tempIcon.tag2 = parser.getAttributeValue("", "tag2");
                         tempIcon.value2 = parser.getAttributeValue("", "value2");
+
+                        String zoom = parser.getAttributeValue("", "zoom");
+                        if (!Algorithms.isEmpty(zoom)) {
+                            tempIcon.zoom = Integer.parseInt(zoom);
+                        }
 
                         if (Algorithms.isEmpty(tempIcon.name) || Algorithms.isEmpty(tempIcon.tag) || Algorithms.isEmpty(tempIcon.value)) {
                             throw new Exception("ERROR: parseXmlConfig() - icon fields invalid at config.xml line " + parser.getLineNumber());
