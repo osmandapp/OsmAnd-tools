@@ -596,7 +596,6 @@ public class UserdataService {
 			}
 		} finally {
 			if (zs != null) {
-				zs.finish();
 				zs.close();
 			}
 			tmpFile.delete();
