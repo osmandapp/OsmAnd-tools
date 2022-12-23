@@ -16,11 +16,18 @@ import java.util.zip.GZIPInputStream;
 
 public class SvgMapLegendGenerator {
 
-    static String configPath = "/Users/nnngrach/Documents/Projects/Coding/OsmAnd/tools/java-tools/OsmAndMapCreatorUtilities/src/main/java/net/osmand/maplegend/config.xml";
-    static String resultsFolderPath = "/Users/nnngrach/Documents/Projects/Coding/OsmAnd/web/main/static/img/legend/osmand/";
+    // Fill repo patches manually:
+    static String toolsRepoPath = "/Users/nnngrach/Documents/Projects/Coding/OsmAnd/tools";
+    static String webRepoPath = "/Users/nnngrach/Documents/Projects/Coding/OsmAnd/web";
+    static String resourcesRepoPath = "/Users/nnngrach/Documents/Projects/Coding/OsmAnd/resources";
 
-    static String shieldsFolder = "/Users/nnngrach/Documents/Projects/Coding/OsmAnd/resources/icons/svg/shields/";
-    static String iconsFolder = "/Users/nnngrach/Documents/Projects/Coding/OsmAnd/resources/rendering_styles/style-icons/poi-icons-svg/";
+
+    static String configPath = toolsRepoPath + "/java-tools/OsmAndMapCreatorUtilities/src/main/java/net/osmand/maplegend/config.xml";
+    static String resultsFolderPath = webRepoPath + "/main/static/img/legend/osmand/";
+
+    static String shieldsFolder = resourcesRepoPath + "/icons/svg/shields/";
+    static String iconsFolder = resourcesRepoPath + "/rendering_styles/style-icons/poi-icons-svg/";
+
     static int canvasWidth = 300;
     static int canvasHeight = 35;
     static double shieldSize = 20;
