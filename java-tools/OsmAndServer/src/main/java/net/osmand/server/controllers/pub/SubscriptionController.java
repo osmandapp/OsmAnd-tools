@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -85,6 +87,9 @@ public class SubscriptionController {
     private Gson gson = new Gson();
 
     private final RestTemplate restTemplate;
+    
+	@Value("${logging.purchase.debug}")
+	private boolean purchaseDebugInfo;
 
     @Autowired
     public SubscriptionController(RestTemplateBuilder builder) {
@@ -310,8 +315,15 @@ public class SubscriptionController {
 							isEligibleForSubscriptionOffer(inAppReceipts, activeSubscriptions) ? "true" : "false");
 				}
 			}
-            LOG.info(receipt);
-			LOG.info(gson.toJson(result));
+			if (purchaseDebugInfo) {
+				String ipAddress = request.getRemoteAddr();
+				Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+				if (hs != null && hs.hasMoreElements()) {
+					ipAddress = hs.nextElement();
+				}
+				LOG.info(String.format("IOS RECEIPT for %s: %s", ipAddress, receipt));
+				LOG.info(gson.toJson(result));
+			}
 			return ResponseEntity.ok(gson.toJson(result));
 		}
 		return error("Cannot load receipt.");

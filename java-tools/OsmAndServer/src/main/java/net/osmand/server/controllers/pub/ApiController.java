@@ -128,14 +128,14 @@ public class ApiController {
     @GetMapping(path = {"/geo-ip"}, produces = "application/json")
     @ResponseBody
     public String findGeoIP(HttpServletRequest request, @RequestParam(required = false) String ip) throws IOException{
-    	String remoteAddr = request.getRemoteAddr();
-    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
-        if (hs != null && hs.hasMoreElements()) {
-            remoteAddr = hs.nextElement();
-        }
-        if(ip != null && ip.length() > 0) {
-        	remoteAddr = ip;
-        }
+		String remoteAddr = request.getRemoteAddr();
+		Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+		if (hs != null && hs.hasMoreElements()) {
+			remoteAddr = hs.nextElement();
+		}
+		if (ip != null && ip.length() > 0) {
+			remoteAddr = ip;
+		}
         return locationService.getLocationAsJson(remoteAddr);
     }
     
