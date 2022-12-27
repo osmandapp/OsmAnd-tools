@@ -13,8 +13,8 @@ public class RendererRulesStorageAmenityFetcher {
         Map<String, String> iconStyle = null;
         if(args.length > 7) {
             String styleName = args[0];
-            String resourcesRepoPath = args[7];
-            String path = getStylePath(styleName, resourcesRepoPath);
+            String repositoriesPath = args[7];
+            String path = getStylePath(styleName, repositoriesPath);
             RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(path);
             iconStyle = getAmenityIconStyle(args[1], args[2], args[3],args[4], args[5].equals("true"), Integer.parseInt(args[6]), storage);
         } else {
@@ -26,7 +26,7 @@ public class RendererRulesStorageAmenityFetcher {
         return iconStyle;
     }
 
-    private static String getStylePath(String styleName, String resourcesRepoPath) {
+    private static String getStylePath(String styleName, String repositoriesPath) {
         String[] allStylesNames = new String[] {"default", "desert", "LightRS", "mapnik", "nautical",
                 "offroad", "osm-carto", "regions", "skimap", "snowmobile", "standalone-template",
                 "Topo-map-assimilation", "topo", "Touring-view_(more-contrast-and-details)", "UniRS",
@@ -34,7 +34,7 @@ public class RendererRulesStorageAmenityFetcher {
         if (Algorithms.isEmpty(styleName) || !Arrays.asList(allStylesNames).contains(styleName)) {
             styleName = "default";
         }
-        return resourcesRepoPath + "/rendering_styles/"  + styleName + ".render.xml";
+        return repositoriesPath + "/resources/rendering_styles/"  + styleName + ".render.xml";
     }
 
     public static Map<String, String> getAmenityIconStyle(String tag, String value, String tag2, String value2,
