@@ -1,4 +1,4 @@
-package net.osmand.server.controllers.pub;
+package net.osmand.server.controllers.user;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 @Controller
-@RequestMapping("/fav")
+@RequestMapping("/mapapi/fav")
 public class FavoriteController {
     
     public static final String ADD_FAVORITE = "add";
