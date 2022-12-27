@@ -82,8 +82,11 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 //      @Fetch(FetchMode.JOIN)
         @Column(name = "data", columnDefinition="bytea")
         public byte[] data;
+        
 //        @Lob
 //        public Blob data;
+        
+        public String status;
 
     }
 

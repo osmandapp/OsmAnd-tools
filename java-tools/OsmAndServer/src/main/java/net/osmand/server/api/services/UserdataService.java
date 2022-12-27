@@ -266,6 +266,7 @@ public class UserdataService {
 		if (usf.data != null) {
 			usf.data = null;
 		}
+		usf.status = "ok";
 		return ResponseEntity.ok(gson.toJson(usf));
 	}
     
