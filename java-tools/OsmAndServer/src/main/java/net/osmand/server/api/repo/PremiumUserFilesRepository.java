@@ -12,6 +12,7 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+import javax.persistence.Transient;
 
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -85,7 +86,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         
 //        @Lob
 //        public Blob data;
-        
+        @Transient
         public String status;
 
     }
