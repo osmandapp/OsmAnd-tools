@@ -229,42 +229,45 @@ public class UserdataService {
     }
     
     public ResponseEntity<String> uploadFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                             String name, String type, Long clienttime) throws IOException {
-        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
-        long cnt;
-        long sum;
-        ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
-        if (serverCommonFile != null) {
-            file = createEmptyMultipartFile(file, name);
-        }
-        long zipsize = file.getSize();
-        try {
-            GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
-            byte[] buf = new byte[1024];
-            sum = 0;
-            while ((cnt = gzis.read(buf)) >= 0) {
-                sum += cnt;
-            }
-        } catch (IOException e) {
-            return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
-        }
-        usf.name = name;
-        usf.type = type;
-        usf.updatetime = new Date();
+			String name, String type, Long clienttime) throws IOException {
+		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+		long cnt;
+		long sum;
+		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
+		if (serverCommonFile != null) {
+			file = createEmptyMultipartFile(file, name);
+		}
+		long zipsize = file.getSize();
+		try {
+			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
+			byte[] buf = new byte[1024];
+			sum = 0;
+			while ((cnt = gzis.read(buf)) >= 0) {
+				sum += cnt;
+			}
+		} catch (IOException e) {
+			return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
+		}
+		usf.name = name;
+		usf.type = type;
+		usf.updatetime = new Date();
 		if (clienttime != null) {
 			usf.clienttime = new Date(clienttime);
 		}
-        usf.userid = dev.userid;
-        usf.deviceid = dev.id;
-        usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
-        usf.zipfilesize = zipsize;
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
-        if (storageService.storeLocally()) {
-            usf.data = file.getBytes();
-        }
-        filesRepository.saveAndFlush(usf);
-        return null;
-    }
+		usf.userid = dev.userid;
+		usf.deviceid = dev.id;
+		usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
+		usf.zipfilesize = zipsize;
+		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
+		if (storageService.storeLocally()) {
+			usf.data = file.getBytes();
+		}
+		filesRepository.saveAndFlush(usf);
+		if (usf.data != null) {
+			usf.data = null;
+		}
+		return ResponseEntity.ok(gson.toJson(usf));
+	}
     
     public String userFolder(UserFile uf) {
         return userFolder(uf.userid);

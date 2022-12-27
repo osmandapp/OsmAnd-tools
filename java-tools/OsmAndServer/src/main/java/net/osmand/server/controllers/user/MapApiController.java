@@ -208,9 +208,9 @@ public class MapApiController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
-		if (uploadError != null) {
-			return uploadError;
+		ResponseEntity<String> responseStatus = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
+		if (responseStatus != null) {
+			return responseStatus;
 		}
 		
 		return okStatus();
@@ -241,22 +241,15 @@ public class MapApiController {
 			return validateError;
 		}
 		
-		//get last version
 		UserFile currentFile = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
 		if (currentFile == null) {
 			return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
 		}
 		
-		//add new version
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
-		if (uploadError != null) {
-			return uploadError;
+		ResponseEntity<String> responseStatus = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
+		if (responseStatus != null) {
+			return responseStatus;
 		}
-		//delete last version
-		storageService.deleteFile(currentFile.storage, userdataService.userFolder(currentFile),
-				userdataService.storageFileName(currentFile));
-		filesRepository.delete(currentFile);
-		
 		return userdataService.ok();
 	}
 	
