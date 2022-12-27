@@ -24,6 +24,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -207,9 +209,9 @@ public class MapApiController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> uploadError = userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
-		if (uploadError != null) {
-			return uploadError;
+		ResponseEntity<String> responseStatus = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
+		if (responseStatus != null) {
+			return responseStatus;
 		}
 		
 		return okStatus();
@@ -419,6 +421,23 @@ public class MapApiController {
 			}
 		}
 	}
+	
+	@GetMapping(value = "/download-backup")
+	@ResponseBody
+	public void getFile(HttpServletResponse response,
+			@RequestParam(name = "updatetime", required = false) boolean includeDeleted) throws IOException, SQLException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			ResponseEntity<String> error = tokenNotValid();
+			if (error != null) {
+				response.setStatus(error.getStatusCodeValue());
+				response.getWriter().write(error.getBody());
+				return;
+			}
+		}
+		userdataService.getBackup(response, dev, null, includeDeleted);
+	}
+	
 	
 	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")

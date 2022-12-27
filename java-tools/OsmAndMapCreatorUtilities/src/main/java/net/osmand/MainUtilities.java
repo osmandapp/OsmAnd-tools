@@ -54,6 +54,8 @@ import net.osmand.util.GenerateExtractScript;
 import net.osmand.util.IndexBatchCreator;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.ResourceDeleter;
+import net.osmand.maplegend.SvgMapLegendGenerator;
+import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -96,6 +98,8 @@ public class MainUtilities {
 				RenderingRulesStoragePrinter.main(subArgsArray);
 			} else if (utl.equals("explain-rendering-style")) {
 				RenderingRulesStorage.main(subArgsArray);
+            } else if (utl.equals("generate-maplegend-svg")) {
+                SvgMapLegendGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-wiki-world-sqlite")) {
 				WikiDatabasePreparation.main(subArgsArray);
 			} else if (utl.equals("generate-wikipedia-by-country")) {
@@ -265,7 +269,7 @@ public class MainUtilities {
 			}
 		}
 	}
-	
+
 	private static void generateAllOsmLiveTests(File testResources, String unpackFolder, boolean delete) throws IOException {
 		// clean all files
 		if (delete) {
@@ -325,7 +329,7 @@ public class MainUtilities {
 			IndexHeightData.MAXIMUM_LOADED_DATA = settings.maxHeightTilesInRam;
 		}
 		IndexCreator ic = new IndexCreator(new File("."), settings);
-		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE, 
+		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE,
 				settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE);
 		ic.setLastModifiedDate(fileToGen.lastModified());
 		String regionName = fileToGen.getName();
@@ -377,7 +381,7 @@ public class MainUtilities {
 				fout.close();
 			}
 		}
-		System.out.println("File " + res.getName() + " was uploaded to "  + targetDir);     
+		System.out.println("File " + res.getName() + " was uploaded to "  + targetDir);
 
 	}
 

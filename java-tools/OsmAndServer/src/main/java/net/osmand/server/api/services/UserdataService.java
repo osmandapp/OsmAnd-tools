@@ -4,6 +4,15 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -16,6 +25,11 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -27,6 +41,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,6 +51,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
+import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
@@ -226,57 +242,67 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
     }
     
-    public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                      String name, String type, Long clienttime) throws IOException {
-        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
-        long cnt;
-        long sum;
-        ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
-        if (serverCommonFile != null) {
-            file = createEmptyMultipartFile(file, name);
-        }
-        long zipsize = file.getSize();
-        try {
-            GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
-            byte[] buf = new byte[1024];
-            sum = 0;
-            while ((cnt = gzis.read(buf)) >= 0) {
-                sum += cnt;
-            }
-        } catch (IOException e) {
-            return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
-        }
-        usf.name = name;
-        usf.type = type;
-        usf.updatetime = new Date();
+    public ResponseEntity<String> uploadFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
+			String name, String type, Long clienttime) throws IOException {
+		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+		long cnt;
+		long sum;
+		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
+		if (serverCommonFile != null) {
+			file = createEmptyMultipartFile(file, name);
+		}
+		long zipsize = file.getSize();
+		try {
+			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
+			byte[] buf = new byte[1024];
+			sum = 0;
+			while ((cnt = gzis.read(buf)) >= 0) {
+				sum += cnt;
+			}
+		} catch (IOException e) {
+			return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
+		}
+		usf.name = name;
+		usf.type = type;
+		usf.updatetime = new Date();
 		if (clienttime != null) {
 			usf.clienttime = new Date(clienttime);
 		}
-        usf.userid = dev.userid;
-        usf.deviceid = dev.id;
-        usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
-        usf.zipfilesize = zipsize;
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipsize, file.getInputStream());
-        if (storageService.storeLocally()) {
-            usf.data = file.getBytes();
-        }
-        filesRepository.saveAndFlush(usf);
-        return null;
+		usf.userid = dev.userid;
+		usf.deviceid = dev.id;
+		usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
+		usf.zipfilesize = zipsize;
+		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
+		if (storageService.storeLocally()) {
+			usf.data = file.getBytes();
+		}
+		filesRepository.saveAndFlush(usf);
+		if (usf.data != null) {
+			usf.data = null;
+		}
+		return ResponseEntity.ok(gson.toJson(usf));
+	}
+    
+    public String userFolder(UserFile uf) {
+        return userFolder(uf.userid);
     }
     
-    public String userFolder(PremiumUserFilesRepository.UserFile usf) {
-        return USER_FOLDER_PREFIX + usf.userid;
+    public String userFolder(int userid) {
+        return USER_FOLDER_PREFIX + userid;
     }
     
-    public String storageFileName(PremiumUserFilesRepository.UserFile usf) {
-        String fldName = usf.type;
-        String name = usf.name;
+    public String storageFileName(UserFile uf) {
+        return storageFileName(uf.type, uf.name, uf.updatetime);
+    }
+    
+    public String storageFileName(String type, String name, Date updatetime) {
+        String fldName = type;
         if (name.indexOf('/') != -1) {
             int nt = name.lastIndexOf('/');
             fldName += "/" + name.substring(0, nt);
             name = name.substring(nt + 1);
         }
-        return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
+        return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
     
     public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
@@ -419,8 +445,10 @@ public class UserdataService {
             byte[] buf = new byte[BUFFER_SIZE];
             int r;
             OutputStream ous = gzout && !gzin ? new GZIPOutputStream(response.getOutputStream()) : response.getOutputStream();
-            while ((r = bin.read(buf)) != -1) {
-                ous.write(buf, 0, r);
+			if (bin != null) {
+				while ((r = bin.read(buf)) != -1) {
+					ous.write(buf, 0, r);
+				}
 			}
 			ous.close();
 		} finally {
@@ -481,6 +509,10 @@ public class UserdataService {
     
     public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
+    }
+    
+    public InputStream getInputStream(PremiumUserFilesRepository.UserFileNoData userFile) {
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
     }
     
     public ResponseEntity<String> tokenNotValid() {
@@ -558,44 +590,54 @@ public class UserdataService {
         return null;
     }
     
-    public ResponseEntity<String> uploadFile(File file,
-                                             PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                             String name,
-                                             String type,
-                                             Long clienttime) throws IOException {
-        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
-        
-        File fileZip = new File(file.getPath().substring(0, file.getPath().indexOf("gpx")) + "gpx.gz");
-        byte[] buffer = new byte[1024];
-        try (FileInputStream fis = new FileInputStream(file);
-             FileOutputStream fos = new FileOutputStream(fileZip);
-             GZIPOutputStream gos = new GZIPOutputStream(fos)) {
-            int len;
-            while ((len = fis.read(buffer)) != -1) {
-                gos.write(buffer, 0, len);
-            }
-        } catch (Exception e) {
-            return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
-        }
-        
-        long size = file.length();
-        long zipSize = fileZip.length();
-        
-        usf.name = name;
-        usf.type = type;
-        usf.updatetime = new Date();
-        if (clienttime != null) {
-            usf.clienttime = new Date(clienttime);
-        }
-        usf.userid = dev.userid;
-        usf.deviceid = dev.id;
-        usf.filesize = size;
-        usf.zipfilesize = zipSize;
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipSize, new FileInputStream(fileZip));
-        if (storageService.storeLocally()) {
-            usf.data = Files.readAllBytes(fileZip.toPath());
-        }
-        filesRepository.saveAndFlush(usf);
-        return null;
-    }
+    
+    public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
+			Set<String> filterTypes, boolean includeDeleted) throws IOException {
+		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
+		Set<String> fileIds = new TreeSet<String>();
+		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
+		String fileName = "Export_" + formatter.format(new Date());
+		File tmpFile = File.createTempFile(fileName, ".zip");
+		response.setHeader("Content-Disposition", "attachment; filename=" + fileName + ".zip");
+		response.setHeader("Content-Type", "application/zip");
+		ZipOutputStream zs = null;
+		try {
+			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
+			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
+				String fileId = sf.type + "____" + sf.name;
+				if (filterTypes != null && !filterTypes.contains(sf.type.toUpperCase())) {
+					continue;
+				}
+				if (fileIds.add(fileId)) {
+					if (sf.filesize >= 0) {
+						InputStream is = getInputStream(sf);
+						ZipEntry zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
+						zs.putNextEntry(zipEntry);
+						Algorithms.streamCopy(is, zs);
+						zs.closeEntry();
+					} else if (includeDeleted) {
+						// include last version of deleted files
+						fileIds.remove(fileId);
+					}
+				}
+			}
+			zs.flush();
+			zs.finish();
+			zs.close();
+			response.setHeader("Content-Length", tmpFile.length() + "");
+			FileInputStream fis = new FileInputStream(tmpFile);
+			try {
+				OutputStream ous = response.getOutputStream();
+				Algorithms.streamCopy(fis, ous);
+				ous.close();
+			} finally {
+				fis.close();
+			}
+		} finally {
+			if (zs != null) {
+				zs.close();
+			}
+			tmpFile.delete();
+		}
+	}
 }

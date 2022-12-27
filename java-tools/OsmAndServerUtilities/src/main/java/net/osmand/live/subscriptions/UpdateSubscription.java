@@ -340,6 +340,9 @@ public class UpdateSubscription {
 			} else if (reasonToDelete != null) {
 				deleteSubscription(orderId, sku, currentTime, reasonToDelete, kind);
 			} else {
+				if (verbose && loadReceipt.error > 0 && loadReceipt.response != null) {
+					System.out.println("Error status: " + loadReceipt.error + ", json:" + loadReceipt.response.toString());
+				}
 				System.err.println(String.format(
 						"?? Error updating  sku %s and orderid %s (should be checked and fixed)!", sku, orderId));
 			}

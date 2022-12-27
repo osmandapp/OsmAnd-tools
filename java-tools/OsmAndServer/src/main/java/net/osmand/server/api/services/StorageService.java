@@ -26,6 +26,11 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 
 import net.osmand.util.Algorithms;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 @Service
 public class StorageService {
@@ -175,9 +180,10 @@ public class StorageService {
 	}
 	
 	
-	public String save(String fld, String fileName, long zipsize, InputStream is) throws IOException {
+	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
 		for (StorageType s : getAndInitDefaultStorageProviders()) {
-			saveFile(fld, fileName, s, is, zipsize);
+			InputStream is = file.getInputStream();
+			saveFile(fld, fileName, s, is, file.getSize());
 			is.close();
 		}
 		return defaultStorage;

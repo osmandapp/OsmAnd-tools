@@ -107,7 +107,7 @@ public class OsmAndServerMonitorTasks {
 	@Value("${monitoring.changes.publish.channel}")
 	private String publishChannel;
 	
-	private long lastFeedCheckTimestamp = System.currentTimeMillis() - 1000 * 60 * 60; // last 1 hour 
+	private long lastFeedCheckTimestamp; 
 	
 	private List<FeedEntry> feed = new ArrayList<>();
 
@@ -707,9 +707,15 @@ public class OsmAndServerMonitorTasks {
 					newFeed.add(e);
 				}
 			}
-			for(FeedEntry n : newFeed) {
-				String text = formatGithubMsg(n);
-				telegram.sendChannelMessage(publishChannel, text);
+			if (lastFeedCheckTimestamp == 0) {
+				if (newFeed.size() > 0) {
+					FeedEntry last = newFeed.get(newFeed.size() - 1);
+					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
+				}
+			} else {
+				for (FeedEntry n : newFeed) {
+					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
+				}
 			}
 			feed.addAll(newFeed);
 			while (feed.size() > 100) {
@@ -759,32 +765,27 @@ public class OsmAndServerMonitorTasks {
 			tags += " #issue";
 		}
 
-		int mainIndex = 0;
 		String[] words = n.title.split(" ");
+		StringBuilder bld = new StringBuilder();
+		boolean author = false;
 		for (int i = 0; i < words.length; i++) {
+			bld.append(" ");
 			if (words[i].startsWith("osmandapp/")) {
-				mainIndex = i;
-				break;
-			}
-		}
-
-		String titlePrefix = "";
-		String titleLink = n.title;
-		String titleSuffix = "";
-		for (int i = 0; i < words.length; i++) {
-			if (i < mainIndex) {
-				titlePrefix += " " + words[i];
-			} else if (i == mainIndex) {
-				titleLink = words[i];
+				bld.append(String.format("<a href='%s'>%s</a>", n.link, words[i]));
+			} else if (words[i].equals(n.author)) {
+				author = true;
+				bld.append(String.format("<b>#%s</b>", words[i].replace('-', '_')));
 			} else {
-				titleSuffix += " " + words[i];
+				bld.append(words[i]);
 			}
 		}
-		String text = String.format("%s <b>#%s</b>: %s <a href='%s'>%s</a> %s • %s\n%s",
-				emoji, n.author, 
-				titlePrefix.trim(), n.link, titleLink, titleSuffix.trim(), 
-				DATE_FORMAT.format(n.updated), tags.trim());
-		return text;
+		String message = bld.toString();
+		if (!author) {
+			message = " " + String.format("<b>#%s</b>:", n.author.replace('-', '_'));
+		}
+		message = emoji + " " + message;
+		message += "\n<i>" + DATE_FORMAT.format(n.updated) + "</i>\n" + tags.trim();
+		return message;
 	}
 
 	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
