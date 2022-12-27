@@ -1,12 +1,16 @@
 package net.osmand.server.api.services;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -25,6 +29,7 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 
+import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.util.Algorithms;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -180,7 +185,7 @@ public class StorageService {
 	}
 	
 	
-	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
+	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty InternalZipFile file) throws IOException {
 		for (StorageType s : getAndInitDefaultStorageProviders()) {
 			InputStream is = file.getInputStream();
 			saveFile(fld, fileName, s, is, file.getSize());
@@ -189,13 +194,6 @@ public class StorageService {
 		return defaultStorage;
 	}
 	
-	public String save(String fld, String fileName, long zipsize, InputStream is) throws IOException {
-		for (StorageType s : getAndInitDefaultStorageProviders()) {
-			saveFile(fld, fileName, s, is, zipsize);
-			is.close();
-		}
-		return defaultStorage;
-	}
 
 	private void saveFile(String fld, String fileName, StorageType s, InputStream is, long fileSize) {
 		if (!s.local) {
@@ -235,6 +233,78 @@ public class StorageService {
 		boolean local;
 	}
 
+	
+	public static class InternalZipFile {
+    	
+    	
+    	private long contentSize;
+    	private byte[] data;
+		private MultipartFile multipartfile;
+		
+		public long getContentSize() {
+			return contentSize;
+		}
+		
+		public byte[] getBytes() throws IOException {
+			if (data != null) {
+				return data;
+			}
+			if (multipartfile != null) {
+				return multipartfile.getBytes();
+			}
+			throw new IllegalStateException();
+		}
+		
+		public long getSize() {
+			if (data != null) {
+				return data.length;
+			}
+			if (multipartfile != null) {
+				return multipartfile.getSize();
+			}
+			throw new IllegalStateException(); 
+		}
+		
+		public InputStream getInputStream() throws IOException {
+			if (data != null) {
+				return new ByteArrayInputStream(data);
+			}
+			if (multipartfile != null) {
+				return multipartfile.getInputStream();
+			}
+			throw new IllegalStateException();
+        }
+		
+		public static InternalZipFile buildFromFile(File file) throws IOException {
+			throw new UnsupportedOperationException();
+		}
+
+    	public static InternalZipFile buildFromServerFile(ServerCommonFile file, String name) throws IOException {
+    		InternalZipFile zipfile = new InternalZipFile();
+			zipfile.contentSize = file.di.getContentSize();
+			byte[] bytes = ("{\"type\":\"link\",\"name\":\"" + name + "\"}").getBytes();
+            ByteArrayOutputStream bous = new ByteArrayOutputStream();
+            GZIPOutputStream gz = new GZIPOutputStream(bous);
+            Algorithms.streamCopy(new ByteArrayInputStream(bytes), gz);
+            gz.close();
+            zipfile.data = bous.toByteArray();
+			return zipfile;
+    	}
+    	
+    	
+    	public static InternalZipFile buildFromMultipartFile(MultipartFile file) throws IOException {
+			InternalZipFile zipfile = new InternalZipFile();
+			zipfile.contentSize = 0;
+			zipfile.multipartfile = file;
+			int cnt;
+			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
+			byte[] buf = new byte[1024];
+			while ((cnt = gzis.read(buf)) >= 0) {
+				zipfile.contentSize += cnt;
+			}
+			return zipfile;
+		}
+    }
 
 
 

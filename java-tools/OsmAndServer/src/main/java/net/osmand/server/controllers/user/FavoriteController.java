@@ -6,6 +6,7 @@ import net.osmand.GPXUtilities;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.services.GpxService;
+import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.utils.WebGpxParser;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,15 +93,9 @@ public class FavoriteController {
         return updateFavorite(wpt, wptName, oldGroupName, newGroupName, oldGroupUpdatetime, newGroupUpdatetime, dev, fileType, ind);
     }
     
-    private ResponseEntity<String> updateFavorite(WebGpxParser.Wpt wpt,
-                                                  String wptName,
-                                                  String oldGroupName,
-                                                  String newGroupName,
-                                                  String oldGroupUpdatetime,
-                                                  String newGroupUpdatetime,
-                                                  PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                  String fileType,
-                                                  int ind) throws IOException {
+	private ResponseEntity<String> updateFavorite(WebGpxParser.Wpt wpt, String wptName, String oldGroupName,
+			String newGroupName, String oldGroupUpdatetime, String newGroupUpdatetime,
+			PremiumUserDevicesRepository.PremiumUserDevice dev, String fileType, int ind) throws IOException {
         
         PreparedFavoriteFile preparedNewFavoriteGroup = prepareFile(newGroupName, fileType, dev, newGroupUpdatetime);
         if (preparedNewFavoriteGroup.error != null) {
@@ -162,12 +157,9 @@ public class FavoriteController {
         return ResponseEntity.ok(gson.toJson(res));
     }
     
-    private ResponseEntity<String> addOrDeleteFavorite(WebGpxParser.Wpt wpt,
-                                                      String fileName,
-                                                      PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                      String fileType,
-                                                      String updatetime,
-                                                      String action) throws IOException {
+	private ResponseEntity<String> addOrDeleteFavorite(WebGpxParser.Wpt wpt, String fileName,
+			PremiumUserDevicesRepository.PremiumUserDevice dev, String fileType, String updatetime, String action)
+			throws IOException {
         PreparedFavoriteFile preparedFavoriteGroup = prepareFile(fileName, fileType, dev, updatetime);
         if (preparedFavoriteGroup.error != null) {
             return preparedFavoriteGroup.error;
@@ -199,20 +191,18 @@ public class FavoriteController {
                 "trackData", gsonWithNans.toJson(trackData))));
     }
     
-    static class PreparedFavoriteFile {
-        GPXUtilities.GPXFile file;
-        ResponseEntity<String> error;
-        
-        PreparedFavoriteFile(GPXUtilities.GPXFile file, ResponseEntity<String> error) {
-            this.file = file;
-            this.error = error;
-        }
-    }
+	static class PreparedFavoriteFile {
+		GPXUtilities.GPXFile file;
+		ResponseEntity<String> error;
+
+		PreparedFavoriteFile(GPXUtilities.GPXFile file, ResponseEntity<String> error) {
+			this.file = file;
+			this.error = error;
+		}
+	}
     
-    private PreparedFavoriteFile prepareFile(String groupName,
-                                            String fileType,
-                                            PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                            String updatetime) throws IOException {
+	private PreparedFavoriteFile prepareFile(String groupName, String fileType,
+			PremiumUserDevicesRepository.PremiumUserDevice dev, String updatetime) throws IOException {
         PremiumUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, groupName, fileType);
         if (userGroupFile == null) {
             return new PreparedFavoriteFile(null, userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE));
@@ -232,12 +222,10 @@ public class FavoriteController {
         return new PreparedFavoriteFile(null, ResponseEntity.badRequest().body("Error prepare gpx file!"));
     }
     
-    private ResponseEntity<String> updateFile(File file,
-                                              PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                              String fileName,
-                                              String fileType,
-                                              String updatetime) throws IOException {
-        ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, fileName, fileType, System.currentTimeMillis());
+	private ResponseEntity<String> updateFile(File file, PremiumUserDevicesRepository.PremiumUserDevice dev,
+			String fileName, String fileType, String updatetime) throws IOException {
+		
+        ResponseEntity<String> uploadError = userdataService.uploadFile(InternalZipFile.buildFromFile(file), dev, fileName, fileType, System.currentTimeMillis());
         if (uploadError != null) {
             return uploadError;
         }

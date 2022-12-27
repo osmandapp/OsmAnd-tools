@@ -281,9 +281,9 @@ public class UserdataController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> uploadError = userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
-		if (uploadError != null) {
-			return uploadError;
+		ResponseEntity<String> uploadStatus = userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
+		if (uploadStatus != null) {
+			return uploadStatus;
 		}
 
 		return userdataService.ok();

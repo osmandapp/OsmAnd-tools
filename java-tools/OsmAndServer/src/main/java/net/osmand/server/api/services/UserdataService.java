@@ -3,14 +3,12 @@ package net.osmand.server.api.services;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,9 +30,6 @@ import java.util.zip.ZipOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.google.gson.GsonBuilder;
-import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,14 +42,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
+import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
+import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 
 @Service
@@ -177,59 +176,6 @@ public class UserdataService {
         return null;
     }
     
-    public MultipartFile createEmptyMultipartFile(MultipartFile file, String name) {
-        return new MultipartFile() {
-            
-            @Override
-            public void transferTo(File dest) throws IOException, IllegalStateException {
-                throw new UnsupportedOperationException();
-            }
-            
-            @Override
-            public boolean isEmpty() {
-                return getSize() == 0;
-            }
-            
-            @Override
-            public long getSize() {
-                try {
-                    return getBytes().length;
-                } catch (IOException e) {
-                    return 0;
-                }
-            }
-            
-            @Override
-            public String getOriginalFilename() {
-                return file.getOriginalFilename();
-            }
-            
-            @Override
-            public String getName() {
-                return file.getName();
-            }
-            
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(getBytes());
-            }
-            
-            @Override
-            public String getContentType() {
-                return file.getContentType();
-            }
-            
-            @Override
-            public byte[] getBytes() throws IOException {
-				byte[] bytes = ("{\"type\":\"link\",\"name\":\"" + name + "\"}").getBytes();
-                ByteArrayOutputStream bous = new ByteArrayOutputStream();
-                GZIPOutputStream gz = new GZIPOutputStream(bous);
-                Algorithms.streamCopy(new ByteArrayInputStream(bytes), gz);
-                gz.close();
-                return bous.toByteArray();
-            }
-        };
-    }
     
     public ResponseEntity<String> error(int errorCode, String message) {
         Map<String, Object> mp = new TreeMap<>();
@@ -238,26 +184,27 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
     }
     
+    
+   
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
                                                       String name, String type, Long clienttime) throws IOException {
-		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
-		long cnt;
-		long sum;
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
+		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
-			file = createEmptyMultipartFile(file, name);
-		}
-		long zipsize = file.getSize();
-		try {
-			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
-			byte[] buf = new byte[1024];
-			sum = 0;
-			while ((cnt = gzis.read(buf)) >= 0) {
-				sum += cnt;
+			zipfile = InternalZipFile.buildFromServerFile(serverCommonFile, name);
+		} else {
+			try {
+				zipfile = InternalZipFile.buildFromMultipartFile(file);
+			} catch (IOException e) {
+				return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
-		} catch (IOException e) {
-			return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 		}
+		return uploadFile(zipfile, dev, name, type, clienttime);
+	}
+
+	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, PremiumUserDevicesRepository.PremiumUserDevice dev,
+			String name, String type, Long clienttime) throws IOException {
+		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
 		usf.name = name;
 		usf.type = type;
 		usf.updatetime = new Date();
@@ -266,11 +213,11 @@ public class UserdataService {
 		}
 		usf.userid = dev.userid;
 		usf.deviceid = dev.id;
-		usf.filesize = serverCommonFile != null ? serverCommonFile.di.getContentSize() : sum;
-		usf.zipfilesize = zipsize;
-		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), file);
+		usf.filesize = zipfile.getContentSize();
+		usf.zipfilesize = zipfile.getSize();
+		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipfile);
 		if (storageService.storeLocally()) {
-			usf.data = file.getBytes();
+			usf.data = zipfile.getBytes();
 		}
 		filesRepository.saveAndFlush(usf);
 		if (usf.data != null) {
@@ -279,46 +226,6 @@ public class UserdataService {
 		return ResponseEntity.ok(gson.toJson(usf));
 	}
     
-    public ResponseEntity<String> uploadFile(File file,
-                                             PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                             String name,
-                                             String type,
-                                             Long clienttime) throws IOException {
-        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
-        
-        File fileZip = new File(file.getPath().substring(0, file.getPath().indexOf("gpx")) + "gpx.gz");
-        byte[] buffer = new byte[1024];
-        try (FileInputStream fis = new FileInputStream(file);
-             FileOutputStream fos = new FileOutputStream(fileZip);
-             GZIPOutputStream gos = new GZIPOutputStream(fos)) {
-            int len;
-            while ((len = fis.read(buffer)) != -1) {
-                gos.write(buffer, 0, len);
-            }
-        } catch (Exception e) {
-            return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
-        }
-        
-        long size = file.length();
-        long zipSize = fileZip.length();
-        
-        usf.name = name;
-        usf.type = type;
-        usf.updatetime = new Date();
-        if (clienttime != null) {
-            usf.clienttime = new Date(clienttime);
-        }
-        usf.userid = dev.userid;
-        usf.deviceid = dev.id;
-        usf.filesize = size;
-        usf.zipfilesize = zipSize;
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipSize, new FileInputStream(fileZip));
-        if (storageService.storeLocally()) {
-            usf.data = Files.readAllBytes(fileZip.toPath());
-        }
-        filesRepository.saveAndFlush(usf);
-        return null;
-    }
     
     public String userFolder(UserFile uf) {
         return userFolder(uf.userid);
