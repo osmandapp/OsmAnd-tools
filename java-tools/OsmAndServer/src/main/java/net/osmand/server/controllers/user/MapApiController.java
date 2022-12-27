@@ -24,8 +24,6 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -53,7 +51,6 @@ import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.springframework.web.multipart.MultipartFile;
 
-import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 @Controller
@@ -209,7 +206,7 @@ public class MapApiController {
 			return validateError;
 		}
 		
-		ResponseEntity<String> responseStatus = userdataService.uploadFile(file, dev, name, type, System.currentTimeMillis());
+		ResponseEntity<String> responseStatus = userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
 		if (responseStatus != null) {
 			return responseStatus;
 		}

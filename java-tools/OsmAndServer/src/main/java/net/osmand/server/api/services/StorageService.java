@@ -188,6 +188,14 @@ public class StorageService {
 		}
 		return defaultStorage;
 	}
+	
+	public String save(String fld, String fileName, long zipsize, InputStream is) throws IOException {
+		for (StorageType s : getAndInitDefaultStorageProviders()) {
+			saveFile(fld, fileName, s, is, zipsize);
+			is.close();
+		}
+		return defaultStorage;
+	}
 
 	private void saveFile(String fld, String fileName, StorageType s, InputStream is, long fileSize) {
 		if (!s.local) {
