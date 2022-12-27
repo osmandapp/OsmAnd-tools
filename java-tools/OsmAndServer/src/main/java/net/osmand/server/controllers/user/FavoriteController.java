@@ -79,7 +79,8 @@ public class FavoriteController {
                                             @RequestParam String newGroupName,
                                             @RequestParam String oldGroupUpdatetime,
                                             @RequestParam String newGroupUpdatetime,
-                                            @RequestParam String fileType) throws IOException {
+                                            @RequestParam String fileType,
+                                            @RequestParam int ind) throws IOException {
         WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
         
         PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
@@ -88,7 +89,7 @@ public class FavoriteController {
             return validateError;
         }
         
-        return updateFavorite(wpt, wptName, oldGroupName, newGroupName, oldGroupUpdatetime, newGroupUpdatetime, dev, fileType);
+        return updateFavorite(wpt, wptName, oldGroupName, newGroupName, oldGroupUpdatetime, newGroupUpdatetime, dev, fileType, ind);
     }
     
     private ResponseEntity<String> updateFavorite(WebGpxParser.Wpt wpt,
@@ -98,7 +99,8 @@ public class FavoriteController {
                                                   String oldGroupUpdatetime,
                                                   String newGroupUpdatetime,
                                                   PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                  String fileType) throws IOException {
+                                                  String fileType,
+                                                  int ind) throws IOException {
         
         PreparedFavoriteFile preparedNewFavoriteGroup = prepareFile(newGroupName, fileType, dev, newGroupUpdatetime);
         if (preparedNewFavoriteGroup.error != null) {
@@ -113,7 +115,7 @@ public class FavoriteController {
             }
         }
         
-        preparedNewFavoriteGroup.file.updateWptPtWeb(webGpxParser.updateWpt(wpt), wptName);
+        preparedNewFavoriteGroup.file.updateWptPtWeb(webGpxParser.updateWpt(wpt), wptName, ind);
         
         File newTmpGpx = File.createTempFile(newGroupName, ".gpx");
         File oldTmpGpx = null;
@@ -127,7 +129,7 @@ public class FavoriteController {
             return error;
         } else {
             if (changeGroup) {
-                preparedOldFavoriteGroup.file.deleteWptPt(wptName);
+                preparedOldFavoriteGroup.file.deleteWptPt(wptName, ind);
                 oldTmpGpx = File.createTempFile(oldGroupName, ".gpx");
                 exception = GPXUtilities.writeGpxFile(oldTmpGpx, preparedOldFavoriteGroup.file);
                 if (exception != null) {
