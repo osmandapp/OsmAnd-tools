@@ -13,10 +13,11 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
-public class SvgMapLegendGenerator {
+// Launches from MainUtilities with CLI Arguments: generate-maplegend-svg
+// Also you need to add environment variables like this:
+// web.repo.dir=/Users/nnngrach/OsmAnd/web;resources.repo.dir=/Users/nnngrach/OsmAnd/resources
 
-    // Add environment variables like this:
-    // web.repo.dir=/Users/nnngrach/OsmAnd/web;resources.repo.dir=/Users/nnngrach/OsmAnd/resources
+public class SvgMapLegendGenerator {
 
     static String configPath = System.getenv("resources.repo.dir") + "/rendering_styles/map-legend/map-legend.xml";
     static String resultIconsFolderPath = System.getenv("web.repo.dir") + "/main/static/img/legend/osmand/";
