@@ -1,39 +1,51 @@
 package net.osmand.obf;
 
-import java.io.*;
-import java.sql.SQLException;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.text.NumberFormat;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.zip.GZIPOutputStream;
-
-import net.osmand.GPXUtilities;
-import net.osmand.IProgress;
-import net.osmand.binary.MapZooms;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.obf.preparation.IndexHeightData;
-import net.osmand.util.MapAlgorithms;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlSerializer;
-
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.GPXUtilities.Track;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
-import net.osmand.PlatformUtil;
-import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.RouteActivityType;
-import net.osmand.util.Algorithms;
-import rtree.RTree;
-
 import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.sql.SQLException;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Set;
+import java.util.zip.GZIPOutputStream;
+
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlSerializer;
+
+import net.osmand.IProgress;
+import net.osmand.PlatformUtil;
+import net.osmand.binary.MapZooms;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.Track;
+import net.osmand.gpx.GPXUtilities.TrkSegment;
+import net.osmand.gpx.GPXUtilities.WptPt;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.obf.preparation.IndexHeightData;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.RouteActivityType;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapAlgorithms;
+import rtree.RTree;
 
 public class OsmGpxWriteContext {
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());

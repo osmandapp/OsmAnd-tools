@@ -30,7 +30,6 @@ import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
 
-import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,10 +48,6 @@ import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
@@ -65,6 +60,10 @@ import net.osmand.binary.OsmandIndex.RoutingPart;
 import net.osmand.binary.OsmandIndex.RoutingSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.TrkSegment;
+import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.render.RenderingRuleProperty;
@@ -89,6 +88,7 @@ import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.MapsCollection;
 
 @Service
 public class OsmAndMapsService {

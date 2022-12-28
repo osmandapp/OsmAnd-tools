@@ -9,10 +9,10 @@ import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionListener;
 
-import net.osmand.GPXUtilities;
 import org.springframework.stereotype.Component;
 
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
 
 @WebListener
 @Component

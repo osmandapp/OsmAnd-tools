@@ -17,19 +17,19 @@ import javax.swing.AbstractAction;
 import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 
-import net.osmand.data.QuadRect;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.Track;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities.Track;
+import net.osmand.gpx.GPXUtilities.TrkSegment;
+import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;

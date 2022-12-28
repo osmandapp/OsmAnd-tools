@@ -28,7 +28,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import net.osmand.wiki.WikiImageUrlStorage;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -38,10 +37,10 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.util.SqlInsertValuesReader;
@@ -49,6 +48,7 @@ import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 import net.osmand.wiki.CustomWikiModel;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikiDatabasePreparation.LatLon;
+import net.osmand.wiki.WikiImageUrlStorage;
 import net.osmand.wiki.WikidataConnection;
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	

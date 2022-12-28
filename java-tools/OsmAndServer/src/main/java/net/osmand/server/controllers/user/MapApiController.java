@@ -1,5 +1,7 @@
 package net.osmand.server.controllers.user;
 
+import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,18 +17,11 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.services.StorageService;
-import net.osmand.server.api.services.UserdataService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,27 +30,35 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.services.StorageService;
+import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
-import org.springframework.web.multipart.MultipartFile;
-
-import static net.osmand.server.api.services.UserdataService.ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD;
-import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 @Controller
 @RequestMapping("/mapapi")

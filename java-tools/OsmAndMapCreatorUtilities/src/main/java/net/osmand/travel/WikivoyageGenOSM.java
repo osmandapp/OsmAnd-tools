@@ -26,12 +26,11 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlSerializer;
 
-
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageOSMTags;
