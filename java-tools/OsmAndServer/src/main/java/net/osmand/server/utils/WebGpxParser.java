@@ -1,15 +1,31 @@
 package net.osmand.server.utils;
 
-import net.osmand.GPXUtilities;
-import net.osmand.util.MapUtils;
-import org.springframework.stereotype.Component;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static net.osmand.GPXUtilities.*;
+import static net.osmand.gpx.GPXUtilities.ADDRESS_EXTENSION;
+import static net.osmand.gpx.GPXUtilities.BACKGROUND_TYPE_EXTENSION;
+import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
+import static net.osmand.gpx.GPXUtilities.ICON_NAME_EXTENSION;
+import static net.osmand.gpx.GPXUtilities.PROFILE_TYPE_EXTENSION;
+import static net.osmand.gpx.GPXUtilities.TRKPT_INDEX_EXTENSION;
+import static net.osmand.gpx.GPXUtilities.parseColor;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.util.Algorithms.colorToString;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.WptPt;
+import net.osmand.util.MapUtils;
 
 @Component
 public class WebGpxParser {
@@ -209,7 +225,7 @@ public class WebGpxParser {
         public List<GPXUtilities.RouteType> routeTypes;
     }
     
-    public void addRoutePoints(GPXUtilities.GPXFile gpxFile, TrackData gpxData) {
+    public void addRoutePoints(GPXFile gpxFile, TrackData gpxData) {
         gpxFile.routes.forEach(route -> {
             List<Point> routePoints = new ArrayList<>();
             List<Point> trackPoints = gpxData.tracks.get(gpxFile.routes.indexOf(route)).points;
@@ -263,7 +279,7 @@ public class WebGpxParser {
         return prevTrkPointInd;
     }
     
-    public void addSrtmEle(List<Track> tracks, GPXUtilities.GPXTrackAnalysis srtmAnalysis) {
+    public void addSrtmEle(List<Track> tracks, GPXTrackAnalysis srtmAnalysis) {
         if (srtmAnalysis != null) {
             tracks.forEach(track -> track.points.forEach(point -> {
                 if (point.geometry != null) {
@@ -275,7 +291,7 @@ public class WebGpxParser {
         }
     }
     
-    public void addDistance(List<Track> tracks, GPXUtilities.GPXTrackAnalysis analysis) {
+    public void addDistance(List<Track> tracks, GPXTrackAnalysis analysis) {
         if (analysis != null && !analysis.elevationData.isEmpty()) {
             tracks.forEach(track -> track.points.forEach(point -> {
                 if (point.geometry != null) {
@@ -287,7 +303,7 @@ public class WebGpxParser {
         }
     }
     
-    public Map<String, Object> getTrackAnalysis(GPXUtilities.GPXTrackAnalysis analysis, GPXUtilities.GPXTrackAnalysis srtmAnalysis) {
+    public Map<String, Object> getTrackAnalysis(GPXTrackAnalysis analysis, GPXTrackAnalysis srtmAnalysis) {
         if (analysis != null) {
             Map<String, Object> res = new HashMap<>();
             res.put("totalDistance", analysis.totalDistance);
@@ -316,7 +332,7 @@ public class WebGpxParser {
         return Collections.emptyMap();
     }
     
-    public List<Wpt> getWpts(GPXUtilities.GPXFile gpxFile) {
+    public List<Wpt> getWpts(GPXFile gpxFile) {
         List<GPXUtilities.WptPt> points = gpxFile.getPoints();
         if (points != null) {
             List<Wpt> res = new ArrayList<>();
@@ -326,7 +342,7 @@ public class WebGpxParser {
         return Collections.emptyList();
     }
     
-    public Map<String, PointsGroup> getPointsGroups(GPXUtilities.GPXFile gpxFile) {
+    public Map<String, PointsGroup> getPointsGroups(GPXFile gpxFile) {
         Map<String, GPXUtilities.PointsGroup> pointsGroups = gpxFile.getPointsGroups();
         Map<String, PointsGroup> res = new LinkedHashMap<>();
         if (!pointsGroups.isEmpty()) {
@@ -339,7 +355,7 @@ public class WebGpxParser {
         return Collections.emptyMap();
     }
     
-    public List<Track> getTracks(GPXUtilities.GPXFile gpxFile) {
+    public List<Track> getTracks(GPXFile gpxFile) {
         if (!gpxFile.tracks.isEmpty()) {
             List<Track> res = new ArrayList<>();
             List<GPXUtilities.Track> tracks = gpxFile.tracks.stream().filter(t -> !t.generalTrack).collect(Collectors.toList());
@@ -355,8 +371,8 @@ public class WebGpxParser {
         return Collections.emptyList();
     }
     
-    public GPXUtilities.GPXFile createGpxFileFromTrackData(WebGpxParser.TrackData trackData) {
-        GPXUtilities.GPXFile gpxFile = new GPXUtilities.GPXFile(OSMAND_ROUTER_V2);
+    public GPXFile createGpxFileFromTrackData(WebGpxParser.TrackData trackData) {
+        GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
         if (trackData.metaData != null) {
             gpxFile.metadata = trackData.metaData.ext;
             gpxFile.metadata.name = trackData.metaData.name;

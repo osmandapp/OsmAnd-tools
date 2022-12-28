@@ -2,7 +2,8 @@ package net.osmand.server.controllers.user;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.osmand.GPXUtilities;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.services.GpxService;
@@ -110,7 +111,7 @@ public class FavoriteController {
             }
         }
         
-        preparedNewFavoriteGroup.file.updateWptPtWeb(webGpxParser.updateWpt(wpt), wptName, ind);
+        preparedNewFavoriteGroup.file.updateWptPt(wptName, ind, webGpxParser.updateWpt(wpt));
         
         File newTmpGpx = File.createTempFile(newGroupName, ".gpx");
         File oldTmpGpx = null;
@@ -192,10 +193,10 @@ public class FavoriteController {
     }
     
 	static class PreparedFavoriteFile {
-		GPXUtilities.GPXFile file;
+		GPXFile file;
 		ResponseEntity<String> error;
 
-		PreparedFavoriteFile(GPXUtilities.GPXFile file, ResponseEntity<String> error) {
+		PreparedFavoriteFile(GPXFile file, ResponseEntity<String> error) {
 			this.file = file;
 			this.error = error;
 		}
@@ -212,7 +213,7 @@ public class FavoriteController {
         }
         InputStream in = userGroupFile.data != null ? new ByteArrayInputStream(userGroupFile.data) : userdataService.getInputStream(userGroupFile);
         if (in != null) {
-            GPXUtilities.GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+            GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
             if (gpxFile.error != null) {
                 return new PreparedFavoriteFile(null, ResponseEntity.badRequest().body("Error reading gpx!"));
             } else {

@@ -1,6 +1,8 @@
 package net.osmand.server.api.services;
 
-import net.osmand.GPXUtilities;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
@@ -31,7 +33,7 @@ public class GpxService {
     @Value("${osmand.srtm.location}")
     String srtmLocation;
     
-    public WebGpxParser.TrackData getTrackDataByGpxFile(GPXUtilities.GPXFile gpxFile, File tmpGpx) {
+    public WebGpxParser.TrackData getTrackDataByGpxFile(GPXFile gpxFile, File tmpGpx) {
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
         gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
@@ -43,9 +45,9 @@ public class GpxService {
         if (!gpxFile.routes.isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        GPXUtilities.GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(tmpGpx);
-        GPXUtilities.GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
-        GPXUtilities.GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFileForAnalyse, true);
+        GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(tmpGpx);
+        GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
+        GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFileForAnalyse, true);
         gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
         
         if (!gpxData.tracks.isEmpty()) {
@@ -55,12 +57,12 @@ public class GpxService {
         return gpxData;
     }
     
-    private GPXUtilities.GPXTrackAnalysis getAnalysis(GPXUtilities.GPXFile gpxFile, boolean isSrtm) {
-        GPXUtilities.GPXTrackAnalysis analysis = null;
+    private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
+       GPXTrackAnalysis analysis = null;
         if (!isSrtm) {
             analysis = gpxFile.getAnalysis(System.currentTimeMillis());
         } else {
-            GPXUtilities.GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+            GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
             if (srtmGpx != null) {
                 analysis = srtmGpx.getAnalysis(System.currentTimeMillis());
             }
@@ -71,7 +73,7 @@ public class GpxService {
         return analysis;
     }
     
-    public GPXUtilities.GPXFile calculateSrtmAltitude(GPXUtilities.GPXFile gpxFile, File[] missingFile) {
+    public GPXFile calculateSrtmAltitude(GPXFile gpxFile, File[] missingFile) {
         if (srtmLocation == null) {
             return null;
         }
@@ -128,7 +130,7 @@ public class GpxService {
         return gpxFile;
     }
     
-    public void cleanupFromNan(GPXUtilities.GPXTrackAnalysis analysis) {
+    public void cleanupFromNan(GPXTrackAnalysis analysis) {
         // process analysis
         if (Double.isNaN(analysis.minHdop)) {
             analysis.minHdop = -1;

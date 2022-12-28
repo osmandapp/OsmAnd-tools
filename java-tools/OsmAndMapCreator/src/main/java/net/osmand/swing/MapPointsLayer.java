@@ -1,31 +1,37 @@
 package net.osmand.swing;
 
+import static net.osmand.router.RouteColorize.DARK_GREY;
+import static net.osmand.router.RouteColorize.GREEN;
+import static net.osmand.router.RouteColorize.LIGHT_GREY;
+import static net.osmand.router.RouteColorize.RED;
+import static net.osmand.router.RouteColorize.SLOPE_PALETTE;
+import static net.osmand.router.RouteColorize.YELLOW;
+
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
-import java.awt.BasicStroke;
-import java.awt.GradientPaint;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.osmand.GPXUtilities;
 import net.osmand.data.DataTileManager;
+import net.osmand.gpx.GPXFile;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RouteColorize;
 import net.osmand.router.RouteColorize.ColorizationType;
+import net.osmand.router.RouteColorize.RouteColorizationPoint;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.router.RouteColorize.*;
 
 
 public class MapPointsLayer implements MapPanelLayer {
@@ -44,7 +50,7 @@ public class MapPointsLayer implements MapPanelLayer {
 	private List<LineObject> linesToDraw = new ArrayList<>();
 
 	private Font whiteFont;
-	GPXUtilities.GPXFile gpxFile;
+	GPXFile gpxFile;
 	public ColorizationType colorizationType = ColorizationType.NONE;
 	private boolean isGrey = true;
 
@@ -281,7 +287,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		this.points = points;
 	}
 
-	public void setColorizationType(GPXUtilities.GPXFile gpxFile, ColorizationType colorizationType, boolean grey) {
+	public void setColorizationType(GPXFile gpxFile, ColorizationType colorizationType, boolean grey) {
 		this.gpxFile = gpxFile;
 		this.colorizationType = colorizationType;
 		this.isGrey = grey;

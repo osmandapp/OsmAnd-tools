@@ -1,11 +1,21 @@
 package net.osmand.server.api.services;
 
-import net.osmand.GPXUtilities;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import net.osmand.Location;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataBundle;
 import net.osmand.binary.StringBundle;
 import net.osmand.data.LatLon;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.RouteDataResources;
 import net.osmand.router.RouteSegmentResult;
@@ -13,11 +23,6 @@ import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.util.*;
 
 @Service
 public class RoutingService {
