@@ -42,6 +42,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.GsonBuilder;
 
 import net.osmand.server.WebSecurityConfiguration;
@@ -184,10 +185,29 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
     }
     
+    static class ResponseFileStatus {
+    	public long filesize;
+    	public long zipfilesize;
+    	public long updatetime;
+    	public long clienttime;
+    	public String type;
+    	public String name;
+		public JsonObject details;
+		public String status = "ok";
+    	
+    	public ResponseFileStatus(UserFile f) {
+    		filesize = f.filesize;
+    		zipfilesize = f.zipfilesize;
+    		updatetime = f.updatetime == null ? 0 : f.updatetime.getTime();
+    		clienttime = f.clienttime == null ? 0 : f.clienttime.getTime();
+    		name = f.name;
+    		type = f.type;
+    		details = f.details;
+    	}
+    }
     
-   
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                      String name, String type, Long clienttime) throws IOException {
+			String name, String type, Long clienttime) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -220,11 +240,7 @@ public class UserdataService {
 			usf.data = zipfile.getBytes();
 		}
 		filesRepository.saveAndFlush(usf);
-		if (usf.data != null) {
-			usf.data = null;
-		}
-		usf.status = "ok";
-		return ResponseEntity.ok(gson.toJson(usf));
+		return ResponseEntity.ok(gson.toJson(new ResponseFileStatus(usf)));
 	}
     
     
