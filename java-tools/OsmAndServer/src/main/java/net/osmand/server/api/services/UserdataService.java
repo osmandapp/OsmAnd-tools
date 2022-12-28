@@ -35,7 +35,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,6 +43,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
@@ -228,6 +228,27 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
     }
     
+    static class ResponseFileStatus {
+    	public long filesize;
+    	public long zipfilesize;
+    	public long updatetime;
+    	public long clienttime;
+    	public String type;
+    	public String name;
+		public JsonObject details;
+		public String status = "ok";
+    	
+    	public ResponseFileStatus(UserFile f) {
+    		filesize = f.filesize;
+    		zipfilesize = f.zipfilesize;
+    		updatetime = f.updatetime == null ? 0 : f.updatetime.getTime();
+    		clienttime = f.clienttime == null ? 0 : f.clienttime.getTime();
+    		name = f.name;
+    		type = f.type;
+    		details = f.details;
+    	}
+    }
+    
     public ResponseEntity<String> uploadFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
 		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
@@ -263,11 +284,7 @@ public class UserdataService {
 			usf.data = file.getBytes();
 		}
 		filesRepository.saveAndFlush(usf);
-		if (usf.data != null) {
-			usf.data = null;
-		}
-		usf.status = "ok";
-		return ResponseEntity.ok(gson.toJson(usf));
+		return ResponseEntity.ok(gson.toJson(new ResponseFileStatus(usf)));
 	}
     
     public String userFolder(UserFile uf) {
