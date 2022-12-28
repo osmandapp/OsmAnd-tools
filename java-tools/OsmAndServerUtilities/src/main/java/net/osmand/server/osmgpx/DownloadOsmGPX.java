@@ -1,7 +1,6 @@
 package net.osmand.server.osmgpx;
 
 
-import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.util.Algorithms.readFromInputStream;
 
 import java.io.ByteArrayInputStream;
@@ -25,7 +24,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.TimeZone;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -39,20 +42,22 @@ import javax.net.ssl.X509TrustManager;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
-import net.osmand.data.QuadRect;
-import net.osmand.obf.OsmGpxWriteContext;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
+import net.osmand.data.QuadRect;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.obf.OsmGpxWriteContext.OsmGpxFile;
+import net.osmand.obf.OsmGpxWriteContext.QueryParams;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
