@@ -1,10 +1,7 @@
 package net.osmand.server.api.services;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +38,9 @@ import javax.validation.constraints.NotNull;
 public class StorageService {
 
 	private static final String FILE_SEPARATOR = "/";
-
+	private static final String GPX = "gpx";
+	private static final String GPX_GZ = "gpx.gz";
+	
 	protected static final Log LOGGER = LogFactory.getLog(StorageService.class);
 
 	protected static final String LOCAL_STORAGE = "local";
@@ -240,6 +239,7 @@ public class StorageService {
     	private long contentSize;
     	private byte[] data;
 		private MultipartFile multipartfile;
+		private File tempzipfile;
 		
 		public long getContentSize() {
 			return contentSize;
@@ -252,6 +252,9 @@ public class StorageService {
 			if (multipartfile != null) {
 				return multipartfile.getBytes();
 			}
+			if (tempzipfile != null) {
+				return Files.readAllBytes(tempzipfile.toPath());
+			}
 			throw new IllegalStateException();
 		}
 		
@@ -262,7 +265,10 @@ public class StorageService {
 			if (multipartfile != null) {
 				return multipartfile.getSize();
 			}
-			throw new IllegalStateException(); 
+			if (tempzipfile != null ) {
+				return tempzipfile.length();
+			}
+			throw new IllegalStateException();
 		}
 		
 		public InputStream getInputStream() throws IOException {
@@ -272,11 +278,26 @@ public class StorageService {
 			if (multipartfile != null) {
 				return multipartfile.getInputStream();
 			}
+			if (tempzipfile != null) {
+				return new FileInputStream(tempzipfile);
+			}
 			throw new IllegalStateException();
         }
 		
 		public static InternalZipFile buildFromFile(File file) throws IOException {
-			throw new UnsupportedOperationException();
+			InternalZipFile zipfile = new InternalZipFile();
+			byte[] buffer = new byte[1024];
+			zipfile.tempzipfile = new File(file.getPath().substring(0, file.getPath().indexOf(GPX)) + GPX_GZ);
+			zipfile.contentSize = file.length();
+			try (FileInputStream fis = new FileInputStream(file);
+			     FileOutputStream fos = new FileOutputStream(zipfile.tempzipfile);
+			     GZIPOutputStream gos = new GZIPOutputStream(fos)) {
+				int len;
+				while ((len = fis.read(buffer)) != -1) {
+					gos.write(buffer, 0, len);
+				}
+			}
+			return zipfile;
 		}
 
     	public static InternalZipFile buildFromServerFile(ServerCommonFile file, String name) throws IOException {
@@ -290,8 +311,7 @@ public class StorageService {
             zipfile.data = bous.toByteArray();
 			return zipfile;
     	}
-    	
-    	
+		
     	public static InternalZipFile buildFromMultipartFile(MultipartFile file) throws IOException {
 			InternalZipFile zipfile = new InternalZipFile();
 			zipfile.contentSize = 0;
@@ -305,7 +325,4 @@ public class StorageService {
 			return zipfile;
 		}
     }
-
-
-
 }

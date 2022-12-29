@@ -14,11 +14,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
@@ -30,6 +28,7 @@ import java.util.zip.ZipOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +42,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.google.gson.GsonBuilder;
 
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
@@ -92,7 +90,6 @@ public class UserdataService {
     protected GpxService gpxService;
     
     Gson gson = new Gson();
-    Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
     
     public static final String ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE = "File is not available";
     public static final String TOKEN_DEVICE_WEB = "web";
@@ -117,22 +114,21 @@ public class UserdataService {
     
     protected static final Log LOG = LogFactory.getLog(UserdataController.class);
     
-    public ResponseEntity<String> validateUser(PremiumUsersRepository.PremiumUser user) {
+    public void validateUser(PremiumUsersRepository.PremiumUser user) {
         if (user == null) {
-            return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
+            throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
         }
         String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
         if (errorMsg != null) {
-            return error(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
+            throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
                     "Subscription is not valid any more: " + errorMsg);
         }
         UserdataController.UserFilesResults res = generateFiles(user.id, null, null, false, false);
         if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
-            return error(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
+            throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
                     "Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
                             + " MB. Please contact support in order to investigate possible solutions.");
         }
-        return null;
     }
     
     public UserdataController.UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
@@ -169,7 +165,7 @@ public class UserdataService {
     }
     
     public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
-        boolean checkExistingServerMap = type.toLowerCase().equals("file") && (
+        boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb"));
         if (checkExistingServerMap) {
             return downloadService.getServerGlobalFile(name);
@@ -177,23 +173,15 @@ public class UserdataService {
         return null;
     }
     
-    
-    public ResponseEntity<String> error(int errorCode, String message) {
-        Map<String, Object> mp = new TreeMap<>();
-        mp.put("errorCode", errorCode);
-        mp.put("message", message);
-        return ResponseEntity.badRequest().body(gson.toJson(Collections.singletonMap("error", mp)));
-    }
-    
-    static class ResponseFileStatus {
-    	public long filesize;
-    	public long zipfilesize;
-    	public long updatetime;
-    	public long clienttime;
-    	public String type;
-    	public String name;
-		public JsonObject details;
-		public String status = "ok";
+    public static class ResponseFileStatus {
+    	private long filesize;
+        private long zipfilesize;
+        private long updatetime;
+        private long clienttime;
+        private String type;
+        private String name;
+        private JsonObject details;
+        private String status = "ok";
     	
     	public ResponseFileStatus(UserFile f) {
     		filesize = f.filesize;
@@ -204,6 +192,10 @@ public class UserdataService {
     		type = f.type;
     		details = f.details;
     	}
+        
+        public void setJsonObject(JsonObject details) {
+            this.details = details;
+        }
     }
     
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
@@ -216,7 +208,7 @@ public class UserdataService {
 			try {
 				zipfile = InternalZipFile.buildFromMultipartFile(file);
 			} catch (IOException e) {
-				return error(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
+                throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
 		return uploadFile(zipfile, dev, name, type, clienttime);
@@ -266,9 +258,9 @@ public class UserdataService {
         return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
     
-    public ResponseEntity<String> webUserActivate(String email, String token, String password) throws IOException {
+    public ResponseEntity<String> webUserActivate(String email, String token, String password) {
         if (password.length() < 6) {
-            return error(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
+            throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
         }
         return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
     }
@@ -277,15 +269,15 @@ public class UserdataService {
         // allow to register only with small case
         email = email.toLowerCase().trim();
         if (!email.contains("@")) {
-            return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+            throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
         }
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
         if (pu == null) {
-            return error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+            throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
         }
         String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
         if (errorMsg != null) {
-            return error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+            throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
         }
         pu.tokendevice = TOKEN_DEVICE_WEB;
         pu.token = (new Random().nextInt(8999) + 1000) + "";
@@ -323,11 +315,11 @@ public class UserdataService {
         email = email.toLowerCase().trim();
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
         if (pu == null) {
-            return error(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
+            throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
                 - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
-            return error(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
+            throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
         }
         pu.token = null;
         pu.tokenTime = null;
@@ -358,7 +350,6 @@ public class UserdataService {
         File fileToDelete = null;
         try {
             @SuppressWarnings("unchecked")
-            ResponseEntity<String>[] error = new ResponseEntity[]{null};
 			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
 			ServerCommonFile scf = checkThatObfFileisOnServer(name, type); 
 			boolean gzin = true, gzout;
@@ -382,13 +373,9 @@ public class UserdataService {
 					bin = getGzipInputStreamFromFile(fp, ".obf");
 				}
 			} else {
-				bin = getInputStream(dev, error, userFile);
+				bin = getInputStream(dev, userFile);
 			}
-            if (error[0] != null) {
-                response.setStatus(error[0].getStatusCodeValue());
-                response.getWriter().write(error[0].getBody());
-                return;
-            }
+            
             response.setHeader("Content-Disposition", "attachment; filename=" + userFile.name);
             // InputStream bin = fl.data.getBinaryStream();
             
@@ -437,17 +424,17 @@ public class UserdataService {
     }
     
     
-    public InputStream getInputStream(PremiumUserDevicesRepository.PremiumUserDevice dev, ResponseEntity<String>[] error, PremiumUserFilesRepository.UserFile userFile) {
+    public InputStream getInputStream(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile) {
         InputStream bin = null;
         if (dev == null) {
-            error[0] = tokenNotValid();
+            tokenNotValid();
         } else {
             if (userFile == null) {
-                error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+                throw new OsmAndPublicApiException(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
             } else if (userFile.data == null) {
                 bin = getInputStream(userFile);
                 if (bin == null) {
-                    error[0] = error(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+                    throw new OsmAndPublicApiException(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
                 }
             } else {
                 bin = new ByteArrayInputStream(userFile.data);
@@ -477,7 +464,7 @@ public class UserdataService {
     }
     
     public ResponseEntity<String> tokenNotValid() {
-        return error(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
+        throw new OsmAndPublicApiException(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
     }
     
     public void deleteFile(String name, String type, Integer deviceId, Long clienttime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
@@ -504,7 +491,7 @@ public class UserdataService {
                     new Date(updatetime));
         }
         if (userFile == null) {
-            return error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+            throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         }
         storageService.deleteFile(userFile.storage, userFolder(userFile), storageFileName(userFile));
         filesRepository.delete(userFile);
@@ -535,22 +522,19 @@ public class UserdataService {
 		uf = filesRepository.getById(ufnd.id);
 	}
     
-    public ResponseEntity<String> validate(PremiumUserDevicesRepository.PremiumUserDevice dev) {
-        if (dev == null) {
-            return tokenNotValid();
-        }
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-        return validateUser(pu);
-    }
-    
-    public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
+    public PremiumUserDevicesRepository.PremiumUserDevice checkValidateUser() {
         Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        PremiumUserDevicesRepository.PremiumUserDevice dev = null;
         if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-            return ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
+            dev = ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
         }
-        return null;
+        if (dev == null) {
+            throw new OsmAndPublicApiException(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
+        }
+        validateUser(usersRepository.findById(dev.userid));
+        
+        return dev;
     }
-    
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted) throws IOException {

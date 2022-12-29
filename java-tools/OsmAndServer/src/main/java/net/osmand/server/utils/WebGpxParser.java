@@ -380,7 +380,7 @@ public class WebGpxParser {
         }
         if (trackData.wpts != null) {
             for (Wpt wpt : trackData.wpts) {
-                gpxFile.addPoint(updateWpt(wpt));
+                gpxFile.addPoint(convertToWptPt(wpt));
             }
         }
     
@@ -392,7 +392,7 @@ public class WebGpxParser {
                 group.color = parseColor(dataGroup.color, 0);
                 List<Wpt> wptsData = dataGroup.points;
                 for (Wpt wpt : wptsData) {
-                    group.points.add(updateWpt(wpt));
+                    group.points.add(convertToWptPt(wpt));
                 }
                 res.put(key, group);
             }
@@ -438,7 +438,7 @@ public class WebGpxParser {
         return gpxFile;
     }
     
-    public WptPt updateWpt(Wpt wpt) {
+    public WptPt convertToWptPt(Wpt wpt) {
         WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
         point.name = wpt.name;
         if (wpt.desc != null) {

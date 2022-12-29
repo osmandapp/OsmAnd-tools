@@ -53,20 +53,14 @@ import com.google.gson.JsonObject;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.gpx.GPXUtilities;
-import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.services.StorageService;
-import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
-import org.springframework.web.multipart.MultipartFile;
 
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
@@ -217,16 +211,8 @@ public class MapApiController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-		ResponseEntity<String> validateError = userdataService.validateUser(pu);
-		if (validateError != null) {
-			return validateError;
-		}
-		
-		ResponseEntity<String> responseStatus = userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
-		if (responseStatus != null) {
-			return responseStatus;
-		}
+		userdataService.validateUser(usersRepository.findById(dev.userid));
+		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
 		
 		return okStatus();
 	}
@@ -345,18 +331,12 @@ public class MapApiController {
 		PremiumUserDevice dev = checkUser();
 		InputStream bin = null;
 		try {
-			ResponseEntity<String>[] error = new ResponseEntity[] { null };
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(ANALYSIS))));
 			}
-			bin = userdataService.getInputStream(dev, error, userFile);
-			ResponseEntity<String> err = error[0];
-			if (err != null) {
-				response.setStatus(err.getStatusCodeValue());
-				response.getWriter().write(err.getBody());
-				return err;
-			}
+			bin = userdataService.getInputStream(dev, userFile);
+			
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
@@ -407,18 +387,11 @@ public class MapApiController {
 		InputStream bin = null;
 		try {
 			@SuppressWarnings("unchecked")
-			ResponseEntity<String>[] error = new ResponseEntity[] { null };
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(SRTM_ANALYSIS))));
 			}
-			bin = userdataService.getInputStream(dev, error, userFile);
-			ResponseEntity<String> err = error[0];
-			if (err != null) {
-				response.setStatus(err.getStatusCodeValue());
-				response.getWriter().write(err.getBody());
-				return err;
-			}
+			bin = userdataService.getInputStream(dev, userFile);
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
