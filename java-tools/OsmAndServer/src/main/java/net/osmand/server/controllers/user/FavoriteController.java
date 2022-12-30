@@ -3,7 +3,6 @@ package net.osmand.server.controllers.user;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
@@ -27,7 +26,7 @@ import java.util.zip.GZIPInputStream;
 @RequestMapping("/mapapi/fav")
 public class FavoriteController {
     
-    public static final String FILE_TYPE_FAVOURITES = "favourites";
+    public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_EXT_GPX = ".gpx";
     public static final String ERROR_WRITING_GPX_MSG = "Error writing gpx!";
     public static final String ERROR_FILE_WAS_CHANGED_MSG = "File was changed!";
@@ -43,7 +42,6 @@ public class FavoriteController {
     protected GpxService gpxService;
     
     Gson gson = new Gson();
-    JsonParser jsonParser = new JsonParser();
     
     Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
     
@@ -103,7 +101,7 @@ public class FavoriteController {
         if (changeGroup) {
             oldGpxFile = createGpxFile(oldGroupName, dev, oldGroupUpdatetime);
             if (oldGpxFile != null) {
-                oldGpxFile.deleteWptPt(wptPt);
+                oldGpxFile.deleteWptPt(wptName, ind);
             } else
                 throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                         UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
@@ -135,12 +133,7 @@ public class FavoriteController {
                                                       Long updatetime, GPXFile file) throws IOException {
         File tmpGpx = createTmpGpxFile(file, fileName);
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
-        
-        PremiumUserFilesRepository.UserFile newFile = userdataService.getLastFileVersion(dev.userid, fileName, FILE_TYPE_FAVOURITES);
-        WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(file, tmpGpx);
-        
-        UserdataService.ResponseFileStatus resp = new UserdataService.ResponseFileStatus(newFile);
-        resp.setJsonObject((JsonObject) jsonParser.parse(gsonWithNans.toJson(trackData)));
+        UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, file, tmpGpx);
         
         return ResponseEntity.ok(gson.toJson(resp));
     }
@@ -150,8 +143,12 @@ public class FavoriteController {
         UserdataService.ResponseFileStatus resp = null;
         if (file != null && tmpFile != null) {
             PremiumUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
+            if (userFile.details == null) {
+                userFile.details = new JsonObject();
+            }
+            WebGpxParser.TrackData trackData = gpxService.getTrackDataByGpxFile(file, tmpFile);
+            userFile.details.add("trackData", gson.toJsonTree(gsonWithNans.toJson(trackData)));
             resp = new UserdataService.ResponseFileStatus(userFile);
-            resp.setJsonObject((JsonObject) jsonParser.parse(gsonWithNans.toJson(gpxService.getTrackDataByGpxFile(file, tmpFile))));
         }
         return resp;
     }
@@ -170,7 +167,7 @@ public class FavoriteController {
         if (userGroupFile == null) {
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         }
-        if (userGroupFile.updatetime.getTime() == updatetime) {
+        if (userGroupFile.updatetime.getTime() != updatetime) {
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_FILE_WAS_CHANGED_MSG);
         }
         InputStream in = userGroupFile.data != null ? new ByteArrayInputStream(userGroupFile.data) : userdataService.getInputStream(userGroupFile);

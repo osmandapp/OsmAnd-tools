@@ -1,6 +1,8 @@
 package net.osmand.server.controllers.user;
 
 import java.io.*;
+
+import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
@@ -18,12 +20,14 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import com.google.gson.JsonParser;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -103,9 +107,14 @@ public class MapApiController {
 	@Autowired
 	protected GpxService gpxService;
 	
+	@Autowired
+	WebGpxParser webGpxParser;
+	
 	Gson gson = new Gson();
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	
+	JsonParser jsonParser = new JsonParser();
 
 	public static class UserPasswordPost {
 		public String username;
@@ -254,26 +263,29 @@ public class MapApiController {
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, true);
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
-			if (nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details)) {
-				GPXTrackAnalysis analysis = null;
+			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
+			if (isGPZTrack || isFavorite) {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
-				UserFile uf = of.get();
-				if (uf != null) {
-					try {
-						InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
-								: userdataService.getInputStream(uf);
-						if (in != null) {
-							GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-							if (gpxFile != null) {
-								analysis = getAnalysis(uf, gpxFile);
-								if (gpxFile.metadata != null) {
-									uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
-								}
+				if (of.isPresent()) {
+					GPXTrackAnalysis analysis = null;
+					UserFile uf = of.get();
+					InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
+							: userdataService.getInputStream(uf);
+					if (in != null) {
+						GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+						if (isGPZTrack) {
+							analysis = getAnalysis(uf, gpxFile);
+							if (gpxFile.metadata != null) {
+								uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
 							}
+						} else {
+							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
 						}
-					} catch (RuntimeException e) {
 					}
-					saveAnalysis(ANALYSIS, uf, analysis);
+					if (isGPZTrack) {
+						saveAnalysis(ANALYSIS, uf, analysis);
+					}
 					nd.details = uf.details.deepCopy();
 				}
 			}
