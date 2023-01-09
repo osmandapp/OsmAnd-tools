@@ -28,6 +28,8 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
@@ -730,6 +732,17 @@ public class UpdateSubscription {
 		return updated;
 	}
 
+	private static HttpRequestInitializer setHttpTimeout(final HttpRequestInitializer requestInitializer) {
+		  return new HttpRequestInitializer() {
+		    @Override
+		    public void initialize(HttpRequest httpRequest) throws IOException {
+		      requestInitializer.initialize(httpRequest);
+		      httpRequest.setConnectTimeout(3 * 60000);  // 3 minutes connect timeout
+		      httpRequest.setReadTimeout(3 * 60000);  // 3 minutes read timeout
+		    }
+		  };
+	}
+	
 	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
@@ -751,7 +764,7 @@ public class UpdateSubscription {
 		// bld.setHost(serverPublicUrl);
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
 		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());
-		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
+		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, setHttpTimeout(credential))
 				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
 
 		return publisher;
