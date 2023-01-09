@@ -47,8 +47,9 @@ public class ApkPublisher {
 			v3 = v3.substring(1);
 		}
 		String name = pack + "-" + v1 + "." + v2 + "." + v3 + "-" + version + ".aab";
+		// "application/vnd.android.package-archive"
 		Uploadbundle bundle = publisher.internalappsharingartifacts().uploadbundle(pack,
-				new FileContent(null, new File(path, name)));
+				new FileContent("application/x-authorware-bin", new File(path, name)));
 		InternalAppSharingArtifact artifact = bundle.execute();
 		System.out.println(String.format("Release %s - uploaded fingerprint %s, url - ", name,
 				artifact.getCertificateFingerprint(), artifact.getDownloadUrl()));
