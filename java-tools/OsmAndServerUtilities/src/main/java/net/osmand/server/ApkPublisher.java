@@ -46,7 +46,7 @@ public class ApkPublisher {
 		if (v3.startsWith("0")) {
 			v3 = v3.substring(1);
 		}
-		String name = pack + "-" + v1 + v2 + v3 + "-" + version + ".aab";
+		String name = pack + "-" + v1 + "." + v2 + "." + v3 + "." + "-" + version + ".aab";
 		Uploadbundle bundle = publisher.internalappsharingartifacts().uploadbundle(pack,
 				new FileContent(null, new File(path, name)));
 		InternalAppSharingArtifact artifact = bundle.execute();
