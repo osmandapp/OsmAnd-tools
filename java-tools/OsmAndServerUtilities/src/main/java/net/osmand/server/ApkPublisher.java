@@ -7,6 +7,8 @@ import java.security.GeneralSecurityException;
 import org.json.JSONException;
 
 import com.google.api.client.http.FileContent;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.AndroidPublisher.Internalappsharingartifacts.Uploadbundle;
 import com.google.api.services.androidpublisher.model.InternalAppSharingArtifact;
@@ -22,6 +24,17 @@ public class ApkPublisher {
 	public static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
 
+	private static HttpRequestInitializer setHttpTimeout(final HttpRequestInitializer requestInitializer) {
+		  return new HttpRequestInitializer() {
+		    @Override
+		    public void initialize(HttpRequest httpRequest) throws IOException {
+		      requestInitializer.initialize(httpRequest);
+		      httpRequest.setConnectTimeout(3 * 60000);  // 3 minutes connect timeout
+		      httpRequest.setReadTimeout(3 * 60000);  // 3 minutes read timeout
+		    }
+		  };
+	}
+	
 	public static void main(String[] args) throws JSONException, IOException, GeneralSecurityException {
 		String androidClientSecretFile = "";
 		String path = "";
@@ -48,8 +61,10 @@ public class ApkPublisher {
 		}
 		String name = pack + "-" + v1 + "." + v2 + "." + v3 + "-" + version + ".aab";
 		// 
+		
+//		setHttpTimeout(publisher.getGoogleClientRequestInitializer());
 		Uploadbundle bundle = publisher.internalappsharingartifacts().uploadbundle(pack,
-				new FileContent("application/vnd.android.package-archive", new File(path, name)));
+				new FileContent("application/octet-stream", new File(path, name)));
 		InternalAppSharingArtifact artifact = bundle.execute();
 		System.out.println(String.format("Release %s - uploaded fingerprint %s, url - ", name,
 				artifact.getCertificateFingerprint(), artifact.getDownloadUrl()));
