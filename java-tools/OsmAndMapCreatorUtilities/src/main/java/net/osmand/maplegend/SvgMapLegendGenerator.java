@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -279,7 +280,7 @@ public class SvgMapLegendGenerator {
             double rescalingRatio = newSize / svg.width;
             double xOffset = canvasWidth / 2 - newSize / 2;
             double yOffset = canvasHeight / 2 - newSize / 2;
-            String resultContent = String.format("\n<g transform=\"translate(%f, %f) scale(%f %f) \"> \n", xOffset, yOffset, rescalingRatio, rescalingRatio);
+            String resultContent = String.format(Locale.US, "\n<g transform=\"translate(%f, %f) scale(%f %f) \"> \n", xOffset, yOffset, rescalingRatio, rescalingRatio);
             resultContent += svg.content + "</g>\n\n" ;
             return resultContent;
         }
