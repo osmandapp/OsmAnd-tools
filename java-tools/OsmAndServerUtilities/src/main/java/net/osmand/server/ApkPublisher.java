@@ -3,6 +3,7 @@ package net.osmand.server;
 import java.io.File;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,14 +37,15 @@ public class ApkPublisher {
 	public static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
 	public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
 
-	private static final boolean QUICK_UPLOAD = false;
-	private static final String TRACK_ALPHA = "alpha";
+	protected static final String TRACK_ALPHA = "alpha";
+	protected static final String TRACK_BETA = "beta";
 
 	public static void main(String[] args) throws JSONException, IOException, GeneralSecurityException {
 		String androidClientSecretFile = "";
 		String path = "";
 		String apkNumber = "";
 		String pack = "";
+		String track = TRACK_ALPHA;
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].startsWith("--androidclientsecret=")) {
 				androidClientSecretFile = args[i].substring("--androidclientsecret=".length());
@@ -53,6 +55,8 @@ public class ApkPublisher {
 				apkNumber = args[i].substring("--version=".length());
 			} else if (args[i].startsWith("--package=")) {
 				pack = args[i].substring("--package=".length());
+			} else if (args[i].startsWith("--track=")) {
+				track = args[i].substring("--track=".length());
 			}
 		}
 
@@ -65,39 +69,32 @@ public class ApkPublisher {
 		}
 		String version = v1 + "." + v2 + "." + v3;
 		String name = pack + "-" + version + "-" + apkNumber + ".aab";
+		String appName = pack.contains("plus") ? "OsmAnd+" : "OsmAnd"; 
 		//
 		FileContent aabFile = new FileContent("application/octet-stream", new File(path, name));
-		if (QUICK_UPLOAD) {
-			Uploadbundle bundle = publisher.internalappsharingartifacts().uploadbundle(pack, aabFile);
-			InternalAppSharingArtifact artifact = bundle.execute();
-			System.out.println(String.format("Release %s - uploaded fingerprint %s, url - ", name,
-					artifact.getCertificateFingerprint(), artifact.getDownloadUrl()));
-		} else {
-			final Edits edits = publisher.edits();
-			// Create a new edit to make changes to your listing.
-			Insert editRequest = edits.insert(pack, null /** no content */
-			);
-			AppEdit edit = editRequest.execute();
-			final String editId = edit.getId();
-			log.info(String.format("Created edit with id: %s", editId));
+		final Edits edits = publisher.edits();
+		// Create a new edit to make changes to your listing.
+		Insert editRequest = edits.insert(pack, null);
+		AppEdit edit = editRequest.execute();
+		final String editId = edit.getId();
+		log.info(String.format("Created edit with id: %s", editId));
 
-			Upload uploadRequest = edits.bundles().upload(pack, editId, aabFile);
-			Bundle bundle = uploadRequest.execute();
-			log.info(String.format("Version code %d has been uploaded", bundle.getVersionCode()));
-			List<Long> versionCode = Collections.singletonList(Long.valueOf(bundle.getVersionCode()));
-			Update updateTrackRequest = edits.tracks().update(pack, editId, TRACK_ALPHA,
-					new Track().setReleases(Collections.singletonList(new TrackRelease().setName("OsmAnd " + version)
-							.setVersionCodes(versionCode).setStatus("completed")
-							.setReleaseNotes(Collections.singletonList(
-									new LocalizedText().setLanguage("en-US").setText("Alpha release " + version))))));
-			Track updatedTrack = updateTrackRequest.execute();
-			log.info(String.format("Track %s has been updated.", updatedTrack.getTrack()));
+		Upload uploadRequest = edits.bundles().upload(pack, editId, aabFile);
+		Bundle bundle = uploadRequest.execute();
+		log.info(String.format("Version code %d has been uploaded", bundle.getVersionCode()));
+		List<Long> versionCode = Collections.singletonList(Long.valueOf(bundle.getVersionCode()));
+		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
+		releaseNotes.add(new LocalizedText().setLanguage("en-US").setText("Release " + version));
+		Update updateTrackRequest = edits.tracks().update(pack, editId, track,
+				new Track().setReleases(Collections.singletonList(new TrackRelease().setName(appName + " " + version)
+						.setVersionCodes(versionCode).setStatus("completed").setReleaseNotes(releaseNotes))));
+		Track updatedTrack = updateTrackRequest.execute();
+		log.info(String.format("Track %s has been updated.", updatedTrack.getTrack()));
 
-			// Commit changes for edit.
-			Commit commitRequest = edits.commit(pack, editId);
-			AppEdit appEdit = commitRequest.execute();
-			log.info(String.format("App edit with id %s has been comitted", appEdit.getId()));
+		// Commit changes for edit.
+		Commit commitRequest = edits.commit(pack, editId);
+		AppEdit appEdit = commitRequest.execute();
+		log.info(String.format("App edit with id %s has been comitted", appEdit.getId()));
 
-		}
 	}
 }
