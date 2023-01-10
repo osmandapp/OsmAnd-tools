@@ -3,7 +3,6 @@ package net.osmand.server;
 import java.io.File;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -64,56 +63,41 @@ public class ApkPublisher {
 		if (v3.startsWith("0")) {
 			v3 = v3.substring(1);
 		}
-		String version =  v1 + "." + v2 + "." + v3 ;
+		String version = v1 + "." + v2 + "." + v3;
 		String name = pack + "-" + version + "-" + apkNumber + ".aab";
-		// 
+		//
 		FileContent aabFile = new FileContent("application/octet-stream", new File(path, name));
 		if (QUICK_UPLOAD) {
-		Uploadbundle bundle = publisher.internalappsharingartifacts().uploadbundle(pack,aabFile);
-		InternalAppSharingArtifact artifact = bundle.execute();
-		System.out.println(String.format("Release %s - uploaded fingerprint %s, url - ", name,
-				artifact.getCertificateFingerprint(), artifact.getDownloadUrl()));
-	} else {
-		final Edits edits = publisher.edits();
-        // Create a new edit to make changes to your listing.
-        Insert editRequest = edits
-                .insert(pack,null /** no content */);
-        AppEdit edit = editRequest.execute();
-        final String editId = edit.getId();
-        log.info(String.format("Created edit with id: %s", editId));
-        
-        Upload uploadRequest = edits
-                .bundles()
-                .upload(pack,
-                        editId,
-                        aabFile);
-        Bundle bundle = uploadRequest.execute();
-        log.info(String.format("Version code %d has been uploaded",
-        		bundle.getVersionCode()));
-        List<Long> versionCode = Collections.singletonList(Long.valueOf(bundle.getVersionCode()));
-        Update updateTrackRequest = edits
-                .tracks()
-                .update(pack,
-                        editId,
-                        TRACK_ALPHA,
-                        new Track().setReleases(
-                            Collections.singletonList(
-                                new TrackRelease()
-                                    .setName("OsmAnd " + version)
-                                    .setVersionCodes(versionCode)
-                                    .setStatus("completed")
-                                    .setReleaseNotes(Collections.singletonList(
-                                        new LocalizedText()
-                                            .setLanguage("en-US")
-                                            .setText("Alpha release " + version))))));
-        Track updatedTrack = updateTrackRequest.execute();
-        log.info(String.format("Track %s has been updated.", updatedTrack.getTrack()));
+			Uploadbundle bundle = publisher.internalappsharingartifacts().uploadbundle(pack, aabFile);
+			InternalAppSharingArtifact artifact = bundle.execute();
+			System.out.println(String.format("Release %s - uploaded fingerprint %s, url - ", name,
+					artifact.getCertificateFingerprint(), artifact.getDownloadUrl()));
+		} else {
+			final Edits edits = publisher.edits();
+			// Create a new edit to make changes to your listing.
+			Insert editRequest = edits.insert(pack, null /** no content */
+			);
+			AppEdit edit = editRequest.execute();
+			final String editId = edit.getId();
+			log.info(String.format("Created edit with id: %s", editId));
 
-        // Commit changes for edit.
-        Commit commitRequest = edits.commit(pack, editId);
-        AppEdit appEdit = commitRequest.execute();
-        log.info(String.format("App edit with id %s has been comitted", appEdit.getId()));
+			Upload uploadRequest = edits.bundles().upload(pack, editId, aabFile);
+			Bundle bundle = uploadRequest.execute();
+			log.info(String.format("Version code %d has been uploaded", bundle.getVersionCode()));
+			List<Long> versionCode = Collections.singletonList(Long.valueOf(bundle.getVersionCode()));
+			Update updateTrackRequest = edits.tracks().update(pack, editId, TRACK_ALPHA,
+					new Track().setReleases(Collections.singletonList(new TrackRelease().setName("OsmAnd " + version)
+							.setVersionCodes(versionCode).setStatus("completed")
+							.setReleaseNotes(Collections.singletonList(
+									new LocalizedText().setLanguage("en-US").setText("Alpha release " + version))))));
+			Track updatedTrack = updateTrackRequest.execute();
+			log.info(String.format("Track %s has been updated.", updatedTrack.getTrack()));
 
+			// Commit changes for edit.
+			Commit commitRequest = edits.commit(pack, editId);
+			AppEdit appEdit = commitRequest.execute();
+			log.info(String.format("App edit with id %s has been comitted", appEdit.getId()));
+
+		}
 	}
-
 }
