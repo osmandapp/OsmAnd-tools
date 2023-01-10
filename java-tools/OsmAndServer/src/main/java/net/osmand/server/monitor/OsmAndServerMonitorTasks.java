@@ -706,17 +706,18 @@ public class OsmAndServerMonitorTasks {
 				}
 				if ((old == null || old.updated.getTime() != e.updated.getTime())
 						&& e.updated.getTime() > lastFeedCheckTimestamp) {
-					downloadLinkTitle(e);
 					newFeed.add(e);
 				}
 			}
 			if (lastFeedCheckTimestamp == 0) {
 				if (newFeed.size() > 0) {
 					FeedEntry last = newFeed.get(newFeed.size() - 1);
+					downloadLinkTitle(last);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
 				}
 			} else {
 				for (FeedEntry n : newFeed) {
+					downloadLinkTitle(n);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
 				}
 			}
@@ -739,6 +740,7 @@ public class OsmAndServerMonitorTasks {
 				String s;
 				while ((s = br.readLine()) != null) {
 					if (s.contains("<title>")) {
+						LOG.info("Check " + s);
 						int i1 = s.indexOf("<title>");
 						int i2 = s.indexOf("</title>");
 						if (i1 != -1 && i2 != -1) {
@@ -799,7 +801,7 @@ public class OsmAndServerMonitorTasks {
 			bld.append(" ");
 			if (words[i].startsWith("osmandapp/")) {
 				String linkName = n.linkTitle;
-				if (Algorithms.isEmpty(n.linkTitle)) {
+				if (Algorithms.isEmpty(linkName)) {
 					linkName = words[i].substring("osmandapp/".length());
 				}
 				bld.append(String.format("<a href='%s'>%s</a>", n.link, linkName));
