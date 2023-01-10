@@ -18,10 +18,8 @@ import com.google.api.services.androidpublisher.AndroidPublisher.Edits.Bundles.U
 import com.google.api.services.androidpublisher.AndroidPublisher.Edits.Commit;
 import com.google.api.services.androidpublisher.AndroidPublisher.Edits.Insert;
 import com.google.api.services.androidpublisher.AndroidPublisher.Edits.Tracks.Update;
-import com.google.api.services.androidpublisher.AndroidPublisher.Internalappsharingartifacts.Uploadbundle;
 import com.google.api.services.androidpublisher.model.AppEdit;
 import com.google.api.services.androidpublisher.model.Bundle;
-import com.google.api.services.androidpublisher.model.InternalAppSharingArtifact;
 import com.google.api.services.androidpublisher.model.LocalizedText;
 import com.google.api.services.androidpublisher.model.Track;
 import com.google.api.services.androidpublisher.model.TrackRelease;
