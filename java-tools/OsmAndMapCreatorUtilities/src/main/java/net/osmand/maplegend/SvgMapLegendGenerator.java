@@ -24,7 +24,7 @@ public class SvgMapLegendGenerator {
     static int canvasWidth = 300;
     static int canvasHeight = 35;
     static double shieldSize = 30;
-    static double iconSize = 18;
+    static double iconSize = 22;
 
     public static void main(String[] args) throws Exception{
         generate(System.getenv("repo_dir"), "default");
