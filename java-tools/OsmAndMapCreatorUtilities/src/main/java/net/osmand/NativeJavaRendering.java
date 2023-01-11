@@ -113,6 +113,14 @@ public class NativeJavaRendering extends NativeLibrary {
 
 	public void loadRuleStorage(String path, String renderingProperties) throws IOException, XmlPullParserException, SAXException{
 		storage = parseStorage(path);
+		if (storage != null) {
+			String addonName = "route.addon.render.xml";
+//			for (String addonName : getRendererAddons().keySet()) {
+				RenderingRulesStorage addonStorage = parseStorage(addonName);
+				storage.mergeDependsOrAddon(addonStorage);
+//			}
+//			loadedRenderers.put(name, renderer);
+		}
 		setRenderingProps(renderingProperties);
 		clearRenderingRulesStorage();
 		initRenderingRulesStorage(storage);
@@ -158,8 +166,13 @@ public class NativeJavaRendering extends NativeLibrary {
 			if (name.lastIndexOf('/') != -1) {
 				name = name.substring(name.lastIndexOf('/') + 1);
 			}
+			boolean addon = false;
+			if((name.endsWith(".addon"))){
+				addon = true;
+				name = name.substring(0, name.length() - ".addon".length());
+			}
 			storage = new RenderingRulesStorage(name, renderingConstants);
-			storage.parseRulesFromXmlInputStream(is2, resolver, false);
+			storage.parseRulesFromXmlInputStream(is2, resolver, addon);
 			is.close();
 			is2.close();
 		}
