@@ -52,7 +52,11 @@ public class GpxService {
         
         if (!gpxData.tracks.isEmpty()) {
             webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
-            webGpxParser.addDistance(gpxData.tracks, analysis);
+            if (analysis != null && !analysis.elevationData.isEmpty()) {
+                webGpxParser.addDistance(gpxData.tracks, analysis);
+            } else {
+                webGpxParser.addDistance(gpxData.tracks, srtmAnalysis);
+            }
         }
         return gpxData;
     }

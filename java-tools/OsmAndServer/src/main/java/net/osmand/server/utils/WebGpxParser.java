@@ -292,23 +292,21 @@ public class WebGpxParser {
     }
     
     public void addDistance(List<Track> tracks, GPXTrackAnalysis analysis) {
-        if (analysis != null && !analysis.elevationData.isEmpty()) {
-            tracks.forEach(track -> track.points.forEach(point -> {
-                if (point.geometry != null) {
-                    point.geometry.forEach(p -> {
-                        int ind = point.geometry.indexOf(p);
-                        if (ind < analysis.elevationData.size()) {
-                            p.distance = analysis.elevationData.get(ind).distance;
-                        }
-                    });
-                } else {
-                    int ind = track.points.indexOf(point);
+        tracks.forEach(track -> track.points.forEach(point -> {
+            if (point.geometry != null) {
+                point.geometry.forEach(p -> {
+                    int ind = point.geometry.indexOf(p);
                     if (ind < analysis.elevationData.size()) {
-                        point.distance = analysis.elevationData.get(ind).distance;
+                        p.distance = analysis.elevationData.get(ind).distance;
                     }
+                });
+            } else {
+                int ind = track.points.indexOf(point);
+                if (ind < analysis.elevationData.size()) {
+                    point.distance = analysis.elevationData.get(ind).distance;
                 }
-            }));
-        }
+            }
+        }));
     }
     
     public Map<String, Object> getTrackAnalysis(GPXTrackAnalysis analysis, GPXTrackAnalysis srtmAnalysis) {
