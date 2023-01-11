@@ -295,9 +295,17 @@ public class WebGpxParser {
         if (analysis != null && !analysis.elevationData.isEmpty()) {
             tracks.forEach(track -> track.points.forEach(point -> {
                 if (point.geometry != null) {
-                    point.geometry.forEach(p -> p.distance = analysis.elevationData.get(point.geometry.indexOf(p)).distance);
+                    point.geometry.forEach(p -> {
+                        int ind = point.geometry.indexOf(p);
+                        if (ind < analysis.elevationData.size()) {
+                            p.distance = analysis.elevationData.get(ind).distance;
+                        }
+                    });
                 } else {
-                    track.points.forEach(p -> p.distance = analysis.elevationData.get(track.points.indexOf(p)).distance);
+                    int ind = track.points.indexOf(point);
+                    if (ind < analysis.elevationData.size()) {
+                        point.distance = analysis.elevationData.get(ind).distance;
+                    }
                 }
             }));
         }
