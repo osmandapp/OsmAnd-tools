@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.ParseException;
@@ -136,6 +137,7 @@ public class OsmAndServerMonitorTasks {
 		String title;
 		String author;
 		String link;
+		String linkTitle;
 	}
 
 
@@ -710,10 +712,12 @@ public class OsmAndServerMonitorTasks {
 			if (lastFeedCheckTimestamp == 0) {
 				if (newFeed.size() > 0) {
 					FeedEntry last = newFeed.get(newFeed.size() - 1);
+					downloadLinkTitle(last);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
 				}
 			} else {
 				for (FeedEntry n : newFeed) {
+					downloadLinkTitle(n);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
 				}
 			}
@@ -727,6 +731,31 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 	
+	private void downloadLinkTitle(FeedEntry e) {
+		if (e.link != null) {
+			try {
+				URL url = new URL(e.link);
+				InputStream stream = url.openStream();
+				BufferedReader br = new BufferedReader(new InputStreamReader(stream));
+				String s;
+				while ((s = br.readLine()) != null) {
+					if (s.contains("<title>")) {
+						LOG.info("Check " + s);
+						int i1 = s.indexOf("<title>");
+						int i2 = s.indexOf("</title>");
+						if (i1 != -1 && i2 != -1) {
+							e.linkTitle = s.substring(i1 + "<title>".length(), i2).trim();
+							break;
+						}
+					}
+				}
+				br.close();
+			} catch (Exception e1) {
+				LOG.info("Failed to fetch " + e.link, e1);
+			}
+		}
+	}
+
 	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
 	
 	private String formatGithubMsg(FeedEntry n) {
@@ -771,7 +800,11 @@ public class OsmAndServerMonitorTasks {
 		for (int i = 0; i < words.length; i++) {
 			bld.append(" ");
 			if (words[i].startsWith("osmandapp/")) {
-				bld.append(String.format("<a href='%s'>%s</a>", n.link, words[i]));
+				String linkName = n.linkTitle;
+				if (Algorithms.isEmpty(linkName)) {
+					linkName = words[i].substring("osmandapp/".length());
+				}
+				bld.append(String.format("<a href='%s'>%s</a>", n.link, linkName));
 			} else if (words[i].equals(n.author)) {
 				author = true;
 				bld.append(String.format("<b>#%s</b>", words[i].replace('-', '_')));

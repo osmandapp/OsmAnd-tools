@@ -670,8 +670,12 @@ public class IndexBatchCreator {
 			}
 			log.warn("-------------------------------------------");
 			log.warn("----------- Generate on AWS " + file.getName() + "\n\n\n");
-			generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
-			return true;
+			try {
+				generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
+				return true;
+			} catch (RuntimeException e) {
+				log.error("----------- FAILED Generation on AWS go to local " + file.getName() + " " + e.getMessage(), e);
+			}
 		}
 		log.warn("-------------------------------------------");
 		log.warn("----------- Scheduled on local " + file.getName() + "\n\n\n");

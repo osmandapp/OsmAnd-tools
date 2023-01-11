@@ -20,6 +20,8 @@ public class ServerUtilities {
 		String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
 		if (utl.equals("update-subscriptions")) {
 			UpdateSubscription.main(subArgsArray);
+		} else if (utl.equals("upload-apk")) {
+			ApkPublisher.main(subArgsArray); 
 		} else if (utl.equals("send-email")) {
 			EmailSenderMain.main(subArgsArray);
 		} else if (utl.equals("analyze-exceptions")) {

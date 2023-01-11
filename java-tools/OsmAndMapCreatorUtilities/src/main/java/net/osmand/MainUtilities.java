@@ -315,6 +315,7 @@ public class MainUtilities {
 		if (fl.startsWith("http://") || fl.startsWith("https://")) {
 			URL fu = new URL(fl);
 			HttpURLConnection connection = (HttpURLConnection) fu.openConnection();
+			connection.setConnectTimeout(120000);
 			long lastModified = connection.getLastModified();
 			String fileName = new File(fu.getFile()).getName();
 			System.out.println(String.format("Downloading file %s from %s", fileName, fu));

@@ -10,23 +10,24 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 // Script launches from MainUtilities with CLI Arguments: generate-maplegend-svg
 // Also you need to add to environment variables a path to all OsmAnd repositories. Like this:
-// repo.dir=/Users/nnngrach/OsmAnd/
+// repo_dir=/Users/nnngrach/OsmAnd/
 
 public class SvgMapLegendGenerator {
 
     static int defaultZoomLevel = 19; //Most of the icons on this zoom are visible
     static int canvasWidth = 300;
     static int canvasHeight = 35;
-    static double shieldSize = 30;
-    static double iconSize = 18;
+    static int defaultShieldSize = 30;
+    static int defaultIconSize = 18;
 
     public static void main(String[] args) throws Exception{
-        generate(System.getenv("repo.dir"), "default");
+        generate(System.getenv("repo_dir"), "default");
     }
 
     public static void generate(String repositoriesPath, String rendererStyle) throws Exception{
@@ -35,7 +36,7 @@ public class SvgMapLegendGenerator {
         try {
 
             if (Algorithms.isEmpty(repositoriesPath)) {
-                throw new Exception("ERROR: SvgMapLegendGenerator - 'repo.dir' env parameter is empty");
+                throw new Exception("ERROR: SvgMapLegendGenerator - 'repo_dir' env parameter is empty");
             }
 
             // 1 Read XML config file
@@ -55,12 +56,11 @@ public class SvgMapLegendGenerator {
                     String[] argumentsNight = {rendererStyle, icon.tag, icon.value, icon.tag2, icon.value2, "true", Integer.toString(icon.zoom), repositoriesPath};
                     Map<String, String> dayStyle = RendererRulesStorageAmenityFetcher.main(argumentsDay);
                     Map<String, String> nightStyle = RendererRulesStorageAmenityFetcher.main(argumentsNight);
-
                     if (!Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle.get("iconName"))) {
-                        icon.iconSize = Float.valueOf(dayStyle.get("iconSize"));
                         icon.iconName = dayStyle.get("iconName");
                         icon.shieldNameDay = dayStyle.get("shieldName");
                         icon.shieldNameNight = nightStyle.get("shieldName");
+                        icon.styleIconSize = Float.valueOf(dayStyle.get("iconSize"));
                     } else {
                         throw new Exception(String.format("ERROR: SvgMapLegendGenerator - style collecting invalid result for  '%s':'%s'  '%s':'%s'",
                                 icon.tag, icon.value, icon.tag2, icon.value2));
@@ -74,7 +74,7 @@ public class SvgMapLegendGenerator {
             for (GroupDTO group : configGroups) {
 
                 //Create directory is it needed. Clean files inside.
-                String resultIconsFolderPath = System.getenv("repo.dir") + "/web/main/static/img/legend/osmand/";
+                String resultIconsFolderPath = System.getenv("repo_dir") + "/web/main/static/img/legend/osmand/";
                 String resultFolderPath = resultIconsFolderPath + group.folderName;
                 try {
                     Files.createDirectories(Paths.get(resultFolderPath));
@@ -86,9 +86,9 @@ public class SvgMapLegendGenerator {
 
                 for (IconDTO icon : group.icons) {
                     try {
-                        String contentDay = SvgGenerator.generate(icon.iconName, icon.shieldNameDay, null, 0.f);
+                        String contentDay = SvgGenerator.generate(icon.iconName, icon.iconSize, icon.shieldNameDay, icon.shieldSize, null, 0.f);
                         SvgGenerator.createSvgFile(group, icon, contentDay, true, resultIconsFolderPath);
-                        String contentNight = SvgGenerator.generate(icon.iconName, icon.shieldNameNight, null, 0.f);
+                        String contentNight = SvgGenerator.generate(icon.iconName, icon.iconSize, icon.shieldNameNight, icon.shieldSize, null, 0.f);
                         SvgGenerator.createSvgFile(group, icon, contentNight, false, resultIconsFolderPath);
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -123,12 +123,14 @@ public class SvgMapLegendGenerator {
         String value = null;
         String tag2 = null;
         String value2 = null;
+        int iconSize = defaultIconSize;  //optional value
+        int shieldSize = defaultShieldSize;  //optional value
         int zoom = defaultZoomLevel;  //optional value
 
         String iconName = null;
         String shieldNameNight = null;
         String shieldNameDay = null;
-        float iconSize = -1;
+        float styleIconSize = -1;
     }
 
     private static ArrayList<GroupDTO> parseXmlConfig(String filePath) throws Exception {
@@ -172,9 +174,19 @@ public class SvgMapLegendGenerator {
                         tempIcon.tag2 = parser.getAttributeValue("", "tag2");
                         tempIcon.value2 = parser.getAttributeValue("", "value2");
 
-                        String zoom = parser.getAttributeValue("", "zoom");
-                        if (!Algorithms.isEmpty(zoom)) {
-                            tempIcon.zoom = Integer.parseInt(zoom);
+                        String numberString = parser.getAttributeValue("", "icon_size");
+                        if (!Algorithms.isEmpty(numberString)) {
+                            tempIcon.iconSize = Integer.parseInt(numberString);
+                        }
+
+                        numberString = parser.getAttributeValue("", "shield_size");
+                        if (!Algorithms.isEmpty(numberString)) {
+                            tempIcon.shieldSize = Integer.parseInt(numberString);
+                        }
+
+                        numberString = parser.getAttributeValue("", "zoom");
+                        if (!Algorithms.isEmpty(numberString)) {
+                            tempIcon.zoom = Integer.parseInt(numberString);
                         }
 
                         if (Algorithms.isEmpty(tempIcon.name) || Algorithms.isEmpty(tempIcon.tag) || Algorithms.isEmpty(tempIcon.value)) {
@@ -193,17 +205,17 @@ public class SvgMapLegendGenerator {
 
     private static class SvgGenerator {
 
-        public static String generate(String iconName, String shieldName, String backgroundColor, float backgroundOpacity) throws Exception {
+        public static String generate(String iconName, int iconSize, String shieldName, int shieldSize, String backgroundColor, float backgroundOpacity) throws Exception {
             String content = String.format("<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n",
                     canvasWidth, canvasHeight, canvasWidth, canvasHeight);
             if (!Algorithms.isEmpty(backgroundColor)) {
                 content += geBackgroundRect(backgroundColor, backgroundOpacity);
             }
             if (!Algorithms.isEmpty(shieldName)) {
-                content += getShield(shieldName);
+                content += getShield(shieldName, shieldSize);
             }
             if (!Algorithms.isEmpty(iconName)) {
-                content += getIcon(iconName);
+                content += getIcon(iconName, iconSize);
             }
             content += "</svg>";
             return content;
@@ -213,17 +225,16 @@ public class SvgMapLegendGenerator {
             return String.format("<rect width=\"%d\" height=\"%d\" fill=\"%s\" fill-opacity=\"%f\"/>\n", canvasWidth, canvasHeight, color, opacity);
         }
 
-        private static String getShield(String shieldName) throws Exception {
-            String shieldsFolder = System.getenv("repo.dir") + "/resources/icons/svg/shields/";
+        private static String getShield(String shieldName, int shieldSize) throws Exception {
+            String shieldsFolder = System.getenv("repo_dir") + "/resources/icons/svg/shields/";
             String filePath = shieldsFolder + "h_" + shieldName + ".svg";
             SvgDTO shieldSvg = parseSvg(filePath);
             return moveToCenterAndResize(shieldSvg, shieldSize);
         }
 
-        private static String getIcon(String iconName) throws Exception {
-            String filePath = System.getenv("repo.dir") + "/resources/rendering_styles/style-icons/poi-icons-svg/" + "mx_" + iconName + ".svg";
+        private static String getIcon(String iconName, int iconSize) throws Exception {
+            String filePath = System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/poi-icons-svg/" + "mx_" + iconName + ".svg";
             SvgDTO iconSvg = parseSvg(filePath);
-
             // change clip_id from default "clip0", "clip1"...   to  "clip1000", "clip1001"...
             // for not overwriting shield's clip_id data
             iconSvg.content = iconSvg.content.replace("clip", "clip100");
@@ -275,11 +286,11 @@ public class SvgMapLegendGenerator {
             }
         }
 
-        private static String moveToCenterAndResize(SvgDTO svg, Double newSize) {
+        private static String moveToCenterAndResize(SvgDTO svg, int newSize) {
             double rescalingRatio = newSize / svg.width;
             double xOffset = canvasWidth / 2 - newSize / 2;
             double yOffset = canvasHeight / 2 - newSize / 2;
-            String resultContent = String.format("\n<g transform=\"translate(%f, %f) scale(%f %f) \"> \n", xOffset, yOffset, rescalingRatio, rescalingRatio);
+            String resultContent = String.format(Locale.US, "\n<g transform=\"translate(%f, %f) scale(%f %f) \"> \n", xOffset, yOffset, rescalingRatio, rescalingRatio);
             resultContent += svg.content + "</g>\n\n" ;
             return resultContent;
         }
@@ -329,7 +340,7 @@ public class SvgMapLegendGenerator {
                             "}\n\n";
 
                 String CapitalisedName = group.folderName.substring(0, 1).toUpperCase() + group.folderName.substring(1);
-                String path = System.getenv("repo.dir") + "/web/main/src/components/docs/autogenerated/LegendItemAutogenerated" + CapitalisedName + ".js";
+                String path = System.getenv("repo_dir") + "/web/main/src/components/docs/autogenerated/LegendItemAutogenerated" + CapitalisedName + ".js";
                 try {
                     FileWriter writer = new FileWriter(path);
                     writer.write(content);

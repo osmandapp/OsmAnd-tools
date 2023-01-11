@@ -22,6 +22,8 @@
 				<filter exclude="us_florida_northamerica" />
 				<filter exclude="congo-democratic-republic_africa" />
 				<filter exclude="south-africa_africa" />
+                <filter exclude="kazakhstan_asia" />
+                <filter exclude="mongolia_asia" />
 			</job>
 			
 		</aws>
