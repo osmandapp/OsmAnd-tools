@@ -13,7 +13,6 @@ import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.transaction.Transactional;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
@@ -21,6 +20,7 @@ import javax.validation.constraints.NotNull;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +36,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
@@ -138,11 +137,11 @@ public class UserdataController {
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
-			return userdataService.error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
-			return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
@@ -156,16 +155,16 @@ public class UserdataController {
 			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
-			return userdataService.error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(orderid);
 		if (errorMsg != null) {
-			return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 		if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
 			String hideEmail = userdataService.hideEmail(otherUser.email);
-			return userdataService.error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+			throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
 					"user was already signed up as " + hideEmail);
 		}
 		pu.orderid = orderid;
@@ -183,17 +182,17 @@ public class UserdataController {
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
-			return userdataService.error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
 		if (pu != null) {
 			if (!login) {
-				return userdataService.error(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
+				throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
 		} else {
 			String error = userSubService.checkOrderIdPremium(orderid);
 			if (error != null) {
-				return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
+				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
 			}
 			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 			if (otherUser != null) {
@@ -201,7 +200,7 @@ public class UserdataController {
 				List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
 				// check that user already registered at least 1 device (avoid typos in email)
 				if (pud != null && !pud.isEmpty()) {
-					return userdataService.error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+					throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
 							"user was already signed up as " + hideEmail);
 				} else {
 					otherUser.orderid = null;
@@ -245,30 +244,20 @@ public class UserdataController {
 		userdataService.deleteFile(name, type, deviceId, clienttime, dev);
 		return userdataService.ok();
 	}
-
+	
 	@PostMapping(value = "/delete-file-version")
 	@ResponseBody
 	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = true) Long updatetime,
-			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
-		UserFile fl = null;
+	                                         @RequestParam(name = "name", required = true) String name,
+	                                         @RequestParam(name = "type", required = true) String type,
+	                                         @RequestParam(name = "updatetime", required = true) Long updatetime,
+	                                         @RequestParam(name = "deviceid", required = true) int deviceId,
+	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		} else {
-			if (updatetime != null) {
-				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-						new Date(updatetime));
-			}
-			if (fl == null) {
-				return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-			}
-			storageService.deleteFile(fl.storage,userdataService.userFolder(fl), userdataService.storageFileName(fl));
-			filesRepository.delete(fl);
-			return userdataService.ok();
+			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
 	}
 
@@ -287,16 +276,8 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		PremiumUser pu = usersRepository.findById(dev.userid);
-		ResponseEntity<String> validateError = userdataService.validateUser(pu);
-		if (validateError != null) {
-			return validateError;
-		}
-		
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, clienttime);
-		if (uploadError != null) {
-			return uploadError;
-		}
+		userdataService.validateUser(usersRepository.findById(dev.userid));
+		userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
 
 		return userdataService.ok();
 	}
@@ -335,7 +316,7 @@ public class UserdataController {
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
 		if (!storageService.hasStorageProviderById(storageId)) {
-			return userdataService.error(400, "Storage id is not configured");
+			throw new OsmAndPublicApiException(400, "Storage id is not configured");
 		}
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {

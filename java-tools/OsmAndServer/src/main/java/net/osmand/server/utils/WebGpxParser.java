@@ -292,15 +292,21 @@ public class WebGpxParser {
     }
     
     public void addDistance(List<Track> tracks, GPXTrackAnalysis analysis) {
-        if (analysis != null && !analysis.elevationData.isEmpty()) {
-            tracks.forEach(track -> track.points.forEach(point -> {
-                if (point.geometry != null) {
-                    point.geometry.forEach(p -> p.distance = analysis.elevationData.get(point.geometry.indexOf(p)).distance);
-                } else {
-                    track.points.forEach(p -> p.distance = analysis.elevationData.get(track.points.indexOf(p)).distance);
+        tracks.forEach(track -> track.points.forEach(point -> {
+            if (point.geometry != null) {
+                point.geometry.forEach(p -> {
+                    int ind = point.geometry.indexOf(p);
+                    if (ind < analysis.elevationData.size()) {
+                        p.distance = analysis.elevationData.get(ind).distance;
+                    }
+                });
+            } else {
+                int ind = track.points.indexOf(point);
+                if (ind < analysis.elevationData.size()) {
+                    point.distance = analysis.elevationData.get(ind).distance;
                 }
-            }));
-        }
+            }
+        }));
     }
     
     public Map<String, Object> getTrackAnalysis(GPXTrackAnalysis analysis, GPXTrackAnalysis srtmAnalysis) {
@@ -380,7 +386,7 @@ public class WebGpxParser {
         }
         if (trackData.wpts != null) {
             for (Wpt wpt : trackData.wpts) {
-                gpxFile.addPoint(updateWpt(wpt));
+                gpxFile.addPoint(convertToWptPt(wpt));
             }
         }
     
@@ -392,7 +398,7 @@ public class WebGpxParser {
                 group.color = parseColor(dataGroup.color, 0);
                 List<Wpt> wptsData = dataGroup.points;
                 for (Wpt wpt : wptsData) {
-                    group.points.add(updateWpt(wpt));
+                    group.points.add(convertToWptPt(wpt));
                 }
                 res.put(key, group);
             }
@@ -438,20 +444,30 @@ public class WebGpxParser {
         return gpxFile;
     }
     
-    private WptPt updateWpt(Wpt wpt) {
+    public WptPt convertToWptPt(Wpt wpt) {
         WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
         point.name = wpt.name;
-        point.desc = wpt.desc;
+        if (wpt.desc != null) {
+            point.desc = wpt.desc;
+        }
         point.lat = wpt.lat;
         point.lon = wpt.lon;
         point.category = wpt.category;
         if (point.extensions == null) {
             point.extensions = new LinkedHashMap<>();
         }
-        point.extensions.put(COLOR_EXTENSION, String.valueOf(wpt.color));
-        point.extensions.put(ADDRESS_EXTENSION, String.valueOf(wpt.address));
-        point.extensions.put(BACKGROUND_TYPE_EXTENSION, String.valueOf(wpt.background));
-        point.extensions.put(ICON_NAME_EXTENSION, String.valueOf(wpt.icon));
+        if (wpt.color != null) {
+            point.extensions.put(COLOR_EXTENSION, wpt.color);
+        }
+        if (wpt.address != null) {
+            point.extensions.put(ADDRESS_EXTENSION, wpt.address);
+        }
+        if (wpt.background != null) {
+            point.extensions.put(BACKGROUND_TYPE_EXTENSION, wpt.background);
+        }
+        if (wpt.icon != null) {
+            point.extensions.put(ICON_NAME_EXTENSION, wpt.icon);
+        }
         return point;
     }
     
