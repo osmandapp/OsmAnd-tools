@@ -33,7 +33,7 @@ public class GpxService {
     @Value("${osmand.srtm.location}")
     String srtmLocation;
     
-    public WebGpxParser.TrackData getTrackDataByGpxFile(GPXFile gpxFile, File tmpGpx) {
+    public WebGpxParser.TrackData getTrackDataByGpxFile(GPXFile gpxFile, File originalSourceGpx) {
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
         gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
@@ -45,7 +45,7 @@ public class GpxService {
         if (!gpxFile.routes.isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(tmpGpx);
+        GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(originalSourceGpx);
         GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
         GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFileForAnalyse, true);
         gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
