@@ -140,9 +140,11 @@ public class NativeJavaRendering extends NativeLibrary {
 		} else {
 			InputStream is = null;
 			InputStream is2 = null;
+			File stylesDir = null;
 			if (new File(path).exists()) {
 				is = new FileInputStream(new File(path));
 				is2 = new FileInputStream(new File(path));
+				stylesDir = new File(path).getParentFile();
 			} else {
 				is = RenderingRulesStorage.class.getResourceAsStream(path );
 				is2 = RenderingRulesStorage.class.getResourceAsStream(path);
@@ -162,6 +164,15 @@ public class NativeJavaRendering extends NativeLibrary {
 			storage.parseRulesFromXmlInputStream(is2, resolver, false);
 			is.close();
 			is2.close();
+			if (stylesDir != null) {
+				for (File file : stylesDir.listFiles()) {
+					if (file.isFile() && file.getName().endsWith("addon.render.xml")) {
+						InputStream is3 = new FileInputStream(file);
+						storage.parseRulesFromXmlInputStream(is3, resolver, true);
+						is3.close();
+					}
+				}
+			}
 		}
 		return storage;
 	}
