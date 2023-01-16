@@ -58,10 +58,14 @@ public class GpxService {
         GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
         GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
         if (srtmAnalysis != null) {
-            GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
-            trackData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
+            trackData.analysis.put("srtmAnalysis", true);
+            trackData.analysis.put("minElevationSrtm", srtmAnalysis.minElevation);
+            trackData.analysis.put("avgElevationSrtm", srtmAnalysis.avgElevation);
+            trackData.analysis.put("maxElevationSrtm", srtmAnalysis.maxElevation);
             webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
-            webGpxParser.addDistance(trackData.tracks, srtmAnalysis);
+            if (trackData.analysis.get("elevationData") == null) {
+                webGpxParser.addDistance(trackData.tracks, srtmAnalysis);
+            }
         }
         return trackData;
     }
