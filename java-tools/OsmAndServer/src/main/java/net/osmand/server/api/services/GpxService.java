@@ -38,7 +38,6 @@ public class GpxService {
         
         gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
         gpxData.wpts = webGpxParser.getWpts(gpxFile);
-        gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFile);
         gpxData.tracks = webGpxParser.getTracks(gpxFile);
         gpxData.ext = gpxFile.extensions;
         
@@ -47,20 +46,28 @@ public class GpxService {
         }
         GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(originalSourceGpx);
         GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
-        GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFileForAnalyse, true);
-        gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
-        
-        if (!gpxData.tracks.isEmpty()) {
-            webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
-            if (analysis != null) {
-                if (!analysis.elevationData.isEmpty()) {
-                    webGpxParser.addDistance(gpxData.tracks, analysis);
-                } else if (srtmAnalysis != null) {
-                    webGpxParser.addDistance(gpxData.tracks, srtmAnalysis);
-                }
-            }
+        gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
+        gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
+        if (!gpxData.tracks.isEmpty() && analysis != null && !analysis.elevationData.isEmpty()) {
+            webGpxParser.addDistance(gpxData.tracks, analysis);
         }
         return gpxData;
+    }
+    
+    public WebGpxParser.TrackData addSrtmData(WebGpxParser.TrackData trackData) {
+        GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+        GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+        if (srtmAnalysis != null) {
+            trackData.analysis.put("srtmAnalysis", true);
+            trackData.analysis.put("minElevationSrtm", srtmAnalysis.minElevation);
+            trackData.analysis.put("avgElevationSrtm", srtmAnalysis.avgElevation);
+            trackData.analysis.put("maxElevationSrtm", srtmAnalysis.maxElevation);
+            webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
+            if (trackData.analysis.get("elevationData") == null) {
+                webGpxParser.addDistance(trackData.tracks, srtmAnalysis);
+            }
+        }
+        return trackData;
     }
     
     private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {

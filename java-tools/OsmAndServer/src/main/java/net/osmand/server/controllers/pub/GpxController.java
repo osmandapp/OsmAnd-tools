@@ -316,6 +316,13 @@ public class GpxController {
 				.contentType(MediaType.APPLICATION_XML)
 				.body(resource);
 	}
+	@PostMapping(path = {"/get-srtm-data"}, produces = "application/json")
+	public ResponseEntity<String> getSrtmData(@RequestBody String data) {
+		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		trackData = gpxService.addSrtmData(trackData);
+		
+		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
+	}
     
     private double getCommonMaxSizeFiles() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
