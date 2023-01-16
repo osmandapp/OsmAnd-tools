@@ -38,7 +38,6 @@ public class GpxService {
         
         gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
         gpxData.wpts = webGpxParser.getWpts(gpxFile);
-        gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFile);
         gpxData.tracks = webGpxParser.getTracks(gpxFile);
         gpxData.ext = gpxFile.extensions;
         
@@ -49,7 +48,7 @@ public class GpxService {
         GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
         GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFileForAnalyse, true);
         gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
-        
+        gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
         if (!gpxData.tracks.isEmpty()) {
             webGpxParser.addSrtmEle(gpxData.tracks, srtmAnalysis);
             if (analysis != null) {
@@ -61,6 +60,18 @@ public class GpxService {
             }
         }
         return gpxData;
+    }
+    
+    public WebGpxParser.TrackData addSrtmData(WebGpxParser.TrackData trackData) {
+        GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+        GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+        if (srtmAnalysis != null) {
+            GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
+            trackData.analysis = webGpxParser.getTrackAnalysis(analysis, srtmAnalysis);
+            webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
+            webGpxParser.addDistance(trackData.tracks, srtmAnalysis);
+        }
+        return trackData;
     }
     
     private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
