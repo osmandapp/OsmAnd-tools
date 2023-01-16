@@ -918,10 +918,14 @@ public class AdminController {
 		report.columns.add(new AdminGenericSubReportColumn("I Y" + h).app(SubAppType.IOS).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("I/2 Y" + h).app(SubAppType.IOS).discount(true).duration(12));
 
+		
+		report.columns.add(new AdminGenericSubReportColumn("APro A" + h).pro(true).app(SubAppType.OSMAND).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("APro M" + h).pro(true).app(SubAppType.OSMAND).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("IPro A" + h).pro(true).app(SubAppType.IOS).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("IPro M" + h).pro(true).app(SubAppType.IOS).duration(1));
+		
 		report.columns.add(new AdminGenericSubReportColumn("All Q" + h).duration(3));
 		report.columns.add(new AdminGenericSubReportColumn("All M" + h).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("PRO A" + h).pro(true).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("PRO M" + h).pro(true).duration(1));
 		return report;
 	}
 	
@@ -1154,6 +1158,7 @@ public class AdminController {
 		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
 		case "net.osmand.plus.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "net.osmand.plus.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		
 
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
