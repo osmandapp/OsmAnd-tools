@@ -144,7 +144,7 @@ public class ApkPublisher {
 		String path = "";
 		String apkNumber = "";
 		String pack = "";
-		String track = TRACK_ALPHA;
+		String track = null;
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].startsWith("--androidclientsecret=")) {
 				androidClientSecretFile = args[i].substring("--androidclientsecret=".length());
@@ -157,6 +157,14 @@ public class ApkPublisher {
 			} else if (args[i].startsWith("--track=")) {
 				track = args[i].substring("--track=".length());
 			}
+		}
+		
+//		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
+//		releaseNotes.add(new LocalizedText().setLanguage("en-US").setText("Release " + version));
+		List<LocalizedText> releaseNotes = gatherReleaseNotes(new File(DEFAULT_PATH), apkNumber);
+		if (track == null || track.isEmpty()) {
+			System.out.println("Nothing to upload - track is not selected");
+			return;
 		}
 
 		AndroidPublisher publisher = UpdateSubscription.getPublisherApi(androidClientSecretFile);
@@ -182,9 +190,7 @@ public class ApkPublisher {
 		Bundle bundle = uploadRequest.execute();
 		log.info(String.format("Version code %d has been uploaded", bundle.getVersionCode()));
 		List<Long> versionCode = Collections.singletonList(Long.valueOf(bundle.getVersionCode()));
-//		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
-//		releaseNotes.add(new LocalizedText().setLanguage("en-US").setText("Release " + version));
-		List<LocalizedText> releaseNotes = gatherReleaseNotes(new File(DEFAULT_PATH), apkNumber);
+
 		
 		Update updateTrackRequest = edits.tracks().update(pack, editId, track,
 				new Track().setReleases(Collections.singletonList(new TrackRelease().setName(appName + " " + version)
