@@ -277,9 +277,7 @@ public class UserdataController {
 			return userdataService.tokenNotValid();
 		}
 		userdataService.validateUser(usersRepository.findById(dev.userid));
-		userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
-
-		return userdataService.ok();
+		return userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
 	}
 
 	@GetMapping(value = "/check-file-on-server")
