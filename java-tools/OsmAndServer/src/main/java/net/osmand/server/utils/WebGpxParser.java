@@ -408,6 +408,9 @@ public class WebGpxParser {
         if (trackData.tracks != null) {
             trackData.tracks.forEach(t -> {
                 GPXUtilities.Track track = t.ext;
+                if (track == null) {
+                    track = new GPXUtilities.Track();
+                }
                 List<GPXUtilities.TrkSegment> segments = new ArrayList<>();
                 if (t.points.get(0).geometry != null) {
                     GPXUtilities.Route route = new GPXUtilities.Route();
@@ -476,6 +479,9 @@ public class WebGpxParser {
         boolean isNanEle = isNanEle(points);
         for (Point point : points) {
             GPXUtilities.WptPt filePoint = point.ext;
+            if (filePoint == null) {
+                filePoint = new GPXUtilities.WptPt();
+            }
             if (filePoint.hdop == -1) {
                 filePoint.hdop = Double.NaN;
             }
