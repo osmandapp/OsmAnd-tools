@@ -380,7 +380,9 @@ public class WebGpxParser {
     public GPXFile createGpxFileFromTrackData(WebGpxParser.TrackData trackData) {
         GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
         if (trackData.metaData != null) {
-            gpxFile.metadata = trackData.metaData.ext;
+            if (trackData.metaData.ext != null) {
+                gpxFile.metadata = trackData.metaData.ext;
+            }
             gpxFile.metadata.name = trackData.metaData.name;
             gpxFile.metadata.desc = trackData.metaData.desc;
         }
@@ -419,10 +421,16 @@ public class WebGpxParser {
                     for (int i = 0; i < t.points.size(); i++) {
                         Point point = t.points.get(i);
                         GPXUtilities.WptPt routePoint = point.ext;
+                        if (routePoint == null) {
+                            routePoint = new WptPt();
+                        }
                         routePoint.lat = point.lat;
                         routePoint.lon = point.lng;
                         if (point.ele == 99999) {
                             routePoint.ele = Double.NaN;
+                        }
+                        if (routePoint.extensions == null) {
+                            routePoint.extensions = new LinkedHashMap<>();
                         }
                         routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                         allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;

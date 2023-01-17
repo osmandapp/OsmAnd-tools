@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStreamWriter;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 
 @Service
 public class GpxService {
@@ -58,6 +59,9 @@ public class GpxService {
         GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
         GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
         if (srtmAnalysis != null) {
+            if (trackData.analysis == null) {
+                trackData.analysis = new LinkedHashMap<>();
+            }
             trackData.analysis.put("srtmAnalysis", true);
             trackData.analysis.put("minElevationSrtm", srtmAnalysis.minElevation);
             trackData.analysis.put("avgElevationSrtm", srtmAnalysis.avgElevation);
