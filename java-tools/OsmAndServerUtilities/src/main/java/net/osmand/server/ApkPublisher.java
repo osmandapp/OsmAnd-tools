@@ -1,6 +1,7 @@
 package net.osmand.server;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
@@ -10,6 +11,8 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONException;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.api.client.http.FileContent;
 import com.google.api.services.androidpublisher.AndroidPublisher;
@@ -24,6 +27,7 @@ import com.google.api.services.androidpublisher.model.LocalizedText;
 import com.google.api.services.androidpublisher.model.Track;
 import com.google.api.services.androidpublisher.model.TrackRelease;
 
+import net.osmand.PlatformUtil;
 import net.osmand.live.subscriptions.UpdateSubscription;
 
 public class ApkPublisher {
@@ -37,7 +41,104 @@ public class ApkPublisher {
 
 	protected static final String TRACK_ALPHA = "alpha";
 	protected static final String TRACK_BETA = "beta";
+	
+	protected static String DEFAULT_PATH = "android/OsmAnd/res/";
+	
+	protected static String RELEASE_KEY = "release";
+	protected static int MAX_RELEASE_SYMBOLS = 490; 
+	
+	protected static String[][] LOCALES = new String[][] {
+		{"en-US", ""}, 
+		{"ar", "ar"},
+		{"bg", "bg"},
+		{"cs-CZ", "cs"},
+		{"da-DK", "da"},
+		{"de-DE", "de"},
+		{"el-GR", "el"},
+		{"es-ES", "es"},
+		{"fr-FR", "fr"},
+		{"hu-HU", "hu"},
+		{"id", "in"},
+		{"it-IT", "it"},
+		{"iw-IL", "iw"},
+		{"ja-JP", "ja"},
+		{"ko-KR", "ko"},
+		{"nl-NL", "nl"},
+		{"no-NO", "nn"},
+		{"pl-PL", "pl"},
+		{"pt-PT", "pt"},
+		{"ro", "ro"},
+		{"ru-RU", "ru"},
+		{"sv-SE", "sv"},
+		{"tr-TR", "tr"},
+		{"uk", "uk"},
+	};
+	
+	
+	
+	public static void main2(String[] args) {
+		gatherReleaseNotes(new File(DEFAULT_PATH), "4305");
+	}
+//	
+	public static List<LocalizedText> gatherReleaseNotes(File file, String version) {
+		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
+		for(int i = 0; i < LOCALES.length; i++) {
+			String fld = LOCALES[i][1].length() == 0 ? "" : ("-"+ LOCALES[i][1]);
+			File fl = new File(file, "values"+fld+"/strings.xml");
+			String releaseNote = null; //"Release " + version;
+			String key = RELEASE_KEY + "_" + version.charAt(0) + "_"+version.charAt(1);
+			if (fl.exists()) {
+				try {
+					XmlPullParser parser = PlatformUtil.newXMLPullParser();
+					FileReader fis = new FileReader(fl);
+					parser.setInput(fis);
+					int tok;
+					boolean found = false;
+					StringBuilder sb = new StringBuilder();
+					while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+						if (tok == XmlPullParser.START_TAG && parser.getName().equals("string")) {
+							found = key.equals(parser.getAttributeValue("", "name"));
+							releaseNote = "";
+						} else if (tok == XmlPullParser.END_TAG && parser.getName().equals("string") && found) {
+							int ind = 0;
+							while ((ind = sb.indexOf("\\n")) != -1) {
+								sb.replace(ind, ind + 2, "");
+							}
+							ind = 0;
+							while ((ind = sb.indexOf("\\\"")) != -1) {
+								sb.replace(ind, ind + 2, "\"");
+							}
+							// remove empty lines
+							for(int k = 1; k < sb.length(); k++) {
+								if (sb.charAt(k - 1) == '\n' && sb.charAt(k) == '\n') {
+									sb.deleteCharAt(k);
+								}
+							}
+							releaseNote = sb.toString();
+							if (releaseNote.length() > MAX_RELEASE_SYMBOLS) {
+								releaseNote = releaseNote.substring(0, MAX_RELEASE_SYMBOLS).trim() + "...";
+							}
+							System.out.println("-------- " + LOCALES[i][0] + " ----------");
+							System.out.println(releaseNote);
+							break;
+						} else if (tok == XmlPullParser.TEXT && found) {
+							sb.append(parser.getText());
+						}
 
+					}
+					fis.close();
+				} catch (IOException | XmlPullParserException e) {
+					log.warn("Error reading strings " + LOCALES[i][1] + ": " + e.getMessage(), e);
+				}
+			}
+			if (releaseNote != null) {
+				releaseNotes.add(new LocalizedText().setLanguage(LOCALES[i][0]).setText(releaseNote));
+			}
+		}
+		return releaseNotes;
+//		System.out.println(releaseNotes);
+	}
+	
 	public static void main(String[] args) throws JSONException, IOException, GeneralSecurityException {
 		String androidClientSecretFile = "";
 		String path = "";
@@ -81,8 +182,10 @@ public class ApkPublisher {
 		Bundle bundle = uploadRequest.execute();
 		log.info(String.format("Version code %d has been uploaded", bundle.getVersionCode()));
 		List<Long> versionCode = Collections.singletonList(Long.valueOf(bundle.getVersionCode()));
-		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
-		releaseNotes.add(new LocalizedText().setLanguage("en-US").setText("Release " + version));
+//		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
+//		releaseNotes.add(new LocalizedText().setLanguage("en-US").setText("Release " + version));
+		List<LocalizedText> releaseNotes = gatherReleaseNotes(new File(DEFAULT_PATH), apkNumber);
+		
 		Update updateTrackRequest = edits.tracks().update(pack, editId, track,
 				new Track().setReleases(Collections.singletonList(new TrackRelease().setName(appName + " " + version)
 						.setVersionCodes(versionCode).setStatus("completed").setReleaseNotes(releaseNotes))));
