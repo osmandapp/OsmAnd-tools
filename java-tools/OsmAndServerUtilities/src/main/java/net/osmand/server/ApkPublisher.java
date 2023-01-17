@@ -114,7 +114,19 @@ public class ApkPublisher {
 									sb.deleteCharAt(k);
 								}
 							}
-							releaseNote = sb.toString();
+							String[] lines = sb.toString().split("\n");
+							StringBuilder res = new StringBuilder();
+							for (String line : lines) {
+								line = line.trim();
+								if (line.startsWith("-")) {
+									line = "•" + line.substring(1);
+								}
+								if (res.length() + line.length() > MAX_RELEASE_SYMBOLS) {
+									break;
+								}
+								res.append(line).append("\n");
+							}
+							releaseNote = res.toString().trim();
 							if (releaseNote.length() > MAX_RELEASE_SYMBOLS) {
 								releaseNote = releaseNote.substring(0, MAX_RELEASE_SYMBOLS).trim() + "...";
 							}
