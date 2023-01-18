@@ -74,6 +74,21 @@ public class GpxService {
         return trackData;
     }
     
+    public WebGpxParser.TrackData addAnalysisData(WebGpxParser.TrackData trackData) {
+        GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+        GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
+        if (analysis != null) {
+            if (trackData.analysis == null) {
+                trackData.analysis = new LinkedHashMap<>();
+            }
+            trackData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
+            if (trackData.analysis.get("elevationData") != null) {
+                webGpxParser.addDistance(trackData.tracks, analysis);
+            }
+        }
+        return trackData;
+    }
+    
     private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
        GPXTrackAnalysis analysis = null;
         if (!isSrtm) {
