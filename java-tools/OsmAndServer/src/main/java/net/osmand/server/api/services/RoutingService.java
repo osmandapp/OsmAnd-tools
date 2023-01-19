@@ -230,20 +230,25 @@ public class RoutingService {
                 int stInd = r.getStartPointIndex();
                 int endInd = r.getEndPointIndex();
                 while (stInd != endInd) {
-                    LatLon point = r.getPoint(stInd);
-                    locations.add(new Location("", point.getLatitude(), point.getLongitude()));
-                    GPXUtilities.WptPt pt = new GPXUtilities.WptPt();
-                    if (heightArray != null && heightArray.length > stInd * 2 + 1) {
-                        pt.ele = heightArray[stInd * 2 + 1];
-                    }
-                    pt.lat = point.getLatitude();
-                    pt.lon = point.getLongitude();
-                    pointsRes.add(new WebGpxParser.Point(pt));
+                    getPoint(stInd, r, locations, heightArray, pointsRes);
                     stInd += ((stInd < endInd) ? 1 : -1);
                 }
+                getPoint(endInd, r, locations, heightArray, pointsRes);
             }
             return pointsRes;
         }
         return Collections.emptyList();
+    }
+    
+    private void getPoint(int ind, RouteSegmentResult r, List<Location> locations, float[] heightArray, List<WebGpxParser.Point> pointsRes) {
+        LatLon point = r.getPoint(ind);
+        locations.add(new Location("", point.getLatitude(), point.getLongitude()));
+        GPXUtilities.WptPt pt = new GPXUtilities.WptPt();
+        if (heightArray != null && heightArray.length > ind * 2 + 1) {
+            pt.ele = heightArray[ind * 2 + 1];
+        }
+        pt.lat = point.getLatitude();
+        pt.lon = point.getLongitude();
+        pointsRes.add(new WebGpxParser.Point(pt));
     }
 }
