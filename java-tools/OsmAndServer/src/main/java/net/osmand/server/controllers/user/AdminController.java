@@ -555,9 +555,11 @@ public class AdminController {
 		public YearSubRetentionGroup ios = new YearSubRetentionGroup();
 		public YearSubRetentionGroup iosFull = new YearSubRetentionGroup();
 		public YearSubRetentionGroup iosIntro = new YearSubRetentionGroup();
+		public YearSubRetentionGroup iosPro = new YearSubRetentionGroup();
 		public YearSubRetentionGroup android = new YearSubRetentionGroup();
 		public YearSubRetentionGroup androidFull = new YearSubRetentionGroup();
 		public YearSubRetentionGroup androidIntro = new YearSubRetentionGroup();
+		public YearSubRetentionGroup androidPro = new YearSubRetentionGroup();
 		public YearSubRetentionGroup androidV2 = new YearSubRetentionGroup();
 		public YearSubRetentionGroup total = new YearSubRetentionGroup();
 		
@@ -569,10 +571,12 @@ public class AdminController {
 			this.ios.addReport(r.ios);
 			this.iosFull.addReport(r.iosFull);
 			this.iosIntro.addReport(r.iosIntro);
+			this.iosPro.addReport(r.iosPro);
 			this.android.addReport(r.android);
 			this.androidFull.addReport(r.androidFull);
 			this.androidIntro.addReport(r.androidIntro);
 			this.androidV2.addReport(r.androidV2);
+			this.androidPro.addReport(r.androidPro);
 			this.total.addReport(r.total);
 		}
 
@@ -633,11 +637,16 @@ public class AdminController {
 						}
 						if (sku.startsWith("net.osmand")) {
 							report.ios.addNumber(years, active, possibleGone, gone);
-							if (intro) {
+							if(sku.contains("pro")) {
+								report.iosPro.addNumber(years, active, possibleGone, gone);
+							} else if (intro) {
 								report.iosIntro.addNumber(years, active, possibleGone, gone);
 							} else {
 								report.iosFull.addNumber(years, active, possibleGone, gone);
 							}
+						} else if(sku.contains("pro")) {
+							report.android.addNumber(years, active, possibleGone, gone);
+							report.androidPro.addNumber(years, active, possibleGone, gone);
 						} else if(sku.contains("v1")) {
 							report.android.addNumber(years, active, possibleGone, gone);
 							if (intro) {
@@ -794,8 +803,16 @@ public class AdminController {
 				return false;
 			}
 			if (discount != null) {
-				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0 || sub.introCycles > 0;
-				if (d != discount) {
+				boolean subDiscount;
+				if(sub.sku.contains("v2")) {
+					subDiscount = true; // start from aug 21 (no discount)
+				} else {
+					subDiscount = (sub.introPriceMillis >= 0 && sub.introPriceEurMillis < sub.fullPriceEurMillis) || sub.introCycles > 0;
+					if (subDiscount && sub.currentPeriod >= sub.introCycles) {
+						subDiscount = false;
+					}
+				}
+				if (subDiscount != discount) {
 					return false;
 				}
 			}
@@ -919,8 +936,8 @@ public class AdminController {
 		report.columns.add(new AdminGenericSubReportColumn("I/2 Y" + h).app(SubAppType.IOS).discount(true).duration(12));
 
 		
-		report.columns.add(new AdminGenericSubReportColumn("APro A" + h).pro(true).app(SubAppType.OSMAND).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("APro M" + h).pro(true).app(SubAppType.OSMAND).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("APro A" + h).pro(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("APro M" + h).pro(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS).duration(1));
 		report.columns.add(new AdminGenericSubReportColumn("IPro A" + h).pro(true).app(SubAppType.IOS).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("IPro M" + h).pro(true).app(SubAppType.IOS).duration(1));
 		
@@ -1201,6 +1218,7 @@ public class AdminController {
 			this.introPriceMillis = s.introPriceMillis;
 			this.introCycles = s.introCycles;
 			this.durationMonth = s.durationMonth;
+			this.pro = s.pro;
 			this.app = s.app;
 			this.defPriceEurMillis = s.defPriceEurMillis;
 			this.totalPeriods = s.totalPeriods;
