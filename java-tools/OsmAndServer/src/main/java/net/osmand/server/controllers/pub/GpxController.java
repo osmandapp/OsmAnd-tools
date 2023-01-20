@@ -323,6 +323,14 @@ public class GpxController {
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
 	}
+	
+	@PostMapping(path = {"/get-analysis"}, produces = "application/json")
+	public ResponseEntity<String> getAnalysis(@RequestBody String data) {
+		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		trackData = gpxService.addAnalysisData(trackData);
+		
+		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
+	}
     
     private double getCommonMaxSizeFiles() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
