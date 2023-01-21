@@ -940,8 +940,8 @@ public class AdminController {
 		
 		report.columns.add(new AdminGenericSubReportColumn("G Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("G/2 Y" + h).app(SubAppType.OSMAND).discount(true).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("APro A/2" + h).pro(true).app(SubAppType.OSMAND).discount(true).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("GO/2" + h).pro(false).app(SubAppType.OSMAND).discount(true).duration(12));
+//		report.columns.add(new AdminGenericSubReportColumn("APro A/2" + h).pro(true).app(SubAppType.OSMAND).discount(true).duration(12));
+//		report.columns.add(new AdminGenericSubReportColumn("GO/2" + h).pro(false).app(SubAppType.OSMAND).discount(true).duration(12));
 		
 		report.columns.add(new AdminGenericSubReportColumn("G+ Y" + h).app(SubAppType.OSMAND_PLUS).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("G+/2 Y" + h).app(SubAppType.OSMAND_PLUS).discount(true).duration(12));
