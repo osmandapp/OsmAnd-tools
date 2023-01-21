@@ -29,8 +29,6 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 
-import net.osmand.server.api.repo.OsmRecipientsRepository;
-import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,28 +44,42 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.gson.Gson;
 
+import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.LotterySeriesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
+import net.osmand.server.api.repo.OsmRecipientsRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import net.osmand.server.api.services.EmailRegistryService;
+import net.osmand.server.api.services.EmailSenderService;
+import net.osmand.server.api.services.IpLocationService;
+import net.osmand.server.api.services.LogsAccessService;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
+import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
+import net.osmand.server.api.services.PollsService;
+import net.osmand.server.api.services.UserSubscriptionService;
+import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
-import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import net.osmand.server.controllers.pub.WebController;
 
@@ -102,9 +114,6 @@ public class AdminController {
 	
 	@Autowired
 	private PremiumUsersRepository usersRepository;
-
-	@Autowired
-	private UserdataController userDataController;
 
 	@Autowired
 	private EmailRegistryService emailService;
@@ -804,13 +813,14 @@ public class AdminController {
 			}
 			if (discount != null) {
 				boolean subDiscount;
-				if(sub.sku.contains("v2")) {
+				if (sub.sku.contains("v2")) {
 					subDiscount = true; // start from aug 21 (no discount)
 				} else {
-					subDiscount = (sub.introPriceMillis >= 0 && sub.introPriceEurMillis < sub.fullPriceEurMillis) || sub.introCycles > 0;
-					if (subDiscount && sub.currentPeriod >= sub.introCycles) {
-						subDiscount = false;
-					}
+					subDiscount = (sub.introPriceMillis >= 0 && sub.introPriceEurMillis < sub.fullPriceEurMillis)
+							|| sub.introCycles > 0;
+//					if (subDiscount && sub.currentPeriod >= sub.introCycles) {
+//						subDiscount = false;
+//					}
 				}
 				if (subDiscount != discount) {
 					return false;
@@ -930,11 +940,15 @@ public class AdminController {
 		
 		report.columns.add(new AdminGenericSubReportColumn("G Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("G/2 Y" + h).app(SubAppType.OSMAND).discount(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("APro A/2" + h).pro(true).app(SubAppType.OSMAND).discount(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("GO/2" + h).pro(false).app(SubAppType.OSMAND).discount(true).duration(12));
+		
 		report.columns.add(new AdminGenericSubReportColumn("G+ Y" + h).app(SubAppType.OSMAND_PLUS).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("G+/2 Y" + h).app(SubAppType.OSMAND_PLUS).discount(true).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("I Y" + h).app(SubAppType.IOS).discount(false).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("I/2 Y" + h).app(SubAppType.IOS).discount(true).duration(12));
 
+		
 		
 		report.columns.add(new AdminGenericSubReportColumn("APro A" + h).pro(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("APro M" + h).pro(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS).duration(1));
@@ -1042,14 +1056,29 @@ public class AdminController {
 						return s;
 					}
 				});
-		// calculate retention rate
-		Map<String, TIntArrayList> skuRetentions = new LinkedHashMap<String, TIntArrayList>();
+		Map<String,TDoubleArrayList> retentionRates = calculateRetentionRates(subs);
 		for (Subscription s : subs) {
 			if (s.currentPeriod == 0) {
+				s.calculateLTVValue(retentionRates);
+			}
+		}
+		return subs;
+	}
+
+
+	private Map<String, TDoubleArrayList> calculateRetentionRates(List<Subscription> subs) {
+		// calculate retention rate
+		System.out.println("Annual retentions (MOVE TO WEB PAGE): ");
+		Map<String, TIntArrayList> skuRetentions = new TreeMap<>();
+		Map<String, TDoubleArrayList> skuResult = new TreeMap<>();
+		Map<String, Subscription> skuExamples = new TreeMap<>();
+		for (Subscription s : subs) {
+			if (s.currentPeriod == 0 && s.totalPeriods > 0) {
 				TIntArrayList retentionList = skuRetentions.get(s.getSku());
 				if (retentionList == null) {
 					retentionList = new TIntArrayList();
 					skuRetentions.put(s.getSku(), retentionList);
+					skuExamples.put(s.getSku(), s);
 				}
 				boolean ended = s.isEnded();
 				while (retentionList.size() < 2 * s.totalPeriods) {
@@ -1068,46 +1097,64 @@ public class AdminController {
 				}
 			}
 		}
-		System.out.println("Annual retentions (MOVE TO WEB PAGE): ");
 		for (String s : skuRetentions.keySet()) {
 			TIntArrayList arrays = skuRetentions.get(s);
+			Subscription sub = skuExamples.get(s);
+			TDoubleArrayList actualRetention = new TDoubleArrayList();
+			for (int i = 0; i < arrays.size(); i += 2) {
+				int total = arrays.get(i);
+				int left = arrays.get(i + 1);
+				if (total == 0 || left == 0) {
+					break;
+				}
+				actualRetention.add(((double) left) / total);
+			}
+			boolean trim = trimRetention(actualRetention, sub.durationMonth > 1 ? (sub.durationMonth > 3 ? 2 : 3) : 6);
 			StringBuilder bld = new StringBuilder();
-			double partLeft = 1;
 			double sum = 1;
 			if (s.endsWith("-%")) {
 				sum = 0.5;
 			}
-			double retainedAvg = 0;
-			int retainedAvgCnt = 0;
-			for (int i = 0; i < arrays.size(); i += 2) {
-				int t = arrays.get(i);
-				int l = arrays.get(i + 1);
-				if (t == 0 || l == 0) {
-					break;
+			double prod = 1;
+			double last = sub.retention;
+			for (int i = 0; i < actualRetention.size(); i++) {
+				last = actualRetention.get(i);
+				prod *= last;
+				sum += prod;
+				if (i == actualRetention.size() - 1 && trim) {
+					bld.append(String.format("... [%.2f %%] ", 100 * (double) actualRetention.get(i)));
+				} else {
+					bld.append(String.format("%.0f %%, ", 100 * (double) actualRetention.get(i)));
 				}
-				double retained = ((double) l) / t;
-				partLeft = partLeft * retained;
-				if (i > 0) {
-					retainedAvg += retained;
-					retainedAvgCnt++;
-				}
-				sum += partLeft;
-				bld.append(((int) (100 * retained))).append("%, ");
 			}
-			double retainedTail = 0.95;
-			if (retainedAvgCnt > 0 && retainedAvg / retainedAvgCnt < retainedTail) {
-				retainedTail = retainedAvg / retainedAvgCnt;
-			}
-			bld.append('[').append(((int) (100 * retainedTail))).append("%]");
-			sum += partLeft * retainedTail / (1 - retainedTail); // add tail
-			System.out.println(s + " - $ x " + ((float) sum) + " - " + bld.toString());
+			// add up tail
+			last = Math.min(last, 0.95);
+			sum += prod  * last / (1 - last); // add tail
+			
+			
+			double ltv = sub.defPriceEurMillis / 1000 * sum;
+			String msg = String.format("%.0f$ %s - %.1f $ * %.2f: %d%% ~ %s", ltv, s, sub.defPriceEurMillis / 1000.0, sum, 
+					(int) (sub.retention * 100), bld.toString());
+			System.out.println(msg);
+			actualRetention.insert(0, sum);
+			skuResult.put(s, actualRetention);
 		}
-		for (Subscription s : subs) {
-			if (s.currentPeriod == 0) {
-				s.calculateLTVValue();
+		return skuResult;
+	}
+
+
+	private boolean trimRetention(TDoubleArrayList actualRetention, int RET_PERIOD_TRIM) {
+		boolean trim = actualRetention.size() > RET_PERIOD_TRIM;
+		if (trim) {
+			int cnt = actualRetention.size() - RET_PERIOD_TRIM;
+			double prodAverage = 1;
+			for (int i = actualRetention.size() - 1; i >= RET_PERIOD_TRIM; i--) {
+				double vl = actualRetention.removeAt(i);
+				prodAverage *= vl;
 			}
+			actualRetention.add(Math.pow(prodAverage, 1.0 / cnt));
 		}
-		return subs;
+		return trim;
 	}
 
 
@@ -1150,28 +1197,28 @@ public class AdminController {
 		case "osmand_pro_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "osmand_pro_monthly_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
-		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 
 		case "net.osmand.maps.subscription.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
 		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		
-		case "net.osmand.maps.subscription.pro.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 29000; s.pro = true; break;
+		case "net.osmand.maps.subscription.pro.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 29000; s.pro = true; break;
 		case "net.osmand.maps.subscription.pro.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.maps.subscription.plus.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "net.osmand.maps.subscription.plus.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
 
 		case "net.osmand.huawei.annual_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		case "net.osmand.huawei.3months_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
 		case "net.osmand.huawei.monthly_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 
 		case "net.osmand.huawei.monthly.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.huawei.annual.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "net.osmand.huawei.annual.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.6; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "net.osmand.huawei.annual.maps_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
 		
 		case "net.osmand.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "net.osmand.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
 		case "net.osmand.plus.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "net.osmand.plus.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
@@ -1216,6 +1263,8 @@ public class AdminController {
 			this.sku = s.sku;
 			this.priceMillis = s.priceMillis;
 			this.introPriceMillis = s.introPriceMillis;
+			this.priceEurMillis = s.priceEurMillis;
+			this.introPriceEurMillis = s.introPriceEurMillis;
 			this.introCycles = s.introCycles;
 			this.durationMonth = s.durationMonth;
 			this.pro = s.pro;
@@ -1262,15 +1311,35 @@ public class AdminController {
 			return ended; 
 		}
 		
-		public void calculateLTVValue() {
+		public void calculateLTVValue(Map<String, TDoubleArrayList> retentionRates) {
 			priceTotalPaidEurMillis = introPriceEurMillis;
+			if (introCycles > 1) {
+				throw new UnsupportedOperationException();
+			}
 			for (int i = 1; i < totalPeriods; i++) {
 				priceTotalPaidEurMillis += fullPriceEurMillis;
 			}
-			priceLTVEurMillis = priceTotalPaidEurMillis;
-			// we could take into account autorenewing but retention will change
-			if (!isEnded()) {
-				priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
+			int methodLTV = 3;
+			TDoubleArrayList rates = retentionRates.get(getSku());
+			if (methodLTV == 1) {
+				priceLTVEurMillis = priceTotalPaidEurMillis;
+				// we could take into account autorenewing but retention will change
+				if (!isEnded()) {
+					priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
+				}
+			} else if (methodLTV == 2) {
+				priceLTVEurMillis = (int) (fullPriceEurMillis * rates.get(0));
+			} else if (methodLTV == 3) {
+				priceLTVEurMillis = priceTotalPaidEurMillis;
+				if (!isEnded() && autorenewing) {
+					double p = 1;
+					for(int i = totalPeriods; i < rates.size() - 1; i ++) {
+						p *= rates.get(i);
+						priceLTVEurMillis += fullPriceEurMillis * p;
+					}
+					double lastRetention = Math.min(0.95, rates.size() > 1 ? rates.get(rates.size() - 1) : retention);
+					priceLTVEurMillis += (long) (fullPriceEurMillis * lastRetention / (1 - lastRetention)) * p;
+				}
 			}
 		}
 		
@@ -1283,19 +1352,17 @@ public class AdminController {
 			
 			this.fullPriceEurMillis = defPriceEurMillis;
 			this.introPriceEurMillis = defPriceEurMillis;
-			if(this.introCycles > 0) {
+			if (this.introCycles > 0) {
 				this.introPriceEurMillis = defPriceEurMillis / 2;
 			}
-			if (introPriceMillis >= 0 && priceMillis > 0) {
-				introPriceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
+			double rate = rts.getEurRate(pricecurrency, startPeriodTime); 
+			if (introPriceMillis >= 0 && priceMillis > 0 && rate == 0) {
+				rate = priceMillis * 1.0 / defPriceEurMillis;
 			}
-			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
 			if(rate > 0) {
 				fullPriceEurMillis = (int) (priceMillis / rate);
 				if (introPriceMillis >= 0) {
 					introPriceEurMillis =(int) (introPriceMillis / rate);
-				} else {
-					introPriceEurMillis = (int) (priceMillis / rate);
 				}
 			}
 			this.introPeriod = currentPeriod == 0 && introPriceEurMillis != fullPriceEurMillis;
