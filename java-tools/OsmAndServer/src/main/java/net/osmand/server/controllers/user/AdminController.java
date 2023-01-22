@@ -695,6 +695,7 @@ public class AdminController {
 	
 	public static class AdminGenericSubReportColumnValue {
 		public int active;
+		public int activeRenew;
 		public int totalNew;
 		public int totalOld;
 		public int totalEnd;
@@ -718,14 +719,18 @@ public class AdminController {
 			if (formatVersion == 0) {
 				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
-			StringBuilder row = new StringBuilder();
-			if(active > 0) {
-				row.append(active).append("<br>");
-			}
 			boolean lvl1 = (formatVersion & (1 << 1)) > 0;
 			boolean lvl2 = (formatVersion & (1 << 2)) > 0;
 			boolean lvl3 = (formatVersion & (1 << 3)) > 0;
 			boolean lvl4 = (formatVersion & (1 << 4)) > 0;
+			StringBuilder row = new StringBuilder();
+			if (active > 0) {
+				if(activeRenew > 0) {
+					row.append(String.format("%d (%d%%) <br>", active, activeRenew * 100 / active));
+				} else {
+					row.append(String.format("%d<br>", active));
+				}
+			}
 			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
 			if (lvl1 && (totalEnd + totalOld) > 0) {
 				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
@@ -752,6 +757,7 @@ public class AdminController {
 		private int filterDuration = -1;
 		private Boolean discount;
 		private Boolean pro;
+		private Boolean maps;
 		public final String name;
 		
 		public AdminGenericSubReportColumn(String name) {
@@ -782,6 +788,11 @@ public class AdminController {
 			return this;
 		}
 		
+		public AdminGenericSubReportColumn maps(boolean maps) {
+			this.maps = maps;
+			return this;
+		}
+		
 		public void process(Subscription sub, AdminGenericSubReportColumnValue value) {
 			if (!filter(sub)) {
 				return;
@@ -809,6 +820,9 @@ public class AdminController {
 				return false;
 			}
 			if (pro != null && pro.booleanValue() != sub.pro) {
+				return false;
+			}
+			if (maps != null && maps.booleanValue() != sub.maps) {
 				return false;
 			}
 			if (discount != null) {
@@ -882,6 +896,7 @@ public class AdminController {
 			String periodId = period == MONTH ? s.startPeriodMonth
 					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
 			processSub(s, periodId);
+			long now = System.currentTimeMillis();
 			if (s.currentPeriod == 0 && period == MONTH) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
@@ -897,8 +912,7 @@ public class AdminController {
 						}
 					}
 				}
-			}
-			if (s.currentPeriod == 0 && period == YEAR) {
+			} else if (s.currentPeriod == 0 && period == YEAR) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
 				for (int k = 0; k < s.totalMonths; k+= 12) {
@@ -909,6 +923,13 @@ public class AdminController {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
 								vls.get(i).active++;
+								if (k + 12 >= s.totalMonths) {
+									if (s.valid && s.autorenewing) {
+										vls.get(i).activeRenew++;
+									}
+								} else {
+									vls.get(i).activeRenew++;
+								}
 							}
 						}
 					}
@@ -932,31 +953,20 @@ public class AdminController {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.period = period;
 		report.subs = subs;
-		String h = ""; //"<br>New + Renew <br> - Cancel";
 		report.columns.add(new AdminGenericSubReportColumn("All"));
-		report.columns.add(new AdminGenericSubReportColumn("GPlay" + h).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
-		report.columns.add(new AdminGenericSubReportColumn("IOS" + h).app(SubAppType.IOS));
-		report.columns.add(new AdminGenericSubReportColumn("HW/AMZ" + h).app(SubAppType.HUAWEI, SubAppType.AMAZON));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>GPlay").app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>IOS").app(SubAppType.IOS));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>Other" ).app(SubAppType.HUAWEI, SubAppType.AMAZON));
 		
-		report.columns.add(new AdminGenericSubReportColumn("G Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("G/2 Y" + h).app(SubAppType.OSMAND).discount(true).duration(12));
-//		report.columns.add(new AdminGenericSubReportColumn("APro A/2" + h).pro(true).app(SubAppType.OSMAND).discount(true).duration(12));
-//		report.columns.add(new AdminGenericSubReportColumn("GO/2" + h).pro(false).app(SubAppType.OSMAND).discount(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>Maps A").maps(true));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO A").pro(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO M").pro(true).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>Other").pro(false).maps(false));
 		
-		report.columns.add(new AdminGenericSubReportColumn("G+ Y" + h).app(SubAppType.OSMAND_PLUS).discount(false).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("G+/2 Y" + h).app(SubAppType.OSMAND_PLUS).discount(true).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("I Y" + h).app(SubAppType.IOS).discount(false).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("I/2 Y" + h).app(SubAppType.IOS).discount(true).duration(12));
-
-		
-		
-		report.columns.add(new AdminGenericSubReportColumn("APro A" + h).pro(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("APro M" + h).pro(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("IPro A" + h).pro(true).app(SubAppType.IOS).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("IPro M" + h).pro(true).app(SubAppType.IOS).duration(1));
-		
-		report.columns.add(new AdminGenericSubReportColumn("All Q" + h).duration(3));
-		report.columns.add(new AdminGenericSubReportColumn("All M" + h).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("Gplay<br>Full").discount(false).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("Gplay<br>%%").discount(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("iOS<br>Full").discount(false).app(SubAppType.IOS));
+		report.columns.add(new AdminGenericSubReportColumn("iOS<br>%%").discount(true).app(SubAppType.IOS));
 		return report;
 	}
 	
@@ -1185,7 +1195,7 @@ public class AdminController {
 		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
 		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
 		
-		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; s.maps = true; break;
 		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
 		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
 		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.58; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
@@ -1196,18 +1206,18 @@ public class AdminController {
 
 		case "osmand_pro_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "osmand_pro_monthly_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 
 		case "net.osmand.maps.subscription.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; s.maps = true; break;
 		
 		case "net.osmand.maps.subscription.pro.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 29000; s.pro = true; break;
 		case "net.osmand.maps.subscription.pro.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.maps.subscription.plus.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "net.osmand.maps.subscription.plus.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 
 		case "net.osmand.huawei.annual_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		case "net.osmand.huawei.3months_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
@@ -1215,11 +1225,11 @@ public class AdminController {
 
 		case "net.osmand.huawei.monthly.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "net.osmand.huawei.annual.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.6; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.huawei.annual.maps_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "net.osmand.huawei.annual.maps_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 		
 		case "net.osmand.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "net.osmand.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 		case "net.osmand.plus.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "net.osmand.plus.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		
@@ -1268,6 +1278,7 @@ public class AdminController {
 			this.introCycles = s.introCycles;
 			this.durationMonth = s.durationMonth;
 			this.pro = s.pro;
+			this.maps = s.maps;
 			this.app = s.app;
 			this.defPriceEurMillis = s.defPriceEurMillis;
 			this.totalPeriods = s.totalPeriods;
@@ -1285,6 +1296,7 @@ public class AdminController {
 		// from sku
 		protected int durationMonth;
 		protected boolean pro;
+		protected boolean maps;
 		protected SubAppType app;
 		protected int defPriceEurMillis;
 		
@@ -1359,10 +1371,10 @@ public class AdminController {
 			if (introPriceMillis >= 0 && priceMillis > 0 && rate == 0) {
 				rate = priceMillis * 1.0 / defPriceEurMillis;
 			}
-			if(rate > 0) {
+			if (rate > 0) {
 				fullPriceEurMillis = (int) (priceMillis / rate);
 				if (introPriceMillis >= 0) {
-					introPriceEurMillis =(int) (introPriceMillis / rate);
+					introPriceEurMillis = (int) (introPriceMillis / rate);
 				}
 			}
 			this.introPeriod = currentPeriod == 0 && introPriceEurMillis != fullPriceEurMillis;
