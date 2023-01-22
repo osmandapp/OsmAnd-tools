@@ -640,10 +640,14 @@ public class AdminController {
 						int possibleGone = rs.getInt(ind++);
 						int gone = rs.getInt(ind++);
 						YearSubscriptionRetentionReport report  = res.get(month);
+						if (years == 0) {
+							return;
+						}
 						if (report == null) {
 							report = new YearSubscriptionRetentionReport(month);
 							res.put(month, report);
 						}
+						
 						if (sku.startsWith("net.osmand")) {
 							report.ios.addNumber(years, active, possibleGone, gone);
 							if(sku.contains("pro")) {
