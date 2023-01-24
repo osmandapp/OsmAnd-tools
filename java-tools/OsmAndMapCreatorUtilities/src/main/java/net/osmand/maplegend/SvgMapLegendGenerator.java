@@ -206,8 +206,11 @@ public class SvgMapLegendGenerator {
     private static class SvgGenerator {
 
         public static String generate(String iconName, int iconSize, String shieldName, int shieldSize, String backgroundColor, float backgroundOpacity) throws Exception {
-            String content = String.format("<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n",
-                    canvasWidth, canvasHeight, canvasWidth, canvasHeight);
+
+            String additionalIconHeaderTags = getSvgIconAdditionalHeaderTags(iconName);
+            String content = String.format("<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" %s>\n",
+                    canvasWidth, canvasHeight, canvasWidth, canvasHeight, additionalIconHeaderTags);
+
             if (!Algorithms.isEmpty(backgroundColor)) {
                 content += geBackgroundRect(backgroundColor, backgroundOpacity);
             }
@@ -219,6 +222,10 @@ public class SvgMapLegendGenerator {
             }
             content += "</svg>";
             return content;
+        }
+
+        private static String getIconPath(String iconName) {
+            return System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/poi-icons-svg/" + "mx_" + iconName + ".svg";
         }
 
         private static String geBackgroundRect(String color, float opacity) {
@@ -233,7 +240,7 @@ public class SvgMapLegendGenerator {
         }
 
         private static String getIcon(String iconName, int iconSize) throws Exception {
-            String filePath = System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/poi-icons-svg/" + "mx_" + iconName + ".svg";
+            String filePath = getIconPath(iconName);
             SvgDTO iconSvg = parseSvg(filePath);
             // change clip_id from default "clip0", "clip1"...   to  "clip1000", "clip1001"...
             // for not overwriting shield's clip_id data
@@ -269,7 +276,40 @@ public class SvgMapLegendGenerator {
                 throw new Exception("ERROR: parseSvg() failed to parse file " + filePath);
             }
         }
+        private static String getSvgIconAdditionalHeaderTags(String iconName) throws Exception {
+            String filePath = getIconPath(iconName);
+            try {
+                String firstTagStart = "<svg";
+                String firstTagEnd = ">";
+                String svgHeaderContent = Files.readString(Path.of(filePath));
+                int trimIndexStart = svgHeaderContent.indexOf(firstTagStart) + firstTagStart.length();
+                int trimIndexEnd = svgHeaderContent.indexOf(firstTagEnd, trimIndexStart);
+                svgHeaderContent = svgHeaderContent.substring(trimIndexStart, trimIndexEnd);
+                svgHeaderContent = svgHeaderContent.replace("\n", " ");
+                svgHeaderContent = svgHeaderContent.replace("  ", " ");
 
+                String filteredAdditionalTags = "";
+                String[]parameters = svgHeaderContent.split("\" ");
+                for (String parameter : parameters) {
+                    if (!parameter.contains("width=") &&
+                            !parameter.contains("height=") &&
+                            !parameter.contains("viewBox=") &&
+                            !parameter.contains("fill=") &&
+                            !parameter.contains("xmlns=")) {
+                        filteredAdditionalTags += parameter + "\"";
+                    }
+                }
+
+                filteredAdditionalTags = filteredAdditionalTags.trim();
+                if (filteredAdditionalTags.endsWith("\"\"")) {
+                    filteredAdditionalTags = filteredAdditionalTags.substring(0, filteredAdditionalTags.length() - 1);
+                }
+                return filteredAdditionalTags;
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new Exception("ERROR: getSvgIconAdditionalHeaderTags() failed to process file " + filePath);
+            }
+        }
         private static String getSvgInnerContent(String filePath) throws Exception {
             try {
                 String firstTagStart = "<svg";
