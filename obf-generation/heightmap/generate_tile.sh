@@ -106,10 +106,10 @@ echo "Output path:          $OUTPUT_PATH"
 echo "Work directory:       $WORK_PATH"
 echo "Source directory:     $SRC_PATH"
 
-# let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
+let "TILE_FULL_SIZE = $TILE_SIZE + 1 + 2"
 echo "Tile:                 $TILE"
 echo "Tile size:            $TILE_SIZE"
-# echo "Tile size (full):     $TILE_FULL_SIZE"
+echo "Tile size (full):     $TILE_FULL_SIZE"
 
 GDAL2TILES=`which gdal2tiles.py`
 GDAL2TILES_PATH=$(dirname "$GDAL2TILES")
@@ -138,10 +138,10 @@ if [ ! -f "allheighttiles_$TYPE.vrt" ]; then
 fi
 
 # Step 2. Convert VRT to single giant GeoTIFF file
-DELTA=0.1
+DELTA=0.4
 if [ ! -f "$WORK_PATH/${TYPE}_grid.tif" ]; then
     echo "Baking Tile GeoTIFF..."
-    gdal_translate -of GTiff -strict \
+    gdal_translate -of GTiff -strict -epo \
         -projwin $(($LON - $DELTA)) $(($LAT + 1 + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - $DELTA)) \
         -mo "AREA_OR_POINT=POINT" -ot Int16 -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
         "allheighttiles_$TYPE.vrt" "$WORK_PATH/${TYPE}_grid.tif"
@@ -154,6 +154,7 @@ if [[  "$TYPE" == "heightmap" ]]; then
       echo "Re-projecting..."
       gdalwarp -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -ot Int16 -co "SPARSE_OK=TRUE" \
         -t_srs "+init=epsg:3857 +over" -r cubic -multi \
+        -tr 38.218514142588127 38.218514142588127 -tap \
         "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/${TYPE}_mercator.tif"
     fi
     # Step 4. Slice giant projected GeoTIFF to tiles of specified size and downscale them
@@ -167,6 +168,12 @@ if [[  "$TYPE" == "heightmap" ]]; then
     mkdir -p "$WORK_PATH/tiles"
     "$SRC_PATH/overlap.py" --driver=GTiff --driver-options="COMPRESS=LZW" --extension=tif $VERBOSE_PARAM \
         "$WORK_PATH/rawtiles" "$WORK_PATH/tiles"
+
+    # Step 6. Slice projected GeoTIFF to overlapped tiles of specified size and zoom level
+    echo "Generating tile GeoTIFFs..."
+    "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 \
+        --driver=GTiff --driver-options="COMPRESS=LZW" --extension=tif $VERBOSE_PARAM \
+        "$WORK_PATH/${TYPE}_mercator.tif" "$OUTPUT_PATH"
 else
     echo "Calculating base slope..."
     gdaldem slope          -co "COMPRESS=LZW" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_slope.tif"

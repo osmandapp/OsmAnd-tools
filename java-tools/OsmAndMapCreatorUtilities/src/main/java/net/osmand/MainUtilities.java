@@ -55,7 +55,7 @@ import net.osmand.util.IndexBatchCreator;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.ResourceDeleter;
 import net.osmand.maplegend.SvgMapLegendGenerator;
-import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
+import net.osmand.util.TileListsForRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -190,6 +190,8 @@ public class MainUtilities {
 				CombineSRTMIntoFile.main(subArgsArray);
 			} else if (utl.equals("collect-sqlitedb-into-regions")) {
 				ConvertLargeRasterSqliteIntoRegions.main(subArgsArray);
+			} else if (utl.equals("list-tiles-for-regions")) {
+				TileListsForRegions.main(subArgsArray);
 			} else if (utl.equals("merge-std-files")) {
 				BinaryMerger.mergeStandardFiles(subArgsArray);
 			} else if (utl.equals("generate-roads")) {
