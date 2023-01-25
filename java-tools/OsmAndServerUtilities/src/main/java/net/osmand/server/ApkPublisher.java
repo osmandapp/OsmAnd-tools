@@ -203,7 +203,6 @@ public class ApkPublisher {
 		log.info(String.format("Version code %d has been uploaded", bundle.getVersionCode()));
 		List<Long> versionCode = Collections.singletonList(Long.valueOf(bundle.getVersionCode()));
 
-		
 		Update updateTrackRequest = edits.tracks().update(pack, editId, track,
 				new Track().setReleases(Collections.singletonList(new TrackRelease().setName(appName + " " + version)
 						.setVersionCodes(versionCode).setStatus("completed").setReleaseNotes(releaseNotes))));
