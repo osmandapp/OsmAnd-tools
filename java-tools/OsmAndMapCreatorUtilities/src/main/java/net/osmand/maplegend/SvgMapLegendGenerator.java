@@ -296,7 +296,7 @@ public class SvgMapLegendGenerator {
                             !parameter.contains("viewBox=") &&
                             !parameter.contains("fill=") &&
                             !parameter.contains("xmlns=")) {
-                        filteredAdditionalTags += parameter + "\"";
+                        filteredAdditionalTags += parameter + "\" ";
                     }
                 }
 
