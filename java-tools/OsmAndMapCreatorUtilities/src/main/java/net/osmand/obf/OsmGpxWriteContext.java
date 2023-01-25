@@ -17,7 +17,6 @@ import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -359,7 +358,7 @@ public class OsmGpxWriteContext {
 
 		startDocument();
 		for (File gf : files) {
-			GPXFile f = GPXUtilities.loadGPXFile(gf);
+			GPXFile f = GPXUtilities.loadGPXFile(gf, null, false);
 			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
 			OsmGpxFile file = new OsmGpxFile();
 			String name = gf.getName();
@@ -398,7 +397,6 @@ public class OsmGpxWriteContext {
 		return targetObf;
 	}
 	
-
 	public static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
 			XmlPullParserException, InterruptedException {
 		if (subArgs.size() != 0) {
