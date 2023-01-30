@@ -88,8 +88,8 @@ if [ -z "$LAT" ] || [ -z "$LON" ]; then
    echo "Please specify -lat LAT -lon LON to process the tile"
    exit 1;
 fi
-LATL='N'; if (( LAT < 0 )); then LATL='S'; LAT=$(( - $LAT)); fi
-LONL='E'; if (( LON < 0 )); then LONL='W'; LON=$(( - $LON)); fi
+LATL='N'; if (( LAT < 0 )); then LATL='S'; fi
+LONL='E'; if (( LON < 0 )); then LONL='W'; fi
 TILE=${LATL}$(printf "%02d" $LAT)${LONL}$(printf "%03d" $LON)
 
 # Step 0. Clean output path and recreate it
