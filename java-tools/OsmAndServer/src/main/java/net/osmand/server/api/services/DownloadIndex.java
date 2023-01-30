@@ -175,6 +175,8 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.HILLSHADE;
 			} else if (v.equals("heightmap")) {
 				dt = DownloadIndexesService.DownloadType.HEIGHTMAP;
+			} else if (v.equals("geotiff")) {
+				dt = DownloadIndexesService.DownloadType.GEOTIFF;
 			} else if (v.equals("slope")) {
 				dt = DownloadIndexesService.DownloadType.SLOPE;
 			} else if (v.equals("road_map")) {

@@ -118,6 +118,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getHillshade(), rootFolder, DownloadType.HILLSHADE);
 		loadIndexesFromDir(doc.getSlope(), rootFolder, DownloadType.SLOPE);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.HEIGHTMAP);
+		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.GEOTIFF);
 		return doc;
 	}
 	
@@ -403,6 +404,7 @@ public class DownloadIndexesService  {
 	    ROAD_MAP("road-indexes") ,
 	    HILLSHADE("hillshade"),
 	    HEIGHTMAP("heightmap"),
+	    GEOTIFF("heightmap"),
 	    SLOPE("slope") ,
 	    SRTM_MAP("srtm-countries") ;
 
@@ -422,6 +424,8 @@ public class DownloadIndexesService  {
             switch (this) {
                 case HEIGHTMAP:
                     return fileName.endsWith(".sqlite");
+                case GEOTIFF:
+                    return fileName.endsWith(".tif");
                 case TRAVEL:
                     return fileName.endsWith(".travel.obf.zip") || fileName.endsWith(".travel.obf");
                 case MAP:
@@ -460,6 +464,8 @@ public class DownloadIndexesService  {
 			case TRAVEL:
 				return String.format("Travel for %s", regionName);
 			case HEIGHTMAP:
+				return String.format("%s", regionName);
+			case GEOTIFF:
 				return String.format("%s", regionName);
 			case HILLSHADE:
 				return String.format("%s", regionName);
@@ -515,7 +521,7 @@ public class DownloadIndexesService  {
 		SRTM("srtmcountry", DownloadType.SRTM_MAP),
 		HILLSHADE("hillshade", DownloadType.HILLSHADE),
 		SLOPE("slope", DownloadType.SLOPE),
-		HEIGHTMAP("heightmap", DownloadType.HEIGHTMAP),
+		HEIGHTMAP("heightmap", DownloadType.HEIGHTMAP, DownloadType.GEOTIFF),
 		OSMLIVE(new String[] {"aosmc", "osmc"}, DownloadType.MAP),
 		DEPTH("depth", DownloadType.DEPTH, DownloadType.DEPTHMAP),
 		WIKI(new String[] {"wikivoyage", "wiki", "travel"}, DownloadType.WIKIMAP, DownloadType.TRAVEL),
