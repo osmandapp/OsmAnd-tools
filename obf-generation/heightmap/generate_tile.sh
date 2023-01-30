@@ -90,7 +90,9 @@ if [ -z "$LAT" ] || [ -z "$LON" ]; then
 fi
 LATL='N'; if (( LAT < 0 )); then LATL='S'; fi
 LONL='E'; if (( LON < 0 )); then LONL='W'; fi
-TILE=${LATL}$(printf "%02d" $LAT)${LONL}$(printf "%03d" $LON)
+LATP=$LAT; if (( LAT < 0 )); then LATP=$(( - $LATP)); fi
+LONP=$LON; if (( LON < 0 )); then LONP=$(( - $LONP)); fi
+TILE=${LATL}$(printf "%02d" $LATP)${LONL}$(printf "%03d" $LONP)
 
 # Step 0. Clean output path and recreate it
 WORK_PATH="./.tmp_${TILE}_${TYPE}"
