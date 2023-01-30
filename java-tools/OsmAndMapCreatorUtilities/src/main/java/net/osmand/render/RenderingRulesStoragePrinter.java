@@ -1,22 +1,14 @@
 package net.osmand.render;
 
-import gnu.trove.iterator.TIntObjectIterator;
-
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Map.Entry;
 
-import net.osmand.PlatformUtil;
-import net.osmand.render.RenderingRulesStorage.RenderingRulesStorageResolver;
-
-import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+
+import gnu.trove.iterator.TIntObjectIterator;
 
 public class RenderingRulesStoragePrinter {
 
@@ -31,6 +23,7 @@ public class RenderingRulesStoragePrinter {
         }
         String name = "Style";
         RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(defaultFile);
+        
         new RenderingRulesStoragePrinter().printJavaFile(outputPath, name, storage);
 
     }

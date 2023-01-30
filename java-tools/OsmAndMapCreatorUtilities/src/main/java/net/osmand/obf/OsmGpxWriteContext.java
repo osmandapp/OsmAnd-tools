@@ -5,6 +5,7 @@ import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -32,6 +33,7 @@ import org.xmlpull.v1.XmlSerializer;
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
+import net.osmand.data.QuadRect;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.gpx.GPXUtilities;
@@ -45,6 +47,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RouteActivityType;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
+import net.osmand.util.MapUtils;
 import rtree.RTree;
 
 public class OsmGpxWriteContext {
@@ -88,7 +91,7 @@ public class OsmGpxWriteContext {
 				outputStream = new GZIPOutputStream(outputStream);
 			}
 			serializer = PlatformUtil.newSerializer();
-			serializer.setOutput(new OutputStreamWriter(outputStream));
+			serializer.setOutput(new BufferedWriter(new OutputStreamWriter(outputStream)));
 			serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true); //$NON-NLS-1$
 			serializer.startDocument("UTF-8", true); //$NON-NLS-1$
 			serializer.startTag(null, "osm"); //$NON-NLS-1$
@@ -141,8 +144,12 @@ public class OsmGpxWriteContext {
 					}
 					segments++;
 					long idStart = id;
+					double dlon = s.points.get(0).lon;
+					double dlat = s.points.get(0).lat;
+					QuadRect qr = new QuadRect(dlon, dlat, dlon, dlat);
 					for (WptPt p : s.points) {
 						long nid = id--;
+						GPXUtilities.updateQR(qr, p, dlat, dlon);
 						writePoint(nid, p, null, null, null);
 					}
 					long endid = id;
@@ -158,7 +165,9 @@ public class OsmGpxWriteContext {
 					}
 					tagValue(serializer, "route", "segment");
 					tagValue(serializer, "route_type", "track");
-					tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
+					int radius = (int) MapUtils.getDistance(qr.bottom, qr.left, qr.top, qr.right);
+					tagValue(serializer, "route_radius", MapUtils.convertDistToChar(radius, GPXUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GPXUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
+							GPXUtilities.TRAVEL_GPX_CONVERT_MULT_1, GPXUtilities.TRAVEL_GPX_CONVERT_MULT_2));
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 					addAnalysisTags(gpxTrackTags, analysis);
@@ -349,7 +358,7 @@ public class OsmGpxWriteContext {
 
 		startDocument();
 		for (File gf : files) {
-			GPXFile f = GPXUtilities.loadGPXFile(gf);
+			GPXFile f = GPXUtilities.loadGPXFile(gf, null, false);
 			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
 			OsmGpxFile file = new OsmGpxFile();
 			String name = gf.getName();
@@ -387,7 +396,7 @@ public class OsmGpxWriteContext {
 		}
 		return targetObf;
 	}
-
+	
 	public static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
 			XmlPullParserException, InterruptedException {
 		if (subArgs.size() != 0) {

@@ -36,6 +36,7 @@
 #include <OsmAndCore/RoadLocator.h>
 #include <OsmAndCore/IRoadLocator.h>
 #include <OsmAndCore/TileSqliteDatabasesCollection.h>
+#include <OsmAndCore/GeoTiffCollection.h>
 #include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
 #include <OsmAndCore/Data/Amenity.h>
@@ -87,6 +88,7 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
 std::shared_ptr<const OsmAnd::ITileSqliteDatabasesCollection> heightsCollection;
+std::shared_ptr<const OsmAnd::IGeoTiffCollection> geotiffCollection;
 std::shared_ptr<OsmAnd::ObfMapObjectsProvider> binaryMapObjectsProvider;
 std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
 std::shared_ptr<OsmAnd::MapPrimitiviser> primitivizer;
@@ -111,6 +113,8 @@ QDir dataDir;
 QDir cacheDir(QDir::current());
 QDir heightsDir;
 bool heightsDirSpecified = false;
+QDir geotiffDir;
+bool geotiffDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
 
@@ -359,6 +363,11 @@ int main(int argc, char** argv)
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
             heightsDirSpecified = true;
         }
+        else if (arg.startsWith("-geotiffDir="))
+        {
+            geotiffDir = QDir(arg.mid(strlen("-geotiffDir=")));
+            geotiffDirSpecified = true;
+        }
         else if (arg == "-nsight")
         {
             useSpecificOpenGL = true;
@@ -494,14 +503,6 @@ int main(int argc, char** argv)
                 std::cout << "Failed to parse metadata of '" << styleFile.fileName().toStdString() << "' or duplicate style" << std::endl;
         }
         stylesCollection.reset(pMapStylesCollection);
-    }
-
-    if (heightsDirSpecified)
-    {
-        const auto manualHeightsCollection = new OsmAnd::TileSqliteDatabasesCollection();
-        manualHeightsCollection->addDirectory(heightsDir);
-
-        heightsCollection.reset(manualHeightsCollection);
     }
 
     if (!styleName.isEmpty())
@@ -961,11 +962,40 @@ void keyboardHandler(unsigned char key, int x, int y)
         {
             if (state.elevationDataProvider)
             {
+                heightsCollection.reset();
+                geotiffCollection.reset();
                 renderer->resetElevationDataProvider();
             }
             else
             {
-                if (heightsCollection)
+                if (heightsDirSpecified)
+                {
+                    const auto manualHeightsCollection = new OsmAnd::TileSqliteDatabasesCollection();
+                    manualHeightsCollection->addDirectory(heightsDir);
+
+                    heightsCollection.reset(manualHeightsCollection);
+                }
+
+                if (geotiffDirSpecified)
+                {
+                    const auto manualGeoTiffCollection = new OsmAnd::GeoTiffCollection();
+                    manualGeoTiffCollection->addDirectory(geotiffDir);
+                    manualGeoTiffCollection->setLocalCache(cacheDir);
+
+                    geotiffCollection.reset(manualGeoTiffCollection);
+                }
+
+                if (heightsCollection && geotiffCollection)
+                {
+                    renderer->setElevationDataProvider(
+                        std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
+                            heightsCollection,
+                            geotiffCollection,
+                            renderer->getElevationDataTileSize()
+                        )
+                    );
+                }
+                else if (heightsCollection)
                 {
                     renderer->setElevationDataProvider(
                         std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
@@ -973,6 +1003,18 @@ void keyboardHandler(unsigned char key, int x, int y)
                             renderer->getElevationDataTileSize()
                         )
                     );
+                }
+                else if (geotiffCollection)
+                {
+                    renderer->setElevationDataProvider(
+                        std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
+                            geotiffCollection,
+                            renderer->getElevationDataTileSize()
+                        )
+                    );
+                }
+                if (heightsCollection || geotiffCollection)
+                {
                     elevationConfigurationPresetIndex = 0;
                     renderer->setElevationConfiguration(elevationConfigurationPresets[elevationConfigurationPresetIndex].second);
                 }
