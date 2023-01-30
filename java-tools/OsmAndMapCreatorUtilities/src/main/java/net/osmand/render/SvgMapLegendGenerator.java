@@ -85,6 +85,7 @@ public class SvgMapLegendGenerator {
 						if (!Algorithms.isEmpty(icon.tag2)) {
 							icon.iconTargetFileName += "_" + icon.tag2 + "_" + icon.value2;
 						}
+						icon.iconTargetFileName = icon.iconTargetFileName.replace(':', '_');
 						icon.styleIconSize = Float.valueOf(dayStyle.get("iconSize"));
 					} else {
 						throw new Exception(String.format(
