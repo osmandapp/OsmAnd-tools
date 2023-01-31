@@ -463,7 +463,9 @@ public class WebGpxParser {
                         if (routePoint.extensions == null) {
                             routePoint.extensions = new LinkedHashMap<>();
                         }
-                        routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
+                        if (!point.profile.equals("line")) {
+                            routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
+                        }
                         allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;
                         routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
                         route.points.add(routePoint);
