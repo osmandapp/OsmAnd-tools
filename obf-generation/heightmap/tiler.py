@@ -98,6 +98,8 @@ class OsmAndHeightMapSlicer(object):
         self.inputGeoTransform = self.inputDataset.GetGeoTransform()
         if (self.inputGeoTransform[2], self.inputGeoTransform[4]) != (0,0):
             self.error("Georeference of the raster must not contain rotation or skew")
+        self.wkt = self.inputDataset.GetProjection()
+        self.gcps = self.inputDataset.GetGCPs()
 
         # Constants
         self.earthInMeters = 40075016.68557848615314309804
@@ -176,9 +178,11 @@ class OsmAndHeightMapSlicer(object):
                 tileTop = dataTop * self.inputGeoTransform[5] + self.inputGeoTransform[3]
 
                 # Create target dataset
-                targetDataset = self.outDriver.Create(outputTileFile, dataSizeX, dataSizeY, 1, self.inputBand.DataType, options = self.options.driverOptions)
+                targetDataset = self.outDriver.Create(outputTileFile, dataSizeX, dataSizeY,
+                    1, self.inputBand.DataType, options = self.options.driverOptions)
                 targetDataset.SetGeoTransform( (tileLeft, self.inputGeoTransform[1], 0.0,
                     tileTop, 0.0, self.inputGeoTransform[5]) )
+                targetDataset.SetGCPs(self.gcps, self.wkt)
 
                 # Store tile in target dataset
                 targetDataset.WriteRaster(0, 0, dataSizeX, dataSizeY,
