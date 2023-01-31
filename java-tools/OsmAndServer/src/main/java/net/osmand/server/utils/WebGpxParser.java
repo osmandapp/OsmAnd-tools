@@ -32,6 +32,8 @@ public class WebGpxParser {
     
     private static final String COLOR_EXTENSION = "color";
     
+    private static final String LINE_PROFILE_TYPE = "line";
+    
     public static class TrackData {
         public MetaData metaData;
         public List<Wpt> wpts;
@@ -217,6 +219,9 @@ public class WebGpxParser {
                     profile = e.getValue();
                     it.remove();
                 }
+            }
+            if (geometry != null && profile == null) {
+                profile = LINE_PROFILE_TYPE;
             }
             ext = point;
         }
@@ -463,7 +468,7 @@ public class WebGpxParser {
                         if (routePoint.extensions == null) {
                             routePoint.extensions = new LinkedHashMap<>();
                         }
-                        if (!point.profile.equals("line")) {
+                        if (!point.profile.equals(LINE_PROFILE_TYPE)) {
                             routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                         }
                         allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;
