@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import math
 import sys
 import os
 from optparse import OptionParser
@@ -99,7 +100,7 @@ class OsmAndHeightMapSlicer(object):
             self.error("Georeference of the raster must not contain rotation or skew")
 
         # Constants
-        self.earthInMeters = 2 * 3.14159265358979323846 * 6378137
+        self.earthInMeters = 40075016.68557848615314309804
         self.earthIn31 = 2 ** 31
         self.tileSizeIn31 = 2 ** (31 - self.options.zoom)
         self.maxTileIndex = 2 ** self.options.zoom - 1
@@ -162,15 +163,11 @@ class OsmAndHeightMapSlicer(object):
                         tileRight - tileLeft, tileTop - tileBottom))
 
                 # Calculate pixel coordinates and raster size of the tile
-                dataSizeX = int((tileRight - tileLeft) / self.inputGeoTransform[1] + 2)
-                dataSizeY = int((tileBottom - tileTop) / self.inputGeoTransform[5] + 2)
-                if tileLeft < -0.5 * self.earthInMeters:
-                    tileLeft += self.earthInMeters
-                if tileTop >= 0.5 * self.earthInMeters:
-                    tileTop -= self.earthInMeters
+                dataSizeX = math.floor((tileRight - tileLeft) / self.inputGeoTransform[1] + 2)
+                dataSizeY = math.floor((tileBottom - tileTop) / self.inputGeoTransform[5] + 2)
                 pixelLeft = (tileLeft - self.inputGeoTransform[0]) / self.inputGeoTransform[1]
                 pixelTop = (tileTop - self.inputGeoTransform[3]) / self.inputGeoTransform[5]
-                dataLeft, dataTop = int(pixelLeft), int(pixelTop)
+                dataLeft, dataTop = math.floor(pixelLeft), math.floor(pixelTop)
                 if dataLeft == pixelLeft:
                     dataLeft -=1
                 if dataTop == pixelTop:
@@ -204,7 +201,7 @@ class OsmAndHeightMapSlicer(object):
 
     # -------------------------------------------------------------------------
     def metersIn31(self, m):
-        return int((m / self.earthInMeters + 0.5) * self.earthIn31)
+        return math.floor((m / self.earthInMeters + 0.5) * self.earthIn31)
 
     # -------------------------------------------------------------------------
     def metersTo31(self, x, y):
@@ -212,8 +209,8 @@ class OsmAndHeightMapSlicer(object):
 
     # -------------------------------------------------------------------------
     def metersToTile(self, x, y):
-        tx = int(self.metersIn31(x) / self.tileSizeIn31)
-        ty = int((self.earthIn31 - 1 - self.metersIn31(y)) / self.tileSizeIn31)
+        tx = math.floor(self.metersIn31(x) / self.tileSizeIn31)
+        ty = math.floor((self.earthIn31 - 1 - self.metersIn31(y)) / self.tileSizeIn31)
         return (tx, ty)
 
     # -------------------------------------------------------------------------
