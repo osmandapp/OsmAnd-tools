@@ -32,6 +32,8 @@ public class WebGpxParser {
     
     private static final String COLOR_EXTENSION = "color";
     
+    private static final String LINE_PROFILE_TYPE = "line";
+    
     public static class TrackData {
         public MetaData metaData;
         public List<Wpt> wpts;
@@ -146,6 +148,8 @@ public class WebGpxParser {
     
     public class Track {
         public List<Point> points;
+    
+        public List<List<Point>> segments = new ArrayList<>();
         public GPXUtilities.Track ext;
         
         public Track(GPXUtilities.Track track) {
@@ -161,6 +165,7 @@ public class WebGpxParser {
                     pointsSeg.add(p);
                 });
                 addRouteSegmentsToPoints(seg, pointsSeg);
+                segments.add(pointsSeg);
                 points.addAll(pointsSeg);
             });
             
@@ -215,6 +220,9 @@ public class WebGpxParser {
                     it.remove();
                 }
             }
+            if (geometry != null && profile == null) {
+                profile = LINE_PROFILE_TYPE;
+            }
             ext = point;
         }
         
@@ -226,9 +234,11 @@ public class WebGpxParser {
     }
     
     public void addRoutePoints(GPXFile gpxFile, TrackData gpxData) {
+        Map<Integer, List<Point>> trackPointsMap = new HashMap<>();
         gpxFile.routes.forEach(route -> {
             List<Point> routePoints = new ArrayList<>();
-            List<Point> trackPoints = gpxData.tracks.get(gpxFile.routes.indexOf(route)).points;
+            int index = gpxFile.routes.indexOf(route);
+            List<Point> trackPoints = getPointsFromSegmentIndex(gpxData, index);
             int prevTrkPointInd = 0;
             for (GPXUtilities.WptPt p : route.points) {
                 Point routePoint = new Point(p);
@@ -241,8 +251,34 @@ public class WebGpxParser {
                 
                 prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
             }
-            gpxData.tracks.get(gpxFile.routes.indexOf(route)).points = routePoints;
+            int indTrack = getTrackBySegmentIndex(gpxData, index);
+            List<Point> routeP = trackPointsMap.get(indTrack);
+            if (routeP != null) {
+                routeP.addAll(routePoints);
+            } else {
+                trackPointsMap.put(indTrack, routePoints);
+            }
         });
+        gpxData.tracks.forEach(track -> track.points = trackPointsMap.get(gpxData.tracks.indexOf(track)));
+    }
+    
+    public List<Point> getPointsFromSegmentIndex(TrackData gpxData, int index) {
+        List<List<Point>> segments = new ArrayList<>();
+        gpxData.tracks.forEach(track -> segments.addAll(track.segments));
+        return segments.get(index);
+    }
+    
+    public int getTrackBySegmentIndex(TrackData gpxData, int index) {
+        int size = 0;
+        for(Track track : gpxData.tracks) {
+            size += track.segments.size() - 1;
+            if (size >= index) {
+                return gpxData.tracks.indexOf(track);
+            } else {
+                size += index;
+            }
+        }
+        return -1;
     }
     
     public int findNearestPoint(List<Point> trackPoints, Point routePoint) {
@@ -365,9 +401,9 @@ public class WebGpxParser {
         if (!gpxFile.tracks.isEmpty()) {
             List<Track> res = new ArrayList<>();
             List<GPXUtilities.Track> tracks = gpxFile.tracks.stream().filter(t -> !t.generalTrack).collect(Collectors.toList());
-            if (!gpxFile.routes.isEmpty() && tracks.size() != gpxFile.routes.size()) {
-                return Collections.emptyList();
-            }
+//            if (!gpxFile.routes.isEmpty() && tracks.get(0).segments.size() != gpxFile.routes.size()) {
+//                return Collections.emptyList();
+//            }
             tracks.forEach(track -> {
                 Track t = new Track(track);
                 res.add(t);
@@ -432,7 +468,9 @@ public class WebGpxParser {
                         if (routePoint.extensions == null) {
                             routePoint.extensions = new LinkedHashMap<>();
                         }
-                        routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
+                        if (!point.profile.equals(LINE_PROFILE_TYPE)) {
+                            routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
+                        }
                         allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;
                         routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
                         route.points.add(routePoint);
