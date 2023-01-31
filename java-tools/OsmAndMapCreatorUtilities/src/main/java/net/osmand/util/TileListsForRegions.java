@@ -191,7 +191,7 @@ public class TileListsForRegions {
 				if (!isOut) {
 					int x = tileX;
 					int y = tileY;
-					wb.write("Y" + tileY + "X" + tileX + EXTENSION);
+					wb.write("./" + ZOOM + "/" + tileX + "/" + tileY + EXTENSION);
 					wb.newLine();
 				}
 			}

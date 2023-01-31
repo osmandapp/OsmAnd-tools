@@ -136,7 +136,7 @@ class OsmAndHeightMapSlicer(object):
 
         for tileY in range(tileMinY, tileMaxY + 1):
             for tileX in range(tileMinX, tileMaxX + 1):
-                outputTileFile = os.path.join(self.outputDir, "Y%sX%s.%s" % (tileY, tileX, self.options.extension))
+                outputTileFile = os.path.join(self.outputDir, str(self.options.zoom), str(tileX), "%s.%s" % (tileY, self.options.extension))
 
                 # Skip if this tile already exists
                 if os.path.exists(outputTileFile):
