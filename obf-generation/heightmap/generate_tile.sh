@@ -88,9 +88,11 @@ if [ -z "$LAT" ] || [ -z "$LON" ]; then
    echo "Please specify -lat LAT -lon LON to process the tile"
    exit 1;
 fi
-LATL='N'; if (( LAT < 0 )); then LATL='S'; LAT=$(( - $LAT)); fi
-LONL='E'; if (( LON < 0 )); then LONL='W'; LON=$(( - $LON)); fi
-TILE=${LATL}$(printf "%02d" $LAT)${LONL}$(printf "%03d" $LON)
+LATL='N'; if (( LAT < 0 )); then LATL='S'; fi
+LONL='E'; if (( LON < 0 )); then LONL='W'; fi
+LATP=$LAT; if (( LAT < 0 )); then LATP=$(( - $LATP)); fi
+LONP=$LON; if (( LON < 0 )); then LONP=$(( - $LONP)); fi
+TILE=${LATL}$(printf "%02d" $LATP)${LONL}$(printf "%03d" $LONP)
 
 # Step 0. Clean output path and recreate it
 WORK_PATH="./.tmp_${TILE}_${TYPE}"
@@ -136,6 +138,7 @@ if [ ! -f "allheighttiles_$TYPE.vrt" ]; then
     echo "Creating VRT..."
     NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
     gdalbuildvrt \
+        -te -181 -91 181 91 \
         -resolution highest \
         -hidenodata \
         -vrtnodata "$NODATA" \
