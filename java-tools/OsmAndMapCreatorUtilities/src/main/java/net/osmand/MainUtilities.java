@@ -323,6 +323,7 @@ public class MainUtilities {
 			URL fu = new URL(fl);
 			HttpURLConnection connection = (HttpURLConnection) fu.openConnection();
 			connection.setConnectTimeout(120000);
+			connection.setReadTimeout(1200000);
 			long lastModified = connection.getLastModified();
 			String fileName = new File(fu.getFile()).getName();
 			System.out.println(String.format("Downloading file %s from %s", fileName, fu));
