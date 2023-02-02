@@ -586,6 +586,7 @@ public class IndexBatchCreator {
 
 	private final static int DOWNLOAD_DEBUG = 1 << 20;
 	private final static int BUFFER_SIZE = 1 << 15;
+	private static final int SLEEP_SEC = 1;
 	private File internalDownload(String url, File toSave) {
 		int count = 0;
 		int downloaded = 0;
@@ -713,12 +714,17 @@ public class IndexBatchCreator {
 		}
 		pr.parameters(pms);
 		SubmitJobRequest req = pr.build();
-		log.info("Submit aws request: " + req );
+		log.info("Submit aws request (sleep " + SLEEP_SEC+ "s): " + req );
 		AwsPendingGeneration p = new AwsPendingGeneration();
 		p.response = client.submitJob(req);
 		p.s3Url = uploadedS3File;
 		p.targetFileName = targetFileName;
 		log.info("Got response: " + p.response);
+		try {
+			Thread.sleep(SLEEP_SEC * 1000);
+		} catch (InterruptedException e) {
+			log.error(e.getMessage(), e);
+		}
 		if (p.s3Url != null) {
 			awsPendingGenerations.add(p);
 		}
