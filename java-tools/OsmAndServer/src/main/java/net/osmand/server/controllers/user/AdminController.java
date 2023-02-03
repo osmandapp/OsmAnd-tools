@@ -264,7 +264,8 @@ public class AdminController {
 					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, null, true, false);
 					ufs.allFiles.clear();
 					ufs.uniqueFiles.clear();
-					deviceSub.payload = gson.toJson(ufs);
+					deviceSub.payload = pu.email + " token:" + pu.token + " at " + pu.tokenTime + "\n"
+							+ gson.toJson(ufs);
 				}
 			}
 		} else {
@@ -900,7 +901,6 @@ public class AdminController {
 			String periodId = period == MONTH ? s.startPeriodMonth
 					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
 			processSub(s, periodId);
-			long now = System.currentTimeMillis();
 			if (s.currentPeriod == 0 && period == MONTH) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
