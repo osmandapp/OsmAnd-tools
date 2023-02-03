@@ -16,11 +16,14 @@ import java.util.zip.GZIPInputStream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
 import com.google.gson.JsonParser;
+import net.osmand.IndexConstants;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
@@ -28,11 +31,15 @@ import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -65,6 +72,7 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import org.xmlpull.v1.XmlPullParserException;
 
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
@@ -444,5 +452,36 @@ public class MapApiController {
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
 		return okStatus();
+	}
+	
+	@RequestMapping(path = { "/download-obf-web"})
+	@ResponseBody
+	public ResponseEntity<Resource> downloadObfWeb(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file, HttpSession httpSession)
+			throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		String sessionId = httpSession.getId();
+		OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
+		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm.gz");
+		File tmpFolder = new File(tmpOsm.getParentFile(), sessionId);
+		qp.osmFile = tmpOsm;
+		qp.details = OsmGpxWriteContext.QueryParams.DETAILS_ELE_SPEED;
+		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
+		
+		InputStream is = file.getInputStream();
+		FileOutputStream fous = new FileOutputStream(tmpGpx);
+		Algorithms.streamCopy(is, fous);
+		is.close();
+		fous.close();
+		
+		File targetObf = new File(tmpFolder.getParentFile(), tmpGpx.getName() + IndexConstants.BINARY_MAP_INDEX_EXT);
+		String fileName = "gpx_" + sessionId;
+		
+		writeCtx.writeObf(Collections.singletonList(tmpGpx), tmpFolder, fileName, targetObf);
+		
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		
+		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 	}
 }
