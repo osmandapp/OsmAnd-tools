@@ -69,7 +69,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
-			 "dl2.osmand.net", "dl3.osmand.net", "dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
+			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net", "dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
 			"maptile.osmand.net" };
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
