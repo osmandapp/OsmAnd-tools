@@ -1510,9 +1510,12 @@ public class AdminController {
 			for (Object type : types) {
 				if (type instanceof DownloadServerSpecialty) {
 					DownloadServerSpecialty sp = (DownloadServerSpecialty) type;
-					mo.put(sp.name(), dProps.getGlobalPercent(sp, serverName) + "%");
+					mo.put(sp.name(),
+							String.format("%d (%d%%)", dProps.getDownloadCounts(sp, serverName), 
+									dProps.getGlobalPercent(sp, serverName)));
 				} else if (type instanceof DownloadServerRegion) {
-					mo.put(type.toString(), ((DownloadServerRegion)type).getServers().contains(serverName) ? "x" : "-");
+					mo.put(type.toString(), ((DownloadServerRegion)type).getServers().contains(serverName) ? 
+							((DownloadServerRegion)type).getDownloadCounts(serverName) : "-");
 				} else {
 					mo.put(type.toString(), "-");
 				}
