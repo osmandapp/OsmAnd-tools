@@ -318,7 +318,7 @@ public class GpxController {
 	}
 	@PostMapping(path = {"/get-srtm-data"}, produces = "application/json")
 	public ResponseEntity<String> getSrtmData(@RequestBody String data) {
-		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addSrtmData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
@@ -326,7 +326,7 @@ public class GpxController {
 	
 	@PostMapping(path = {"/get-analysis"}, produces = "application/json")
 	public ResponseEntity<String> getAnalysis(@RequestBody String data) {
-		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addAnalysisData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
