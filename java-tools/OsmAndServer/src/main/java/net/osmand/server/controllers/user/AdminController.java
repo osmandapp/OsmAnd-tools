@@ -1508,8 +1508,8 @@ public class AdminController {
 				mo.put("name", serverName);
 				for (DownloadServerSpecialty type : DownloadServerSpecialty.values()) {
 					DownloadServerSpecialty sp = (DownloadServerSpecialty) type;
-					mo.put(sp.name(), String.format("%d (%d%%)", dProps.getDownloadCounts(sp, serverName),
-							dProps.getGlobalPercent(sp, serverName)));
+					mo.put(sp.name(), String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
+							region.getPercent(sp, serverName)));
 				}
 				servers.add(mo);
 			}
