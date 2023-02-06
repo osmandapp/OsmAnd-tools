@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.Enumeration;
 import java.util.List;
 
 import javax.servlet.ServletOutputStream;
@@ -31,7 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import net.osmand.server.api.services.DownloadIndexesService;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
 
 @Controller
@@ -227,11 +228,16 @@ public class DownloadIndexController {
 							  @RequestHeader HttpHeaders headers,
 							  HttpServletRequest req,
 							  HttpServletResponse resp) throws IOException {
-		DownloadProperties servers = downloadService.getSettings();
+		DownloadServerLoadBalancer servers = downloadService.getSettings();
 		InetSocketAddress inetHost = headers.getHost();
 		if (inetHost == null) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
 			return;
+		}
+		String remoteAddr = req.getRemoteAddr();
+		Enumeration<String> hs = req.getHeaders("X-Forwarded-For");
+		if (hs != null && hs.hasMoreElements()) {
+			remoteAddr = hs.nextElement();
 		}
 		boolean self = isContainAndEqual("self", "true", params) ;
 		String proto = headers.getFirst("X-Forwarded-Proto");
@@ -250,7 +256,7 @@ public class DownloadIndexController {
 			for (DownloadServerSpecialty dss : DownloadServerSpecialty.values()) {
 				for (String httpParam : dss.httpParams) {
 					if (isContainAndEqual(httpParam, params)) {
-						host = servers.getServer(dss);
+						host = servers.getServer(dss, remoteAddr);
 						if (host != null) {
 							break;
 						}
@@ -258,7 +264,7 @@ public class DownloadIndexController {
 				}
 			}
 			if (host == null) {
-				host = servers.getServer(DownloadServerSpecialty.MAIN);
+				host = servers.getServer(DownloadServerSpecialty.MAIN, remoteAddr);
 			}
 			if (host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);

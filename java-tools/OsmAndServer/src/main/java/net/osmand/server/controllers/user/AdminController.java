@@ -65,7 +65,8 @@ import net.osmand.server.api.repo.OsmRecipientsRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.DownloadIndexesService;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
 import net.osmand.server.api.services.EmailRegistryService;
 import net.osmand.server.api.services.EmailSenderService;
@@ -1495,18 +1496,30 @@ public class AdminController {
 	}
 
 	
-	private List<Map<String, Object>> getDownloadSettings() {
-		DownloadProperties dProps = downloadService.getSettings();
+	private Map<String, Object> getDownloadSettings() {
+		DownloadServerLoadBalancer dProps = downloadService.getSettings();
 		List<Map<String, Object>> list = new ArrayList<>();
-		for (String s : dProps.getServers()) {
+		List<Object> types = new ArrayList<>();
+		for (DownloadServerSpecialty type : DownloadServerSpecialty.values()) {
+			types.add(type);
+		}
+		types.addAll(dProps.getRegions());
+		for (String serverName : dProps.getServerNames()) {
 			Map<String, Object> mo = new TreeMap<>();
-			mo.put("name", s);
-			for (DownloadServerSpecialty sp : DownloadServerSpecialty.values()) {
-				mo.put(sp.name().toLowerCase(), dProps.getPercent(sp, s) + "%");
+			mo.put("name", serverName);
+			for (Object type : types) {
+				if (type instanceof DownloadServerSpecialty) {
+					DownloadServerSpecialty sp = (DownloadServerSpecialty) type;
+					mo.put(sp.name(), dProps.getGlobalPercent(sp, serverName) + "%");
+				} else if (type instanceof DownloadServerRegion) {
+					mo.put(type.toString(), ((DownloadServerRegion)type).getServers().contains(serverName) ? "x" : "-");
+				} else {
+					mo.put(type.toString(), "-");
+				}
 			}
 			list.add(mo);
 		}
-		return list;
+		return Map.of("servers", list, "types", types);
 	}
 	
 	@RequestMapping(path = "report")
