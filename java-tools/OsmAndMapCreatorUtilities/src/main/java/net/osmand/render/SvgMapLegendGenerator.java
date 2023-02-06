@@ -30,9 +30,9 @@ public class SvgMapLegendGenerator {
 
 	static int defaultZoomLevel = 19; // Most of the icons on this zoom are visible
 	static int canvasWidth = 300;
-	static int canvasHeight = 35;
-	static int defaultShieldSize = 30;
-	static int defaultIconSize = 18;
+	static int canvasHeight = 40;
+	static int defaultShieldSize = 40;
+	static int defaultIconSize = 24;
 
 	public static void main(String[] args) throws Exception {
 		generate(System.getenv("repo_dir"), "default");
