@@ -1498,31 +1498,24 @@ public class AdminController {
 	
 	private Map<String, Object> getDownloadSettings() {
 		DownloadServerLoadBalancer dProps = downloadService.getSettings();
-		List<Map<String, Object>> list = new ArrayList<>();
-		List<Object> types = new ArrayList<>();
-		for (DownloadServerSpecialty type : DownloadServerSpecialty.values()) {
-			types.add(type);
-		}
-		types.addAll(dProps.getRegions());
-		for (String serverName : dProps.getServerNames()) {
-			Map<String, Object> mo = new TreeMap<>();
-			mo.put("name", serverName);
-			for (Object type : types) {
-				if (type instanceof DownloadServerSpecialty) {
+		List<DownloadServerRegion> regions = new ArrayList<>(dProps.getRegions());
+		regions.add(0, dProps.getGlobalRegion());
+		List<Object> regionResults = new ArrayList<Object>();
+		for (DownloadServerRegion region : regions) {
+			List<Map<String, Object>> servers = new ArrayList<>();
+			for (String serverName : region.getServers()) {
+				Map<String, Object> mo = new TreeMap<>();
+				mo.put("name", serverName);
+				for (DownloadServerSpecialty type : DownloadServerSpecialty.values()) {
 					DownloadServerSpecialty sp = (DownloadServerSpecialty) type;
-					mo.put(sp.name(),
-							String.format("%d (%d%%)", dProps.getDownloadCounts(sp, serverName), 
-									dProps.getGlobalPercent(sp, serverName)));
-				} else if (type instanceof DownloadServerRegion) {
-					mo.put(type.toString(), ((DownloadServerRegion)type).getServers().contains(serverName) ? 
-							((DownloadServerRegion)type).getDownloadCounts(serverName) : "-");
-				} else {
-					mo.put(type.toString(), "-");
+					mo.put(sp.name(), String.format("%d (%d%%)", dProps.getDownloadCounts(sp, serverName),
+							dProps.getGlobalPercent(sp, serverName)));
 				}
+				servers.add(mo);
 			}
-			list.add(mo);
+			regionResults.add(Map.of("name", region.toString(), "servers", servers));
 		}
-		return Map.of("servers", list, "types", types);
+		return Map.of("regions", regionResults, "types", DownloadServerSpecialty.values());
 	}
 	
 	@RequestMapping(path = "report")

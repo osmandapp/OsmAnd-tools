@@ -510,7 +510,7 @@ public class DownloadIndexesService  {
 		}
 		for (DownloadServerRegion reg : dp.getRegions()) {
 			for (String serverName : dp.getServerNames()) {
-				System.out.println(reg.name + " " + reg.getDownloadCounts(type, serverName));
+				System.out.println(reg.getName() + " " + reg.getDownloadCounts(type, serverName));
 			}
 		}
 		System.out.println(cnts);
@@ -566,7 +566,7 @@ public class DownloadIndexesService  {
 	}
 	
 	public static class DownloadServerRegion {
-		String name;
+		String name = "Global";
 		List<String> servers = new ArrayList<String>();
 		List<String> zones = new ArrayList<String>();
 		List<SubnetUtils> cidrZones = new ArrayList<>();
@@ -608,7 +608,7 @@ public class DownloadIndexesService  {
 		
 		@Override
 		public String toString() {
-			return name + " " + cidrZones.size();
+			return getName() + " " + cidrZones.size();
 		}
 
 		private void prepare(DownloadServerSpecialty tp, Map<String, Integer> mp) {
@@ -668,6 +668,18 @@ public class DownloadIndexesService  {
 			}
 			return sum;
 		}
+
+		public int getPercent(DownloadServerSpecialty type, String serverName) {
+			int ind = getServerIndex(type, serverName);
+			if (ind >= 0 && specialties[type.ordinal()] != null) {
+				return specialties[type.ordinal()].percents[ind];
+			}
+			return 0;
+		}
+
+		public String getName() {
+			return name;
+		}
 		
 	}
 	
@@ -708,20 +720,21 @@ public class DownloadIndexesService  {
 			return globalRegion.servers;
 		}
 		
+		public DownloadServerRegion getGlobalRegion() {
+			return globalRegion;
+		}
+		
 		public int getDownloadCounts(DownloadServerSpecialty type, String serverName) {
 			int sum = globalRegion.getDownloadCounts(type, serverName);
-			for(DownloadServerRegion r : regions) {
+			for (DownloadServerRegion r : regions) {
 				sum += r.getDownloadCounts(type, serverName);
 			}
 			return sum;
 		}
 
 		public int getGlobalPercent(DownloadServerSpecialty type, String serverName) {
-			int ind = globalRegion.getServerIndex(type, serverName);
-			if (ind >= 0) {
-				return globalRegion.specialties[type.ordinal()].percents[ind];
-			}
-			return 0;
+			return globalRegion.getPercent(type, serverName);
+			
 		}
 		
 		
