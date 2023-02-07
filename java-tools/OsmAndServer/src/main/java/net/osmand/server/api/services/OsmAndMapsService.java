@@ -887,9 +887,7 @@ public class OsmAndMapsService {
 		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
 		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
 		writeCtx.writeObf(files, tmpFolder, fileName, targetObf);
-		for (File file : files) {
-			Algorithms.removeAllFiles(file);
-		}
+		
 		return targetObf;
 	}
 }

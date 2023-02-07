@@ -464,31 +464,47 @@ public class MapApiController {
 		return okStatus();
 	}
 	
-	@RequestMapping(path = { "/download-obf"})
+	@RequestMapping(path = {"/download-obf"})
 	@ResponseBody
-	public ResponseEntity<Resource> downloadObf(@RequestBody List<String> names)
+	public void downloadObf(HttpServletResponse response, @RequestBody List<String> names)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		PremiumUserDevice dev = checkUser();
 		List<File> files = new ArrayList<>();
-		for (String name : names) {
-			UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
-			if (userFile != null) {
-				InputStream is = userdataService.getInputStream(dev, userFile);
-				File file = File.createTempFile(name, ".gpx");
-				FileOutputStream fous;
-				fous = new FileOutputStream(file);
-				Algorithms.streamCopy(is, fous);
+		InputStream is = null;
+		FileOutputStream fous = null;
+		FileInputStream fis = null;
+		try (OutputStream os = response.getOutputStream()) {
+			File targetObf;
+			for (String name : names) {
+				UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
+				if (userFile != null) {
+					File file = File.createTempFile(name, ".gpx");
+					is = userdataService.getInputStream(dev, userFile);
+					fous = new FileOutputStream(file);
+					Algorithms.streamCopy(is, fous);
+					files.add(file);
+				}
+			}
+			targetObf = osmAndMapsService.getObf(files);
+			fis = new FileInputStream(targetObf);
+			Algorithms.streamCopy(fis, os);
+		} finally {
+			if (is != null) {
+				is.close();
+			}
+			if (fous != null) {
 				fous.close();
-				files.add(file);
+			}
+			if (fis != null) {
+				fis.close();
+			}
+			for (File file : files) {
+				Algorithms.removeAllFiles(file);
 			}
 		}
 		
-		File targetObf = osmAndMapsService.getObf(files);
-		
-		HttpHeaders headers = new HttpHeaders();
-		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
-		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
-		
-		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
+		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
+		response.setHeader(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		response.setStatus(HttpServletResponse.SC_OK);
 	}
 }
