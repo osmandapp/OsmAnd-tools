@@ -347,23 +347,4 @@ public class GpxController {
         }
         return sizeFiles;
     }
-
-	@RequestMapping(path = { "/download-obf"})
-	@ResponseBody
-    public ResponseEntity<Resource> downloadObf(@RequestParam(defaultValue="", required=false) String gzip,
-			HttpSession httpSession, HttpServletResponse resp) throws IOException, FactoryConfigurationError,
-			SQLException, InterruptedException, XmlPullParserException {
-		GPXSessionContext ctx = session.getGpxResources(httpSession);
-		List<File> files = new ArrayList<>();
-		for (GPXSessionFile f : ctx.files) {
-			files.add(f.file);
-		}
-		File targetObf = osmAndMapsService.getObf(httpSession, ctx, files);
-		
-		HttpHeaders headers = new HttpHeaders();
-		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
-		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
-		
-		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
-	}
 }

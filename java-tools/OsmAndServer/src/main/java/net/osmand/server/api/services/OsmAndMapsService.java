@@ -876,21 +876,20 @@ public class OsmAndMapsService {
 		return osmandRegions;
 	}
 	
-	public File getObf(HttpSession httpSession, UserSessionResources.GPXSessionContext ctx, List<File> files)
+	public File getObf(List<File> files)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
-		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm.gz");
-		ctx.tempFiles.add(tmpOsm);
-		String sessionId = httpSession.getId();
-		File tmpFolder = new File(tmpOsm.getParentFile(), sessionId);
-		String fileName = "gpx_" + sessionId;
+		File tmpOsm = File.createTempFile("gpx_obf", ".osm.gz");
+		File tmpFolder = new File(tmpOsm.getParentFile(), String.valueOf(System.currentTimeMillis()));
+		String fileName = "gpx_" + System.currentTimeMillis();
 		OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
 		qp.osmFile = tmpOsm;
 		qp.details = OsmGpxWriteContext.QueryParams.DETAILS_ELE_SPEED;
 		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
 		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
 		writeCtx.writeObf(files, tmpFolder, fileName, targetObf);
-		ctx.tempFiles.add(targetObf);
-		
+		for (File file : files) {
+			Algorithms.removeAllFiles(file);
+		}
 		return targetObf;
 	}
 }

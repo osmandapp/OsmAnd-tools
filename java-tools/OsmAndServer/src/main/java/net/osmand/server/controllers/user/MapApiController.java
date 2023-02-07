@@ -466,10 +466,9 @@ public class MapApiController {
 	
 	@RequestMapping(path = { "/download-obf"})
 	@ResponseBody
-	public ResponseEntity<Resource> downloadObf(HttpSession httpSession, @RequestBody List<String> names)
+	public ResponseEntity<Resource> downloadObf(@RequestBody List<String> names)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		PremiumUserDevice dev = checkUser();
-		UserSessionResources.GPXSessionContext ctx = session.getGpxResources(httpSession);
 		List<File> files = new ArrayList<>();
 		for (String name : names) {
 			UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
@@ -484,7 +483,7 @@ public class MapApiController {
 			}
 		}
 		
-		File targetObf = osmAndMapsService.getObf(httpSession, ctx, files);
+		File targetObf = osmAndMapsService.getObf(files);
 		
 		HttpHeaders headers = new HttpHeaders();
 		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
