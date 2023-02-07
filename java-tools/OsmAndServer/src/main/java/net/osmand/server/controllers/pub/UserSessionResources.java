@@ -28,9 +28,9 @@ public class UserSessionResources implements HttpSessionListener {
 		GPXTrackAnalysis srtmAnalysis;
 	}
 	
-	static class GPXSessionContext {
-		List<GPXSessionFile> files = new ArrayList<GPXSessionFile>();
-		List<File> tempFiles = new ArrayList<File>();
+	public static class GPXSessionContext {
+		List<GPXSessionFile> files = new ArrayList<>();
+		public List<File> tempFiles = new ArrayList<>();
 	}
 	
 	public GPXSessionContext getGpxResources(HttpSession httpSession) {

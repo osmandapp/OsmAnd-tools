@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,7 +30,11 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
+import javax.servlet.http.HttpSession;
 
+import net.osmand.IndexConstants;
+import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.server.controllers.pub.UserSessionResources;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -869,5 +874,23 @@ public class OsmAndMapsService {
 	
 	public OsmandRegions getOsmandRegions() {
 		return osmandRegions;
+	}
+	
+	public File getObf(HttpSession httpSession, UserSessionResources.GPXSessionContext ctx, List<File> files)
+			throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm.gz");
+		ctx.tempFiles.add(tmpOsm);
+		String sessionId = httpSession.getId();
+		File tmpFolder = new File(tmpOsm.getParentFile(), sessionId);
+		String fileName = "gpx_" + sessionId;
+		OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
+		qp.osmFile = tmpOsm;
+		qp.details = OsmGpxWriteContext.QueryParams.DETAILS_ELE_SPEED;
+		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
+		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
+		writeCtx.writeObf(files, tmpFolder, fileName, targetObf);
+		ctx.tempFiles.add(targetObf);
+		
+		return targetObf;
 	}
 }
