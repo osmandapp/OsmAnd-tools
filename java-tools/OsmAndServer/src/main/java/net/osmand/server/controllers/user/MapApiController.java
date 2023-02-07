@@ -9,30 +9,43 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
+import javax.xml.stream.FactoryConfigurationError;
+import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.JsonParser;
+import net.osmand.IndexConstants;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.GpxService;
+import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -65,6 +78,7 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import org.xmlpull.v1.XmlPullParserException;
 
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
@@ -109,6 +123,12 @@ public class MapApiController {
 	
 	@Autowired
 	WebGpxParser webGpxParser;
+	
+	@Autowired
+	UserSessionResources session;
+	
+	@Autowired
+	OsmAndMapsService osmAndMapsService;
 	
 	Gson gson = new Gson();
 	
@@ -437,12 +457,54 @@ public class MapApiController {
 		userdataService.getBackup(response, dev, null, includeDeleted);
 	}
 	
-	
-	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
 		return okStatus();
+	}
+	
+	@RequestMapping(path = {"/download-obf"})
+	@ResponseBody
+	public void downloadObf(HttpServletResponse response, @RequestBody List<String> names)
+			throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		PremiumUserDevice dev = checkUser();
+		List<File> files = new ArrayList<>();
+		InputStream is = null;
+		FileOutputStream fous = null;
+		FileInputStream fis = null;
+		try (OutputStream os = response.getOutputStream()) {
+			File targetObf;
+			for (String name : names) {
+				UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
+				if (userFile != null) {
+					File file = File.createTempFile(name, ".gpx");
+					is = userdataService.getInputStream(dev, userFile);
+					fous = new FileOutputStream(file);
+					Algorithms.streamCopy(is, fous);
+					files.add(file);
+				}
+			}
+			targetObf = osmAndMapsService.getObf(files);
+			fis = new FileInputStream(targetObf);
+			Algorithms.streamCopy(fis, os);
+		} finally {
+			if (is != null) {
+				is.close();
+			}
+			if (fous != null) {
+				fous.close();
+			}
+			if (fis != null) {
+				fis.close();
+			}
+			for (File file : files) {
+				Algorithms.removeAllFiles(file);
+			}
+		}
+		
+		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
+		response.setHeader(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		response.setStatus(HttpServletResponse.SC_OK);
 	}
 }

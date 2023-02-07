@@ -33,6 +33,7 @@ public class WebGpxParser {
     private static final String COLOR_EXTENSION = "color";
     
     private static final String LINE_PROFILE_TYPE = "line";
+    private static final int NAN_MARKER = 99999;
     
     public static class TrackData {
         public MetaData metaData;
@@ -200,7 +201,7 @@ public class WebGpxParser {
                 point.lon = Double.NaN;
             }
             
-            if (!Double.isNaN(point.ele)) {
+            if (!Double.isNaN(point.ele) || point.ele == NAN_MARKER) {
                 ele = point.ele;
                 point.ele = Double.NaN;
             }
@@ -462,7 +463,7 @@ public class WebGpxParser {
                         }
                         routePoint.lat = point.lat;
                         routePoint.lon = point.lng;
-                        if (point.ele == 99999) {
+                        if (point.ele == NAN_MARKER) {
                             routePoint.ele = Double.NaN;
                         }
                         if (routePoint.extensions == null) {
@@ -558,7 +559,7 @@ public class WebGpxParser {
     }
     
     private boolean isNanEle(List<Point> points) {
-        return points.get(0).ele == 99999;
+        return points.get(0).ele == NAN_MARKER;
     }
     
     public void addRouteSegmentsToPoints(GPXUtilities.TrkSegment seg, List<WebGpxParser.Point> points) {

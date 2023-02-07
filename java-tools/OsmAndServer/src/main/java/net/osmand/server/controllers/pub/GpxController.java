@@ -318,7 +318,7 @@ public class GpxController {
 	}
 	@PostMapping(path = {"/get-srtm-data"}, produces = "application/json")
 	public ResponseEntity<String> getSrtmData(@RequestBody String data) {
-		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addSrtmData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
@@ -326,7 +326,7 @@ public class GpxController {
 	
 	@PostMapping(path = {"/get-analysis"}, produces = "application/json")
 	public ResponseEntity<String> getAnalysis(@RequestBody String data) {
-		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addAnalysisData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
@@ -347,32 +347,4 @@ public class GpxController {
         }
         return sizeFiles;
     }
-
-	@RequestMapping(path = { "/download-obf"})
-	@ResponseBody
-    public ResponseEntity<Resource> downloadObf(@RequestParam(defaultValue="", required=false) String gzip,
-			HttpSession httpSession, HttpServletResponse resp) throws IOException, FactoryConfigurationError,
-			XMLStreamException, SQLException, InterruptedException, XmlPullParserException {
-		GPXSessionContext ctx = session.getGpxResources(httpSession);
-		File tmpOsm = File.createTempFile("gpx_obf_" + httpSession.getId(), ".osm.gz");
-		ctx.tempFiles.add(tmpOsm);
-		List<File> files = new ArrayList<>();
-		for (GPXSessionFile f : ctx.files) {
-			files.add(f.file);
-		}
-		String sessionId = httpSession.getId();
-		File tmpFolder = new File(tmpOsm.getParentFile(), sessionId);
-		String fileName = "gpx_" + sessionId;
-		QueryParams qp = new QueryParams();
-		qp.osmFile = tmpOsm;
-		qp.details = QueryParams.DETAILS_ELE_SPEED;
-		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
-		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
-		writeCtx.writeObf(files, tmpFolder, fileName, targetObf);
-		ctx.tempFiles.add(targetObf);
-		HttpHeaders headers = new HttpHeaders();
-		headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
-		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
-		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
-	}
 }
