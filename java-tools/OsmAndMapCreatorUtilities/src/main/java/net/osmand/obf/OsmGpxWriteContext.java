@@ -352,28 +352,24 @@ public class OsmGpxWriteContext {
 		serializer.attribute(null, "v", value);
 		serializer.endTag(null, "tag");
 	}
-
-	public File writeObf(List<File> files, File tmpFolder, String fileName, File targetObf) throws IOException,
+	
+	public File writeObf(Map<String, GPXFile> gpxFiles, List<File> files, File tmpFolder, String fileName, File targetObf) throws IOException,
 			SQLException, InterruptedException, XmlPullParserException {
-
+		
 		startDocument();
-		for (File gf : files) {
-			GPXFile f = GPXUtilities.loadGPXFile(gf, null, false);
-			GPXTrackAnalysis analysis = f.getAnalysis(gf.lastModified());
-			OsmGpxFile file = new OsmGpxFile();
-			String name = gf.getName();
-			if (name.lastIndexOf('.') != -1) {
-				name = name.substring(0, name.lastIndexOf('.'));
+		if (gpxFiles != null) {
+			for (Entry<String, GPXFile> entry : gpxFiles.entrySet()) {
+				GPXFile gpxFile = entry.getValue();
+				writeFile(gpxFile, entry.getKey());
 			}
-			file.name = name;
-			file.id = gf.lastModified() / 1000;
-			file.timestamp = new Date(gf.lastModified());
-			file.description = "";
-			file.tags = new String[0];
-			writeTrack(file, null, f, analysis, "GPX");
+		} else if (files != null) {
+			for (File gf : files) {
+				GPXFile gpxFile = GPXUtilities.loadGPXFile(gf, null, false);
+				writeFile(gpxFile, gf.getName());
+			}
 		}
 		endDocument();
-
+		
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
 		settings.indexAddress = false;
@@ -397,6 +393,21 @@ public class OsmGpxWriteContext {
 		return targetObf;
 	}
 	
+	private void writeFile(GPXFile gpxFile, String fileName) throws SQLException, IOException {
+		GPXTrackAnalysis analysis = gpxFile.getAnalysis(gpxFile.modifiedTime);
+		OsmGpxFile file = new OsmGpxFile();
+		String name = fileName;
+		if (name.lastIndexOf('.') != -1) {
+			name = name.substring(0, name.lastIndexOf('.'));
+		}
+		file.name = name;
+		file.id = gpxFile.modifiedTime / 1000;
+		file.timestamp = new Date(gpxFile.modifiedTime);
+		file.description = "";
+		file.tags = new String[0];
+		writeTrack(file, null, gpxFile, analysis, "GPX");
+	}
+	
 	public static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
 			XmlPullParserException, InterruptedException {
 		if (subArgs.size() != 0) {
@@ -415,7 +426,7 @@ public class OsmGpxWriteContext {
 					files.add(file);
 				}
 				if (!files.isEmpty()) {
-					ctx.writeObf(files, tmpFolder, Algorithms.getFileNameWithoutExtension(file), targetObf);
+					ctx.writeObf(null, files, tmpFolder, Algorithms.getFileNameWithoutExtension(file), targetObf);
 				}
 				if (!qp.osmFile.delete()) {
 					qp.osmFile.deleteOnExit();
