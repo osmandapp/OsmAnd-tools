@@ -876,7 +876,7 @@ public class OsmAndMapsService {
 		return osmandRegions;
 	}
 	
-	public File getObf(List<File> files)
+	public File getObf(Map<String, GPXFile> files)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		File tmpOsm = File.createTempFile("gpx_obf", ".osm.gz");
 		File tmpFolder = new File(tmpOsm.getParentFile(), String.valueOf(System.currentTimeMillis()));
@@ -886,7 +886,7 @@ public class OsmAndMapsService {
 		qp.details = OsmGpxWriteContext.QueryParams.DETAILS_ELE_SPEED;
 		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
 		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
-		writeCtx.writeObf(files, tmpFolder, fileName, targetObf);
+		writeCtx.writeObf(files, null, tmpFolder, fileName, targetObf);
 		
 		return targetObf;
 	}

@@ -9,10 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
@@ -469,20 +466,17 @@ public class MapApiController {
 	public void downloadObf(HttpServletResponse response, @RequestBody List<String> names)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		PremiumUserDevice dev = checkUser();
-		List<File> files = new ArrayList<>();
 		InputStream is = null;
-		FileOutputStream fous = null;
 		FileInputStream fis = null;
 		try (OutputStream os = response.getOutputStream()) {
 			File targetObf;
+			Map<String, GPXFile> files = new HashMap<>();
 			for (String name : names) {
 				UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
 				if (userFile != null) {
-					File file = File.createTempFile(name, ".gpx");
 					is = userdataService.getInputStream(dev, userFile);
-					fous = new FileOutputStream(file);
-					Algorithms.streamCopy(is, fous);
-					files.add(file);
+					GPXFile file = GPXUtilities.loadGPXFile(new GZIPInputStream(is));
+					files.put(name, file);
 				}
 			}
 			targetObf = osmAndMapsService.getObf(files);
@@ -492,14 +486,8 @@ public class MapApiController {
 			if (is != null) {
 				is.close();
 			}
-			if (fous != null) {
-				fous.close();
-			}
 			if (fis != null) {
 				fis.close();
-			}
-			for (File file : files) {
-				Algorithms.removeAllFiles(file);
 			}
 		}
 		
