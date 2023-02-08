@@ -25,7 +25,7 @@ public class GenerateYMLFromAndroidTranslations {
 
 	public static void main(String[] args) throws XmlPullParserException, IOException {
 		convertAndroidTranslationsToYml("../../../android/OsmAnd/res/");
-		convertIosTranslationsToYml("../../../ios/Resources/");
+		convertIosTranslationsToYml("../../../ios/Resources/Localizations");
 	}
 	
 	
@@ -83,7 +83,7 @@ public class GenerateYMLFromAndroidTranslations {
 			while ((line = br.readLine()) != null) {
 				oline += line.trim();
 				ln++;
-				if (oline.endsWith(";")) {
+				if (oline.endsWith(";") && oline.substring(0, oline.length() - 1).trim().endsWith("\"")) {
 					if (!oline.equals(";")) {
 						try {
 							int eq = oline.indexOf('=');
