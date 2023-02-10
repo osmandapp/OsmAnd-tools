@@ -201,7 +201,7 @@ public class WebGpxParser {
                 point.lon = Double.NaN;
             }
             
-            if (!Double.isNaN(point.ele) || point.ele == NAN_MARKER) {
+            if (!Double.isNaN(point.ele) || point.ele != NAN_MARKER) {
                 ele = point.ele;
                 point.ele = Double.NaN;
             }
