@@ -189,6 +189,7 @@ public class UserdataController {
 				throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
+			// keep old order id
 		} else {
 			String error = userSubService.checkOrderIdPremium(orderid);
 			if (error != null) {
@@ -214,10 +215,15 @@ public class UserdataController {
 		}
 		// keep old order id
 		pu.tokendevice = deviceId;
-		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
+		if (pu.token != null && pu.token.length() >= 8) {
+			// this is a permanent token for users who can't receive email but validated
+			// identity differently
+		} else {
+			pu.token = (new Random().nextInt(8999) + 1000) + "";
+			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
+		}
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
 		return userdataService.ok();
 	}
 
