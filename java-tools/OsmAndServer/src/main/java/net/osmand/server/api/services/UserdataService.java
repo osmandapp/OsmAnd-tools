@@ -265,27 +265,29 @@ public class UserdataService {
         return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
     }
     
-    public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email) throws IOException {
-        // allow to register only with small case
-        email = email.toLowerCase().trim();
-        if (!email.contains("@")) {
-            throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
-        }
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
-        if (pu == null) {
-            throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
-        }
-        String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-        if (errorMsg != null) {
-            throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-        }
-        pu.tokendevice = TOKEN_DEVICE_WEB;
-        pu.token = (new Random().nextInt(8999) + 1000) + "";
-        pu.tokenTime = new Date();
-        usersRepository.saveAndFlush(pu);
-        emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token);
-        return ok();
-    }
+	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email) throws IOException {
+		// allow to register only with small case
+		email = email.toLowerCase().trim();
+		if (!email.contains("@")) {
+			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+		}
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+		if (pu == null) {
+			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+		}
+		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+		if (errorMsg != null) {
+			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+		}
+		pu.tokendevice = TOKEN_DEVICE_WEB;
+		if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
+			pu.token = (new Random().nextInt(8999) + 1000) + "";
+		}
+		pu.tokenTime = new Date();
+		usersRepository.saveAndFlush(pu);
+		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token);
+		return ok();
+	}
     
     public ResponseEntity<String> ok() {
         return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
@@ -321,7 +323,9 @@ public class UserdataService {
                 - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
             throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
         }
-        pu.token = null;
+        if (pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
+        	pu.token = null;
+        }
         pu.tokenTime = null;
         PremiumUserDevicesRepository.PremiumUserDevice device = new PremiumUserDevicesRepository.PremiumUserDevice();
         PremiumUserDevicesRepository.PremiumUserDevice sameDevice;
