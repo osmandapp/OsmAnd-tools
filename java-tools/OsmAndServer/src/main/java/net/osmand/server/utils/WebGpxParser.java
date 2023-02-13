@@ -201,7 +201,7 @@ public class WebGpxParser {
                 point.lon = Double.NaN;
             }
             
-            if (!Double.isNaN(point.ele) || point.ele == NAN_MARKER) {
+            if (!Double.isNaN(point.ele) || point.ele != NAN_MARKER) {
                 ele = point.ele;
                 point.ele = Double.NaN;
             }
@@ -457,6 +457,13 @@ public class WebGpxParser {
                     int allPoints = 0;
                     for (int i = 0; i < t.points.size(); i++) {
                         Point point = t.points.get(i);
+                        if (point.geometry.isEmpty()) {
+                            if (!route.points.isEmpty()) {
+                                gpxFile.routes.add(route);
+                            }
+                            route = new GPXUtilities.Route();
+                            allPoints = 0;
+                        }
                         GPXUtilities.WptPt routePoint = point.ext;
                         if (routePoint == null) {
                             routePoint = new WptPt();
@@ -472,7 +479,7 @@ public class WebGpxParser {
                         if (!point.profile.equals(LINE_PROFILE_TYPE)) {
                             routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                         }
-                        allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size() - 1;
+                        allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size();
                         routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
                         route.points.add(routePoint);
                         trkPoints.addAll(point.geometry);
