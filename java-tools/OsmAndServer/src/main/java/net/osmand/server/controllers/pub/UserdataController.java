@@ -56,6 +56,9 @@ public class UserdataController {
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
+	
+	// This is a permanent token for users who can't receive email but validated identity differently
+	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
 
 	Gson gson = new Gson();
@@ -189,6 +192,7 @@ public class UserdataController {
 				throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
+			// keep old order id
 		} else {
 			String error = userSubService.checkOrderIdPremium(orderid);
 			if (error != null) {
@@ -214,10 +218,13 @@ public class UserdataController {
 		}
 		// keep old order id
 		pu.tokendevice = deviceId;
-		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
+		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
+			// see comment on constant
+			pu.token = (new Random().nextInt(8999) + 1000) + "";
+			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
+		}
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
 		return userdataService.ok();
 	}
 

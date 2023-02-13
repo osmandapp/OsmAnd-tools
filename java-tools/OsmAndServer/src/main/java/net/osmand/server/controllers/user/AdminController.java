@@ -82,6 +82,7 @@ import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import net.osmand.util.Algorithms;
 import net.osmand.server.controllers.pub.WebController;
 
 @Controller
@@ -265,8 +266,8 @@ public class AdminController {
 					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, null, true, false);
 					ufs.allFiles.clear();
 					ufs.uniqueFiles.clear();
-					deviceSub.payload = pu.email + " token:" + pu.token + " at " + pu.tokenTime + "\n"
-							+ gson.toJson(ufs);
+					deviceSub.payload = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") + " at "
+							+ pu.tokenTime + "\n" + gson.toJson(ufs);
 				}
 			}
 		} else {
