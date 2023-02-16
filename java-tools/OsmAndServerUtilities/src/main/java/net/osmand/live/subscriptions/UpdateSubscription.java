@@ -17,7 +17,6 @@ import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
@@ -367,7 +366,7 @@ public class UpdateSubscription {
 		SubscriptionPurchase subscription = null;
 		List<InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
 		if (!inAppReceipts.isEmpty()) {
-			boolean autoRenewing = false;
+			Boolean autoRenewing = null;
 			int introCycles = 0;
 			long startDate = 0;
 			long expiresDate = 0;
