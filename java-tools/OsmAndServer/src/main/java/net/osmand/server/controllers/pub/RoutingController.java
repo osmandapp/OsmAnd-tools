@@ -21,11 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -51,6 +47,8 @@ import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+
+import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 
 @Controller
 @RequestMapping("/routing")
@@ -376,5 +374,12 @@ public class RoutingController {
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
 		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasSpeed, hasRouting);
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
+	}
+	
+	@PostMapping(path = {"/get-route"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getRoute(@RequestBody List<WebGpxParser.Point> points) throws IOException, InterruptedException {
+		List<WebGpxParser.Point> res = routingService.getRoute(points);
+		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
 	}
 }

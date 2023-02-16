@@ -24,6 +24,8 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
+
 @Service
 public class RoutingService {
     
@@ -38,10 +40,16 @@ public class RoutingService {
                                                              String routeMode, boolean hasSpeed, boolean hasRouting) throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
-        List<RouteSegmentResult> routeSegmentResults = osmAndMapsService.routing(routeMode, props, startLatLon,
-                endLatLon, Collections.emptyList(), Collections.emptyList());
-        
-        List<WebGpxParser.Point> pointsRes = getPoints(routeSegmentResults, locations);
+        List<WebGpxParser.Point> pointsRes;
+        List<RouteSegmentResult> routeSegmentResults = new ArrayList<>();
+        if (routeMode.equals(LINE_PROFILE_TYPE)) {
+            pointsRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(), endLatLon.getLatitude(), endLatLon.getLongitude());
+        } else {
+            routeSegmentResults = osmAndMapsService.routing(routeMode, props, startLatLon,
+                    endLatLon, Collections.emptyList(), Collections.emptyList());
+    
+            pointsRes = getPoints(routeSegmentResults, locations);
+        }
         
         if (!pointsRes.isEmpty()) {
             GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
@@ -54,6 +62,38 @@ public class RoutingService {
             addDistance(pointsRes);
         }
         return pointsRes;
+    }
+    
+    public List<WebGpxParser.Point> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
+        List<WebGpxParser.Point> res = new ArrayList<>();
+        res.add(points.get(0));
+        for (int i = 1; i < points.size(); i++) {
+            WebGpxParser.Point prevPoint = points.get(i - 1);
+            WebGpxParser.Point currentPoint = points.get(i);
+            LatLon prevCoord = new LatLon(prevPoint.lat, prevPoint.lng);
+            LatLon currentCoord = new LatLon(currentPoint.lat, currentPoint.lng);
+            if (prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
+                currentPoint.geometry = getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
+            } else {
+                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, true);
+            }
+            res.add(currentPoint);
+        }
+        return res;
+    }
+    
+    private List<WebGpxParser.Point> getStraightLine(double lat1, double lng1, double lat2, double lng2) {
+        List<WebGpxParser.Point> line = new ArrayList<>();
+        WebGpxParser.Point firstP = new WebGpxParser.Point();
+        firstP.lat = lat1;
+        firstP.lng = lng1;
+        WebGpxParser.Point lastP = new WebGpxParser.Point();
+        lastP.lat = lat2;
+        lastP.lng = lng2;
+        line.add(firstP);
+        line.add(lastP);
+        
+        return line;
     }
     
     public void fillRoutingModeParams(RoutingController.RoutingParameter nativeRouting, RoutingController.RoutingParameter nativeTrack, RoutingController.RoutingParameter calcMode,
