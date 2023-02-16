@@ -17,7 +17,9 @@ import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
+import org.apache.commons.logging.Log;
 import org.json.JSONException;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -40,17 +42,21 @@ import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
+import net.osmand.PlatformUtil;
 import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonIOException;
 import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonSubscription;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiJsonResponseException;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
+import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.util.Algorithms;
 
 
 public class UpdateSubscription {
 
+
+    private final static Log LOGGER = PlatformUtil.getLog(UpdateSubscription.class);
 
 	// init one time
 	public static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
@@ -350,7 +356,8 @@ public class UpdateSubscription {
 			}
 			return subscription;
 		} catch (RuntimeException e) {
-			throw new SubscriptionUpdateException(orderId, String.format("?? Error updating  sku %s and orderid %s (should be checked and fixed)!!!: %s", sku,
+			LOGGER.warn(e.getMessage(), e);
+			throw new SubscriptionUpdateException(orderId, String.format("??- Error updating  sku %s and orderid %s (should be checked and fixed)!!!: %s", sku,
 					orderId, e.getMessage()));
 		}
 	}
