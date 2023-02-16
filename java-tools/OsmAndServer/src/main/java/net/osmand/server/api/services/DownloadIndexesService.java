@@ -740,10 +740,12 @@ public class DownloadIndexesService  {
 		
 		public String getServer(DownloadServerSpecialty type, String remoteAddr) {
 			DownloadServerRegion region = globalRegion;
-			for (DownloadServerRegion r : regions) {
-				if (r.matchesIp(r.asInteger(remoteAddr))) {
-					region = r;
-					break;
+			if (remoteAddr != null) {
+				for (DownloadServerRegion r : regions) {
+					if (r.matchesIp(r.asInteger(remoteAddr))) {
+						region = r;
+						break;
+					}
 				}
 			}
 			DownloadServerCategory cat = region.specialties[type.ordinal()];
