@@ -120,6 +120,15 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getSlope(), rootFolder, DownloadType.SLOPE);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.HEIGHTMAP);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.GEOTIFF);
+		DownloadFreeMapsConfig free = getSettings().freemaps;
+		for (DownloadIndex di : doc.getAllMaps()) {
+			for (String pattern : free.namepatterns) {
+				if (di.getName().startsWith(pattern)) {
+					di.setFree(true);
+					di.setFreeMessage(free.message);
+				}
+			}
+		}
 		return doc;
 	}
 	
@@ -264,8 +273,6 @@ public class DownloadIndexesService  {
 		if(files == null || files.length == 0) {
 			return;
 		}
-		DownloadFreeeMapsConfig emergency = getSettings().freemaps;
-		
 		if (files.length > 0 && files[0].getName().equals(INDEX_FILE_EXTERNAL_URL)) {
             try {
                 String host;
@@ -286,12 +293,6 @@ public class DownloadIndexesService  {
                                 String ext = name.substring(extInd + 1);
                                 formatName(name, extInd);
                                 di.setName(name);
-								for (String pattern : emergency.namepatterns) {
-									if (name.startsWith(pattern)) {
-										di.setFree(true);
-										di.setFreeMessage(emergency.message);
-									}
-								}
                                 di.setSize(source.size);
                                 di.setContainerSize(source.size);
                                 di.setTimestamp(source.getTimestamp());
@@ -691,7 +692,7 @@ public class DownloadIndexesService  {
 		
 	}
 	
-	public static class DownloadFreeeMapsConfig {
+	public static class DownloadFreeMapsConfig {
 		
 		String message;
 		List<String> namepatterns = new ArrayList<String>();
@@ -703,9 +704,14 @@ public class DownloadIndexesService  {
 		// provided from settings.json
 		Map<String, Map<String, Integer>> servers = new TreeMap<>();
 		List<DownloadServerRegion> regions = new ArrayList<>();
-		DownloadFreeeMapsConfig freemaps = new DownloadFreeeMapsConfig();
+		DownloadFreeMapsConfig freemaps = new DownloadFreeMapsConfig();
 		DownloadServerRegion globalRegion = new DownloadServerRegion();
 
+		
+		
+		public DownloadFreeMapsConfig getFreemaps() {
+			return freemaps;
+		}
 		
 		public void prepare() {
 			for (DownloadServerRegion region : regions) {

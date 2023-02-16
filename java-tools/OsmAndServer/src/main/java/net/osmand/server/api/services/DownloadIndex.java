@@ -44,6 +44,7 @@ public class DownloadIndex {
     private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd.MM.yyyy");
 
     
+    @XmlAttribute(name = "free")
 	public boolean isFree() {
 		return free;
 	}
@@ -52,6 +53,7 @@ public class DownloadIndex {
 		this.free = free;
 	}
 
+	@XmlAttribute(name = "freeMessage")
 	public String getFreeMessage() {
 		return freeMessage;
 	}

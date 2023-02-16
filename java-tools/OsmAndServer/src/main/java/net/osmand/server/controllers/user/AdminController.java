@@ -1516,7 +1516,8 @@ public class AdminController {
 			}
 			regionResults.add(Map.of("name", region.toString(), "servers", servers));
 		}
-		return Map.of("regions", regionResults, "types", DownloadServerSpecialty.values());
+		return Map.of("regions", regionResults, "types", DownloadServerSpecialty.values(),
+				"freemaps", dProps.getFreemaps());
 	}
 	
 	@RequestMapping(path = "report")
