@@ -32,7 +32,7 @@ public class WebGpxParser {
     
     private static final String COLOR_EXTENSION = "color";
     
-    private static final String LINE_PROFILE_TYPE = "line";
+    public static final String LINE_PROFILE_TYPE = "line";
     private static final int NAN_MARKER = 99999;
     
     public static class TrackData {
@@ -189,6 +189,8 @@ public class WebGpxParser {
         public transient int geometrySize;
         public RouteSegment segment; // on each turn point
         public GPXUtilities.WptPt ext;
+    
+        public Point(){}
         
         public Point(GPXUtilities.WptPt point) {
             if (!Double.isNaN(point.lat)) {
