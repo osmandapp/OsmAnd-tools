@@ -694,8 +694,8 @@ public class DownloadIndexesService  {
 	
 	public static class DownloadFreeMapsConfig {
 		
-		String message;
-		List<String> namepatterns = new ArrayList<String>();
+		public String message;
+		public List<String> namepatterns = new ArrayList<String>();
 	}
 	
 	public static class DownloadServerLoadBalancer {
