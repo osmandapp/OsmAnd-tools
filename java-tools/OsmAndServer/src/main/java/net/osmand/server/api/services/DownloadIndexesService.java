@@ -264,6 +264,8 @@ public class DownloadIndexesService  {
 		if(files == null || files.length == 0) {
 			return;
 		}
+		DownloadFreeeMapsConfig emergency = getSettings().freemaps;
+		
 		if (files.length > 0 && files[0].getName().equals(INDEX_FILE_EXTERNAL_URL)) {
             try {
                 String host;
@@ -284,6 +286,12 @@ public class DownloadIndexesService  {
                                 String ext = name.substring(extInd + 1);
                                 formatName(name, extInd);
                                 di.setName(name);
+								for (String pattern : emergency.namepatterns) {
+									if (name.startsWith(pattern)) {
+										di.setFree(true);
+										di.setFreeMessage(emergency.message);
+									}
+								}
                                 di.setSize(source.size);
                                 di.setContainerSize(source.size);
                                 di.setTimestamp(source.getTimestamp());
@@ -683,13 +691,19 @@ public class DownloadIndexesService  {
 		
 	}
 	
+	public static class DownloadFreeeMapsConfig {
+		
+		String message;
+		List<String> namepatterns = new ArrayList<String>();
+	}
+	
 	public static class DownloadServerLoadBalancer {
 		public final static String SELF = "self";
 				
 		// provided from settings.json
 		Map<String, Map<String, Integer>> servers = new TreeMap<>();
 		List<DownloadServerRegion> regions = new ArrayList<>();
-		
+		DownloadFreeeMapsConfig freemaps = new DownloadFreeeMapsConfig();
 		DownloadServerRegion globalRegion = new DownloadServerRegion();
 
 		

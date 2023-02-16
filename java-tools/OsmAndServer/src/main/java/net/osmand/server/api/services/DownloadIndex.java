@@ -37,8 +37,28 @@ public class DownloadIndex {
 
     private String description;
     
+    private boolean free;
+    
+    private String freeMessage;
+    
     private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd.MM.yyyy");
 
+    
+	public boolean isFree() {
+		return free;
+	}
+
+	public void setFree(boolean free) {
+		this.free = free;
+	}
+
+	public String getFreeMessage() {
+		return freeMessage;
+	}
+
+	public void setFreeMessage(String freeMessage) {
+		this.freeMessage = freeMessage;
+	}
     public void setType(DownloadType type) {
 		this.type = type;
 	}
@@ -190,6 +210,7 @@ public class DownloadIndex {
 			return v.getType();
 		}
 	}
+
 
 	
 }
