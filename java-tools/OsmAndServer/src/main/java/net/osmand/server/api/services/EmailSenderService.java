@@ -12,10 +12,12 @@ import com.sendgrid.FooterSetting;
 import com.sendgrid.Mail;
 import com.sendgrid.MailSettings;
 import com.sendgrid.Method;
+import com.sendgrid.OpenTrackingSetting;
 import com.sendgrid.Personalization;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
+import com.sendgrid.TrackingSettings;
 
 import net.osmand.util.Algorithms;
 
@@ -117,7 +119,7 @@ public class EmailSenderService {
 		contentStr.append("Hello OsmAnd User!");
 		contentStr.append("<br><br>");
 		contentStr.append("New device has been connected to OsmAnd Cloud. You activation code is <b>"+token+"</b>.<br>");
-		contentStr.append("You can also use <a href='https://osmand.net/premium/device-registration?token=" + token
+		contentStr.append("You can also use <a clicktracking=\"off\" href='https://osmand.net/premium/device-registration?token=" + token
 				+ "'>following link<a> to open it with OsmAnd.");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
