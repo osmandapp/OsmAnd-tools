@@ -888,6 +888,10 @@ public class OsmAndMapsService {
 		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
 		writeCtx.writeObf(files, null, tmpFolder, fileName, targetObf);
 		
+		if (!qp.osmFile.delete()) {
+			qp.osmFile.deleteOnExit();
+		}
+		
 		return targetObf;
 	}
 }

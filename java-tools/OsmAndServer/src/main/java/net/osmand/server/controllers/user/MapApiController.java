@@ -463,25 +463,32 @@ public class MapApiController {
 	
 	@RequestMapping(path = {"/download-obf"})
 	@ResponseBody
-	public void downloadObf(HttpServletResponse response, @RequestBody List<String> names)
+	public ResponseEntity<Resource> downloadObf(HttpServletResponse response, @RequestBody List<String> names)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		PremiumUserDevice dev = checkUser();
 		InputStream is = null;
 		FileInputStream fis = null;
+		File targetObf = null;
 		try (OutputStream os = response.getOutputStream()) {
-			File targetObf;
 			Map<String, GPXFile> files = new HashMap<>();
 			for (String name : names) {
 				UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
 				if (userFile != null) {
 					is = userdataService.getInputStream(dev, userFile);
-					GPXFile file = GPXUtilities.loadGPXFile(new GZIPInputStream(is));
+					GPXFile file = GPXUtilities.loadGPXFile(new GZIPInputStream(is), null, false);
 					files.put(name, file);
 				}
 			}
 			targetObf = osmAndMapsService.getObf(files);
 			fis = new FileInputStream(targetObf);
 			Algorithms.streamCopy(fis, os);
+			
+			HttpHeaders headers = new HttpHeaders();
+			headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + targetObf.getName());
+			headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+			headers.add(HttpHeaders.CONTENT_LENGTH, targetObf.length() + "");
+			
+			return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 		} finally {
 			if (is != null) {
 				is.close();
@@ -489,10 +496,9 @@ public class MapApiController {
 			if (fis != null) {
 				fis.close();
 			}
+			if (targetObf != null) {
+				targetObf.delete();
+			}
 		}
-		
-		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"gpx.obf\""));
-		response.setHeader(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
-		response.setStatus(HttpServletResponse.SC_OK);
 	}
 }
