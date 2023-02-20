@@ -540,9 +540,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException {
 		ResultSet rs;
 		if (useInMemoryCreator) {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi ORDER BY id");
 		} else {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi ORDER BY id");
 		}
 		rootZoomsTree.setNode(new PoiTileBox());
 
