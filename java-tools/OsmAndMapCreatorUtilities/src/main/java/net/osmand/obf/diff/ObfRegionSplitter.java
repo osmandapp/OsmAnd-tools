@@ -127,7 +127,7 @@ public class ObfRegionSplitter {
  					if (dw == null || wr == null) {
 						continue;
 					}
-					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
+					if (!Algorithms.isEmpty(dw) && (wr.isRegionMapDownload() || wr.isRegionRoadsDownload())) {
  						TLongObjectHashMap<Map<String, Amenity>> mp = result.get(dw);
  						if (mp == null) {
  							mp = new TLongObjectHashMap<>();
@@ -159,7 +159,7 @@ public class ObfRegionSplitter {
 					if (dw == null || wr == null) {
 						continue;
 					}
-					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
+					if (!Algorithms.isEmpty(dw) && (wr.isRegionMapDownload() || wr.isRegionRoadsDownload())) {
 						TLongObjectHashMap<RouteDataObject> mp = result.get(dw);
 						if (mp == null) {
 							mp = new TLongObjectHashMap<>();
@@ -188,7 +188,7 @@ public class ObfRegionSplitter {
 					if (dw == null || wr == null) {
 						continue;
 					}
-					if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
+					if (!Algorithms.isEmpty(dw) && (wr.isRegionMapDownload() || wr.isRegionRoadsDownload())) {
 						TLongObjectHashMap<TransportStop> mp = result.get(dw);
 						if (mp == null) {
 							mp = new TLongObjectHashMap<>();
@@ -218,7 +218,7 @@ public class ObfRegionSplitter {
 						if (dw == null || wr == null) {
 							continue;
 						}
-						if (!Algorithms.isEmpty(dw) && wr.isRegionMapDownload()) {
+						if (!Algorithms.isEmpty(dw) && (wr.isRegionMapDownload() || wr.isRegionRoadsDownload())) {
 							Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mp = result.get(dw);
 							if(mp == null) {
 								mp = new LinkedHashMap<>();
