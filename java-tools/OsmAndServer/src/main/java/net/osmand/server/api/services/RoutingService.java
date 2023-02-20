@@ -36,8 +36,7 @@ public class RoutingService {
     @Autowired
     WebGpxParser webGpxParser;
     
-    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon,
-                                                             String routeMode, boolean hasSpeed, boolean hasRouting) throws IOException, InterruptedException {
+    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode, boolean hasRouting) throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
         List<WebGpxParser.Point> pointsRes;
@@ -56,9 +55,6 @@ public class RoutingService {
             if (hasRouting) {
                 webGpxParser.addRouteSegmentsToPoints(seg, pointsRes);
             }
-            if (hasSpeed) {
-                addSpeed(seg, pointsRes);
-            }
             addDistance(pointsRes);
         }
         return pointsRes;
@@ -75,7 +71,7 @@ public class RoutingService {
             if (prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
                 currentPoint.geometry = getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
             } else {
-                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, true);
+                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true);
             }
             res.add(currentPoint);
         }
@@ -239,19 +235,6 @@ public class RoutingService {
         trkSegment.routeTypes = routeTypes;
         
         return trkSegment;
-    }
-    
-    private void addSpeed(GPXUtilities.TrkSegment seg, List<WebGpxParser.Point> pointsRes) {
-        int startInd = 0;
-        if (!seg.routeSegments.isEmpty()) {
-            for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
-                int length = Integer.parseInt(rs.length);
-                for (int i = startInd; i < startInd + (length - 1); i++) {
-                    pointsRes.get(i).ext.speed = Double.parseDouble(rs.speed);
-                }
-                startInd = startInd + (length - 1);
-            }
-        }
     }
     
     private void addDistance(List<WebGpxParser.Point> pointsRes) {

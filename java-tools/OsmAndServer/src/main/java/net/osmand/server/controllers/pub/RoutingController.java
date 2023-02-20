@@ -368,11 +368,10 @@ public class RoutingController {
 	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start,
 	                                                       @RequestParam String end,
 	                                                       @RequestParam String routeMode,
-	                                                       @RequestParam boolean hasSpeed,
 	                                                       @RequestParam boolean hasRouting) throws IOException, InterruptedException {
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasSpeed, hasRouting);
+		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting);
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 	}
 	
