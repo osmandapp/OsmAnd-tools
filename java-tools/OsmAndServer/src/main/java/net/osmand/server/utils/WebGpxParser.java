@@ -546,7 +546,7 @@ public class WebGpxParser {
             }
             filePoint.lat = point.lat;
             filePoint.lon = point.lng;
-            filePoint.ele = !isNanEle ? point.ele : Double.NaN;
+            filePoint.ele = (!isNanEle && point.ele != NAN_MARKER) ? point.ele : Double.NaN;
 
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {
                 filePoint.extensions.put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
