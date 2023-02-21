@@ -299,7 +299,7 @@ public class MapPointsLayer implements MapPanelLayer {
 			return;
 		}
 
-		RouteColorize routeColorize = new RouteColorize(map.getZoom(), gpxFile, colorizationType);
+		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType);
 		double[][] palette;
 		if (isGrey) {
 			palette = new double[][]{{routeColorize.minValue, LIGHT_GREY}, {routeColorize.maxValue, DARK_GREY}};
@@ -313,7 +313,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		routeColorize.setPalette(palette);
-		List<RouteColorizationPoint> dataList = routeColorize.getResult(true);
+		List<RouteColorizationPoint> dataList = routeColorize.getSimplifiedResult(map.getZoom());
 
 		for (int i = 1; i < dataList.size(); i++) {
 			int pixX1 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i - 1).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
