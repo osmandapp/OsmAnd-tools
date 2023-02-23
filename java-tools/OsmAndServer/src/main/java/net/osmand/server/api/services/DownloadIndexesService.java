@@ -27,6 +27,7 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import javax.annotation.Nullable;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
@@ -273,49 +274,30 @@ public class DownloadIndexesService  {
 		if(files == null || files.length == 0) {
 			return;
 		}
-		if (files.length > 0 && files[0].getName().equals(INDEX_FILE_EXTERNAL_URL)) {
-            try {
-                String host;
-                BufferedReader bufferreader = new BufferedReader(new FileReader(files[0]));
-                while ((host = bufferreader.readLine()) != null) {
-                    URL url = new URL("https://" + host + "/" + EXTERNAL_URL + subPath);
-                    InputStreamReader reader = new InputStreamReader(url.openStream());
-                    ExternalSource [] externalSources = gson.fromJson(reader, ExternalSource[].class);
-                    if (externalSources.length > 0) {
-                        boolean areFilesAdded = false;
-                        for (ExternalSource source : externalSources) {
-                            // do not read external zip files, otherwise it will be too long by remote connection
-                            if (source.type.equals("file") && type.acceptFileName(source.name) && !isZip(source.name)) {
-                                DownloadIndex di = new DownloadIndex();
-                                di.setType(type);
-                                String name = source.name;
-                                int extInd = name.indexOf('.');
-                                String ext = name.substring(extInd + 1);
-                                formatName(name, extInd);
-                                di.setName(name);
-                                di.setSize(source.size);
-                                di.setContainerSize(source.size);
-                                di.setTimestamp(source.getTimestamp());
-                                di.setDate(source.getTimestamp());
-                                di.setContentSize(source.size);
-                                di.setTargetsize(source.size);
-                                di.setDescription(type.getDefaultTitle(name, ext));
-                                list.add(di);
-                                areFilesAdded = true;
-                            }
-                        }
-                        if (areFilesAdded) {
-                            break;
-                        }
-                    }
-                    // will continue if was not find any files in this host (server)
-                }
-                bufferreader.close();
-            } catch (IOException e) {
-                LOGGER.error("LOAD EXTERNAL INDEXES: " + e.getMessage(), e.getCause());
-            }
-            return;
-        }
+		ExternalSource [] externalSources = getExternalSources(files, subPath);
+		if (externalSources != null) {
+			for (ExternalSource source : externalSources) {
+				// do not read external zip files, otherwise it will be too long by remote connection
+				if (source.type.equals("file") && type.acceptFileName(source.name) && !isZip(source.name)) {
+					DownloadIndex di = new DownloadIndex();
+					di.setType(type);
+					String name = source.name;
+					int extInd = name.indexOf('.');
+					String ext = name.substring(extInd + 1);
+					formatName(name, extInd);
+					di.setName(name);
+					di.setSize(source.size);
+					di.setContainerSize(source.size);
+					di.setTimestamp(source.getTimestamp());
+					di.setDate(source.getTimestamp());
+					di.setContentSize(source.size);
+					di.setTargetsize(source.size);
+					di.setDescription(type.getDefaultTitle(name, ext));
+					list.add(di);
+				}
+			}
+			return;
+		}
 		for (File lf : files) {
 			if (filterFiles != null && !lf.getName().contains(filterFiles)) {
 				continue;
@@ -864,4 +846,34 @@ public class DownloadIndexesService  {
             return -1;
         }
     }
+
+    @Nullable
+    public ExternalSource[] getExternalSources(File[] files, String directory) {
+		if(files == null || files.length == 0) {
+			return null;
+		}
+		if (files[0].getName().equals(DownloadIndexesService.INDEX_FILE_EXTERNAL_URL)) {
+			try {
+				String host;
+				BufferedReader bufferreader = new BufferedReader(new FileReader(files[0]));
+				while ((host = bufferreader.readLine()) != null) {
+					URL url = new URL("https://" + host + "/" + EXTERNAL_URL + directory);
+					InputStreamReader reader = new InputStreamReader(url.openStream());
+					ExternalSource[] externalSources = gson.fromJson(reader, ExternalSource[].class);
+					boolean filesAreAdded = false;
+					if (externalSources.length > 0) {
+						filesAreAdded = true;
+						return externalSources;
+					}
+					if (filesAreAdded) {
+						break;
+					}
+				}
+				bufferreader.close();
+			} catch (IOException e) {
+				LOGGER.error("LOAD EXTERNAL INDEXES: " + e.getMessage(), e.getCause());
+			}
+		}
+		return null;
+	}
 }

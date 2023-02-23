@@ -7,7 +7,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
@@ -283,15 +285,66 @@ public class DownloadIndexController {
 	public void checkRangeRequests(@RequestParam MultiValueMap<String, String> params, HttpServletResponse resp)
 			throws IOException {
 		try {
-			Resource resource = findFileResource(params);
-			resp.setStatus(HttpServletResponse.SC_OK);
-			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
-			resp.setContentLengthLong(resource.contentLength());
+			long externalUrlSize = getExternalUrlSize(params);
+			if (externalUrlSize >= 0) {
+				resp.setStatus(HttpServletResponse.SC_OK);
+				resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
+				resp.setContentLengthLong(externalUrlSize);
+			} else {
+				Resource resource = findFileResource(params);
+				resp.setStatus(HttpServletResponse.SC_OK);
+				resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
+				resp.setContentLengthLong(resource.contentLength());
+			}
 		} catch (FileNotFoundException ex) {
 			LOGGER.error(ex.getMessage(), ex);
 			resp.sendError(HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
 		}
 	}
 
+	long getExternalUrlSize(MultiValueMap<String, String> params) {
+		String filename = getFileOrThrow(params);
+		String directory = null;
+		Map<String, String> dirMap = new HashMap<>() {
+			{
+				put("srtm", "srtm");
+				put("srtmcountry", "srtm-countries");
+				put("road", "road-indexes");
+				String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
+				put("aosmc", "aosmc" + File.separator + folder);
+				put("wiki", "wiki");
+				put("hillshade", "hillshade");
+				put("slope", "slope");
+				put("heightmap", "heightmap");
+				put("depth", "depth");
+				String type = params.getFirst("inapp");
+				put("inapp", "indexes/inapp/"+type);
+				put("fonts", "indexes/fonts");
+				//put("standard", "indexes");
+			}
+		};
+		for (Map.Entry<String, String> entry : dirMap.entrySet()) {
+			if (params.containsKey(entry.getKey())) {
+				directory = entry.getValue();
+				break;
+			}
+		}
+		if (directory != null) {
+			File subFolder = new File(filesPath, directory);
+			File[] files = subFolder.listFiles();
+			if (files != null && files.length > 0) {
+				DownloadIndexesService downloadIndexesService = new DownloadIndexesService();
+				DownloadIndexesService.ExternalSource[] externalSources = downloadIndexesService.getExternalSources(files, directory);
+				if (externalSources != null) {
+					for (DownloadIndexesService.ExternalSource source : externalSources) {
+						if (source.getName().equals(filename)) {
+							return source.getSize();
+						}
+					}
+				}
+			}
+		}
+		return -1;
+	}
 	
 }
