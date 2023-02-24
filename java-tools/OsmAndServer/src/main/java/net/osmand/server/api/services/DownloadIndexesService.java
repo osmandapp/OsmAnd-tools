@@ -20,6 +20,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -68,9 +69,12 @@ public class DownloadIndexesService  {
 	private DownloadServerLoadBalancer settings;
 
 	private Gson gson;
+
+	private Map<String, Double> mapSizesCache;
 	
 	public DownloadIndexesService() {
 		gson = new Gson();
+		mapSizesCache = new HashMap<>();
 	}
 	
 	public DownloadServerLoadBalancer getSettings() {
@@ -122,6 +126,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.GEOTIFF);
 		DownloadFreeMapsConfig free = getSettings().freemaps;
 		for (DownloadIndex di : doc.getAllMaps()) {
+			mapSizesCache.put(di.getName(), di.getSize());
 			for (String pattern : free.namepatterns) {
 				if (di.getName().startsWith(pattern)) {
 					di.setFree(true);
@@ -864,4 +869,11 @@ public class DownloadIndexesService  {
             return -1;
         }
     }
+
+	public Map<String, Double> getMapSizesCache() {
+		if (mapSizesCache.size() == 0) {
+			loadDownloadIndexes();
+		}
+		return mapSizesCache;
+	}
 }

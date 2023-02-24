@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
@@ -287,38 +288,10 @@ public class DownloadIndexController {
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.HEAD)
 	public void checkRangeRequests(@RequestParam MultiValueMap<String, String> params, HttpServletResponse resp)
 			throws IOException {
-
-		DownloadIndexesService downloadIndexesService = new DownloadIndexesService();
-		File indexes = downloadIndexesService.getIndexesXml(false, false);
-		XmlPullParser xpp = new KXmlParser();
 		String filename = getFileOrThrow(params);
-		long size = 0;
-		boolean found = false;
-		try {
-			InputStream is = new FileInputStream(indexes);
-			xpp.setInput(new InputStreamReader(is));
-			int eventType = xpp.getEventType();
-			while (eventType != XmlPullParser.END_DOCUMENT) {
-				if (eventType == XmlPullParser.START_TAG) {
-					String name = xpp.getAttributeValue("", "name");
-					String contentSize = xpp.getAttributeValue("", "contentSize");
-					if (name == null || contentSize == null || name.isEmpty() || contentSize.isEmpty()) {
-						eventType = xpp.next();
-						continue;
-					}
-					if (name.equals(filename) || name.equalsIgnoreCase(filename)) {
-						size = Long.parseLong(contentSize);
-						found = true;
-						break;
-					}
-				}
-				eventType = xpp.next();
-			}
-		} catch (FileNotFoundException | XmlPullParserException ex) {
-			LOGGER.error(ex.getMessage(), ex);
-			resp.sendError(HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
-		}
-		if (found) {
+		Map<String, Double> mapSizesCache = downloadService.getMapSizesCache();
+		if (mapSizesCache.containsKey(filename)) {
+			long size = mapSizesCache.get(filename).longValue();
 			resp.setStatus(HttpServletResponse.SC_OK);
 			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
 			resp.setContentLengthLong(size);
