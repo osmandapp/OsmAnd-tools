@@ -256,7 +256,9 @@ public class RoutingService {
                     getPoint(stInd, r, locations, heightArray, pointsRes);
                     stInd += ((stInd < endInd) ? 1 : -1);
                 }
-                getPoint(endInd, r, locations, heightArray, pointsRes);
+                if (routeSegmentResults.indexOf(r) == routeSegmentResults.size() - 1) {
+                    getPoint(endInd, r, locations, heightArray, pointsRes);
+                }
             }
             return pointsRes;
         }
