@@ -10,13 +10,7 @@ import static net.osmand.gpx.GPXUtilities.parseColor;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.util.Algorithms.colorToString;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
@@ -533,6 +527,9 @@ public class WebGpxParser {
     private void addSegmentsToTrack(List<Point> points, List<GPXUtilities.TrkSegment> segments) {
         GPXUtilities.TrkSegment segment = new GPXUtilities.TrkSegment();
         boolean isNanEle = isNanEle(points);
+        int lastStartTrkptIdx = 0;
+        int prevTypesSize = 0;
+        Point lastPointWithSeg = null;
         for (Point point : points) {
             GPXUtilities.WptPt filePoint = point.ext;
             if (filePoint == null) {
@@ -558,13 +555,60 @@ public class WebGpxParser {
             }
             
             if (point.segment != null) {
-                segment.routeSegments.add(point.segment.ext);
+                GPXUtilities.RouteSegment seg = point.segment.ext;
+                int ind = Integer.parseInt(seg.startTrackPointIndex);
+                if (ind == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
+                    lastStartTrkptIdx = Integer.parseInt(lastPointWithSeg.segment.ext.length) - 1
+                            + Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex);
+                    prevTypesSize = lastPointWithSeg.segment.routeTypes.size();
+                    segment.routeTypes.addAll(point.segment.routeTypes);
+                }
+                seg.startTrackPointIndex = Integer.toString(ind + lastStartTrkptIdx);
+    
+                seg.types = prepareTypes(seg.types, prevTypesSize);
+                seg.pointTypes = prepareTypes(seg.pointTypes, prevTypesSize);
+                seg.names = prepareTypes(seg.names, prevTypesSize);
+                
+                segment.routeSegments.add(seg);
+                
                 if (segment.routeTypes.isEmpty()) {
                     segment.routeTypes.addAll(point.segment.routeTypes);
                 }
+                lastPointWithSeg = point;
             }
         }
         segments.add(segment);
+    }
+    
+    private String prepareTypes(String stringTypes, int prevTypesSize) {
+        if (stringTypes != null) {
+            List<Character> characterList = stringTypes.chars()
+                    .mapToObj(e->((char)e)).
+                    collect(Collectors.toList());
+            StringBuilder sbNumber = null;
+            StringBuilder sb = new StringBuilder();
+            for (char current : characterList) {
+                if (Character.isDigit(current)) {
+                    if (sbNumber == null) {
+                        sbNumber = new StringBuilder();
+                    }
+                    sbNumber.append(current);
+                } else {
+                    if (sbNumber != null) {
+                        sb.append(Integer.parseInt(String.valueOf(sbNumber)) + prevTypesSize);
+                        sbNumber = null;
+                    }
+                    sb.append(current);
+                }
+            }
+            if (sbNumber != null) {
+                sb.append(Integer.parseInt(String.valueOf(sbNumber)) + prevTypesSize);
+            }
+            
+            return sb.toString();
+        } else {
+            return null;
+        }
     }
     
     private boolean isNanEle(List<Point> points) {
