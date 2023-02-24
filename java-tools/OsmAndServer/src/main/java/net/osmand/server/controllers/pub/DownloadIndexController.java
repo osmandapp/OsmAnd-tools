@@ -1,10 +1,6 @@
 package net.osmand.server.controllers.pub;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.List;
@@ -15,6 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -34,6 +31,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 @Controller
 public class DownloadIndexController {
@@ -282,14 +281,43 @@ public class DownloadIndexController {
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.HEAD)
 	public void checkRangeRequests(@RequestParam MultiValueMap<String, String> params, HttpServletResponse resp)
 			throws IOException {
+
+		DownloadIndexesService downloadIndexesService = new DownloadIndexesService();
+		File indexes = downloadIndexesService.getIndexesXml(false, false);
+		XmlPullParser xpp = new KXmlParser();
+		String filename = getFileOrThrow(params);
+		long size = 0;
+		boolean found = false;
 		try {
-			Resource resource = findFileResource(params);
-			resp.setStatus(HttpServletResponse.SC_OK);
-			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
-			resp.setContentLengthLong(resource.contentLength());
-		} catch (FileNotFoundException ex) {
+			InputStream is = new FileInputStream(indexes);
+			xpp.setInput(new InputStreamReader(is));
+			int eventType = xpp.getEventType();
+			while (eventType != XmlPullParser.END_DOCUMENT) {
+				if (eventType == XmlPullParser.START_TAG) {
+					String name = xpp.getAttributeValue("", "name");
+					String contentSize = xpp.getAttributeValue("", "contentSize");
+					if (name == null || contentSize == null || name.isEmpty() || contentSize.isEmpty()) {
+						eventType = xpp.next();
+						continue;
+					}
+					if (name.equals(filename) || name.equalsIgnoreCase(filename)) {
+						size = Long.parseLong(contentSize);
+						found = true;
+						break;
+					}
+				}
+				eventType = xpp.next();
+			}
+		} catch (FileNotFoundException | XmlPullParserException ex) {
 			LOGGER.error(ex.getMessage(), ex);
 			resp.sendError(HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
+		}
+		if (found) {
+			resp.setStatus(HttpServletResponse.SC_OK);
+			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
+			resp.setContentLengthLong(size);
+		} else {
+			resp.sendError(HttpServletResponse.SC_NOT_FOUND);
 		}
 	}
 
