@@ -5,9 +5,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
@@ -15,6 +18,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -34,6 +38,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 @Controller
 public class DownloadIndexController {
@@ -282,14 +288,15 @@ public class DownloadIndexController {
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.HEAD)
 	public void checkRangeRequests(@RequestParam MultiValueMap<String, String> params, HttpServletResponse resp)
 			throws IOException {
-		try {
-			Resource resource = findFileResource(params);
+		String filename = getFileOrThrow(params);
+		Map<String, Double> mapSizesCache = downloadService.getMapSizesCache();
+		if (mapSizesCache.containsKey(filename)) {
+			long size = mapSizesCache.get(filename).longValue();
 			resp.setStatus(HttpServletResponse.SC_OK);
 			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
-			resp.setContentLengthLong(resource.contentLength());
-		} catch (FileNotFoundException ex) {
-			LOGGER.error(ex.getMessage(), ex);
-			resp.sendError(HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
+			resp.setContentLengthLong(size);
+		} else {
+			resp.sendError(HttpServletResponse.SC_NOT_FOUND);
 		}
 	}
 
