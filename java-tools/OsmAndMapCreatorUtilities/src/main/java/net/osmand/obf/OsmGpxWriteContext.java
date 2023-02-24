@@ -237,9 +237,9 @@ public class OsmGpxWriteContext {
 			}
 			int color = p.getColor(0);
 			if (color != 0) {
-				gpxTrackTags.put("color",
+				gpxTrackTags.put("colour",
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-				gpxTrackTags.put("color_int", Algorithms.colorToString(color));
+				gpxTrackTags.put("colour_int", Algorithms.colorToString(color));
 			}
 		}
 	}
@@ -326,8 +326,8 @@ public class OsmGpxWriteContext {
 		}
 		int color = p.getColor(0);
 		if(color != 0) {
-			tagValue(serializer, "color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-			tagValue(serializer, "color_int", Algorithms.colorToString(color));
+			tagValue(serializer, "colour", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
+			tagValue(serializer, "colour_int", Algorithms.colorToString(color));
 		}
 		if (qp.details >= QueryParams.DETAILS_ELE_SPEED) {
 			if (!Double.isNaN(p.ele)) {
