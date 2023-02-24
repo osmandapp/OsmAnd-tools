@@ -384,9 +384,9 @@ public class WikivoyageGenOSM {
 			}
 			int color = p.getColor(0);
 			if (color != 0) {
-				tagValue(serializer, "color",
+				tagValue(serializer, "colour",
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-				tagValue(serializer, "color_int", Algorithms.colorToString(color));
+				tagValue(serializer, "colour_int", Algorithms.colorToString(color));
 			}
 		}
 
