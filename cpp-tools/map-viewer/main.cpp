@@ -52,9 +52,10 @@
 #include <OsmAndCore/Map/AtlasMapRenderer_Metrics.h>
 #include <OsmAndCore/Map/OnlineRasterMapLayerProvider.h>
 #include <OsmAndCore/Map/OnlineTileSources.h>
-#include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/SqliteHeightmapTileProvider.h>
+#include <OsmAndCore/Map/HillshadeRasterMapLayerProvider.h>
+#include <OsmAndCore/Map/SlopeRasterMapLayerProvider.h>
 #include <OsmAndCore/Map/ObfMapObjectsProvider.h>
 #include <OsmAndCore/Map/MapPrimitivesProvider.h>
 #include <OsmAndCore/Map/MapRasterLayerProvider_Software.h>
@@ -117,6 +118,9 @@ QDir geotiffDir;
 bool geotiffDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
+
+bool heightmap = false;
+bool hillshade = false;
 
 #define USE_GREEN_TEXT_COLOR 1
 #define SCREEN_WIDTH 1024
@@ -963,8 +967,10 @@ void keyboardHandler(unsigned char key, int x, int y)
             if (state.elevationDataProvider)
             {
                 heightsCollection.reset();
-                geotiffCollection.reset();
+                if (!hillshade)
+                    geotiffCollection.reset();
                 renderer->resetElevationDataProvider();
+                heightmap = false;
             }
             else
             {
@@ -976,7 +982,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                     heightsCollection.reset(manualHeightsCollection);
                 }
 
-                if (geotiffDirSpecified)
+                if (geotiffDirSpecified && !geotiffCollection)
                 {
                     const auto manualGeoTiffCollection = new OsmAnd::GeoTiffCollection();
                     manualGeoTiffCollection->addDirectory(geotiffDir);
@@ -994,6 +1000,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                             renderer->getElevationDataTileSize()
                         )
                     );
+                    heightmap = true;
                 }
                 else if (heightsCollection)
                 {
@@ -1012,6 +1019,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                             renderer->getElevationDataTileSize()
                         )
                     );
+                    heightmap = true;
                 }
                 if (heightsCollection || geotiffCollection)
                 {
@@ -1466,6 +1474,38 @@ void activateProvider(int layerIdx, int idx)
         auto tileProvider = new OsmAnd::MapRasterMetricsLayerProvider(
             std::shared_ptr<OsmAnd::MapRasterLayerProvider>(new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider)));
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
+    }
+    else if (idx == 9)
+    {
+        if (geotiffDirSpecified)
+        {
+            if (!hillshade)
+            {
+                if (!geotiffCollection)
+                {
+                    const auto manualGeoTiffCollection = new OsmAnd::GeoTiffCollection();
+                    manualGeoTiffCollection->addDirectory(geotiffDir);
+                    manualGeoTiffCollection->setLocalCache(cacheDir);
+                    geotiffCollection.reset(manualGeoTiffCollection);
+                }
+                auto reliefRasterMapLayerProvider = new OsmAnd::HillshadeRasterMapLayerProvider(geotiffCollection,
+                    QString("../../../../tools/obf-generation/heightmap/color/hillshade_main.txt"),
+                    QString("../../../../tools/obf-generation/heightmap/color/color_slope.txt"));
+                //auto reliefRasterMapLayerProvider = new OsmAnd::SlopeRasterMapLayerProvider(geotiffCollection,
+                //    QString("../../../../tools/obf-generation/heightmap/color/slopes_main.txt"));
+
+                renderer->setMapLayerProvider(layerIdx,
+                    std::shared_ptr<OsmAnd::IMapLayerProvider>(reliefRasterMapLayerProvider));
+                hillshade = true;
+            }
+            else
+            {
+                if (!heightmap)
+                    geotiffCollection.reset();
+                renderer->resetMapLayerProvider(layerIdx);
+                hillshade = false;
+            }
+        }
     }
     //else if (idx == 7)
     //{
