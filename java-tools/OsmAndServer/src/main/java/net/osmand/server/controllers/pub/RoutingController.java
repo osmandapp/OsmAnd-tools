@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.Math;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
@@ -53,7 +54,7 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 @Controller
 @RequestMapping("/routing")
 public class RoutingController {
-	private static final int MAX_DISTANCE = 1000000;
+	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
@@ -306,9 +307,10 @@ public class RoutingController {
 	}
 	
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routing(@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode,
-			@RequestParam(required = false) String[] avoidRoads)
-			throws IOException, InterruptedException {
+	public ResponseEntity<?> routing(@RequestParam String[] points,
+	                                 @RequestParam(defaultValue = "car") String routeMode,
+	                                 @RequestParam(required = false) String[] avoidRoads,
+	                                 @RequestParam int maxDist) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig();
 		}
@@ -326,7 +328,7 @@ public class RoutingController {
 				} else {
 					LatLon pnt = new LatLon(lat, vl);
 					if (!list.isEmpty()) {
-						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > MAX_DISTANCE;
+						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > Math.min(maxDist, 1000) * 1000;
 					}
 					list.add(pnt);
 					prev = pnt;
@@ -359,8 +361,13 @@ public class RoutingController {
 		Feature route = new Feature(Geometry.lineString(resList));
 		route.properties = props;
 		features.add(0, route);
-
-		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		
+		if (tooLong) {
+			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg",
+					MSG_LONG_DIST + maxDist + " km.")));
+		} else {
+			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		}
 	}
 	
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
@@ -368,11 +375,18 @@ public class RoutingController {
 	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start,
 	                                                       @RequestParam String end,
 	                                                       @RequestParam String routeMode,
-	                                                       @RequestParam boolean hasRouting) throws IOException, InterruptedException {
+	                                                       @RequestParam boolean hasRouting,
+	                                                       @RequestParam int maxDist) throws IOException, InterruptedException {
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting);
-		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
+		boolean isLongDist = MapUtils.getDistance(startPoint, endPoint) > Math.min(maxDist, 1000) * 1000;
+		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, isLongDist);
+		if (isLongDist) {
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg",
+					MSG_LONG_DIST + maxDist + " km.")));
+		} else {
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
+		}
 	}
 	
 	@PostMapping(path = {"/get-route"}, produces = "application/json")
