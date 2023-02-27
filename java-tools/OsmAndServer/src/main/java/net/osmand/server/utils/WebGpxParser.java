@@ -481,7 +481,9 @@ public class WebGpxParser {
                         trkPoints.addAll(point.geometry);
                     }
                     gpxFile.routes.add(route);
-                    addSegmentsToTrack(trkPoints, segments);
+                    if (!trkPoints.isEmpty()) {
+                        addSegmentsToTrack(trkPoints, segments);
+                    }
                 } else {
                     addSegmentsToTrack(t.points, segments);
                 }
