@@ -53,7 +53,8 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 @Controller
 @RequestMapping("/routing")
 public class RoutingController {
-	private static final int MAX_DISTANCE = 1000000;
+	public static final int MAX_DISTANCE = 30000;
+	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to " + MAX_DISTANCE / 1000 + " km.";
 
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
@@ -359,8 +360,12 @@ public class RoutingController {
 		Feature route = new Feature(Geometry.lineString(resList));
 		route.properties = props;
 		features.add(0, route);
-
-		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		
+		if (tooLong) {
+			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg", MSG_LONG_DIST)));
+		} else {
+			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
+		}
 	}
 	
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
@@ -371,14 +376,18 @@ public class RoutingController {
 	                                                       @RequestParam boolean hasRouting) throws IOException, InterruptedException {
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting);
-		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
+		boolean isLongDist = MapUtils.getDistance(startPoint, endPoint) > MAX_DISTANCE;
+		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, isLongDist);
+		if (isLongDist) {
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg", MSG_LONG_DIST)));
+		} else {
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
+		}
 	}
 	
 	@PostMapping(path = {"/get-route"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> getRoute(@RequestBody List<WebGpxParser.Point> points) throws IOException, InterruptedException {
-		List<WebGpxParser.Point> res = routingService.getRoute(points);
-		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
+		return routingService.getRoute(points);
 	}
 }

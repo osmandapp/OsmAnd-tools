@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import net.osmand.Location;
@@ -24,6 +27,8 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.server.controllers.pub.RoutingController.MAX_DISTANCE;
+import static net.osmand.server.controllers.pub.RoutingController.MSG_LONG_DIST;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 
 @Service
@@ -36,12 +41,14 @@ public class RoutingService {
     @Autowired
     WebGpxParser webGpxParser;
     
-    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode, boolean hasRouting) throws IOException, InterruptedException {
+    Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+    
+    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode, boolean hasRouting, boolean isLongDist) throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
         List<WebGpxParser.Point> pointsRes;
         List<RouteSegmentResult> routeSegmentResults = new ArrayList<>();
-        if (routeMode.equals(LINE_PROFILE_TYPE)) {
+        if (routeMode.equals(LINE_PROFILE_TYPE) || isLongDist) {
             pointsRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(), endLatLon.getLatitude(), endLatLon.getLongitude());
         } else {
             routeSegmentResults = osmAndMapsService.routing(routeMode, props, startLatLon,
@@ -60,9 +67,10 @@ public class RoutingService {
         return pointsRes;
     }
     
-    public List<WebGpxParser.Point> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
+    public ResponseEntity<String> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
         List<WebGpxParser.Point> res = new ArrayList<>();
         res.add(points.get(0));
+        boolean isLongDist = false;
         for (int i = 1; i < points.size(); i++) {
             WebGpxParser.Point prevPoint = points.get(i - 1);
             WebGpxParser.Point currentPoint = points.get(i);
@@ -71,11 +79,17 @@ public class RoutingService {
             if (prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
                 currentPoint.geometry = getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
             } else {
-                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true);
+                isLongDist = MapUtils.getDistance(prevCoord, currentCoord) > MAX_DISTANCE;
+                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, isLongDist);
             }
             res.add(currentPoint);
         }
-        return res;
+    
+        if (isLongDist) {
+            return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res, "msg", MSG_LONG_DIST)));
+        } else {
+            return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
+        }
     }
     
     private List<WebGpxParser.Point> getStraightLine(double lat1, double lng1, double lat2, double lng2) {
