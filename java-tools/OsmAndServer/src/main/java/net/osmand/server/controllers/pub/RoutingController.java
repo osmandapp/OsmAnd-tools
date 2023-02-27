@@ -53,8 +53,7 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 @Controller
 @RequestMapping("/routing")
 public class RoutingController {
-	public static final int MAX_DISTANCE = 30000;
-	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to " + MAX_DISTANCE / 1000 + " km.";
+	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
@@ -307,9 +306,10 @@ public class RoutingController {
 	}
 	
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routing(@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode,
-			@RequestParam(required = false) String[] avoidRoads)
-			throws IOException, InterruptedException {
+	public ResponseEntity<?> routing(@RequestParam String[] points,
+	                                 @RequestParam(defaultValue = "car") String routeMode,
+	                                 @RequestParam(required = false) String[] avoidRoads,
+	                                 @RequestParam int maxDist) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig();
 		}
@@ -327,7 +327,7 @@ public class RoutingController {
 				} else {
 					LatLon pnt = new LatLon(lat, vl);
 					if (!list.isEmpty()) {
-						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > MAX_DISTANCE;
+						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > maxDist * 1000;
 					}
 					list.add(pnt);
 					prev = pnt;
@@ -362,7 +362,8 @@ public class RoutingController {
 		features.add(0, route);
 		
 		if (tooLong) {
-			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg", MSG_LONG_DIST)));
+			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg",
+					MSG_LONG_DIST + maxDist + " km.")));
 		} else {
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		}
@@ -373,13 +374,15 @@ public class RoutingController {
 	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start,
 	                                                       @RequestParam String end,
 	                                                       @RequestParam String routeMode,
-	                                                       @RequestParam boolean hasRouting) throws IOException, InterruptedException {
+	                                                       @RequestParam boolean hasRouting,
+	                                                       @RequestParam int maxDist) throws IOException, InterruptedException {
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		boolean isLongDist = MapUtils.getDistance(startPoint, endPoint) > MAX_DISTANCE;
+		boolean isLongDist = MapUtils.getDistance(startPoint, endPoint) > maxDist * 1000;
 		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, isLongDist);
 		if (isLongDist) {
-			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg", MSG_LONG_DIST)));
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg",
+					MSG_LONG_DIST + maxDist + " km.")));
 		} else {
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 		}
@@ -388,6 +391,7 @@ public class RoutingController {
 	@PostMapping(path = {"/get-route"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> getRoute(@RequestBody List<WebGpxParser.Point> points) throws IOException, InterruptedException {
-		return routingService.getRoute(points);
+		List<WebGpxParser.Point> res = routingService.getRoute(points);
+		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
 	}
 }

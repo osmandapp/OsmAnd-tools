@@ -10,7 +10,6 @@ import java.util.TreeMap;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import net.osmand.Location;
@@ -27,8 +26,6 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
-import static net.osmand.server.controllers.pub.RoutingController.MAX_DISTANCE;
-import static net.osmand.server.controllers.pub.RoutingController.MSG_LONG_DIST;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 
 @Service
@@ -67,10 +64,9 @@ public class RoutingService {
         return pointsRes;
     }
     
-    public ResponseEntity<String> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
+    public List<WebGpxParser.Point> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
         List<WebGpxParser.Point> res = new ArrayList<>();
         res.add(points.get(0));
-        boolean isLongDist = false;
         for (int i = 1; i < points.size(); i++) {
             WebGpxParser.Point prevPoint = points.get(i - 1);
             WebGpxParser.Point currentPoint = points.get(i);
@@ -79,17 +75,11 @@ public class RoutingService {
             if (prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
                 currentPoint.geometry = getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
             } else {
-                isLongDist = MapUtils.getDistance(prevCoord, currentCoord) > MAX_DISTANCE;
-                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, isLongDist);
+                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false);
             }
             res.add(currentPoint);
         }
-    
-        if (isLongDist) {
-            return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res, "msg", MSG_LONG_DIST)));
-        } else {
-            return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
-        }
+        return res;
     }
     
     private List<WebGpxParser.Point> getStraightLine(double lat1, double lng1, double lat2, double lng2) {
