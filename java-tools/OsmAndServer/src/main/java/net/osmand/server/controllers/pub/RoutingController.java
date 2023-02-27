@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.Math;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
@@ -327,7 +328,7 @@ public class RoutingController {
 				} else {
 					LatLon pnt = new LatLon(lat, vl);
 					if (!list.isEmpty()) {
-						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > maxDist * 1000;
+						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > Math.min(maxDist, 1000) * 1000;
 					}
 					list.add(pnt);
 					prev = pnt;
@@ -378,7 +379,7 @@ public class RoutingController {
 	                                                       @RequestParam int maxDist) throws IOException, InterruptedException {
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		boolean isLongDist = MapUtils.getDistance(startPoint, endPoint) > maxDist * 1000;
+		boolean isLongDist = MapUtils.getDistance(startPoint, endPoint) > Math.min(maxDist, 1000) * 1000;
 		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, isLongDist);
 		if (isLongDist) {
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg",
