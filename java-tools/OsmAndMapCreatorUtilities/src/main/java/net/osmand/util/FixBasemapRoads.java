@@ -855,7 +855,8 @@ public class FixBasemapRoads {
 		if (candidate.distance < MINIMAL_DISTANCE && intRefEqual) {
 			return CONNECT_S3;
 		}
-		if (!onlyUnique && candidate.distance < MINIMAL_DISTANCE && longRoadToKeep.distance > PREFERRED_DISTANCE) {
+		if (!onlyUnique && (refEqual || intRefEqualNotNull)
+				&& candidate.distance < MINIMAL_DISTANCE && longRoadToKeep.distance > PREFERRED_DISTANCE) {
 			// connect short to long roads
 			return CONNECT_S4;
 		}
