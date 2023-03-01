@@ -26,6 +26,7 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 
 @Service
@@ -74,7 +75,7 @@ public class RoutingService {
             LatLon currentCoord = new LatLon(currentPoint.lat, currentPoint.lng);
             if (prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
                 currentPoint.geometry = getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
-            } else {
+            } else if (!prevPoint.profile.equals(GAP_PROFILE_TYPE)) {
                 currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false);
             }
             res.add(currentPoint);

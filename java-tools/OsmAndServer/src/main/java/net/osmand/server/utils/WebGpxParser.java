@@ -301,6 +301,9 @@ public class WebGpxParser {
                     if (routePoint.geometry == null) {
                         routePoint.geometry = new ArrayList<>();
                     }
+                    if (Objects.equals(pt.profile, GAP_PROFILE_TYPE)) {
+                        routePoint.profile = GAP_PROFILE_TYPE;
+                    }
                     routePoint.geometry.add(pt);
                 }
             }
