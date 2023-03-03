@@ -277,6 +277,7 @@ public class FixBasemapRoads {
         String highway;
         String ref;
         String int_ref;
+        int idWayTagsSource = 0;
         double distance = 0;
         boolean deleted = false;
         boolean isLink = false;
@@ -421,7 +422,7 @@ public class FixBasemapRoads {
 
         public void combineWaysIntoOneWay() {
             Way first = combinedWays.get(0);
-            for(int i = 1; i < combinedWays.size(); i++) {
+            for (int i = 1; i < combinedWays.size(); i++) {
                 boolean f = true;
                 for(Node n : combinedWays.get(i).getNodes()) {
                     if(n != null && !f){
@@ -430,19 +431,28 @@ public class FixBasemapRoads {
                     f = false;
                 }
             }
+            Way way = combinedWays.get(idWayTagsSource);
+            if (way != null) {
+                first.replaceTags(way.getTags());
+            }
 	        // don't keep names
 	        first.removeTag("name");
 	        first.removeTag("junction");
-	        if(highway == null) {
+	        if (highway == null) {
 	        	first.removeTag("highway");
 	        } else {
 	        	first.putTag("highway", highway);
 	        }
-	        if(ref == null) {
+	        if (ref == null) {
 	        	first.removeTag("ref");
 	        } else {
 	        	first.putTag("ref", ref);
 	        }
+            if (int_ref == null) {
+                first.removeTag("int_ref");
+            } else {
+                first.putTag("int_ref", int_ref);
+            }
         }
 
         public void reverse() {
@@ -555,17 +565,22 @@ public class FixBasemapRoads {
         }
 
         public void mergeRoadInto(RoadLine toMerge, RoadLine toKeep, boolean mergeToEnd) {
-        	if(!Algorithms.objectEquals(toMerge.ref, toKeep.ref)) {
-        		if(toKeep.distance > MINIMAL_DISTANCE || toMerge.distance > MINIMAL_DISTANCE) {
+        	if (!Algorithms.objectEquals(toMerge.ref, toKeep.ref)) {
+        		if (toKeep.distance > MINIMAL_DISTANCE || toMerge.distance > MINIMAL_DISTANCE) {
         			toKeep.ref = null;
+        			toKeep.int_ref = null;
         		} else if(toMerge.distance > toKeep.distance) {
             		toKeep.ref = toMerge.ref;
+            		toKeep.int_ref = toMerge.int_ref;
             	}
+        		if (toKeep.distance > PREFERRED_DISTANCE && !mergeToEnd) {
+        			toKeep.idWayTagsSource += toMerge.combinedWays.size();
+        		}
         	}
-        	if(toMerge.distance > toKeep.distance) {
+        	if (toMerge.distance > toKeep.distance) {
         		toKeep.highway = toMerge.highway;
         	}
-        	if(mergeToEnd) {
+        	if (mergeToEnd) {
         		long op = toKeep.endPoint;
         		toKeep.insertInToEnd(toMerge);
         		endPoints.get(op).remove(toKeep);
