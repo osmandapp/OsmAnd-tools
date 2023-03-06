@@ -131,6 +131,14 @@ public class FavoriteController {
                 "respOldGroup", respOldGroup != null ? respOldGroup : "")));
     }
     
+    @PostMapping(value = "/add-group")
+    @ResponseBody
+    public ResponseEntity<String> addGroup(@RequestBody String data, @RequestParam String groupName) throws IOException {
+        PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkValidateUser();
+        WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+        return addNewGroup(trackData, groupName, dev);
+    }
+    
     private void uploadFavoriteFile(File tmpFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String name, Long updatetime) throws IOException {
         userdataService.uploadFile(InternalZipFile.buildFromFile(tmpFile), dev, name, FILE_TYPE_FAVOURITES, System.currentTimeMillis());
         if (updatetime != null) {
@@ -201,5 +209,20 @@ public class FavoriteController {
         File tmpGpx = createTmpGpxFile(file, groupName);
         uploadFavoriteFile(tmpGpx, dev, groupName, updatetime);
         return userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
+    }
+    
+    private ResponseEntity<String> addNewGroup(WebGpxParser.TrackData trackData, String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+        GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+        gpxFile.metadata.name = groupName;
+        String name = DEFAULT_GROUP_NAME + "-" + groupName + FILE_EXT_GPX;
+        File tmpGpx = createTmpGpxFile(gpxFile, name);
+        uploadFavoriteFile(tmpGpx, dev, name, null);
+        UserdataService.ResponseFileStatus resp = createResponse(dev, name, gpxFile, tmpGpx);
+        if (resp != null) {
+            JsonObject obj = new JsonObject();
+            obj.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
+            resp.setJsonObject(obj);
+        }
+        return ResponseEntity.ok(gson.toJson(resp));
     }
 }
