@@ -27,7 +27,7 @@ public class WebGpxParser {
     private static final String COLOR_EXTENSION = "color";
     
     public static final String LINE_PROFILE_TYPE = "line";
-    private static final int NAN_MARKER = 99999;
+    public static final int NAN_MARKER = 99999;
     
     public static class TrackData {
         public MetaData metaData;
@@ -122,6 +122,9 @@ public class WebGpxParser {
     
     public class PointsGroup {
         public String color;
+        public String name;
+        public String iconName;
+        public String backgroundType;
         public final List<Wpt> points = new ArrayList<>();
         public GPXUtilities.PointsGroup ext;
         public PointsGroup(GPXUtilities.PointsGroup group) {
@@ -129,6 +132,17 @@ public class WebGpxParser {
                 if (group.color != 0) {
                     color = colorToString(group.color);
                     group.color = 0;
+                }
+                if (group.name != null) {
+                    name = group.name;
+                }
+                if (group.iconName != null) {
+                    iconName = group.iconName;
+                    group.iconName = null;
+                }
+                if (group.backgroundType != null) {
+                    backgroundType = group.backgroundType;
+                    group.backgroundType = null;
                 }
                 if (!group.points.isEmpty()) {
                     List<Wpt> res = new ArrayList<>();
@@ -432,11 +446,16 @@ public class WebGpxParser {
             Map<String, GPXUtilities.PointsGroup> res = new LinkedHashMap<>();
             for (String key : trackData.pointsGroups.keySet()) {
                 PointsGroup dataGroup = trackData.pointsGroups.get(key);
-                GPXUtilities.PointsGroup group = dataGroup.ext;
-                group.color = parseColor(dataGroup.color, 0);
-                List<Wpt> wptsData = dataGroup.points;
-                for (Wpt wpt : wptsData) {
-                    group.points.add(convertToWptPt(wpt));
+                GPXUtilities.PointsGroup group;
+                if (dataGroup.ext != null) {
+                    group = dataGroup.ext;
+                    group.color = parseColor(dataGroup.color, 0);
+                    List<Wpt> wptsData = dataGroup.points;
+                    for (Wpt wpt : wptsData) {
+                        group.points.add(convertToWptPt(wpt));
+                    }
+                } else {
+                    group = new GPXUtilities.PointsGroup(dataGroup.name, dataGroup.iconName, dataGroup.backgroundType, parseColor(dataGroup.color, 0));
                 }
                 res.put(key, group);
             }
