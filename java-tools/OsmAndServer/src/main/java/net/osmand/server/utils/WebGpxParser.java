@@ -27,7 +27,7 @@ public class WebGpxParser {
     private static final String COLOR_EXTENSION = "color";
     
     public static final String LINE_PROFILE_TYPE = "line";
-    private static final int NAN_MARKER = 99999;
+    public static final int NAN_MARKER = 99999;
     
     public static class TrackData {
         public MetaData metaData;
@@ -122,6 +122,9 @@ public class WebGpxParser {
     
     public class PointsGroup {
         public String color;
+        public String name;
+        public String iconName;
+        public String backgroundType;
         public final List<Wpt> points = new ArrayList<>();
         public GPXUtilities.PointsGroup ext;
         public PointsGroup(GPXUtilities.PointsGroup group) {
@@ -129,6 +132,17 @@ public class WebGpxParser {
                 if (group.color != 0) {
                     color = colorToString(group.color);
                     group.color = 0;
+                }
+                if (group.name != null) {
+                    name = group.name;
+                }
+                if (group.iconName != null) {
+                    iconName = group.iconName;
+                    group.iconName = null;
+                }
+                if (group.backgroundType != null) {
+                    backgroundType = group.backgroundType;
+                    group.backgroundType = null;
                 }
                 if (!group.points.isEmpty()) {
                     List<Wpt> res = new ArrayList<>();
@@ -301,6 +315,9 @@ public class WebGpxParser {
                     if (routePoint.geometry == null) {
                         routePoint.geometry = new ArrayList<>();
                     }
+                    if (Objects.equals(pt.profile, GAP_PROFILE_TYPE)) {
+                        routePoint.profile = GAP_PROFILE_TYPE;
+                    }
                     routePoint.geometry.add(pt);
                 }
             }
@@ -429,11 +446,16 @@ public class WebGpxParser {
             Map<String, GPXUtilities.PointsGroup> res = new LinkedHashMap<>();
             for (String key : trackData.pointsGroups.keySet()) {
                 PointsGroup dataGroup = trackData.pointsGroups.get(key);
-                GPXUtilities.PointsGroup group = dataGroup.ext;
-                group.color = parseColor(dataGroup.color, 0);
-                List<Wpt> wptsData = dataGroup.points;
-                for (Wpt wpt : wptsData) {
-                    group.points.add(convertToWptPt(wpt));
+                GPXUtilities.PointsGroup group;
+                if (dataGroup.ext != null) {
+                    group = dataGroup.ext;
+                    group.color = parseColor(dataGroup.color, 0);
+                    List<Wpt> wptsData = dataGroup.points;
+                    for (Wpt wpt : wptsData) {
+                        group.points.add(convertToWptPt(wpt));
+                    }
+                } else {
+                    group = new GPXUtilities.PointsGroup(dataGroup.name, dataGroup.iconName, dataGroup.backgroundType, parseColor(dataGroup.color, 0));
                 }
                 res.put(key, group);
             }
@@ -446,47 +468,51 @@ public class WebGpxParser {
                 if (track == null) {
                     track = new GPXUtilities.Track();
                 }
-                List<GPXUtilities.TrkSegment> segments = new ArrayList<>();
-                if (t.points.get(0).geometry != null) {
-                    GPXUtilities.Route route = new GPXUtilities.Route();
-                    List<Point> trkPoints = new ArrayList<>();
-                    int allPoints = 0;
-                    for (int i = 0; i < t.points.size(); i++) {
-                        Point point = t.points.get(i);
-                        if (point.geometry.isEmpty()) {
-                            if (!route.points.isEmpty()) {
-                                gpxFile.routes.add(route);
+                if (!t.points.isEmpty()) {
+                    List<GPXUtilities.TrkSegment> segments = new ArrayList<>();
+                    if (t.points.get(0).geometry != null) {
+                        GPXUtilities.Route route = new GPXUtilities.Route();
+                        List<Point> trkPoints = new ArrayList<>();
+                        int allPoints = 0;
+                        for (int i = 0; i < t.points.size(); i++) {
+                            Point point = t.points.get(i);
+                            if (point.geometry.isEmpty()) {
+                                if (!route.points.isEmpty()) {
+                                    gpxFile.routes.add(route);
+                                }
+                                route = new GPXUtilities.Route();
+                                allPoints = 0;
                             }
-                            route = new GPXUtilities.Route();
-                            allPoints = 0;
+                            GPXUtilities.WptPt routePoint = point.ext;
+                            if (routePoint == null) {
+                                routePoint = new WptPt();
+                            }
+                            routePoint.lat = point.lat;
+                            routePoint.lon = point.lng;
+                            if (point.ele == NAN_MARKER) {
+                                routePoint.ele = Double.NaN;
+                            }
+                            if (routePoint.extensions == null) {
+                                routePoint.extensions = new LinkedHashMap<>();
+                            }
+                            if (!point.profile.equals(LINE_PROFILE_TYPE)) {
+                                routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
+                            }
+                            allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size();
+                            routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
+                            route.points.add(routePoint);
+                            trkPoints.addAll(point.geometry);
                         }
-                        GPXUtilities.WptPt routePoint = point.ext;
-                        if (routePoint == null) {
-                            routePoint = new WptPt();
+                        gpxFile.routes.add(route);
+                        if (!trkPoints.isEmpty()) {
+                            addSegmentsToTrack(trkPoints, segments);
                         }
-                        routePoint.lat = point.lat;
-                        routePoint.lon = point.lng;
-                        if (point.ele == NAN_MARKER) {
-                            routePoint.ele = Double.NaN;
-                        }
-                        if (routePoint.extensions == null) {
-                            routePoint.extensions = new LinkedHashMap<>();
-                        }
-                        if (!point.profile.equals(LINE_PROFILE_TYPE)) {
-                            routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
-                        }
-                        allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size();
-                        routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
-                        route.points.add(routePoint);
-                        trkPoints.addAll(point.geometry);
+                    } else {
+                        addSegmentsToTrack(t.points, segments);
                     }
-                    gpxFile.routes.add(route);
-                    addSegmentsToTrack(trkPoints, segments);
-                } else {
-                    addSegmentsToTrack(t.points, segments);
+                    track.segments = segments;
+                    gpxFile.tracks.add(track);
                 }
-                track.segments = segments;
-                gpxFile.tracks.add(track);
             });
         }
         
