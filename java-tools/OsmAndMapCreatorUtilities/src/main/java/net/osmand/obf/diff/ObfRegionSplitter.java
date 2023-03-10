@@ -1,24 +1,22 @@
 package net.osmand.obf.diff;
 
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.TransportStop;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
+import net.osmand.obf.preparation.IndexHeightData;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeSet;
+import java.util.*;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
 
@@ -27,14 +25,15 @@ public class ObfRegionSplitter {
 	
 	public static void main(String[] args) throws IOException {
 		if(args.length == 1 && args[0].equals("test")) {
-			args = new String[5];
-			args[0] = "/Users/victorshcherb/osmand/maps/olive/19_07_29_20_30_diff.obf";
-			args[1] = "/Users/victorshcherb/osmand/maps/olive/regions";
+			args = new String[6];
+			args[0] = "/Users/macmini/OsmAnd/overpass/23_03_10_06_00.obf.gz";
+			args[1] = "/Users/macmini/OsmAnd/overpass/split_obf/";
 			args[2] = "";
-			args[3] = "_20_30";
+			args[3] = "_11_05";
+			args[4] = "--srtm=/Users/macmini/OsmAnd/overpass/srtm/";
 		}
 		if (args.length <= 3) {
-			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix>");
+			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix> --srtm=<folder with srtm>");
 			return;
 		}
 		
@@ -54,6 +53,17 @@ public class ObfRegionSplitter {
 		if (!dir.exists()) {
 			dir.mkdir();
 		}
+
+		IndexHeightData heightData = null;
+		if (args.length > 4 && args[4].startsWith("--srtm=")) {
+			String srtmDataFolderUrl = args[4].replace("--srtm=", "");
+			File heightDir = new File(srtmDataFolderUrl);
+			if (heightDir.exists()) {
+				heightData = new IndexHeightData();
+				heightData.setSrtmData(srtmDataFolderUrl, dir);
+			}
+		}
+
 		try {
 			ObfFileInMemory fl = new ObfFileInMemory();
 			fl.readObfFiles(Collections.singletonList(worldObf));
@@ -62,7 +72,7 @@ public class ObfRegionSplitter {
 			osmandRegions.cacheAllCountries();
 
 			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,osmandRegions);
-			Map<String, TLongObjectHashMap<RouteDataObject>> regionsRouteData = splitRegionRouteData(fl, osmandRegions);
+			Map<String, TLongObjectHashMap<RouteDataObject>> regionsRouteData = splitRegionRouteData(fl, osmandRegions, heightData);
 			Map<String, TLongObjectHashMap<Map<String, Amenity>>> regionsPoiData = splitRegionPoiData(fl, osmandRegions);
 			Map<String, TLongObjectHashMap<TransportStop>> regionsTransportData = splitRegionTransportData(fl, osmandRegions);
 			TreeSet<String> regionNames = new TreeSet<>();
@@ -142,9 +152,11 @@ public class ObfRegionSplitter {
  	}
 
 	private Map<String, TLongObjectHashMap<RouteDataObject>> splitRegionRouteData(ObfFileInMemory fl,
-			OsmandRegions osmandRegions) throws IOException {
+			OsmandRegions osmandRegions, IndexHeightData heightData) throws IOException {
 		Map<String, TLongObjectHashMap<RouteDataObject>> result = new HashMap<>();
 		TLongObjectHashMap<RouteDataObject> routingData = fl.getRoutingData();
+		long time = System.currentTimeMillis();
+		int count = 0;
 		for (RouteDataObject obj : routingData.valueCollection()) {
 //			if(obj.getPointsLength() == 0) {
 //				continue;
@@ -165,12 +177,141 @@ public class ObfRegionSplitter {
 							mp = new TLongObjectHashMap<>();
 							result.put(dw, mp);
 						}
+						if (heightData != null) {
+							attachElevationData(obj, heightData);
+							count++;
+						}
 						mp.put(obj.getId(), obj);
 					}
 				}
 			}
 		}
+		long t = (System.currentTimeMillis() - time) / 1000L;
+		long p = count / t;
+		System.out.println("Attach elevation data to ROUTE DATA section.");
+		System.out.println("Time total:" + t + " count:" + count + " per/sec:" + p);
 		return result;
+	}
+
+	private void attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
+		List<Node> nodes = new ArrayList<>();
+		int id = 1;
+		for(int i = 0; i < obj.getPointsLength(); i++, id++) {
+			double lon = MapUtils.get31LongitudeX(obj.getPoint31XTile(i));
+			double lat = MapUtils.get31LatitudeY(obj.getPoint31YTile(i));
+			Node n = new Node(lat, lon, id);
+			nodes.add(n);
+		}
+
+		// Prepare Way with Nodes
+		Map<String, String> cachedNodeTags = new HashMap<>();
+		for (int i = 0; i < obj.getPointsLength(); i++) {
+			if (obj.getPointNames(i) != null) {
+				//String[] vs = obj.getPointNames(i);
+				int[] keys = obj.getPointNameTypes(i);
+				for (int j = 0; j < keys.length; j++) {
+					BinaryMapRouteReaderAdapter.RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
+					nodes.get(i).putTag(rt.getTag(), rt.getValue());
+					cachedNodeTags.put(rt.getTag(), rt.getValue());
+				}
+			}
+			if (obj.getPointTypes(i) != null) {
+				int[] keys = obj.getPointTypes(i);
+				for (int j = 0; j < keys.length; j++) {
+					BinaryMapRouteReaderAdapter.RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
+					nodes.get(i).putTag(rt.getTag(), rt.getValue());
+					cachedNodeTags.put(rt.getTag(), rt.getValue());
+				}
+			}
+		}
+
+		Way way = new Way(obj.getId(), nodes);
+		Map<String, String> cachedTags = new HashMap<>();
+		for (int t : obj.getTypes()) {
+			String tag = obj.region.routeEncodingRules.get(t).getTag();
+			String val = obj.region.routeEncodingRules.get(t).getValue();
+			way.putTag(tag, val);
+			cachedTags.put(tag, val);
+		}
+
+		heightData.proccess(way);
+
+		// Write result to RouteDataObject
+		if (way.getTags().size() > obj.types.length) {
+			int[] types = Arrays.copyOf(obj.types, way.getTags().size());
+			int index = obj.types.length;
+			for (Map.Entry<String, String> entry : way.getTags().entrySet()) {
+				String tag = entry.getKey();
+				if (!cachedTags.containsKey(tag)) {
+					String val = entry.getValue();
+					int ruleId = obj.region.searchRouteEncodingRule(tag, val);
+					if (ruleId == -1) {
+						ruleId = obj.region.routeEncodingRules.size();
+						obj.region.initRouteEncodingRule(ruleId, tag, val);
+					}
+					if (index < types.length) {
+						types[index] = ruleId;
+					} else {
+						System.out.println("Error. Write elevation tags of way. Array index out of bounds exception");
+						break;
+					}
+					index++;
+				}
+			}
+			obj.types = types;
+		}
+
+		nodes = way.getNodes();
+		Map <Integer, List<Integer>> pointTypesMap = new HashMap<>();
+		for (int i = 0; i < obj.getPointsLength(); i++) {
+			Node n = nodes.get(i);
+			Map<String, String> tags = n.getTags();
+			if (tags.size() == 0) {
+				continue;
+			}
+			List<Integer> rulesList = new ArrayList<>();
+			for (Map.Entry<String, String> entry : tags.entrySet()) {
+				String tag = entry.getKey();
+				if (!cachedNodeTags.containsKey(tag)) {
+					String val = entry.getValue();
+					int ruleId = obj.region.searchRouteEncodingRule(tag, val);
+					if (ruleId == -1) {
+						ruleId = obj.region.routeEncodingRules.size();
+						obj.region.initRouteEncodingRule(ruleId, tag, val);
+					}
+					rulesList.add(ruleId);
+				}
+			}
+			pointTypesMap.put(i, rulesList);
+		}
+
+		if (pointTypesMap.size() > 0) {
+			if (obj.pointTypes == null) {
+				obj.pointTypes = new int[pointTypesMap.size()][];
+			}
+			for (Map.Entry<Integer, List<Integer>> entry : pointTypesMap.entrySet()) {
+				int pointIndex = entry.getKey();
+				List<Integer> pointTypes = entry.getValue();
+				if (pointTypes.size() == 0) {
+					continue;
+				}
+				if (pointIndex >= obj.pointTypes.length) {
+					obj.pointTypes = Arrays.copyOf(obj.pointTypes, pointIndex + 1);
+				}
+				int index = 0;
+				if (obj.pointTypes[pointIndex] == null) {
+					obj.pointTypes[pointIndex] = new int[pointTypes.size()];
+				} else if (obj.pointTypes[pointIndex].length > 0) {
+					index = obj.pointTypes[pointIndex].length;
+					obj.pointTypes[pointIndex] = Arrays.copyOf(obj.pointTypes[pointIndex], obj.pointTypes[pointIndex].length + pointTypes.size());
+				}
+				for (int i = 0; i < pointTypes.size(); i++) {
+					int type = pointTypes.get(i);
+					obj.pointTypes[pointIndex][index] = type;
+					index++;
+				}
+			}
+		}
 	}
 
 	private Map<String, TLongObjectHashMap<TransportStop>> splitRegionTransportData(ObfFileInMemory fl,
