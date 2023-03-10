@@ -743,8 +743,9 @@ public class UpdateSubscription {
 		    @Override
 		    public void initialize(HttpRequest httpRequest) throws IOException {
 		      requestInitializer.initialize(httpRequest);
-		      httpRequest.setConnectTimeout(7 * 60000);  // 7 minutes connect timeout
-		      httpRequest.setReadTimeout(7 * 60000);  // 7 minutes read timeout
+		      // 12 min
+		      httpRequest.setConnectTimeout(12 * 60000);  
+		      httpRequest.setReadTimeout(12 * 60000);  
 		    }
 		  };
 	}
