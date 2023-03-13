@@ -145,6 +145,7 @@ public class CalculateOsmChangesets {
 						return true;
 					}
 				});
+				con.setRequestProperty("User-Agent", "OsmAndDownloadChangesets");
 				StringBuilder sb = Algorithms.readFromInputStream(con.getInputStream());
 				XmlPullParser parser = PlatformUtil.newXMLPullParser();
 				parser.setInput(new StringReader(sb.toString()));
