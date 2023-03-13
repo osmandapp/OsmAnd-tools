@@ -26,10 +26,10 @@ public class ObfRegionSplitter {
 	public static void main(String[] args) throws IOException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[6];
-			args[0] = "/Users/macmini/OsmAnd/overpass/23_03_10_06_00.obf.gz";
+			args[0] = "/Users/macmini/OsmAnd/overpass/23_03_09_24_00.obf";
 			args[1] = "/Users/macmini/OsmAnd/overpass/split_obf/";
 			args[2] = "";
-			args[3] = "_11_05";
+			args[3] = "_23_03_10";
 			args[4] = "--srtm=/Users/macmini/OsmAnd/overpass/srtm/";
 		}
 		if (args.length <= 3) {
@@ -187,13 +187,26 @@ public class ObfRegionSplitter {
 			}
 		}
 		long t = (System.currentTimeMillis() - time) / 1000L;
-		long p = count / t;
+		long p = t > 0 ? count / t : count;
 		System.out.println("Attach elevation data to ROUTE DATA section.");
 		System.out.println("Time total:" + t + " count:" + count + " per/sec:" + p);
 		return result;
 	}
 
 	private void attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
+
+		final List<String> elevationTags = new ArrayList<String>() {{
+			add(IndexHeightData.ELE_ASC_START);
+			add(IndexHeightData.ELE_ASC_END);
+			add(IndexHeightData.ELE_INCLINE);
+			add(IndexHeightData.ELE_INCLINE_MAX);
+			add(IndexHeightData.ELE_DECLINE);
+			add(IndexHeightData.ELE_DECLINE_MAX);
+			add(IndexHeightData.ELE_ASC_TAG);
+			add(IndexHeightData.ELE_DESC_TAG);
+		}};
+
+		// Prepare Way with Nodes
 		List<Node> nodes = new ArrayList<>();
 		int id = 1;
 		for(int i = 0; i < obj.getPointsLength(); i++, id++) {
@@ -203,35 +216,10 @@ public class ObfRegionSplitter {
 			nodes.add(n);
 		}
 
-		// Prepare Way with Nodes
-		Map<String, String> cachedNodeTags = new HashMap<>();
-		for (int i = 0; i < obj.getPointsLength(); i++) {
-			if (obj.getPointNames(i) != null) {
-				//String[] vs = obj.getPointNames(i);
-				int[] keys = obj.getPointNameTypes(i);
-				for (int j = 0; j < keys.length; j++) {
-					BinaryMapRouteReaderAdapter.RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
-					nodes.get(i).putTag(rt.getTag(), rt.getValue());
-					cachedNodeTags.put(rt.getTag(), rt.getValue());
-				}
-			}
-			if (obj.getPointTypes(i) != null) {
-				int[] keys = obj.getPointTypes(i);
-				for (int j = 0; j < keys.length; j++) {
-					BinaryMapRouteReaderAdapter.RouteTypeRule rt = obj.region.quickGetEncodingRule(keys[j]);
-					nodes.get(i).putTag(rt.getTag(), rt.getValue());
-					cachedNodeTags.put(rt.getTag(), rt.getValue());
-				}
-			}
-		}
-
 		Way way = new Way(obj.getId(), nodes);
-		Map<String, String> cachedTags = new HashMap<>();
 		for (int t : obj.getTypes()) {
-			String tag = obj.region.routeEncodingRules.get(t).getTag();
-			String val = obj.region.routeEncodingRules.get(t).getValue();
-			way.putTag(tag, val);
-			cachedTags.put(tag, val);
+			BinaryMapRouteReaderAdapter.RouteTypeRule type = obj.region.routeEncodingRules.get(t);
+			way.putTag(type.getTag(), type.getValue());
 		}
 
 		heightData.proccess(way);
@@ -242,7 +230,7 @@ public class ObfRegionSplitter {
 			int index = obj.types.length;
 			for (Map.Entry<String, String> entry : way.getTags().entrySet()) {
 				String tag = entry.getKey();
-				if (!cachedTags.containsKey(tag)) {
+				if (elevationTags.contains(tag)) {
 					String val = entry.getValue();
 					int ruleId = obj.region.searchRouteEncodingRule(tag, val);
 					if (ruleId == -1) {
@@ -262,54 +250,32 @@ public class ObfRegionSplitter {
 		}
 
 		nodes = way.getNodes();
-		Map <Integer, List<Integer>> pointTypesMap = new HashMap<>();
 		for (int i = 0; i < obj.getPointsLength(); i++) {
 			Node n = nodes.get(i);
 			Map<String, String> tags = n.getTags();
 			if (tags.size() == 0) {
 				continue;
 			}
-			List<Integer> rulesList = new ArrayList<>();
+			int ind = 0;
+			int size = tags.size();
+			if (obj.pointTypes != null && obj.pointTypes.length > i && obj.pointTypes[i] != null && obj.pointTypes[i].length > 0) {
+				// save previous pointTypes
+				ind = obj.pointTypes[i].length;
+				obj.pointTypes[i] = Arrays.copyOf(obj.pointTypes[i], obj.pointTypes[i].length + size);
+			} else {
+				obj.setPointTypes(i, new int[size]);
+			}
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
+				//no other tags in Node except elevation
 				String tag = entry.getKey();
-				if (!cachedNodeTags.containsKey(tag)) {
-					String val = entry.getValue();
-					int ruleId = obj.region.searchRouteEncodingRule(tag, val);
-					if (ruleId == -1) {
-						ruleId = obj.region.routeEncodingRules.size();
-						obj.region.initRouteEncodingRule(ruleId, tag, val);
-					}
-					rulesList.add(ruleId);
+				String val = entry.getValue();
+				int ruleId = obj.region.searchRouteEncodingRule(tag, val);
+				if (ruleId == -1) {
+					ruleId = obj.region.routeEncodingRules.size();
+					obj.region.initRouteEncodingRule(ruleId, tag, val);
 				}
-			}
-			pointTypesMap.put(i, rulesList);
-		}
-
-		if (pointTypesMap.size() > 0) {
-			if (obj.pointTypes == null) {
-				obj.pointTypes = new int[pointTypesMap.size()][];
-			}
-			for (Map.Entry<Integer, List<Integer>> entry : pointTypesMap.entrySet()) {
-				int pointIndex = entry.getKey();
-				List<Integer> pointTypes = entry.getValue();
-				if (pointTypes.size() == 0) {
-					continue;
-				}
-				if (pointIndex >= obj.pointTypes.length) {
-					obj.pointTypes = Arrays.copyOf(obj.pointTypes, pointIndex + 1);
-				}
-				int index = 0;
-				if (obj.pointTypes[pointIndex] == null) {
-					obj.pointTypes[pointIndex] = new int[pointTypes.size()];
-				} else if (obj.pointTypes[pointIndex].length > 0) {
-					index = obj.pointTypes[pointIndex].length;
-					obj.pointTypes[pointIndex] = Arrays.copyOf(obj.pointTypes[pointIndex], obj.pointTypes[pointIndex].length + pointTypes.size());
-				}
-				for (int i = 0; i < pointTypes.size(); i++) {
-					int type = pointTypes.get(i);
-					obj.pointTypes[pointIndex][index] = type;
-					index++;
-				}
+				obj.pointTypes[i][ind] = ruleId;
+				ind++;
 			}
 		}
 	}
