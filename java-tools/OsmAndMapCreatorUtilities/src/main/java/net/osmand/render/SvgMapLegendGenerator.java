@@ -291,7 +291,7 @@ public class SvgMapLegendGenerator {
 		}
 
 		private static String getIconPath(String iconName) {
-			return System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/poi-icons-svg/" + "mx_"
+			return System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/map-icons-svg/" + "mx_"
 					+ iconName + ".svg";
 		}
 
