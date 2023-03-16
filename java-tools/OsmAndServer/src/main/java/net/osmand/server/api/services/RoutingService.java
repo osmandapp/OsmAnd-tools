@@ -73,7 +73,7 @@ public class RoutingService {
             WebGpxParser.Point currentPoint = points.get(i);
             LatLon prevCoord = new LatLon(prevPoint.lat, prevPoint.lng);
             LatLon currentCoord = new LatLon(currentPoint.lat, currentPoint.lng);
-            if (prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
+            if (prevPoint.profile == null || prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
                 currentPoint.geometry = getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
             } else if (!prevPoint.profile.equals(GAP_PROFILE_TYPE)) {
                 currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false);
