@@ -27,6 +27,7 @@ import javax.servlet.http.HttpSession;
 import net.osmand.IndexConstants;
 import net.osmand.data.Amenity;
 import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.osm.PoiType;
 import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import org.apache.commons.logging.Log;
@@ -904,9 +905,22 @@ public class OsmAndMapsService {
 		}
 		List<RoutingController.Feature> features = new ArrayList<>();
 		for (Amenity amenity : results) {
+			PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+			String iconName = null;
+			if (poiType.getParentType() != null) {
+				iconName = poiType.getParentType().getIconKeyName();
+			} else if (poiType.getFilter() != null) {
+				iconName = poiType.getFilter().getIconKeyName();
+			} else if (poiType.getCategory() != null) {
+				iconName = poiType.getCategory().getIconKeyName();
+			}
 			RoutingController.Feature feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
 					.prop("name", amenity.getName())
 					.prop("color", amenity.getColor())
+					.prop("iconKeyName", poiType.getIconKeyName())
+					.prop("typeOsmTag", poiType.getOsmTag())
+					.prop("typeOsmValue", poiType.getOsmValue())
+					.prop("iconName", iconName)
 					.prop("type", amenity.getType().getKeyName())
 					.prop("subType", amenity.getSubType());
 			
