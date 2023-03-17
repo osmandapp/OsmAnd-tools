@@ -395,4 +395,15 @@ public class RoutingController {
 		List<WebGpxParser.Point> res = routingService.getRoute(points);
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
 	}
+	
+	@PostMapping(path = {"/get-poi"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getPoi(@RequestParam double lat,
+	                                     @RequestParam double lon,
+	                                     @RequestParam int zoom,
+	                                     @RequestParam int radius) throws IOException {
+		FeatureCollection collection = osmAndMapsService.searchPoi(lat, lon, zoom, radius);
+		return ResponseEntity.ok(gson.toJson(collection));
+	}
+	
 }

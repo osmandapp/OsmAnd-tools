@@ -14,16 +14,8 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
@@ -33,7 +25,9 @@ import javax.imageio.ImageIO;
 import javax.servlet.http.HttpSession;
 
 import net.osmand.IndexConstants;
+import net.osmand.data.Amenity;
 import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -94,6 +88,9 @@ import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.MapsCollection;
+
+import static net.osmand.binary.BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER;
+import static net.osmand.binary.BinaryMapIndexReader.buildSearchPoiRequest;
 
 @Service
 public class OsmAndMapsService {
@@ -894,4 +891,46 @@ public class OsmAndMapsService {
 		
 		return targetObf;
 	}
+	
+	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, int zoom, int radius) throws IOException {
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+		searchUICore.getSearchSettings().setRegions(osmandRegions);
+		QuadRect bbox = getBboxRadius(lat, lon, radius, zoom);
+		BinaryMapIndexReader[] list = getObfReaders(bbox);
+		List<Amenity> results = new ArrayList<>();
+		for (BinaryMapIndexReader reader : list) {
+			results.addAll(reader.searchPoi(buildSearchPoiRequest((int) bbox.left,
+					(int) bbox.right, (int) bbox.top, (int) bbox.bottom, zoom, ACCEPT_ALL_POI_TYPE_FILTER, null)));
+		}
+		List<RoutingController.Feature> features = new ArrayList<>();
+		for (Amenity amenity : results) {
+			RoutingController.Feature feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
+					.prop("name", amenity.getName())
+					.prop("color", amenity.getColor())
+					.prop("type", amenity.getType().getKeyName())
+					.prop("subType", amenity.getSubType());
+			
+			for (String e : amenity.getAdditionalInfoKeys()) {
+				feature.prop(e, amenity.getAdditionalInfo(e));
+			}
+			features.add(feature);
+		}
+		return new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0]));
+	}
+	
+	private QuadRect getBboxRadius(double lat, double lon, int radiusMeters, int zoom) {
+		double dx = MapUtils.getTileNumberX(zoom, lon);
+		double half16t = MapUtils.getDistance(lat, MapUtils.getLongitudeFromTile(zoom, ((int) dx) + 0.5),
+				lat, MapUtils.getLongitudeFromTile(zoom, (int) dx));
+		double cf31 = (radiusMeters / (half16t * 2)) * (1 << 15);
+		double y = MapUtils.get31TileNumberY(lat);
+		double x = MapUtils.get31TileNumberX(lon);
+		double left = (int) (x - cf31);
+		double top = (int) (x + cf31);
+		double right = (int) (y - cf31);
+		double bottom = (int) (y + cf31);
+		
+		return new QuadRect(left, right, top, bottom);
+	}
+	
 }
