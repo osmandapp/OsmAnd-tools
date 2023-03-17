@@ -9,9 +9,12 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
 import javax.swing.JTextField;
 
+import net.osmand.PlatformUtil;
 import net.osmand.core.jni.AreaI;
 import net.osmand.core.jni.AtlasMapRendererConfiguration;
 import net.osmand.core.jni.CoreResourcesEmbeddedBundle;
@@ -32,11 +35,14 @@ import net.osmand.core.jni.PointI;
 import net.osmand.core.jni.QStringStringHash;
 import net.osmand.core.jni.ResolvedMapStyle;
 import net.osmand.data.LatLon;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import com.jogamp.opengl.GLAutoDrawable;
 import com.jogamp.opengl.GLEventListener;
 import com.jogamp.opengl.util.Animator;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class QtCorePanel implements GLEventListener {
 
@@ -259,8 +265,9 @@ public class QtCorePanel implements GLEventListener {
 		MapStylesCollection mapStylesCollection = new MapStylesCollection();
 		ResolvedMapStyle mapStyle = null;
 		if (this.styleFile != null) {
-			mapStylesCollection.addStyleFromFile(this.styleFile);
-			System.out.println("Going to use map style from: " + this.styleFile);
+			File styleDir = new File(styleFile).getParentFile();
+			loadRendererAddons(mapStylesCollection, styleDir);
+			loadRenderer(mapStylesCollection, this.styleFile, styleDir);
 			mapStyle = mapStylesCollection.getResolvedStyleByName((new File(this.styleFile)).getName());
 		} else {
 			System.out.println("Going to use embedded map style");
@@ -321,6 +328,47 @@ public class QtCorePanel implements GLEventListener {
 		 * (mapnik == null) Log.e(TAG, "Failed to create mapnik");
 		 */
 		mapRenderer.setMapLayerProvider(0, mapRasterLayerProvider);
+	}
+
+	private void loadRenderer(MapStylesCollection mapStylesCollection, String styleFile, File styleDir) {
+		String depends = getDepends(styleFile);
+		if (!Algorithms.isEmpty(depends)) {
+			String dependsStyle = new File(styleDir, depends + ".render.xml").getAbsolutePath();
+			loadRenderer(mapStylesCollection, dependsStyle, styleDir);
+		}
+		mapStylesCollection.addStyleFromFile(styleFile);
+		System.out.println("Going to use map style from: " + styleFile);
+	}
+
+	private String getDepends(String styleFile) {
+		String depends = null;
+		try {
+			XmlPullParser parser = PlatformUtil.newXMLPullParser();
+			parser.setInput(new FileInputStream(styleFile), null);
+			int tok;
+			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+				if (tok == XmlPullParser.START_TAG) {
+					if ("renderingStyle".equals(parser.getName())) {
+						depends = parser.getAttributeValue(null, "depends");
+						break;
+					}
+				}
+			}
+		} catch (XmlPullParserException | IOException e) {
+			throw new RuntimeException(e);
+		}
+		return depends;
+	}
+
+	private void loadRendererAddons(MapStylesCollection mapStylesCollection, File stylesDir) {
+		File[] files = stylesDir.listFiles();
+		if (files != null) {
+			for (File file : files) {
+				if (file.isFile() && file.getName().endsWith("addon.render.xml")) {
+					mapStylesCollection.addStyleFromFile(file.getAbsolutePath());
+				}
+			}
+		}
 	}
 
 	private class RenderRequestCallback extends MapRendererSetupOptions.IFrameUpdateRequestCallback {
