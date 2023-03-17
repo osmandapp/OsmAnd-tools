@@ -4,7 +4,6 @@ import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
@@ -19,7 +18,6 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.amazonaws.transform.MapEntry;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
