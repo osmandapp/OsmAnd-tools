@@ -143,12 +143,10 @@ public class UserdataController {
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
 			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
-			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
 			logErrorMassage(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
@@ -164,19 +162,15 @@ public class UserdataController {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
 			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
-			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(orderid);
 		if (errorMsg != null) {
 			logErrorMassage(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 		if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
 			String hideEmail = userdataService.hideEmail(otherUser.email);
 			logErrorMassage(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
-			throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-					"user was already signed up as " + hideEmail);
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
@@ -195,12 +189,10 @@ public class UserdataController {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
 			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
-			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
 		if (pu != null) {
 			if (!login) {
 				logErrorMassage(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
-				throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
 			// keep old order id
@@ -216,8 +208,6 @@ public class UserdataController {
 				// check that user already registered at least 1 device (avoid typos in email)
 				if (pud != null && !pud.isEmpty()) {
 					logErrorMassage(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
-					throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-							"user was already signed up as " + hideEmail);
 				} else {
 					otherUser.orderid = null;
 					usersRepository.saveAndFlush(otherUser);
@@ -393,7 +383,7 @@ public class UserdataController {
 
 	}
 
-	private void logErrorMassage(HttpServletRequest request, int code, String msg) {
+	private void logErrorMassage(HttpServletRequest request, int code, String msg) throws OsmAndPublicApiException {
 		Map<String, String[]> params = request.getParameterMap();
 		String url = request.getRequestURI();
 		String ipAddress = request.getHeader("X-FORWARDED-FOR") == null ? request.getRemoteAddr() : request.getHeader("X-FORWARDED-FOR");
@@ -403,5 +393,6 @@ public class UserdataController {
 			m += ", " + e.getKey() + ":" + v;
 		}
 		LOG.error("URL:" + url + ", ip:" + ipAddress +  ", code:" + code + ", message:" + msg + m);
+		throw new OsmAndPublicApiException(code, msg);
 	}
 }
