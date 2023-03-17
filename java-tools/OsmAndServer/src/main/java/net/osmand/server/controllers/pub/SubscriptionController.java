@@ -19,6 +19,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -146,7 +147,7 @@ public class SubscriptionController {
     
     private ResponseEntity<String> error(String txt) {
     	// clients don't accept error requests (neither mobile, neither http)
-    	return ResponseEntity.ok().body(String.format("{\"error\": \"%s.\"}", txt.replace('"', '\'')));
+    	return ResponseEntity.badRequest().body(String.format("{\"error\": \"%s.\"}", txt.replace('"', '\'')));
 	}
     
     @PostMapping(path = {"/register_email", "/register_email.php"},
@@ -456,6 +457,11 @@ public class SubscriptionController {
 		subscr.orderId = ios ? request.getParameter("purchaseToken") : request.getParameter("orderId");
 		subscr.sku = request.getParameter("sku");
 		subscr.timestamp = new Date();
+		StringBuilder req = new StringBuilder("Purchased info: ");
+		for (Entry<String, String[]> s : request.getParameterMap().entrySet()) {
+			req.append(s.getKey()).append("=").append(Arrays.toString(s.getValue())).append(" ");
+		}
+		LOG.info(req);
 		if (isEmpty(subscr.orderId)) {
 			return error("Please validate the purchase (orderid is empty).");
 		}

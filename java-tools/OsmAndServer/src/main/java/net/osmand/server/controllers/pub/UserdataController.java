@@ -4,7 +4,14 @@ import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
+import java.util.UUID;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -188,6 +195,8 @@ public class UserdataController {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
+		LOG.info(String.format("User register: email='%s', deviceid='%s', orderid='%s', login='%s'", email, deviceId,
+				orderid, login));
 		if (!email.contains("@")) {
 			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
