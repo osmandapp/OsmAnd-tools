@@ -4,12 +4,7 @@ import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -17,6 +12,7 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import com.amazonaws.transform.MapEntry;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
@@ -133,17 +129,20 @@ public class UserdataController {
 	@GetMapping(value = "/user-validate-sub")
 	@ResponseBody
 	public ResponseEntity<String> check(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException {
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			HttpServletRequest request) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
+			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
+			logErrorMassage(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		return ResponseEntity.ok(gson.toJson(pu));
@@ -155,18 +154,22 @@ public class UserdataController {
 	@ResponseBody
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
+			@RequestParam(name = "orderid", required = false) String orderid,
+			HttpServletRequest request) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
+			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(orderid);
 		if (errorMsg != null) {
+			logErrorMassage(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 		if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
 			String hideEmail = userdataService.hideEmail(otherUser.email);
+			logErrorMassage(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
 			throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
 					"user was already signed up as " + hideEmail);
 		}
@@ -180,15 +183,18 @@ public class UserdataController {
 	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
 			@RequestParam(name = "orderid", required = false) String orderid,
-			@RequestParam(name = "login", required = false) boolean login) throws IOException {
+			@RequestParam(name = "login", required = false) boolean login,
+			HttpServletRequest request) throws IOException {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
+			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
 		if (pu != null) {
 			if (!login) {
+				logErrorMassage(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 				throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
@@ -204,6 +210,7 @@ public class UserdataController {
 				List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
 				// check that user already registered at least 1 device (avoid typos in email)
 				if (pud != null && !pud.isEmpty()) {
+					logErrorMassage(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
 					throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
 							"user was already signed up as " + hideEmail);
 				} else {
@@ -379,5 +386,17 @@ public class UserdataController {
 		public int userid;
 		public long maximumAccountSize;
 
+	}
+
+	private void logErrorMassage(HttpServletRequest request, int code, String msg) {
+		Map<String, String[]> params = request.getParameterMap();
+		String url = request.getRequestURI();
+		String ipAddress = request.getHeader("X-FORWARDED-FOR") == null ? request.getRemoteAddr() : request.getHeader("X-FORWARDED-FOR");
+		String m = "";
+		for (Map.Entry<String, String[]> e : params.entrySet()) {
+			String v = e.getValue().length > 0 ? e.getValue()[0] : "EMPTY";
+			m += ", " + e.getKey() + ":" + v;
+		}
+		LOG.error("URL:" + url + ", ip:" + ipAddress +  ", code:" + code + ", message:" + msg + m);
 	}
 }
