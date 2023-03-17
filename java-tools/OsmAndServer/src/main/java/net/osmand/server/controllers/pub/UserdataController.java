@@ -193,8 +193,6 @@ public class UserdataController {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
-		LOG.info(String.format("User register: email='%s', deviceid='%s', orderid='%s', login='%s'", email, deviceId,
-				orderid, login));
 		if (!email.contains("@")) {
 			logErrorMassage(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
