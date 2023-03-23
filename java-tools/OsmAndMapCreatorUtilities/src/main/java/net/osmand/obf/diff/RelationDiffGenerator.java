@@ -42,27 +42,36 @@ public class RelationDiffGenerator {
     private static final String TAG_NODE_OF_WAY = "nd";
 
     public static void main(String[] args) {
-        String diff = "/Users/macmini/OsmAnd/overpass/relation_diff.osm.gz";
-        String start = "/Users/macmini/OsmAnd/overpass/relation_start.osm.gz";
-        String end = "/Users/macmini/OsmAnd/overpass/relation_end.osm";
 
-        String tmp = "/Users/macmini/OsmAnd/overpass/tmp.osm";
+        if(args.length == 1 && args[0].equals("test")) {
+            args = new String[3];
+            List<String> s = new ArrayList<String>();
+            s.add("/Users/macmini/OsmAnd/overpass/relation_diff.osm.gz");
+            s.add("/Users/macmini/OsmAnd/overpass/relation_start.osm.gz");
+            s.add("/Users/macmini/OsmAnd/overpass/relation_end.osm");
+            args = s.toArray(new String[0]);
+        } else if (args.length < 3) {
+            System.out.println("Usage: <path to diff.osm file> <path to relation_start.osm file> " +
+                "<path to relation_end.osm file> <path to intermediate result file>(optional, if not set result will write to " + System.getProperty("maps.dir") + "/relation_diff_tmp.osm");
+            System.exit(1);
+        }
+
+        String diff = args[0];
+        String start = args[1];
+        String end = args[2];
+        String tmp = args.length >= 4 ? args[3] : System.getProperty("maps.dir") + "/relation_diff_tmp.osm";
+
         try {
             HashSet<LatLon> nodeCoordsCashe = new HashSet<>();
-            HashSet<EntityId> membersDelRelation = getMembersDeletedRelation(new File(diff), nodeCoordsCashe);
-            mergeStartIntoEnd(new File(start), new File(end), new File(tmp), membersDelRelation, nodeCoordsCashe);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (XmlPullParserException e) {
-            e.printStackTrace();
-        } catch (SAXException e) {
-            e.printStackTrace();
-        } catch (ParserConfigurationException e) {
+            RelationDiffGenerator rdg = new RelationDiffGenerator();
+            HashSet<EntityId> membersDelRelation = rdg.getMembersDeletedRelation(new File(diff), nodeCoordsCashe);
+            rdg.mergeStartIntoEnd(new File(start), new File(end), new File(tmp), membersDelRelation, nodeCoordsCashe);
+        } catch (IOException | XmlPullParserException | SAXException | ParserConfigurationException e) {
             e.printStackTrace();
         }
     }
 
-    private static HashSet<EntityId> getMembersDeletedRelation(File diff, HashSet<LatLon> nodeCoordsCashe) throws IOException, XmlPullParserException {
+    private HashSet<EntityId> getMembersDeletedRelation(File diff, HashSet<LatLon> nodeCoordsCashe) throws IOException, XmlPullParserException {
         InputStream fis;
         if(diff.getName().endsWith(".gz")) {
             fis = new GZIPInputStream(new FileInputStream(diff));
@@ -107,7 +116,7 @@ public class RelationDiffGenerator {
                     relationDelete = true;
                 }
 
-                // TODO add cache of deleted nodes and ways for remove them from result and nodeCoordsCashe
+                // TODO perhaps add cache of deleted nodes and ways for remove them from result and nodeCoordsCashe
 
                 if (TAG_ACTION.equals(name)
                         && ATTRIBUTE_TYPE.equals(parser.getAttributeName(0))
@@ -125,7 +134,7 @@ public class RelationDiffGenerator {
         return result;
     }
 
-    private static void mergeStartIntoEnd(File start, File end, File tmp, HashSet<EntityId> members, HashSet<LatLon> nodeCoordsCashe)
+    private void mergeStartIntoEnd(File start, File end, File tmp, HashSet<EntityId> members, HashSet<LatLon> nodeCoordsCashe)
             throws IOException, ParserConfigurationException, SAXException, XmlPullParserException {
 
         InputStream fisStart;
@@ -219,7 +228,7 @@ public class RelationDiffGenerator {
         //tmp.delete();
     }
 
-    private static void removeRepeatedMembers(File endFile, HashSet<EntityId> members) throws IOException, XmlPullParserException {
+    private void removeRepeatedMembers(File endFile, HashSet<EntityId> members) throws IOException, XmlPullParserException {
         InputStream fis;
         if(endFile.getName().endsWith(".gz")) {
             fis = new GZIPInputStream(new FileInputStream(endFile));
@@ -245,7 +254,7 @@ public class RelationDiffGenerator {
     }
 
     // write doc to output stream
-    private static void writeXml(Document doc,
+    private void writeXml(Document doc,
                                  OutputStream output)
             throws TransformerException {
         TransformerFactory transformerFactory = TransformerFactory.newInstance();
@@ -258,7 +267,7 @@ public class RelationDiffGenerator {
         transformer.transform(source, streamResult);
     }
 
-    private static void mergeOsmFiles(File tmpSource, File dest) throws IOException {
+    private void mergeOsmFiles(File tmpSource, File dest) throws IOException {
 
         boolean gzip = false;
         File tmpUncompressed = null;
@@ -328,7 +337,7 @@ public class RelationDiffGenerator {
         }
     }
 
-    private static String byteListToString(List<Byte> l) {
+    private String byteListToString(List<Byte> l) {
         if (l == null) {
             return "";
         }

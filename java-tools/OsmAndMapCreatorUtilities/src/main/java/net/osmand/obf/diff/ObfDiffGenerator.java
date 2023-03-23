@@ -351,7 +351,7 @@ public class ObfDiffGenerator {
 		}
 	}
 
-	private Map<String, Amenity> buildPoiMap(TLongObjectHashMap<Map<String, Amenity>> startPoiSource) {
+	public Map<String, Amenity> buildPoiMap(TLongObjectHashMap<Map<String, Amenity>> startPoiSource) {
 		HashMap<String, Amenity> map = new HashMap<>();
 		for (Map<String, Amenity> am : startPoiSource.valueCollection()) {
 			Iterator<Entry<String, Amenity>> it = am.entrySet().iterator();
