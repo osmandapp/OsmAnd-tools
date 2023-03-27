@@ -28,7 +28,7 @@ public class ObfDiffMerger {
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
 	
 	public static void main(String[] args) {
-		try {
+		/*try {
 			if(args.length == 1 && args[0].equals("test")) {
 				args = new String[4];
 				List<String> s = new ArrayList<String>();
@@ -44,7 +44,8 @@ public class ObfDiffMerger {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
-		}
+		}*/
+		mergeRelationOsmLive(args);
 	}
 	
 	
@@ -84,9 +85,9 @@ public class ObfDiffMerger {
 			if(args.length == 1 && args[0].equals("test")) {
 				args = new String[3];
 				List<String> s = new ArrayList<String>();
-				s.add("/Users/macmini/OsmAnd/overpass/Relation_end.obf");
-				s.add("/Users/macmini/OsmAnd/overpass/23_03_09_24_00.obf");
-				s.add("/Users/macmini/OsmAnd/overpass/Relation_end_merged.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_end_test.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00.obf.gz");
+				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_MERGED.obf");
 				args = s.toArray(new String[0]);
 			} else if (args.length < 2) {
 				System.out.println("Usage: <path to relation_osm_live.obf> <path to common_osm_live.obf> " +
@@ -123,11 +124,11 @@ public class ObfDiffMerger {
 				BinaryMapDataObject relObj = relMapData.get(id);
 				BinaryMapDataObject commonObj = commonMapData.get(id);
 				if (commonObj == null) {
-					commonMapData.put(id, relObj);
+					commonMapData.put(id, mi.adoptMapObject(relObj));
 					cnt++;
 				} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
 					commonMapData.remove(id);
-					commonMapData.put(id, relObj);
+					commonMapData.put(id, mi.adoptMapObject(relObj));
 					cnt++;
 				}
 			}
@@ -144,11 +145,11 @@ public class ObfDiffMerger {
 			RouteDataObject relObj = relRouteData.get(id);
 			RouteDataObject commonObj = commonRouteData.get(id);
 			if (commonObj == null) {
-				commonRouteData.put(id, relObj);
+				commonRouteData.put(id, ri.adopt(relObj));
 				cnt++;
 			} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
 				commonRouteData.remove(id);
-				commonRouteData.put(id, relObj);
+				commonRouteData.put(id, ri.adopt(relObj));
 				cnt++;
 			}
 		}
