@@ -195,21 +195,10 @@ public class ObfRegionSplitter {
 
 	private void attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
 
-		final List<String> elevationTags = new ArrayList<String>() {{
-			add(IndexHeightData.ELE_ASC_START);
-			add(IndexHeightData.ELE_ASC_END);
-			add(IndexHeightData.ELE_INCLINE);
-			add(IndexHeightData.ELE_INCLINE_MAX);
-			add(IndexHeightData.ELE_DECLINE);
-			add(IndexHeightData.ELE_DECLINE_MAX);
-			add(IndexHeightData.ELE_ASC_TAG);
-			add(IndexHeightData.ELE_DESC_TAG);
-		}};
-
 		// Prepare Way with Nodes
 		List<Node> nodes = new ArrayList<>();
 		int id = 1;
-		for(int i = 0; i < obj.getPointsLength(); i++, id++) {
+		for (int i = 0; i < obj.getPointsLength(); i++, id++) {
 			double lon = MapUtils.get31LongitudeX(obj.getPoint31XTile(i));
 			double lat = MapUtils.get31LatitudeY(obj.getPoint31YTile(i));
 			Node n = new Node(lat, lon, id);
@@ -219,9 +208,16 @@ public class ObfRegionSplitter {
 		Way way = new Way(obj.getId(), nodes);
 		for (int t : obj.getTypes()) {
 			BinaryMapRouteReaderAdapter.RouteTypeRule type = obj.region.routeEncodingRules.get(t);
-			way.putTag(type.getTag(), type.getValue());
+			String tag = type.getTag();
+			if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
+				// already processed tags
+				return;
+			}
+			way.putTag(tag, type.getValue());
 		}
-
+		if (!IndexHeightData.isHeightDataNeeded(way)) {
+			return;
+		}
 		heightData.proccess(way);
 
 		// Write result to RouteDataObject
@@ -230,7 +226,7 @@ public class ObfRegionSplitter {
 			int index = obj.types.length;
 			for (Map.Entry<String, String> entry : way.getTags().entrySet()) {
 				String tag = entry.getKey();
-				if (elevationTags.contains(tag)) {
+				if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
 					String val = entry.getValue();
 					int ruleId = obj.region.searchRouteEncodingRule(tag, val);
 					if (ruleId == -1) {
