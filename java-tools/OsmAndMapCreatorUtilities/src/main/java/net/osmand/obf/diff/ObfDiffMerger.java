@@ -28,7 +28,11 @@ public class ObfDiffMerger {
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
 	
 	public static void main(String[] args) {
-		/*try {
+		if ((args.length == 1 && args[0].equals("mergeRelationTest"))) {
+			mergeRelationOsmLive(args);
+			return;
+		}
+		try {
 			if(args.length == 1 && args[0].equals("test")) {
 				args = new String[4];
 				List<String> s = new ArrayList<String>();
@@ -44,8 +48,7 @@ public class ObfDiffMerger {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
-		}*/
-		mergeRelationOsmLive(args);
+		}
 	}
 	
 	
@@ -82,10 +85,10 @@ public class ObfDiffMerger {
 
 	public static void mergeRelationOsmLive(String[] args) {
 		try {
-			if(args.length == 1 && args[0].equals("test")) {
+			if(args.length == 1 && args[0].equals("mergeRelationTest")) {
 				args = new String[3];
 				List<String> s = new ArrayList<String>();
-				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_end_test.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_result.obf");
 				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00.obf.gz");
 				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_MERGED.obf");
 				args = s.toArray(new String[0]);
