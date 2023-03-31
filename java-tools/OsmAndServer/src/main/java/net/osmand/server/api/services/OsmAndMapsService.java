@@ -109,6 +109,7 @@ public class OsmAndMapsService {
 	
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final double SEARCH_RADIUS_DEGREE = 1.5;
+	private static final double MAX_SIZE_POI = 500;
 	private static final String SEARCH_LOCALE = "en";
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -894,8 +895,6 @@ public class OsmAndMapsService {
 	}
 	
 	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, int zoom, int radius) throws IOException {
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-		searchUICore.getSearchSettings().setRegions(osmandRegions);
 		QuadRect bbox = getBboxRadius(lat, lon, radius, zoom);
 		BinaryMapIndexReader[] list = getObfReaders(bbox);
 		List<Amenity> results = new ArrayList<>();
@@ -903,33 +902,45 @@ public class OsmAndMapsService {
 			results.addAll(reader.searchPoi(buildSearchPoiRequest((int) bbox.left,
 					(int) bbox.right, (int) bbox.top, (int) bbox.bottom, zoom, ACCEPT_ALL_POI_TYPE_FILTER, null)));
 		}
-		List<RoutingController.Feature> features = new ArrayList<>();
-		for (Amenity amenity : results) {
-			PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-			String iconName = null;
-			if (poiType.getParentType() != null) {
-				iconName = poiType.getParentType().getIconKeyName();
-			} else if (poiType.getFilter() != null) {
-				iconName = poiType.getFilter().getIconKeyName();
-			} else if (poiType.getCategory() != null) {
-				iconName = poiType.getCategory().getIconKeyName();
+		if (!results.isEmpty() && results.size() < MAX_SIZE_POI) {
+			List<RoutingController.Feature> features = new ArrayList<>();
+			for (Amenity amenity : results) {
+				PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+				RoutingController.Feature feature;
+				if (poiType != null) {
+					feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
+							.prop("name", amenity.getName())
+							.prop("color", amenity.getColor())
+							.prop("iconKeyName", poiType.getIconKeyName())
+							.prop("typeOsmTag", poiType.getOsmTag())
+							.prop("typeOsmValue", poiType.getOsmValue())
+							.prop("iconName", getIconName(poiType))
+							.prop("type", amenity.getType().getKeyName())
+							.prop("subType", amenity.getSubType());
+					
+					for (String e : amenity.getAdditionalInfoKeys()) {
+						feature.prop(e, amenity.getAdditionalInfo(e));
+					}
+					features.add(feature);
+				}
 			}
-			RoutingController.Feature feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
-					.prop("name", amenity.getName())
-					.prop("color", amenity.getColor())
-					.prop("iconKeyName", poiType.getIconKeyName())
-					.prop("typeOsmTag", poiType.getOsmTag())
-					.prop("typeOsmValue", poiType.getOsmValue())
-					.prop("iconName", iconName)
-					.prop("type", amenity.getType().getKeyName())
-					.prop("subType", amenity.getSubType());
-			
-			for (String e : amenity.getAdditionalInfoKeys()) {
-				feature.prop(e, amenity.getAdditionalInfo(e));
-			}
-			features.add(feature);
+			return new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0]));
+		} else {
+			return null;
 		}
-		return new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0]));
+	}
+	
+	private String getIconName(PoiType poiType) {
+		if (poiType != null) {
+			if (poiType.getParentType() != null) {
+				return poiType.getParentType().getIconKeyName();
+			} else if (poiType.getFilter() != null) {
+				return poiType.getFilter().getIconKeyName();
+			} else if (poiType.getCategory() != null) {
+				return poiType.getCategory().getIconKeyName();
+			}
+		}
+		return null;
 	}
 	
 	private QuadRect getBboxRadius(double lat, double lon, int radiusMeters, int zoom) {
