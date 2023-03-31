@@ -345,27 +345,6 @@ public class MapRouterLayer implements MapPanelLayer {
 			directions.add(recalculate);
 		}
 
-		Action route_YOURS = new AbstractAction("Build route (YOURS)") {
-			private static final long serialVersionUID = 507156107455281238L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				new Thread(){
-					@Override
-					public void run() {
-						List<Way> ways = route_YOURS(startRoute, endRoute);
-						DataTileManager<Entity> points = new DataTileManager<Entity>(11);
-						for(Way w : ways){
-							LatLon n = w.getLatLon();
-							points.registerObject(n.getLatitude(), n.getLongitude(), w);
-						}
-						map.setPoints(points);
-						map.fillPopupActions();
-					}
-				}.start();
-			}
-		};
-		directions.add(route_YOURS);
 		Action straightRoute = new AbstractAction("Build straight route ") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
@@ -808,74 +787,6 @@ public class MapRouterLayer implements MapPanelLayer {
 		}.start();
 	}
 
-	public static List<Way> route_YOURS(LatLon start, LatLon end){
-		List<Way> res = new ArrayList<Way>();
-		long time = System.currentTimeMillis();
-		System.out.println("Route from " + start + " to " + end);
-		if (start != null && end != null) {
-			try {
-				StringBuilder uri = new StringBuilder();
-				uri.append("http://www.yournavigation.org/api/1.0/gosmore.php?format=kml");
-				uri.append("&flat=").append(start.getLatitude());
-				uri.append("&flon=").append(start.getLongitude());
-				uri.append("&tlat=").append(end.getLatitude());
-				uri.append("&tlon=").append(end.getLongitude());
-				uri.append("&v=motorcar").append("&fast=1").append("&layer=mapnik");
-
-				URL url = new URL(uri.toString());
-				URLConnection connection = url.openConnection();
-				StringBuilder content = new StringBuilder();
-				BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-				{
-					String s = null;
-					boolean fist = true;
-					while ((s = reader.readLine()) != null) {
-						if (fist) {
-							fist = false;
-						}
-						content.append(s).append("\n");
-					}
-					System.out.println(content);
-				}
-				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-				DocumentBuilder dom = factory.newDocumentBuilder();
-				Document doc = dom.parse(new InputSource(new StringReader(content.toString())));
-				NodeList list = doc.getElementsByTagName("coordinates");
-				for(int i=0; i<list.getLength(); i++){
-					Node item = list.item(i);
-					String str = item.getTextContent();
-					int st = 0;
-					int next = 0;
-					Way w = new Way(-1);
-					while((next = str.indexOf('\n', st)) != -1){
-						String coordinate = str.substring(st, next + 1);
-						int s = coordinate.indexOf(',');
-						if (s != -1) {
-							try {
-								double lon = Double.parseDouble(coordinate.substring(0, s));
-								double lat = Double.parseDouble(coordinate.substring(s + 1));
-								w.addNode(new net.osmand.osm.edit.Node(lat, lon, -1));
-							} catch (NumberFormatException e) {
-							}
-						}
-						st = next + 1;
-					}
-					if(!w.getNodes().isEmpty()){
-						res.add(w);
-					}
-
-				}
-			} catch (IOException e) {
-				ExceptionHandler.handle(e);
-			} catch (ParserConfigurationException e) {
-				ExceptionHandler.handle(e);
-			} catch (SAXException e) {
-				ExceptionHandler.handle(e);
-			}
-			System.out.println("Finding routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
-		}
-		return res;
-	}
 
 	private static Reader getUTF8Reader(InputStream f) throws IOException {
 		BufferedInputStream bis = new BufferedInputStream(f);
@@ -937,80 +848,6 @@ public class MapRouterLayer implements MapPanelLayer {
 
 
 
-	public List<Way> route_CloudMate(LatLon start, LatLon end) {
-		List<Way> res = new ArrayList<Way>();
-		long time = System.currentTimeMillis();
-		System.out.println("Cloud made route from " + start + " to " + end);
-		if (start != null && end != null) {
-			try {
-				StringBuilder uri = new StringBuilder();
-				// possibly hide that API key because it is privacy of osmand
-				uri.append("http://routes.cloudmade.com/A6421860EBB04234AB5EF2D049F2CD8F/api/0.3/");
-
-				uri.append(String.valueOf(start.getLatitude())).append(",");
-				uri.append(String.valueOf(start.getLongitude())).append(",");
-				uri.append(String.valueOf(end.getLatitude())).append(",");
-				uri.append(String.valueOf(end.getLongitude())).append("/");
-				uri.append("car.gpx").append("?lang=ru");
-
-				URL url = new URL(uri.toString());
-				URLConnection connection = url.openConnection();
-				StringBuilder content = new StringBuilder();
-				BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-				{
-					String s = null;
-					boolean fist = true;
-					while ((s = reader.readLine()) != null) {
-						if (fist) {
-							fist = false;
-						}
-						content.append(s).append("\n");
-					}
-					System.out.println(content);
-				}
-				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-				DocumentBuilder dom = factory.newDocumentBuilder();
-				Document doc = dom.parse(new InputSource(new StringReader(content.toString())));
-				NodeList list = doc.getElementsByTagName("wpt");
-				Way w = new Way(-1);
-				for (int i = 0; i < list.getLength(); i++) {
-					Element item = (Element) list.item(i);
-					try {
-						double lon = Double.parseDouble(item.getAttribute("lon"));
-						double lat = Double.parseDouble(item.getAttribute("lat"));
-						w.addNode(new net.osmand.osm.edit.Node(lat, lon, -1));
-					} catch (NumberFormatException e) {
-					}
-				}
-				list = doc.getElementsByTagName("rtept");
-				for (int i = 0; i < list.getLength(); i++) {
-					Element item = (Element) list.item(i);
-					try {
-						double lon = Double.parseDouble(item.getAttribute("lon"));
-						double lat = Double.parseDouble(item.getAttribute("lat"));
-						System.out.println("Lat " + lat + " lon " + lon);
-						System.out.println("Distance : " + item.getElementsByTagName("distance").item(0).getTextContent());
-						System.out.println("Time : " + item.getElementsByTagName("time").item(0).getTextContent());
-						System.out.println("Offset : " + item.getElementsByTagName("offset").item(0).getTextContent());
-						System.out.println("Direction : " + item.getElementsByTagName("direction").item(0).getTextContent());
-					} catch (NumberFormatException e) {
-					}
-				}
-
-				if (!w.getNodes().isEmpty()) {
-					res.add(w);
-				}
-			} catch (IOException e) {
-				ExceptionHandler.handle(e);
-			} catch (ParserConfigurationException e) {
-				ExceptionHandler.handle(e);
-			} catch (SAXException e) {
-				ExceptionHandler.handle(e);
-			}
-			System.out.println("Finding cloudmade routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
-		}
-		return res;
-	}
 
 	private static Double[] decodeGooglePolylinesFlow(String encodedData) {
         final List<Double> decodedValues = new ArrayList<Double>();
@@ -1137,7 +974,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(2000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
-				// addImpassableRoad(6859437l).
+				 addImpassableRoad(68716374655l).
 				// addImpassableRoad(46859655089l).
 						setDirectionPoints(directionPointsFile)
 						.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
