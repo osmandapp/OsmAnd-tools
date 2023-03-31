@@ -90,8 +90,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.MapsCollection;
 
-import static net.osmand.binary.BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER;
-import static net.osmand.binary.BinaryMapIndexReader.buildSearchPoiRequest;
+import static net.osmand.binary.BinaryMapIndexReader.*;
 
 @Service
 public class OsmAndMapsService {
@@ -109,7 +108,7 @@ public class OsmAndMapsService {
 	
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final double SEARCH_RADIUS_DEGREE = 1.5;
-	private static final double MAX_SIZE_POI = 500;
+	private static final int MAX_SIZE_POI = 500;
 	private static final String SEARCH_LOCALE = "en";
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -899,10 +898,17 @@ public class OsmAndMapsService {
 		BinaryMapIndexReader[] list = getObfReaders(bbox);
 		List<Amenity> results = new ArrayList<>();
 		for (BinaryMapIndexReader reader : list) {
-			results.addAll(reader.searchPoi(buildSearchPoiRequest((int) bbox.left,
-					(int) bbox.right, (int) bbox.top, (int) bbox.bottom, zoom, ACCEPT_ALL_POI_TYPE_FILTER, null)));
+			List<Amenity> pois = reader.searchPoi(buildSearchPoiWebRequest((int) bbox.left,
+					(int) bbox.right, (int) bbox.top, (int) bbox.bottom, zoom, ACCEPT_ALL_POI_TYPE_FILTER, null, MAX_SIZE_POI));
+			if (pois.size() + results.size() < MAX_SIZE_POI) {
+				results.addAll(pois);
+			} else {
+				List<Amenity> subList = pois.subList(0, MAX_SIZE_POI - results.size());
+				results.addAll(subList);
+				break;
+			}
 		}
-		if (!results.isEmpty() && results.size() < MAX_SIZE_POI) {
+		if (!results.isEmpty()) {
 			List<RoutingController.Feature> features = new ArrayList<>();
 			for (Amenity amenity : results) {
 				PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
