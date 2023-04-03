@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.obf.diff.*;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -25,11 +26,6 @@ import net.osmand.obf.BinaryMerger;
 import net.osmand.obf.GenerateRegionTags;
 import net.osmand.obf.IconVisibility;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.obf.diff.AugmentedDiffsInspector;
-import net.osmand.obf.diff.GenerateDailyObf;
-import net.osmand.obf.diff.ObfDiffGenerator;
-import net.osmand.obf.diff.ObfDiffMerger;
-import net.osmand.obf.diff.ObfRegionSplitter;
 import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
@@ -110,6 +106,9 @@ public class MainUtilities {
 			} else if (utl.equals("generate-wikipedia-by-country")) {
 				WikipediaByCountryDivider.main(subArgsArray);
 			} else if (utl.equals("generate-obf-diff")) {
+				ObfDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("generate-obf-diff-no-transport")) {
+				ObfDiffGenerator.COMPARE_TRANSPORT = false;
 				ObfDiffGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-basemap")) {
 				BasemapProcessor.main(subArgsArray);
@@ -229,6 +228,10 @@ public class MainUtilities {
 				GenerateDailyObf.main(argsToGenerateObf);
 			} else if (utl.equals("travel-guide-creator")) {
 				TravelGuideCreatorMain.main(subArgsArray);
+			} else if (utl.equals("generate-relation-osm")) {
+				RelationDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("merge-obf-diff")) {
+				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
 			} else {
 				printSynopsys();
 			}

@@ -88,9 +88,9 @@ public class ObfDiffMerger {
 			if(args.length == 1 && args[0].equals("mergeRelationTest")) {
 				args = new String[3];
 				List<String> s = new ArrayList<String>();
-				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_result.obf");
-				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00.obf.gz");
-				s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_MERGED.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_after_rel_m.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_14_20.obf.gz");
+				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_diff_test.obf");
 				args = s.toArray(new String[0]);
 			} else if (args.length < 2) {
 				System.out.println("Usage: <path to relation_osm_live.obf> <path to common_osm_live.obf> " +
@@ -134,6 +134,9 @@ public class ObfDiffMerger {
 					commonMapData.put(id, mi.adoptMapObject(relObj));
 					cnt++;
 				}
+				if (commonObj != null && commonObj.containsType(deleteId)) {
+					System.out.println("Map id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
+				}
 			}
 		}
 		System.out.println("Map section. Merged " + cnt);
@@ -154,6 +157,9 @@ public class ObfDiffMerger {
 				commonRouteData.remove(id);
 				commonRouteData.put(id, ri.adopt(relObj));
 				cnt++;
+			}
+			if (commonObj != null && commonObj.containsType(deleteId)) {
+				System.out.println("Route id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
 			}
 		}
 		System.out.println("Route section. Merged " + cnt);
@@ -177,6 +183,9 @@ public class ObfDiffMerger {
 					commonPoiSource.get(relObj.getId()).remove(relObj.getType().getKeyName());
 					commonPoiSource.get(relObj.getId()).put(relObj.getType().getKeyName(), relObj);
 					cnt++;
+				}
+				if (commonObj != null && commonObj.getAdditionalInfo(OSMAND_CHANGE_TAG) != null) {
+					System.out.println("Amenity id:" + relObj.getId() + " has osmand_change=delete tag");
 				}
 			}
 		}

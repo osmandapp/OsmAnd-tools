@@ -2,12 +2,10 @@ package net.osmand.obf.diff;
 
 
 import net.osmand.PlatformUtil;
-import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.util.Algorithms;
 import org.w3c.dom.*;
-import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -22,130 +20,80 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class RelationDiffGenerator {
 
-    private static final String TAG_ACTION = "action";
-    private static final String TAG_OLD_END = "old";
-    private static final String TAG_MEMBER = "member";
-    private static final String ATTRIBUTE_TYPE = "type";
-    private static final String ATTRIBUTE_REF = "ref";
-    private static final String TYPE_DELETE = "delete";
-    private static final String TAG_RELATION = "relation";
     private static final String TAG_NODE = "node";
     private static final String TAG_WAY = "way";
-    private static final String TAG_NODE_OF_WAY = "nd";
 
     public static void main(String[] args) {
 
         if(args.length == 1 && args[0].equals("test")) {
-            args = new String[5];
+            args = new String[4];
             List<String> s = new ArrayList<String>();
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_diff.osm.gz");
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_start_test.osm.gz");
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_end_test.osm.gz");
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_result.osm.gz");
+            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_before_rel.osm.gz");
+            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_after_rel.osm.gz");
+            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_after_rel_m.osm.gz");
             s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_tmp.osm");
             args = s.toArray(new String[0]);
         } else if (args.length < 3) {
-            System.out.println("Usage: <path to diff osm.gz file> <path start osm.gz file> " +
-                "<path to end osm.gz file> " +
-                "<path to write osm.gz result> " +
+            System.out.println("Usage: <path before_rel.osm.gz file> " +
+                "<path to after_rel.osm.gz file> " +
+                "<path to write result> " +
                 "<path to temporary osm file>(optional)");
             System.exit(1);
         }
 
-        String diff = args[0];
-        String start = args[1];
-        String end = args[2];
-        String result = args[3];
-        File tmpFile = args.length >= 5 ? new File(args[4]) : null;
+        String start = args[0];
+        String end = args[1];
+        String result = args[2];
+        File tmpFile = args.length >= 4 ? new File(args[3]) : null;
 
         try {
-            HashSet<LatLon> nodeCoordsCashe = new HashSet<>();
             RelationDiffGenerator rdg = new RelationDiffGenerator();
-            HashSet<EntityId> membersDelRelation = rdg.getMembersDeletedRelation(new File(diff), nodeCoordsCashe);
             File endFile = new File(end);
-            Document doc = rdg.getDocument(new File(start), endFile, tmpFile, membersDelRelation, nodeCoordsCashe);
+            HashSet<EntityId> nodesWaysFromEnd = rdg.getNodesWaysFromEnd(endFile);
+            Document doc = rdg.getDocument(new File(start), tmpFile, nodesWaysFromEnd);
             rdg.mergeDocIntoOsm(doc, endFile, new File(result));
-        } catch (IOException | XmlPullParserException | SAXException | ParserConfigurationException e) {
+        } catch (IOException | XmlPullParserException | ParserConfigurationException e) {
             e.printStackTrace();
         }
     }
 
-    private HashSet<EntityId> getMembersDeletedRelation(File diff, HashSet<LatLon> nodeCoordsCashe) throws IOException, XmlPullParserException {
+    private HashSet<EntityId> getNodesWaysFromEnd(File end) throws XmlPullParserException, IOException {
         InputStream fis;
-        if(diff.getName().endsWith(".gz")) {
-            fis = new GZIPInputStream(new FileInputStream(diff));
+        if(end.getName().endsWith(".gz")) {
+            fis = new GZIPInputStream(new FileInputStream(end));
         } else {
-            fis = new FileInputStream(diff);
+            fis = new FileInputStream(end);
         }
 
         XmlPullParser parser = PlatformUtil.newXMLPullParser();
         parser.setInput(fis, "UTF-8");
         int tok;
-        boolean actionDelete = false;
-        boolean relationDelete = false;
         HashSet<EntityId> result = new HashSet<>();
         while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+            String name = parser.getName();
             if (tok == XmlPullParser.START_TAG ) {
-                String name = parser.getName();
-
-                if (relationDelete) {
-                    if (TAG_MEMBER.equals(name)) {
-                        String type = parser.getAttributeValue("", ATTRIBUTE_TYPE);
-                        String ref = parser.getAttributeValue("", ATTRIBUTE_REF);
-                        if (!Algorithms.isEmpty(type) && !Algorithms.isEmpty(ref)) {
-                            if (TAG_NODE.equals(type)) {
-                                EntityId e = new EntityId(Entity.EntityType.NODE, Long.parseLong(ref));
-                                result.add(e);
-                            } else if (TAG_WAY.equals(type)) {
-                                EntityId e = new EntityId(Entity.EntityType.WAY, Long.parseLong(ref));
-                                result.add(e);
-                            }
-                        }
+                if (TAG_WAY.equals(name) || TAG_NODE.equals(name)) {
+                    Entity.EntityType entityType = TAG_WAY.equals(name) ? Entity.EntityType.WAY : Entity.EntityType.NODE;
+                    String id = parser.getAttributeValue("", "id");
+                    if (!Algorithms.isEmpty(id)) {
+                        EntityId e = new EntityId(entityType, Long.parseLong(id));
+                        result.add(e);
                     }
-                    if (TAG_NODE_OF_WAY.equals(name)) {
-                        String lat = parser.getAttributeValue("", "lat");
-                        String lon = parser.getAttributeValue("", "lon");
-                        if (!Algorithms.isEmpty(lat) && !Algorithms.isEmpty(lon)) {
-                            nodeCoordsCashe.add(new LatLon(Float.parseFloat(lat), Float.parseFloat(lon)));
-                        }
-                    }
-                }
-
-                if (actionDelete && TAG_RELATION.equals(name)) {
-                    relationDelete = true;
-                }
-
-                // TODO perhaps add cache of deleted nodes and ways for remove them from result and nodeCoordsCashe
-
-                if (TAG_ACTION.equals(name)
-                        && ATTRIBUTE_TYPE.equals(parser.getAttributeName(0))
-                        && TYPE_DELETE.equals(parser.getAttributeValue(0))) {
-                    actionDelete = true;
-                }
-            } else if (tok == XmlPullParser.END_TAG) {
-                String name = parser.getName();
-                if (TAG_OLD_END.equals(name)) {
-                    actionDelete = false;
-                    relationDelete = false;
                 }
             }
         }
         return result;
     }
 
-    private Document getDocument(File start, File end, @Nullable File tmp, HashSet<EntityId> members, HashSet<LatLon> nodeCoordsCashe)
-            throws IOException, ParserConfigurationException, SAXException, XmlPullParserException {
-
+    private Document getDocument(File start, @Nullable File tmp, HashSet<EntityId> nodesWaysFromEnd) throws IOException, ParserConfigurationException, XmlPullParserException {
         InputStream fisStart;
         if(start.getName().endsWith(".gz")) {
             fisStart = new GZIPInputStream(new FileInputStream(start));
@@ -156,11 +104,6 @@ public class RelationDiffGenerator {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         DocumentBuilder db = dbf.newDocumentBuilder();
         Document doc = db.newDocument();
-
-        int cnt = members.size();
-        //TODO add also for check nodeCoordsCashe
-        removeRepeatedMembers(end, members);
-        System.out.println("Clear members. Size before:" + cnt + ", after:" + members.size());
 
         //parse start file and put data to doc
         Element root = doc.createElement("osm");
@@ -190,20 +133,10 @@ public class RelationDiffGenerator {
                     String id = parser.getAttributeValue("", "id");
                     if (!Algorithms.isEmpty(id)) {
                         EntityId e = new EntityId(type, Long.parseLong(id));
-                        if (members.contains(e)) {
+                        if (!nodesWaysFromEnd.contains(e)) {
                             // check members
-                            write = true;
                             statisticAddedMembers++;
-                        } else if (type == Entity.EntityType.NODE) {
-                            // check node coords cache
-                            String lat = parser.getAttributeValue("", "lat");
-                            String lon = parser.getAttributeValue("", "lon");
-                            if (!Algorithms.isEmpty(lat) && !Algorithms.isEmpty(lon)) {
-                                LatLon latLon = new LatLon(Float.parseFloat(lat), Float.parseFloat(lon));
-                                if (nodeCoordsCashe.contains(latLon)) {
-                                    write = true;
-                                }
-                            }
+                            write = true;
                         }
                     }
                     if (write) {
@@ -227,7 +160,7 @@ public class RelationDiffGenerator {
             }
         }
 
-        System.out.println("Processed members. Size processed:" + statisticAddedMembers + ", total size:" + members.size());
+        System.out.println("Processed members. Added node and ways from start:" + statisticAddedMembers);
 
         if (tmp != null) {
             try {
@@ -239,31 +172,6 @@ public class RelationDiffGenerator {
         }
 
         return doc;
-    }
-
-    private void removeRepeatedMembers(File endFile, HashSet<EntityId> members) throws IOException, XmlPullParserException {
-        InputStream fis;
-        if(endFile.getName().endsWith(".gz")) {
-            fis = new GZIPInputStream(new FileInputStream(endFile));
-        } else {
-            fis = new FileInputStream(endFile);
-        }
-
-        XmlPullParser parser = PlatformUtil.newXMLPullParser();
-        parser.setInput(fis, "UTF-8");
-        int tok;
-        HashSet<EntityId> result = new HashSet<>();
-        while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-            if (tok == XmlPullParser.START_TAG) {
-                String name = parser.getName();
-                if (TAG_WAY.equals(name) || TAG_NODE.equals(name)) {
-                    Entity.EntityType type = TAG_WAY.equals(name) ? Entity.EntityType.WAY : Entity.EntityType.NODE;
-                    String id = parser.getAttributeValue("", "id");
-                    EntityId e = new EntityId(type, Long.parseLong(id));
-                    members.remove(e);
-                }
-            }
-        }
     }
 
     // write doc to output stream
@@ -475,8 +383,11 @@ public class RelationDiffGenerator {
             Algorithms.streamCopy(fis, gzout);
             fis.close();
             gzout.close();
-            // TODO uncomment after test
-            //destFileSource.delete();
+            destFileSource.delete();
+        }
+
+        if (source.getName().endsWith(".gz")) {
+            fromFileSource.delete();
         }
 
         destFile.close();
