@@ -13,7 +13,6 @@ import org.apache.commons.logging.Log;
 
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
-import org.luaj.vm2.ast.Str;
 import rtree.RTreeException;
 
 public class ObfDiffMerger {
