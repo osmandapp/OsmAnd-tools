@@ -498,7 +498,7 @@ public class IndexUploader {
 		}
 	}
 
-	public static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
+	public synchronized static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
 		RandomAccessFile raf = new RandomAccessFile(mainFile, "r");
 		BinaryMapIndexReader index = new BinaryMapIndexReader(raf, mainFile);
 		final RandomAccessFile routf = new RandomAccessFile(roadOnlyFile, "rw");
