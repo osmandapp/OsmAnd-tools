@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -348,10 +349,16 @@ public class IndexUploader {
 					});
 				}
 			}
+			log.error("Stopping the tasks queue...");
+			service.shutdown();
+			log.error("Waiting termination all tasks...");
+			service.awaitTermination(24, TimeUnit.HOURS);
 			if (deleteFileFilter != null) {
 				log.error("Delete file filter is not supported with this credentions (method) " + uploadCredentials);
 			}
-
+			log.error("All tasks has finished.");
+		} catch (InterruptedException e) {
+			log.error("Await failed: " + e.getMessage(), e);
 		} finally {
 			uploadCredentials.disconnect();
 		}
