@@ -202,14 +202,22 @@ public class UpdateSubscription {
 //			return;
 //		}
 		Class.forName("org.postgresql.Driver");
+		List<SubscriptionUpdateException> exceptionsUpdates = new ArrayList<UpdateSubscription.SubscriptionUpdateException>();
 		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		for (SubscriptionType t : set) {
-			new UpdateSubscription(publisher, t, revalidateinvalid).queryPurchases(conn, up);
+			new UpdateSubscription(publisher, t, revalidateinvalid).queryPurchases(conn, up, exceptionsUpdates);
+		}
+		if (exceptionsUpdates.size() > 0) {
+			StringBuilder msg = new StringBuilder();
+			for (SubscriptionUpdateException e : exceptionsUpdates) {
+				msg.append(e.orderid + " " + e.getMessage()).append("\n");
+			}
+			throw new IllegalStateException(msg.toString());
 		}
 	}
 
-	void queryPurchases(Connection conn, UpdateParams pms) throws SQLException {
+	void queryPurchases(Connection conn, UpdateParams pms, List<SubscriptionUpdateException> exceptionsUpdates) throws SQLException {
 		ResultSet rs = conn.createStatement().executeQuery(selQuery);
 		updStat = conn.prepareStatement(updQuery);
 		delStat = conn.prepareStatement(delQuery);
@@ -219,7 +227,6 @@ public class UpdateSubscription {
 		AmazonIAPHelper amazonIAPHelper = null;
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = SubscriptionType.IOS == subType ? new ReceiptValidationHelper() : null;
-		List<SubscriptionUpdateException> exceptionsUpdates = new ArrayList<UpdateSubscription.SubscriptionUpdateException>();
 		while (rs.next()) {
 			String purchaseToken = rs.getString("purchaseToken");
 			String prevpurchaseToken = rs.getString("prevvalidpurchasetoken");
@@ -295,13 +302,6 @@ public class UpdateSubscription {
 		}
 		if (!conn.getAutoCommit()) {
 			conn.commit();
-		}
-		if (exceptionsUpdates.size() > 0) {
-			StringBuilder msg = new StringBuilder();
-			for (SubscriptionUpdateException e : exceptionsUpdates) {
-				msg.append(e.orderid + " " + e.getMessage()).append("\n");
-			}
-			throw new IllegalStateException(msg.toString());
 		}
 	}
 
