@@ -266,8 +266,8 @@ public class QtCorePanel implements GLEventListener {
 		ResolvedMapStyle mapStyle = null;
 		if (this.styleFile != null) {
 			File styleDir = new File(styleFile).getParentFile();
-			loadRendererAddons(mapStylesCollection, styleDir);
 			loadRenderer(mapStylesCollection, this.styleFile, styleDir);
+			loadRendererAddons(mapStylesCollection, styleDir);
 			mapStyle = mapStylesCollection.getResolvedStyleByName((new File(this.styleFile)).getName());
 		} else {
 			System.out.println("Going to use embedded map style");
