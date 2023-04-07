@@ -48,7 +48,6 @@ import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiJsonResponseException
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
-import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.util.Algorithms;
 
 
@@ -258,36 +257,28 @@ public class UpdateSubscription {
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			try {
+				SubscriptionPurchase sub = null;
 				if (subType == SubscriptionType.IOS) {
-					SubscriptionPurchase sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId,
+					sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId,
 							regTime, startTime, expireTime, currentTime, introcycles, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new IllegalStateException("This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
 				} else if (subType == SubscriptionType.HUAWEI) {
 					if (huaweiIAPHelper == null) {
 						huaweiIAPHelper = new HuaweiIAPHelper();
 					}
-					SubscriptionPurchase sub = processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId,
+					sub = processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId,
 							regTime, startTime, expireTime, currentTime, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
 				} else if (subType == SubscriptionType.AMAZON) {
 					if (amazonIAPHelper == null) {
 						amazonIAPHelper = new AmazonIAPHelper();
 					}
-					SubscriptionPurchase sub = processAmazonSubscription(amazonIAPHelper, purchaseToken, sku, orderId,
+					sub = processAmazonSubscription(amazonIAPHelper, purchaseToken, sku, orderId,
 							regTime, startTime, expireTime, currentTime, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
 				} else if (subType == SubscriptionType.ANDROID) {
-					SubscriptionPurchase sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId,
+					sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId,
 							regTime, startTime, expireTime, currentTime, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
+				}
+				if (sub == null && prevpurchaseToken != null) {
+					exceptionsUpdates.add(new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid."));
 				}
 			} catch (SubscriptionUpdateException e) {
 				exceptionsUpdates.add(e);
