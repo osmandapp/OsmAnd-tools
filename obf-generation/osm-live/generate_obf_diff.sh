@@ -83,7 +83,8 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             
             gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
             # TESTONLY: comment after test
-            gzip -c ${BASENAME}_diff_test.obf > $DATE_DIR/${BASENAME}_test.obf.gz
+            mkdir -p $DATE_DIR/test
+            gzip -c ${BASENAME}_diff_test.obf > $DATE_DIR/test/${BASENAME}_test.obf.gz
             touch -r $DIFF_FILE $DATE_DIR/${BASENAME}.obf.gz
 
             rm -r *.osm || true
