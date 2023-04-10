@@ -71,10 +71,10 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             wait
 
             echo "#### 3. Merge ${BASENAME}_diff_rel.obf into ${BASENAME}_diff.obf . Avoid osmand_change=delete"
-            # for test only
+            # TESTONLY: comment after test
             $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
-            # uncomment after test
-            #$OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
+            # TESTONLY: uncomment after test
+            # $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
 
             echo "### 4. Split files : $(date -u)"
             DATE_NAME=${BASENAME:0:8} #22_10_11
@@ -82,6 +82,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME" --srtm="$SRTM_DIR"
             
             gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
+            # TESTONLY: comment after test
             gzip -c ${BASENAME}_diff_test.obf > $DATE_DIR/${BASENAME}_test.obf.gz
             touch -r $DIFF_FILE $DATE_DIR/${BASENAME}.obf.gz
 
