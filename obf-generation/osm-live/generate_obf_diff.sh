@@ -47,44 +47,25 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
                 exit 1;
             fi
 
-            echo "### 0. Generate relation osm : $(date -u) . All nodes and ways copy from before_rel to after_rel " &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-relation-osm \
-                $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel_m.osm.gz
-
             echo "### 1. Generate obf files : $(date -u)"
             # SRTM takes too much time and memory at this step (probably it could be used at the change step)
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
                 --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" & # --srtm="$SRTM_DIR" &
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before.osm.gz  \
                 --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" & # --srtm="$SRTM_DIR" &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
-                --ram-process --add-region-tags &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after_rel_m.osm.gz \
-                --ram-process --add-region-tags            
             wait
 
             echo "### 2. Generate diff files : $(date -u)"
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-diff \
                 ${BASENAME}_before.obf ${BASENAME}_after.obf ${BASENAME}_diff.obf $DIFF_FILE &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-diff-no-transport \
-                ${BASENAME}_before_rel.obf ${BASENAME}_after_rel_m.obf ${BASENAME}_diff_rel.obf &
             wait
 
-            echo "#### 3. Merge ${BASENAME}_diff_rel.obf into ${BASENAME}_diff.obf . Avoid osmand_change=delete"
-            # TESTONLY: comment after test
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
-            # TESTONLY: uncomment after test
-            # $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
-
-            echo "### 4. Split files : $(date -u)"
+            echo "### 3. Split files : $(date -u)"
             DATE_NAME=${BASENAME:0:8} #22_10_11
             TIME_NAME=${BASENAME:9:12} #20_30
             $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME" --srtm="$SRTM_DIR"
             
             gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
-            # TESTONLY: comment after test
-            mkdir -p $DATE_DIR/test
-            gzip -c ${BASENAME}_diff_test.obf > $DATE_DIR/test/${BASENAME}_test.obf.gz
             touch -r $DIFF_FILE $DATE_DIR/${BASENAME}.obf.gz
 
             rm -r *.osm || true
