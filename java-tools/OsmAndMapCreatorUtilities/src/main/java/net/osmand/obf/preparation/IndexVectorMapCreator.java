@@ -155,7 +155,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             long ts = System.currentTimeMillis();
             Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION,
                     EntityConvertApplyType.MAP);
-            if (!settings.keepOnlyRouteRelationObjects) {
+            if (!settings.keepOnlyRouteRelationObjects && settings.indexMultipolygon) {
                 indexMultiPolygon((Relation) e, tags, ctx);
             }
             tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);

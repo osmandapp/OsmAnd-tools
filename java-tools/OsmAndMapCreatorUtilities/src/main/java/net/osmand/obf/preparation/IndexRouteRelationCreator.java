@@ -126,20 +126,22 @@ public class IndexRouteRelationCreator {
 			}
 			tags.put("route_activity_type", activityType.getName().toLowerCase());
 		}
-		WayGeneralStats wg = icc.getIndexHeightData().calculateWayGeneralStats(w, DIST_STEP);
-		if (tags.get("distance") == null && wg.dist > 0) {
-			tags.put("distance", String.valueOf((int) wg.dist));
-		}
-		if (wg.eleCount > 0) {
-			int st = (int) wg.startEle;
-			tags.put("start_ele", String.valueOf((int) wg.startEle));
-			tags.put("end_ele__start", String.valueOf((int) wg.endEle - st));
-			tags.put("avg_ele__start", String.valueOf((int) (wg.sumEle / wg.eleCount) - st));
-			tags.put("min_ele__start", String.valueOf((int) wg.minEle - st));
-			tags.put("max_ele__start", String.valueOf((int) wg.maxEle - st));
-			tags.put("diff_ele_up", String.valueOf((int) wg.up));
-			tags.put("diff_ele_down", String.valueOf((int) wg.down));
-			tags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wg.step, wg.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
+		if (icc.getIndexHeightData() != null) {
+			WayGeneralStats wg = icc.getIndexHeightData().calculateWayGeneralStats(w, DIST_STEP);
+			if (tags.get("distance") == null && wg.dist > 0) {
+				tags.put("distance", String.valueOf((int) wg.dist));
+			}
+			if (wg.eleCount > 0) {
+				int st = (int) wg.startEle;
+				tags.put("start_ele", String.valueOf((int) wg.startEle));
+				tags.put("end_ele__start", String.valueOf((int) wg.endEle - st));
+				tags.put("avg_ele__start", String.valueOf((int) (wg.sumEle / wg.eleCount) - st));
+				tags.put("min_ele__start", String.valueOf((int) wg.minEle - st));
+				tags.put("max_ele__start", String.valueOf((int) wg.maxEle - st));
+				tags.put("diff_ele_up", String.valueOf((int) wg.up));
+				tags.put("diff_ele_down", String.valueOf((int) wg.down));
+				tags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wg.step, wg.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
+			}
 		}
 		tags.put("route", "segment");
 		tags.put("route_type", "track");
