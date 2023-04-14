@@ -145,8 +145,8 @@ while true; do
   echo -e "$QUERY_START" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query > $FILENAME_START.osm &
   echo -e "$QUERY_END" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_END.osm &
   echo "$QUERY_DIFF" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_CHANGE.osm  &
-  echo -e "$QUERY_START_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query > $FILENAME_START_REL.osm &
-  echo -e "$QUERY_END_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_END_REL.osm &
+  #echo -e "$QUERY_START_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query > $FILENAME_START_REL.osm &
+  #echo -e "$QUERY_END_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_END_REL.osm &
   wait
   END_T=$(date -u "+%H:%M")
   echo "$START_DATE -> $END_DATE - $END_T ($START_T)" >> $DATE_LOG_FILE
@@ -166,20 +166,20 @@ while true; do
     rm $FILENAME_CHANGE.osm;
     exit 1;
   fi
-  if ! grep -q "<\/osm>"  $FILENAME_START_REL.osm; then
-    rm $FILENAME_START_REL.osm;
-    exit 1;
-  fi
-  if ! grep -q "<\/osm>"  $FILENAME_END_REL.osm; then
-    rm $FILENAME_END_REL.osm;
-    exit 1;
-  fi
+  #if ! grep -q "<\/osm>"  $FILENAME_START_REL.osm; then
+  #  rm $FILENAME_START_REL.osm;
+  #  exit 1;
+  #fi
+  #if ! grep -q "<\/osm>"  $FILENAME_END_REL.osm; then
+  #  rm $FILENAME_END_REL.osm;
+  #  exit 1;
+  #fi
 
   gzip -c $FILENAME_START.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before.osm.gz &
   gzip -c $FILENAME_END.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after.osm.gz &
   gzip -c $FILENAME_CHANGE.osm > $FINAL_FOLDER/src/${FILENAME_DIFF}_diff.osm.gz &
-  gzip -c $FILENAME_START_REL.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before_rel.osm.gz &
-  gzip -c $FILENAME_END_REL.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after_rel.osm.gz &
+  #gzip -c $FILENAME_START_REL.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before_rel.osm.gz &
+  #gzip -c $FILENAME_END_REL.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after_rel.osm.gz &
   wait;
 
   TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}_before.osm.gz
