@@ -22,17 +22,17 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         continue
     fi
     # folder for store _after.obf _before.obf _before_rel.obf _after_rel_m.obf
-    mkdir -p $DATE_DIR/inter/
+    mkdir -p $DATE_DIR/OBF/
 
-    COUNT_INTER_FILES=$(find $DATE_DIR/inter -type f -name "*_before_after_done.log" | wc -l)
+    COUNT_OBF_FILES=$(find $DATE_DIR/obf -type f -name "*.done" | wc -l)
     if [ ! -d $DATE_DIR/src ]; then
         continue;
     fi
     COUNT_OSM_FILES=$(find $DATE_DIR/src -type f  -name "*_diff.osm.gz" | wc -l)
-    if [ $COUNT_OSM_FILES -le $COUNT_INTER_FILES ]; then
+    if [ $COUNT_OSM_FILES -le $COUNT_OBF_FILES ]; then
         continue;
     fi
-    echo "###  Process " $DATE_DIR $COUNT_INTER_FILES $COUNT_OSM_FILES
+    echo "###  Process " $DATE_DIR $COUNT_OBF_FILES $COUNT_OSM_FILES
     for DIFF_FILE in $(ls $DATE_DIR/src/*_diff.osm.gz); do
         # cut _diff.osm.gz
         BASENAME=$(basename $DIFF_FILE);
@@ -62,7 +62,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
                 $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz ${BASENAME}_after_rel_m.osm.gz
             
 
-            echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/inter/"
+            echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/obf/"
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
                 --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before.osm.gz  \
