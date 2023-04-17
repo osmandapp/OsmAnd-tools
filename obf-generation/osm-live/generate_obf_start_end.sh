@@ -9,7 +9,8 @@ QUERY_LOW_EMMISIONS_ZONE="[timeout:3600][maxsize:160000000];
     relation[\"boundary\"=\"low_emission_zone\"];
     (._;>;);
     out meta;"
-LOW_EMMISION_ZONE_FILE=low_emission_zone.osm.gz
+LOW_EMMISION_ZONE_FILE=lez/low_emission_zone.osm.gz
+mkdir -p lez
 ## UPDATE LOW_EMMISION_ZONE_FILE once per day 
 if ! test "`find $LOW_EMMISION_ZONE_FILE -mmin -1440`"; then 
     echo "$QUERY_LOW_EMMISIONS_ZONE" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  | gzip > $LOW_EMMISION_ZONE_FILE
@@ -75,10 +76,10 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         echo "Complete file ${PROC_FILE} $(date -u)"
         # marked intermediate step was processed for counting
         touch ${PROC_FILE}
-        rm -r *.osm.gz || true
-        rm -r *.osm || true
-        rm -r *.rtree* || true
-        rm -r *.obf || true
+        rm *.osm.gz || true
+        rm *.osm || true
+        rm *.rtree* || true
+        rm *.obf || true
         DATE_NAME=${BASENAME:0:8} #22_10_11
         TIME_NAME=${BASENAME:9:12} #20_30
     done
