@@ -20,7 +20,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
     if [ $COUNT_IOBF_FILES -le $COUNT_OBF_FILES ]; then
         continue;
     fi
-    echo "###  Process " $DATE_DIR $COUNT_OBF_FILES $COUNT_IOBF_FILES"
+    echo "###  Process $DATE_DIR $COUNT_OBF_FILES $COUNT_IOBF_FILES "
     for PROC_FILE in $(ls $DATE_DIR/obf/*.done); do
         # cut _diff.osm.gz
         BASENAME=$(basename $PROC_FILE);
