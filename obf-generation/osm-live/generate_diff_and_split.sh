@@ -13,24 +13,24 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         continue
     fi
     COUNT_OBF_FILES=$(find $DATE_DIR -maxdepth 1 -type f  -name "*.obf.gz" | wc -l)
-    if [ ! -d $DATE_DIR/src ]; then
+    if [ ! -d $DATE_DIR/obf ]; then
         continue;
     fi
-    COUNT_INTER_FILES=$(find $DATE_DIR/inter -type f -name "*_before_after_done.log" | wc -l)
-    if [ $COUNT_INTER_FILES -le $COUNT_OBF_FILES ]; then
+    COUNT_IOBF_FILES=$(find $DATE_DIR/obf -type f -name "*.done" | wc -l)
+    if [ $COUNT_IOBF_FILES -le $COUNT_OBF_FILES ]; then
         continue;
     fi
-    echo "###  Process " $DATE_DIR $COUNT_OBF_FILES $COUNT_OSM_FILES
-    for AFTER_REL_M in $(ls $DATE_DIR/inter/*_after_rel_m.obf); do
+    echo "###  Process " $DATE_DIR $COUNT_OBF_FILES $COUNT_IOBF_FILES"
+    for PROC_FILE in $(ls $DATE_DIR/obf/*.done); do
         # cut _diff.osm.gz
-        BASENAME=$(basename $AFTER_REL_M);
-        BASENAME=${BASENAME%*_after_rel_m.obf}
+        BASENAME=$(basename $PROC_FILE);
+        BASENAME=${BASENAME%*.done}
         OBF_FILE=$DATE_DIR/${BASENAME}.obf.gz
         DIFF_FILE=$DATE_DIR/src/${BASENAME}_diff.osm.gz
-        BEFORE_OBF_FILE=$DATE_DIR/inter/${BASENAME}_before.obf
-        AFTER_OBF_FILE=$DATE_DIR/inter/${BASENAME}_after.obf
-        BEFORE_REL_OBF_FILE=$DATE_DIR/inter/${BASENAME}_before_rel.obf
-        AFTER_REL_M_OBF_FILE=$DATE_DIR/inter/${BASENAME}_after_rel_m.obf
+        BEFORE_OBF_FILE=$DATE_DIR/obf/${BASENAME}_before.obf
+        AFTER_OBF_FILE=$DATE_DIR/obf/${BASENAME}_after.obf
+        BEFORE_REL_OBF_FILE=$DATE_DIR/obf/${BASENAME}_before_rel.obf
+        AFTER_REL_M_OBF_FILE=$DATE_DIR/obf/${BASENAME}_after_rel_m.obf
         if [ ! -f $OBF_FILE ]; then
             echo "Process missing file $OBF_FILE"
             if [ ! -f $BEFORE_OBF_FILE ]; then
