@@ -21,6 +21,9 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
     if [ ! -d $DATE_DIR/src ]; then
         continue;
     fi
+    if [ ! -d $DATE_DIR/src ]; then
+        continue;
+    fi
     # folder for store _after.obf _before.obf _before_rel.obf _after_rel_m.obf
     mkdir -p $DATE_DIR/obf/
     COUNT_OBF_FILES=$(find $DATE_DIR/obf -type f -name "*.done" | wc -l)
@@ -34,54 +37,53 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         BASENAME=$(basename $DIFF_FILE);
         BASENAME=${BASENAME%_diff.osm.gz}
         PROC_FILE=$DATE_DIR/obf/${BASENAME}.done
-        if [ ! -f $PROC_FILE ]; then
-            echo "Process missing file ${PROC_FILE} $(date -u)"
-            if [ ! -f $DATE_DIR/src/${BASENAME}_after.osm.gz ]; then
-                echo "Missing file $DATE_DIR/src/${BASENAME}_after.osm.gz"
-                exit 1;
-            fi
-            if [ ! -f $DATE_DIR/src/${BASENAME}_before.osm.gz ]; then
-                echo "Missing file $DATE_DIR/src/${BASENAME}_before.osm.gz"
-                exit 1;
-            fi
-            if [ ! -f $DATE_DIR/src/${BASENAME}_after_rel.osm.gz ]; then
-                echo "Missing file $DATE_DIR/src/${BASENAME}_after_rel.osm.gz"
-                exit 1;
-            fi
-            if [ ! -f $DATE_DIR/src/${BASENAME}_before_rel.osm.gz ]; then
-                echo "Missing file $DATE_DIR/src/${BASENAME}_before_rel.osm.gz"
-                exit 1;
-            fi
+        PROC_FILE=$DATE_DIR/obf/${BASENAME}.done
+        if [ -f $PROC_FILE ] || [ -f $DATE_DIR/${BASENAME}.obf.gz ]; then
+            continue;
+        fi
 
-            echo "### 1. Generate relation osm : $(date -u) . All nodes and ways copy from before_rel to after_rel " &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-relation-osm \
-                $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz ${BASENAME}_after_rel_m.osm.gz
-            
+        echo "Process missing file ${PROC_FILE} $(date -u)"
+        if [ ! -f $DATE_DIR/src/${BASENAME}_after.osm.gz ]; then
+            echo "Missing file $DATE_DIR/src/${BASENAME}_after.osm.gz"
+            exit 1;
+        fi
+        if [ ! -f $DATE_DIR/src/${BASENAME}_before.osm.gz ]; then
+            echo "Missing file $DATE_DIR/src/${BASENAME}_before.osm.gz"
+            exit 1;
+        fi
+        if [ ! -f $DATE_DIR/src/${BASENAME}_after_rel.osm.gz ]; then
+            echo "Missing file $DATE_DIR/src/${BASENAME}_after_rel.osm.gz"
+            exit 1;
+        fi
+        if [ ! -f $DATE_DIR/src/${BASENAME}_before_rel.osm.gz ]; then
+            echo "Missing file $DATE_DIR/src/${BASENAME}_before_rel.osm.gz"
+            exit 1;
+        fi
 
-            echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/obf/"
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
-                --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before.osm.gz  \
-                --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
-                --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address ${BASENAME}_after_rel_m.osm.gz \
-                --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
-            wait
-            
-            echo "Complete file ${PROC_FILE} $(date -u)"
-            # marked intermediate step was processed for counting
-            touch ${PROC_FILE}
+        echo "### 1. Generate relation osm : $(date -u) . All nodes and ways copy from before_rel to after_rel " &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-relation-osm \
+            $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz ${BASENAME}_after_rel_m.osm.gz            
 
-            rm -r *.osm.gz || true
-            rm -r *.osm || true
-            rm -r *.rtree* || true
-            rm -r *.obf || true
+        echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/obf/"
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
+            --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before.osm.gz  \
+            --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
+            --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address ${BASENAME}_after_rel_m.osm.gz \
+            --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
+        wait            
 
-            DATE_NAME=${BASENAME:0:8} #22_10_11
-            TIME_NAME=${BASENAME:9:12} #20_30
-
-        fi 
+        echo "Complete file ${PROC_FILE} $(date -u)"
+        # marked intermediate step was processed for counting
+        touch ${PROC_FILE}
+        rm -r *.osm.gz || true
+        rm -r *.osm || true
+        rm -r *.rtree* || true
+        rm -r *.obf || true
+        DATE_NAME=${BASENAME:0:8} #22_10_11
+        TIME_NAME=${BASENAME:9:12} #20_30
     done
 done
 

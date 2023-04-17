@@ -28,58 +28,59 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         AFTER_OBF_FILE=$DATE_DIR/obf/${BASENAME}_after.obf
         BEFORE_REL_OBF_FILE=$DATE_DIR/obf/${BASENAME}_before_rel.obf
         AFTER_REL_M_OBF_FILE=$DATE_DIR/obf/${BASENAME}_after_rel_m.obf
-        if [ ! -f $OBF_FILE ]; then
-            echo "Process missing file $OBF_FILE"
-            if [ ! -f $BEFORE_OBF_FILE ]; then
-                echo "Missing file $BEFORE_OBF_FILE"
-                exit 1;
-            fi
-            if [ ! -f $AFTER_OBF_FILE ]; then
-                echo "Missing file $AFTER_OBF_FILE"
-                exit 1;
-            fi
-            if [ ! -f $BEFORE_REL_OBF_FILE ]; then
-                echo "Missing file $BEFORE_REL_OBF_FILE"
-                exit 1;
-            fi
-            if [ ! -f $AFTER_REL_M_OBF_FILE ]; then
-                echo "Missing file $AFTER_REL_M_OBF_FILE"
-                exit 1;
-            fi
+        if [ -f $OBF_FILE ]; then
+            continue;
+        fi
+        
+        echo "Process missing file $OBF_FILE"
+        if [ ! -f $BEFORE_OBF_FILE ]; then
+            echo "Missing file $BEFORE_OBF_FILE"
+            exit 1;
+        fi
+        if [ ! -f $AFTER_OBF_FILE ]; then
+            echo "Missing file $AFTER_OBF_FILE"
+            exit 1;
+        fi
+        if [ ! -f $BEFORE_REL_OBF_FILE ]; then
+            echo "Missing file $BEFORE_REL_OBF_FILE"
+            exit 1;
+        fi
+        if [ ! -f $AFTER_REL_M_OBF_FILE ]; then
+            echo "Missing file $AFTER_REL_M_OBF_FILE"
+            exit 1;
+        fi
 
-            echo "### 1. Generate diff files : $(date -u)"
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-diff \
-                ${BEFORE_OBF_FILE} ${AFTER_OBF_FILE} ${BASENAME}_diff.obf $DIFF_FILE &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-diff-no-transport \
-                ${BEFORE_REL_OBF_FILE} ${AFTER_REL_M_OBF_FILE} ${BASENAME}_diff_rel.obf &
-            wait
+        echo "### 1. Generate diff files : $(date -u)"
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-diff \
+            ${BEFORE_OBF_FILE} ${AFTER_OBF_FILE} ${BASENAME}_diff.obf $DIFF_FILE &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-diff-no-transport \
+            ${BEFORE_REL_OBF_FILE} ${AFTER_REL_M_OBF_FILE} ${BASENAME}_diff_rel.obf &
+        wait
 
-            echo "#### 2. Merge ${BASENAME}_diff_rel.obf into ${BASENAME}_diff.obf . Avoid osmand_change=delete"
-            # TESTONLY: comment after test
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
-            # TESTONLY: uncomment after test
-            # $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
+        echo "#### 2. Merge ${BASENAME}_diff_rel.obf into ${BASENAME}_diff.obf . Avoid osmand_change=delete"
+        # TESTONLY: comment after test
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
+        # TESTONLY: uncomment after test
+        # $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
 
-            echo "### 3. Split files : $(date -u)"
-            DATE_NAME=${BASENAME:0:8} #22_10_11
-            TIME_NAME=${BASENAME:9:12} #20_30
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME" --srtm="$SRTM_DIR"
+        echo "### 3. Split files : $(date -u)"
+        DATE_NAME=${BASENAME:0:8} #22_10_11
+        TIME_NAME=${BASENAME:9:12} #20_30
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME" --srtm="$SRTM_DIR"
 
-            gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
-            # TESTONLY: comment after test
-            mkdir -p $DATE_DIR/test
-            gzip -c ${BASENAME}_diff_test.obf > $DATE_DIR/test/${BASENAME}_test.obf.gz
-            touch -r $DIFF_FILE $DATE_DIR/${BASENAME}.obf.gz
+        gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
+        # TESTONLY: comment after test
+        mkdir -p $DATE_DIR/test
+        gzip -c ${BASENAME}_diff_test.obf > $DATE_DIR/test/${BASENAME}_test.obf.gz
+        touch -r $DIFF_FILE $DATE_DIR/${BASENAME}.obf.gz
 
-            # Remove intermediate obf files
-            rm ${BEFORE_OBF_FILE}
-            rm ${AFTER_OBF_FILE}
-            rm ${BEFORE_REL_OBF_FILE}
-            rm ${AFTER_REL_M_OBF_FILE}
-            rm -r *.osm || true
-            rm -r *.rtree* || true
-            rm -r *.obf || true
-            
-        fi 
+        # Remove intermediate obf files
+        rm ${BEFORE_OBF_FILE}
+        rm ${AFTER_OBF_FILE}
+        rm ${BEFORE_REL_OBF_FILE}
+        rm ${AFTER_REL_M_OBF_FILE}
+        rm -r *.osm || true
+        rm -r *.rtree* || true
+        rm -r *.obf || true
     done
 done
