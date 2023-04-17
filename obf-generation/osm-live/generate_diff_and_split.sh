@@ -75,10 +75,10 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         touch -r $DIFF_FILE $DATE_DIR/${BASENAME}.obf.gz
 
         # Remove intermediate obf files
-        rm ${BEFORE_OBF_FILE}
-        rm ${AFTER_OBF_FILE}
-        rm ${BEFORE_REL_OBF_FILE}
-        rm ${AFTER_REL_M_OBF_FILE}
+        # rm ${BEFORE_OBF_FILE}
+        # rm ${AFTER_OBF_FILE}
+        # rm ${BEFORE_REL_OBF_FILE}
+        # rm ${AFTER_REL_M_OBF_FILE}
         rm -r *.osm || true
         rm -r *.rtree* || true
         rm -r *.obf || true
