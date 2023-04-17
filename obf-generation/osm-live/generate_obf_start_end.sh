@@ -15,14 +15,11 @@ if ! test "`find $LOW_EMMISION_ZONE_FILE -mmin -1440`"; then
     echo "$QUERY_LOW_EMMISIONS_ZONE" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  | gzip > $LOW_EMMISION_ZONE_FILE
 fi
 for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
+    if [ ! -d $DATE_DIR/src ]; then
+        continue;
+    fi
     if [ "$DATE_DIR" = "$RESULT_DIR/_diff" ]; then
         continue
-    fi
-    if [ ! -d $DATE_DIR/src ]; then
-        continue;
-    fi
-    if [ ! -d $DATE_DIR/src ]; then
-        continue;
     fi
     # folder for store _after.obf _before.obf _before_rel.obf _after_rel_m.obf
     mkdir -p $DATE_DIR/obf/
