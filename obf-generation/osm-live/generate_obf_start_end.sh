@@ -18,7 +18,9 @@ if ! test "`find $LOW_EMMISION_ZONE_FILE -mmin -1440`"; then
     echo "$QUERY_LOW_EMMISIONS_ZONE" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  | gzip > $LOW_EMMISION_ZONE_FILE
 fi
 for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
-
+    if [ "$DATE_DIR" = "$RESULT_DIR/_diff" ]; then
+        continue
+    fi
     # folder for store _after.obf _before.obf _before_rel.obf _after_rel_m.obf
     mkdir -p $DATE_DIR/inter/
 
@@ -35,11 +37,12 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         # cut _diff.osm.gz
         BASENAME=$(basename $DIFF_FILE);
         BASENAME=${BASENAME%_diff.osm.gz}
+        LOG_FILE=$DATE_DIR/inter/${BASENAME}_before_after_done.log
         BEFORE_OBF_FILE=$DATE_DIR/inter/${BASENAME}_before.obf
         AFTER_OBF_FILE=$DATE_DIR/inter/${BASENAME}_after.obf
         BEFORE_REL_OBF_FILE=$DATE_DIR/inter/${BASENAME}_before_rel.obf
         AFTER_REL_M_OBF_FILE=$DATE_DIR/inter/${BASENAME}_after_rel_m.obf
-        if [ ! -f $BEFORE_OBF_FILE ]; then
+        if [ ! -f $LOG_FILE ]; then
             echo "Process missing file $BEFORE_OBF_FILE $AFTER_OBF_FILE $BEFORE_REL_OBF_FILE $AFTER_REL_M_OBF_FILE"
             if [ ! -f $DATE_DIR/src/${BASENAME}_after.osm.gz ]; then
                 echo "Missing file $DATE_DIR/src/${BASENAME}_after.osm.gz"
@@ -81,6 +84,9 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             rm -r *.osm || true
             rm -r *.rtree* || true
             rm -r *.obf || true
+
+            DATE_NAME=${BASENAME:0:8} #22_10_11
+            TIME_NAME=${BASENAME:9:12} #20_30
 
             echo "20${DATE_NAME//_/-} ${TIME_NAME//_/:}" > $TIMESTAMP_FILE
         fi 

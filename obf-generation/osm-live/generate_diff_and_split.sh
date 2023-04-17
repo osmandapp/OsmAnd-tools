@@ -9,6 +9,9 @@ SRTM_DIR="/home/relief-data/srtm/"
 TIMESTAMP_FILE=/home/osmlive/.proc_diff_split_timestamp
 # TIMESTAMP_FILE=.timestamp
 for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
+    if [ "$DATE_DIR" = "$RESULT_DIR/_diff" ]; then
+        continue
+    fi
     COUNT_OBF_FILES=$(find $DATE_DIR -maxdepth 1 -type f  -name "*.obf.gz" | wc -l)
     if [ ! -d $DATE_DIR/src ]; then
         continue;
