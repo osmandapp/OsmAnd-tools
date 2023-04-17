@@ -5,9 +5,6 @@ OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator
 export JAVA_OPTS="-Xms512M -Xmx24014M"
 chmod +x $OSMAND_MAP_CREATOR_PATH/utilities.sh
 SRTM_DIR="/home/relief-data/srtm/"
-# File to store processed timestamp as oneline: 2022-10-12 18:00
-TIMESTAMP_FILE=/home/osmlive/.proc_diff_split_timestamp
-# TIMESTAMP_FILE=.timestamp
 for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
     if [ "$DATE_DIR" = "$RESULT_DIR/_diff" ]; then
         continue
@@ -82,8 +79,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             rm -r *.osm || true
             rm -r *.rtree* || true
             rm -r *.obf || true
-            # 2022-10-12 18:00
-            echo "20${DATE_NAME//_/-} ${TIME_NAME//_/:}" > $TIMESTAMP_FILE
+            
         fi 
     done
 done
