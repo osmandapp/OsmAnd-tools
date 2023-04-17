@@ -63,7 +63,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
 
             echo "### 1. Generate relation osm : $(date -u) . All nodes and ways copy from before_rel to after_rel " &
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-relation-osm \
-                $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel_m.osm.gz
+                $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz $DATE_DIR/inter/${BASENAME}_after_rel_m.osm.gz
             
 
             echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/inter/"
@@ -73,14 +73,14 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
                 --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/inter/ &
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
                 --ram-process --add-region-tags --upload $DATE_DIR/inter/ &
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after_rel_m.osm.gz \
+            $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/inter/${BASENAME}_after_rel_m.osm.gz \
                 --ram-process --add-region-tags --upload $DATE_DIR/inter/ &
             wait
 
             # marked intermediate step was processed for counting
             touch $DATE_DIR/inter/${BASENAME}_before_after_done.log
 
-            rm $DATE_DIR/src/${BASENAME}_after_rel_m.osm.gz
+            rm $DATE_DIR/inter/${BASENAME}_after_rel_m.osm.gz
             rm -r *.osm || true
             rm -r *.rtree* || true
             rm -r *.obf || true
