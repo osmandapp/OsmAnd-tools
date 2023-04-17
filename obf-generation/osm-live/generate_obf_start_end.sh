@@ -21,14 +21,13 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
     if [ "$DATE_DIR" = "$RESULT_DIR/_diff" ]; then
         continue
     fi
-    # folder for store _after.obf _before.obf _before_rel.obf _after_rel_m.obf
-    mkdir -p $DATE_DIR/OBF/
-
-    COUNT_OBF_FILES=$(find $DATE_DIR/obf -type f -name "*.done" | wc -l)
     if [ ! -d $DATE_DIR/src ]; then
         continue;
     fi
-    COUNT_OSM_FILES=$(find $DATE_DIR/src -type f  -name "*_diff.osm.gz" | wc -l)
+    # folder for store _after.obf _before.obf _before_rel.obf _after_rel_m.obf
+    mkdir -p $DATE_DIR/obf/
+    COUNT_OBF_FILES=$(find $DATE_DIR/obf -type f -name "*.done" | wc -l)
+    COUNT_OSM_FILES=$(find $DATE_DIR/src -type f -name "*_diff.osm.gz" | wc -l)
     if [ $COUNT_OSM_FILES -le $COUNT_OBF_FILES ]; then
         continue;
     fi
