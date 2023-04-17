@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash -e
 
 RESULT_DIR="/home/osmlive"
 OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator

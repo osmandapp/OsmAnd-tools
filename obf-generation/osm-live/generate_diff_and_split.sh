@@ -1,5 +1,5 @@
-#!/bin/bash
-# GIT History could be found at https://github.com/osmandapp/OsmAnd-misc/blob/master/osm-live/generate_hourly_osmand_diff.sh
+#!/bin/bash -e
+
 RESULT_DIR="/home/osmlive"
 OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator
 export JAVA_OPTS="-Xms512M -Xmx24014M"
