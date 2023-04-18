@@ -129,9 +129,11 @@ public class ObfDiffMerger {
 					commonMapData.put(id, mi.adoptMapObject(relObj));
 					cnt++;
 				} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
-					commonMapData.remove(id);
-					commonMapData.put(id, mi.adoptMapObject(relObj));
-					cnt++;
+					if (isNewTagsAdded(commonObj, relObj)) {
+						commonMapData.remove(id);
+						commonMapData.put(id, mi.adoptMapObject(relObj));
+						cnt++;
+					}
 				}
 				if (commonObj != null && commonObj.containsType(deleteId)) {
 					System.out.println("Map id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
@@ -153,9 +155,11 @@ public class ObfDiffMerger {
 				commonRouteData.put(id, ri.adopt(relObj));
 				cnt++;
 			} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
-				commonRouteData.remove(id);
-				commonRouteData.put(id, ri.adopt(relObj));
-				cnt++;
+				if (isNewTagsAdded(commonObj, relObj)) {
+					commonRouteData.remove(id);
+					commonRouteData.put(id, ri.adopt(relObj));
+					cnt++;
+				}
 			}
 			if (commonObj != null && commonObj.containsType(deleteId)) {
 				System.out.println("Route id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
@@ -179,9 +183,11 @@ public class ObfDiffMerger {
 			} else {
 				Amenity commonObj = commonPoi.get(id);
 				if (commonObj == null || commonObj.getAdditionalInfo(OSMAND_CHANGE_TAG) == null) {
-					commonPoiSource.get(relObj.getId()).remove(relObj.getType().getKeyName());
-					commonPoiSource.get(relObj.getId()).put(relObj.getType().getKeyName(), relObj);
-					cnt++;
+					if (Algorithms.objectEquals(commonObj.getLocation(), relObj.getLocation())) {
+						commonPoiSource.get(relObj.getId()).remove(relObj.getType().getKeyName());
+						commonPoiSource.get(relObj.getId()).put(relObj.getType().getKeyName(), relObj);
+						cnt++;
+					}
 				}
 				if (commonObj != null && commonObj.getAdditionalInfo(OSMAND_CHANGE_TAG) != null) {
 					System.out.println("Amenity id:" + relObj.getId() + " has osmand_change=delete tag");
@@ -368,7 +374,24 @@ public class ObfDiffMerger {
 		return true;
 	}
 
+	private boolean isNewTagsAdded(RouteDataObject commonObj, RouteDataObject relObj) {
+		if (commonObj.types.length < relObj.types.length
+				|| commonObj.pointTypes.length < relObj.pointTypes.length
+				|| commonObj.restrictions.length < relObj.restrictions.length
+				|| commonObj.pointNames.length < relObj.pointNames.length
+				|| commonObj.pointNameTypes.length < relObj.pointNameTypes.length) {
+			return true;
+		}
+		return false;
+	}
 
-	
+	private boolean isNewTagsAdded(BinaryMapDataObject commonObj, BinaryMapDataObject relObj) {
+		if (commonObj.getTypes().length < relObj.getTypes().length
+				|| commonObj.getAdditionalTypes().length < relObj.getAdditionalTypes().length
+				|| commonObj.getObjectNames().size() < relObj.getObjectNames().size()) {
+			return true;
+		}
+		return false;
+	}
 	
 }
