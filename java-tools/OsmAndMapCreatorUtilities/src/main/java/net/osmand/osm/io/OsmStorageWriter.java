@@ -92,10 +92,10 @@ public class OsmStorageWriter {
 		if (interestedObjects == null) {
 			interestedObjects = entities.keySet();
 		}
-		Stack<EntityId> toResolve = new Stack<EntityId>();
+		List<EntityId> toResolve = new ArrayList<>();
 		toResolve.addAll(interestedObjects);
 		while (!toResolve.isEmpty()) {
-			EntityId l = toResolve.pop();
+			EntityId l = toResolve.remove(0);
 			if (entities.get(l) instanceof Node) {
 				nodes.add((Node) entities.get(l));
 			} else if (entities.get(l) instanceof Way) {
