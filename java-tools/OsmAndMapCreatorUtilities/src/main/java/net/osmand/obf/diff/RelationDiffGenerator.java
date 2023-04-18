@@ -36,10 +36,10 @@ public class RelationDiffGenerator {
         if(args.length == 1 && args[0].equals("test")) {
             args = new String[4];
             List<String> s = new ArrayList<String>();
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_before_rel.osm.gz");
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_after_rel.osm.gz");
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_after_rel_m.osm.gz");
-            s.add("/Users/macmini/OsmAnd/overpass/test1/23_03_19_24_00_tmp.osm");
+            s.add("/Users/macmini/OsmAnd/overpass/test3/23_04_17_20_20_before_rel.osm.gz");
+            s.add("/Users/macmini/OsmAnd/overpass/test3/23_04_17_20_20_after_rel.osm");
+            s.add("/Users/macmini/OsmAnd/overpass/test3/23_04_17_20_20_after_rel_m.osm.gz");
+            //s.add("/Users/macmini/OsmAnd/overpass/test1/23_04_17_19_50_tmp.osm");
             args = s.toArray(new String[0]);
         } else if (args.length < 3) {
             System.out.println("Usage: <path before_rel.osm.gz file> " +
@@ -219,7 +219,8 @@ public class RelationDiffGenerator {
         String line = null;
         boolean isWayStarted = false;
         boolean isEndOfFile = false;
-        for (int i = 0; i < nodes.getLength(); i++) {
+        int length = nodes.getLength();
+        for (int i = 0; i < length; i++) {
             Node n = nodes.item(i);
             NamedNodeMap atrs = n.getAttributes();
             Long idNode = -1L;
@@ -297,7 +298,8 @@ public class RelationDiffGenerator {
 
         // write sorted ways
         NodeList ways = doc.getElementsByTagName("way");
-        for (int i = 0; i < ways.getLength(); i++) {
+        length = ways.getLength();
+        for (int i = 0; i < length; i++) {
             Node w = ways.item(i);
             NamedNodeMap atrs = w.getAttributes();
             Long idWay = -1L;
