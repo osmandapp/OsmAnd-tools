@@ -62,8 +62,7 @@ public class OsmStorageWriter {
 
 
 
-	public <T extends Entity> List<T> sort(Collection<T> e) {
-		List<T> lst = new ArrayList<T>(e);
+	public <T extends Entity> List<T> sort(List<T> lst) {
 		Collections.sort(lst, new Comparator<T>() {
 
 			@Override
@@ -93,9 +92,14 @@ public class OsmStorageWriter {
 			interestedObjects = entities.keySet();
 		}
 		List<EntityId> toResolve = new ArrayList<>();
+		Set<EntityId> resolved = new HashSet<Entity.EntityId>();
 		toResolve.addAll(interestedObjects);
 		while (!toResolve.isEmpty()) {
 			EntityId l = toResolve.remove(toResolve.size() - 1);
+			boolean add = resolved.add(l);
+			if (!add) {
+				continue;
+			}
 			if (entities.get(l) instanceof Node) {
 				nodes.add((Node) entities.get(l));
 			} else if (entities.get(l) instanceof Way) {
