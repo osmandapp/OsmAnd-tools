@@ -27,7 +27,9 @@ import javax.servlet.http.HttpSession;
 import net.osmand.IndexConstants;
 import net.osmand.data.Amenity;
 import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiType;
+import net.osmand.search.core.ObjectType;
 import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import org.apache.commons.logging.Log;
@@ -870,6 +872,12 @@ public class OsmAndMapsService {
 		}
 	}
 	
+	public ResponseEntity<?> errorConfig() {
+		VectorTileServerConfig config = getConfig();
+		return ResponseEntity.badRequest()
+				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
+	}
+	
 	public OsmandRegions getOsmandRegions() {
 		return osmandRegions;
 	}
@@ -893,43 +901,53 @@ public class OsmAndMapsService {
 		return targetObf;
 	}
 	
-	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, int zoom, int radius) throws IOException {
-		QuadRect bbox = getBboxRadius(lat, lon, radius, zoom);
-		BinaryMapIndexReader[] list = getObfReaders(bbox);
-		List<Amenity> results = new ArrayList<>();
-		for (BinaryMapIndexReader reader : list) {
-			List<Amenity> pois = reader.searchPoi(buildSearchPoiWebRequest((int) bbox.left,
-					(int) bbox.right, (int) bbox.top, (int) bbox.bottom, zoom, ACCEPT_ALL_POI_TYPE_FILTER, null, MAX_SIZE_POI));
-			if (pois.size() + results.size() < MAX_SIZE_POI) {
-				results.addAll(pois);
-			} else {
-				List<Amenity> subList = pois.subList(0, MAX_SIZE_POI - results.size());
-				results.addAll(subList);
-				break;
-			}
-		}
-		if (!results.isEmpty()) {
-			List<RoutingController.Feature> features = new ArrayList<>();
-			for (Amenity amenity : results) {
-				PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-				RoutingController.Feature feature;
-				if (poiType != null) {
-					feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
-							.prop("name", amenity.getName())
-							.prop("color", amenity.getColor())
-							.prop("iconKeyName", poiType.getIconKeyName())
-							.prop("typeOsmTag", poiType.getOsmTag())
-							.prop("typeOsmValue", poiType.getOsmValue())
-							.prop("iconName", getIconName(poiType))
-							.prop("type", amenity.getType().getKeyName())
-							.prop("subType", amenity.getSubType());
-					
-					for (String e : amenity.getAdditionalInfoKeys()) {
-						feature.prop(e, amenity.getAdditionalInfo(e));
+	public Map<String, List<String>> getPoiCategories() {
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+		List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
+		Map<String, List<String>> res = new HashMap<>();
+		categoriesList.forEach(poiCategory -> {
+			String category = poiCategory.getKeyName();
+			List<PoiType> poiTypes = poiCategory.getPoiTypes();
+			List<String> typesNames = new ArrayList<>();
+			poiTypes.forEach(type -> typesNames.add(type.getOsmValue()));
+			res.put(category, typesNames);
+			
+		});
+		return res;
+	}
+	
+	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, List<String> categories) throws IOException, InterruptedException {
+		List<RoutingController.Feature> features = new ArrayList<>();
+		for (String category : categories) {
+			List<SearchResult> res = search(lat, lon, category);
+			if (!res.isEmpty()) {
+				for (SearchResult result : res) {
+					if (result.objectType == ObjectType.POI) {
+						Amenity amenity = (Amenity) result.object;
+						PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+						RoutingController.Feature feature;
+						if (poiType != null) {
+							feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
+									.prop("name", amenity.getName())
+									.prop("color", amenity.getColor())
+									.prop("iconKeyName", poiType.getIconKeyName())
+									.prop("typeOsmTag", poiType.getOsmTag())
+									.prop("typeOsmValue", poiType.getOsmValue())
+									.prop("iconName", getIconName(poiType))
+									.prop("type", amenity.getType().getKeyName())
+									.prop("subType", amenity.getSubType());
+							
+							for (String e : amenity.getAdditionalInfoKeys()) {
+								feature.prop(e, amenity.getAdditionalInfo(e));
+							}
+							features.add(feature);
+						}
 					}
-					features.add(feature);
 				}
 			}
+		}
+		
+		if (!features.isEmpty()) {
 			return new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0]));
 		} else {
 			return null;
@@ -948,20 +966,4 @@ public class OsmAndMapsService {
 		}
 		return null;
 	}
-	
-	private QuadRect getBboxRadius(double lat, double lon, int radiusMeters, int zoom) {
-		double dx = MapUtils.getTileNumberX(zoom, lon);
-		double half16t = MapUtils.getDistance(lat, MapUtils.getLongitudeFromTile(zoom, ((int) dx) + 0.5),
-				lat, MapUtils.getLongitudeFromTile(zoom, (int) dx));
-		double cf31 = (radiusMeters / (half16t * 2)) * (1 << 15);
-		double y = MapUtils.get31TileNumberY(lat);
-		double x = MapUtils.get31TileNumberX(lon);
-		double left = (int) (x - cf31);
-		double top = (int) (x + cf31);
-		double right = (int) (y - cf31);
-		double bottom = (int) (y + cf31);
-		
-		return new QuadRect(left, right, top, bottom);
-	}
-	
 }
