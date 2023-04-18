@@ -95,7 +95,7 @@ public class OsmStorageWriter {
 		List<EntityId> toResolve = new ArrayList<>();
 		toResolve.addAll(interestedObjects);
 		while (!toResolve.isEmpty()) {
-			EntityId l = toResolve.remove(0);
+			EntityId l = toResolve.remove(toResolve.size() - 1);
 			if (entities.get(l) instanceof Node) {
 				nodes.add((Node) entities.get(l));
 			} else if (entities.get(l) instanceof Way) {
@@ -106,7 +106,7 @@ public class OsmStorageWriter {
 			} else if (entities.get(l) instanceof Relation) {
 				relations.add((Relation) entities.get(l));
 				if (includeLinks) {
-					for(RelationMember rm : ((Relation) entities.get(l)).getMembers()) {
+					for (RelationMember rm : ((Relation) entities.get(l)).getMembers()) {
 						toResolve.add(rm.getEntityId());
 					}
 				}
