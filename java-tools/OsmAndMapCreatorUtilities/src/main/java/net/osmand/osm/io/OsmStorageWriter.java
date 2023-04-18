@@ -86,9 +86,9 @@ public class OsmStorageWriter {
 			Map<EntityId, Entity> entities, Map<EntityId, EntityInfo> entityInfo,
 			Collection<EntityId> interestedObjects, boolean includeLinks)
 			throws FactoryConfigurationError, XMLStreamException {
-		Set<Node> nodes = new LinkedHashSet<Node>();
-		Set<Way> ways = new LinkedHashSet<Way>();
-		Set<Relation> relations = new LinkedHashSet<Relation>();
+		List<Node> nodes = new ArrayList<Node>();
+		List<Way> ways = new ArrayList<Way>();
+		List<Relation> relations = new ArrayList<Relation>();
 		if (interestedObjects == null) {
 			interestedObjects = entities.keySet();
 		}
