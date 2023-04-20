@@ -82,16 +82,17 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-//					"-vrouting",
+					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-zoom=15",
+					"-zoom=13",
 					// road
-//					"-latlon=48.46614,9.16976",
+					//"-latlon=48.46614,9.16976",
+					"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir")+"11_netherlands_noord-holland_europe_2.obf"
+					System.getProperty("maps.dir")+"Us_arizona_northamerica_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -227,6 +228,15 @@ public class BinaryInspector {
 					lattop = latmid + dist;
 					lonright = lonmid + dist;
 					latbottom = latmid - dist;
+				} else if (params[i].startsWith("-xyz=")) {
+					String[] values = params[i].substring("-xyz=".length()).split(",");
+					int tileX = Integer.parseInt(values[0]);
+					int tileY = Integer.parseInt(values[1]);
+					int z = Integer.parseInt(values[2]);
+					lonleft = MapUtils.getLongitudeFromTile(z, tileX);
+					lonright = MapUtils.getLongitudeFromTile(z, tileX + 1);
+					lattop = MapUtils.getLatitudeFromTile(z, tileY);
+					latbottom = MapUtils.getLatitudeFromTile(z, tileY + 1);
 				} else if (params[i].startsWith("-bbox=")) {
 					String[] values = params[i].substring("-bbox=".length()).split(",");
 					lonleft = Double.parseDouble(values[0]);
