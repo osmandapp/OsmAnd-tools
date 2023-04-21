@@ -2,6 +2,7 @@ package net.osmand.obf.preparation;
 
 
 
+import com.google.protobuf.Message;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
@@ -1805,6 +1806,15 @@ public class BinaryMapIndexWriter {
 	public void preclose() throws IOException {
 		codedOutStream.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, IndexConstants.BINARY_MAP_VERSION);
 		codedOutStream.flush();
+	}
+
+	public void writeOsmAndOwner(BinaryMapIndexReader.OsmAndOwner owner) throws IOException {
+		OsmandOdb.OsmAndOwner.Builder b = OsmandOdb.OsmAndOwner.newBuilder();
+		b.setOwner(owner.getOwner());
+		b.setDescription(owner.getDescription());
+		b.setPluginid(owner.getPluginid());
+		Message m = b.build();
+		codedOutStream.writeMessage(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER, m);
 	}
 
 }
