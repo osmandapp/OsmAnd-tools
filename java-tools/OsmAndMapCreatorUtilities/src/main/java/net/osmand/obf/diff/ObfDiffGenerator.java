@@ -1,18 +1,18 @@
 package net.osmand.obf.diff;
 
-import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
-import net.osmand.data.*;
+import net.osmand.data.Amenity;
+import net.osmand.data.MapObject;
+import net.osmand.data.TransportRoute;
+import net.osmand.data.TransportStop;
 import net.osmand.obf.BinaryInspector;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.util.MapUtils;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -42,8 +42,8 @@ public class ObfDiffGenerator {
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = "/Users/macmini/OsmAnd/overpass/test6/23_04_19_04_00.obf.gz";
-			args[1] = "/Users/macmini/OsmAnd/overpass/test6/23_04_19_04_00_test.obf.gz";
+			args[0] = System.getProperty("maps.dir") + "Iran_bushehr_asia.obf";
+			args[1] = System.getProperty("maps.dir") + "Iran_bushehr_asia_2.obf";
 			args[2] = "stdout";
 //			args[2] = "19_07_29_20_30_diff.obf";
 //			args[3] = "19_07_29_20_30_diff.osm.gz";
@@ -393,78 +393,7 @@ public class ObfDiffGenerator {
 					} else {
 						if (//!objS.getMapIndex().decodeType(objS.getTypes()[0]).tag.equals(OSMAND_CHANGE_TAG) &&
 								!objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE )) {
-
-							int[] typesS = objS.getTypes();
-							int[] typesE = objE.getTypes();
-							HashSet<Integer> setS = new HashSet<>();
-							for (int i : typesS) {
-								setS.add(i);
-							}
-							HashSet<Integer> setE = new HashSet<>();
-							for (int i : typesE) {
-								setE.add(i);
-							}
-
-							setE.removeAll(setS);
-
-							String diff = "";
-							for (Integer j : setE) {
-								BinaryMapIndexReader.TagValuePair pair = objE.getMapIndex().decodeType(j);
-								diff += pair.tag + "-" + pair.value + ", ";
-							}
-
-							typesS = objS.getAdditionalTypes();
-							typesE = objE.getAdditionalTypes();
-							setS.clear();
-							for (int i : typesS) {
-								setS.add(i);
-							}
-							setE.clear();
-							for (int i : typesE) {
-								setE.add(i);
-							}
-
-							setE.removeAll(setS);
-
-							for (Integer j : setE) {
-								BinaryMapIndexReader.TagValuePair pair = objE.getMapIndex().decodeType(j);
-								diff += pair.tag + "-" + pair.value + ", ";
-							}
-
-							if (objS.getPointsLength() != objE.getPointsLength()) {
-								diff += " points size is not equal ";
-							} else {
-								for (int i = 0; i < objS.getPointsLength(); i++) {
-									if (objS.getPoint31XTile(i) != objE.getPoint31XTile(i)) {
-										diff += " points coordinate is not equal ";
-										break;
-									}
-									if (objS.getPoint31YTile(i) != objE.getPoint31YTile(i)) {
-										diff += " points coordinate is not equal ";
-										break;
-									}
-								}
-							}
-
-							TIntObjectHashMap<String> sNames = objS.getObjectNames();
-							TIntObjectHashMap<String> eNames = objE.getObjectNames();
-							HashSet<String> sns = new HashSet<>();
-							for (int k : sNames.keys()) {
-								sns.add(sNames.get(k));
-							}
-							HashSet<String> sne = new HashSet<>();
-							for (int k : eNames.keys()) {
-								sne.add(eNames.get(k));
-							}
-
-							sne.removeAll(sns);
-							for (String s : sne) {
-								diff += "name:" + s + ", ";
-							}
-
-
-
-							System.out.println("Map " + idx + " is not equal: >>>" + diff + "<<<" + toString(objS) + " != " + toString(objE));
+							System.out.println("Map " + idx + " is not equal: " + toString(objS) + " != " + toString(objE));
 						}
 						endData.remove(idx);
 					}
