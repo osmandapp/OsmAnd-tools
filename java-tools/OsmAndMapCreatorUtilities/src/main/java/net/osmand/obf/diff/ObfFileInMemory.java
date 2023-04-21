@@ -288,7 +288,6 @@ public class ObfFileInMemory {
 			writer.writeTransportStringTable(stringTable);
 			writer.endWriteTransportIndex();
 		}
-		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 
 		if (osmAndOwner != null) {
 			OsmandOdb.OsmAndOwner.Builder b = OsmandOdb.OsmAndOwner.newBuilder();
@@ -299,6 +298,7 @@ public class ObfFileInMemory {
 			ous.writeMessage(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER, m);
 		}
 
+		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
 		
