@@ -57,9 +57,10 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             ${BEFORE_REL_OBF_FILE} ${AFTER_REL_M_OBF_FILE} ${BASENAME}_diff_rel.obf &
         wait
 
+        
         echo "#### 2. Merge ${BASENAME}_diff_rel.obf into ${BASENAME}_diff.obf . Avoid osmand_change=delete"
-        # TESTONLY:
         if [ "$OLD_PROCESS" == "true" ]; then 
+            echo "#### 2. ONLYTEST: No actual merge"
             $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
         else 
             $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
