@@ -59,8 +59,11 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
 
         echo "#### 2. Merge ${BASENAME}_diff_rel.obf into ${BASENAME}_diff.obf . Avoid osmand_change=delete"
         # TESTONLY:
-        # $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
-        $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
+        if [ "$OLD_PROCESS" == "true" ]; then 
+            $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
+        else 
+            $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
+        fi
 
         echo "### 3. Split files : $(date -u)"
         DATE_NAME=${BASENAME:0:8} #22_10_11
