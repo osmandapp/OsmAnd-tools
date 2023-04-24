@@ -50,11 +50,11 @@ public class PromoService {
                 return ResponseEntity.badRequest().body(resp.deviceSub.purchaseToken);
             }
         }
-        return ResponseEntity.badRequest().body("Limit promo is exceeded!");
+        return ResponseEntity.badRequest().body("Unfortunately we ran out of available promocodes");
     }
     
     
-    public PromoResponse createPromoSubscription(String email, String key, Date expireTime) {
+    public synchronized PromoResponse createPromoSubscription(String email, String key, Date expireTime) {
         DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
         deviceSub.sku = key;
         deviceSub.orderId = UUID.randomUUID().toString();
