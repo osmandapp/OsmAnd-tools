@@ -205,11 +205,10 @@ public class ObfDiffMerger {
 			e.printStackTrace();
 		} catch (SQLException throwables) {
 			throwables.printStackTrace();
-		} finally {
-			if (writeToCommon) {
-				common.delete();
-				result.renameTo(common);
-			}
+		}
+		if (writeToCommon) {
+			common.delete();
+			result.renameTo(common);
 		}
 	}
 	
