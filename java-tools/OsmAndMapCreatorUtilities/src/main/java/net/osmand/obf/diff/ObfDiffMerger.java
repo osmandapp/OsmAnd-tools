@@ -87,13 +87,13 @@ public class ObfDiffMerger {
 			if(args.length == 1 && args[0].equals("mergeRelationTest")) {
 				args = new String[3];
 				List<String> s = new ArrayList<String>();
-				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_after_rel_m.obf");
-				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_14_20.obf.gz");
-				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_diff_test.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff_rel.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_merged.obf");
 				args = s.toArray(new String[0]);
-			} else if (args.length < 2) {
+			} else if (args.length < 3) {
 				System.out.println("Usage: <path to relation_osm_live.obf> <path to common_osm_live.obf> " +
-						"<path to merged_osm_live.obf>(optional, if not set result will write to common_osm_live.obf)");
+						"<path to merged_osm_live.obf>");
 				System.exit(1);
 			}
 			ObfDiffMerger merger = new ObfDiffMerger();
@@ -112,7 +112,7 @@ public class ObfDiffMerger {
 		ObfFileInMemory commonObf = new ObfFileInMemory();
 		commonObf.readObfFiles(Collections.singletonList(common));
 
-		File result = args.length > 2 ? new File(args[2]) : new File(args[1]);
+		File result = new File(args[2]);
 
 		// Map section
 		BinaryMapIndexReader.MapIndex mi = commonObf.getMapIndex();

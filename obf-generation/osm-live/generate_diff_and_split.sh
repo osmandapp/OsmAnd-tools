@@ -63,7 +63,9 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             echo "#### 2. ONLYTEST: No actual merge"
             $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_test.obf
         else 
-            $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf
+            $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${BASENAME}_diff.obf ${BASENAME}_diff_merged.obf
+            rm ${BASENAME}_diff.obf
+            mv ${BASENAME}_diff_merged.obf ${BASENAME}_diff.obf
         fi
 
         echo "### 3. Split files : $(date -u)"
