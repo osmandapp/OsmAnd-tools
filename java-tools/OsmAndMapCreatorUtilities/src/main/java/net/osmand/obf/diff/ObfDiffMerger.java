@@ -85,11 +85,11 @@ public class ObfDiffMerger {
 	public static void mergeRelationOsmLive(String[] args) {
 		try {
 			if(args.length == 1 && args[0].equals("mergeRelationTest")) {
-				args = new String[3];
+				args = new String[2];
 				List<String> s = new ArrayList<String>();
-				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_after_rel_m.obf");
-				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_14_20.obf.gz");
-				s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_diff_test.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff_rel.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff.obf");
+				//s.add("/Users/macmini/OsmAnd/overpass/test2/23_04_03_diff_test.obf");
 				args = s.toArray(new String[0]);
 			} else if (args.length < 2) {
 				System.out.println("Usage: <path to relation_osm_live.obf> <path to common_osm_live.obf> " +
@@ -112,7 +112,11 @@ public class ObfDiffMerger {
 		ObfFileInMemory commonObf = new ObfFileInMemory();
 		commonObf.readObfFiles(Collections.singletonList(common));
 
-		File result = args.length > 2 ? new File(args[2]) : new File(args[1]);
+		boolean writeToCommon = true;
+		if (args.length > 2) {
+			writeToCommon = false;
+		}
+		File result = writeToCommon ? new File(args[1].replace(".obf", "_merged.obf")) : new File(args[2]);
 
 		// Map section
 		BinaryMapIndexReader.MapIndex mi = commonObf.getMapIndex();
@@ -201,6 +205,11 @@ public class ObfDiffMerger {
 			e.printStackTrace();
 		} catch (SQLException throwables) {
 			throwables.printStackTrace();
+		} finally {
+			if (writeToCommon) {
+				common.delete();
+				result.renameTo(common);
+			}
 		}
 	}
 	
