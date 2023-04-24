@@ -414,9 +414,13 @@ public class AdminController {
 		if (settings != null) {
 			model.addAttribute("subSettings", settings);
 		}
-		model.addAttribute("promos", promoRepository.findAllByOrderByStartTimeDesc());
+		
+		List<PromoRepository.Promo> promos = promoRepository.findAllByOrderByStartTimeDesc();
+		
+		model.addAttribute("promos", promos);
+		model.addAttribute("emails", getLastUsersPromo(promos));
 		model.addAttribute("giveaways", seriesRepo.findAllByOrderByUpdateTimeDesc());
-		model.addAttribute("downloadServers", getDownloadSettings());
+		//model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
 		List<Subscription> allSubs = parseSubscriptions();
@@ -432,7 +436,22 @@ public class AdminController {
 		return "admin/info";
 	}
 	
-
+	private Map<String, String> getLastUsersPromo(List<PromoRepository.Promo> promos) {
+		Map<String, String> emails = new HashMap<>();
+		for (PromoRepository.Promo promo : promos) {
+			StringBuilder res = new StringBuilder();
+			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findFirst5BySkuOrderByStarttimeDesc("promo_" + promo.name);
+			for (SupporterDeviceSubscription subscription : subscriptions) {
+				PremiumUser user = usersRepository.findByOrderid(subscription.orderId);
+				res.append(user.email);
+				if (subscriptions.indexOf(subscription) != 4) {
+					res.append(" | ");
+				}
+			}
+			emails.put(promo.name, res.toString());
+		}
+		return emails;
+	}
 
 
 	
