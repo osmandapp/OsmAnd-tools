@@ -14,18 +14,13 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.obf.*;
 import net.osmand.obf.diff.*;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.BinaryComparator;
-import net.osmand.obf.BinaryInspector;
-import net.osmand.obf.BinaryMerger;
-import net.osmand.obf.GenerateRegionTags;
-import net.osmand.obf.IconVisibility;
-import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
@@ -242,6 +237,8 @@ public class MainUtilities {
 				RelationDiffGenerator.main(subArgsArray);
 			} else if (utl.equals("merge-obf-diff")) {
 				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
+			} else if (utl.equals("add-owner-to-obf")) {
+				BinaryMerger.signObfFile(subArgsArray);
 			} else {
 				printSynopsys();
 			}

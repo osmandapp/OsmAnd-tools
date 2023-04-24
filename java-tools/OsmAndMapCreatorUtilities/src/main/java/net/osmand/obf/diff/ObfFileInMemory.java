@@ -2,6 +2,7 @@ package net.osmand.obf.diff;
 
 import com.google.protobuf.CodedOutputStream;
 
+import com.google.protobuf.Message;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
@@ -75,6 +76,7 @@ public class ObfFileInMemory {
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
 	private TLongObjectHashMap<RouteDataObject> routeObjects = new TLongObjectHashMap<>();
 	private long timestamp = 0;
+	private BinaryMapIndexReader.OsmAndOwner osmAndOwner;
 	private MapIndex mapIndex = new MapIndex(); 
 	private RouteRegion routeIndex = new RouteRegion();
 
@@ -286,6 +288,23 @@ public class ObfFileInMemory {
 			writer.writeTransportStringTable(stringTable);
 			writer.endWriteTransportIndex();
 		}
+
+		if (osmAndOwner != null) {
+			OsmandOdb.OsmAndOwner.Builder b = OsmandOdb.OsmAndOwner.newBuilder();
+			b.setName(osmAndOwner.getName());
+			if (!osmAndOwner.getResource().isEmpty()) {
+				b.setResource(osmAndOwner.getResource());
+			}
+			if (!osmAndOwner.getDescription().isEmpty()) {
+				b.setDescription(osmAndOwner.getDescription());
+			}
+			if (!osmAndOwner.getPluginid().isEmpty()) {
+				b.setPluginid(osmAndOwner.getPluginid());
+			}
+			Message m = b.build();
+			ous.writeMessage(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER, m);
+		}
+
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
@@ -501,6 +520,7 @@ public class ObfFileInMemory {
 			}
 			
 			updateTimestamp(indexReader.getDateCreated());
+			setOsmAndOwner(indexReader.getOwner());
 			indexReader.close();
 			raf.close();
 			if(gzip) {
@@ -692,5 +712,8 @@ public class ObfFileInMemory {
 		}		
 	}
 
+	public void setOsmAndOwner(BinaryMapIndexReader.OsmAndOwner owner) {
+		osmAndOwner = owner;
+	}
 	
 }
