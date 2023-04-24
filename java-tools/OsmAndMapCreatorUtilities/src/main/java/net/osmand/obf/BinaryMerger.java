@@ -88,25 +88,28 @@ public class BinaryMerger {
 
 	public static void signObfFile(String[] args) throws IOException, SQLException {
 		String pathToObf = "";
-		String owner = "";
+		String name = "";
 		String pluginid = "";
 		String description = "";
+		String resource = "";
+		String usage = "Usage: <path to obf> name=\"Owner name\" resource=\"Link to resource\"(optional) pluginid=\"Plugin name\"(optional) description>\"Description (any text)\"(optional)";
 		if(args.length == 1 && args[0].equals("test")) {
-			pathToObf = "/Users/macmini/OsmAnd/overpass/test1/Ukraine_vinnytsya_europe.obf";
-			owner = "owner=John";
+			pathToObf = "/Users/macmini/OsmAnd/maps/Ukraine_vinnytsya_europe.obf";
+			name = "owner=John";
 			pluginid = "pluginid=Offroad tracks";
 			description = "description=Offroad tracks of Middle-earth";
+			resource = "https://osmand.net OsmAnd";
 		} else {
 			if (args.length < 4) {
-				System.out.println("Usage: <path to obf> owner=\"Owner name\" pluginid=\"Plugin name\" description>\"Description (any text)\"");
+				System.out.println(usage);
 				System.exit(1);
 				return;
 			}
 			pathToObf = args[0];
 			for(int i = 1; i < args.length; i++) {
 				String arg = args[i];
-				if (arg.startsWith("owner=")) {
-					owner = arg.replace("owner=", "");
+				if (arg.startsWith("name=")) {
+					name = arg.replace("name=", "");
 					continue;
 				}
 				if (arg.startsWith("pluginid=")) {
@@ -117,10 +120,14 @@ public class BinaryMerger {
 					description = arg.replace("description=", "");
 					continue;
 				}
+				if (arg.startsWith("resource=")) {
+					resource = arg.replace("resource=", "");
+					continue;
+				}
 			}
 		}
-		if (pathToObf.isEmpty() || owner.isEmpty() || pluginid.isEmpty() || description.isEmpty()) {
-			System.out.println("Usage: <path to obf> owner=\"Owner name\" pluginid=\"Plugin name\" description>\"Description (any text)\"");
+		if (pathToObf.isEmpty() || name.isEmpty()) {
+			System.out.println(usage);
 			System.exit(1);
 			return;
 		}
@@ -132,10 +139,10 @@ public class BinaryMerger {
 		}
 
 		BinaryMerger in = new BinaryMerger();
-		in.addOsmAndOwner(pathToObf, owner, description, pluginid);
+		in.addOsmAndOwner(pathToObf, name, resource, description, pluginid);
 	}
 
-	public void addOsmAndOwner(String pathToFile, String owner, String description, String pluginid) throws IOException, SQLException {
+	public void addOsmAndOwner(String pathToFile, String name, String resource, String description, String pluginid) throws IOException, SQLException {
 		String signed = "";
 		boolean zip = false;
 		if (pathToFile.endsWith(".obf.zip")) {
@@ -149,7 +156,7 @@ public class BinaryMerger {
 				pathToFile
 		};
 		BinaryMerger in = new BinaryMerger();
-		in.osmAndOwner = new BinaryMapIndexReader.OsmAndOwner(owner, pluginid, description);
+		in.osmAndOwner = new BinaryMapIndexReader.OsmAndOwner(name, resource, pluginid, description);
 		in.merger(args);
 
 		File sFile = new File(signed);
@@ -168,7 +175,7 @@ public class BinaryMerger {
 			oFile.delete();
 			sFile.renameTo(oFile);
 		}
-		System.out.println("Sign added to file:" + pathToFile + " . Sign owner=" + owner + ", pluginid=" + pluginid + ", description=" + description);
+		System.out.println("Sign added to file:" + pathToFile + " . Sign name=" + name + ", resource=" + resource + ", pluginid=" + pluginid + ", description=" + description);
 	}
 	
 	public static void mergeStandardFiles(String[] args) throws IOException, SQLException, XmlPullParserException {

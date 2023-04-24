@@ -291,9 +291,16 @@ public class ObfFileInMemory {
 
 		if (osmAndOwner != null) {
 			OsmandOdb.OsmAndOwner.Builder b = OsmandOdb.OsmAndOwner.newBuilder();
-			b.setOwner(osmAndOwner.getOwner());
-			b.setDescription(osmAndOwner.getDescription());
-			b.setPluginid(osmAndOwner.getPluginid());
+			b.setName(osmAndOwner.getName());
+			if (!osmAndOwner.getResource().isEmpty()) {
+				b.setResource(osmAndOwner.getResource());
+			}
+			if (!osmAndOwner.getDescription().isEmpty()) {
+				b.setDescription(osmAndOwner.getDescription());
+			}
+			if (!osmAndOwner.getPluginid().isEmpty()) {
+				b.setPluginid(osmAndOwner.getPluginid());
+			}
 			Message m = b.build();
 			ous.writeMessage(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER, m);
 		}
@@ -703,10 +710,6 @@ public class ObfFileInMemory {
 				mapObjects.remove(mz);
 			}
 		}		
-	}
-
-	public void setOsmAndOwner(String owner, String pluginid, String description) {
-		osmAndOwner = new BinaryMapIndexReader.OsmAndOwner(owner, pluginid, description);
 	}
 
 	public void setOsmAndOwner(BinaryMapIndexReader.OsmAndOwner owner) {

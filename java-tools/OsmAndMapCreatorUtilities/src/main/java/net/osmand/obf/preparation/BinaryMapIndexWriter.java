@@ -1810,9 +1810,16 @@ public class BinaryMapIndexWriter {
 
 	public void writeOsmAndOwner(BinaryMapIndexReader.OsmAndOwner owner) throws IOException {
 		OsmandOdb.OsmAndOwner.Builder b = OsmandOdb.OsmAndOwner.newBuilder();
-		b.setOwner(owner.getOwner());
-		b.setDescription(owner.getDescription());
-		b.setPluginid(owner.getPluginid());
+		b.setName(owner.getName());
+		if (!owner.getResource().isEmpty()) {
+			b.setResource(owner.getResource());
+		}
+		if (!owner.getDescription().isEmpty()) {
+			b.setDescription(owner.getDescription());
+		}
+		if (!owner.getPluginid().isEmpty()) {
+			b.setPluginid(owner.getPluginid());
+		}
 		Message m = b.build();
 		codedOutStream.writeMessage(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER, m);
 	}

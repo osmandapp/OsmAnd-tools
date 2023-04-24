@@ -82,7 +82,7 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+					//"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
@@ -90,9 +90,9 @@ public class BinaryInspector {
 					"-zoom=13",
 					// road
 					//"-latlon=48.46614,9.16976",
-					"-xyz=12071,26142,16",
+					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir")+"Us_arizona_northamerica_2.obf"
+					"/Users/macmini/OsmAnd/maps/Ukraine_vinnytsya_europe.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -495,8 +495,9 @@ public class BinaryInspector {
 		String filename = file.getName();
 		try {
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			String owner = index.getOwner() != null ? "\n" + index.getOwner().toString() : "";
 			int i = 1;
-			println("Binary index " + filename + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()));
+			println("Binary index " + filename + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()) + owner);
 			for (BinaryIndexPart p : index.getIndexes()) {
 				String partname = "";
 				if (p instanceof MapIndex) {
