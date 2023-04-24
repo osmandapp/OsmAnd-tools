@@ -9,26 +9,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.UUID;
+import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 
+import net.osmand.server.api.repo.*;
+import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,28 +43,15 @@ import com.google.gson.Gson;
 
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.repo.LotterySeriesRepository;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
-import net.osmand.server.api.repo.OsmRecipientsRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
-import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
-import net.osmand.server.api.services.EmailRegistryService;
-import net.osmand.server.api.services.EmailSenderService;
-import net.osmand.server.api.services.IpLocationService;
-import net.osmand.server.api.services.LogsAccessService;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
-import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MotdSettings;
-import net.osmand.server.api.services.PollsService;
-import net.osmand.server.api.services.UserSubscriptionService;
-import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
@@ -143,6 +117,12 @@ public class AdminController {
 
 	@Autowired
 	private LotterySeriesRepository seriesRepo;
+	
+	@Autowired
+	private PromoRepository promoRepository;
+	
+	@Autowired
+	PromoService promoService;
 
 	@Autowired
 	private EmailSenderService emailSender;
@@ -199,52 +179,11 @@ public class AdminController {
         return "redirect:info";
 	}
 	
-	@PostMapping(path = { "/register-promo" })
-	public String registerPromo(Model model, 
-			@RequestParam(required = true) String comment, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
-		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
-		deviceSub.sku = "promo_website";
-		deviceSub.orderId = UUID.randomUUID().toString();
-		deviceSub.kind = "promo";
-		Calendar c = Calendar.getInstance();
-		c.setTimeInMillis(System.currentTimeMillis());
-		deviceSub.timestamp = c.getTime();
-		deviceSub.starttime = c.getTime();
-		deviceSub.valid = true;
-		deviceSub.purchaseToken = comment;
-		c.add(Calendar.YEAR, 1);
-		deviceSub.expiretime = c.getTime(); 
-		boolean error = false;
-		if (emailSender.isEmail(comment)) {
-			String email = comment;
-			PremiumUser existingUser = usersRepository.findByEmail(email);
-			if (existingUser == null) {
-				PremiumUser pu = new PremiumUsersRepository.PremiumUser();
-				pu.email = email;
-				pu.regTime = new Date();
-				pu.orderid = deviceSub.orderId;
-				usersRepository.saveAndFlush(pu);
-				deviceSub.purchaseToken += " (email sent & registered)";
-				emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
-			} else {
-				if(existingUser.orderid == null || userSubService.checkOrderIdPremium(existingUser.orderid) != null) {
-					existingUser.orderid = deviceSub.orderId;
-					usersRepository.saveAndFlush(existingUser);
-					deviceSub.purchaseToken += " (new PRO subscription is updated)";
-				} else {
-					error = true;
-					deviceSub.purchaseToken += " (ERROR: user already has PRO subscription)";
-				}
-			}
-		} else {
-			error = true;
-			deviceSub.purchaseToken += " (ERROR: please enter email only)";
-		}
-		if (!error) {
-			subscriptionsRepository.save(deviceSub);
-		}
-		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
-        return "redirect:info#audience";
+	@PostMapping(path = {"/register-promo"})
+	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) {
+		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, "promo_website", null);
+		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(resp.deviceSub));
+		return "redirect:info#audience";
 	}
 	
 	@PostMapping(path = { "/search-subscription" })
@@ -475,6 +414,7 @@ public class AdminController {
 		if (settings != null) {
 			model.addAttribute("subSettings", settings);
 		}
+		model.addAttribute("promos", promoRepository.findAllByOrderByStartTimeDesc());
 		model.addAttribute("giveaways", seriesRepo.findAllByOrderByUpdateTimeDesc());
 		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
@@ -1531,5 +1471,28 @@ public class AdminController {
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
 	
+	@PostMapping(path = {"/register-promo-pro"})
+	public String registerPromo(@RequestParam String name,
+	                            @RequestParam int subActiveMonths,
+	                            @RequestParam int numberLimit,
+	                            @RequestParam String endTime,
+	                            final RedirectAttributes redirectAttrs) throws ParseException {
+		
+		PromoRepository.Promo promo = new PromoRepository.Promo();
+		promo.name = name;
+		promo.subActiveMonths = subActiveMonths;
+		promo.numberLimit = numberLimit;
+		promo.startTime = new Date();
+		SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
+		promo.endTime = formatter.parse(endTime);
+		
+		promoService.register(promo);
+		
+		redirectAttrs.addFlashAttribute("update_status", "OK");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", "Promo registered");
+		
+		return "redirect:info#promo";
+	}
 	
 }
