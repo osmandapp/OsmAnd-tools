@@ -85,7 +85,7 @@ public class ObfDiffMerger {
 	public static void mergeRelationOsmLive(String[] args) {
 		try {
 			if(args.length == 1 && args[0].equals("mergeRelationTest")) {
-				args = new String[2];
+				args = new String[3];
 				List<String> s = new ArrayList<String>();
 				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff_rel.obf");
 				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff.obf");
