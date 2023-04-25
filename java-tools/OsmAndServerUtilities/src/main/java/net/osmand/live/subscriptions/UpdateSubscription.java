@@ -18,6 +18,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
+import com.google.gson.JsonParser;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 
@@ -49,6 +50,7 @@ import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
+import org.json.JSONObject;
 
 
 public class UpdateSubscription {
@@ -362,6 +364,7 @@ public class UpdateSubscription {
 			long startDate = 0;
 			long expiresDate = 0;
 			String appstoreOrderId = null;
+			long currentTime = System.currentTimeMillis();
 			for (InAppReceipt receipt : inAppReceipts) {
 				// there could be multiple subscriptions for same purchaseToken !
 				// i.e. 2020-04-01 -> 2021-04-01 + 2021-04-05 -> 2021-04-05
@@ -372,6 +375,9 @@ public class UpdateSubscription {
 					boolean introPeriod = "true".equals(fields.get("is_in_intro_offer_period"));
 					long inAppStartDateMs = Long.parseLong(fields.get("purchase_date_ms"));
 					long inAppExpiresDateMs = Long.parseLong(fields.get("expires_date_ms"));
+					if (inAppExpiresDateMs < currentTime) {
+						continue;
+					}
 					if (startDate == 0 || inAppStartDateMs < startDate) {
 						startDate = inAppStartDateMs;
 					}
