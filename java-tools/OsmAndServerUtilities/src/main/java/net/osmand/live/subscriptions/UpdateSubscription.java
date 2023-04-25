@@ -18,7 +18,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gson.JsonParser;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 
@@ -50,7 +49,6 @@ import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
-import org.json.JSONObject;
 
 
 public class UpdateSubscription {
