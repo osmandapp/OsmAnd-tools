@@ -576,9 +576,9 @@ public class ApiController {
     }
 	
 	@PostMapping(path = {"/promo-add-user"})
-	public ResponseEntity<String> addUser(@RequestParam String name,
-	                                      @RequestParam String email) {
-		return promoService.addUser(name, email);
+	public ResponseEntity<String> addUser(@RequestParam String promoKey,
+	                                      @RequestParam String userEmail) {
+		return promoService.addUser(promoKey, userEmail);
 	}
     
 }
