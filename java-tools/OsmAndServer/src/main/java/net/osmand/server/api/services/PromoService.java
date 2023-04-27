@@ -2,18 +2,19 @@ package net.osmand.server.api.services;
 
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.repo.PromoRepository;
+import net.osmand.server.api.repo.PromoCampaignRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
 import java.util.*;
 
 @Service
 public class PromoService {
     
     @Autowired
-    PromoRepository promoRepository;
+    PromoCampaignRepository promoCampaignRepository;
     
     @Autowired
     private EmailSenderService emailSender;
@@ -27,24 +28,26 @@ public class PromoService {
     @Autowired
     private DeviceSubscriptionsRepository subscriptionsRepository;
     
-    public void register(PromoRepository.Promo promo) {
-        if (promoRepository.existsById(promo.name)) {
+    public void register(PromoCampaignRepository.Promo promo) {
+        if (promoCampaignRepository.existsById(promo.name)) {
             throw new IllegalStateException("Promo already exists");
         } else {
-            promoRepository.save(promo);
+            promoCampaignRepository.save(promo);
         }
     }
     
+    @Transactional
     public ResponseEntity<String> addUser(String name, String email) {
-        PromoRepository.Promo promo = promoRepository.findByName(name);
-        if (promo.used < promo.numberLimit) {
-            String key = "promo_" + promo.name;
-            Date expireTime = getExpirationDate(promo);
+        PromoCampaignRepository.Promo promoCampaign = promoCampaignRepository.findByName(name);
+        if (promoCampaign.used < promoCampaign.numberLimit) {
+            String key = "promo_" + promoCampaign.name;
+            Date expireTime = getExpirationDate(promoCampaign);
             PromoResponse resp = createPromoSubscription(email, key, expireTime);
             PremiumUsersRepository.PremiumUser existingUser = usersRepository.findByEmail(email);
             if (existingUser != null && !resp.error) {
-                promo.used++;
-                promoRepository.save(promo);
+                promoCampaign.used++;
+                promoCampaign.lastUsers = getLastUsers(promoCampaign);
+                promoCampaignRepository.save(promoCampaign);
                 return ResponseEntity.ok(expireTime.toString());
             } else {
                 return ResponseEntity.badRequest().body(resp.deviceSub.purchaseToken);
@@ -53,8 +56,18 @@ public class PromoService {
         return ResponseEntity.badRequest().body("Unfortunately we ran out of available promocodes");
     }
     
+    private String getLastUsers(PromoCampaignRepository.Promo promoCampaign) {
+        StringBuilder res = new StringBuilder();
+        List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findFirst5BySkuOrderByStarttimeDesc("promo_" + promoCampaign.name);
+        for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptions) {
+            PremiumUsersRepository.PremiumUser user = usersRepository.findByOrderid(subscription.orderId);
+            res.append(user.email).append(" | ");
+        }
+        String emails = res.toString();
+        return emails.substring(0, emails.length() - 3);
+    }
     
-    public synchronized PromoResponse createPromoSubscription(String email, String key, Date expireTime) {
+    public PromoResponse createPromoSubscription(String email, String key, Date expireTime) {
         DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
         deviceSub.sku = key;
         deviceSub.orderId = UUID.randomUUID().toString();
@@ -117,7 +130,7 @@ public class PromoService {
         }
     }
     
-    private Date getExpirationDate(PromoRepository.Promo promo) {
+    private Date getExpirationDate(PromoCampaignRepository.Promo promo) {
         Calendar instance = Calendar.getInstance();
         instance.setTime(new Date());
         instance.add(Calendar.MONTH, promo.subActiveMonths);

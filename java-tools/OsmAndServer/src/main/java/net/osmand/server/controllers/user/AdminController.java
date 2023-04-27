@@ -119,7 +119,7 @@ public class AdminController {
 	private LotterySeriesRepository seriesRepo;
 	
 	@Autowired
-	private PromoRepository promoRepository;
+	private PromoCampaignRepository promoCampaignRepository;
 	
 	@Autowired
 	PromoService promoService;
@@ -415,12 +415,9 @@ public class AdminController {
 			model.addAttribute("subSettings", settings);
 		}
 		
-		List<PromoRepository.Promo> promos = promoRepository.findAllByOrderByStartTimeDesc();
-		
-		model.addAttribute("promos", promos);
-		model.addAttribute("emails", getLastUsersPromo(promos));
+		model.addAttribute("promos", promoCampaignRepository.findAllByOrderByStartTimeDesc());
 		model.addAttribute("giveaways", seriesRepo.findAllByOrderByUpdateTimeDesc());
-		//model.addAttribute("downloadServers", getDownloadSettings());
+		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
 		model.addAttribute("surveyReport", getSurveyReport());
 		List<Subscription> allSubs = parseSubscriptions();
@@ -435,26 +432,6 @@ public class AdminController {
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
 		return "admin/info";
 	}
-	
-	private Map<String, String> getLastUsersPromo(List<PromoRepository.Promo> promos) {
-		Map<String, String> emails = new HashMap<>();
-		for (PromoRepository.Promo promo : promos) {
-			StringBuilder res = new StringBuilder();
-			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findFirst5BySkuOrderByStarttimeDesc("promo_" + promo.name);
-			for (SupporterDeviceSubscription subscription : subscriptions) {
-				PremiumUser user = usersRepository.findByOrderid(subscription.orderId);
-				res.append(user.email);
-				if (subscriptions.indexOf(subscription) != 4) {
-					res.append(" | ");
-				}
-			}
-			emails.put(promo.name, res.toString());
-		}
-		return emails;
-	}
-
-
-	
 	
 	private BtcTransactionReport getBitcoinReport() {
 //		new File(websiteLocation, BTC_REPORT);
@@ -1490,14 +1467,14 @@ public class AdminController {
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
 	
-	@PostMapping(path = {"/register-promo-pro"})
-	public String registerPromo(@RequestParam String name,
+	@PostMapping(path = {"/register-promo-campaign"})
+	public String registerPromoCampaign(@RequestParam String name,
 	                            @RequestParam int subActiveMonths,
 	                            @RequestParam int numberLimit,
 	                            @RequestParam String endTime,
 	                            final RedirectAttributes redirectAttrs) throws ParseException {
 		
-		PromoRepository.Promo promo = new PromoRepository.Promo();
+		PromoCampaignRepository.Promo promo = new PromoCampaignRepository.Promo();
 		promo.name = name;
 		promo.subActiveMonths = subActiveMonths;
 		promo.numberLimit = numberLimit;

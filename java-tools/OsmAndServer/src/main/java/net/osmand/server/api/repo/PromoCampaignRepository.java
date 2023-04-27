@@ -8,10 +8,10 @@ import java.util.Date;
 import java.util.List;
 
 @Repository
-public interface PromoRepository extends JpaRepository<PromoRepository.Promo, String> {
+public interface PromoCampaignRepository extends JpaRepository<PromoCampaignRepository.Promo, String> {
     
     @Entity
-    @Table(name = "promo")
+    @Table(name = "promo_campaigns")
     class Promo {
         
         @Id
@@ -34,9 +34,12 @@ public interface PromoRepository extends JpaRepository<PromoRepository.Promo, St
         
         @Column(name = "used")
         public int used;
+    
+        @Column(name = "lastusers")
+        public String lastUsers;
     }
     
-    List<PromoRepository.Promo> findAllByOrderByStartTimeDesc();
+    List<PromoCampaignRepository.Promo> findAllByOrderByStartTimeDesc();
     
-    PromoRepository.Promo findByName(String name);
+    PromoCampaignRepository.Promo findByName(String name);
 }
