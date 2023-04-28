@@ -100,7 +100,7 @@ public class BinaryMerger {
 			description = "description=Offroad tracks of Middle-earth";
 			resource = "https://osmand.net OsmAnd";
 		} else {
-			if (args.length < 4) {
+			if (args.length < 2) {
 				System.out.println(usage);
 				System.exit(1);
 				return;
