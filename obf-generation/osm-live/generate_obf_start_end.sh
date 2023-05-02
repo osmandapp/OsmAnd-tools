@@ -35,7 +35,6 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         BASENAME=$(basename $DIFF_FILE);
         BASENAME=${BASENAME%_diff.osm.gz}
         PROC_FILE=$DATE_DIR/obf/${BASENAME}.done
-        PROC_FILE=$DATE_DIR/obf/${BASENAME}.done
         if [ -f $PROC_FILE ] || [ -f $DATE_DIR/${BASENAME}.obf.gz ]; then
             continue;
         fi
@@ -73,15 +72,22 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
         wait            
 
-        echo "Complete file ${PROC_FILE} $(date -u)"
-        # marked intermediate step was processed for counting
-        touch ${PROC_FILE}
+        
+        AFTER_OBF=$DATE_DIR/obf/${BASENAME}_after.obf
+        BEFORE_OBF=$DATE_DIR/obf/${BASENAME}_before.obf
+        AFTER_REL_M_OBF=$DATE_DIR/obf/${BASENAME}_after_rel_m.obf
+        BEFORE_REL_OBF=$DATE_DIR/obf/${BASENAME}_before_rel.obf
+        if [ -f $AFTER_OBF ] && [ -f $BEFORE_OBF ] && [ -f $AFTER_REL_M_OBF ] && [ -f $BEFORE_REL_OBF ]; then
+            # marked intermediate step was processed for counting
+            touch ${PROC_FILE}
+            echo "Complete file ${PROC_FILE} $(date -u)"
+        else
+            echo "ERROR. One of file:${AFTER_OBF} ${BEFORE_OBF} ${AFTER_REL_M_OBF} ${BEFORE_REL_OBF} did not generated!"
+            exit 1;
+        fi        
         rm *.osm.gz || true
         rm *.osm || true
         rm *.rtree* || true
         rm *.obf || true
-        DATE_NAME=${BASENAME:0:8} #22_10_11
-        TIME_NAME=${BASENAME:9:12} #20_30
     done
 done
-
