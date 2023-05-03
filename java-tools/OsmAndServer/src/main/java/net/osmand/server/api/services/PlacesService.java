@@ -131,6 +131,7 @@ public class PlacesService {
 				if (wikimediaPrimaryCameraPlace != null) {
 					visibile.add(0, wikimediaPrimaryCameraPlace);
 				}
+				response.setCharacterEncoding("UTF-8");
 				response.getWriter().println(gson.toJson(Collections.singletonMap("features", visibile)));
 				asyncCtx.complete();
 			} catch (Exception e) {
