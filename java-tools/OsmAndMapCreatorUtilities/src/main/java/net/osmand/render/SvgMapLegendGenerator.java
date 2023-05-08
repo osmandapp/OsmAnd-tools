@@ -29,7 +29,7 @@ import net.osmand.util.Algorithms;
 public class SvgMapLegendGenerator {
 
 	static int defaultZoomLevel = 19; // Most of the icons on this zoom are visible
-	static int canvasWidth = 300;
+	static int canvasWidth = 40;
 	static int canvasHeight = 40;
 	static int defaultShieldSize = 40;
 	static int defaultIconSize = 24;
