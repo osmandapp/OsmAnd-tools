@@ -39,7 +39,7 @@ public class PromoService {
     @Transactional
     public ResponseEntity<String> addUser(String name, String email) {
         PromoCampaignRepository.Promo promoCampaign = promoCampaignRepository.findByName(name);
-        if (promoCampaign.used < promoCampaign.numberLimit) {
+        if (promoCampaign != null && promoCampaign.used < promoCampaign.numberLimit) {
             String key = "promo_" + promoCampaign.name;
             Date expireTime = getExpirationDate(promoCampaign);
             PromoResponse resp = createPromoSubscription(email, key, expireTime);
