@@ -107,6 +107,7 @@ public class OsmAndMapsService {
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final double SEARCH_RADIUS_DEGREE = 1.5;
 	private static final int TOTAL_LIMIT_POI = 400;
+	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 7;
 	private static final String SEARCH_LOCALE = "en";
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -912,10 +913,10 @@ public class OsmAndMapsService {
 		return res;
 	}
 	
-	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, List<String> categories, QuadRect searchBbox) throws IOException {
+	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, List<String> categories, QuadRect searchBbox, int zoom) throws IOException {
 		List<RoutingController.Feature> features = new ArrayList<>();
 		for (String category : categories) {
-			List<SearchResult> res = searchPoiByCategory(lat, lon, category,searchBbox, TOTAL_LIMIT_POI/categories.size());
+			List<SearchResult> res = searchPoiByCategory(lat, lon, category,searchBbox, TOTAL_LIMIT_POI/categories.size(), zoom);
 			if (!res.isEmpty()) {
 				prepareSearchResult(res, features);
 			}
@@ -953,7 +954,7 @@ public class OsmAndMapsService {
 		}
 	}
 	
-	public synchronized List<SearchResult> searchPoiByCategory(double lat, double lon, String text, QuadRect searchBbox, int limit) throws IOException {
+	public synchronized List<SearchResult> searchPoiByCategory(double lat, double lon, String text, QuadRect searchBbox, int limit, int zoom) throws IOException {
 		if (!validateAndInitConfig()) {
 			return null;
 		}
@@ -963,15 +964,28 @@ public class OsmAndMapsService {
 		searchUICore.getSearchSettings().setOfflineIndexes(list);
 		searchUICore.init();
 		searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-		
-		SearchSettings settings = searchUICore
-				.getPhrase()
-				.getSettings();
-		settings = settings.setSearchBBox31(searchBbox);
-		searchUICore.updateSettings(settings);
+		SearchSettings settings = searchUICore.getPhrase().getSettings();
+		if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
+			searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+		} else {
+			searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
+		}
 		searchUICore.setTotalLimit(limit);
 		SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
 		return r.getCurrentSearchResults();
+	}
+	
+	public QuadRect getSearchBbox(Map<String, Object> data, int zoom, double lat, double lon) {
+		LatLon point1;
+		LatLon point2;
+		if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
+			point1 = new LatLon((double) data.get("latBboxPoint1"), (double) data.get("lngBboxPoint1"));
+			point2 = new LatLon((double) data.get("latBboxPoint2"), (double) data.get("lngBboxPoint2"));
+		} else {
+			point1 = new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE);
+			point2 = new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE);
+		}
+		return points(null, point1, point2);
 	}
 	
 	private String getIconName(PoiType poiType) {
