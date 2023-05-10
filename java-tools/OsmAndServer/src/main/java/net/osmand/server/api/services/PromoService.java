@@ -8,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 @Service
@@ -39,7 +42,8 @@ public class PromoService {
     @Transactional
     public ResponseEntity<String> addUser(String name, String email) {
         PromoCampaignRepository.Promo promoCampaign = promoCampaignRepository.findByName(name);
-        if (promoCampaign.used < promoCampaign.numberLimit) {
+        ResponseEntity<String> error = validatePromo(promoCampaign);
+        if (error == null) {
             String key = "promo_" + promoCampaign.name;
             Date expireTime = getExpirationDate(promoCampaign);
             PromoResponse resp = createPromoSubscription(email, key, expireTime);
@@ -53,7 +57,31 @@ public class PromoService {
                 return ResponseEntity.badRequest().body(resp.deviceSub.purchaseToken);
             }
         }
-        return ResponseEntity.badRequest().body("Unfortunately we ran out of available promocodes");
+        return error;
+    }
+    
+    private ResponseEntity<String> validatePromo(PromoCampaignRepository.Promo promo) {
+        if (promo != null) {
+            long endTime = promo.endTime.getTime();
+            long today = new Date().getTime();
+            if (endTime > today) {
+                if (promo.used < promo.numberLimit) {
+                    return null;
+                } else {
+                    return ResponseEntity.badRequest().body("Unfortunately we ran out of available promocodes.");
+                }
+            } else {
+                String startDate = getDateWithoutTime(promo.startTime);
+                String endDate = getDateWithoutTime(promo.endTime);
+                return ResponseEntity.badRequest().body(String.format("Promo campaign already over. Valid only from %s to %s.", startDate, endDate));
+            }
+        }
+        return ResponseEntity.badRequest().body("Promo campaign hasn't been created yet.");
+    }
+    
+    private String getDateWithoutTime(Date date) {
+        DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy");
+        return formatter.format(date);
     }
     
     private String getLastUsers(PromoCampaignRepository.Promo promoCampaign) {
