@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 @Controller
-@RequestMapping("/search")
+@RequestMapping("/routing/search")
 public class SearchController {
     
     protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
