@@ -915,9 +915,12 @@ public class OsmAndMapsService {
 	
 	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, List<String> categories, QuadRect searchBbox, int zoom) throws IOException {
 		List<RoutingController.Feature> features = new ArrayList<>();
+		int leftoverLimit = 0;
+		int limit = TOTAL_LIMIT_POI/categories.size();
 		for (String category : categories) {
-			List<SearchResult> res = searchPoiByCategory(lat, lon, category,searchBbox, TOTAL_LIMIT_POI/categories.size(), zoom);
+			List<SearchResult> res = searchPoiByCategory(lat, lon, category,searchBbox, limit + leftoverLimit, zoom);
 			if (!res.isEmpty()) {
+				leftoverLimit = limit - res.size();
 				prepareSearchResult(res, features);
 			}
 		}
