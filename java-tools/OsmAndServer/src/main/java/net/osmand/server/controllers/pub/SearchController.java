@@ -2,6 +2,8 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
 import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
@@ -82,10 +84,12 @@ public class SearchController {
     
     @RequestMapping(path = {"/get-poi"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getPoi(@RequestBody List<String> categories,
+    public ResponseEntity<String> getPoi(@RequestBody Map<String, Object> data,
                                          @RequestParam double lat,
-                                         @RequestParam double lon) throws IOException, InterruptedException {
-        RoutingController.FeatureCollection collection = osmAndMapsService.searchPoi(lat, lon, categories);
+                                         @RequestParam double lon) throws IOException {
+        List<String> categories = (List<String>) data.get("categories");
+        QuadRect searchBbox = getBbox(data);
+        RoutingController.FeatureCollection collection = osmAndMapsService.searchPoi(lat, lon, categories, searchBbox);
         if (collection != null) {
             return ResponseEntity.ok(gson.toJson(collection));
         } else {
@@ -102,5 +106,11 @@ public class SearchController {
         } else {
             return ResponseEntity.badRequest().body("Error get poi categories!");
         }
+    }
+    
+    private QuadRect getBbox(Map<String, Object> data) {
+        LatLon point1 = new LatLon((double) data.get("latBboxPoint1"), (double) data.get("lngBboxPoint1"));
+        LatLon point2 = new LatLon((double) data.get("latBboxPoint2"), (double) data.get("lngBboxPoint2"));
+        return osmAndMapsService.points(null,  point1, point2);
     }
 }
