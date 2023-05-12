@@ -89,7 +89,9 @@ public class PromoService {
         List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findFirst5BySkuOrderByStarttimeDesc("promo_" + promoCampaign.name);
         for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptions) {
             PremiumUsersRepository.PremiumUser user = usersRepository.findByOrderid(subscription.orderId);
-            res.append(user.email).append(" | ");
+            if (user != null) {
+                res.append(user.email).append(" | ");
+            }
         }
         String emails = res.toString();
         return emails.substring(0, emails.length() - 3);
