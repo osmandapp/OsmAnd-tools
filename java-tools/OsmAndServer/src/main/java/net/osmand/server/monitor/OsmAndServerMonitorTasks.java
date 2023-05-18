@@ -73,7 +73,7 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
 			"maptile.osmand.net" };
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
-			"https://builder.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/",
+			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/",
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
 			"https://tile.osmand.net:8080/job/UpdateOsmAndServer/" };
 
@@ -241,7 +241,7 @@ public class OsmAndServerMonitorTasks {
 		}
 		try {
 			Set<String> jobsFailed = new TreeSet<String>();
-			URL url = new URL("https://builder.osmand.net:8080/api/json");
+			URL url = new URL("https://creator.osmand.net:8080/api/json");
 			InputStream is = url.openConnection().getInputStream();
 			JSONObject object = new JSONObject(new JSONTokener(is));
 			JSONArray jsonArray = object.getJSONArray("jobs");
@@ -617,9 +617,9 @@ public class OsmAndServerMonitorTasks {
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
 		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
-			msg += "<a href='https://builder.osmand.net:8080'>builder</a>: <b>OK</b>.\n";
+			msg += "<a href='https://creator.osmand.net:8080'>builder</a>: <b>OK</b>.\n";
 		} else {
-			msg += "<a href='https://builder.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
+			msg += "<a href='https://creator.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
 		}
 		for (String host: downloadTests.keySet()) {
 			DownloadTestResult r = downloadTests.get(host);
@@ -670,7 +670,7 @@ public class OsmAndServerMonitorTasks {
 	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
 		Set<String> formatted = new TreeSet<>();
 		for (String jobName : jobNames) {
-			formatted.add(String.format("<a href='https://builder.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
+			formatted.add(String.format("<a href='https://creator.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
 		}
 		return formatted;
 	}
