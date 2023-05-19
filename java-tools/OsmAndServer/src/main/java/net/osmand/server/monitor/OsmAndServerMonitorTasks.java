@@ -617,9 +617,9 @@ public class OsmAndServerMonitorTasks {
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
 		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
-			msg += "<a href='https://creator.osmand.net:8080'>builder</a>: <b>OK</b>.\n";
+			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>OK</b>.\n";
 		} else {
-			msg += "<a href='https://creator.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
+			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
 		}
 		for (String host: downloadTests.keySet()) {
 			DownloadTestResult r = downloadTests.get(host);
