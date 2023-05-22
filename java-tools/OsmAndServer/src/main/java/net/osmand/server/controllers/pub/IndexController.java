@@ -71,7 +71,7 @@ public class IndexController {
         return String.format("%.1f", size);
     }
 
-    private String formatDate(File file) {
+    private synchronized String formatDate(File file) {
         return dateFormat.format(new Date(file.lastModified()));
     }
 
