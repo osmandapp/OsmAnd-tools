@@ -106,6 +106,8 @@ public class StorageService {
 				builder = builder.withCredentials(
 						new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey)));
 			}
+			LOGGER.info(String.format("Configure %s with %s to %s: accesskey=%s, secretKeyLength=", id, endpointUrl,
+					region, accessKey, secretKey == null ? 0 : secretKey.length()));
 			AmazonS3 s3 = builder.build();
 			st = new StorageType();
 			st.bucket = bucket;
