@@ -72,8 +72,6 @@ public class ApiController {
     @Value("${osmand.files.location}")
     private String filesLocation;
     
-    @Value("${osmand.web.location}")
-    private String websiteLocation;
 
 	@Autowired
 	private DataSource dataSource;

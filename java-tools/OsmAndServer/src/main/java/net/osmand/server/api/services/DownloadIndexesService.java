@@ -53,7 +53,7 @@ public class DownloadIndexesService  {
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexesService.class);
 
 	private static final String INDEX_FILE = "indexes.xml";
-	private static final String DOWNLOAD_SETTINGS = "api/settings.json";
+	private static final String DOWNLOAD_SETTINGS = "api/download_settings.json";
 	private static final String INDEX_FILE_EXTERNAL_URL = "index-source.info";
     private static final String EXTERNAL_URL = "public-api-indexes/";
 	
@@ -504,7 +504,7 @@ public class DownloadIndexesService  {
 		// small test
 		Gson gson = new Gson();
 		DownloadServerLoadBalancer dp = gson.fromJson(new FileReader(new File(
-				System.getProperty("repo.location") + "/help/website", DOWNLOAD_SETTINGS)), DownloadServerLoadBalancer.class);
+				System.getProperty("repo.location") + "/web-server-config/", DOWNLOAD_SETTINGS)), DownloadServerLoadBalancer.class);
 		dp.prepare();
 		DownloadServerSpecialty type = DownloadServerSpecialty.MAIN;
 		for(String serverName : dp.getServerNames()) {

@@ -60,6 +60,9 @@ public class ObfDiffMerger {
 					continue;
 				}
 				String regionName = Algorithms.capitalizeFirstLetter(region.getName());
+				if (regionName.startsWith("_")) {
+					continue;
+				}
 				LOG.info("Processing " + regionName);
 				if (regionName.equals("_diff")) {
 					regionName = "World";
