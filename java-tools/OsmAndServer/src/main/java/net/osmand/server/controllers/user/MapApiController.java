@@ -28,10 +28,7 @@ import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.services.GpxService;
-import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.api.services.StorageService;
-import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.api.services.*;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
@@ -127,6 +124,9 @@ public class MapApiController {
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 	
+	@Autowired
+	private EmailSenderService emailSender;
+	
 	Gson gson = new Gson();
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
@@ -184,6 +184,19 @@ public class MapApiController {
 		}
 		request.login(us.username, us.password); // SecurityContextHolder.getContext().getAuthentication();
 		return okStatus();
+	}
+	
+	@PostMapping(path = {"/auth/delete-account"})
+	@ResponseBody
+	public ResponseEntity<String> deleteAccount(@RequestBody String email, HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(email)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.deleteAccount(email, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")

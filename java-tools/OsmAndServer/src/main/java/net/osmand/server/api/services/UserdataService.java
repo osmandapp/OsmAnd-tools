@@ -25,8 +25,10 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.transaction.Transactional;
 
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.logging.Log;
@@ -589,4 +591,26 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
+    
+    @Transactional
+    public ResponseEntity<String> deleteAccount(String email, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        if (pu != null && pu.id == dev.userid) {
+            int numOfUsersDelete = usersRepository.deleteByEmail(email);
+            if (numOfUsersDelete != -1) {
+                int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
+                if (numOfUserDevicesDelete != -1) {
+                    Iterable<UserFile> files = filesRepository.findAllByUserid(dev.userid);
+                    files.forEach(file -> {
+                        storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
+                        filesRepository.delete(file);
+                    });
+                    request.logout();
+                    return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", email));
+                }
+            }
+            return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", email));
+        }
+        return ResponseEntity.badRequest().body("Email doesn't match login username");
+    }
 }
