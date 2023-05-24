@@ -80,19 +80,19 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					//"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-zoom=13",
+//					"-zoom=13",
 					// road
-					//"-latlon=48.46614,9.16976",
+//					"-latlon=50.73381,7.08721",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					"/Users/macmini/OsmAnd/maps/Ukraine_vinnytsya_europe.obf"
+					"/Users/victorshcherb/Desktop/Belarus_gomel_europe_merge.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

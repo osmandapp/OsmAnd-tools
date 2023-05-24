@@ -1,9 +1,39 @@
 package net.osmand.obf;
 
 
+import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.sql.SQLException;
+import java.text.Collator;
+import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
@@ -32,26 +62,6 @@ import net.osmand.util.CountryOcbfGeneration;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.sql.SQLException;
-import java.text.Collator;
-import java.text.MessageFormat;
-import java.util.*;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
-
-import gnu.trove.set.hash.TLongHashSet;
-
-import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
 
 public class BinaryMerger {
 
