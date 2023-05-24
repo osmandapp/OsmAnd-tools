@@ -14,22 +14,13 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.obf.*;
+import net.osmand.obf.diff.*;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.BinaryComparator;
-import net.osmand.obf.BinaryInspector;
-import net.osmand.obf.BinaryMerger;
-import net.osmand.obf.GenerateRegionTags;
-import net.osmand.obf.IconVisibility;
-import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.obf.diff.AugmentedDiffsInspector;
-import net.osmand.obf.diff.GenerateDailyObf;
-import net.osmand.obf.diff.ObfDiffGenerator;
-import net.osmand.obf.diff.ObfDiffMerger;
-import net.osmand.obf.diff.ObfRegionSplitter;
 import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
@@ -111,6 +102,9 @@ public class MainUtilities {
 				WikipediaByCountryDivider.main(subArgsArray);
 			} else if (utl.equals("generate-obf-diff")) {
 				ObfDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("generate-obf-diff-no-transport")) {
+				ObfDiffGenerator.COMPARE_TRANSPORT = false;
+				ObfDiffGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-basemap")) {
 				BasemapProcessor.main(subArgsArray);
 			} else if (utl.equals("fix-basemap-roads")) {
@@ -141,6 +135,16 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
+				parseIndexCreatorArgs(subArgs, settings);
+				generateObf(subArgs, settings);
+			} else if (utl.equals("generate-obf-no-address-no-multipolygon")) {
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexMap = true;
+				settings.indexAddress = false;
+				settings.indexPOI = true;
+				settings.indexTransport = false;
+				settings.indexRouting = true;
+				settings.indexMultipolygon = false;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
 			} else if (utl.equals("convert-gpx-to-obf")) {
@@ -229,6 +233,12 @@ public class MainUtilities {
 				GenerateDailyObf.main(argsToGenerateObf);
 			} else if (utl.equals("travel-guide-creator")) {
 				TravelGuideCreatorMain.main(subArgsArray);
+			} else if (utl.equals("generate-relation-osm")) {
+				RelationDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("merge-obf-diff")) {
+				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
+			} else if (utl.equals("add-owner-to-obf")) {
+				BinaryMerger.signObfFile(subArgsArray);
 			} else {
 				printSynopsys();
 			}

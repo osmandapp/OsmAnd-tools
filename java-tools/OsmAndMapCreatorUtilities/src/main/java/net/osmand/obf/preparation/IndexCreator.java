@@ -6,10 +6,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -377,6 +374,7 @@ public class IndexCreator {
 		} else {
 			stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
 		}
+		stat.close();
 
 		accessor.setDbConn(dbConn, osmDBdialect);
 		boolean shiftIds = generateUniqueIds || overwriteIds;
@@ -388,11 +386,14 @@ public class IndexCreator {
 			if (readFile.length > 1) {
 				log.info("Processing " + (mapInd + 1) + " file out of " + readFile.length);
 			}
-			stat.execute("INSERT INTO input(ind, shift, file, length) VALUES (" + Integer.toString(mapInd) + ", "
-					+ shift + ", '" + read.getAbsolutePath() + "'," + read.length() + ")");
+			PreparedStatement pStat = dbConn.prepareStatement("INSERT INTO input(shift, ind, file, length) VALUES (?, ?, ?, ?)");
+			pStat.setInt(1, shift);
+			pStat.setInt(2, mapInd);
+			pStat.setString(3, read.getAbsolutePath());
+			pStat.setInt(4, (int) read.length());
+			pStat.executeUpdate();
 			mapInd++;
 		}
-		stat.close();
 		// load cities names
 		// accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 		// @Override

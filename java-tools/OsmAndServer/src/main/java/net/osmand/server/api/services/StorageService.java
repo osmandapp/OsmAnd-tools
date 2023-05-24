@@ -106,6 +106,8 @@ public class StorageService {
 				builder = builder.withCredentials(
 						new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey)));
 			}
+			LOGGER.info(String.format("Configure %s with %s in %s bucket=%s: accesskey=%s, secretKeyLength=%d", id, endpointUrl,
+					region, bucket, accessKey, secretKey == null ? 0 : secretKey.length()));
 			AmazonS3 s3 = builder.build();
 			st = new StorageType();
 			st.bucket = bucket;
@@ -207,6 +209,7 @@ public class StorageService {
 			for (String id : storage.split(",")) {
 				StorageType st = getStorageProviderById(id);
 				if (st != null && !st.local) {
+//					LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename)); // TODO fix
 					S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
 					return obj.getObjectContent();
 				}

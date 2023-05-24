@@ -62,8 +62,7 @@ public class OsmStorageWriter {
 
 
 
-	public <T extends Entity> List<T> sort(Collection<T> e) {
-		List<T> lst = new ArrayList<T>(e);
+	public <T extends Entity> List<T> sort(List<T> lst) {
 		Collections.sort(lst, new Comparator<T>() {
 
 			@Override
@@ -86,16 +85,21 @@ public class OsmStorageWriter {
 			Map<EntityId, Entity> entities, Map<EntityId, EntityInfo> entityInfo,
 			Collection<EntityId> interestedObjects, boolean includeLinks)
 			throws FactoryConfigurationError, XMLStreamException {
-		Set<Node> nodes = new LinkedHashSet<Node>();
-		Set<Way> ways = new LinkedHashSet<Way>();
-		Set<Relation> relations = new LinkedHashSet<Relation>();
+		List<Node> nodes = new ArrayList<Node>();
+		List<Way> ways = new ArrayList<Way>();
+		List<Relation> relations = new ArrayList<Relation>();
 		if (interestedObjects == null) {
 			interestedObjects = entities.keySet();
 		}
-		Stack<EntityId> toResolve = new Stack<EntityId>();
+		List<EntityId> toResolve = new ArrayList<>();
+		Set<EntityId> resolved = new HashSet<Entity.EntityId>();
 		toResolve.addAll(interestedObjects);
 		while (!toResolve.isEmpty()) {
-			EntityId l = toResolve.pop();
+			EntityId l = toResolve.remove(toResolve.size() - 1);
+			boolean add = resolved.add(l);
+			if (!add) {
+				continue;
+			}
 			if (entities.get(l) instanceof Node) {
 				nodes.add((Node) entities.get(l));
 			} else if (entities.get(l) instanceof Way) {
@@ -106,7 +110,7 @@ public class OsmStorageWriter {
 			} else if (entities.get(l) instanceof Relation) {
 				relations.add((Relation) entities.get(l));
 				if (includeLinks) {
-					for(RelationMember rm : ((Relation) entities.get(l)).getMembers()) {
+					for (RelationMember rm : ((Relation) entities.get(l)).getMembers()) {
 						toResolve.add(rm.getEntityId());
 					}
 				}

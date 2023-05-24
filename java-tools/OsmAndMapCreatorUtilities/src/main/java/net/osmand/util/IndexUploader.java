@@ -23,6 +23,9 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -137,6 +140,7 @@ public class IndexUploader {
 	private boolean travelProcess;
 	private boolean depthProcess;
 	private boolean mapsProcess;
+	private int numberOfThreads = 2;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -212,6 +216,9 @@ public class IndexUploader {
 				start++;
 			} else if (args[start].startsWith("--roads")) {
 				roadProcess = true;
+				start++;
+			} else if (args[start].startsWith("--nt=")) {
+				numberOfThreads = Integer.parseInt(args[start].substring("--nt=".length()));
 				start++;
 			} else if (args[start].startsWith("--wiki")) {
 				wikiProcess = true;
@@ -331,83 +338,105 @@ public class IndexUploader {
 		try {
 			uploadCredentials.connect();
 			File[] listFiles = directory.listFiles();
+			ExecutorService service = Executors.newFixedThreadPool(numberOfThreads);
 			for (File f : listFiles) {
-				try {
-					if (!fileFilter.fileCanBeUploaded(f)) {
-						continue;
-					}
-					long timestampCreated = f.lastModified();
-					if (!uploadCredentials.checkIfUploadNeededByTimestamp(f.getName(), timestampCreated)) {
-						log.info("File skipped because timestamp was not changed " + f.getName());
-						continue;
-					}
-					String fileName = f.getName();
-					log.info("Process file " + f.getName());
-					boolean skip = false;
-					if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
-						skip = true;
-					} else if (fileName.contains(".road") != this.roadProcess) {
-						skip = true;
-					} else if (fileName.contains(".wiki") != this.wikiProcess) {
-						skip = true;
-					} else if (fileName.contains(".travel") != this.travelProcess) {
-						skip = true;
-					} else if (fileName.contains(".depth") != this.depthProcess) {
-						skip = true;
-					}
-					if (skip) {
-						log.info("Skip file: " + f.getName());
-						continue;
-					}
-					File unzippedFolder = unzip(f);
-					File mainFile = unzippedFolder;
-					if (unzippedFolder.isDirectory()) {
-						for (File tf : unzippedFolder.listFiles()) {
-							if (tf.getName().endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
-								mainFile = tf;
-								break;
-							}
+				if (checkFileNeedToBeUploaded(f)) {
+					service.submit(new Runnable() {
+						@Override
+						public void run() {
+							processFile(f);
 						}
-					}
-					try {
-						if (mapsProcess) {
-							boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
-							if (!worldFile && !fileName.contains("_ext_")) {
-								extractRoadOnlyFile(mainFile, new File(directory, fileName.replace(IndexConstants.BINARY_MAP_INDEX_EXT,
-										IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
-							}
-						}
-						String description = checkfileAndGetDescription(mainFile);
-						timestampCreated = mainFile.lastModified();
-						if (description == null) {
-							log.info("Skip file empty description " + f.getName());
-							skip = true;
-						} else {
-							File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
-							zip(unzippedFolder, zFile, description, timestampCreated);
-							uploadIndex(f, zFile, description, uploadCredentials);
-						}
-					} finally {
-						if (!skip) {
-							if (!f.getName().equals(unzippedFolder.getName())
-									|| (targetDirectory != null && !targetDirectory.equals(directory))) {
-								Algorithms.removeAllFiles(unzippedFolder);
-							}
-						}
-					}
-				} catch (OneFileException e) {
-					log.error(f.getName() + ": " + e.getMessage(), e);
-				} catch (RuntimeException e) {
-					log.error(f.getName() + ": " + e.getMessage(), e);
+					});
 				}
 			}
+			log.error("Stopping the tasks queue...");
+			service.shutdown();
+			log.error("Waiting termination all tasks...");
+			service.awaitTermination(24, TimeUnit.HOURS);
 			if (deleteFileFilter != null) {
 				log.error("Delete file filter is not supported with this credentions (method) " + uploadCredentials);
 			}
-
+			log.error("All tasks has finished.");
+		} catch (InterruptedException e) {
+			log.error("Await failed: " + e.getMessage(), e);
 		} finally {
 			uploadCredentials.disconnect();
 		}
+	}
+
+	private void processFile(File f) {
+		try {
+			String fileName = f.getName();
+			File unzippedFolder = unzip(f);
+			File mainFile = unzippedFolder;
+			if (unzippedFolder.isDirectory()) {
+				for (File tf : unzippedFolder.listFiles()) {
+					if (tf.getName().endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
+						mainFile = tf;
+						break;
+					}
+				}
+			}
+			boolean skip = false;
+			try {
+				if (mapsProcess) {
+					boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
+					if (!worldFile && !fileName.contains("_ext_")) {
+						extractRoadOnlyFile(mainFile, new File(directory, fileName.replace(IndexConstants.BINARY_MAP_INDEX_EXT,
+								IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
+					}
+				}
+				String description = checkfileAndGetDescription(mainFile);
+				long timestampCreated = mainFile.lastModified();
+				if (description == null) {
+					log.info("Skip file empty description " + f.getName());
+					skip = true;
+				} else {
+					File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
+					zip(unzippedFolder, zFile, description, timestampCreated);
+					uploadIndex(f, zFile, description, uploadCredentials);
+				}
+			} finally {
+				if (!skip) {
+					if (!f.getName().equals(unzippedFolder.getName())
+							|| (targetDirectory != null && !targetDirectory.equals(directory))) {
+						Algorithms.removeAllFiles(unzippedFolder);
+					}
+				}
+			}
+		} catch (OneFileException | IOException | RuntimeException | RTreeException e) {
+			log.error(f.getName() + ": " + e.getMessage(), e);
+		}
+	}
+
+	private boolean checkFileNeedToBeUploaded(File f) {
+		if (!fileFilter.fileCanBeUploaded(f)) {
+			return false;
+		}
+		long timestampCreated = f.lastModified();
+		if (!uploadCredentials.checkIfUploadNeededByTimestamp(f.getName(), timestampCreated)) {
+			log.info("File skipped because timestamp was not changed " + f.getName());
+			return false;
+		}
+		String fileName = f.getName();
+		log.info("Process file " + f.getName());
+		boolean skip = false;
+		if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
+			skip = true;
+		} else if (fileName.contains(".road") != this.roadProcess) {
+			skip = true;
+		} else if (fileName.contains(".wiki") != this.wikiProcess) {
+			skip = true;
+		} else if (fileName.contains(".travel") != this.travelProcess) {
+			skip = true;
+		} else if (fileName.contains(".depth") != this.depthProcess) {
+			skip = true;
+		}
+		if (skip) {
+			log.info("Skip file: " + f.getName());
+			return false;
+		}
+		return true;
 	}
 
 	public static File zip(File folder, File zFile, String description, long lastModifiedTime) throws OneFileException {
@@ -476,7 +505,7 @@ public class IndexUploader {
 		}
 	}
 
-	public static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
+	public synchronized static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
 		RandomAccessFile raf = new RandomAccessFile(mainFile, "r");
 		BinaryMapIndexReader index = new BinaryMapIndexReader(raf, mainFile);
 		final RandomAccessFile routf = new RandomAccessFile(roadOnlyFile, "rw");

@@ -1401,7 +1401,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface)
 				|| "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface)
-				|| "metal".equals(surface) || "wood".equals(surface)) {
+				|| "metal".equals(surface) || "wood".equals(surface) || "chipseal".equals(surface)) {
 			result += 3;
 			result_bicycle_routing += 3;
 		} else if ("fine_gravel".equals(surface) || "grass_paver".equals(surface)) {

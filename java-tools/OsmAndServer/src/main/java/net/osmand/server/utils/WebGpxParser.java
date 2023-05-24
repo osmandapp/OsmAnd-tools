@@ -25,6 +25,8 @@ import net.osmand.util.MapUtils;
 public class WebGpxParser {
     
     private static final String COLOR_EXTENSION = "color";
+    private static final String DESC_EXTENSION = "desc";
+    private static final String ARTICLE_TITLE = "article_title";
     
     public static final String LINE_PROFILE_TYPE = "line";
     public static final int NAN_MARKER = 99999;
@@ -41,17 +43,28 @@ public class WebGpxParser {
     public static class MetaData {
         public String name;
         public String desc;
+        public String link;
         public GPXUtilities.Metadata ext;
-        
+    
         public MetaData(GPXUtilities.Metadata data) {
             if (data != null) {
-                if (data.desc != null) {
-                    desc = data.desc;
-                    data.desc = null;
-                }
                 if (data.name != null) {
                     name = data.name;
                     data.name = null;
+                }
+                if (data.link != null) {
+                    link = data.link;
+                    data.link = null;
+                }
+            
+                Iterator<Map.Entry<String, String>> it = data.getExtensionsToWrite().entrySet().iterator();
+            
+                while (it.hasNext()) {
+                    Map.Entry<String, String> e = it.next();
+                    if (e.getKey().equals(DESC_EXTENSION)) {
+                        desc = e.getValue();
+                        it.remove();
+                    }
                 }
                 ext = data;
             }
@@ -434,7 +447,13 @@ public class WebGpxParser {
                 gpxFile.metadata = trackData.metaData.ext;
             }
             gpxFile.metadata.name = trackData.metaData.name;
-            gpxFile.metadata.desc = trackData.metaData.desc;
+            gpxFile.metadata.link = trackData.metaData.link;
+            if (gpxFile.metadata.extensions == null) {
+                gpxFile.metadata.extensions = new LinkedHashMap<>();
+            }
+            if (trackData.metaData.desc != null) {
+                gpxFile.metadata.extensions.put(DESC_EXTENSION, trackData.metaData.desc);
+            }
         }
         if (trackData.wpts != null) {
             for (Wpt wpt : trackData.wpts) {

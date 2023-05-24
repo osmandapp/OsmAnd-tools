@@ -1,5 +1,4 @@
-#!/bin/bash
-# GIT History could be found at https://github.com/osmandapp/OsmAnd-misc/blob/master/osm-live/generate_hourly_osmand_diff.sh
+#!/bin/bash -e
 
 RESULT_DIR="/home/osmlive"
 OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator
@@ -46,6 +45,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
                 echo "Missing file $DATE_DIR/src/${BASENAME}_before.osm.gz"
                 exit 1;
             fi
+
             echo "### 1. Generate obf files : $(date -u)"
             # SRTM takes too much time and memory at this step (probably it could be used at the change step)
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
@@ -56,7 +56,8 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
 
             echo "### 2. Generate diff files : $(date -u)"
             $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-diff \
-                ${BASENAME}_before.obf ${BASENAME}_after.obf ${BASENAME}_diff.obf $DIFF_FILE
+                ${BASENAME}_before.obf ${BASENAME}_after.obf ${BASENAME}_diff.obf $DIFF_FILE &
+            wait
 
             echo "### 3. Split files : $(date -u)"
             DATE_NAME=${BASENAME:0:8} #22_10_11
