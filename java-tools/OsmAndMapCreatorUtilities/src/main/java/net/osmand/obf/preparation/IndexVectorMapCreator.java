@@ -804,6 +804,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
                 if (cycle) {
                     res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, settings.zoomWaySmoothness);
+                    if (isClockwiseBroken(tags, (Way) e, res)) {
+                        res = null;
+                    }
                 } else {
                     validateDuplicate(originalId, id);
                     insertLowLevelMapBinaryObject(level, zoomToSimplify, typeUse, addtypeUse, id, ((Way) e).getNodes(),
@@ -1344,6 +1347,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
         closeAllPreparedStatements();
 
+    }
+
+    private boolean isClockwiseBroken(Map<String, String> tags, Way e, List<Node> simplyiedNodes) {
+        if (!"coastline".equals(tags.get("natural")) || simplyiedNodes == null) {
+            return false;
+        }
+        boolean clockwiseBefore = OsmMapUtils.isClockwiseWay(e);
+        boolean clockwiseAfter = OsmMapUtils.isClockwiseWay(new Way(e.getId(), simplyiedNodes));
+        return clockwiseAfter != clockwiseBefore;
     }
 
 }
