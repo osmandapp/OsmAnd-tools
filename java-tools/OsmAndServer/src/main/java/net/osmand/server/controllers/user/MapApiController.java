@@ -26,6 +26,7 @@ import com.google.gson.JsonParser;
 import net.osmand.IndexConstants;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
@@ -86,6 +87,7 @@ public class MapApiController {
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
 	private static final long ANALYSIS_RERUN = 1645061114000l; // 17-02-2022
+	private static final String INFO_KEY = "info";
 											   
 
 	@Autowired
@@ -126,6 +128,9 @@ public class MapApiController {
 	
 	@Autowired
 	private EmailSenderService emailSender;
+	
+	@Autowired
+	protected DeviceSubscriptionsRepository subscriptionsRepo;
 	
 	Gson gson = new Gson();
 	
@@ -375,7 +380,7 @@ public class MapApiController {
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(ANALYSIS, userFile)) {
-				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(ANALYSIS))));
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
 			}
 			bin = userdataService.getInputStream(dev, userFile);
 			
@@ -387,7 +392,7 @@ public class MapApiController {
 			if (!analysisPresent(ANALYSIS, userFile)) {
 				saveAnalysis(ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
@@ -431,7 +436,7 @@ public class MapApiController {
 			@SuppressWarnings("unchecked")
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
-				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(SRTM_ANALYSIS))));
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(SRTM_ANALYSIS))));
 			}
 			bin = userdataService.getInputStream(dev, userFile);
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
@@ -443,7 +448,7 @@ public class MapApiController {
 			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
 				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
@@ -513,5 +518,32 @@ public class MapApiController {
 				targetObf.delete();
 			}
 		}
+	}
+	
+	@GetMapping(path = { "/get-account-info" })
+	@ResponseBody
+	public ResponseEntity<String> getAccountInfo() {
+		final String ACCOUNT_KEY = "account";
+		final String FREE_ACCOUNT = "Free";
+		final String PRO_ACCOUNT = "Osmand_Pro";
+		final String START_TIME_KEY = "startTime";
+		final String EXPIRE_TIME_KEY = "expireTime";
+		
+		PremiumUserDevice dev = checkUser();
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		Map<String,String> info = new HashMap<>();
+		
+		String orderId = pu.orderid;
+		if (orderId == null) {
+			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
+		} else {
+			info.put(ACCOUNT_KEY, PRO_ACCOUNT);
+			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptionsRepo.findFirstByOrderId(orderId);
+			if (subscription != null) {
+				info.put(START_TIME_KEY, subscription.starttime.toString());
+				info.put(EXPIRE_TIME_KEY, subscription.expiretime.toString());
+			}
+		}
+		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
 	}
 }

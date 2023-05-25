@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -115,6 +116,10 @@ public class UserdataService {
     
     public static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
     
+    private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
+    private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 1 * MB;
+    private static final String FILE_TYPE_SETTINGS = "SETTINGS";
+    
     protected static final Log LOG = LogFactory.getLog(UserdataController.class);
     
     public void validateUser(PremiumUsersRepository.PremiumUser user) {
@@ -203,6 +208,12 @@ public class UserdataService {
     
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+    
+        ResponseEntity<String> error = validateFreeAccount(pu, type);
+        if (error != null) {
+            return error;
+        }
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -214,8 +225,37 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
+        error = validateFreeAccountFile(pu, zipfile);
+        if (error != null) {
+            return error;
+        }
+        
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
+    
+    private ResponseEntity<String> validateFreeAccount(PremiumUsersRepository.PremiumUser pu, String type) {
+        if (pu.orderid == null) {
+            Iterable<UserFile> files = filesRepository.findAllByUserid(pu.id);
+            if (IterableUtils.size(files) > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
+                return ResponseEntity.badRequest().body(String.format("File limit reached (%d)!", MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
+            }
+            if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_SETTINGS)) {
+                return ResponseEntity.badRequest().body(String.format("Free account can upload files with type %s and %s, this file type is %s!",
+                        FILE_TYPE_FAVOURITES, FILE_TYPE_SETTINGS, type));
+            }
+        }
+        return null;
+    }
+    
+    private ResponseEntity<String> validateFreeAccountFile(PremiumUsersRepository.PremiumUser pu, InternalZipFile zipfile) {
+        if (pu.orderid == null) {
+            long fileSize = zipfile.getSize();
+            if (fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
+                return ResponseEntity.badRequest().body(String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_SIZE / MB));
+            }
+        }
+        return null;
+    }
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
@@ -278,10 +318,12 @@ public class UserdataService {
 		if (pu == null) {
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-		if (errorMsg != null) {
-			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-		}
+        if (pu.orderid != null) {
+            String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+            if (errorMsg != null) {
+                throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+            }
+        }
 		pu.tokendevice = TOKEN_DEVICE_WEB;
 		if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
 			pu.token = (new Random().nextInt(8999) + 1000) + "";

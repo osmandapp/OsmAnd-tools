@@ -179,11 +179,11 @@ public class UserdataController {
 
 	@PostMapping(value = "/user-register")
 	@ResponseBody
-	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email,
-			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid,
-			@RequestParam(name = "login", required = false) boolean login,
-			HttpServletRequest request) throws IOException {
+	public ResponseEntity<String> userRegister(@RequestParam(name = "email") String email,
+	                                           @RequestParam(name = "deviceid", required = false) String deviceId,
+	                                           @RequestParam(name = "orderid", required = false) String orderid,
+	                                           @RequestParam(name = "login", required = false) boolean login,
+	                                           HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
@@ -197,20 +197,22 @@ public class UserdataController {
 			// don't check order id validity for login
 			// keep old order id
 		} else {
-			String error = userSubService.checkOrderIdPremium(orderid);
-			if (error != null) {
-				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
-			}
-			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
-			if (otherUser != null) {
-				String hideEmail = userdataService.hideEmail(otherUser.email);
-				List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
-				// check that user already registered at least 1 device (avoid typos in email)
-				if (pud != null && !pud.isEmpty()) {
-					logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
-				} else {
-					otherUser.orderid = null;
-					usersRepository.saveAndFlush(otherUser);
+			if (orderid != null) {
+				String error = userSubService.checkOrderIdPremium(orderid);
+				if (error != null) {
+					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
+				}
+				PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+				if (otherUser != null) {
+					String hideEmail = userdataService.hideEmail(otherUser.email);
+					List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
+					// check that user already registered at least 1 device (avoid typos in email)
+					if (pud != null && !pud.isEmpty()) {
+						logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
+					} else {
+						otherUser.orderid = null;
+						usersRepository.saveAndFlush(otherUser);
+					}
 				}
 			}
 			pu = new PremiumUsersRepository.PremiumUser();
