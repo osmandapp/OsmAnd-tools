@@ -117,7 +117,8 @@ public class UserdataService {
     public static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
     
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
-    private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 1 * MB;
+    private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
+    private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
     private static final String FILE_TYPE_SETTINGS = "SETTINGS";
     
     protected static final Log LOG = LogFactory.getLog(UserdataController.class);
@@ -250,8 +251,13 @@ public class UserdataService {
     private ResponseEntity<String> validateFreeAccountFile(PremiumUsersRepository.PremiumUser pu, InternalZipFile zipfile) {
         if (pu.orderid == null) {
             long fileSize = zipfile.getSize();
-            if (fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
-                return ResponseEntity.badRequest().body(String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_SIZE / MB));
+            if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
+                return ResponseEntity.badRequest().body(String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+            }
+            UserdataController.UserFilesResults res = generateFiles(pu.id, null, null, false, false);
+            if (res.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
+                return ResponseEntity.badRequest()
+                        .body(String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
             }
         }
         return null;
