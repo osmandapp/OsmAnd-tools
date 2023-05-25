@@ -26,9 +26,8 @@ import javax.imageio.ImageIO;
 import net.osmand.IndexConstants;
 import net.osmand.data.Amenity;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.osm.PoiCategory;
-import net.osmand.osm.PoiType;
-import net.osmand.search.core.ObjectType;
+import net.osmand.osm.*;
+import net.osmand.search.core.*;
 import net.osmand.server.controllers.pub.RoutingController;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -65,7 +64,6 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXUtilities.TrkSegment;
 import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
-import net.osmand.osm.MapPoiTypes;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter.GeneralRouterProfile;
@@ -83,9 +81,6 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.SearchUICore.SearchResultCollection;
-import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.MapsCollection;
@@ -911,6 +906,33 @@ public class OsmAndMapsService {
 			
 		});
 		return res;
+	}
+	
+	public Map<String, Map<String, String>> getPoiCategories(String search) throws IOException {
+		Map<String, Map<String, String>> searchRes = new HashMap<>();
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
+		searchUICore.init();
+		List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
+				.getCurrentSearchResults();
+		results.forEach(res -> {
+			Map<String, String> tags = new HashMap<>();
+			if (res.object instanceof PoiType) {
+				PoiType type = (PoiType) res.object;
+				tags.put("keyName", type.getKeyName());
+				tags.put("osmTag", type.getOsmTag());
+				tags.put("osmValue", type.getOsmValue());
+				tags.put("iconName", type.getIconKeyName());
+			} else if (res.object instanceof PoiCategory) {
+				PoiCategory type = (PoiCategory) res.object;
+				tags.put("keyName", type.getKeyName());
+				tags.put("iconName", type.getIconKeyName());
+			} else if (res.object instanceof PoiFilter) {
+				PoiFilter type = (PoiFilter) res.object;
+				tags.put("keyName", type.getKeyName());
+			}
+			searchRes.put(res.localeName, tags);
+		});
+		return searchRes;
 	}
 	
 	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, List<String> categories, QuadRect searchBbox, int zoom) throws IOException {

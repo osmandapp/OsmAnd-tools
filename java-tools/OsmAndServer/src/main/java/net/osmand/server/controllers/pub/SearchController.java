@@ -108,4 +108,15 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Error get poi categories!");
         }
     }
+    
+    @GetMapping(path = {"/search-poi-categories"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> searchPoiCategories(@RequestParam String search) throws IOException {
+        Map<String, Map<String, String>> res = osmAndMapsService.getPoiCategories(search);
+        if (!res.isEmpty()) {
+            return ResponseEntity.ok(gson.toJson(res));
+        } else {
+            return ResponseEntity.badRequest().body("Error get poi categories!");
+        }
+    }
 }
