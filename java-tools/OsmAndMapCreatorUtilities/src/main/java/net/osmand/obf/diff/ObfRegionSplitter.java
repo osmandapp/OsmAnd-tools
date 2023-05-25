@@ -157,31 +157,32 @@ public class ObfRegionSplitter {
 		TLongObjectHashMap<RouteDataObject> routingData = fl.getRoutingData();
 		long time = System.currentTimeMillis();
 		int count = 0;
-		for (RouteDataObject obj : routingData.valueCollection()) {
-//			if(obj.getPointsLength() == 0) {
-//				continue;
-//			}
-			int x = obj.getPoint31XTile(0);
-			int y = obj.getPoint31YTile(0);
-			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
-			for (BinaryMapDataObject b : l) {
-				if (osmandRegions.contain(b, x, y)) {
-					String dw = osmandRegions.getDownloadName(b);
-					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
-					if (dw == null || wr == null) {
-						continue;
-					}
-					if (!Algorithms.isEmpty(dw) && (wr.isRegionMapDownload() || wr.isRegionRoadsDownload())) {
-						TLongObjectHashMap<RouteDataObject> mp = result.get(dw);
-						if (mp == null) {
-							mp = new TLongObjectHashMap<>();
-							result.put(dw, mp);
+		Map<Integer, List<Long>> sortedMap = createSortedMap(routingData);
+		for (List<Long> keys : sortedMap.values()) {
+			for (long key : keys) {
+				RouteDataObject obj = routingData.get(key);
+				int x = obj.getPoint31XTile(0);
+				int y = obj.getPoint31YTile(0);
+				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
+				for (BinaryMapDataObject b : l) {
+					if (osmandRegions.contain(b, x, y)) {
+						String dw = osmandRegions.getDownloadName(b);
+						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
+						if (dw == null || wr == null) {
+							continue;
 						}
-						if (heightData != null) {
-							attachElevationData(obj, heightData);
-							count++;
+						if (!Algorithms.isEmpty(dw) && (wr.isRegionMapDownload() || wr.isRegionRoadsDownload())) {
+							TLongObjectHashMap<RouteDataObject> mp = result.get(dw);
+							if (mp == null) {
+								mp = new TLongObjectHashMap<>();
+								result.put(dw, mp);
+							}
+							if (heightData != null) {
+								attachElevationData(obj, heightData);
+								count++;
+							}
+							mp.put(obj.getId(), obj);
 						}
-						mp.put(obj.getId(), obj);
 					}
 				}
 			}
@@ -191,6 +192,37 @@ public class ObfRegionSplitter {
 		System.out.println("Attach elevation data to ROUTE DATA section.");
 		System.out.println("Time total:" + t + " count:" + count + " per/sec:" + p);
 		return result;
+	}
+
+	private Map<Integer, List<Long>> createSortedMap(TLongObjectHashMap<RouteDataObject> routingData) {
+		Map<Integer, List<Long>> sortedMap = new HashMap<>();
+		for (long key : routingData.keys()) {
+			RouteDataObject rdo = routingData.get(key);
+			if (rdo.getPointsLength() > 0) {
+				double lon = MapUtils.get31LongitudeX(rdo.getPoint31XTile(0));
+				double lat = MapUtils.get31LatitudeY(rdo.getPoint31YTile(0));
+				int lt = (int) lat;
+				int ln = (int) lon;
+				double lonDelta = lon - ln;
+				double latDelta = lat - lt;
+				if (lonDelta < 0) {
+					ln -= 1;
+				}
+				if (latDelta < 0) {
+					lt -= 1;
+				}
+				int id = IndexHeightData.getTileId(lt, ln);
+				if (sortedMap.containsKey(id)) {
+					List<Long> list = sortedMap.get(id);
+					list.add(key);
+				} else {
+					List<Long> list = new ArrayList<>();
+					list.add(key);
+					sortedMap.put(id, list);
+				}
+			}
+		}
+		return sortedMap;
 	}
 
 	private void attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
