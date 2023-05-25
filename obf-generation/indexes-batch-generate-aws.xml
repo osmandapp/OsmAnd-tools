@@ -24,6 +24,9 @@
 				<filter exclude="south-africa_africa" />
                 <filter exclude="kazakhstan_asia" />
                 <filter exclude="mongolia_asia" />
+				<filter excludePattern="_africa" />
+				<filter excludePattern="_asia" />
+				<filter excludePattern="_southamerica" />
 			</job>
 			
 		</aws>
