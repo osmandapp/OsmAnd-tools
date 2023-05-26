@@ -33,6 +33,7 @@ import net.osmand.server.api.services.*;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -520,28 +521,32 @@ public class MapApiController {
 		}
 	}
 	
-	@GetMapping(path = { "/get-account-info" })
+	@GetMapping(path = {"/get-account-info"})
 	@ResponseBody
 	public ResponseEntity<String> getAccountInfo() {
 		final String ACCOUNT_KEY = "account";
 		final String FREE_ACCOUNT = "Free";
-		final String PRO_ACCOUNT = "Osmand_Pro";
+		final String PRO_ACCOUNT = "Osmand Pro";
+		final String TYPE_SUB = "type";
 		final String START_TIME_KEY = "startTime";
 		final String EXPIRE_TIME_KEY = "expireTime";
 		
 		PremiumUserDevice dev = checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-		Map<String,String> info = new HashMap<>();
+		Map<String, String> info = new HashMap<>();
 		
 		String orderId = pu.orderid;
 		if (orderId == null) {
 			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
 		} else {
-			info.put(ACCOUNT_KEY, PRO_ACCOUNT);
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptionsRepo.findFirstByOrderId(orderId);
 			if (subscription != null) {
-				info.put(START_TIME_KEY, subscription.starttime.toString());
-				info.put(EXPIRE_TIME_KEY, subscription.expiretime.toString());
+				info.put(ACCOUNT_KEY, PRO_ACCOUNT);
+				info.put(TYPE_SUB, subscription.sku);
+				Date prepareStartTime = DateUtils.truncate(subscription.starttime, Calendar.SECOND);
+				Date prepareExpireTime = DateUtils.truncate(subscription.expiretime, Calendar.SECOND);
+				info.put(START_TIME_KEY, prepareStartTime.toString());
+				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
