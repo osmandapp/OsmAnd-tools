@@ -710,9 +710,13 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        pu.email = email;
-        usersRepository.saveAndFlush(pu);
-        request.logout();
-        return ok();
+        PremiumUsersRepository.PremiumUser user = usersRepository.findByEmail(email);
+        if (user == null) {
+            pu.email = email;
+            usersRepository.saveAndFlush(pu);
+            request.logout();
+            return ok();
+        }
+        return ResponseEntity.badRequest().body("User with this email already exist");
     }
 }
