@@ -540,7 +540,11 @@ public class MapApiController {
 		if (orderId == null) {
 			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
 		} else {
-			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptionsRepo.findFirstByOrderId(orderId);
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
+			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.stream()
+					.filter(s -> s.valid)
+					.findFirst()
+					.orElse(null);
 			if (subscription != null) {
 				info.put(ACCOUNT_KEY, PRO_ACCOUNT);
 				info.put(TYPE_SUB, subscription.sku);

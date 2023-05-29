@@ -22,8 +22,6 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 	List<SupporterDeviceSubscription> findByOrderId(String orderId);
 	
-	SupporterDeviceSubscription findFirstByOrderId(String orderId);
-	
 	List<SupporterDeviceSubscription> findFirst5BySkuOrderByStarttimeDesc(String sku);
 
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
