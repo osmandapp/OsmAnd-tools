@@ -12,6 +12,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.Map;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
@@ -27,13 +28,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -371,6 +366,22 @@ public class UserdataController {
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, false);
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+	
+	@PostMapping(path = {"/delete-account"})
+	@ResponseBody
+	public ResponseEntity<String> deleteAccount(@RequestBody String email,
+	                                            @RequestParam(name = "deviceid") int deviceId,
+	                                            @RequestParam String accessToken,
+	                                            HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(email)) {
+			PremiumUserDevice dev = checkToken(deviceId, accessToken);
+			if (dev == null) {
+				return userdataService.tokenNotValid();
+			}
+			return userdataService.deleteAccount(email, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 
 	public static class UserFilesResults {
