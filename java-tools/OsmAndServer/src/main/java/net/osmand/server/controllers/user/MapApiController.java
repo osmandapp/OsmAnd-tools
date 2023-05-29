@@ -32,6 +32,7 @@ import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.util.Algorithms;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
@@ -550,5 +551,41 @@ public class MapApiController {
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
+	}
+	
+	@PostMapping(path = {"/auth/send-code"})
+	@ResponseBody
+	public ResponseEntity<String> sendCode(@RequestBody String email) {
+		if (emailSender.isEmail(email)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.sendCode(email, dev);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+	
+	@PostMapping(path = {"/auth/confirm-code"})
+	@ResponseBody
+	public ResponseEntity<String> confirmCode(@RequestBody String code) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		return userdataService.confirmCode(code, dev);
+	}
+	
+	@PostMapping(path = {"/auth/change-email"})
+	@ResponseBody
+	public ResponseEntity<String> changeEmail(@RequestBody String email, HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(email)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.changeEmail(email, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 }

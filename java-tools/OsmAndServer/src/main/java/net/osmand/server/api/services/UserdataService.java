@@ -31,6 +31,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.logging.Log;
@@ -38,6 +39,9 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -671,5 +675,44 @@ public class UserdataService {
     
         files = filesRepository.findAllByUserid(dev.userid);
         return IterableUtils.size(files) == 0;
+    }
+    
+    @Transactional
+    public ResponseEntity<String> sendCode(String email, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("Email is not registered");
+        }
+        String token = (new Random().nextInt(8999) + 1000) + "";
+        emailSender.sendOsmAndCloudWebEmail(email, token);
+        pu.token = token;
+        pu.tokenTime = new Date();
+        usersRepository.saveAndFlush(pu);
+        return ok();
+    }
+    
+    public ResponseEntity<String> confirmCode(String code, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("User is not registered");
+        }
+        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        if (pu.token.equals(code) && !tokenExpired) {
+            return ok();
+        } else {
+            return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+        }
+    }
+    
+    
+    public ResponseEntity<String> changeEmail(String email, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("User is not registered");
+        }
+        pu.email = email;
+        usersRepository.saveAndFlush(pu);
+        request.logout();
+        return ok();
     }
 }
