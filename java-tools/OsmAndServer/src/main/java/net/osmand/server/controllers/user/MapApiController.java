@@ -592,4 +592,18 @@ public class MapApiController {
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
+	
+	@GetMapping(path = {"/auth/get-user"})
+	@ResponseBody
+	public ResponseEntity<String> getUser(@RequestParam String email) {
+		if (emailSender.isEmail(email)) {
+			PremiumUsersRepository.PremiumUser user = usersRepository.findByEmail(email);
+			if (user != null) {
+				return ResponseEntity.ok(gson.toJson(user));
+			} else {
+				return ResponseEntity.badRequest().body("User isn't found");
+			}
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
 }
