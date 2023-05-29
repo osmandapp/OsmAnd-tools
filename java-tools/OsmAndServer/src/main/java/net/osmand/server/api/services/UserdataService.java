@@ -38,7 +38,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -711,13 +710,9 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        try {
-            pu.email = email;
-            usersRepository.saveAndFlush(pu);
-            request.logout();
-            return ok();
-        } catch (DataIntegrityViolationException e) {
-            return ResponseEntity.badRequest().body("User with this email already exist");
-        }
+        pu.email = email;
+        usersRepository.saveAndFlush(pu);
+        request.logout();
+        return ok();
     }
 }
