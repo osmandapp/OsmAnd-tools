@@ -21,6 +21,8 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
 	
 	
 	PremiumUser findByEmail(String email);
+    
+    int deleteByEmail(String email);
 	
 	PremiumUser findByOrderid(String orderid);
 	
