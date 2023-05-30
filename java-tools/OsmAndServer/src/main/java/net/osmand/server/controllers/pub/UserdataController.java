@@ -22,6 +22,7 @@ import javax.validation.constraints.NotNull;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
+import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -370,16 +371,16 @@ public class UserdataController {
 	
 	@PostMapping(path = {"/delete-account"})
 	@ResponseBody
-	public ResponseEntity<String> deleteAccount(@RequestBody String email,
+	public ResponseEntity<String> deleteAccount(@RequestBody MapApiController.UserPasswordPost us,
 	                                            @RequestParam(name = "deviceid") int deviceId,
 	                                            @RequestParam String accessToken,
 	                                            HttpServletRequest request) throws ServletException {
-		if (emailSender.isEmail(email)) {
+		if (emailSender.isEmail(us.username)) {
 			PremiumUserDevice dev = checkToken(deviceId, accessToken);
 			if (dev == null) {
 				return userdataService.tokenNotValid();
 			}
-			return userdataService.deleteAccount(email, dev, request);
+			return userdataService.deleteAccount(us, dev, request);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

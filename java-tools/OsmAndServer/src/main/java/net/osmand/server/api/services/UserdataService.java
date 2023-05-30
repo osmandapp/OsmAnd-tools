@@ -647,22 +647,27 @@ public class UserdataService {
 	}
     
     @Transactional
-    public ResponseEntity<String> deleteAccount(String email, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+    public ResponseEntity<String> deleteAccount(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(us.username);
         if (pu != null && pu.id == dev.userid) {
-            if (deleteAllFiles(dev)) {
-                int numOfUsersDelete = usersRepository.deleteByEmail(email);
-                if (numOfUsersDelete != -1) {
-                    int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
-                    if (numOfUserDevicesDelete != -1) {
-                        request.logout();
-                        return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", email));
+            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+            boolean validToken = pu.token.equals(us.token) && !tokenExpired;
+            if (validToken) {
+                if (deleteAllFiles(dev)) {
+                    int numOfUsersDelete = usersRepository.deleteByEmail(us.username);
+                    if (numOfUsersDelete != -1) {
+                        int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
+                        if (numOfUserDevicesDelete != -1) {
+                            request.logout();
+                            return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", us.username));
+                        }
                     }
+                    return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", us.username));
+                } else {
+                    return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", us.username));
                 }
-                return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", email));
-            } else {
-                return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", email));
             }
+            return ResponseEntity.badRequest().body("Token is not valid or expired (24h), or password is not valid");
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
