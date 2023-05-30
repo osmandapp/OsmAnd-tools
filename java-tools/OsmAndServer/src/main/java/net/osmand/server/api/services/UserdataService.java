@@ -38,6 +38,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -125,7 +126,7 @@ public class UserdataService {
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
     private static final String FILE_TYPE_SETTINGS = "SETTINGS";
     
-    protected static final Log LOG = LogFactory.getLog(UserdataController.class);
+    protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
     public void validateUser(PremiumUsersRepository.PremiumUser user) {
         if (user == null) {
@@ -705,14 +706,23 @@ public class UserdataService {
     }
     
     
-    public ResponseEntity<String> changeEmail(String email, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+    public ResponseEntity<String> changeEmail(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        pu.email = email;
-        usersRepository.saveAndFlush(pu);
-        request.logout();
-        return ok();
+        try {
+            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+            if (pu.token.equals(us.token) && !tokenExpired) {
+                pu.email = us.username;
+                usersRepository.saveAndFlush(pu);
+                request.logout();
+                return ok();
+            }
+        } catch (DataIntegrityViolationException e) {
+            LOG.warn(e.getMessage(), e);
+            return ResponseEntity.badRequest().body("User with this email already exist");
+        }
+        return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
     }
 }
