@@ -195,13 +195,13 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/delete-account"})
 	@ResponseBody
-	public ResponseEntity<String> deleteAccount(@RequestBody String email, HttpServletRequest request) throws ServletException {
-		if (emailSender.isEmail(email)) {
+	public ResponseEntity<String> deleteAccount(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(us.username)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
-			return userdataService.deleteAccount(email, dev, request);
+			return userdataService.deleteAccount(us, dev, request);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
@@ -582,13 +582,13 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/change-email"})
 	@ResponseBody
-	public ResponseEntity<String> changeEmail(@RequestBody String email, HttpServletRequest request) throws ServletException {
-		if (emailSender.isEmail(email)) {
+	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(us.username)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
-			return userdataService.changeEmail(email, dev, request);
+			return userdataService.changeEmail(us, dev, request);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

@@ -38,6 +38,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -125,7 +126,7 @@ public class UserdataService {
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
     private static final String FILE_TYPE_SETTINGS = "SETTINGS";
     
-    protected static final Log LOG = LogFactory.getLog(UserdataController.class);
+    protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
     public void validateUser(PremiumUsersRepository.PremiumUser user) {
         if (user == null) {
@@ -646,22 +647,27 @@ public class UserdataService {
 	}
     
     @Transactional
-    public ResponseEntity<String> deleteAccount(String email, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+    public ResponseEntity<String> deleteAccount(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(us.username);
         if (pu != null && pu.id == dev.userid) {
-            if (deleteAllFiles(dev)) {
-                int numOfUsersDelete = usersRepository.deleteByEmail(email);
-                if (numOfUsersDelete != -1) {
-                    int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
-                    if (numOfUserDevicesDelete != -1) {
-                        request.logout();
-                        return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", email));
+            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+            boolean validToken = pu.token.equals(us.token) && !tokenExpired;
+            if (validToken) {
+                if (deleteAllFiles(dev)) {
+                    int numOfUsersDelete = usersRepository.deleteByEmail(us.username);
+                    if (numOfUsersDelete != -1) {
+                        int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
+                        if (numOfUserDevicesDelete != -1) {
+                            request.logout();
+                            return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", us.username));
+                        }
                     }
+                    return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", us.username));
+                } else {
+                    return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", us.username));
                 }
-                return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", email));
-            } else {
-                return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", email));
             }
+            return ResponseEntity.badRequest().body("Token is not valid or expired (24h), or password is not valid");
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
@@ -705,14 +711,23 @@ public class UserdataService {
     }
     
     
-    public ResponseEntity<String> changeEmail(String email, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+    public ResponseEntity<String> changeEmail(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        pu.email = email;
-        usersRepository.saveAndFlush(pu);
-        request.logout();
-        return ok();
+        try {
+            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+            if (pu.token.equals(us.token) && !tokenExpired) {
+                pu.email = us.username;
+                usersRepository.saveAndFlush(pu);
+                request.logout();
+                return ok();
+            }
+        } catch (DataIntegrityViolationException e) {
+            LOG.warn(e.getMessage(), e);
+            return ResponseEntity.badRequest().body("User with this email already exist");
+        }
+        return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
     }
 }
