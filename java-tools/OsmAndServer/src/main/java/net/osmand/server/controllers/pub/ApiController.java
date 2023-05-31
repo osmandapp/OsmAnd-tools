@@ -45,6 +45,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
+import net.osmand.map.OsmandRegions;
 import net.osmand.server.api.repo.DataMissingSearchRepository;
 import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -113,6 +114,9 @@ public class ApiController {
 	PromoService promoService;
 
 	Gson gson = new Gson();
+	
+	OsmandRegions osmandRegions;
+
 
 
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
@@ -180,6 +184,19 @@ public class ApiController {
 		return pollResult(pq);
 	}
 
+	
+	@GetMapping(path = {"/regions-by-latlon"})
+	@ResponseBody
+	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
+		List<String> regions = new ArrayList<String>();
+		if(osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
+		
+		gson.toJson(Map.of("regions", regions));
+	}
     
 	@GetMapping(path = { "/poll-results" }, produces = "application/json")
 	@ResponseBody

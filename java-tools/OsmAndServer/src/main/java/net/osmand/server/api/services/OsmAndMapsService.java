@@ -30,11 +30,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.imageio.ImageIO;
-import javax.servlet.http.HttpSession;
 
 import net.osmand.IndexConstants;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.server.controllers.pub.UserSessionResources;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -131,7 +129,7 @@ public class OsmAndMapsService {
 	@Autowired
 	RoutingServerConfig routingConfig;
 
-	private OsmandRegions osmandRegions;
+	OsmandRegions osmandRegions;
 
 
 	public static class BinaryMapIndexReaderReference {
