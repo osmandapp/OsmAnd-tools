@@ -67,7 +67,7 @@ dependencies {
 
 	implementation 'com.moparisthebest:junidecode:0.1.1'
 	implementation group: 'org.json', name: 'json', version: '20171018'
-	implementation group: 'com.jcraft', name: 'jsch', version: '0.1.54'
+	implementation group: 'com.jcraft', name: 'jsch', version: '0.1.55'
 
 	// Add to process srtm data
 	// implementation 'com.twelvemonkeys.common:common-lang:3.3.2'
