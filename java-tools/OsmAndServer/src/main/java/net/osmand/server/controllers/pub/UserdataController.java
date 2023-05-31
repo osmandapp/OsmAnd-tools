@@ -12,6 +12,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.Map;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
@@ -21,19 +22,14 @@ import javax.validation.constraints.NotNull;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
+import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -179,11 +175,11 @@ public class UserdataController {
 
 	@PostMapping(value = "/user-register")
 	@ResponseBody
-	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email,
-			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid,
-			@RequestParam(name = "login", required = false) boolean login,
-			HttpServletRequest request) throws IOException {
+	public ResponseEntity<String> userRegister(@RequestParam(name = "email") String email,
+	                                           @RequestParam(name = "deviceid", required = false) String deviceId,
+	                                           @RequestParam(name = "orderid", required = false) String orderid,
+	                                           @RequestParam(name = "login", required = false) boolean login,
+	                                           HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
@@ -197,20 +193,22 @@ public class UserdataController {
 			// don't check order id validity for login
 			// keep old order id
 		} else {
-			String error = userSubService.checkOrderIdPremium(orderid);
-			if (error != null) {
-				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
-			}
-			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
-			if (otherUser != null) {
-				String hideEmail = userdataService.hideEmail(otherUser.email);
-				List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
-				// check that user already registered at least 1 device (avoid typos in email)
-				if (pud != null && !pud.isEmpty()) {
-					logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
-				} else {
-					otherUser.orderid = null;
-					usersRepository.saveAndFlush(otherUser);
+			if (orderid != null) {
+				String error = userSubService.checkOrderIdPremium(orderid);
+				if (error != null) {
+					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
+				}
+				PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+				if (otherUser != null) {
+					String hideEmail = userdataService.hideEmail(otherUser.email);
+					List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
+					// check that user already registered at least 1 device (avoid typos in email)
+					if (pud != null && !pud.isEmpty()) {
+						logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
+					} else {
+						otherUser.orderid = null;
+						usersRepository.saveAndFlush(otherUser);
+					}
 				}
 			}
 			pu = new PremiumUsersRepository.PremiumUser();
@@ -369,6 +367,22 @@ public class UserdataController {
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, false);
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+	
+	@PostMapping(path = {"/delete-account"})
+	@ResponseBody
+	public ResponseEntity<String> deleteAccount(@RequestBody MapApiController.UserPasswordPost us,
+	                                            @RequestParam(name = "deviceid") int deviceId,
+	                                            @RequestParam String accessToken,
+	                                            HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(us.username)) {
+			PremiumUserDevice dev = checkToken(deviceId, accessToken);
+			if (dev == null) {
+				return userdataService.tokenNotValid();
+			}
+			return userdataService.deleteAccount(us, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 
 	public static class UserFilesResults {

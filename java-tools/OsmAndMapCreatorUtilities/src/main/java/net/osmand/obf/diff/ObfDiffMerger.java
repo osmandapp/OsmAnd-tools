@@ -27,21 +27,25 @@ public class ObfDiffMerger {
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
 	
 	public static void main(String[] args) {
-		if ((args.length == 1 && args[0].equals("mergeRelationTest"))) {
-			mergeRelationOsmLive(args);
-			return;
-		}
 		try {
 			if(args.length == 1 && args[0].equals("test")) {
 				args = new String[4];
 				List<String> s = new ArrayList<String>();
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_merge.obf_");
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_10.obf");
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_20.obf");
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_30.obf");
-//				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_22_10.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_merge.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_07_10.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_07_30.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_09_00.obf");
 				args = s.toArray(new String[0]);
-			}
+			} else if (args.length == 1 && args[0].equals("mergeRelationTest")) {
+				args = new String[3];
+				List<String> s = new ArrayList<String>();
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff_rel.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_merged.obf");
+				args = s.toArray(new String[0]);
+				mergeRelationOsmLive(args);
+				return;
+			} 
 			ObfDiffMerger merger = new ObfDiffMerger();
 			merger.mergeChanges(args);
 		} catch (Exception e) {
@@ -87,14 +91,7 @@ public class ObfDiffMerger {
 
 	public static void mergeRelationOsmLive(String[] args) {
 		try {
-			if(args.length == 1 && args[0].equals("mergeRelationTest")) {
-				args = new String[3];
-				List<String> s = new ArrayList<String>();
-				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff_rel.obf");
-				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff.obf");
-				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_merged.obf");
-				args = s.toArray(new String[0]);
-			} else if (args.length < 3) {
+			if (args.length < 3) {
 				System.out.println("Usage: <path to relation_osm_live.obf> <path to common_osm_live.obf> " +
 						"<path to merged_osm_live.obf>");
 				System.exit(1);
@@ -333,7 +330,7 @@ public class ObfDiffMerger {
 	public boolean process(File result, List<File> inputDiffs, boolean checkTimestamps) throws IOException,
 			RTreeException, SQLException {
 		List<File> diffs = new ArrayList<>();
-		for(File fl : inputDiffs) {
+		for (File fl : inputDiffs) {
 			if (fl.isDirectory()) {
 				File[] lf = fl.listFiles();
 				List<File> odiffs = new ArrayList<>();
@@ -350,18 +347,18 @@ public class ObfDiffMerger {
 				diffs.add(fl);
 			}
 		}
-		if(checkTimestamps && result.exists()) {
+		if (checkTimestamps && result.exists()) {
 			boolean skipEditing = true;
 			long lastModified = result.lastModified();
-			for(File f : diffs) {
-				if(f.lastModified() > lastModified) {
-					LOG.info("Process " + result.getName() + " because of " + f.getName() + " " + 
-							lastModified + " != " + f.lastModified());
+			for (File f : diffs) {
+				if (f.lastModified() > lastModified) {
+					LOG.info("Process " + result.getName() + " because of " + f.getName() + " " + lastModified + " != "
+							+ f.lastModified());
 					skipEditing = false;
 					break;
 				}
 			}
-			if(skipEditing) {
+			if (skipEditing) {
 				return false;
 			}
 		}

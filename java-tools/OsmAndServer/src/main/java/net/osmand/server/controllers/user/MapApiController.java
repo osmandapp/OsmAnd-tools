@@ -26,15 +26,15 @@ import com.google.gson.JsonParser;
 import net.osmand.IndexConstants;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.services.GpxService;
-import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.api.services.StorageService;
-import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.api.services.*;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.util.Algorithms;
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,6 +89,7 @@ public class MapApiController {
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
 	private static final long ANALYSIS_RERUN = 1645061114000l; // 17-02-2022
+	private static final String INFO_KEY = "info";
 											   
 
 	@Autowired
@@ -126,6 +127,12 @@ public class MapApiController {
 	
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
+	
+	@Autowired
+	private EmailSenderService emailSender;
+	
+	@Autowired
+	protected DeviceSubscriptionsRepository subscriptionsRepo;
 	
 	Gson gson = new Gson();
 	
@@ -184,6 +191,19 @@ public class MapApiController {
 		}
 		request.login(us.username, us.password); // SecurityContextHolder.getContext().getAuthentication();
 		return okStatus();
+	}
+	
+	@PostMapping(path = {"/auth/delete-account"})
+	@ResponseBody
+	public ResponseEntity<String> deleteAccount(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(us.username)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.deleteAccount(us, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
@@ -362,7 +382,7 @@ public class MapApiController {
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(ANALYSIS, userFile)) {
-				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(ANALYSIS))));
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
 			}
 			bin = userdataService.getInputStream(dev, userFile);
 			
@@ -374,7 +394,7 @@ public class MapApiController {
 			if (!analysisPresent(ANALYSIS, userFile)) {
 				saveAnalysis(ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
@@ -418,7 +438,7 @@ public class MapApiController {
 			@SuppressWarnings("unchecked")
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
-				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", userFile.details.get(SRTM_ANALYSIS))));
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(SRTM_ANALYSIS))));
 			}
 			bin = userdataService.getInputStream(dev, userFile);
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
@@ -430,7 +450,7 @@ public class MapApiController {
 			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
 				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
-			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("info", analysis)));
+			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
 			if (bin != null) {
 				bin.close();
@@ -500,5 +520,76 @@ public class MapApiController {
 				targetObf.delete();
 			}
 		}
+	}
+	
+	@GetMapping(path = {"/get-account-info"})
+	@ResponseBody
+	public ResponseEntity<String> getAccountInfo() {
+		final String ACCOUNT_KEY = "account";
+		final String FREE_ACCOUNT = "Free";
+		final String PRO_ACCOUNT = "Osmand Pro";
+		final String TYPE_SUB = "type";
+		final String START_TIME_KEY = "startTime";
+		final String EXPIRE_TIME_KEY = "expireTime";
+		
+		PremiumUserDevice dev = checkUser();
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		Map<String, String> info = new HashMap<>();
+		
+		String orderId = pu.orderid;
+		if (orderId == null) {
+			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
+		} else {
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
+			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.stream()
+					.filter(s -> s.valid)
+					.findFirst()
+					.orElse(null);
+			if (subscription != null) {
+				info.put(ACCOUNT_KEY, PRO_ACCOUNT);
+				info.put(TYPE_SUB, subscription.sku);
+				Date prepareStartTime = DateUtils.truncate(subscription.starttime, Calendar.SECOND);
+				Date prepareExpireTime = DateUtils.truncate(subscription.expiretime, Calendar.SECOND);
+				info.put(START_TIME_KEY, prepareStartTime.toString());
+				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
+			}
+		}
+		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
+	}
+	
+	@PostMapping(path = {"/auth/send-code"})
+	@ResponseBody
+	public ResponseEntity<String> sendCode(@RequestBody String email) {
+		if (emailSender.isEmail(email)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.sendCode(email, dev);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+	
+	@PostMapping(path = {"/auth/confirm-code"})
+	@ResponseBody
+	public ResponseEntity<String> confirmCode(@RequestBody String code) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		return userdataService.confirmCode(code, dev);
+	}
+	
+	@PostMapping(path = {"/auth/change-email"})
+	@ResponseBody
+	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(us.username)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.changeEmail(us, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 }

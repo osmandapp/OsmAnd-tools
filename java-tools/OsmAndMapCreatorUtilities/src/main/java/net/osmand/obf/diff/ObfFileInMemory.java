@@ -126,14 +126,14 @@ public class ObfFileInMemory {
 
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
 		TLongObjectHashMap<BinaryMapDataObject> res = get(pair);
-		for(BinaryMapDataObject o: objects) {
+		for (BinaryMapDataObject o : objects) {
 			o = mapIndex.adoptMapObject(o);
-			if(override) {
+			if (override) {
 				res.put(o.getId(), o);
-			} else if(!res.containsKey(o.getId())){
+			} else if (!res.containsKey(o.getId())) {
 				res.put(o.getId(), o);
 			}
-			
+
 		}
 	}
 	
@@ -481,13 +481,13 @@ public class ObfFileInMemory {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
 			boolean gzip = false;
-			if(inputFile == null) {
+			if (inputFile == null) {
 				continue;
 			}
 			File parentFile = inputFile.getParentFile();
 			LOG.info(String.format("Reading %s / %s ", parentFile == null ? "" : parentFile.getName(),
 					inputFile.getName()));
-			if(inputFile.getName().endsWith(".gz")) {
+			if (inputFile.getName().endsWith(".gz")) {
 				nonGzip = new File(inputFile.getParentFile(), inputFile.getName().substring(0, inputFile.getName().length() - 3));
 				GZIPInputStream gzin = new GZIPInputStream(new FileInputStream(inputFile));
 				FileOutputStream fous = new FileOutputStream(nonGzip);
@@ -499,21 +499,21 @@ public class ObfFileInMemory {
 			RandomAccessFile raf = new RandomAccessFile(nonGzip, "r");
 			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, nonGzip);
 			for (BinaryIndexPart p : indexReader.getIndexes()) {
-				if(p instanceof MapIndex) {
+				if (p instanceof MapIndex) {
 					MapIndex mi = (MapIndex) p;
-					for(MapRoot mr : mi.getRoots()) {
+					for (MapRoot mr : mi.getRoots()) {
 						MapZooms.MapZoomPair pair = new MapZooms.MapZoomPair(mr.getMinZoom(), mr.getMaxZoom());
-						TLongObjectHashMap<BinaryMapDataObject> objects = readBinaryMapData(indexReader, mi, mr.getMinZoom());
+						TLongObjectHashMap<BinaryMapDataObject> objects = readBinaryMapData(indexReader, mi,
+								mr.getMinZoom());
 						putMapObjects(pair, objects.valueCollection(), true);
 					}
 				} else if (p instanceof RouteRegion) {
 					RouteRegion rr = (RouteRegion) p;
 					readRoutingData(indexReader, rr, ZOOM_LEVEL_ROUTING, true);
 				} else if (p instanceof PoiRegion) {
-					 PoiRegion pr = (PoiRegion) p;
-					 TLongObjectHashMap<Map<String, Amenity>> rr = 
-							 readPoiData(indexReader, pr, ZOOM_LEVEL_POI, true);
-					 putPoiData(rr, true);
+					PoiRegion pr = (PoiRegion) p;
+					TLongObjectHashMap<Map<String, Amenity>> rr = readPoiData(indexReader, pr, ZOOM_LEVEL_POI, true);
+					putPoiData(rr, true);
 				} else if (p instanceof TransportIndex) {
 					readTransportData(indexReader, (TransportIndex) p, true);
 				}

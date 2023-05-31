@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -25,15 +26,23 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.transaction.Transactional;
 
+import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -112,7 +121,12 @@ public class UserdataService {
     
     public static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
     
-    protected static final Log LOG = LogFactory.getLog(UserdataController.class);
+    private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
+    private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
+    private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
+    private static final String FILE_TYPE_SETTINGS = "SETTINGS";
+    
+    protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
     public void validateUser(PremiumUsersRepository.PremiumUser user) {
         if (user == null) {
@@ -200,6 +214,12 @@ public class UserdataService {
     
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+    
+        ResponseEntity<String> error = validateFreeAccount(pu, type);
+        if (error != null) {
+            return error;
+        }
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -211,8 +231,42 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
+        error = validateFreeAccountFile(pu, zipfile);
+        if (error != null) {
+            return error;
+        }
+        
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
+    
+    private ResponseEntity<String> validateFreeAccount(PremiumUsersRepository.PremiumUser pu, String type) {
+        if (pu.orderid == null) {
+            Iterable<UserFile> files = filesRepository.findAllByUserid(pu.id);
+            if (IterableUtils.size(files) > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
+                return ResponseEntity.badRequest().body(String.format("File limit reached (%d)!", MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
+            }
+            if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_SETTINGS)) {
+                return ResponseEntity.badRequest().body(String.format("Free account can upload files with type %s and %s, this file type is %s!",
+                        FILE_TYPE_FAVOURITES, FILE_TYPE_SETTINGS, type));
+            }
+        }
+        return null;
+    }
+    
+    private ResponseEntity<String> validateFreeAccountFile(PremiumUsersRepository.PremiumUser pu, InternalZipFile zipfile) {
+        if (pu.orderid == null) {
+            long fileSize = zipfile.getSize();
+            if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
+                return ResponseEntity.badRequest().body(String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+            }
+            UserdataController.UserFilesResults res = generateFiles(pu.id, null, null, false, false);
+            if (res.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
+                return ResponseEntity.badRequest()
+                        .body(String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+            }
+        }
+        return null;
+    }
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
@@ -275,10 +329,12 @@ public class UserdataService {
 		if (pu == null) {
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-		if (errorMsg != null) {
-			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-		}
+        if (pu.orderid != null) {
+            String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+            if (errorMsg != null) {
+                throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+            }
+        }
 		pu.tokendevice = TOKEN_DEVICE_WEB;
 		if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
@@ -589,4 +645,89 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
+    
+    @Transactional
+    public ResponseEntity<String> deleteAccount(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(us.username);
+        if (pu != null && pu.id == dev.userid) {
+            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+            boolean validToken = pu.token.equals(us.token) && !tokenExpired;
+            if (validToken) {
+                if (deleteAllFiles(dev)) {
+                    int numOfUsersDelete = usersRepository.deleteByEmail(us.username);
+                    if (numOfUsersDelete != -1) {
+                        int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
+                        if (numOfUserDevicesDelete != -1) {
+                            request.logout();
+                            return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", us.username));
+                        }
+                    }
+                    return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", us.username));
+                } else {
+                    return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", us.username));
+                }
+            }
+            return ResponseEntity.badRequest().body("Token is not valid or expired (24h), or password is not valid");
+        }
+        return ResponseEntity.badRequest().body("Email doesn't match login username");
+    }
+    
+    private boolean deleteAllFiles(PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        Iterable<UserFile> files = filesRepository.findAllByUserid(dev.userid);
+        files.forEach(file -> {
+            storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
+            filesRepository.delete(file);
+        });
+    
+        files = filesRepository.findAllByUserid(dev.userid);
+        return IterableUtils.size(files) == 0;
+    }
+    
+    @Transactional
+    public ResponseEntity<String> sendCode(String email, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("Email is not registered");
+        }
+        String token = (new Random().nextInt(8999) + 1000) + "";
+        emailSender.sendOsmAndCloudWebEmail(email, token);
+        pu.token = token;
+        pu.tokenTime = new Date();
+        usersRepository.saveAndFlush(pu);
+        return ok();
+    }
+    
+    public ResponseEntity<String> confirmCode(String code, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("User is not registered");
+        }
+        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        if (pu.token.equals(code) && !tokenExpired) {
+            return ok();
+        } else {
+            return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+        }
+    }
+    
+    
+    public ResponseEntity<String> changeEmail(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("User is not registered");
+        }
+        try {
+            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+            if (pu.token.equals(us.token) && !tokenExpired) {
+                pu.email = us.username;
+                usersRepository.saveAndFlush(pu);
+                request.logout();
+                return ok();
+            }
+        } catch (DataIntegrityViolationException e) {
+            LOG.warn(e.getMessage(), e);
+            return ResponseEntity.badRequest().body("User with this email already exist");
+        }
+        return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+    }
 }

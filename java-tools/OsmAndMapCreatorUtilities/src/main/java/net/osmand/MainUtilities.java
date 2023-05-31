@@ -11,8 +11,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import net.osmand.obf.*;
 import net.osmand.obf.diff.*;
@@ -59,14 +57,6 @@ public class MainUtilities {
 	public static void main(String[] args) throws Exception {
 		if (args.length == 0) {
 			printSynopsys();
-		} else if (args[0].equals("--test-osm-live-tag-removal")) {
-			generateAllOsmLiveTests(new File(System.getProperty("repo.dir")+"/resources/test-resources/osm_live"),
-					System.getProperty("maps.dir"), false);
-//			String test = "2017_06_18-10_30_tagRemovalBug_01.xml";
-//			String osmLivePath = System.getProperty("repo.dir")+"/resources/test-resources/osm_live/";
-//			Algorithms.removeAllFiles(new File(osmLivePath, AugmentedDiffsInspector.DEFAULT_REGION));
-//			AugmentedDiffsInspector.main(new String[] { osmLivePath + test, osmLivePath });
-//			GenerateDailyObf.main(new String[] { osmLivePath });
 		} else {
 			String utl = args[0];
 			List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
@@ -210,27 +200,6 @@ public class MainUtilities {
 				generateObf(subArgs, settings);
 			} else if (utl.equals("filter-osm-by-tag")) {
 				FilterOsmByTags.main(subArgsArray);
-			} else if (utl.contentEquals("generate-osmlive-tests")) {
-				if (subArgsArray.length < 1) {
-					System.out.println("Usage: <path_to_directory_with_resources_project> <optional_path_to_unpack_files>");
-					return;
-				}
-				File testResources = new File(subArgsArray[0]+"/resources/test-resources/osm_live/");
-				generateAllOsmLiveTests(testResources, subArgsArray.length > 1 ? subArgsArray[1] : null, false);
-			} else if (utl.contentEquals("generate-from-overpass")) {
-				if (subArgsArray.length < 2) {
-					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR");
-					return;
-				}
-				String[] argsToGenerateOsm = new String[] {
-						subArgsArray[0],
-						subArgsArray[1]
-				};
-				AugmentedDiffsInspector.main(argsToGenerateOsm);
-				String[] argsToGenerateObf = new String[] {
-						subArgsArray[1]
-				};
-				GenerateDailyObf.main(argsToGenerateObf);
 			} else if (utl.equals("travel-guide-creator")) {
 				TravelGuideCreatorMain.main(subArgsArray);
 			} else if (utl.equals("generate-relation-osm")) {
@@ -287,44 +256,7 @@ public class MainUtilities {
 		}
 	}
 
-	private static void generateAllOsmLiveTests(File testResources, String unpackFolder, boolean delete) throws IOException {
-		// clean all files
-		if (delete) {
-			Algorithms.removeAllFiles(new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION));
-		}
-		for(File f : testResources.listFiles()) {
-			if(f.getName().endsWith(".diff.osm")) {
-				int DATE_LENGTH = 10;
-				String date = f.getName().substring(0, DATE_LENGTH);
-				String targetFl = AugmentedDiffsInspector.DEFAULT_REGION + f.getName().substring(DATE_LENGTH) + ".gz";
-				FileInputStream fis = new FileInputStream(f);
-				File outFl = new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION + "/" + date + "/"
-						+ targetFl);
-				outFl.getParentFile().mkdirs();
-				GZIPOutputStream out = new GZIPOutputStream(new FileOutputStream(outFl));
-				Algorithms.streamCopy(fis, out);
-				out.close();
-				fis.close();
-			}
-			if(f.getName().endsWith(".xml")) {
-				AugmentedDiffsInspector.main(new String[] { f.getAbsolutePath(), testResources.getAbsolutePath() });
-			}
-		}
-		GenerateDailyObf.main(new String[] { testResources.getAbsolutePath() });
-		if(unpackFolder != null) {
-			for(File obfgz : new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION).listFiles()) {
-				if(obfgz.getName().endsWith(".obf.gz")) {
-					GZIPInputStream is = new GZIPInputStream(new FileInputStream(obfgz));
-					FileOutputStream out = new FileOutputStream(new File(unpackFolder, obfgz.getName().substring(0,
-							obfgz.getName().length() - 3)));
-					Algorithms.streamCopy(is, out);
-					is.close();
-					out.close();
-				}
-			}
-		}
-	}
-
+	
 	private static void generateObf(List<String> subArgs, IndexCreatorSettings settings) throws IOException, SQLException,
 			InterruptedException, XmlPullParserException {
 		String fl = subArgs.get(0);

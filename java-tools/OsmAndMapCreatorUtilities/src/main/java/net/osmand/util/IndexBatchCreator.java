@@ -90,6 +90,7 @@ public class IndexBatchCreator {
 		String definition;
 		int sizeUpToMB = -1;
 		Set<String> excludedRegions = new TreeSet<>();
+		List<String> excludePatterns = new ArrayList<>();
 	}
 
 	private static class RegionSpecificData {
@@ -250,6 +251,9 @@ public class IndexBatchCreator {
 					Element f = (Element) filters.item(l);
 					if (!Algorithms.isEmpty(f.getAttribute("exclude"))) {
 						jd.excludedRegions.add(f.getAttribute("exclude").toLowerCase());
+					}
+					if (!Algorithms.isEmpty(f.getAttribute("excludePattern"))) {
+						jd.excludePatterns.add(f.getAttribute("excludePattern").toLowerCase());
 					}
 				}
 				jd.name = jbe.getAttribute("name");
@@ -663,10 +667,20 @@ public class IndexBatchCreator {
 		}
 		String targetMapFileName = fileMapName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
 		for (AwsJobDefinition jd : awsJobQueues) {
+			boolean exclude = false;
 			if (jd.sizeUpToMB > 0 && file.length() > jd.sizeUpToMB * 1024 * 1024) {
-				continue;
+				exclude = true;
+			} else if (jd.excludedRegions.contains(fileMapName.toLowerCase())) {
+				exclude = true;
+			} else {
+				for (String t : jd.excludePatterns) {
+					if (fileMapName.contains(t)) {
+						exclude = true;
+						break;
+					}
+				}
 			}
-			if (jd.excludedRegions.contains(fileMapName.toLowerCase())) {
+			if (exclude) {
 				continue;
 			}
 			log.warn("-------------------------------------------");

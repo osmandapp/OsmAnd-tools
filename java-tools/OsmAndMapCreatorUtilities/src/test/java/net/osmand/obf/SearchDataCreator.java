@@ -5,7 +5,6 @@ import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexTestReader;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.obf.diff.AugmentedDiffsInspector;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.compress.compressors.gzip.GzipUtils;
