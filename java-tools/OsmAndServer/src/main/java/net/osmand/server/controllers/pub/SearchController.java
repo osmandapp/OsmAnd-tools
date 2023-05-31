@@ -2,7 +2,6 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
 import net.osmand.data.Amenity;
-import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.search.core.ObjectType;
@@ -101,7 +100,7 @@ public class SearchController {
     @GetMapping(path = {"/get-poi-categories"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiCategories() {
-        Map<String, List<String>> categoriesNames = osmAndMapsService.getPoiCategories();
+        Map<String, List<String>> categoriesNames = osmAndMapsService.searchPoiCategories();
         if (categoriesNames != null) {
             return ResponseEntity.ok(gson.toJson(categoriesNames));
         } else {
@@ -109,10 +108,21 @@ public class SearchController {
         }
     }
     
+    @GetMapping(path = {"/get-top-filters"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getTopFilters() {
+        List<String> filters = osmAndMapsService.getTopFilters();
+        if (filters != null) {
+            return ResponseEntity.ok(gson.toJson(filters));
+        } else {
+            return ResponseEntity.badRequest().body("Error get top poi filters!");
+        }
+    }
+    
     @GetMapping(path = {"/search-poi-categories"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> searchPoiCategories(@RequestParam String search) throws IOException {
-        Map<String, Map<String, String>> res = osmAndMapsService.getPoiCategories(search);
+        Map<String, Map<String, String>> res = osmAndMapsService.searchPoiCategories(search);
         if (!res.isEmpty()) {
             return ResponseEntity.ok(gson.toJson(res));
         } else {
