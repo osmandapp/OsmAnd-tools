@@ -187,15 +187,14 @@ public class ApiController {
 	
 	@GetMapping(path = {"/regions-by-latlon"})
 	@ResponseBody
-	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
+	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
 		List<String> regions = new ArrayList<String>();
 		if(osmandRegions == null) {
 			osmandRegions = new OsmandRegions();
 			osmandRegions.prepareFile();
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
-		
-		gson.toJson(Map.of("regions", regions));
+		return gson.toJson(Map.of("regions", regions));
 	}
     
 	@GetMapping(path = { "/poll-results" }, produces = "application/json")
