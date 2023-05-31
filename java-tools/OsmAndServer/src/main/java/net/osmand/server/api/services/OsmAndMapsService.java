@@ -909,6 +909,10 @@ public class OsmAndMapsService {
 	}
 	
 	public Map<String, Map<String, String>> getPoiCategories(String search) throws IOException {
+		final String KEY_NAME = "keyName";
+		final String OSM_TAG = "osmTag";
+		final String OSM_VALUE = "osmValue";
+		final String ICON_NAME = "iconName";
 		Map<String, Map<String, String>> searchRes = new HashMap<>();
 		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
 		searchUICore.init();
@@ -918,17 +922,17 @@ public class OsmAndMapsService {
 			Map<String, String> tags = new HashMap<>();
 			if (res.object instanceof PoiType) {
 				PoiType type = (PoiType) res.object;
-				tags.put("keyName", type.getKeyName());
-				tags.put("osmTag", type.getOsmTag());
-				tags.put("osmValue", type.getOsmValue());
-				tags.put("iconName", type.getIconKeyName());
+				tags.put(KEY_NAME, type.getKeyName());
+				tags.put(OSM_TAG, type.getOsmTag());
+				tags.put(OSM_VALUE, type.getOsmValue());
+				tags.put(ICON_NAME, type.getIconKeyName());
 			} else if (res.object instanceof PoiCategory) {
 				PoiCategory type = (PoiCategory) res.object;
-				tags.put("keyName", type.getKeyName());
-				tags.put("iconName", type.getIconKeyName());
+				tags.put(KEY_NAME, type.getKeyName());
+				tags.put(ICON_NAME, type.getIconKeyName());
 			} else if (res.object instanceof PoiFilter) {
 				PoiFilter type = (PoiFilter) res.object;
-				tags.put("keyName", type.getKeyName());
+				tags.put(KEY_NAME, type.getKeyName());
 			}
 			searchRes.put(res.localeName, tags);
 		});
