@@ -8,6 +8,7 @@ import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 public class DownloadIndex {
@@ -42,6 +43,8 @@ public class DownloadIndex {
     private String freeMessage;
     
     private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd.MM.yyyy");
+    
+    private SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm:ss");
 
     
     @XmlAttribute(name = "free")
@@ -97,6 +100,15 @@ public class DownloadIndex {
 		return type.getType();
 	}
 	
+	
+	public String getHttpParam() {
+		DownloadServerSpecialty sp = DownloadServerSpecialty.getSpecialtyByDownloadType(type);
+		if (sp != null && sp.httpParams != null && sp.httpParams.length > 0) {
+			return sp.httpParams[0];
+		}
+		return "standard";
+	}
+	
 	public DownloadType getDownloadType() {
 		return type;
 	}
@@ -131,6 +143,10 @@ public class DownloadIndex {
 	@XmlAttribute(name = "name")
 	public String getName() {
 		return name;
+	}
+	
+	public String getTime() {
+		return TIME_FORMAT.format(new Date(timestamp));
 	}
 
 	@XmlAttribute(name = "description")
