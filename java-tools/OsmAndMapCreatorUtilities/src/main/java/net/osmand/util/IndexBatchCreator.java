@@ -41,6 +41,14 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.InspectContainerCmd;
+import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.Volume;
+import com.github.dockerjava.core.DockerClientBuilder;
+
 import net.osmand.IndexConstants;
 import net.osmand.MapCreatorVersion;
 import net.osmand.PlatformUtil;
@@ -69,6 +77,7 @@ public class IndexBatchCreator {
 
 	private static final int INMEM_LIMIT = 2000;
 	private static final long TIMEOUT_TO_CHECK_AWS = 15000;
+	private static final long TIMEOUT_TO_CHECK_DOCKER = 15000;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 
@@ -83,14 +92,22 @@ public class IndexBatchCreator {
 		String siteToDownload = "";
 	}
 	
-	private static class AwsJobDefinition {
+	private static class ExternalJobDefinition {
 		Map<String, String> params = new LinkedHashMap<>();
 		String name;
+		String type;
+		// On AWS name of the queue
 		String queue;
+		// Docker
+		int threads = 1;
+		// AWS
 		String definition;
+		
+		// filter
 		int sizeUpToMB = -1;
 		Set<String> excludedRegions = new TreeSet<>();
 		List<String> excludePatterns = new ArrayList<>();
+
 	}
 
 	private static class RegionSpecificData {
@@ -107,6 +124,16 @@ public class IndexBatchCreator {
 		SubmitJobResponse response;
 		String s3Url;
 		String targetFileName;
+	}
+	
+	private static class DockerPendingGeneration {
+
+		public ExternalJobDefinition job;
+		public List<String> cmd;
+		public String image;
+		public String name;
+		public List<Bind> binds = new ArrayList<>();
+		public CreateContainerResponse container;
 	}
 	
 	private static class LocalPendingGeneration {
@@ -129,14 +156,20 @@ public class IndexBatchCreator {
 	
 
 	List<LocalPendingGeneration> localPendingGenerations = new ArrayList<>();
+	List<ExternalJobDefinition> externalJobQueues = new ArrayList<>();
 	
-	List<AwsJobDefinition> awsJobQueues = new ArrayList<>();
-	// aws gen block
+	
+	//// AWS gen block
 	List<AwsPendingGeneration> awsPendingGenerations = new ArrayList<>();
 	List<AwsPendingGeneration> awsFailedGenerations = new ArrayList<>();
 	int awsStatushash = 0;
 	int awsSucceeded = 0;
 	int awsFailed = 0;
+	
+	/// DOCKER gen block
+	DockerClient dockerClient;
+	Map<ExternalJobDefinition, List<DockerPendingGeneration>> dockerPendingGenerations = new LinkedHashMap<>();
+	List<DockerPendingGeneration> dockerFailedGenerations = new ArrayList<>();
 	
 	boolean indexPOI = false;
 	boolean indexTransport = false;
@@ -228,15 +261,25 @@ public class IndexBatchCreator {
 			workDir = new File(dir);
 		}
 
-		NodeList awsl = process.getElementsByTagName("aws");
-		for (int j = 0; j < awsl.getLength(); j++) {
-			Element aws = (Element) awsl.item(j);
-			NodeList jobs = aws.getElementsByTagName("job");
+		parseJobDefinitions(process.getElementsByTagName("external"), externalJobQueues);
+		List<RegionCountries> countriesToDownload = new ArrayList<RegionCountries>();
+		parseCountriesToDownload(doc, countriesToDownload);
+		return countriesToDownload;
+	}
+
+	private void parseJobDefinitions(NodeList nodeList, List<ExternalJobDefinition> jobQueues) {
+		for (int j = 0; j < nodeList.getLength(); j++) {
+			Element node = (Element) nodeList.item(j);
+			NodeList jobs = node.getElementsByTagName("job");
 			for (int k = 0; k < jobs.getLength(); k++) {
 				Element jbe = (Element) jobs.item(k);
-				AwsJobDefinition jd = new AwsJobDefinition();
+				ExternalJobDefinition jd = new ExternalJobDefinition();
 				jd.definition = jbe.getAttribute("definition");
+				if (!Algorithms.isEmpty(jbe.getAttribute("threads"))) {
+					jd.threads = Integer.parseInt(jbe.getAttribute("threads"));
+				}
 				jd.name = jbe.getAttribute("name");
+				jd.type = jbe.getAttribute("type");
 				jd.queue = jbe.getAttribute("queue");
 				if (!Algorithms.isEmpty(jbe.getAttribute("sizeUpToMB"))) {
 					jd.sizeUpToMB = Integer.parseInt(jbe.getAttribute("sizeUpToMB"));
@@ -257,12 +300,9 @@ public class IndexBatchCreator {
 					}
 				}
 				jd.name = jbe.getAttribute("name");
-				awsJobQueues.add(jd);
+				jobQueues.add(jd);
 			}
 		}
-		List<RegionCountries> countriesToDownload = new ArrayList<RegionCountries>();
-		parseCountriesToDownload(doc, countriesToDownload);
-		return countriesToDownload;
 	}
 
 	private void parseCountriesToDownload(Document doc, List<RegionCountries> countriesToDownload) throws IOException, XmlPullParserException {
@@ -385,21 +425,81 @@ public class IndexBatchCreator {
 				waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS * 4);
 			}
 		}).start();
+		// run check in parallel
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER*2);
+			}
+		}).start();
 		generateLocalFolderIndexes(alreadyGeneratedFiles);
 		log.info("Generate local " + localPendingGenerations.size() + " maps");
 		for (LocalPendingGeneration lp : localPendingGenerations) {
 			generateLocalIndex(lp.file, lp.regionName, lp.mapFileName, lp.rdata, alreadyGeneratedFiles);
 		}
-		
-		
 		waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS);
+		waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
 		log.info("GENERATING INDEXES FINISHED ");
 		if (awsFailedGenerations.size() > 0) {
-			throw new IllegalStateException("There are " + awsFailedGenerations.size() + " failed generations");
+			throw new IllegalStateException("There are " + awsFailedGenerations.size() + " aws failed generations");
+		}
+		if (dockerFailedGenerations.size() > 0) {
+			throw new IllegalStateException("There are " + dockerFailedGenerations.size() + " docker  failed generations");
 		}
 	}
 
 
+	private void waitDockerJobsToFinish(long timeout) {
+		int s = 0;
+		for(List<?> l : dockerPendingGenerations.values()) {
+			s += l.size();
+		}
+		log.info(String.format("Waiting %d docker jobs to complete...", s));
+		while (s > 0) {
+			waitDockerJobsIteration();
+			try {
+				Thread.sleep(timeout);
+			} catch (InterruptedException e) {
+			}
+		}
+		
+	}
+
+	private synchronized void waitDockerJobsIteration() {
+		if (dockerClient == null) {
+			dockerClient = DockerClientBuilder.getInstance().build();
+		}
+		for (ExternalJobDefinition e : dockerPendingGenerations.keySet()) {
+			int allocation = e.threads;
+			Iterator<DockerPendingGeneration> it = dockerPendingGenerations.get(e).iterator();
+			while (it.hasNext() && allocation > 0) {
+				DockerPendingGeneration p = it.next();
+				allocation--;
+				if (p.container == null) {
+					// start container
+					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd)
+							.withName(p.name).exec();
+					dockerClient.startContainerCmd(p.container.getId());
+				} else {
+					// check if it's complete
+					InspectContainerResponse res = dockerClient.inspectContainerCmd(p.container.getId()).exec();
+					if (!res.getState().getRunning()) {
+						Long l = res.getState().getExitCodeLong();
+						if (l == null || l.longValue() != 0) {
+							dockerFailedGenerations.add(p);
+						} else {
+							dockerClient.removeContainerCmd(p.container.getId());
+						}
+						allocation++;
+						it.remove();
+					}
+				}
+
+			}
+		}
+		
+		
+	}
 
 	private void waitAwsJobsToFinish(long timeout) {
 		log.info(String.format("Waiting %d aws jobs to complete...", awsPendingGenerations.size()));
@@ -666,7 +766,7 @@ public class IndexBatchCreator {
 			regionName = Algorithms.capitalizeFirstLetterAndLowercase(regionName);
 		}
 		String targetMapFileName = fileMapName + "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
-		for (AwsJobDefinition jd : awsJobQueues) {
+		for (ExternalJobDefinition jd : externalJobQueues) {
 			boolean exclude = false;
 			if (jd.sizeUpToMB > 0 && file.length() > jd.sizeUpToMB * 1024 * 1024) {
 				exclude = true;
@@ -683,13 +783,25 @@ public class IndexBatchCreator {
 			if (exclude) {
 				continue;
 			}
-			log.warn("-------------------------------------------");
-			log.warn("----------- Generate on AWS " + file.getName() + "\n\n\n");
-			try {
-				generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
-				return true;
-			} catch (RuntimeException e) {
-				log.error("----------- FAILED Generation on AWS go to local " + file.getName() + " " + e.getMessage(), e);
+			if (jd.type.equals("aws")) {
+				log.warn("-------------------------------------------");
+				log.warn("----------- Generate on AWS " + file.getName() + "\n\n\n");
+				try {
+					generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
+					return true;
+				} catch (RuntimeException e) {
+					log.error("----------- FAILED Generation on AWS go to local " + file.getName() + " " + e.getMessage(), e);
+				}
+			} else if (jd.type.equals("docker")) {
+				log.warn("-------------------------------------------");
+				log.warn("----------- Generate on Docker " + file.getName() + "\n\n\n");
+				try {
+					generateDockerIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
+					return true;
+				} catch (RuntimeException e) {
+					log.error("----------- FAILED Generation on Docker " + file.getName() + " " + e.getMessage(), e);
+					return false;
+				}
 			}
 		}
 		log.warn("-------------------------------------------");
@@ -704,13 +816,61 @@ public class IndexBatchCreator {
 	}
 	
 	
-	private void generateAwsIndex(AwsJobDefinition jd, File file, String targetFileName,
+	private synchronized void generateDockerIndex(ExternalJobDefinition jd, File file, String targetFileName,
 			RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		String fileParam = file.getName().substring(0, file.getName().indexOf('.'));
 		String currentMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
-		String name = MessageFormat.format(jd.name, fileParam, currentMonth);
-		String queue = MessageFormat.format(jd.queue, fileParam, currentMonth);
-		String definition = MessageFormat.format(jd.definition, fileParam, currentMonth);
+		String name = MessageFormat.format(jd.name, fileParam, currentMonth, targetFileName);
+//		String queue = MessageFormat.format(jd.queue, fileParam, currentMonth, targetFileName);
+//		String definition = MessageFormat.format(jd.definition, fileParam, currentMonth, targetFileName);
+		alreadyGeneratedFiles.add(file.getName());
+		LinkedHashMap<String, String> pms = new LinkedHashMap<>();
+		Iterator<Entry<String, String>> it = jd.params.entrySet().iterator();
+		String image = null;
+		List<String> cmd = new ArrayList<>();
+		boolean srtmRun = !Algorithms.isEmpty(srtmDir) && (rdata == null || rdata.indexSRTM);
+
+		while (it.hasNext()) {
+			Entry<String, String> e = it.next();
+			String vl = MessageFormat.format(e.getValue(), fileParam, currentMonth, targetFileName);
+			pms.put(e.getKey(), vl);
+			if (e.getKey().equals("image")) {
+				image = vl;
+			} else if (e.getKey().equals("cmd")) {
+				cmd.addAll(Arrays.asList(vl.split(" ")));
+			}
+		}
+		log.info("Submit docker request : " + name);
+		DockerPendingGeneration p = new DockerPendingGeneration();
+		p.job = jd;
+		p.image = image;
+		
+		if (image == null || cmd.isEmpty()) {
+			throw new IllegalArgumentException("Can't start docker container Image or cmd is empty ");
+		}
+		if (srtmRun) {
+			cmd.add("--srtm=/home/srtm");
+			p.binds.add(new Bind(srtmDir, new Volume("/home/srtm")));
+		}
+		cmd.add("--upload");
+		cmd.add("/home/result/"+targetFileName);
+		p.binds.add(new Bind(indexDirFiles.getAbsolutePath(), new Volume("/home/result")));
+		p.cmd = cmd;
+		p.name = name;
+		
+		if(!dockerPendingGenerations.containsKey(jd)) {
+			dockerPendingGenerations.put(jd, new ArrayList<DockerPendingGeneration>());
+		}
+		dockerPendingGenerations.get(jd).add(p);
+	}
+	
+	private synchronized void generateAwsIndex(ExternalJobDefinition jd, File file, String targetFileName,
+			RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
+		String fileParam = file.getName().substring(0, file.getName().indexOf('.'));
+		String currentMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
+		String name = MessageFormat.format(jd.name, fileParam, currentMonth, targetFileName);
+		String queue = MessageFormat.format(jd.queue, fileParam, currentMonth, targetFileName);
+		String definition = MessageFormat.format(jd.definition, fileParam, currentMonth, targetFileName);
 		alreadyGeneratedFiles.add(file.getName());
 		BatchClient client = BatchClient.builder().build();
 		SubmitJobRequest.Builder pr = SubmitJobRequest.builder().jobName(name).jobQueue(queue)
@@ -720,7 +880,7 @@ public class IndexBatchCreator {
 		String uploadedS3File = null;
 		while (it.hasNext()) {
 			Entry<String, String> e = it.next();
-			String vl = MessageFormat.format(e.getValue(), fileParam, currentMonth);
+			String vl = MessageFormat.format(e.getValue(), fileParam, currentMonth, targetFileName);
 			pms.put(e.getKey(), vl);
 			if(e.getKey().equals("upload")) {
 				uploadedS3File = vl;

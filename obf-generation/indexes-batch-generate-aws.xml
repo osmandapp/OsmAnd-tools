@@ -8,9 +8,9 @@
 		skipExistingIndexesAt="/var/lib/jenkins/indexes/uploaded"	
 		indexPOI="true" indexMap="true" indexRouting="true" indexTransport="true" indexAddress="true" 
 		directory_for_srtm_files="/home/relief-data/srtm/">
-		<!-- not supported yet for AWS -->
-		<aws>
-			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60">
+		
+		<external>
+			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
 				<filter excludePattern="_africa" />
@@ -19,7 +19,7 @@
 				<filter excludePattern="_centralamerica" />
 				<filter excludePattern="_australia-oceania" />
 			</job>
-			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="900">
+			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="900" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
 				<filter exclude="world_seamarks" />
@@ -35,8 +35,15 @@
 				<filter excludePattern="_centralamerica" />
 				<filter excludePattern="_australia-oceania" />
 			</job>
-			
-		</aws>
+			<job queue="gen-docker-small" threads="3" name="{1}-{0}" sizeUpToMB="50" type="docker">
+				<parameter k="image" v="osmandapp/osmand-mapcreator" />
+				<parameter k="cmd" v="generate-obf https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+			</job>
+			<job queue="gen-docker-large" threads="1" name="{1}-{0}" sizeUpToMB="900" type="docker">
+				<parameter k="image" v="osmandapp/osmand-mapcreator" />
+				<parameter k="cmd" v="generate-obf https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+			</job>
+		</external>
 	</process>
 	
 	<regions siteToDownload="/home/osm-planet/osm-extract/{0}/{0}.pbf" >
