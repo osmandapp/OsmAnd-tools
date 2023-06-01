@@ -128,7 +128,7 @@ public class IndexBatchCreator {
 	
 	private static class DockerPendingGeneration {
 
-		public List<String> cmd = new ArrayList<String>;
+		public List<String> cmd = new ArrayList<String>();
 		public String image;
 		public String name;
 		public List<Bind> binds = new ArrayList<>();
