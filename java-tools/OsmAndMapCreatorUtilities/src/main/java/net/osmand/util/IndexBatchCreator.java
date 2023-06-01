@@ -418,6 +418,7 @@ public class IndexBatchCreator {
 		if (!countriesToDownload.isEmpty()) {
 			downloadFilesAndGenerateIndex(countriesToDownload, alreadyGeneratedFiles);
 		}
+		generateLocalFolderIndexes(alreadyGeneratedFiles);
 		// run check in parallel
 		new Thread(new Runnable() {
 			@Override
@@ -432,7 +433,6 @@ public class IndexBatchCreator {
 				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
 			}
 		}).start();
-		generateLocalFolderIndexes(alreadyGeneratedFiles);
 		log.info("Generate local " + localPendingGenerations.size() + " maps");
 		for (LocalPendingGeneration lp : localPendingGenerations) {
 			generateLocalIndex(lp.file, lp.regionName, lp.mapFileName, lp.rdata, alreadyGeneratedFiles);
@@ -450,25 +450,29 @@ public class IndexBatchCreator {
 
 
 	private void waitDockerJobsToFinish(long timeout) {
-		int total = 0;
-		List<String> names = new ArrayList<String>(); 
-		for (List<DockerPendingGeneration> l : dockerPendingGenerations.values()) {
-			total += l.size();
-			for (DockerPendingGeneration d : l) {
-				if (d.container != null) {
-					names.add(d.name);
+		while (true) {
+			int total = 0;
+			List<String> names = new ArrayList<String>();
+			for (List<DockerPendingGeneration> l : dockerPendingGenerations.values()) {
+				total += l.size();
+				for (DockerPendingGeneration d : l) {
+					if (d.container != null) {
+						names.add(d.name);
+					}
 				}
 			}
-		}
-		log.warn(String.format("Waiting %d docker jobs to complete, running %d: %s", total, names.size(), names));
-		while (total > 0) {
+			if (total == 0) {
+				return;
+			}
+			log.warn(String.format("Waiting %d docker jobs to complete, running %d: %s", total, names.size(), names));
+
 			waitDockerJobsIteration();
 			try {
 				Thread.sleep(timeout);
 			} catch (InterruptedException e) {
 			}
 		}
-		
+
 	}
 
 	@SuppressWarnings("deprecation")
