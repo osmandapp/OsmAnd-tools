@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -43,7 +44,6 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
-import com.github.dockerjava.api.command.InspectContainerCmd;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Volume;
@@ -128,7 +128,6 @@ public class IndexBatchCreator {
 	
 	private static class DockerPendingGeneration {
 
-		public ExternalJobDefinition job;
 		public List<String> cmd;
 		public String image;
 		public String name;
@@ -168,7 +167,7 @@ public class IndexBatchCreator {
 	
 	/// DOCKER gen block
 	DockerClient dockerClient;
-	Map<ExternalJobDefinition, List<DockerPendingGeneration>> dockerPendingGenerations = new LinkedHashMap<>();
+	Map<ExternalJobDefinition, List<DockerPendingGeneration>> dockerPendingGenerations = new ConcurrentHashMap<>();
 	List<DockerPendingGeneration> dockerFailedGenerations = new ArrayList<>();
 	
 	boolean indexPOI = false;
@@ -451,10 +450,16 @@ public class IndexBatchCreator {
 
 	private void waitDockerJobsToFinish(long timeout) {
 		int s = 0;
-		for(List<?> l : dockerPendingGenerations.values()) {
+		List<String> names = new ArrayList<String>(); 
+		for (List<DockerPendingGeneration> l : dockerPendingGenerations.values()) {
 			s += l.size();
+			for (DockerPendingGeneration d : l) {
+				if (d.container != null) {
+					names.add(d.name);
+				}
+			}
 		}
-		log.info(String.format("Waiting %d docker jobs to complete...", s));
+		log.info(String.format("Waiting %d docker jobs to complete, running %d: %s", s, names.size(), names));
 		while (s > 0) {
 			waitDockerJobsIteration();
 			try {
@@ -465,6 +470,7 @@ public class IndexBatchCreator {
 		
 	}
 
+	@SuppressWarnings("deprecation")
 	private synchronized void waitDockerJobsIteration() {
 		if (dockerClient == null) {
 			dockerClient = DockerClientBuilder.getInstance().build();
@@ -842,7 +848,6 @@ public class IndexBatchCreator {
 		}
 		log.info("Submit docker request : " + name);
 		DockerPendingGeneration p = new DockerPendingGeneration();
-		p.job = jd;
 		p.image = image;
 		
 		if (image == null || cmd.isEmpty()) {
@@ -858,10 +863,14 @@ public class IndexBatchCreator {
 		p.cmd = cmd;
 		p.name = name;
 		
-		if(!dockerPendingGenerations.containsKey(jd)) {
-			dockerPendingGenerations.put(jd, new ArrayList<DockerPendingGeneration>());
+		
+		// to avoid concurrency issues
+		List<DockerPendingGeneration> lst = new ArrayList<DockerPendingGeneration>();
+		if (dockerPendingGenerations.containsKey(jd)) {
+			lst.addAll(dockerPendingGenerations.get(jd));
 		}
-		dockerPendingGenerations.get(jd).add(p);
+		lst.add(p);
+		dockerPendingGenerations.put(jd, lst);
 	}
 	
 	private synchronized void generateAwsIndex(ExternalJobDefinition jd, File file, String targetFileName,
