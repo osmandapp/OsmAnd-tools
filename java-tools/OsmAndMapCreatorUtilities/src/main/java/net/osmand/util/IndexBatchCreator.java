@@ -77,7 +77,7 @@ public class IndexBatchCreator {
 
 	private static final int INMEM_LIMIT = 2000;
 	private static final long TIMEOUT_TO_CHECK_AWS = 15000;
-	private static final long TIMEOUT_TO_CHECK_DOCKER = 15000;
+	private static final long TIMEOUT_TO_CHECK_DOCKER = 10000;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 
