@@ -16,6 +16,8 @@
 				<filter excludePattern="_africa" />
 				<filter excludePattern="_asia" />
 				<filter excludePattern="_southamerica" />
+				<filter excludePattern="_centralamerica" />
+				<filter excludePattern="_australia-oceania" />
 			</job>
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="900">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
@@ -30,6 +32,8 @@
 				<filter excludePattern="_africa" />
 				<filter excludePattern="_asia" />
 				<filter excludePattern="_southamerica" />
+				<filter excludePattern="_centralamerica" />
+				<filter excludePattern="_australia-oceania" />
 			</job>
 			
 		</aws>
