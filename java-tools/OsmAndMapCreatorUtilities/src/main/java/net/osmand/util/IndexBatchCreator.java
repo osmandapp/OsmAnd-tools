@@ -460,7 +460,7 @@ public class IndexBatchCreator {
 				}
 			}
 		}
-		log.info(String.format("Waiting %d docker jobs to complete, running %d: %s", total, names.size(), names));
+		log.warn(String.format("Waiting %d docker jobs to complete, running %d: %s", total, names.size(), names));
 		while (total > 0) {
 			waitDockerJobsIteration();
 			try {
@@ -499,6 +499,7 @@ public class IndexBatchCreator {
 						}
 						allocation++;
 						it.remove();
+						p.container = null;
 					}
 				}
 
@@ -823,7 +824,7 @@ public class IndexBatchCreator {
 	}
 	
 	
-	private synchronized void generateDockerIndex(ExternalJobDefinition jd, File file, String targetFileName,
+	private void generateDockerIndex(ExternalJobDefinition jd, File file, String targetFileName,
 			RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		String fileParam = file.getName().substring(0, file.getName().indexOf('.'));
 		String currentMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
@@ -869,7 +870,7 @@ public class IndexBatchCreator {
 		dockerPendingGenerations.put(jd, lst);
 	}
 	
-	private synchronized void generateAwsIndex(ExternalJobDefinition jd, File file, String targetFileName,
+	private void generateAwsIndex(ExternalJobDefinition jd, File file, String targetFileName,
 			RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		String fileParam = file.getName().substring(0, file.getName().indexOf('.'));
 		String currentMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
