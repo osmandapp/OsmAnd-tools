@@ -56,10 +56,10 @@ dependencies {
         implementation 'software.amazon.awssdk:s3'
         implementation 'software.amazon.awssdk:batch'
         
-    implementation 'com.github.docker-java:docker-java:3.3.1', {
-    	exclude group 'org.slf4j', module 'slf4j-api'
-    	exclude group 'org.slf4j', module 'jcl-over-slf4j'
-    	exclude group 'commons-logging', module 'commons-logging'
+    implementation ('com.github.docker-java:docker-java:3.3.1') {
+    	exclude (group: 'org.slf4j', module: 'slf4j-api')
+    	exclude (group: 'org.slf4j', module: 'jcl-over-slf4j')
+    	exclude (group: 'commons-logging', module: 'commons-logging')
     }
 
 	implementation 'org.apache.commons:commons-compress:1.17'
