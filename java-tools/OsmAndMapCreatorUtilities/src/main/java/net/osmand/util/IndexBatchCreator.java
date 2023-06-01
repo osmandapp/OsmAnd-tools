@@ -428,7 +428,7 @@ public class IndexBatchCreator {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER*2);
+				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
 			}
 		}).start();
 		generateLocalFolderIndexes(alreadyGeneratedFiles);
@@ -449,18 +449,18 @@ public class IndexBatchCreator {
 
 
 	private void waitDockerJobsToFinish(long timeout) {
-		int s = 0;
+		int total = 0;
 		List<String> names = new ArrayList<String>(); 
 		for (List<DockerPendingGeneration> l : dockerPendingGenerations.values()) {
-			s += l.size();
+			total += l.size();
 			for (DockerPendingGeneration d : l) {
 				if (d.container != null) {
 					names.add(d.name);
 				}
 			}
 		}
-		log.info(String.format("Waiting %d docker jobs to complete, running %d: %s", s, names.size(), names));
-		while (s > 0) {
+		log.info(String.format("Waiting %d docker jobs to complete, running %d: %s", total, names.size(), names));
+		while (total > 0) {
 			waitDockerJobsIteration();
 			try {
 				Thread.sleep(timeout);
@@ -485,7 +485,7 @@ public class IndexBatchCreator {
 					// start container
 					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd)
 							.withName(p.name).exec();
-					dockerClient.startContainerCmd(p.container.getId());
+					dockerClient.startContainerCmd(p.container.getId()).exec();
 				} else {
 					// check if it's complete
 					InspectContainerResponse res = dockerClient.inspectContainerCmd(p.container.getId()).exec();
@@ -494,7 +494,7 @@ public class IndexBatchCreator {
 						if (l == null || l.longValue() != 0) {
 							dockerFailedGenerations.add(p);
 						} else {
-							dockerClient.removeContainerCmd(p.container.getId());
+							dockerClient.removeContainerCmd(p.container.getId()).exec();
 						}
 						allocation++;
 						it.remove();
