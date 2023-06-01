@@ -839,9 +839,9 @@ public class IndexBatchCreator {
 			String vl = MessageFormat.format(e.getValue(), fileParam, currentMonth, targetFileName);
 			if (e.getKey().equals("image")) {
 				p.image = vl;
-			} else if (e.getKey().equals("cmd")) {
+			} else if (e.getKey().startsWith("cmd")) {
 				p.cmd.add(vl);
-			} else if (e.getKey().equals("env")) {
+			} else if (e.getKey().startsWith("env")) {
 				p.envs.add(vl);
 			}
 		}
