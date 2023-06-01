@@ -13,6 +13,9 @@
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
+				<filter excludePattern="_africa" />
+				<filter excludePattern="_asia" />
+				<filter excludePattern="_southamerica" />
 			</job>
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="900">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
