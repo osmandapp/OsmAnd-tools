@@ -37,11 +37,17 @@
 			</job>
 			<job queue="gen-docker-small" threads="3" name="{1}-{0}" sizeUpToMB="100" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
-				<parameter k="cmd" v="generate-obf https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+				<parameter k="cmd" v="generate-obf" />
+				<parameter k="cmd" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+
+				<parameter k="env" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
 			</job>
 			<job queue="gen-docker-large" threads="1" name="{1}-{0}" sizeUpToMB="900" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
-				<parameter k="cmd" v="generate-obf https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+				<parameter k="cmd" v="generate-obf" />
+				<parameter k="cmd" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+				
+				<parameter k="env" v="JAVA_OPTS=-Xms2048M -Xmx32000M "/>
 			</job>
 		</external>
 	</process>

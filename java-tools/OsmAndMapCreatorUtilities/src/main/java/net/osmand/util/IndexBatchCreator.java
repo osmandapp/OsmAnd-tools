@@ -128,10 +128,11 @@ public class IndexBatchCreator {
 	
 	private static class DockerPendingGeneration {
 
-		public List<String> cmd;
+		public List<String> cmd = new ArrayList<String>;
 		public String image;
 		public String name;
 		public List<Bind> binds = new ArrayList<>();
+		public List<String> envs = new ArrayList<String>();
 		public CreateContainerResponse container;
 	}
 	
@@ -483,7 +484,7 @@ public class IndexBatchCreator {
 				allocation--;
 				if (p.container == null) {
 					// start container
-					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd)
+					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd).withEnv(p.envs)
 							.withName(p.name).exec();
 					dockerClient.startContainerCmd(p.container.getId()).exec();
 				} else {
@@ -830,37 +831,32 @@ public class IndexBatchCreator {
 //		String queue = MessageFormat.format(jd.queue, fileParam, currentMonth, targetFileName);
 //		String definition = MessageFormat.format(jd.definition, fileParam, currentMonth, targetFileName);
 		alreadyGeneratedFiles.add(file.getName());
-		LinkedHashMap<String, String> pms = new LinkedHashMap<>();
 		Iterator<Entry<String, String>> it = jd.params.entrySet().iterator();
-		String image = null;
-		List<String> cmd = new ArrayList<>();
 		boolean srtmRun = !Algorithms.isEmpty(srtmDir) && (rdata == null || rdata.indexSRTM);
-
+		DockerPendingGeneration p = new DockerPendingGeneration();
 		while (it.hasNext()) {
 			Entry<String, String> e = it.next();
 			String vl = MessageFormat.format(e.getValue(), fileParam, currentMonth, targetFileName);
-			pms.put(e.getKey(), vl);
 			if (e.getKey().equals("image")) {
-				image = vl;
+				p.image = vl;
 			} else if (e.getKey().equals("cmd")) {
-				cmd.addAll(Arrays.asList(vl.split(" ")));
+				p.cmd.add(vl);
+			} else if (e.getKey().equals("env")) {
+				p.envs.add(vl);
 			}
 		}
 		log.info("Submit docker request : " + name);
-		DockerPendingGeneration p = new DockerPendingGeneration();
-		p.image = image;
 		
-		if (image == null || cmd.isEmpty()) {
+		if (p.image == null || p.cmd.isEmpty()) {
 			throw new IllegalArgumentException("Can't start docker container Image or cmd is empty ");
 		}
 		if (srtmRun) {
-			cmd.add("--srtm=/home/srtm");
+			p.cmd.add("--srtm=/home/srtm");
 			p.binds.add(new Bind(srtmDir, new Volume("/home/srtm")));
 		}
-		cmd.add("--upload");
-		cmd.add("/home/result/"+targetFileName);
+		p.cmd.add("--upload");
+		p.cmd.add("/home/result/"+targetFileName);
 		p.binds.add(new Bind(indexDirFiles.getAbsolutePath(), new Volume("/home/result")));
-		p.cmd = cmd;
 		p.name = name;
 		
 		
