@@ -77,7 +77,7 @@ public class IndexBatchCreator {
 
 	private static final int INMEM_LIMIT = 2000;
 	private static final long TIMEOUT_TO_CHECK_AWS = 15000;
-	private static final long TIMEOUT_TO_CHECK_DOCKER = 10000;
+	private static final long TIMEOUT_TO_CHECK_DOCKER = 15000;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 
@@ -430,7 +430,7 @@ public class IndexBatchCreator {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
+				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER * 2);
 			}
 		}).start();
 		log.info("Generate local " + localPendingGenerations.size() + " maps");
