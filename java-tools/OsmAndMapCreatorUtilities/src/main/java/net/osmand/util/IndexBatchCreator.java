@@ -100,7 +100,7 @@ public class IndexBatchCreator {
 		// On AWS name of the queue
 		String queue;
 		// Docker
-		int threads = 1;
+		int slotsPerJob = 1;
 		// AWS
 		String definition;
 		
@@ -128,7 +128,7 @@ public class IndexBatchCreator {
 	}
 	
 	private static class DockerPendingGeneration {
-
+		public ExternalJobDefinition jd;
 		public List<String> cmd = new ArrayList<String>();
 		public String image;
 		public String name;
@@ -169,6 +169,7 @@ public class IndexBatchCreator {
 	
 	/// DOCKER gen block
 	DockerClient dockerClient;
+	int dockerSlots = 4;
 	Map<ExternalJobDefinition, List<DockerPendingGeneration>> dockerPendingGenerations = new ConcurrentHashMap<>();
 	List<DockerPendingGeneration> dockerFailedGenerations = new ArrayList<>();
 	
@@ -271,14 +272,17 @@ public class IndexBatchCreator {
 
 	private void parseJobDefinitions(NodeList nodeList, List<ExternalJobDefinition> jobQueues) {
 		for (int j = 0; j < nodeList.getLength(); j++) {
-			Element node = (Element) nodeList.item(j);
-			NodeList jobs = node.getElementsByTagName("job");
+			Element external = (Element) nodeList.item(j);
+			if (!Algorithms.isEmpty(external.getAttribute("dockerSlots"))) {
+				dockerSlots = Integer.parseInt(external.getAttribute("dockerSlots"));
+			}
+			NodeList jobs = external.getElementsByTagName("job");
 			for (int k = 0; k < jobs.getLength(); k++) {
 				Element jbe = (Element) jobs.item(k);
 				ExternalJobDefinition jd = new ExternalJobDefinition();
 				jd.definition = jbe.getAttribute("definition");
-				if (!Algorithms.isEmpty(jbe.getAttribute("threads"))) {
-					jd.threads = Integer.parseInt(jbe.getAttribute("threads"));
+				if (!Algorithms.isEmpty(jbe.getAttribute("slotsPerJob"))) {
+					jd.slotsPerJob = Integer.parseInt(jbe.getAttribute("slotsPerJob"));
 				}
 				jd.name = jbe.getAttribute("name");
 				jd.type = jbe.getAttribute("type");
@@ -482,39 +486,61 @@ public class IndexBatchCreator {
 		if (dockerClient == null) {
 			dockerClient = DockerClientBuilder.getInstance().build();
 		}
-		for (ExternalJobDefinition e : dockerPendingGenerations.keySet()) {
-			int allocation = e.threads;
-			Iterator<DockerPendingGeneration> it = dockerPendingGenerations.get(e).iterator();
-			while (it.hasNext() && allocation > 0) {
-				DockerPendingGeneration p = it.next();
-				allocation--;
-				if (p.container == null) {
-					// start container
-					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd).withEnv(p.envs)
-							.withName(p.name).exec();
-					dockerClient.startContainerCmd(p.container.getId()).exec();
-				} else {
-					// check if it's complete
+		int allocation = dockerSlots;
+		List<List<DockerPendingGeneration>> all = new ArrayList<>(dockerPendingGenerations.values());
+		List<DockerPendingGeneration> queue = createQueueEquallyDistributed(all);
+
+		Iterator<DockerPendingGeneration> it = queue.iterator();
+		while (it.hasNext() && allocation > 0) {
+			DockerPendingGeneration p = it.next();
+			allocation -= p.jd.slotsPerJob;
+			if (p.container == null) {
+				// start container
+				p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd).withEnv(p.envs)
+						.withName(p.name).exec();
+				dockerClient.startContainerCmd(p.container.getId()).exec();
+			} else {
+				// check if it's complete
+				try {
 					InspectContainerResponse res = dockerClient.inspectContainerCmd(p.container.getId()).exec();
 					if (!res.getState().getRunning()) {
 						Long l = res.getState().getExitCodeLong();
 						if (l == null || l.longValue() != 0) {
 							dockerFailedGenerations.add(p);
 						} else {
-							log.info(String.format("Finished %s container %s at %s (started %s).", getDuration(res.getState()), 
-									res.getName(),res.getState().getFinishedAt(), res.getState().getStartedAt()));
+							log.info(String.format("Finished %s container %s at %s (started %s).",
+									getDuration(res.getState()), res.getName(), res.getState().getFinishedAt(),
+									res.getState().getStartedAt()));
 							dockerClient.removeContainerCmd(p.container.getId()).exec();
 						}
-						allocation++;
+						allocation += p.jd.slotsPerJob;
 						it.remove();
-						p.container = null;
+						dockerPendingGenerations.get(p.jd).remove(p);
 					}
+				} catch (RuntimeException e) {
+					log.error(e.getMessage(), e);
+					dockerPendingGenerations.get(p.jd).remove(p);
 				}
-
 			}
 		}
-		
-		
+	}
+
+	private List<DockerPendingGeneration> createQueueEquallyDistributed(List<List<DockerPendingGeneration>> all) {
+		List<DockerPendingGeneration> queue = new ArrayList<IndexBatchCreator.DockerPendingGeneration>();
+		boolean added = true;
+		int ind = 0;
+		while (added) {
+			added = false;
+			for (int i = 0; i < all.size(); i++) {
+				List<DockerPendingGeneration> lst = all.get(i);
+				if (ind < lst.size()) {
+					queue.add(lst.get(ind));
+					added = true;
+				}
+			}
+			ind++;
+		}
+		return queue;
 	}
 
 	private String getDuration(ContainerState state) {
@@ -858,6 +884,7 @@ public class IndexBatchCreator {
 		Iterator<Entry<String, String>> it = jd.params.entrySet().iterator();
 		boolean srtmRun = !Algorithms.isEmpty(srtmDir) && (rdata == null || rdata.indexSRTM);
 		DockerPendingGeneration p = new DockerPendingGeneration();
+		p.jd = jd;
 		while (it.hasNext()) {
 			Entry<String, String> e = it.next();
 			String vl = MessageFormat.format(e.getValue(), fileParam, currentMonth, targetFileName);
