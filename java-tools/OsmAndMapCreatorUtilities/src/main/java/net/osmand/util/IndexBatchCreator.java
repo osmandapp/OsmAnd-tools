@@ -45,6 +45,7 @@ import org.xmlpull.v1.XmlPullParserException;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.github.dockerjava.api.command.InspectContainerResponse.ContainerState;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DockerClientBuilder;
@@ -181,6 +182,7 @@ public class IndexBatchCreator {
 
 	private DBDialect osmDbDialect;
 	private String renderingTypesFile;
+	private SimpleDateFormat sdf;
 
 
 	public static void main(String[] args) throws Exception {
@@ -499,8 +501,8 @@ public class IndexBatchCreator {
 						if (l == null || l.longValue() != 0) {
 							dockerFailedGenerations.add(p);
 						} else {
-							log.info(String.format("Finished container %s at %s (started %s).", res.getName(),
-									res.getState().getFinishedAt(), res.getState().getStartedAt()));
+							log.info(String.format("Finished %s container %s at %s (started %s).", getDuration(res.getState()), 
+									res.getName(),res.getState().getFinishedAt(), res.getState().getStartedAt()));
 							dockerClient.removeContainerCmd(p.container.getId()).exec();
 						}
 						allocation++;
@@ -513,6 +515,21 @@ public class IndexBatchCreator {
 		}
 		
 		
+	}
+
+	private String getDuration(ContainerState state) {
+		if (sdf == null) {
+			sdf = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss");
+		}
+		try {
+			long finish = sdf.parse(state.getFinishedAt()).getTime();
+			long start = sdf.parse(state.getStartedAt()).getTime();
+			long s = (finish - start) / 1000;
+			return String.format("%d:%02d:%02d", s / 3600, (s % 3600) / 60, (s % 60));
+		} catch (Exception e) {
+			log.warn(e.getMessage(), e);
+			return "";
+		}
 	}
 
 	private void waitAwsJobsToFinish(long timeout) {
