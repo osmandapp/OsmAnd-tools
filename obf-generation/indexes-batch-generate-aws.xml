@@ -13,6 +13,9 @@
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
+
+				<!-- For local docker -->
+				<filter excludePattern="_northamerica" />
 				<filter excludePattern="_africa" />
 				<filter excludePattern="_asia" />
 				<filter excludePattern="_southamerica" />
@@ -29,6 +32,9 @@
 				<filter exclude="south-africa_africa" />
                 <filter exclude="kazakhstan_asia" />
                 <filter exclude="mongolia_asia" />
+
+				<!-- For local docker -->
+				<filter excludePattern="_northamerica" />
 				<filter excludePattern="_africa" />
 				<filter excludePattern="_asia" />
 				<filter excludePattern="_southamerica" />
