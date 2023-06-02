@@ -519,7 +519,7 @@ public class IndexBatchCreator {
 
 	private String getDuration(ContainerState state) {
 		if (sdf == null) {
-			sdf = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss");
+			sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 		}
 		try {
 			long finish = sdf.parse(state.getFinishedAt()).getTime();
