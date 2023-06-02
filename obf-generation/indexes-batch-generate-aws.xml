@@ -41,14 +41,14 @@
 				<filter excludePattern="_centralamerica" />
 				<filter excludePattern="_australia-oceania" />
 			</job>
-			<job queue="gen-docker-small" threads="7" name="{1}-{0}" sizeUpToMB="90" type="docker">
+			<job queue="gen-docker-small" threads="8" name="{1}-{0}" sizeUpToMB="120" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
                 <parameter k="cmd_3" v="--max-height-tiles-in-ram=100" />
 				<parameter k="env" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
 			</job>
-			<job queue="gen-docker-large" threads="5" name="{1}-{0}" sizeUpToMB="900" type="docker">
+			<job queue="gen-docker-large" threads="4" name="{1}-{0}" sizeUpToMB="900" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
