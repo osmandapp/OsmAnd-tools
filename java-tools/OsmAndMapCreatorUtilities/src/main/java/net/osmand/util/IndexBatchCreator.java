@@ -499,6 +499,8 @@ public class IndexBatchCreator {
 						if (l == null || l.longValue() != 0) {
 							dockerFailedGenerations.add(p);
 						} else {
+							log.info(String.format("Finished container %s at %s (started %s).", res.getName(),
+									res.getState().getFinishedAt(), res.getState().getStartedAt()));
 							dockerClient.removeContainerCmd(p.container.getId()).exec();
 						}
 						allocation++;
