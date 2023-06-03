@@ -24,6 +24,7 @@ import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.JsonParser;
 import net.osmand.IndexConstants;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -133,6 +134,8 @@ public class MapApiController {
 	
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
+	
+	OsmandRegions osmandRegions;
 	
 	Gson gson = new Gson();
 	
@@ -591,5 +594,17 @@ public class MapApiController {
 			return userdataService.changeEmail(us, dev, request);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+	
+	@GetMapping(path = {"/regions-by-latlon"})
+	@ResponseBody
+	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
+		List<String> regions = new ArrayList<>();
+		if(osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
+		return gson.toJson(Map.of("regions", regions));
 	}
 }
