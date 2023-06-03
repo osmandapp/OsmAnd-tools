@@ -26,8 +26,14 @@ import javax.imageio.ImageIO;
 import net.osmand.IndexConstants;
 import net.osmand.data.Amenity;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.osm.*;
-import net.osmand.search.core.*;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiCategory;
+import net.osmand.osm.PoiFilter;
+import net.osmand.osm.PoiType;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.SearchSettings;
 import net.osmand.server.controllers.pub.RoutingController;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -123,7 +129,7 @@ public class OsmAndMapsService {
 	@Autowired
 	RoutingServerConfig routingConfig;
 
-	private OsmandRegions osmandRegions;
+	OsmandRegions osmandRegions;
 
 
 	public static class BinaryMapIndexReaderReference {

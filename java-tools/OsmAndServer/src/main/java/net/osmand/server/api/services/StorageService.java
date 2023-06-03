@@ -209,9 +209,13 @@ public class StorageService {
 			for (String id : storage.split(",")) {
 				StorageType st = getStorageProviderById(id);
 				if (st != null && !st.local) {
-//					LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename)); // TODO fix
-					S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
-					return obj.getObjectContent();
+					try {
+						S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
+						return obj.getObjectContent();
+					} catch (RuntimeException e) {
+						LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename)); 
+						throw e;
+					}
 				}
 			}
 		}
