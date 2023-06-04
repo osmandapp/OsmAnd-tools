@@ -67,13 +67,6 @@ public class RoutingController {
 	Gson gson = new Gson();
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
-
-	private ResponseEntity<?> errorConfig() {
-		VectorTileServerConfig config = osmAndMapsService.getConfig();
-		return ResponseEntity.badRequest()
-				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
-	}
-	
 	
 	public static class FeatureCollection {
 		public String type = "FeatureCollection";
@@ -238,7 +231,7 @@ public class RoutingController {
 	@RequestMapping(path = "/geocoding", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> geocoding(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			return errorConfig();
+			return osmAndMapsService.errorConfig();
 		}
 		try {
 			List<GeocodingResult> lst = osmAndMapsService.geocoding(lat, lon);
@@ -256,63 +249,13 @@ public class RoutingController {
 		}
 	}
 	
-	
-	@RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> search(@RequestParam double lat, @RequestParam double lon, @RequestParam String search) throws IOException, InterruptedException {
-		if (!osmAndMapsService.validateAndInitConfig()) {
-			return errorConfig();
-		}
-		try {
-			List<SearchResult> res = osmAndMapsService.search(lat, lon, search);
-			List<Feature> features = new ArrayList<>();
-			int pos = 0;
-			int posLoc = 0;
-			for (SearchResult sr : res) {
-				pos++;
-				if (sr.location != null) {
-					posLoc++;
-					double loc = MapUtils.getDistance(sr.location, lat, lon) / 1000.0;
-					String typeString = "";
-					if (!Algorithms.isEmpty(sr.localeRelatedObjectName)) {
-						typeString += " " + sr.localeRelatedObjectName;
-						if (sr.distRelatedObjectName != 0) {
-							typeString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
-						}
-					}
-					if (sr.objectType == ObjectType.HOUSE) {
-						if (sr.relatedObject instanceof Street) {
-							typeString += " " + ((Street) sr.relatedObject).getCity().getName();
-						}
-					}
-					if (sr.objectType == ObjectType.LOCATION) {
-						typeString += " " + osmAndMapsService.getOsmandRegions().getCountryName(sr.location);
-					}
-					if (sr.object instanceof Amenity) {
-						typeString += " " + ((Amenity) sr.object).getSubType();
-						if (((Amenity) sr.object).isClosed()) {
-							typeString += " (CLOSED)";
-						}
-					}
-					String r = String.format("%d. %s %s [%.2f km, %d, %s, %.2f] ", pos, sr.localeName, typeString, loc,
-							sr.getFoundWordCount(), sr.objectType, sr.getUnknownPhraseMatchWeight());
-					features.add(new Feature(Geometry.point(sr.location)).prop("description", r).
-							prop("index", pos).prop("locindex", posLoc).prop("distance", loc).prop("type", sr.objectType));
-				}
-			}
-			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
-		} catch (IOException | InterruptedException | RuntimeException e) {
-			LOGGER.error(e.getMessage(), e);
-			throw e;
-		}
-	}
-	
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routing(@RequestParam String[] points,
 	                                 @RequestParam(defaultValue = "car") String routeMode,
 	                                 @RequestParam(required = false) String[] avoidRoads,
 	                                 @RequestParam int maxDist) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			return errorConfig();
+			return osmAndMapsService.errorConfig();
 		}
 		List<LatLon> list = new ArrayList<>();
 		double lat = 0;

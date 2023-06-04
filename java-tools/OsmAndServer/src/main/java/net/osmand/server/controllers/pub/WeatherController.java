@@ -39,10 +39,15 @@ public class WeatherController {
 	@Value("${osmand.weather.tiff-location}")
 	String tiffLocation;
 	
+	@Value("${osmand.weather.ecmwf-tiff-location}")
+	String ecmwfTiffLocation;
+	
 	@RequestMapping(path = "/point-info", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routing(@RequestParam(required = true) double lat, @RequestParam(required = true) double lon, 
-			@RequestParam(defaultValue = "false") boolean week) {
-		File folder = new File(tiffLocation);
+	public ResponseEntity<?> getWeatherForecast(@RequestParam double lat,
+	                                            @RequestParam double lon,
+	                                            @RequestParam String weatherType,
+	                                            @RequestParam(defaultValue = "false") boolean week) {
+		File folder = new File(getWeatherLocation(weatherType));
 		List<Object[]> dt = new ArrayList<>();
 		int increment = 1;
 		if (folder.exists()) {
@@ -77,7 +82,14 @@ public class WeatherController {
 		}
 		return ResponseEntity.ok(gson.toJson(dt));
 	}
-
-
+	
+	private String getWeatherLocation(String type) {
+		if (type.equals("gfs")) {
+			return tiffLocation;
+		} else if (type.equals("ecmwf")) {
+			return ecmwfTiffLocation;
+		}
+		return "";
+	}
 
 }

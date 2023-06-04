@@ -14,16 +14,8 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
@@ -32,7 +24,17 @@ import java.util.zip.ZipInputStream;
 import javax.imageio.ImageIO;
 
 import net.osmand.IndexConstants;
+import net.osmand.data.Amenity;
 import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiCategory;
+import net.osmand.osm.PoiFilter;
+import net.osmand.osm.PoiType;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.SearchSettings;
+import net.osmand.server.controllers.pub.RoutingController;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,7 +70,6 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXUtilities.TrkSegment;
 import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
-import net.osmand.osm.MapPoiTypes;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter.GeneralRouterProfile;
@@ -86,9 +87,6 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.SearchUICore.SearchResultCollection;
-import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.MapsCollection;
@@ -109,6 +107,8 @@ public class OsmAndMapsService {
 	
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final double SEARCH_RADIUS_DEGREE = 1.5;
+	private static final int TOTAL_LIMIT_POI = 400;
+	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 7;
 	private static final String SEARCH_LOCALE = "en";
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -746,7 +746,7 @@ public class OsmAndMapsService {
 		}
 	}
 
-	private QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
+	public QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
 		QuadRect upd = null;
 		upd = addPnt(start, upd);
 		upd = addPnt(end, upd);
@@ -870,6 +870,12 @@ public class OsmAndMapsService {
 		}
 	}
 	
+	public ResponseEntity<?> errorConfig() {
+		VectorTileServerConfig config = getConfig();
+		return ResponseEntity.badRequest()
+				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
+	}
+	
 	public OsmandRegions getOsmandRegions() {
 		return osmandRegions;
 	}
@@ -891,5 +897,152 @@ public class OsmAndMapsService {
 		}
 		
 		return targetObf;
+	}
+	
+	public Map<String, List<String>> searchPoiCategories() {
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+		List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
+		Map<String, List<String>> res = new HashMap<>();
+		categoriesList.forEach(poiCategory -> {
+			String category = poiCategory.getKeyName();
+			List<PoiType> poiTypes = poiCategory.getPoiTypes();
+			List<String> typesNames = new ArrayList<>();
+			poiTypes.forEach(type -> typesNames.add(type.getOsmValue()));
+			res.put(category, typesNames);
+			
+		});
+		return res;
+	}
+	
+	public List<String> getTopFilters() {
+		List<String> filters = new ArrayList<>();
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
+		searchUICore.getPoiTypes().getTopVisibleFilters().forEach(f -> filters.add(f.getKeyName()));
+		return filters;
+	}
+	
+	
+	public Map<String, Map<String, String>> searchPoiCategories(String search) throws IOException {
+		Map<String, Map<String, String>> searchRes = new HashMap<>();
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
+		searchUICore.init();
+		List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
+				.getCurrentSearchResults();
+		results.forEach(res -> searchRes.put(res.localeName, getTags(res.object)));
+		return searchRes;
+	}
+	
+	private Map<String, String> getTags(Object obj) {
+		final String KEY_NAME = "keyName";
+		final String OSM_TAG = "osmTag";
+		final String OSM_VALUE = "osmValue";
+		final String ICON_NAME = "iconName";
+		Map<String, String> tags = new HashMap<>();
+		if (obj instanceof PoiType) {
+			PoiType type = (PoiType) obj;
+			tags.put(KEY_NAME, type.getKeyName());
+			tags.put(OSM_TAG, type.getOsmTag());
+			tags.put(OSM_VALUE, type.getOsmValue());
+			tags.put(ICON_NAME, type.getIconKeyName());
+		} else if (obj instanceof PoiCategory) {
+			PoiCategory type = (PoiCategory) obj;
+			tags.put(KEY_NAME, type.getKeyName());
+			tags.put(ICON_NAME, type.getIconKeyName());
+		} else if (obj instanceof PoiFilter) {
+			PoiFilter type = (PoiFilter) obj;
+			tags.put(KEY_NAME, type.getKeyName());
+		}
+		return tags;
+	}
+	
+	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, List<String> categories, QuadRect searchBbox, int zoom) throws IOException {
+		List<RoutingController.Feature> features = new ArrayList<>();
+		int leftoverLimit = 0;
+		int limit = TOTAL_LIMIT_POI/categories.size();
+		for (String category : categories) {
+			List<SearchResult> res = searchPoiByCategory(lat, lon, category,searchBbox, limit + leftoverLimit, zoom);
+			if (!res.isEmpty()) {
+				leftoverLimit = limit - res.size();
+				prepareSearchResult(res, features);
+			}
+		}
+		if (!features.isEmpty()) {
+			return new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0]));
+		} else {
+			return null;
+		}
+	}
+	
+	private void prepareSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) {
+		for (SearchResult result : res) {
+			if (result.objectType == ObjectType.POI) {
+				Amenity amenity = (Amenity) result.object;
+				PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+				RoutingController.Feature feature;
+				if (poiType != null) {
+					feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
+							.prop("name", amenity.getName())
+							.prop("color", amenity.getColor())
+							.prop("iconKeyName", poiType.getIconKeyName())
+							.prop("typeOsmTag", poiType.getOsmTag())
+							.prop("typeOsmValue", poiType.getOsmValue())
+							.prop("iconName", getIconName(poiType))
+							.prop("type", amenity.getType().getKeyName())
+							.prop("subType", amenity.getSubType());
+					
+					for (String e : amenity.getAdditionalInfoKeys()) {
+						feature.prop(e, amenity.getAdditionalInfo(e));
+					}
+					features.add(feature);
+				}
+			}
+		}
+	}
+	
+	public synchronized List<SearchResult> searchPoiByCategory(double lat, double lon, String text, QuadRect searchBbox, int limit, int zoom) throws IOException {
+		if (!validateAndInitConfig()) {
+			return null;
+		}
+		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+		searchUICore.getSearchSettings().setRegions(osmandRegions);
+		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(searchBbox));
+		searchUICore.getSearchSettings().setOfflineIndexes(list);
+		searchUICore.init();
+		searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
+		SearchSettings settings = searchUICore.getPhrase().getSettings();
+		if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
+			searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+		} else {
+			searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
+		}
+		searchUICore.setTotalLimit(limit);
+		SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
+		return r.getCurrentSearchResults();
+	}
+	
+	public QuadRect getSearchBbox(Map<String, Object> data, int zoom, double lat, double lon) {
+		LatLon point1;
+		LatLon point2;
+		if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
+			point1 = new LatLon((double) data.get("latBboxPoint1"), (double) data.get("lngBboxPoint1"));
+			point2 = new LatLon((double) data.get("latBboxPoint2"), (double) data.get("lngBboxPoint2"));
+		} else {
+			point1 = new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE);
+			point2 = new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE);
+		}
+		return points(null, point1, point2);
+	}
+	
+	private String getIconName(PoiType poiType) {
+		if (poiType != null) {
+			if (poiType.getParentType() != null) {
+				return poiType.getParentType().getIconKeyName();
+			} else if (poiType.getFilter() != null) {
+				return poiType.getFilter().getIconKeyName();
+			} else if (poiType.getCategory() != null) {
+				return poiType.getCategory().getIconKeyName();
+			}
+		}
+		return null;
 	}
 }
