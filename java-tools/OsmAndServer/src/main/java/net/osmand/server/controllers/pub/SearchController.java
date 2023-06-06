@@ -89,9 +89,9 @@ public class SearchController {
                                             @RequestParam int zoom) throws IOException {
         List<String> categories = (List<String>) data.get("categories");
         QuadRect searchBbox = osmAndMapsService.getSearchBbox(data, zoom,lat, lon);
-        RoutingController.FeatureCollection collection = osmAndMapsService.searchPoi(lat, lon, categories, searchBbox, zoom);
-        if (collection != null) {
-            return ResponseEntity.ok(gson.toJson(collection));
+        OsmAndMapsService.PoiSearchResult poiSearchResult = osmAndMapsService.searchPoi(lat, lon, categories, searchBbox, zoom);
+        if (poiSearchResult != null) {
+            return ResponseEntity.ok(gson.toJson(poiSearchResult));
         } else {
             return ResponseEntity.badRequest().body("Error search poi!");
         }
