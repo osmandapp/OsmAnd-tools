@@ -618,7 +618,7 @@ public class UserdataService {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-				if (filterTypes != null && (!filterTypes.contains(sf.type.toUpperCase()) || isFileTypeByName(filterTypes, sf))) {
+				if (filterTypes != null && (!filterTypes.contains(sf.type.toUpperCase()) && !isFileTypeByName(filterTypes, sf))) {
 					continue;
 				}
 				if (fileIds.add(fileId)) {
