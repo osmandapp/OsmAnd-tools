@@ -73,9 +73,9 @@ public class WikiDatabasePreparation {
 
 	private static final Set<String> unitsOfDistance = new HashSet<>(Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi", "m2"));
 	public static final String WIKI_SQLITE = "wiki.sqlite";
-	public static final String OSM_WIKI = "osm_wiki.osm.gz";
-	public static final String WIKIDATA_ARTICLES = "wikidatawiki-latest-pages-articles.xml.gz";
-	public static final String WIKI_ARTICLES = "wiki-latest-pages-articles.xml.gz";
+	public static final String OSM_WIKI_GZ = "osm_wiki.osm.gz";
+	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
+	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 
 	public static class LatLon {
 		private final double longitude;
@@ -745,7 +745,7 @@ public class WikiDatabasePreparation {
 		}
 
 		final String sqliteFileName = folder + WIKI_SQLITE;
-		final String pathToWikiData = folder + WIKIDATA_ARTICLES;
+		final String pathToWikiData = folder + WIKIDATA_ARTICLES_GZ;
 
 		switch (mode) {
 			case "process-wikidata-regions":
@@ -845,12 +845,12 @@ public class WikiDatabasePreparation {
 
 		final String wikiFile;
 		if (processWikidata) {
-			wikiFile = wikiFolder + WIKIDATA_ARTICLES;
+			wikiFile = wikiFolder + WIKIDATA_ARTICLES_GZ;
 		} else {
-			wikiFile = wikiFolder + lang + WIKI_ARTICLES;
+			wikiFile = wikiFolder + lang + WIKI_ARTICLES_GZ;
 		}
 		final String sqliteFileName = wikiFolder + WIKI_SQLITE;
-		final String pathToWikiOsm = wikiFolder + OSM_WIKI;
+		final String pathToWikiOsm = wikiFolder + OSM_WIKI_GZ;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
@@ -973,9 +973,6 @@ public class WikiDatabasePreparation {
 				page = name.equals("page");
 			} else {
 				if (name.equals("title")) {
-					if("ხიხანის ციხე".contentEquals(title)){
-						System.out.println("title");
-					}
 					title.setLength(0);
 					ctext = title;
 				} else if (name.equals("text")) {
@@ -986,9 +983,6 @@ public class WikiDatabasePreparation {
 				} else if (name.equals("id") && !revision) {
 					pageId.setLength(0);
 					ctext = pageId;
-					if("15296".contentEquals(pageId)){
-						System.out.println("15296");
-					}
 				}
 			}
 		}
@@ -1017,9 +1011,6 @@ public class WikiDatabasePreparation {
 					} else if (name.equals("id") && !revision) {
 						ctext = null;
 						cid = Long.parseLong(pageId.toString());
-						if(cid == 15296){
-							System.out.println("15296");
-						}
 					} else if (name.equals("text")) {
 						boolean isJunk = false;
 						long wikiId = 0;

@@ -6,7 +6,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import javax.xml.parsers.SAXParser;
 
@@ -22,7 +21,6 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
 
 public class WikiDataHandler extends DefaultHandler {
 
@@ -55,7 +53,7 @@ public class WikiDataHandler extends DefaultHandler {
 	private Gson gson;
 
 	private OsmandRegions regions;
-	private List<String> keyNames = new ArrayList<String>();
+	private List<String> keyNames = new ArrayList<>();
 	OsmWikiMap wikiOsmCoordinates;
 
 
@@ -76,7 +74,6 @@ public class WikiDataHandler extends DefaultHandler {
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
 		wikiOsmCoordinates = new OsmWikiMap();
 		wikiOsmCoordinates.parse(wikiOsm);
-		Map<String, LatLon> map = wikiOsmCoordinates.map;
 	}
 
     public void addBatch(PreparedStatement prep, int[] bt) throws SQLException {
@@ -154,11 +151,10 @@ public class WikiDataHandler extends DefaultHandler {
 					}
 					try {
 						ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
-						List<ArticleSiteLink> articleSiteLinks = getArticleSiteLinks(article);
-						for (ArticleSiteLink siteLink : articleSiteLinks) {
+						for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 							String articleTitle = siteLink.title;
 							String articleLang = siteLink.lang;
-							LatLon osmCoordinates = wikiOsmCoordinates.getCoordinates(title.toString() , articleLang , articleTitle);
+							LatLon osmCoordinates = wikiOsmCoordinates.getCoordinates(title.toString(), articleLang, articleTitle);
 							if (osmCoordinates != null) {
 								article.setLat(osmCoordinates.getLatitude());
 								article.setLon(osmCoordinates.getLongitude());
@@ -189,7 +185,7 @@ public class WikiDataHandler extends DefaultHandler {
 								wikiRegionPrep.setString(2, reg);
 								addBatch(wikiRegionPrep, regionBatch);
 							}
-							for (ArticleSiteLink siteLink : articleSiteLinks) {
+							for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 								mappingPrep.setLong(1, id);
 								mappingPrep.setString(2, siteLink.lang);
 								mappingPrep.setString(3, siteLink.title);
@@ -209,31 +205,6 @@ public class WikiDataHandler extends DefaultHandler {
 					break;
 			}
 		}
-	}
-
-	static class ArticleSiteLink {
-		String lang;
-		String title;
-
-		public ArticleSiteLink(String lang, String title) {
-			this.lang = lang;
-			this.title = title;
-		}
-	}
-
-	private List<ArticleSiteLink> getArticleSiteLinks(ArticleMapper.Article article) {
-		List<ArticleSiteLink> articleSiteLinks = new ArrayList<>();
-		if(article.getLinks() != null) {
-			for (Map.Entry<String, JsonElement> entry : article.getLinks().entrySet()) {
-				String lang = entry.getKey().replace("wiki", "");
-				if (lang.equals("commons")) {
-					continue;
-				}
-				String title = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
-				articleSiteLinks.add(new ArticleSiteLink(lang, title));
-			}
-		}
-		return articleSiteLinks;
 	}
 }
 
