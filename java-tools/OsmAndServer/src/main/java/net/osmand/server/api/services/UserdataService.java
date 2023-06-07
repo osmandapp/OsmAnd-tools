@@ -20,6 +20,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -596,6 +597,13 @@ public class UserdataService {
         return dev;
     }
     
+    private boolean isFileTypeByName(Set<String> filterTypes, PremiumUserFilesRepository.UserFileNoData sf) {
+        Set<String> res = filterTypes.stream()
+                .map(String::toLowerCase)
+                .collect(Collectors.toSet());
+        return res.stream().anyMatch(type -> sf.name.startsWith(type) && sf.type.equals("FILE"));
+    }
+    
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted) throws IOException {
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
@@ -610,7 +618,7 @@ public class UserdataService {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-				if (filterTypes != null && !filterTypes.contains(sf.type.toUpperCase())) {
+				if (filterTypes != null && (!filterTypes.contains(sf.type.toUpperCase()) || isFileTypeByName(filterTypes, sf))) {
 					continue;
 				}
 				if (fileIds.add(fileId)) {

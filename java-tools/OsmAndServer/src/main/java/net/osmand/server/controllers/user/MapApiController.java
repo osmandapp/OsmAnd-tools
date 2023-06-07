@@ -245,7 +245,7 @@ public class MapApiController {
 	}
 	
 	private ResponseEntity<String> tokenNotValid() {
-	    return new ResponseEntity<String>("Unauthorized", HttpStatus.UNAUTHORIZED);
+	    return new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
 
 	}
 	
@@ -461,10 +461,10 @@ public class MapApiController {
 		}
 	}
 	
-	@GetMapping(value = "/download-backup")
+	@PostMapping(value = "/download-backup")
 	@ResponseBody
 	public void getFile(HttpServletResponse response,
-			@RequestParam(name = "updatetime", required = false) boolean includeDeleted) throws IOException, SQLException {
+			@RequestParam(name = "updatetime", required = false) boolean includeDeleted, @RequestBody List<String> data) throws IOException, SQLException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			ResponseEntity<String> error = tokenNotValid();
@@ -474,7 +474,8 @@ public class MapApiController {
 				return;
 			}
 		}
-		userdataService.getBackup(response, dev, null, includeDeleted);
+		Set<String> types = Set.copyOf(data);
+		userdataService.getBackup(response, dev, types, includeDeleted);
 	}
 	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
