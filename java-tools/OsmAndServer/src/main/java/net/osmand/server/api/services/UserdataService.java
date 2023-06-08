@@ -41,9 +41,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -597,17 +594,34 @@ public class UserdataService {
         return dev;
     }
     
-    private boolean isFileTypeByName(Set<String> filterTypes, PremiumUserFilesRepository.UserFileNoData sf) {
-        Set<String> res = filterTypes.stream()
-                .map(String::toLowerCase)
-                .collect(Collectors.toSet());
-        return res.stream().anyMatch(type -> sf.name.startsWith(type) && sf.type.equals("FILE"));
+    private boolean isSelectedType(Set<String> filterTypes, PremiumUserFilesRepository.UserFileNoData sf) {
+        final String FILE_TYPE = "FILE";
+        final String FILE_TYPE_MAPS = "FILE_MAPS";
+        final String FILE_TYPE_OTHER = "FILE_OTHER";
+        String currentFileType = sf.type.toUpperCase();
+        if (filterTypes.contains(currentFileType)) {
+            return true;
+        }
+        if (currentFileType.equals(FILE_TYPE)) {
+            List<String> fileTypes = filterTypes.stream()
+                    .filter(type -> type.startsWith(FILE_TYPE))
+                    .collect(Collectors.toList());
+            if (!fileTypes.isEmpty()) {
+                String currentFileSubType = sf.name.contains("/") ? sf.name.split("/")[0] : null;
+                if (currentFileSubType != null) {
+                    return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(type.split(FILE_TYPE + "_")[1]));
+                } else {
+                    return sf.name.endsWith(".obf") && fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
+                }
+            }
+        }
+        return false;
     }
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted) throws IOException {
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
-		Set<String> fileIds = new TreeSet<String>();
+		Set<String> fileIds = new TreeSet<>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
 		String fileName = "Export_" + formatter.format(new Date());
 		File tmpFile = File.createTempFile(fileName, ".zip");
@@ -618,7 +632,7 @@ public class UserdataService {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-				if (filterTypes != null && (!filterTypes.contains(sf.type.toUpperCase()) && !isFileTypeByName(filterTypes, sf))) {
+				if (filterTypes != null && !isSelectedType(filterTypes, sf)) {
 					continue;
 				}
 				if (fileIds.add(fileId)) {
