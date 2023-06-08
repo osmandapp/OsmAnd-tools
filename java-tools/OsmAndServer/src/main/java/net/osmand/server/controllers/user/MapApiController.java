@@ -456,7 +456,7 @@ public class MapApiController {
 	@PostMapping(value = "/download-backup")
 	@ResponseBody
 	public void createBackup(HttpServletResponse response,
-	                         @RequestParam(name = "updatetime") boolean includeDeleted,
+	                         @RequestParam(name = "updatetime", required = false) boolean includeDeleted,
 	                         @RequestBody List<String> data) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
