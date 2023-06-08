@@ -50,7 +50,7 @@ public class GpxService {
         GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
         gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
         gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
-        if (!gpxData.tracks.isEmpty() && analysis != null && !analysis.pointAttributesData.isEmpty()) {
+        if (!gpxData.tracks.isEmpty() && analysis != null && !analysis.getElevationData().getAttributes().isEmpty()) {
             webGpxParser.addDistance(gpxData.tracks, analysis);
         }
         return gpxData;
