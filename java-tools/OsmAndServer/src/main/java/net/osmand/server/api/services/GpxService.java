@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.PointAttribute;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
@@ -49,7 +50,7 @@ public class GpxService {
         GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
         gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
         gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
-        if (!gpxData.tracks.isEmpty() && analysis != null && !analysis.elevationData.isEmpty()) {
+        if (!gpxData.tracks.isEmpty() && analysis != null && !analysis.pointAttributesData.isEmpty()) {
             webGpxParser.addDistance(gpxData.tracks, analysis);
         }
         return gpxData;
@@ -176,11 +177,11 @@ public class GpxService {
         }
         cleanupFromNan(analysis.locationStart);
         cleanupFromNan(analysis.locationEnd);
-        Iterator<GPXUtilities.Speed> itS = analysis.speedData.iterator();
+        Iterator<PointAttribute.Speed> itS = analysis.getSpeedData().getAttributes().iterator();
         float sumDist = 0;
         while (itS.hasNext()) {
-            GPXUtilities.Speed sp = itS.next();
-            if (Float.isNaN(sp.speed)) {
+            PointAttribute.Speed sp = itS.next();
+            if (Float.isNaN(sp.value)) {
                 sumDist += sp.distance;
                 itS.remove();
             } else if (sumDist > 0) {
@@ -188,11 +189,11 @@ public class GpxService {
                 sumDist = 0;
             }
         }
-        Iterator<GPXUtilities.Elevation> itE = analysis.elevationData.iterator();
+        Iterator<PointAttribute.Elevation> itE = analysis.getElevationData().getAttributes().iterator();
         sumDist = 0;
         while (itE.hasNext()) {
-            GPXUtilities.Elevation e = itE.next();
-            if (Float.isNaN(e.elevation)) {
+            PointAttribute.Elevation e = itE.next();
+            if (Float.isNaN(e.value)) {
                 sumDist += e.distance;
                 itE.remove();
             } else if (sumDist > 0) {
