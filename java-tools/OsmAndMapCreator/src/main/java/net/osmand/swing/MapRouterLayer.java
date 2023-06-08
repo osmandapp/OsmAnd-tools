@@ -569,12 +569,12 @@ public class MapRouterLayer implements MapPanelLayer {
 		msg.append(String.format("Track: distance %.1f, distance no gaps %.1f, tracks %d, points %d\n", analysis.totalDistance,
 				analysis.totalDistanceWithoutGaps, analysis.totalTracks, analysis.wptPoints));
 		
-		if (analysis.hasElevationData) {
+		if (analysis.hasElevationData()) {
 			msg.append(String.format("Ele: min - %.1f, max - %.1f, avg - %.1f, uphill - %.1f, downhill - %.1f\n",
 					analysis.minElevation, analysis.maxElevation, analysis.avgElevation, analysis.diffElevationUp,
 					analysis.diffElevationDown));
 		}
-		if (analysis.hasSpeedData) {
+		if (analysis.hasSpeedData()) {
 			msg.append(String.format("Speed: min - %.1f, max - %.1f, avg - %.1f, dist+speed - %.1f, dist+speed no gaps - %.1f\n",
 					analysis.minSpeed, analysis.maxSpeed, analysis.avgSpeed,
 					analysis.totalDistanceMoving,analysis.totalDistanceMovingWithoutGaps));
