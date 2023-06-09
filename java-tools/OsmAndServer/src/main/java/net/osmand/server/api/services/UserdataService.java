@@ -3,13 +3,7 @@ package net.osmand.server.api.services;
 import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -109,7 +103,7 @@ public class UserdataService {
     private static final int ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID = 5 + ERROR_CODE_PREMIUM_USERS;
     //    private static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
-    private static final int BUFFER_SIZE = 1024 * 512;
+    public static final int BUFFER_SIZE = 1024 * 512;
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
     
@@ -651,7 +645,8 @@ public class UserdataService {
 				if (fileIds.add(fileId)) {
 					if (sf.filesize >= 0) {
                         itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
-						InputStream is = getInputStream(sf);
+                        ZipInputStream zin = new ZipInputStream(getInputStream(sf));
+                        InputStream is = convertZipInputStreamToInputStream(zin);
                         ZipEntry zipEntry;
                         if (format.equals(".zip")) {
                             zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
@@ -696,6 +691,16 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
+    
+    private InputStream convertZipInputStreamToInputStream(ZipInputStream in) throws IOException {
+        int count;
+        byte[] buf = new byte[BUFFER_SIZE];
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        while ((count = in.read(buf)) != -1) {
+            out.write(buf, 0, count);
+        }
+        return new ByteArrayInputStream(out.toByteArray());
+    }
     
     @Transactional
     public ResponseEntity<String> deleteAccount(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
