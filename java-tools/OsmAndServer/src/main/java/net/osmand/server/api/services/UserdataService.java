@@ -11,14 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
@@ -37,6 +30,9 @@ import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -618,6 +614,22 @@ public class UserdataService {
         return false;
     }
     
+    public String toJson(String type, String name) throws JSONException {
+        JSONObject json = new JSONObject();
+        json.put("type", type);
+        json.put("file", name);
+        return json.toString();
+    }
+    
+    protected JSONObject createItemsJson(JSONArray itemsJson) throws JSONException {
+        final int VERSION = 1;
+        
+        JSONObject json = new JSONObject();
+        json.put("version", VERSION);
+        json.put("items", itemsJson);
+        return json;
+    }
+    
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
@@ -629,6 +641,7 @@ public class UserdataService {
 		response.setHeader("Content-Type", "application/zip");
 		ZipOutputStream zs = null;
 		try {
+            JSONArray itemsJson = new JSONArray();
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
@@ -637,6 +650,7 @@ public class UserdataService {
 				}
 				if (fileIds.add(fileId)) {
 					if (sf.filesize >= 0) {
+                        itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
 						InputStream is = getInputStream(sf);
                         ZipEntry zipEntry;
                         if (format.equals(".zip")) {
@@ -657,6 +671,12 @@ public class UserdataService {
 					}
 				}
 			}
+            JSONObject json = createItemsJson(itemsJson);
+            ZipEntry zipEntry = new ZipEntry("items.json");
+            zs.putNextEntry(zipEntry);
+            InputStream is = new ByteArrayInputStream(json.toString().getBytes());
+            Algorithms.streamCopy(is, zs);
+            zs.closeEntry();
 			zs.flush();
 			zs.finish();
 			zs.close();
