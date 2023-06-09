@@ -645,7 +645,14 @@ public class UserdataService {
 				if (fileIds.add(fileId)) {
 					if (sf.filesize >= 0) {
                         itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
-                        ZipInputStream zin = new ZipInputStream(getInputStream(sf));
+                        InputStream s3is = getInputStream(sf);
+                        GZIPInputStream zin;
+                        if (s3is == null) {
+                            PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
+                            zin = new GZIPInputStream(getInputStream(dev, userFile));
+                        } else {
+                            zin = new GZIPInputStream(s3is);
+                        }
                         InputStream is = convertZipInputStreamToInputStream(zin);
                         ZipEntry zipEntry;
                         if (format.equals(".zip")) {
@@ -692,7 +699,7 @@ public class UserdataService {
 		}
 	}
     
-    private InputStream convertZipInputStreamToInputStream(ZipInputStream in) throws IOException {
+    private InputStream convertZipInputStreamToInputStream(GZIPInputStream in) throws IOException {
         int count;
         byte[] buf = new byte[BUFFER_SIZE];
         ByteArrayOutputStream out = new ByteArrayOutputStream();
