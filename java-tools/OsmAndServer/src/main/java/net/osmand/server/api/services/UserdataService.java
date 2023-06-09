@@ -619,13 +619,13 @@ public class UserdataService {
     }
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
-			Set<String> filterTypes, boolean includeDeleted) throws IOException {
+			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
 		Set<String> fileIds = new TreeSet<>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
 		String fileName = "Export_" + formatter.format(new Date());
 		File tmpFile = File.createTempFile(fileName, ".zip");
-		response.setHeader("Content-Disposition", "attachment; filename=" + fileName + ".zip");
+		response.setHeader("Content-Disposition", "attachment; filename=" + fileName + format);
 		response.setHeader("Content-Type", "application/zip");
 		ZipOutputStream zs = null;
 		try {
@@ -638,7 +638,16 @@ public class UserdataService {
 				if (fileIds.add(fileId)) {
 					if (sf.filesize >= 0) {
 						InputStream is = getInputStream(sf);
-						ZipEntry zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
+                        ZipEntry zipEntry;
+                        if (format.equals(".zip")) {
+                            zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
+                        } else {
+                            if (sf.type.equals("GPX")) {
+                                zipEntry = new ZipEntry("tracks" + File.separatorChar + sf.name);
+                            } else {
+                                zipEntry = new ZipEntry(sf.name);
+                            }
+                        }
 						zs.putNextEntry(zipEntry);
 						Algorithms.streamCopy(is, zs);
 						zs.closeEntry();

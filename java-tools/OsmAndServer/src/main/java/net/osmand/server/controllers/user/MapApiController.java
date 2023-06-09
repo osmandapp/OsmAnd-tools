@@ -457,6 +457,7 @@ public class MapApiController {
 	@ResponseBody
 	public void createBackup(HttpServletResponse response,
 	                         @RequestParam(name = "updatetime", required = false) boolean includeDeleted,
+	                         @RequestParam String format,
 	                         @RequestBody List<String> data) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
@@ -467,7 +468,7 @@ public class MapApiController {
 			}
 			return;
 		}
-		userdataService.getBackup(response, dev, Set.copyOf(data), includeDeleted);
+		userdataService.getBackup(response, dev, Set.copyOf(data), includeDeleted, format);
 	}
 	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
