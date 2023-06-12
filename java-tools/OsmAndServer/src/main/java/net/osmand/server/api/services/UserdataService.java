@@ -113,6 +113,8 @@ public class UserdataService {
     private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
     private static final String FILE_TYPE_SETTINGS = "SETTINGS";
+    private static final String FILE_TYPE_GPX = "GPX";
+    private static final String FILE_TYPE_FILE = "FILE";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
@@ -610,9 +612,27 @@ public class UserdataService {
     
     public String toJson(String type, String name) throws JSONException {
         JSONObject json = new JSONObject();
+        addName(json, type, name);
         json.put("type", type);
-        json.put("file", name);
+        addSubType(json, type, name);
+        
         return json.toString();
+    }
+    
+    private void addName(JSONObject json, String type, String name) {
+        if (type.equalsIgnoreCase(FILE_TYPE_GPX)) {
+            json.put("file", "tracks" + File.separatorChar + name);
+        } else {
+            json.put("file", name);
+        }
+    }
+    
+    private void addSubType(JSONObject json, String type, String name) {
+        if (type.equalsIgnoreCase(FILE_TYPE_FILE) && name.endsWith(".obf")) {
+            json.put("subtype", "obf_map");
+        } else if (type.equalsIgnoreCase(FILE_TYPE_GPX)) {
+            json.put("subtype", "gpx");
+        }
     }
     
     protected JSONObject createItemsJson(JSONArray itemsJson) throws JSONException {
@@ -649,7 +669,11 @@ public class UserdataService {
                         InputStream is;
                         if (s3is == null) {
                             PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
-                            is = new GZIPInputStream(getInputStream(dev, userFile));
+                            if (userFile != null) {
+                                is = new GZIPInputStream(getInputStream(dev, userFile));
+                            } else {
+                                is = null;
+                            }
                         } else {
                             is = new GZIPInputStream(s3is);
                         }
@@ -657,14 +681,16 @@ public class UserdataService {
                         if (format.equals(".zip")) {
                             zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
                         } else {
-                            if (sf.type.equals("GPX")) {
+                            if (sf.type.equalsIgnoreCase(FILE_TYPE_GPX)) {
                                 zipEntry = new ZipEntry("tracks" + File.separatorChar + sf.name);
                             } else {
                                 zipEntry = new ZipEntry(sf.name);
                             }
                         }
 						zs.putNextEntry(zipEntry);
-						Algorithms.streamCopy(is, zs);
+                        if (is != null) {
+                            Algorithms.streamCopy(is, zs);
+                        }
 						zs.closeEntry();
 					} else if (includeDeleted) {
 						// include last version of deleted files
