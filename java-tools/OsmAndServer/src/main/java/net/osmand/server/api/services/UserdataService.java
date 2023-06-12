@@ -600,6 +600,7 @@ public class UserdataService {
                     .collect(Collectors.toList());
             if (!fileTypes.isEmpty()) {
                 String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
+                LOG.warn(currentFileSubType);
                 if (!currentFileSubType.equals("")) {
                     return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(type.split(FILE_TYPE + "_")[1]));
                 } else {
@@ -661,15 +662,20 @@ public class UserdataService {
                         itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
                         InputStream s3is = getInputStream(sf);
                         InputStream is;
-                        if (s3is == null) {
-                            PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
-                            if (userFile != null) {
-                                is = new GZIPInputStream(getInputStream(dev, userFile));
-                            } else {
-                                is = null;
-                            }
+                        ServerCommonFile scf = checkThatObfFileisOnServer(sf.name, sf.type);
+                        if (scf != null) {
+                            is = new GZIPInputStream(scf.getInputStream());
                         } else {
-                            is = new GZIPInputStream(s3is);
+                            if (s3is == null) {
+                                PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
+                                if (userFile != null) {
+                                    is = new GZIPInputStream(getInputStream(dev, userFile));
+                                } else {
+                                    is = null;
+                                }
+                            } else {
+                                is = new GZIPInputStream(s3is);
+                            }
                         }
                         ZipEntry zipEntry;
                         if (format.equals(".zip")) {
