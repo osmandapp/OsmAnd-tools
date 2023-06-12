@@ -599,11 +599,11 @@ public class UserdataService {
                     .filter(type -> type.startsWith(FILE_TYPE))
                     .collect(Collectors.toList());
             if (!fileTypes.isEmpty()) {
-                String currentFileSubType = sf.name.contains("/") ? sf.name.split("/")[0] : null;
-                if (currentFileSubType != null) {
+                String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder();
+                if (!currentFileSubType.equals("")) {
                     return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(type.split(FILE_TYPE + "_")[1]));
                 } else {
-                    return sf.name.endsWith(".obf") && fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
+                    return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
                 }
             }
         }
@@ -614,7 +614,7 @@ public class UserdataService {
         JSONObject json = new JSONObject();
         addName(json, type, name);
         json.put("type", type);
-        addSubType(json, type, name);
+        json.put("subtype", FileSubtype.getSubtypeByFileName(name));
         
         return json.toString();
     }
@@ -627,22 +627,16 @@ public class UserdataService {
         }
     }
     
-    private void addSubType(JSONObject json, String type, String name) {
-        if (type.equalsIgnoreCase(FILE_TYPE_FILE) && name.endsWith(".obf")) {
-            json.put("subtype", "obf_map");
-        } else if (type.equalsIgnoreCase(FILE_TYPE_GPX)) {
-            json.put("subtype", "gpx");
-        }
-    }
-    
     protected JSONObject createItemsJson(JSONArray itemsJson) throws JSONException {
         final int VERSION = 1;
         
         JSONObject json = new JSONObject();
         json.put("version", VERSION);
         json.put("items", itemsJson);
+        
         return json;
     }
+    
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
