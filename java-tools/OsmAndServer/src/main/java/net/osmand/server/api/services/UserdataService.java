@@ -664,9 +664,14 @@ public class UserdataService {
                         InputStream is;
                         ServerCommonFile scf = checkThatObfFileisOnServer(sf.name, sf.type);
                         if (scf != null) {
+                            if (scf.url != null) {
+                                is = scf.url.openStream();
+                            } else if (scf.file != null) {
+                                is = getGzipInputStreamFromFile(scf.file, ".obf");
+                            } else {
+                                is = null;
+                            }
                             LOG.warn(scf.file.getName());
-                            LOG.warn(scf.url);
-                            is = scf.getInputStream();
                         } else {
                             if (s3is == null) {
                                 PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
