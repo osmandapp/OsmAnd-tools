@@ -3,23 +3,11 @@ package net.osmand.server.api.services;
 import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -34,15 +22,16 @@ import javax.transaction.Transactional;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -115,7 +104,7 @@ public class UserdataService {
     private static final int ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID = 5 + ERROR_CODE_PREMIUM_USERS;
     //    private static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
-    private static final int BUFFER_SIZE = 1024 * 512;
+    public static final int BUFFER_SIZE = 1024 * 512;
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
     
@@ -125,6 +114,8 @@ public class UserdataService {
     private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
     private static final String FILE_TYPE_SETTINGS = "SETTINGS";
+    private static final String FILE_TYPE_GPX = "GPX";
+    private static final String FILE_TYPE_FILE = "FILE";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
@@ -596,29 +587,105 @@ public class UserdataService {
         return dev;
     }
     
+    private boolean isSelectedType(Set<String> filterTypes, PremiumUserFilesRepository.UserFileNoData sf) {
+        final String FILE_TYPE = "FILE";
+        final String FILE_TYPE_MAPS = "FILE_MAPS";
+        final String FILE_TYPE_OTHER = "FILE_OTHER";
+        String currentFileType = sf.type.toUpperCase();
+        if (filterTypes.contains(currentFileType)) {
+            return true;
+        }
+        if (currentFileType.equals(FILE_TYPE)) {
+            List<String> fileTypes = filterTypes.stream()
+                    .filter(type -> type.startsWith(FILE_TYPE))
+                    .collect(Collectors.toList());
+            if (!fileTypes.isEmpty()) {
+                String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
+                if (!currentFileSubType.equals("")) {
+                    return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_")));
+                } else {
+                    return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
+                }
+            }
+        }
+        return false;
+    }
+    
+    public String toJson(String type, String name) throws JSONException {
+        JSONObject json = new JSONObject();
+        name = addName(json, type, name);
+        json.put("type", type);
+        json.put("subtype", FileSubtype.getSubtypeByFileName(name).getSubtypeName());
+        
+        return json.toString();
+    }
+    
+    private String addName(JSONObject json, String type, String name) {
+        if (type.equalsIgnoreCase(FILE_TYPE_GPX)) {
+            name = "tracks" + File.separatorChar + name;
+        }
+        json.put("file", name);
+        return name;
+    }
+    
+    protected JSONObject createItemsJson(JSONArray itemsJson) throws JSONException {
+        final int VERSION = 1;
+        
+        JSONObject json = new JSONObject();
+        json.put("version", VERSION);
+        json.put("items", itemsJson);
+        
+        return json;
+    }
+    
+    
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
-			Set<String> filterTypes, boolean includeDeleted) throws IOException {
+			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
-		Set<String> fileIds = new TreeSet<String>();
+		Set<String> fileIds = new TreeSet<>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
 		String fileName = "Export_" + formatter.format(new Date());
 		File tmpFile = File.createTempFile(fileName, ".zip");
-		response.setHeader("Content-Disposition", "attachment; filename=" + fileName + ".zip");
+		response.setHeader("Content-Disposition", "attachment; filename=" + fileName + format);
 		response.setHeader("Content-Type", "application/zip");
 		ZipOutputStream zs = null;
 		try {
+            JSONArray itemsJson = new JSONArray();
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-				if (filterTypes != null && !filterTypes.contains(sf.type.toUpperCase())) {
+				if (filterTypes != null && !isSelectedType(filterTypes, sf)) {
 					continue;
 				}
 				if (fileIds.add(fileId)) {
 					if (sf.filesize >= 0) {
-						InputStream is = getInputStream(sf);
-						ZipEntry zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
+                        itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
+                        InputStream s3is = getInputStream(sf);
+                        InputStream is;
+                        if (s3is == null) {
+                            PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
+                            if (userFile != null) {
+                                is = new GZIPInputStream(getInputStream(dev, userFile));
+                            } else {
+                                is = null;
+                            }
+                        } else {
+                            is = new GZIPInputStream(s3is);
+                        }
+                        ZipEntry zipEntry;
+                        if (format.equals(".zip")) {
+                            zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
+                        } else {
+                            if (sf.type.equalsIgnoreCase(FILE_TYPE_GPX)) {
+                                zipEntry = new ZipEntry("tracks" + File.separatorChar + sf.name);
+                            } else {
+                                zipEntry = new ZipEntry(sf.name);
+                            }
+                        }
 						zs.putNextEntry(zipEntry);
-						Algorithms.streamCopy(is, zs);
+                        if (is != null) {
+                            Algorithms.streamCopy(is, zs);
+                        }
 						zs.closeEntry();
 					} else if (includeDeleted) {
 						// include last version of deleted files
@@ -626,6 +693,12 @@ public class UserdataService {
 					}
 				}
 			}
+            JSONObject json = createItemsJson(itemsJson);
+            ZipEntry zipEntry = new ZipEntry("items.json");
+            zs.putNextEntry(zipEntry);
+            InputStream is = new ByteArrayInputStream(json.toString().getBytes());
+            Algorithms.streamCopy(is, zs);
+            zs.closeEntry();
 			zs.flush();
 			zs.finish();
 			zs.close();
@@ -645,6 +718,7 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
+    
     
     @Transactional
     public ResponseEntity<String> deleteAccount(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {

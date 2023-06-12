@@ -15,17 +15,12 @@ import java.util.zip.GZIPInputStream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
-import javax.xml.stream.FactoryConfigurationError;
-import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.JsonParser;
-import net.osmand.IndexConstants;
 import net.osmand.map.OsmandRegions;
-import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
@@ -33,7 +28,6 @@ import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
-import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.util.Algorithms;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
@@ -77,8 +71,6 @@ import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
-
-import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 @Controller
 @RequestMapping("/mapapi")
@@ -245,7 +237,7 @@ public class MapApiController {
 	}
 	
 	private ResponseEntity<String> tokenNotValid() {
-	    return new ResponseEntity<String>("Unauthorized", HttpStatus.UNAUTHORIZED);
+	    return new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
 
 	}
 	
@@ -461,20 +453,22 @@ public class MapApiController {
 		}
 	}
 	
-	@GetMapping(value = "/download-backup")
+	@PostMapping(value = "/download-backup")
 	@ResponseBody
-	public void getFile(HttpServletResponse response,
-			@RequestParam(name = "updatetime", required = false) boolean includeDeleted) throws IOException, SQLException {
+	public void createBackup(HttpServletResponse response,
+	                         @RequestParam(name = "updatetime", required = false) boolean includeDeleted,
+	                         @RequestParam String format,
+	                         @RequestBody List<String> data) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			ResponseEntity<String> error = tokenNotValid();
-			if (error != null) {
-				response.setStatus(error.getStatusCodeValue());
+			response.setStatus(error.getStatusCodeValue());
+			if (error.getBody() != null) {
 				response.getWriter().write(error.getBody());
-				return;
 			}
+			return;
 		}
-		userdataService.getBackup(response, dev, null, includeDeleted);
+		userdataService.getBackup(response, dev, Set.copyOf(data), includeDeleted, format);
 	}
 	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
