@@ -662,27 +662,15 @@ public class UserdataService {
                         itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
                         InputStream s3is = getInputStream(sf);
                         InputStream is;
-                        ServerCommonFile scf = checkThatObfFileisOnServer(sf.name, sf.type);
-                        if (scf != null) {
-                            if (scf.url != null) {
-                                is = scf.url.openStream();
-                            } else if (scf.file != null) {
-                                is = getGzipInputStreamFromFile(scf.file, ".obf");
+                        if (s3is == null) {
+                            PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
+                            if (userFile != null) {
+                                is = new GZIPInputStream(getInputStream(dev, userFile));
                             } else {
                                 is = null;
                             }
-                            LOG.warn(scf.file.getName());
                         } else {
-                            if (s3is == null) {
-                                PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
-                                if (userFile != null) {
-                                    is = new GZIPInputStream(getInputStream(dev, userFile));
-                                } else {
-                                    is = null;
-                                }
-                            } else {
-                                is = new GZIPInputStream(s3is);
-                            }
+                            is = new GZIPInputStream(s3is);
                         }
                         ZipEntry zipEntry;
                         if (format.equals(".zip")) {
@@ -705,13 +693,11 @@ public class UserdataService {
 					}
 				}
 			}
-            LOG.warn("Stop files");
             JSONObject json = createItemsJson(itemsJson);
             ZipEntry zipEntry = new ZipEntry("items.json");
             zs.putNextEntry(zipEntry);
             InputStream is = new ByteArrayInputStream(json.toString().getBytes());
             Algorithms.streamCopy(is, zs);
-            LOG.warn("Stop items.json");
             zs.closeEntry();
 			zs.flush();
 			zs.finish();
@@ -721,7 +707,6 @@ public class UserdataService {
 			try {
 				OutputStream ous = response.getOutputStream();
 				Algorithms.streamCopy(fis, ous);
-                LOG.warn("End");
 				ous.close();
 			} finally {
 				fis.close();
