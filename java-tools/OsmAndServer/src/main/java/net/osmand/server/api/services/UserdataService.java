@@ -22,6 +22,7 @@ import javax.transaction.Transactional;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -602,7 +603,10 @@ public class UserdataService {
                 String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
                 LOG.warn(currentFileSubType);
                 if (!currentFileSubType.equals("")) {
-                    return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(type.split(FILE_TYPE + "_")[1]));
+                    return fileTypes.stream().anyMatch(type -> {
+                        LOG.warn(type.split(FILE_TYPE + "_")[1]);
+                        return currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_"));
+                    });
                 } else {
                     return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
                 }
@@ -664,7 +668,7 @@ public class UserdataService {
                         InputStream is;
                         ServerCommonFile scf = checkThatObfFileisOnServer(sf.name, sf.type);
                         if (scf != null) {
-                            is = new GZIPInputStream(scf.getInputStream());
+                            is = scf.getInputStream();
                         } else {
                             if (s3is == null) {
                                 PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
