@@ -705,11 +705,13 @@ public class UserdataService {
 					}
 				}
 			}
+            LOG.warn("Stop files");
             JSONObject json = createItemsJson(itemsJson);
             ZipEntry zipEntry = new ZipEntry("items.json");
             zs.putNextEntry(zipEntry);
             InputStream is = new ByteArrayInputStream(json.toString().getBytes());
             Algorithms.streamCopy(is, zs);
+            LOG.warn("Stop items.json");
             zs.closeEntry();
 			zs.flush();
 			zs.finish();
@@ -719,6 +721,7 @@ public class UserdataService {
 			try {
 				OutputStream ous = response.getOutputStream();
 				Algorithms.streamCopy(fis, ous);
+                LOG.warn("End");
 				ous.close();
 			} finally {
 				fis.close();
