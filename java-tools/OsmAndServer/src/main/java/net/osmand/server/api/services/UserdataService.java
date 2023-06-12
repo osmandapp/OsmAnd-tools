@@ -646,14 +646,13 @@ public class UserdataService {
 					if (sf.filesize >= 0) {
                         itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
                         InputStream s3is = getInputStream(sf);
-                        GZIPInputStream zin;
+                        InputStream is;
                         if (s3is == null) {
                             PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
-                            zin = new GZIPInputStream(getInputStream(dev, userFile));
+                            is = new GZIPInputStream(getInputStream(dev, userFile));
                         } else {
-                            zin = new GZIPInputStream(s3is);
+                            is = new GZIPInputStream(s3is);
                         }
-                        InputStream is = convertZipInputStreamToInputStream(zin);
                         ZipEntry zipEntry;
                         if (format.equals(".zip")) {
                             zipEntry = new ZipEntry(sf.type + File.separatorChar + sf.name);
@@ -699,15 +698,6 @@ public class UserdataService {
 		}
 	}
     
-    private InputStream convertZipInputStreamToInputStream(GZIPInputStream in) throws IOException {
-        int count;
-        byte[] buf = new byte[BUFFER_SIZE];
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        while ((count = in.read(buf)) != -1) {
-            out.write(buf, 0, count);
-        }
-        return new ByteArrayInputStream(out.toByteArray());
-    }
     
     @Transactional
     public ResponseEntity<String> deleteAccount(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
