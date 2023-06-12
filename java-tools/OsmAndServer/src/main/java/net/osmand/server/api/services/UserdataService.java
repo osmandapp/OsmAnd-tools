@@ -599,7 +599,7 @@ public class UserdataService {
                     .filter(type -> type.startsWith(FILE_TYPE))
                     .collect(Collectors.toList());
             if (!fileTypes.isEmpty()) {
-                String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder();
+                String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
                 if (!currentFileSubType.equals("")) {
                     return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(type.split(FILE_TYPE + "_")[1]));
                 } else {
@@ -612,19 +612,19 @@ public class UserdataService {
     
     public String toJson(String type, String name) throws JSONException {
         JSONObject json = new JSONObject();
-        addName(json, type, name);
+        name = addName(json, type, name);
         json.put("type", type);
-        json.put("subtype", FileSubtype.getSubtypeByFileName(name));
+        json.put("subtype", FileSubtype.getSubtypeByFileName(name).getSubtypeName());
         
         return json.toString();
     }
     
-    private void addName(JSONObject json, String type, String name) {
+    private String addName(JSONObject json, String type, String name) {
         if (type.equalsIgnoreCase(FILE_TYPE_GPX)) {
-            json.put("file", "tracks" + File.separatorChar + name);
-        } else {
-            json.put("file", name);
+            name = "tracks" + File.separatorChar + name;
         }
+        json.put("file", name);
+        return name;
     }
     
     protected JSONObject createItemsJson(JSONArray itemsJson) throws JSONException {
