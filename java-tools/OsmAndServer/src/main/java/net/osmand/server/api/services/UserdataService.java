@@ -601,12 +601,8 @@ public class UserdataService {
                     .collect(Collectors.toList());
             if (!fileTypes.isEmpty()) {
                 String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
-                LOG.warn(currentFileSubType);
                 if (!currentFileSubType.equals("")) {
-                    return fileTypes.stream().anyMatch(type -> {
-                        LOG.warn(type.split(FILE_TYPE + "_")[1]);
-                        return currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_"));
-                    });
+                    return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_")));
                 } else {
                     return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
                 }
@@ -668,6 +664,8 @@ public class UserdataService {
                         InputStream is;
                         ServerCommonFile scf = checkThatObfFileisOnServer(sf.name, sf.type);
                         if (scf != null) {
+                            LOG.warn(scf.file.getName());
+                            LOG.warn(scf.url);
                             is = scf.getInputStream();
                         } else {
                             if (s3is == null) {
