@@ -28,7 +28,8 @@ import net.osmand.obf.preparation.IndexWeatherData.WeatherTiff;
 public class WeatherController {
 	
 	protected static final Log LOGGER = LogFactory.getLog(WeatherController.class);
-
+	
+	private static final String ECWMF_WEATHER_TYPE = "ecmwf";
 	
 	Gson gson = new Gson();
 	SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HH");
@@ -36,24 +37,21 @@ public class WeatherController {
 		sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
-	@Value("${osmand.weather.tiff-location}")
-	String tiffLocation;
-	
-	@Value("${osmand.weather.ecmwf-tiff-location}")
-	String ecmwfTiffLocation;
+	@Value("${osmand.weather.location}")
+	String weatherLocation;
 	
 	@RequestMapping(path = "/point-info", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> getWeatherForecast(@RequestParam double lat,
 	                                            @RequestParam double lon,
 	                                            @RequestParam String weatherType,
 	                                            @RequestParam(defaultValue = "false") boolean week) {
-		File folder = new File(getWeatherLocation(weatherType));
+		File folder = new File(weatherLocation + weatherType + "/tiff/");
 		List<Object[]> dt = new ArrayList<>();
 		int increment = 1;
 		if (folder.exists()) {
 			Calendar c = Calendar.getInstance();
 			c.set(Calendar.MINUTE, 0);
-			if (week) {
+			if (week || weatherType.equals(ECWMF_WEATHER_TYPE)) {
 				increment = 3;
 				c.setTimeZone(TimeZone.getTimeZone("UTC"));
 				int h = c.get(Calendar.HOUR);
@@ -82,14 +80,4 @@ public class WeatherController {
 		}
 		return ResponseEntity.ok(gson.toJson(dt));
 	}
-	
-	private String getWeatherLocation(String type) {
-		if (type.equals("gfs")) {
-			return tiffLocation;
-		} else if (type.equals("ecmwf")) {
-			return ecmwfTiffLocation;
-		}
-		return "";
-	}
-
 }
