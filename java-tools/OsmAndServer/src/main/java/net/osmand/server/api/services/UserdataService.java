@@ -341,7 +341,7 @@ public class UserdataService {
 		}
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token);
+		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "setup");
 		return ok();
 	}
     
@@ -690,7 +690,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudWebEmail(email, token);
+        emailSender.sendOsmAndCloudWebEmail(email, token, "delete");
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
