@@ -87,7 +87,7 @@ public class EmailSenderService {
 		StringBuilder contentStr = new StringBuilder();
 		contentStr.append("Hello OsmAnd User!");
 		contentStr.append("<br><br>");
-		contentStr.append("Please use the following activation code to <b>" + action + "</b> your web account. You activation code is <b>"+token+"</b>.<br>");
+		contentStr.append("Please use the following verification code to <b>" + action + "</b> your web account. Your verification code is <b>"+token+"</b>.<br>");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
 		
