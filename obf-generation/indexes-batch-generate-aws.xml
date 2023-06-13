@@ -8,13 +8,23 @@
 		skipExistingIndexesAt="/var/lib/jenkins/indexes/uploaded"	
 		indexPOI="true" indexMap="true" indexRouting="true" indexTransport="true" indexAddress="true" 
 		directory_for_srtm_files="/home/relief-data/srtm/">
-		<!-- not supported yet for AWS -->
-		<aws>
-			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60">
+		
+		
+		<external dockerSlots="15">
+			<!--  Disable AWS for now
+			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
+				
+				<filter excludePattern="_europe" />
+				<filter excludePattern="_northamerica" />
+				<filter excludePattern="_africa" />
+				<filter excludePattern="_asia" />
+				<filter excludePattern="_southamerica" />
+				<filter excludePattern="_centralamerica" />
+				<filter excludePattern="_australia-oceania" />
 			</job>
-			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="900">
+			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="900" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
 				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
 				<filter exclude="world_seamarks" />
@@ -24,9 +34,31 @@
 				<filter exclude="south-africa_africa" />
                 <filter exclude="kazakhstan_asia" />
                 <filter exclude="mongolia_asia" />
+
+				<filter excludePattern="_europe" />
+				<filter excludePattern="_northamerica" />
+				<filter excludePattern="_africa" />
+				<filter excludePattern="_asia" />
+				<filter excludePattern="_southamerica" />
+				<filter excludePattern="_centralamerica" />
+				<filter excludePattern="_australia-oceania" />
 			</job>
-			
-		</aws>
+			-->
+			<job queue="gen-docker-small" slotsPerJob="1" name="{1}-{0}" sizeUpToMB="120" type="docker">
+				<parameter k="image" v="osmandapp/osmand-mapcreator" />
+				<parameter k="cmd_1" v="generate-obf" />
+				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+                <parameter k="cmd_3" v="--max-height-tiles-in-ram=100" />
+				<parameter k="env" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
+			</job>
+			<job queue="gen-docker-large" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="900" type="docker">
+				<parameter k="image" v="osmandapp/osmand-mapcreator" />
+				<parameter k="cmd_1" v="generate-obf" />
+				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+
+				<parameter k="env" v="JAVA_OPTS=-Xms2048M -Xmx32000M "/>
+			</job>
+		</external>
 	</process>
 	
 	<regions siteToDownload="/home/osm-planet/osm-extract/{0}/{0}.pbf" >

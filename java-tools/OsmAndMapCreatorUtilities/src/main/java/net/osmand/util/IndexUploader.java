@@ -489,7 +489,15 @@ public class IndexUploader {
 				}
 				String summary = getDescription(reader, fileName);
 				reader.close();
-				mainFile.setLastModified(reader.getDateCreated());
+				boolean setLastModified = mainFile.setLastModified(reader.getDateCreated());
+				if (!setLastModified) {
+					// it's possible we can't update timestamp due to permission missing
+					File copy = new File(mainFile.getAbsolutePath() + ".cp");
+					Algorithms.fileCopy(mainFile, copy);
+					mainFile.delete();
+					copy.renameTo(mainFile);
+					setLastModified = mainFile.setLastModified(reader.getDateCreated());
+				}
 				return summary;
 			} catch (IOException e) {
 				if (raf != null) {
