@@ -841,8 +841,10 @@ public class OsmAndMapsService {
 				ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
 				LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 			}
+			LOGGER.info(ref.file.getName());
 			files.add(ref.reader);
 		}
+		LOGGER.info(files.size());
 		return files.toArray(new BinaryMapIndexReader[0]);
 	}
 	
