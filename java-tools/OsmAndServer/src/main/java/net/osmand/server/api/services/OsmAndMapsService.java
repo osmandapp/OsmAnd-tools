@@ -1022,7 +1022,7 @@ public class OsmAndMapsService {
 		searchUICore.getSearchSettings().setRegions(osmandRegions);
 		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(searchBbox));
 		LOGGER.warn(list.size());
-		if (list.size() < 4) {
+		if (list.size() < 7) {
 			searchUICore.getSearchSettings().setOfflineIndexes(list);
 			searchUICore.init();
 			searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
