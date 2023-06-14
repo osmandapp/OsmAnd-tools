@@ -1021,7 +1021,6 @@ public class OsmAndMapsService {
 		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
 		searchUICore.getSearchSettings().setRegions(osmandRegions);
 		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(searchBbox));
-		LOGGER.warn(list.size());
 		if (list.size() < 7) {
 			searchUICore.getSearchSettings().setOfflineIndexes(list);
 			searchUICore.init();
