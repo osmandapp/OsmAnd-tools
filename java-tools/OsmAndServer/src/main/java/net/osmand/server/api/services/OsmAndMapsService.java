@@ -108,6 +108,8 @@ public class OsmAndMapsService {
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final double SEARCH_RADIUS_DEGREE = 1.5;
 	private static final int TOTAL_LIMIT_POI = 400;
+	
+	private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 7;
 	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 7;
 	private static final String SEARCH_LOCALE = "en";
 	
@@ -1021,7 +1023,7 @@ public class OsmAndMapsService {
 		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
 		searchUICore.getSearchSettings().setRegions(osmandRegions);
 		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(searchBbox));
-		if (list.size() < 7) {
+		if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
 			searchUICore.getSearchSettings().setOfflineIndexes(list);
 			searchUICore.init();
 			searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
