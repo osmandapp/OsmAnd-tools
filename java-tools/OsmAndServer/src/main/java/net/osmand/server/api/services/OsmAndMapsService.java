@@ -109,8 +109,8 @@ public class OsmAndMapsService {
 	private static final double SEARCH_RADIUS_DEGREE = 1.5;
 	private static final int TOTAL_LIMIT_POI = 400;
 	
-	private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 7;
-	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 7;
+	private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 4;
+	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 14;
 	private static final String SEARCH_LOCALE = "en";
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -1054,41 +1054,37 @@ public class OsmAndMapsService {
 	}
 	
 	public synchronized List<SearchResult> searchPoiByCategory(double lat, double lon, String text, Map<String, Object> data, int limit, int zoom) throws IOException {
-//		if (!validateAndInitConfig()) {
-//			return List.of();
-//		}
-		QuadRect searchBbox = getSearchBbox(data, zoom,lat, lon);
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-		searchUICore.getSearchSettings().setRegions(osmandRegions);
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(searchBbox, data));
-		if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
-			searchUICore.getSearchSettings().setOfflineIndexes(list);
-			searchUICore.init();
-			searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-			SearchSettings settings = searchUICore.getPhrase().getSettings();
-			if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
-				searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-			} else {
-				searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
+		if (!validateAndInitConfig()) {
+			return List.of();
+		}
+		QuadRect searchBbox = getSearchBbox(data, zoom);
+		if (searchBbox != null) {
+			SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+			searchUICore.getSearchSettings().setRegions(osmandRegions);
+			List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(searchBbox, data));
+			if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
+				searchUICore.getSearchSettings().setOfflineIndexes(list);
+				searchUICore.init();
+				searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
+				SearchSettings settings = searchUICore.getPhrase().getSettings();
+				if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
+					searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+					searchUICore.setTotalLimit(limit);
+					SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
+					return r.getCurrentSearchResults();
+				}
 			}
-			searchUICore.setTotalLimit(limit);
-			SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
-			return r.getCurrentSearchResults();
 		}
 		return List.of();
 	}
 	
-	public QuadRect getSearchBbox(Map<String, Object> data, int zoom, double lat, double lon) {
-		LatLon point1;
-		LatLon point2;
+	public QuadRect getSearchBbox(Map<String, Object> data, int zoom) {
 		if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
-			point1 = new LatLon((double) data.get("latBboxPoint1"), (double) data.get("lngBboxPoint1"));
-			point2 = new LatLon((double) data.get("latBboxPoint2"), (double) data.get("lngBboxPoint2"));
-		} else {
-			point1 = new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE);
-			point2 = new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE);
+			LatLon point1 = new LatLon((double) data.get("latBboxPoint1"), (double) data.get("lngBboxPoint1"));
+			LatLon point2 = new LatLon((double) data.get("latBboxPoint2"), (double) data.get("lngBboxPoint2"));
+			return points(null, point1, point2);
 		}
-		return points(null, point1, point2);
+		return null;
 	}
 	
 	private String getIconName(PoiType poiType) {
