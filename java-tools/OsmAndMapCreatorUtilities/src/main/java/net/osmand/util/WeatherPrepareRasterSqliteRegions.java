@@ -2,6 +2,7 @@ package net.osmand.util;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -33,6 +34,7 @@ import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
 import net.osmand.data.Ring;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -75,7 +77,7 @@ public class WeatherPrepareRasterSqliteRegions {
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
 		MapIndex mapIndex = fl.getMapIndexes().get(0);
 		int downloadName = mapIndex.getRule("download_name", null);
-		int boundary = mapIndex.getRule("osmand_region", "boundary");
+		int boundaryTag = mapIndex.getRule("osmand_region", "boundary");
 		int cnt = 1;
 		Set<String> failedCountries = new HashSet<String>();
 		for (String fullName : allCountries.keySet()) {
@@ -83,13 +85,20 @@ public class WeatherPrepareRasterSqliteRegions {
 			if (fullName == null || (filter != null && !fullName.contains(filter))) {
 				continue;
 			}
-			BinaryMapDataObject rc = null;
-			for (BinaryMapDataObject r : lst) {
-				if (!r.containsType(boundary)) {
-					rc = r;
-					break;
-				}
+			WorldRegion region = or.getRegionData(fullName);
+			if (region == null) {
+				continue;
 			}
+			BinaryMapDataObject rc = getBoundary(boundaryTag, lst);
+			if (rc == null) {
+				continue;
+			}
+			WorldRegion parent = region.getSuperregion();
+			if (parent != null && getBoundary(boundaryTag, allCountries.get(parent.getRegionId())) != null) {
+				continue;
+			}
+			
+	
 			String dw = rc.getNameByType(downloadName);
 			System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 			try {
@@ -104,11 +113,21 @@ public class WeatherPrepareRasterSqliteRegions {
 		}
 	}
 
+	private static BinaryMapDataObject getBoundary(int boundary, LinkedList<BinaryMapDataObject> lst) {
+		BinaryMapDataObject rc = null;
+		for (BinaryMapDataObject r : lst) {
+			if (!r.containsType(boundary)) {
+				rc = r;
+				break;
+			}
+		}
+		return rc;
+	}
+
 	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
 			String downloadName, File weatherFolder, String prefix, boolean dryRun) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		String name = country.getName();
 		String dwName = prefix + Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + EXTENSION;
-		Set<Long> regionTileNames = new TreeSet<>();
 		final File targetFile = new File(new File(weatherFolder, REGIONS_FOLDER), dwName);
 		if (!SKIP_EXISTING) {
 			targetFile.delete();
@@ -118,6 +137,16 @@ public class WeatherPrepareRasterSqliteRegions {
 			return;
 		}
 
+		Set<Long> regionTileNames = new TreeSet<>();
+		calculateRegionBoundaries(country, boundaries, name, regionTileNames);
+		if (dryRun) {
+			return;
+		}
+		procRegion(weatherFolder, regionTileNames, targetFile);
+	}
+
+	private static void calculateRegionBoundaries(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
+			String name, Set<Long> regionTileNames) {
 		QuadRect qr = new QuadRect(180, -90, -180, 90);
 		MultipolygonBuilder bld = new MultipolygonBuilder();
 		if(boundaries != null) {
@@ -181,70 +210,67 @@ public class WeatherPrepareRasterSqliteRegions {
 		System.out.println("-----------------------------");
 		System.out.println("PROCESSING " + name + " lon [" + leftLon + " - " + rightLon + "] lat [" + bottomLat + " - "
 				+ topLat + "] TOTAL " + regionTileNames.size() + " tiles ");
-		if (dryRun) {
-			return;
-		}
+	}
+
+	private static void procRegion(File weatherFolder, Set<Long> regionTileNames, final File targetFile)
+			throws SQLException, IOException, FileNotFoundException {
 		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmm");
 		dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
 		Calendar cal = Calendar.getInstance();
 		cal.setTimeInMillis(System.currentTimeMillis());
 		cal.add(Calendar.HOUR_OF_DAY, -GEN_HOURS_BACK);
 		Date filterTime = cal.getTime();
-		for (String source : SOURCES_FORECAST.split(",")) {
-			File srcFile = new File(weatherFolder, source + "/tiff");
-			if (!srcFile.exists()) {
-				continue;
-			}
-			for (File dtFolder : srcFile.listFiles()) {
-				if (dtFolder.isDirectory()) {
-					try {
-						Date pd = dateFormat.parse(dtFolder.getName());
-						if (pd.before(filterTime)) {
-							// ignore early dates
-							continue;
-						}
-						
-						procFile(source, dtFolder, targetFile, regionTileNames, targetFile.exists(), pd);
-					} catch (ParseException e) {
-						LOG.info("Error parsing folder name: " + e.getMessage() + " - " + dtFolder.getName());
-					}
-				}
-			}
-		}
-	}
-
-	
-
-	private static void procFile(String source, File folderWithTiles, final File targetFile, Set<Long> tileNames, boolean initDb, Date forecastdate)
-			throws IOException, SQLException {
+		
+		
 		int batch = 0;
 		try (Connection targetConn = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
-			if (initDb) {
-				prepareNewWeatherFile(targetConn, false, ZOOM, ZOOM);
-			}
-			PreparedStatement psinsnew = targetConn.prepareStatement("INSERT INTO tiles(x, y, z, s, image, time, source, forecastdate) VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
-			
-//			targetConn.createStatement().executeQuery("SELECT count(*) FROM tiles where z = 9 and x = 270 and y = 182").getInt(1);
-			for (long s : tileNames) {
-				int x = unpack1(s);
-				int y = unpack2(s);
-				int z = unpack3(s);
-				File imageGzip = new File(folderWithTiles, z + "_"+x+"_"+y+".tiff.gz");
-				byte[] image = Algorithms.readBytesFromInputStream(new GZIPInputStream(new FileInputStream(imageGzip)));
-				if (image != null) {
-					psinsnew.setInt(1, x);
-					psinsnew.setInt(2, y);
-					psinsnew.setInt(3, z);
-					psinsnew.setString(4, folderWithTiles.getName() +":" + source);
-					psinsnew.setBytes(5, image);
-					psinsnew.setLong(6, imageGzip.lastModified());
-					psinsnew.setString(7, source);
-					psinsnew.setLong(8, forecastdate.getTime());
-					psinsnew.addBatch();
+			prepareNewWeatherFile(targetConn, false, ZOOM, ZOOM);
+			PreparedStatement psinsnew = targetConn.prepareStatement(
+					"INSERT INTO tiles(x, y, z, s, image, time, source, forecastdate) VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
+			for (String source : SOURCES_FORECAST.split(",")) {
+				File srcFile = new File(weatherFolder, source + "/tiff");
+				if (!srcFile.exists()) {
+					continue;
+				}
+				for (File dtFolder : srcFile.listFiles()) {
+					if (dtFolder.isDirectory()) {
+						Date forecastdate;
+						try {
+							forecastdate = dateFormat.parse(dtFolder.getName());
+							if (forecastdate.before(filterTime)) {
+								// ignore early dates
+								continue;
+							}
+						} catch (ParseException e) {
+							LOG.info("Error parsing folder name: " + e.getMessage() + " - " + dtFolder.getName());
+							continue;
+						}
 
-					if (batch++ >= BATCH_SIZE) {
-						batch = 0;
-						psinsnew.executeBatch();
+						for (long s : regionTileNames) {
+							int x = unpack1(s);
+							int y = unpack2(s);
+							int z = unpack3(s);
+							File imageGzip = new File(dtFolder, z + "_" + x + "_" + y + ".tiff.gz");
+							byte[] image = Algorithms
+									.readBytesFromInputStream(new GZIPInputStream(new FileInputStream(imageGzip)));
+							if (image != null) {
+								psinsnew.setInt(1, x);
+								psinsnew.setInt(2, y);
+								psinsnew.setInt(3, z);
+								psinsnew.setString(4, dtFolder.getName() + ":" + source);
+								psinsnew.setBytes(5, image);
+								psinsnew.setLong(6, imageGzip.lastModified());
+								psinsnew.setString(7, source);
+								psinsnew.setLong(8, forecastdate.getTime());
+								psinsnew.addBatch();
+
+								if (batch++ >= BATCH_SIZE) {
+									batch = 0;
+									psinsnew.executeBatch();
+								}
+							}
+						}
+
 					}
 				}
 			}
@@ -252,6 +278,7 @@ public class WeatherPrepareRasterSqliteRegions {
 			psinsnew.close();
 		}
 	}
+
 	
 
 	private static void prepareNewWeatherFile(Connection newFile, boolean bigPlanet, int minZoom, int maxZoom) throws SQLException {
