@@ -94,7 +94,7 @@ public class WeatherPrepareRasterSqliteRegions {
 				continue;
 			}
 			WorldRegion parent = region.getSuperregion();
-			if (parent == null || getBoundary(boundaryTag, allCountries.get(parent.getRegionId())) != null) {
+			if (parent == null || getBoundary(boundaryTag, allCountries.get(parent.getRegionDownloadName())) != null) {
 				continue;
 			}
 	
