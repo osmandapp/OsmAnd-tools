@@ -86,8 +86,9 @@ public class WeatherPrepareRasterSqliteRegions {
 			}
 			WorldRegion region = or.getRegionData(fullName);
 			BinaryMapDataObject rc = getBoundary(or, allCountries, boundaryTag, region);
-			boolean hasParentBoundaries = getBoundary(or, allCountries, boundaryTag, region.getSuperregion()) != null && 
-					!region.getSuperregion().getRegionId().equals("northamerica_us");
+			boolean hasParentBoundaries = getBoundary(or, allCountries, boundaryTag, region.getSuperregion()) != null 
+					&& !region.getSuperregion().getRegionId().equals("northamerica_us")
+					&& !region.getSuperregion().getRegionId().equals("northamerica_canada");
 			if (rc == null || hasParentBoundaries) {
 				continue;
 			}
