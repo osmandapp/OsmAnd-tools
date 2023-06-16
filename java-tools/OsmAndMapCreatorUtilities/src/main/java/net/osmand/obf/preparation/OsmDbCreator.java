@@ -246,9 +246,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		initIds("node", nodeIds);
 		initIds("ways", wayIds);
 		initRelationIds("relations", relationIds);
-		prepNode = dbConn.prepareStatement("insert into node(id, latitude, longitude, tags) values (?, ?, ?, ?)"); //$NON-NLS-1$
-		prepWays = dbConn.prepareStatement("insert into ways(id, node, ord, tags, boundary) values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
-		prepRelations = dbConn.prepareStatement("insert into relations(id, member, type, role, ord, tags, del) values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
+		prepNode = dbConn.prepareStatement("replace into node(id, latitude, longitude, tags) values (?, ?, ?, ?)"); //$NON-NLS-1$
+		prepWays = dbConn.prepareStatement("replace into ways(id, node, ord, tags, boundary) values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
+		prepRelations = dbConn.prepareStatement("replace into relations(id, member, type, role, ord, tags, del) values (?, ?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		dbConn.setAutoCommit(false);
 	}
 
