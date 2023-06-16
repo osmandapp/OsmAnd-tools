@@ -279,31 +279,6 @@ get_raw_gfs_files() {
 }
 
 
-generate_bands_tiff() {
-    echo "============================= generate_bands_tiff() ==================================="
-    for WFILE in ${DOWNLOAD_FOLDER}/*.gt
-    do
-        local FILE_NAME=$WFILE
-        if [[ $OS =~ "Darwin" ]]; then
-            FILE_NAME="${FILE_NAME//"raw"}"
-            FILE_NAME="${FILE_NAME//".gt"}"
-            FILE_NAME="${FILE_NAME:1}"
-        else
-            FILE_NAME="${FILE_NAME//"raw/"}"
-            FILE_NAME="${FILE_NAME//".gt"}"
-        fi
-
-        local FOLDER_NAME=$FILE_NAME
-        for i in ${!GFS_BANDS_SHORT_NAMES[@]}; do
-            FOLDER_NAME="${FOLDER_NAME//"${GFS_BANDS_SHORT_NAMES[$i]}_"}"
-        done
-
-        mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
-        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff -ot Float32 -stats  || echo "Error of gdal_translate"
-    done
-}
-
-
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
     MODE=$1
@@ -319,27 +294,29 @@ join_tiff_files() {
 
     mkdir -p $TIFF_FOLDER/
     cd $TIFF_TEMP_FOLDER
-    for CHANNELS_FOLDER in *
+    for DATE_FOLDER in *
     do
-        if [ ! -d "$CHANNELS_FOLDER" ]; then
-            echo "Error: Directory $CHANNELS_FOLDER not exist. Skip"
+        if [ ! -d "${DATE_FOLDER}" ]; then
+            echo "Error: Directory ${DATE_FOLDER} not exist. Skip"
             continue
         fi
-        cd $CHANNELS_FOLDER
+        cd $DATE_FOLDER
 
         # Create channels list in correct order
         touch settings.txt
         local ALL_CHANNEL_FILES_EXISTS=1
+        local FILE_DATE_CP
         for i in ${!BANDS_SHORT_NAMES[@]}; do
-            if [ ! -f "${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
+            if [ ! -f "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" ]; then
                 ALL_CHANNEL_FILES_EXISTS=0
                 break
             fi
-            echo "${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
+            FILE_DATE_CP=${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff
+            echo "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" >> settings.txt
         done
 
         if [ $ALL_CHANNEL_FILES_EXISTS == 0 ]; then
-            echo "Joining Error:  ${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
+            echo "Joining Error:  ${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff  not exists. Skip joining."
             cd ..
             continue
         fi
@@ -347,10 +324,11 @@ join_tiff_files() {
         # Create "Virtual Tiff" with layers order from settings.txt
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         # Create joined tiff from "Virtual Tiff"
-        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32 -stats  || echo "Error of gdal_translate"
+        local TARGET_FILE=../../${TIFF_FOLDER}/${DATE_FOLDER}.tiff
+        gdal_translate bigtiff.vrt $TARGET_FILE -ot Float32 -stats  || echo "Error of gdal_translate"
         
         # # Write tiff layers names
-        local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff '
+        local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py $TARGET_FILE '
         for i in ${!BANDS_DESCRIPTIONS[@]}; do
             NUMBER=$(( $i + 1))
             DESCRIPTION="${BANDS_DESCRIPTIONS[$i]}"
@@ -360,6 +338,7 @@ join_tiff_files() {
             BANDS_RENAMING_COMMAND+='" '
         done
         eval $BANDS_RENAMING_COMMAND
+        touch -r $FILE_DATE_CP 
 
         rm settings.txt
         rm bigtiff.vrt
