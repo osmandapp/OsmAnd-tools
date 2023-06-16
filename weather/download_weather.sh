@@ -19,7 +19,7 @@ ECMWF_BANDS_SHORT_NAMES_SAVING=("temperature" "pressure" "precip" "windspeed_u" 
 
 MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-1800} # 30 hours
 HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
-HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-180}
+HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-192}
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
@@ -246,7 +246,7 @@ get_raw_gfs_files() {
 
                 # Make partial download for needed band data only  
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-                sleep 5
+                sleep 3
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then  

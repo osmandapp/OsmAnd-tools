@@ -76,35 +76,33 @@ public class WeatherPrepareRasterSqliteRegions {
 		BinaryMapIndexReader fl = or.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
 		MapIndex mapIndex = fl.getMapIndexes().get(0);
-		int downloadName = mapIndex.getRule("download_name", null);
 		int boundaryTag = mapIndex.getRule("osmand_region", "boundary");
 		int cnt = 1;
 		Set<String> failedCountries = new HashSet<String>();
-		for (String fullName : allCountries.keySet()) {
-			LinkedList<BinaryMapDataObject> lst = allCountries.get(fullName);
-			if (fullName == null || (filter != null && !fullName.contains(filter))) {
-				continue;
-			}
-			WorldRegion region = or.getRegionData(fullName);
-			if (region == null) {
+		for (String downloadName : allCountries.keySet()) {
+			LinkedList<BinaryMapDataObject> lst = allCountries.get(downloadName);
+			if (downloadName == null || (filter != null && !downloadName.contains(filter))) {
 				continue;
 			}
 			BinaryMapDataObject rc = getBoundary(boundaryTag, lst);
 			if (rc == null) {
 				continue;
 			}
-			WorldRegion parent = region.getSuperregion();
-			if (parent != null && getBoundary(boundaryTag, allCountries.get(parent.getRegionId())) != null) {
+			WorldRegion region = or.getRegionDataByDownloadName(downloadName);
+			if (region == null) {
+				System.err.println("Boundary present but there is no world region: " + downloadName);
 				continue;
 			}
-			
+			WorldRegion parent = region.getSuperregion();
+			if (parent == null || getBoundary(boundaryTag, allCountries.get(parent.getRegionId())) != null) {
+				continue;
+			}
 	
-			String dw = rc.getNameByType(downloadName);
-			System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
+			System.out.println("Region " + downloadName + " " + cnt++ + " out of " + allCountries.size());
 			try {
-				process(rc, lst, dw, weatherFolder, prefix, dryRun);
+				process(rc, lst, downloadName, weatherFolder, prefix, dryRun);
 			} catch (Exception e) {
-				failedCountries.add(fullName);
+				failedCountries.add(downloadName);
 				e.printStackTrace();
 			}
 		}
@@ -115,6 +113,9 @@ public class WeatherPrepareRasterSqliteRegions {
 
 	private static BinaryMapDataObject getBoundary(int boundary, LinkedList<BinaryMapDataObject> lst) {
 		BinaryMapDataObject rc = null;
+		if (lst == null) {
+			return null;
+		}
 		for (BinaryMapDataObject r : lst) {
 			if (!r.containsType(boundary)) {
 				rc = r;
@@ -289,7 +290,7 @@ public class WeatherPrepareRasterSqliteRegions {
 		statement.close();
 
 
-		PreparedStatement pStatement = newFile.prepareStatement("INSERT INTO INFO VALUES(?,?,?,?,?,?,?,?)");
+		PreparedStatement pStatement = newFile.prepareStatement("INSERT INTO INFO(tilenumbering,minzoom,maxzoom,timecolumn,gentime) VALUES(?,?,?,?,?)");
 		String tileNumbering = bigPlanet ? "BigPlanet" : "simple";
 		pStatement.setString(1, tileNumbering);
 		int minNormalZoom = bigPlanet ? 17 - maxZoom : minZoom;
@@ -298,9 +299,6 @@ public class WeatherPrepareRasterSqliteRegions {
 		pStatement.setInt(3, maxNormalZoom);
 		pStatement.setString(4, "yes");
 		pStatement.setLong(5, System.currentTimeMillis());
-		pStatement.setString(5, "");
-		pStatement.setString(6, "");
-		pStatement.setString(7, "");
 		pStatement.execute();
 	}
 	
