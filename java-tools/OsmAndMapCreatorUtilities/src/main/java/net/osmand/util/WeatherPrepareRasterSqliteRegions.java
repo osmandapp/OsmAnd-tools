@@ -91,8 +91,11 @@ public class WeatherPrepareRasterSqliteRegions {
 			if (rc == null || hasParentBoundaries) {
 				continue;
 			}
-			String dname = region.getRegionDownloadName() == null ? region.getRegionId()
-					: region.getRegionDownloadName();
+			String dname = region.getRegionDownloadName();
+			if (dname == null) {
+				String superRegion = region.getSuperregion().getRegionId();
+				dname = fullName.substring(superRegion.length() +1) + "_" + superRegion;
+			}
 			System.out.println(String.format("\nRegion %s processed %d [%d/%d]", dname, cnt++, proc, allCountries.size()));
 			try {
 				process(rc, allCountries.get(fullName), dname, weatherFolder, prefix, dryRun);
