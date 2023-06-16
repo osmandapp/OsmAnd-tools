@@ -41,7 +41,7 @@ import net.osmand.osm.edit.Way;
 
 public class WeatherPrepareRasterSqliteRegions {
 	private static final Log LOG = PlatformUtil.getLog(WeatherPrepareRasterSqliteRegions.class);
-	private static boolean SKIP_EXISTING = true;
+	private static boolean SKIP_EXISTING = false;
 	private static String EXTENSION = ".sqlitedb";
 	private static int ZOOM = 4;
 	private static final int BATCH_SIZE = 100;
@@ -91,7 +91,8 @@ public class WeatherPrepareRasterSqliteRegions {
 			if (rc == null || hasParentBoundaries) {
 				continue;
 			}
-			String dname = region.getRegionDownloadName() == null ? region.getRegionId() : region.getRegionDownloadName();
+			String dname = region.getRegionDownloadName() == null ? region.getRegionId()
+					: region.getRegionDownloadName();
 			System.out.println(String.format("\nRegion %s processed %d [%d/%d]", dname, cnt++, proc, allCountries.size()));
 			try {
 				process(rc, allCountries.get(fullName), dname, weatherFolder, prefix, dryRun);
