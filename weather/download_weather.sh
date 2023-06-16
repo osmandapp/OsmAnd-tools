@@ -338,7 +338,7 @@ join_tiff_files() {
             BANDS_RENAMING_COMMAND+='" '
         done
         eval $BANDS_RENAMING_COMMAND
-        touch -r $FILE_DATE_CP 
+        touch -r $FILE_DATE_CP $TARGET_FILE
 
         rm settings.txt
         rm bigtiff.vrt
@@ -369,6 +369,7 @@ split_tiles() {
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
+        find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec touch -r ${JOINED_TIFF_NAME}.tiff "{}" \;    
         find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;    
 
         rm ${JOINED_TIFF_NAME}.tiff.gz || true
