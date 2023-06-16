@@ -77,30 +77,25 @@ public class WeatherPrepareRasterSqliteRegions {
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
 		MapIndex mapIndex = fl.getMapIndexes().get(0);
 		int boundaryTag = mapIndex.getRule("osmand_region", "boundary");
-		int cnt = 1;
+		int cnt = 1, proc = 1;
 		Set<String> failedCountries = new HashSet<String>();
 		for (String downloadName : allCountries.keySet()) {
-			LinkedList<BinaryMapDataObject> lst = allCountries.get(downloadName);
-			if (downloadName == null || (filter != null && !downloadName.contains(filter))) {
+			proc++;
+			if (downloadName == null) {
 				continue;
 			}
-			BinaryMapDataObject rc = getBoundary(boundaryTag, lst);
+			if (filter != null && !downloadName.contains(filter)) {
+				continue;
+			}
+			
+			BinaryMapDataObject rc = getBoundary(or, allCountries, boundaryTag, or.getRegionDataByDownloadName(downloadName), downloadName);
 			if (rc == null) {
 				continue;
 			}
-			WorldRegion region = or.getRegionDataByDownloadName(downloadName);
-			if (region == null) {
-				System.err.println("Boundary present but there is no world region: " + downloadName);
-				continue;
-			}
-			WorldRegion parent = region.getSuperregion();
-			if (parent == null || getBoundary(boundaryTag, allCountries.get(parent.getRegionDownloadName())) != null) {
-				continue;
-			}
 	
-			System.out.println("Region " + downloadName + " " + cnt++ + " out of " + allCountries.size());
+			System.out.println(String.format("\nRegion %s processed %d [%d/%d]", downloadName, cnt++, proc, allCountries.size()));
 			try {
-				process(rc, lst, downloadName, weatherFolder, prefix, dryRun);
+				process(rc, allCountries.get(downloadName), downloadName, weatherFolder, prefix, dryRun);
 			} catch (Exception e) {
 				failedCountries.add(downloadName);
 				e.printStackTrace();
@@ -111,16 +106,32 @@ public class WeatherPrepareRasterSqliteRegions {
 		}
 	}
 
-	private static BinaryMapDataObject getBoundary(int boundary, LinkedList<BinaryMapDataObject> lst) {
+	private static BinaryMapDataObject getBoundary(OsmandRegions or, Map<String, LinkedList<BinaryMapDataObject>> allCountries, int boundaryTag, WorldRegion region, String checkOnlyfirstLevelName) {
+		if (region == null) {
+			System.err.println("Boundary present but there is no world region: " + checkOnlyfirstLevelName);
+			return null;
+		}
+		if (region.getRegionDownloadName() == null) {
+			return null;
+		}
+		LinkedList<BinaryMapDataObject> lst = allCountries.get(region.getRegionDownloadName());
 		BinaryMapDataObject rc = null;
 		if (lst == null) {
 			return null;
 		}
 		for (BinaryMapDataObject r : lst) {
-			if (!r.containsType(boundary)) {
+			if (!r.containsType(boundaryTag) && r.getPointsLength() > 1) {
 				rc = r;
 				break;
 			}
+		}
+		if (rc == null || checkOnlyfirstLevelName == null) {
+			return rc;
+		}
+		
+		WorldRegion parent = region.getSuperregion();
+		if (parent == null || getBoundary(or, allCountries, boundaryTag, parent, null) != null) {
+			return null;
 		}
 		return rc;
 	}
