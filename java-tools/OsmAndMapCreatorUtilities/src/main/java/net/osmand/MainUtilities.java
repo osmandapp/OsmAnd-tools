@@ -45,6 +45,7 @@ import net.osmand.util.IndexBatchCreator;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.ResourceDeleter;
 import net.osmand.util.TileListsForRegions;
+import net.osmand.util.WeatherPrepareRasterSqliteRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -79,6 +80,8 @@ public class MainUtilities {
 				RenderingRulesStoragePrinter.main(subArgsArray);
 			} else if (utl.equals("explain-rendering-style")) {
 				RenderingRulesStorage.main(subArgsArray);
+			} else if (utl.equals("collect-weather-sqlitedb-into-regions")) {
+				WeatherPrepareRasterSqliteRegions.main(subArgsArray);
             } else if (utl.equals("generate-maplegend-svg")) {
 				if (subArgsArray.length < 1) {
 					System.out.println(
