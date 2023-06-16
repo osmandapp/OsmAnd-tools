@@ -276,14 +276,14 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("time_moving", analysis.timeMoving + "");
 			gpxTrackTags.put("time_moving_no_gaps", analysis.timeMovingWithoutGaps + "");
 		}
-		if (analysis.hasElevationData) {
+		if (analysis.hasElevationData()) {
 			gpxTrackTags.put("avg_ele", latLonFormat.format(analysis.avgElevation));
 			gpxTrackTags.put("min_ele", latLonFormat.format(analysis.minElevation));
 			gpxTrackTags.put("max_ele", latLonFormat.format(analysis.maxElevation));
 			gpxTrackTags.put("diff_ele_up", latLonFormat.format(analysis.diffElevationUp));
 			gpxTrackTags.put("diff_ele_down", latLonFormat.format(analysis.diffElevationDown));
 		}
-		if (analysis.hasSpeedData) {
+		if (analysis.hasSpeedData()) {
 			gpxTrackTags.put("avg_speed", latLonFormat.format(analysis.avgSpeed));
 			gpxTrackTags.put("max_speed", latLonFormat.format(analysis.maxSpeed));
 			gpxTrackTags.put("min_speed", latLonFormat.format(analysis.minSpeed));

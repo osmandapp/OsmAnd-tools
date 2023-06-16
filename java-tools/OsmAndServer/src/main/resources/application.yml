@@ -27,7 +27,7 @@ osmand:
   gen.location: ${osmand.files.location}/gen
   web.location: ${osmand.files.location}/website
   srtm.location: ${SRTM_LOCATION:}
-  weather.tiff-location: ${WEATHER_TIFF_LOCATION:}
+  weather.location: ${WEATHER_LOCATION:}
   
 server:
   port: 8080
