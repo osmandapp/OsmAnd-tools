@@ -493,6 +493,7 @@ get_raw_ecmwf_files() {
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
                 gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                TZ=UTC touch -t "${FORECAST_DATE}${FORECAST_RND_TIME}00" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff"
             done
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
