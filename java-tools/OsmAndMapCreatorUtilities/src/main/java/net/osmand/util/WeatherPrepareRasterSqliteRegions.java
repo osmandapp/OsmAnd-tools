@@ -24,6 +24,8 @@ import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
@@ -46,8 +48,8 @@ import net.osmand.osm.edit.Way;
 public class WeatherPrepareRasterSqliteRegions {
 	private static final Log LOG = PlatformUtil.getLog(WeatherPrepareRasterSqliteRegions.class);
 	private static boolean SKIP_EXISTING = false;
-	private static String EXTENSION = ".sqlitedb";
-	private static boolean GZIP = false;
+	private static String EXTENSION = ".tifsqlite";
+	private static boolean ZIP = false;
 	private static int ZOOM = 4;
 	private static final int BATCH_SIZE = 100;
 	private static int GEN_HOURS_BACK = 4;
@@ -63,8 +65,8 @@ public class WeatherPrepareRasterSqliteRegions {
 		for (int i = 1; i < args.length; i++) {
 			if ("--dry-run".equals(args[i])) {
 				dryRun = true;
-			} else if ("--gzip".equals(args[i])) {
-				GZIP = true;
+			} else if ("--zip".equals(args[i])) {
+				ZIP = true;
 			} else if ("--skip-existing".equals(args[i])) {
 				SKIP_EXISTING = true;
 			} else if (args[i].startsWith("--zoom=")) {
@@ -129,7 +131,7 @@ public class WeatherPrepareRasterSqliteRegions {
 	private static void processWorld(File weatherFolder, String prefix, boolean dryRun) throws Exception {
 		String dwName = prefix + "World" + EXTENSION;
 		final File targetFile = new File(new File(weatherFolder, REGIONS_FOLDER), dwName);
-		final File targetFileGZip = new File(new File(weatherFolder, REGIONS_FOLDER), dwName + ".gz");
+		final File targetFileGZip = new File(new File(weatherFolder, REGIONS_FOLDER), dwName + ".zip");
 		if (!SKIP_EXISTING) {
 			targetFile.delete();
 			targetFileGZip.delete();
@@ -149,18 +151,19 @@ public class WeatherPrepareRasterSqliteRegions {
 			}
 		}
 		procRegion(weatherFolder, regionTileNames, targetFile);
-		gzipFile(targetFile, targetFileGZip);
+		zipFile(targetFile, targetFileGZip);
 		
 	}
 
-	private static void gzipFile(final File targetFile, final File targetFileGZip)
+	private static void zipFile(final File targetFile, final File targetFileGZip)
 			throws IOException, FileNotFoundException {
-		if (GZIP) {
-			OutputStream fout = new GZIPOutputStream(new FileOutputStream(targetFileGZip));
+		if (ZIP) {
+			ZipOutputStream zous = new ZipOutputStream(new FileOutputStream(targetFileGZip));
+			zous.putNextEntry(new ZipEntry(targetFile.getName()));
 			InputStream fin = new FileInputStream(targetFile);
-			Algorithms.streamCopy(fin, fout);
+			Algorithms.streamCopy(fin, zous);
 			fin.close();
-			fout.close();
+			zous.close();
 			targetFile.delete();
 		}
 	}
@@ -204,7 +207,7 @@ public class WeatherPrepareRasterSqliteRegions {
 			return;
 		}
 		procRegion(weatherFolder, regionTileNames, targetFile);
-		gzipFile(targetFile, targetFileGZip);
+		zipFile(targetFile, targetFileGZip);
 		
 	}
 

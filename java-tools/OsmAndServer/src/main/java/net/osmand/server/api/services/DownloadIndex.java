@@ -213,6 +213,8 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.HILLSHADE;
 			} else if (v.equals("heightmap")) {
 				dt = DownloadIndexesService.DownloadType.HEIGHTMAP;
+			} else if (v.equals("weather")) {
+				dt = DownloadIndexesService.DownloadType.WEATHER;
 			} else if (v.equals("geotiff")) {
 				dt = DownloadIndexesService.DownloadType.GEOTIFF;
 			} else if (v.equals("slope")) {

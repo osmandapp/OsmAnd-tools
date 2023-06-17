@@ -443,7 +443,7 @@ public class DownloadIndexesService  {
                 case HEIGHTMAP:
                     return fileName.endsWith(".sqlite");
                 case WEATHER:
-                    return fileName.endsWith(".sqlitedb.gz");
+                    return fileName.endsWith(".tifsqlite.zip");
                 case GEOTIFF:
                     return fileName.endsWith(".tif");
                 case TRAVEL:
