@@ -201,8 +201,8 @@ public class DownloadIndexesService  {
 					if (!Algorithms.isEmpty(host)) {
 						try {
 							String pm = "";
-							if (sp.httpParams.length > 0) {
-								pm = "&" + sp.httpParams[0] + "=yes";
+							if (di.getDownloadType().getHeaders().length > 0) {
+								pm = "&" + di.getDownloadType().getHeaders()[0] + "=yes";
 							}
 							String urlRaw = "https://" + host + "/download?file=" + di.getName() + pm;
 							URL url = new URL(urlRaw);
@@ -412,25 +412,35 @@ public class DownloadIndexesService  {
 	
 	public enum DownloadType {
 	    MAP("indexes"),
+	    OSMLIVE("aosmc", "aosmc", "osmc"),
 	    VOICE("indexes") ,
-	    DEPTH("indexes/inapp/depth") ,
-	    DEPTHMAP("depth") ,
-	    FONTS("indexes/fonts") ,
-	    WIKIMAP("wiki") ,
-	    TRAVEL("travel") ,
-	    ROAD_MAP("road-indexes") ,
+	    DEPTH("indexes/inapp/depth", "depth"), // Deprecated
+	    DEPTHMAP("depth", "depth") ,
+	    FONTS("indexes/fonts", "fonts") ,
+	    WIKIMAP("wiki", "wiki") ,
+	    TRAVEL("travel", "wikivoyage", "travel") ,
+	    ROAD_MAP("road-indexes", "road"),
 	    HILLSHADE("hillshade"),
-	    HEIGHTMAP("heightmap"),
-	    GEOTIFF("heightmap"),
-	    SLOPE("slope") ,
-	    SRTM_MAP("srtm-countries"),
-	    WEATHER("weather/regions");
+	    HEIGHTMAP("heightmap", "heightmap"), // Deprecated
+	    GEOTIFF("heightmap", "heightmap"),
+	    SLOPE("slope", "slope") ,
+	    SRTM_MAP("srtm-countries", "srtmcountry"),
+	    WEATHER("weather/regions", "weather");
 
 
 		private final String path;
+		private final String[] headers;
 
-		DownloadType(String path) {
+		DownloadType(String path, String... headers) {
 			this.path = path;
+			this.headers = headers;
+		}
+		
+		public String[] getHeaders() {
+			if (headers == null) {
+				return new String[0];
+			}
+			return headers;
 		}
 		
 		public String getPath() {
@@ -449,6 +459,7 @@ public class DownloadIndexesService  {
                 case TRAVEL:
                     return fileName.endsWith(".travel.obf.zip") || fileName.endsWith(".travel.obf");
                 case MAP:
+                case OSMLIVE:
                 case ROAD_MAP:
                 case WIKIMAP:
                 case DEPTH:
@@ -483,14 +494,11 @@ public class DownloadIndexesService  {
 				return String.format("Contour lines (%s) for %s", suf, regionName);
 			case TRAVEL:
 				return String.format("Travel for %s", regionName);
+			case OSMLIVE:
 			case HEIGHTMAP:
-				return String.format("%s", regionName);
 			case WEATHER:
-				return String.format("%s", regionName);
-			case GEOTIFF:
-				return String.format("%s", regionName);
 			case HILLSHADE:
-				return String.format("%s", regionName);
+			case GEOTIFF:
 			case SLOPE:
 				return String.format("%s", regionName);
 			case FONTS:
@@ -547,29 +555,23 @@ public class DownloadIndexesService  {
 	}
 	
 	public enum DownloadServerSpecialty {
-		MAIN(new String[0], DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
-		SRTM("srtmcountry", DownloadType.SRTM_MAP),
-		HILLSHADE("hillshade", DownloadType.HILLSHADE),
-		SLOPE("slope", DownloadType.SLOPE),
-		HEIGHTMAP("heightmap", DownloadType.HEIGHTMAP, DownloadType.GEOTIFF),
-		OSMLIVE(new String[] {"aosmc", "osmc"}, DownloadType.MAP),
-		DEPTH("depth", DownloadType.DEPTH, DownloadType.DEPTHMAP),
-		ROADS("road", DownloadType.ROAD_MAP),
-		WIKI(new String[] {"wikivoyage", "wiki", "travel"}, DownloadType.WIKIMAP, DownloadType.TRAVEL),
-		WEATHER("weather", DownloadType.WEATHER);
+		MAIN(DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
+		SRTM(DownloadType.SRTM_MAP),
+		HILLSHADE(DownloadType.HILLSHADE),
+		SLOPE(DownloadType.SLOPE),
+		HEIGHTMAP(DownloadType.HEIGHTMAP, DownloadType.GEOTIFF),
+		OSMLIVE(DownloadType.MAP),
+		DEPTH(DownloadType.DEPTH, DownloadType.DEPTHMAP),
+		ROADS(DownloadType.ROAD_MAP),
+		WIKI(DownloadType.WIKIMAP, DownloadType.TRAVEL),
+		WEATHER(DownloadType.WEATHER);
 		
 		public final DownloadType[] types;
-		public final String[] httpParams;
 
-		DownloadServerSpecialty(String httpParam, DownloadType... tp) {
-			this.httpParams = new String[] {httpParam};
+		DownloadServerSpecialty(DownloadType... tp) {
 			this.types = tp;
 		}
 		
-		DownloadServerSpecialty(String[] httpParams, DownloadType... tp) {
-			this.httpParams = httpParams;
-			this.types = tp;
-		}
 		
 		public static DownloadServerSpecialty getSpecialtyByDownloadType(DownloadType c) {
 			for(DownloadServerSpecialty s : values())  {

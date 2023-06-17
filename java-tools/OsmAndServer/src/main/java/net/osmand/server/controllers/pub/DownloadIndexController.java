@@ -167,45 +167,21 @@ public class DownloadIndexController {
 
 	private Resource findFileResource(MultiValueMap<String, String> params) throws FileNotFoundException {
 		String filename = getFileOrThrow(params);
-		// TODO this code could be refactored and use DownloadServerSpecialty.values()
-		// though it needs to fix ambigiouty between travel/wiki, aosmc, fonts / inapp 
-		if (params.containsKey("srtm")) {
-			return getFileAsResource(DownloadType.SRTM_MAP.getPath(), filename);
-		}
-		if (params.containsKey("srtmcountry")) {
-			return getFileAsResource(DownloadType.SRTM_MAP.getPath(), filename);
-		}
-		if (params.containsKey("road")) {
-			return getFileAsResource(DownloadType.ROAD_MAP.getPath(), filename);
-		}
 		if (params.containsKey("aosmc") || params.containsKey("osmc")) {
 			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 			return getFileAsResource("aosmc" + File.separator + folder, filename);
 		}
-		if (params.containsKey("wiki")) {
-			return getFileAsResource(DownloadType.WIKIMAP.getPath(), filename);
-		}
-		if (params.containsKey("hillshade")) {
-			return getFileAsResource(DownloadType.HILLSHADE.getPath(), filename);
-		}
-		if (params.containsKey("slope")) {
-			return getFileAsResource(DownloadType.SLOPE.getPath(), filename);
-		}
-		if (params.containsKey("heightmap")) {
-			return getFileAsResource(DownloadType.HEIGHTMAP.getPath(), filename);
-		}
-		if (params.containsKey("depth")) {
-			return getFileAsResource(DownloadType.DEPTHMAP.getPath(), filename);
-		}
-		if (params.containsKey("inapp")) {
-			String type = params.getFirst("inapp");
-			return getFileAsResource("indexes/inapp/"+type, filename);
-		}
-		if (params.containsKey("fonts")) {
-			return getFileAsResource(DownloadType.FONTS.getPath(), filename);
-		}
-		if (params.containsKey("weather")) {
-			return getFileAsResource(DownloadType.WEATHER.getPath(), filename);
+//		if (params.containsKey("inapp")) {
+//			String type = params.getFirst("inapp");
+//			return getFileAsResource("indexes/inapp/"+type, filename);
+//		}
+		
+		for (DownloadType type : DownloadType.values()) {
+			for (String httpParam : type.getHeaders()) {
+				if (isContainAndEqual(httpParam, params)) {
+					return getFileAsResource(type.getPath(), filename);
+				}
+			}
 		}
 		Resource res = getFileAsResource(DownloadType.MAP.getPath(), filename);
 		if (res.exists()) {
@@ -259,12 +235,14 @@ public class DownloadIndexController {
 			String host = null;
 			boolean headerFound = false;
 			for (DownloadServerSpecialty dss : DownloadServerSpecialty.values()) {
-				for (String httpParam : dss.httpParams) {
-					if (isContainAndEqual(httpParam, params)) {
-						headerFound = true;
-						host = servers.getServer(dss, remoteAddr);
-						if (host != null) {
-							break;
+				for (DownloadType type : dss.types) {
+					for (String httpParam : type.getHeaders()) {
+						if (isContainAndEqual(httpParam, params)) {
+							headerFound = true;
+							host = servers.getServer(dss, remoteAddr);
+							if (host != null) {
+								break;
+							}
 						}
 					}
 				}
