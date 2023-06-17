@@ -161,6 +161,7 @@ public class IndexController {
 		model.addAttribute("depth", doc.getDepths());
 		model.addAttribute("slope", doc.getSlope());
 		model.addAttribute("heightmap", doc.getHeightmap());
+		model.addAttribute("weather", doc.getWeather());
         return "admin/indexes";
     }
 
