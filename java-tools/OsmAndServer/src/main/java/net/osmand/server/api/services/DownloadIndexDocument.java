@@ -62,6 +62,9 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "slope")
 	private List<DownloadIndex> slope = new ArrayList<>();
 	
+	@XmlElement(name = "weather")
+	private List<DownloadIndex> weather = new ArrayList<>();
+	
 	public void prepareMaps() {
 		sortMaps(maps);
 		sortMaps(roadMaps);
@@ -76,6 +79,7 @@ public class DownloadIndexDocument {
 		sortMaps(depths);
 		sortMaps(wikimaps);
 		sortMaps(travel);
+		sortMaps(weather);
 	}
 	
 	public List<DownloadIndex> getAllMaps() {
@@ -91,6 +95,7 @@ public class DownloadIndexDocument {
 		indx.addAll(inapps);
 		indx.addAll(wikimaps);
 		indx.addAll(travel);
+		indx.addAll(weather);
 		return indx;
 	}
 
@@ -156,6 +161,10 @@ public class DownloadIndexDocument {
 	
 	public List<DownloadIndex> getHeightmap() {
 		return heightmap;
+	}
+	
+	public List<DownloadIndex> getWeather() {
+		return weather;
 	}
 
 	@XmlAttribute

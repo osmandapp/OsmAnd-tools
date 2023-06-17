@@ -123,7 +123,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getHillshade(), rootFolder, DownloadType.HILLSHADE);
 		loadIndexesFromDir(doc.getSlope(), rootFolder, DownloadType.SLOPE);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.HEIGHTMAP);
-		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.WEATHER);
+		loadIndexesFromDir(doc.getWeather(), rootFolder, DownloadType.WEATHER);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.GEOTIFF);
 		DownloadFreeMapsConfig free = getSettings().freemaps;
 		for (DownloadIndex di : doc.getAllMaps()) {
@@ -423,7 +423,7 @@ public class DownloadIndexesService  {
 	    GEOTIFF("heightmap"),
 	    SLOPE("slope") ,
 	    SRTM_MAP("srtm-countries"),
-	    WEATHER("weather");
+	    WEATHER("weather/regions");
 
 
 		private final String path;
