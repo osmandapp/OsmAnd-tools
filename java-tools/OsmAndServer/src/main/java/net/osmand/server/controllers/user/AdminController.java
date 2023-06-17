@@ -1503,7 +1503,7 @@ public class AdminController {
 		long length;
 		public ReleaseInfo(File f) {
 			name = f.getName();
-			size = String.format("%.2d", f.length() / 1024.0 / 1024.0);
+			size = String.format("%.2f", f.length() / 1024.0 / 1024.0);
 			length = f.length();
 			timestamp = f.lastModified();
 			date = new Date(f.lastModified()).toString();
