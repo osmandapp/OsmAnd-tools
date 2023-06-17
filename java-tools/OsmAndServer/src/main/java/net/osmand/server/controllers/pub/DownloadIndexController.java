@@ -5,8 +5,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.List;
@@ -18,7 +16,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -38,8 +35,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 @Controller
 public class DownloadIndexController {
@@ -171,47 +167,49 @@ public class DownloadIndexController {
 
 	private Resource findFileResource(MultiValueMap<String, String> params) throws FileNotFoundException {
 		String filename = getFileOrThrow(params);
+		// TODO this code could be refactored and use DownloadServerSpecialty.values()
+		// though it needs to fix ambigiouty between travel/wiki, aosmc, fonts / inapp 
 		if (params.containsKey("srtm")) {
-			return getFileAsResource("srtm", filename);
+			return getFileAsResource(DownloadType.SRTM_MAP.getPath(), filename);
 		}
 		if (params.containsKey("srtmcountry")) {
-			return getFileAsResource("srtm-countries", filename);
+			return getFileAsResource(DownloadType.SRTM_MAP.getPath(), filename);
 		}
 		if (params.containsKey("road")) {
-			return getFileAsResource("road-indexes", filename);
+			return getFileAsResource(DownloadType.ROAD_MAP.getPath(), filename);
 		}
 		if (params.containsKey("aosmc") || params.containsKey("osmc")) {
 			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 			return getFileAsResource("aosmc" + File.separator + folder, filename);
 		}
 		if (params.containsKey("wiki")) {
-			return getFileAsResource("wiki", filename);
+			return getFileAsResource(DownloadType.WIKIMAP.getPath(), filename);
 		}
 		if (params.containsKey("hillshade")) {
-			return getFileAsResource("hillshade", filename);
+			return getFileAsResource(DownloadType.HILLSHADE.getPath(), filename);
 		}
 		if (params.containsKey("slope")) {
-			return getFileAsResource("slope", filename);
+			return getFileAsResource(DownloadType.SLOPE.getPath(), filename);
 		}
 		if (params.containsKey("heightmap")) {
-			return getFileAsResource("heightmap", filename);
+			return getFileAsResource(DownloadType.HEIGHTMAP.getPath(), filename);
 		}
 		if (params.containsKey("depth")) {
-			return getFileAsResource("depth", filename);
+			return getFileAsResource(DownloadType.DEPTHMAP.getPath(), filename);
 		}
 		if (params.containsKey("inapp")) {
 			String type = params.getFirst("inapp");
 			return getFileAsResource("indexes/inapp/"+type, filename);
 		}
-		if (params.containsKey("wikivoyage")) {
-			return getFileAsResource("wikivoyage", filename);
-		}
 		if (params.containsKey("fonts")) {
-			return getFileAsResource("indexes/fonts", filename);
+			return getFileAsResource(DownloadType.FONTS.getPath(), filename);
 		}
-		Resource res = getFileAsResource("indexes", filename);
+		if (params.containsKey("weather")) {
+			return getFileAsResource(DownloadType.WEATHER.getPath(), filename);
+		}
+		Resource res = getFileAsResource(DownloadType.MAP.getPath(), filename);
 		if (res.exists()) {
-			return getFileAsResource("indexes", filename);
+			return getFileAsResource(DownloadType.MAP.getPath(), filename);
 		}
 		String msg = "Requested resource is missing or request is incorrect.\nRequest parameters: " + params;
 		LOGGER.error(msg);
