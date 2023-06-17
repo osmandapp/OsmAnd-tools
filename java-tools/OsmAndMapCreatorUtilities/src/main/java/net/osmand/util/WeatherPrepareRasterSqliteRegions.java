@@ -3,6 +3,7 @@ package net.osmand.util;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -43,6 +44,7 @@ public class WeatherPrepareRasterSqliteRegions {
 	private static final Log LOG = PlatformUtil.getLog(WeatherPrepareRasterSqliteRegions.class);
 	private static boolean SKIP_EXISTING = false;
 	private static String EXTENSION = ".sqlitedb";
+	private static boolean GZIP = false;
 	private static int ZOOM = 4;
 	private static final int BATCH_SIZE = 100;
 	private static int GEN_HOURS_BACK = 4;
@@ -58,6 +60,8 @@ public class WeatherPrepareRasterSqliteRegions {
 		for (int i = 1; i < args.length; i++) {
 			if ("--dry-run".equals(args[i])) {
 				dryRun = true;
+			} else if ("--gzip".equals(args[i])) {
+				GZIP = true;
 			} else if (args[i].startsWith("--zoom=")) {
 				ZOOM = Integer.parseInt(args[i].substring("--zoom=".length()));
 			} else if (args[i].startsWith("--include-hours-before-now=")) {
@@ -133,8 +137,10 @@ public class WeatherPrepareRasterSqliteRegions {
 		String name = country.getName();
 		String dwName = prefix + Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + EXTENSION;
 		final File targetFile = new File(new File(weatherFolder, REGIONS_FOLDER), dwName);
+		final File targetFileGZip = new File(new File(weatherFolder, REGIONS_FOLDER), dwName + ".gz");
 		if (!SKIP_EXISTING) {
 			targetFile.delete();
+			targetFileGZip.delete();
 		}
 		if (targetFile.exists()) {
 			System.out.println("Already processed "+ name);
@@ -147,6 +153,14 @@ public class WeatherPrepareRasterSqliteRegions {
 			return;
 		}
 		procRegion(weatherFolder, regionTileNames, targetFile);
+		if (GZIP) {
+			FileOutputStream fout = new FileOutputStream(targetFileGZip);
+			FileInputStream fin = new FileInputStream(targetFile);
+			Algorithms.streamCopy(fin, fout);
+			fin.close();
+			fout.close();
+		}
+		
 	}
 
 	private static void calculateRegionBoundaries(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
@@ -224,7 +238,6 @@ public class WeatherPrepareRasterSqliteRegions {
 		cal.setTimeInMillis(System.currentTimeMillis());
 		cal.add(Calendar.HOUR_OF_DAY, -GEN_HOURS_BACK);
 		Date filterTime = cal.getTime();
-		
 		
 		int batch = 0;
 		try (Connection targetConn = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
