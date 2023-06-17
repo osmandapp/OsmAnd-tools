@@ -65,6 +65,8 @@ public class WeatherPrepareRasterSqliteRegions {
 				dryRun = true;
 			} else if ("--gzip".equals(args[i])) {
 				GZIP = true;
+			} else if ("--skip-existing".equals(args[i])) {
+				SKIP_EXISTING = true;
 			} else if (args[i].startsWith("--zoom=")) {
 				ZOOM = Integer.parseInt(args[i].substring("--zoom=".length()));
 			} else if (args[i].startsWith("--include-hours-before-now=")) {
@@ -112,8 +114,54 @@ public class WeatherPrepareRasterSqliteRegions {
 				e.printStackTrace();
 			}
 		}
+		try {
+			processWorld(weatherFolder, prefix, dryRun);
+		} catch (Exception e) {
+			failedCountries.add("world");
+			e.printStackTrace();
+		}
+		
 		if (!failedCountries.isEmpty()) {
 			throw new IllegalStateException("Failed countries " + failedCountries);
+		}
+	}
+
+	private static void processWorld(File weatherFolder, String prefix, boolean dryRun) throws Exception {
+		String dwName = prefix + "World" + EXTENSION;
+		final File targetFile = new File(new File(weatherFolder, REGIONS_FOLDER), dwName);
+		final File targetFileGZip = new File(new File(weatherFolder, REGIONS_FOLDER), dwName + ".gz");
+		if (!SKIP_EXISTING) {
+			targetFile.delete();
+			targetFileGZip.delete();
+		}
+		if (targetFile.exists() || targetFileGZip.exists()) {
+			System.out.println("Already processed "+ dwName);
+			return;
+		}
+
+		Set<Long> regionTileNames = new TreeSet<>();
+		if (dryRun) {
+			return;
+		}
+		for (int tileX = 0; tileX <= MapUtils.getPowZoom(ZOOM); tileX++) {
+			for (int tileY = 0; tileY <= MapUtils.getPowZoom(ZOOM); tileY++) {
+				regionTileNames.add(pack(tileX, tileY, ZOOM));
+			}
+		}
+		procRegion(weatherFolder, regionTileNames, targetFile);
+		gzipFile(targetFile, targetFileGZip);
+		
+	}
+
+	private static void gzipFile(final File targetFile, final File targetFileGZip)
+			throws IOException, FileNotFoundException {
+		if (GZIP) {
+			OutputStream fout = new GZIPOutputStream(new FileOutputStream(targetFileGZip));
+			InputStream fin = new FileInputStream(targetFile);
+			Algorithms.streamCopy(fin, fout);
+			fin.close();
+			fout.close();
+			targetFile.delete();
 		}
 	}
 
@@ -145,7 +193,7 @@ public class WeatherPrepareRasterSqliteRegions {
 			targetFile.delete();
 			targetFileGZip.delete();
 		}
-		if (targetFile.exists()) {
+		if (targetFile.exists() || targetFileGZip.exists()) {
 			System.out.println("Already processed "+ name);
 			return;
 		}
@@ -156,14 +204,7 @@ public class WeatherPrepareRasterSqliteRegions {
 			return;
 		}
 		procRegion(weatherFolder, regionTileNames, targetFile);
-		if (GZIP) {
-			OutputStream fout = new GZIPOutputStream(new FileOutputStream(targetFileGZip));
-			InputStream fin = new FileInputStream(targetFile);
-			Algorithms.streamCopy(fin, fout);
-			fin.close();
-			fout.close();
-			targetFile.delete();
-		}
+		gzipFile(targetFile, targetFileGZip);
 		
 	}
 
