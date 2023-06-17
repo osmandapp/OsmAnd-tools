@@ -259,9 +259,11 @@ public class DownloadIndexController {
 				}
 			}
 			String host = null;
+			boolean headerFound = false;
 			for (DownloadServerSpecialty dss : DownloadServerSpecialty.values()) {
 				for (String httpParam : dss.httpParams) {
 					if (isContainAndEqual(httpParam, params)) {
+						headerFound = true;
 						host = servers.getServer(dss, remoteAddr);
 						if (host != null) {
 							break;
@@ -269,7 +271,7 @@ public class DownloadIndexController {
 					}
 				}
 			}
-			if (host == null) {
+			if (host == null && !headerFound) {
 				host = servers.getServer(DownloadServerSpecialty.MAIN, remoteAddr);
 			}
 			if (host != null) {
