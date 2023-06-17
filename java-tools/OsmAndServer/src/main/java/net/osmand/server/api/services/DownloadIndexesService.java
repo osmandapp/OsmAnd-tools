@@ -123,6 +123,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getHillshade(), rootFolder, DownloadType.HILLSHADE);
 		loadIndexesFromDir(doc.getSlope(), rootFolder, DownloadType.SLOPE);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.HEIGHTMAP);
+		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.WEATHER);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.GEOTIFF);
 		DownloadFreeMapsConfig free = getSettings().freemaps;
 		for (DownloadIndex di : doc.getAllMaps()) {
@@ -421,7 +422,8 @@ public class DownloadIndexesService  {
 	    HEIGHTMAP("heightmap"),
 	    GEOTIFF("heightmap"),
 	    SLOPE("slope") ,
-	    SRTM_MAP("srtm-countries") ;
+	    SRTM_MAP("srtm-countries"),
+	    WEATHER("weather");
 
 
 		private final String path;
@@ -439,6 +441,8 @@ public class DownloadIndexesService  {
             switch (this) {
                 case HEIGHTMAP:
                     return fileName.endsWith(".sqlite");
+                case WEATHER:
+                    return fileName.endsWith(".sqlite.gz");
                 case GEOTIFF:
                     return fileName.endsWith(".tif");
                 case TRAVEL:
@@ -479,6 +483,8 @@ public class DownloadIndexesService  {
 			case TRAVEL:
 				return String.format("Travel for %s", regionName);
 			case HEIGHTMAP:
+				return String.format("%s", regionName);
+			case WEATHER:
 				return String.format("%s", regionName);
 			case GEOTIFF:
 				return String.format("%s", regionName);
@@ -547,8 +553,9 @@ public class DownloadIndexesService  {
 		HEIGHTMAP("heightmap", DownloadType.HEIGHTMAP, DownloadType.GEOTIFF),
 		OSMLIVE(new String[] {"aosmc", "osmc"}, DownloadType.MAP),
 		DEPTH("depth", DownloadType.DEPTH, DownloadType.DEPTHMAP),
+		ROADS("road", DownloadType.ROAD_MAP),
 		WIKI(new String[] {"wikivoyage", "wiki", "travel"}, DownloadType.WIKIMAP, DownloadType.TRAVEL),
-		ROADS("road", DownloadType.ROAD_MAP);
+		WEATHER("weather", DownloadType.WEATHER);
 		
 		public final DownloadType[] types;
 		public final String[] httpParams;
