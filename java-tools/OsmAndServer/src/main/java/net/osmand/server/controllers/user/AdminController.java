@@ -1496,17 +1496,25 @@ public class AdminController {
 	
 	public static class ReleaseInfo {
 		
+		public static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 		public String name;
 		public String size;
 		public String date;
 		public long timestamp;
+		public String version;
+		public String type;
 		public long length;
 		public ReleaseInfo(File f) {
 			name = f.getName();
-			size = String.format("%.2f", f.length() / 1024.0 / 1024.0);
+			size = String.format("%.2f MB", f.length() / 1024.0 / 1024.0);
 			length = f.length();
 			timestamp = f.lastModified();
-			date = new Date(f.lastModified()).toString();
+			date = sdf.format(new Date(f.lastModified()));
+			int i1 = name.indexOf('-');
+			int i2 = name.indexOf('-', i1 + 1);
+			if (i2 > 0) {
+				version = name.substring(i1 + 1, i2);
+			}
 		}
 	}
 	@GetMapping(path = {"/releases"})
@@ -1534,6 +1542,9 @@ public class AdminController {
 		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file) ;
 		HttpHeaders headers = new HttpHeaders();
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fl.getName());
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		headers.add(HttpHeaders.CONTENT_LENGTH, fl.length() + "");
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
 	
