@@ -143,8 +143,8 @@ public class WeatherPrepareRasterSqliteRegions {
 		if (dryRun) {
 			return;
 		}
-		for (int tileX = 0; tileX <= MapUtils.getPowZoom(ZOOM); tileX++) {
-			for (int tileY = 0; tileY <= MapUtils.getPowZoom(ZOOM); tileY++) {
+		for (int tileX = 0; tileX < MapUtils.getPowZoom(ZOOM); tileX++) {
+			for (int tileY = 0; tileY < MapUtils.getPowZoom(ZOOM); tileY++) {
 				regionTileNames.add(pack(tileX, tileY, ZOOM));
 			}
 		}
