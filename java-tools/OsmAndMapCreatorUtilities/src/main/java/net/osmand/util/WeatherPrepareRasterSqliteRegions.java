@@ -189,7 +189,7 @@ public class WeatherPrepareRasterSqliteRegions {
 		String name = country.getName();
 		String dwName = prefix + Algorithms.capitalizeFirstLetterAndLowercase(downloadName) + EXTENSION;
 		final File targetFile = new File(new File(weatherFolder, REGIONS_FOLDER), dwName);
-		final File targetFileGZip = new File(new File(weatherFolder, REGIONS_FOLDER), dwName + ".gz");
+		final File targetFileGZip = new File(new File(weatherFolder, REGIONS_FOLDER), dwName + ".zip");
 		if (!SKIP_EXISTING) {
 			targetFile.delete();
 			targetFileGZip.delete();
