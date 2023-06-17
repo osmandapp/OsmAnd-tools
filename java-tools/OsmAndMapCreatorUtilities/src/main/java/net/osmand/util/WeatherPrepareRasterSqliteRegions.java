@@ -5,6 +5,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -21,6 +23,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
@@ -154,11 +157,12 @@ public class WeatherPrepareRasterSqliteRegions {
 		}
 		procRegion(weatherFolder, regionTileNames, targetFile);
 		if (GZIP) {
-			FileOutputStream fout = new FileOutputStream(targetFileGZip);
-			FileInputStream fin = new FileInputStream(targetFile);
+			OutputStream fout = new GZIPOutputStream(new FileOutputStream(targetFileGZip));
+			InputStream fin = new FileInputStream(targetFile);
 			Algorithms.streamCopy(fin, fout);
 			fin.close();
 			fout.close();
+			targetFile.delete();
 		}
 		
 	}
