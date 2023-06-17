@@ -16,6 +16,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
@@ -731,6 +732,9 @@ public class DownloadIndexesService  {
 			}
 			for (DownloadServerSpecialty s : DownloadServerSpecialty.values()) {
 				Map<String, Integer> mp = servers.get(s.name().toLowerCase());
+				if (mp == null) {
+					mp = Collections.emptyMap();
+				}
 				for (String serverName : mp.keySet()) {
 					if (!globalRegion.servers.contains(serverName)) {
 						globalRegion.servers.add(serverName);
