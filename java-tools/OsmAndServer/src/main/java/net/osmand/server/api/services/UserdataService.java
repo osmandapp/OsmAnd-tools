@@ -758,13 +758,13 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String email, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> sendCode(String email, String action, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudWebEmail(email, token, "delete");
+        emailSender.sendOsmAndCloudWebEmail(email, token, action);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
