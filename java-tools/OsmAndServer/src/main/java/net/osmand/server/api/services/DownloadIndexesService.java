@@ -458,8 +458,9 @@ public class DownloadIndexesService  {
                     return fileName.endsWith(".tif");
                 case TRAVEL:
                     return fileName.endsWith(".travel.obf.zip") || fileName.endsWith(".travel.obf");
-                case MAP:
                 case OSMLIVE:
+                	return fileName.endsWith(".obf.gz");
+                case MAP:
                 case ROAD_MAP:
                 case WIKIMAP:
                 case DEPTH:
@@ -560,7 +561,7 @@ public class DownloadIndexesService  {
 		HILLSHADE(DownloadType.HILLSHADE),
 		SLOPE(DownloadType.SLOPE),
 		HEIGHTMAP(DownloadType.HEIGHTMAP, DownloadType.GEOTIFF),
-		OSMLIVE(DownloadType.MAP),
+		OSMLIVE(DownloadType.OSMLIVE),
 		DEPTH(DownloadType.DEPTH, DownloadType.DEPTHMAP),
 		ROADS(DownloadType.ROAD_MAP),
 		WIKI(DownloadType.WIKIMAP, DownloadType.TRAVEL),
