@@ -34,17 +34,39 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 400;
     
     private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 4;
-    private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 14;
     private static final String SEARCH_LOCALE = "en";
     
     public static class PoiSearchResult {
-        public PoiSearchResult(boolean useLimit, RoutingController.FeatureCollection features) {
+        
+        public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, RoutingController.FeatureCollection features) {
             this.useLimit = useLimit;
+            this.mapLimitExceeded = mapLimitExceeded;
             this.features = features;
         }
         
         public boolean useLimit;
+        public boolean mapLimitExceeded;
         public RoutingController.FeatureCollection features;
+    }
+    
+    public static class PoiSearchData {
+        
+        public PoiSearchData(List<String> categories, String northWest, String southEast) {
+            this.categories = categories;
+            this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
+        }
+        
+        public List<String> categories;
+        public List<LatLon> bbox;
+        
+        private static List<LatLon> getBboxCoords(List<String> coords) {
+            List<LatLon> bbox = new ArrayList<>();
+            for (String coord : coords) {
+                String[] lanLonArr = coord.split(",");
+                bbox.add(new LatLon(Double.parseDouble(lanLonArr[0]), Double.parseDouble(lanLonArr[1])));
+            }
+            return bbox;
+        }
     }
     
     public synchronized List<SearchResult> search(double lat, double lon, String text) throws IOException {
@@ -67,85 +89,72 @@ public class SearchService {
         return r.getCurrentSearchResults();
     }
     
-    public synchronized PoiSearchResult searchPoi(double lat, double lon, List<String> categories, Map<String, Object> data, int zoom) throws IOException {
+    public synchronized PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
         List<RoutingController.Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
-        int limit = TOTAL_LIMIT_POI / categories.size();
+        int limit = TOTAL_LIMIT_POI / data.categories.size();
         boolean useLimit = false;
-        for (String category : categories) {
-            int sumLimit = limit + leftoverLimit;
-            List<SearchResult> res = searchPoiByCategory(lat, lon, category, data, limit + leftoverLimit, zoom);
-            if (!res.isEmpty()) {
-                if (res.size() == sumLimit) {
-                    useLimit = true;
+        QuadRect searchBbox = getSearchBbox(data.bbox);
+        List<BinaryMapIndexReader> mapList = getMapsForSearch(data.bbox, searchBbox);
+        if (mapList.isEmpty()) {
+            return new PoiSearchResult(false, true, null);
+        } else {
+            for (String category : data.categories) {
+                int sumLimit = limit + leftoverLimit;
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, mapList);
+                List<SearchResult> res = new ArrayList<>();
+                if (resultCollection != null) {
+                    res = resultCollection.getCurrentSearchResults();
+                    if (!res.isEmpty()) {
+                        if (resultCollection.getUseLimit()) {
+                            useLimit = true;
+                        }
+                        saveSearchResult(res, features);
+                    }
                 }
                 leftoverLimit = limit - res.size();
-                prepareSearchResult(res, features);
             }
-        }
-        if (!features.isEmpty()) {
-            return new PoiSearchResult(useLimit, new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0])));
-        } else {
-            return null;
+            if (!features.isEmpty()) {
+                return new PoiSearchResult(useLimit, false, new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0])));
+            } else {
+                return null;
+            }
         }
     }
     
-    public synchronized List<SearchResult> searchPoiByCategory(double lat, double lon, String text, Map<String, Object> data, int limit, int zoom) throws IOException {
-        if (!osmAndMapsService.validateAndInitConfig()) {
-            return List.of();
-        }
-        QuadRect searchBbox = getSearchBbox(data, zoom);
+    private List<BinaryMapIndexReader> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException {
         if (searchBbox != null) {
             SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
             searchUICore.getSearchSettings().setRegions(osmandRegions);
-            List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(searchBbox, data));
+            List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(searchBbox, bbox));
             if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
-                searchUICore.getSearchSettings().setOfflineIndexes(list);
-                searchUICore.init();
-                searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-                SearchSettings settings = searchUICore.getPhrase().getSettings();
-                if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
-                    searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-                    searchUICore.setTotalLimit(limit);
-                    SearchUICore.SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
-                    return r.getCurrentSearchResults();
-                }
+                return list;
             }
         }
         return List.of();
     }
     
-    private void prepareSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) {
-        for (SearchResult result : res) {
-            if (result.objectType == ObjectType.POI) {
-                Amenity amenity = (Amenity) result.object;
-                PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-                RoutingController.Feature feature;
-                if (poiType != null) {
-                    feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
-                            .prop("name", amenity.getName())
-                            .prop("color", amenity.getColor())
-                            .prop("iconKeyName", poiType.getIconKeyName())
-                            .prop("typeOsmTag", poiType.getOsmTag())
-                            .prop("typeOsmValue", poiType.getOsmValue())
-                            .prop("iconName", getIconName(poiType))
-                            .prop("type", amenity.getType().getKeyName())
-                            .prop("subType", amenity.getSubType());
-                    
-                    for (String e : amenity.getAdditionalInfoKeys()) {
-                        feature.prop(e, amenity.getAdditionalInfo(e));
-                    }
-                    features.add(feature);
-                }
-            }
+    public synchronized SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
         }
+        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+    
+        searchUICore.init();
+        searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
+        searchUICore.setTotalLimit(limit);
+        
+        SearchSettings settings = searchUICore.getPhrase().getSettings();
+        settings.setRegions(osmandRegions);
+        settings.setOfflineIndexes(mapList);
+        searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+        
+        return searchUICore.immediateSearch(text, null);
     }
     
-    public QuadRect getSearchBbox(Map<String, Object> data, int zoom) {
-        if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
-            LatLon point1 = new LatLon((double) data.get("latBboxPoint1"), (double) data.get("lngBboxPoint1"));
-            LatLon point2 = new LatLon((double) data.get("latBboxPoint2"), (double) data.get("lngBboxPoint2"));
-            return osmAndMapsService.points(null, point1, point2);
+    public QuadRect getSearchBbox(List<LatLon> bbox) {
+        if (bbox.size() == 2) {
+            return osmAndMapsService.points(null, bbox.get(0), bbox.get(1));
         }
         return null;
     }
@@ -218,4 +227,31 @@ public class SearchService {
         }
         return tags;
     }
+    
+    private void saveSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) {
+        for (SearchResult result : res) {
+            if (result.objectType == ObjectType.POI) {
+                Amenity amenity = (Amenity) result.object;
+                PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+                RoutingController.Feature feature;
+                if (poiType != null) {
+                    feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
+                            .prop("name", amenity.getName())
+                            .prop("color", amenity.getColor())
+                            .prop("iconKeyName", poiType.getIconKeyName())
+                            .prop("typeOsmTag", poiType.getOsmTag())
+                            .prop("typeOsmValue", poiType.getOsmValue())
+                            .prop("iconName", getIconName(poiType))
+                            .prop("type", amenity.getType().getKeyName())
+                            .prop("subType", amenity.getSubType());
+                    
+                    for (String e : amenity.getAdditionalInfoKeys()) {
+                        feature.prop(e, amenity.getAdditionalInfo(e));
+                    }
+                    features.add(feature);
+                }
+            }
+        }
+    }
+    
 }

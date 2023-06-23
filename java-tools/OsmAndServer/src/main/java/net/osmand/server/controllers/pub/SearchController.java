@@ -85,12 +85,8 @@ public class SearchController {
     
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> searchPoi(@RequestBody Map<String, Object> data,
-                                            @RequestParam double lat,
-                                            @RequestParam double lon,
-                                            @RequestParam int zoom) throws IOException {
-        List<String> categories = (List<String>) data.get("categories");
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(lat, lon, categories, data, zoom);
+    public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData) throws IOException {
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData);
         if (poiSearchResult != null) {
             return ResponseEntity.ok(gson.toJson(poiSearchResult));
         } else {
