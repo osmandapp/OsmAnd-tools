@@ -38,26 +38,32 @@ public class SearchService {
     
     public static class PoiSearchResult {
         
-        public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, RoutingController.FeatureCollection features) {
+        public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound, RoutingController.FeatureCollection features) {
             this.useLimit = useLimit;
             this.mapLimitExceeded = mapLimitExceeded;
+            this.alreadyFound = alreadyFound;
             this.features = features;
         }
         
         public boolean useLimit;
         public boolean mapLimitExceeded;
+        public boolean alreadyFound;
         public RoutingController.FeatureCollection features;
     }
     
     public static class PoiSearchData {
         
-        public PoiSearchData(List<String> categories, String northWest, String southEast) {
+        public PoiSearchData(List<String> categories, String northWest, String southEast, String savedNorthWest, String savedSouthEast) {
             this.categories = categories;
             this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
+            if (savedNorthWest != null && savedSouthEast != null) {
+                this.savedBbox = getBboxCoords(Arrays.asList(savedNorthWest, savedSouthEast));
+            }
         }
         
         public List<String> categories;
         public List<LatLon> bbox;
+        public List<LatLon> savedBbox;
         
         private static List<LatLon> getBboxCoords(List<String> coords) {
             List<LatLon> bbox = new ArrayList<>();
@@ -90,6 +96,11 @@ public class SearchService {
     }
     
     public synchronized PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
+        
+        if (data.savedBbox != null && isContainsBbox(data)) {
+            return new PoiSearchResult(false, false, true,null);
+        }
+        
         List<RoutingController.Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
         int limit = TOTAL_LIMIT_POI / data.categories.size();
@@ -97,29 +108,35 @@ public class SearchService {
         QuadRect searchBbox = getSearchBbox(data.bbox);
         List<BinaryMapIndexReader> mapList = getMapsForSearch(data.bbox, searchBbox);
         if (mapList.isEmpty()) {
-            return new PoiSearchResult(false, true, null);
-        } else {
-            for (String category : data.categories) {
-                int sumLimit = limit + leftoverLimit;
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, mapList);
-                List<SearchResult> res = new ArrayList<>();
-                if (resultCollection != null) {
-                    res = resultCollection.getCurrentSearchResults();
-                    if (!res.isEmpty()) {
-                        if (resultCollection.getUseLimit()) {
-                            useLimit = true;
-                        }
-                        saveSearchResult(res, features);
-                    }
-                }
-                leftoverLimit = limit - res.size();
-            }
-            if (!features.isEmpty()) {
-                return new PoiSearchResult(useLimit, false, new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0])));
-            } else {
-                return null;
-            }
+            return new PoiSearchResult(false, true, false,null);
         }
+        
+        for (String category : data.categories) {
+            int sumLimit = limit + leftoverLimit;
+            SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, mapList);
+            List<SearchResult> res = new ArrayList<>();
+            if (resultCollection != null) {
+                res = resultCollection.getCurrentSearchResults();
+                if (!res.isEmpty()) {
+                    if (resultCollection.getUseLimit()) {
+                        useLimit = true;
+                    }
+                    saveSearchResult(res, features);
+                }
+            }
+            leftoverLimit = limit - res.size();
+        }
+        if (!features.isEmpty()) {
+            return new PoiSearchResult(useLimit, false, false, new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0])));
+        } else {
+            return null;
+        }
+    }
+    
+    private boolean isContainsBbox(SearchService.PoiSearchData data) {
+        QuadRect searchBbox = getSearchBbox(data.bbox);
+        QuadRect oldSearchBbox = getSearchBbox(data.savedBbox);
+        return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
     }
     
     private List<BinaryMapIndexReader> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException {
