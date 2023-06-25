@@ -352,7 +352,7 @@ public class WebGpxParser {
         if (srtmAnalysis != null) {
             tracks.forEach(track -> track.points.forEach(point -> {
                 if (point.geometry != null) {
-                    point.geometry.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
+                    point.geometry.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(point.geometry.indexOf(p)).value);
                 } else {
                     track.points.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
                 }
