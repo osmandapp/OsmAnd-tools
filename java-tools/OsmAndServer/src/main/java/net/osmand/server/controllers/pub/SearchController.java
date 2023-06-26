@@ -87,11 +87,7 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData) throws IOException {
         SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData);
-        if (poiSearchResult != null) {
-            return ResponseEntity.ok(gson.toJson(poiSearchResult));
-        } else {
-            return ResponseEntity.badRequest().body("Error search poi!");
-        }
+        return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
     
     @GetMapping(path = {"/get-poi-categories"}, produces = "application/json")
@@ -120,10 +116,6 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> searchPoiCategories(@RequestParam String search) throws IOException {
         Map<String, Map<String, String>> res = searchService.searchPoiCategories(search);
-        if (!res.isEmpty()) {
-            return ResponseEntity.ok(gson.toJson(res));
-        } else {
-            return ResponseEntity.badRequest().body("Error get poi categories!");
-        }
+        return ResponseEntity.ok(gson.toJson(res));
     }
 }
