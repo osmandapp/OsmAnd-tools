@@ -384,6 +384,21 @@ public class UserdataController {
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
+	
+	@PostMapping(path = {"/send-code"})
+	@ResponseBody
+	public ResponseEntity<String> sendCode(@RequestBody MapApiController.EmailSenderInfo data,
+	                                       @RequestParam(name = "deviceid") int deviceId,
+	                                       @RequestParam String accessToken) {
+		if (emailSender.isEmail(data.email)) {
+			PremiumUserDevice dev = checkToken(deviceId, accessToken);
+			if (dev == null) {
+				return userdataService.tokenNotValid();
+			}
+			return userdataService.sendCode(data.email, data.action, dev);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
 
 	public static class UserFilesResults {
 		public long totalZipSize;
