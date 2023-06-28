@@ -334,6 +334,18 @@ public class DataExtractionSettings {
 		preferences.put("binaryFilesDir", file);
 	}
 
+	public String getLastUsedDir(){
+		String fl = preferences.get("lastUsedDir", null);
+		if(fl != null) {
+			return fl;
+		}
+		return getDefaultWorkingDir().getAbsolutePath();
+	}
+
+	public void setLastUsedDir(String file){
+		preferences.put("lastUsedDir", file);
+	}
+
 
 	public String getOsrmServerAddress(){
 		return preferences.get("osrmServerAddress", "http://127.0.0.1:5000");
