@@ -50,7 +50,6 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -469,9 +468,10 @@ public class MapRouterLayer implements MapPanelLayer {
 					// @Override
 					// public void run() {
 					JFileChooser fileChooser = new JFileChooser(
-							DataExtractionSettings.getSettings().getDefaultWorkingDir());
+							DataExtractionSettings.getSettings().getLastUsedDir());
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
+						DataExtractionSettings.getSettings().setLastUsedDir(file.getParent());
 						selectedGPXFile = GPXUtilities.loadGPXFile(file);
 						displayGpxFiles();
 						map.fillPopupActions();
@@ -994,6 +994,12 @@ public class MapRouterLayer implements MapPanelLayer {
 				// config.initialDirection = 0 / 180d * Math.PI; // NORTH
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
+				try {
+					float minPointApproximation;
+					minPointApproximation = Float.parseFloat(paramsR.get("minPointApproximation"));
+					config.minPointApproximation = minPointApproximation;
+				} catch (NumberFormatException e){
+				}
 				try {
 					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
 							.parse("19.07.2019 12:40").getTime();
