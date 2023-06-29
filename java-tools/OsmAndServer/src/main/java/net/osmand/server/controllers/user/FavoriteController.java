@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
+import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.services.GpxService;
@@ -15,6 +16,7 @@ import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,7 +30,7 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 @RequestMapping("/mapapi/fav")
 public class FavoriteController {
     
-    public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
+    public static final String FILE_TYPE_FAVOURITES = UserdataService.FILE_TYPE_FAVOURITES;
     public static final String FILE_EXT_GPX = ".gpx";
     private static final String DEFAULT_GROUP_FILE_NAME = "favorites.gpx";
     private static final String DEFAULT_GROUP_NAME = "favorites";
@@ -54,7 +56,7 @@ public class FavoriteController {
     public ResponseEntity<String> deleteFav(@RequestBody String data,
                                             @RequestParam String fileName,
                                             @RequestParam Long updatetime) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkValidateUser();
+    	PremiumUserDevicesRepository.PremiumUserDevice dev = getUserId();
         GPXFile file = createGpxFile(fileName, dev, updatetime);
         if (file != null) {
             file.deleteWptPt(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
@@ -70,7 +72,7 @@ public class FavoriteController {
     public ResponseEntity<String> addFav(@RequestBody String data,
                                          @RequestParam String fileName,
                                          @RequestParam(required = false) Long updatetime) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkValidateUser();
+        PremiumUserDevicesRepository.PremiumUserDevice dev = getUserId();
         GPXFile file = createGpxFile(fileName, dev, updatetime);
         if (file != null) {
             file.addPoint(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
@@ -93,9 +95,8 @@ public class FavoriteController {
                                             @RequestParam Long oldGroupUpdatetime,
                                             @RequestParam Long newGroupUpdatetime,
                                             @RequestParam int ind) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkValidateUser();
+    	PremiumUserDevicesRepository.PremiumUserDevice dev = getUserId();
         GPXUtilities.WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class));
-        
         GPXFile newGpxFile = createGpxFile(newGroupName, dev, newGroupUpdatetime);
         if (newGpxFile != null) {
             newGpxFile.updateWptPt(wptName, ind, wptPt);
@@ -131,16 +132,20 @@ public class FavoriteController {
                 "respOldGroup", respOldGroup != null ? respOldGroup : "")));
     }
     
+    
+    
     @PostMapping(value = "/add-group")
     @ResponseBody
     public ResponseEntity<String> addGroup(@RequestBody String data, @RequestParam String groupName) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkValidateUser();
+    	PremiumUserDevicesRepository.PremiumUserDevice dev = getUserId();
         WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
         return addNewGroup(trackData, groupName, dev);
     }
     
     private void uploadFavoriteFile(File tmpFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String name, Long updatetime) throws IOException {
-        userdataService.uploadFile(InternalZipFile.buildFromFile(tmpFile), dev, name, FILE_TYPE_FAVOURITES, System.currentTimeMillis());
+    	InternalZipFile fl = InternalZipFile.buildFromFile(tmpFile);
+    	userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
+        userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, System.currentTimeMillis());
         if (updatetime != null) {
             userdataService.deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_FAVOURITES, null);
         }
@@ -224,5 +229,17 @@ public class FavoriteController {
             resp.setJsonObject(obj);
         }
         return ResponseEntity.ok(gson.toJson(resp));
+    }
+    
+    private PremiumUserDevicesRepository.PremiumUserDevice getUserId() {
+        Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        PremiumUserDevicesRepository.PremiumUserDevice dev = null;
+        if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
+            dev = ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
+        }
+        if (dev == null) {
+            throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
+        }
+        return dev;
     }
 }
