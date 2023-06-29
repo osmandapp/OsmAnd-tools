@@ -123,6 +123,9 @@ public class UserdataService {
         if (user == null) {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
         }
+        if (Algorithms.isEmpty(user.orderid)) {
+            validateFreeAccount(user);
+        }
         String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
         if (errorMsg != null) {
             throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
@@ -207,10 +210,7 @@ public class UserdataService {
 			String name, String type, Long clienttime) throws IOException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
     
-        ResponseEntity<String> error = validateFreeAccount(pu, type);
-        if (error != null) {
-            return error;
-        }
+        validateFreeAccountFileType(pu, type);
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -222,24 +222,25 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
-        error = validateFreeAccountFile(pu, zipfile);
-        if (error != null) {
-            return error;
-        }
+        validateFreeAccountFile(pu, zipfile);
         
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
     
-    private ResponseEntity<String> validateFreeAccount(PremiumUsersRepository.PremiumUser pu, String type) {
+    private ResponseEntity<String> validateFreeAccount(PremiumUsersRepository.PremiumUser pu) {
         if (pu.orderid == null) {
             Iterable<UserFile> files = filesRepository.findAllByUserid(pu.id);
             if (IterableUtils.size(files) > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
-                return ResponseEntity.badRequest().body(String.format("File limit reached (%d)!", MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
+                throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, String.format("File limit reached (%d)!", MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
             }
-            if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_SETTINGS)) {
-                return ResponseEntity.badRequest().body(String.format("Free account can upload files with type %s and %s, this file type is %s!",
-                        FILE_TYPE_FAVOURITES, FILE_TYPE_SETTINGS, type));
-            }
+        }
+        return null;
+    }
+    
+    private ResponseEntity<String> validateFreeAccountFileType(PremiumUsersRepository.PremiumUser pu, String type) {
+        if (pu.orderid == null && (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_SETTINGS))) {
+            throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, String.format("Free account can upload files with type %s and %s, this file type is %s!",
+                    FILE_TYPE_FAVOURITES, FILE_TYPE_SETTINGS, type));
         }
         return null;
     }
@@ -248,12 +249,11 @@ public class UserdataService {
         if (pu.orderid == null) {
             long fileSize = zipfile.getSize();
             if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
-                return ResponseEntity.badRequest().body(String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+                throw new OsmAndPublicApiException(ERROR_CODE_FILE_NOT_AVAILABLE, String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
             }
             UserdataController.UserFilesResults res = generateFiles(pu.id, null, null, false, false);
             if (res.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
-                return ResponseEntity.badRequest()
-                        .body(String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+                throw new OsmAndPublicApiException(ERROR_CODE_FILE_NOT_AVAILABLE, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
             }
         }
         return null;
