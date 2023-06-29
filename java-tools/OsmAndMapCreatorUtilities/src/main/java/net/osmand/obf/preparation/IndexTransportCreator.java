@@ -93,7 +93,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	
 	private GtfsInfoStats gtfsStats = new GtfsInfoStats();
 
-	private IndexCreatorSettings settings;
+	protected IndexCreatorSettings settings;
 
 	static {
 		acceptedRoutes.add("bus"); //$NON-NLS-1$
@@ -713,8 +713,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 
 	private void indexTransportRoute(Relation rel, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
-		icc.translitJapaneseNames(rel, settings.addRegionTag);
-		icc.translitChineseNames(rel, settings.addRegionTag);
 		String ref = rel.getTag(OSMTagKey.REF);
 		String route = rel.getTag(OSMTagKey.ROUTE);
 		String operator = rel.getTag(OSMTagKey.OPERATOR);
@@ -1102,8 +1100,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				continue;
 			}
 			Entity e = entry.getEntity();
-			icc.translitJapaneseNames(e, settings.addRegionTag);
-			icc.translitChineseNames(e, settings.addRegionTag);
+			icc.translitJapaneseNames(e);
+			icc.translitChineseNames(e);
 			if (role.startsWith("platform")) {
 				platformsAndStops.add(e);
 				platforms.add(e);

@@ -203,6 +203,7 @@ public class IndexCreator {
 	/* ***** END OF GETTERS/SETTERS ***** */
 
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
+		calculateRegionTagAndTransliterate(e, icc);
 		if (heightData != null && e instanceof Way) {
 			if (!settings.keepOnlyRouteRelationObjects) {// small speedup
 				heightData.proccess((Way) e);
@@ -226,6 +227,14 @@ public class IndexCreator {
 		if (settings.indexRouting) {
 			indexRouteCreator.iterateMainEntity(e, ctx, icc);
 		}
+	}
+
+	private void calculateRegionTagAndTransliterate(Entity e, IndexCreationContext icc) {
+		if (settings.addRegionTag) {
+            icc.calcRegionTag(e, true);
+        }
+		icc.translitJapaneseNames(e);
+		icc.translitChineseNames(e);
 	}
 
 	private boolean checkBoundary(Entity e) {
@@ -469,6 +478,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					calculateRegionTagAndTransliterate(e, icc);
 					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, icc);
@@ -480,6 +490,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					calculateRegionTagAndTransliterate(e, icc);
 					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, icc);
@@ -493,6 +504,7 @@ public class IndexCreator {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					ctx.loadEntityRelation((Relation) e);
+					calculateRegionTagAndTransliterate(e, icc);
 					processor.processEntity(mini, e);
 				}
 			});
@@ -797,6 +809,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					calculateRegionTagAndTransliterate(e, icc);
 					if (settings.indexAddress) {
 						// indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries
 						// !!!
