@@ -8,7 +8,7 @@ DOWNLOAD_FOLDER="raw"
 TIFF_FOLDER="tiff"
 TIFF_TEMP_FOLDER="tiff_temp"
 FULL_MODE='full_mode'
-LATEST_MODE='lstest_mode'
+LATEST_MODE='latest_mode'
 
 GFS_BANDS_FULL_NAMES=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
@@ -470,10 +470,16 @@ get_raw_ecmwf_files() {
                 # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
                 local SAVING_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$FILETIME"
                 download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
-
+		GRIB_SIZE=$(wc -c "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" | awk '{print $1}')
+		if (( $GRIB_SIZE < 5000 )); then
+			echo "Warning! Looks like $SAVING_FILENAME.grib2 is empty or contains invalid data"
+			continue
+		fi
+		cnvgrib2to1 "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" || echo "cnvgrib2to1 error"
+		rm "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2"
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
-                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "gdal_translate error"
                 TZ=UTC touch -t "${FORECAST_DATE}${FORECAST_RND_TIME}00" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff"
             done
         else
@@ -509,7 +515,7 @@ elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
 
     # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
-    # Overrite "yesterday's" full forecatst with all existing "today's" files. If it needed.
+    # Overrite yesterday's full forecasts with all existing today's files. If it needed.
     LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
     if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
         get_raw_ecmwf_files $LATEST_FORECAST_SEARCH_RESULT
