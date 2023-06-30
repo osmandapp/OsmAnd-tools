@@ -1,14 +1,17 @@
 package net.osmand.server.api.services;
 
+import net.osmand.NativeLibrary;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiFilter;
 import net.osmand.osm.PoiType;
+import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
@@ -20,6 +23,9 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
+
+import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
+import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 
 @Service
 public class SearchService {
@@ -35,6 +41,12 @@ public class SearchService {
     
     private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 4;
     private static final String SEARCH_LOCALE = "en";
+    
+    private static final int SHIFT_MULTIPOLYGON_IDS = 43;
+    private static final int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
+    private static final int DUPLICATE_SPLIT = 5;
+    public static final long RELATION_BIT = 1L << SHIFT_MULTIPOLYGON_IDS - 1; //According IndexPoiCreator SHIFT_MULTIPOLYGON_IDS
+    public static final long SPLIT_BIT = 1L << SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
     
     public static class PoiSearchResult {
         
@@ -96,9 +108,8 @@ public class SearchService {
     }
     
     public synchronized PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
-        
         if (data.savedBbox != null && isContainsBbox(data)) {
-            return new PoiSearchResult(false, false, true,null);
+            return new PoiSearchResult(false, false, true, null);
         }
         
         List<RoutingController.Feature> features = new ArrayList<>();
@@ -108,7 +119,7 @@ public class SearchService {
         QuadRect searchBbox = getSearchBbox(data.bbox);
         List<BinaryMapIndexReader> mapList = getMapsForSearch(data.bbox, searchBbox);
         if (mapList.isEmpty()) {
-            return new PoiSearchResult(false, true, false,null);
+            return new PoiSearchResult(false, true, false, null);
         }
         
         for (String category : data.categories) {
@@ -260,7 +271,8 @@ public class SearchService {
                             .prop("typeOsmValue", poiType.getOsmValue())
                             .prop("iconName", getIconName(poiType))
                             .prop("type", amenity.getType().getKeyName())
-                            .prop("subType", amenity.getSubType());
+                            .prop("subType", amenity.getSubType())
+                            .prop("osmUrl", getOsmUrl(result));
                     
                     for (String e : amenity.getAdditionalInfoKeys()) {
                         feature.prop(e, amenity.getAdditionalInfo(e));
@@ -269,6 +281,70 @@ public class SearchService {
                 }
             }
         }
+    }
+    
+    private String getOsmUrl(SearchResult result) {
+        MapObject mapObject = (MapObject) result.object;
+        Entity.EntityType type = getOsmEntityType(mapObject);
+        if (type != null) {
+            long osmId = getOsmObjectId(mapObject);
+            return "https://www.openstreetmap.org/" + type.name().toLowerCase(Locale.US) + "/" + osmId;
+        }
+        return null;
+    }
+    
+    public static long getOsmObjectId(MapObject object) {
+        long originalId = -1;
+        Long id = object.getId();
+        if (id != null) {
+            if (object instanceof NativeLibrary.RenderedObject) {
+                id >>= 1;
+            }
+            if (isShiftedID(id)) {
+                originalId = getOsmId(id);
+            } else {
+                int shift = object instanceof Amenity ? AMENITY_ID_RIGHT_SHIFT : SHIFT_ID;
+                originalId = id >> shift;
+            }
+        }
+        return originalId;
+    }
+    
+    public Entity.EntityType getOsmEntityType(MapObject object) {
+        if (isOsmUrlAvailable(object)) {
+            Long id = object.getId();
+            long originalId = id >> 1;
+            long relationShift = 1L << 41;
+            if (originalId > relationShift) {
+                return Entity.EntityType.RELATION;
+            } else {
+                return id % 2 == MapObject.WAY_MODULO_REMAINDER ? Entity.EntityType.WAY : Entity.EntityType.NODE;
+            }
+        }
+        return null;
+    }
+    
+    public static boolean isOsmUrlAvailable(MapObject object) {
+        Long id = object.getId();
+        return id != null && id > 0;
+    }
+    
+    public static long getOsmId(long id) {
+        long clearBits = RELATION_BIT | SPLIT_BIT;
+        id = isShiftedID(id) ? (id & ~clearBits) >> DUPLICATE_SPLIT : id;
+        return id >> SHIFT_ID;
+    }
+    
+    public static boolean isShiftedID(long id) {
+        return isIdFromRelation(id) || isIdFromSplit(id);
+    }
+    
+    public static boolean isIdFromRelation(long id) {
+        return id > 0 && (id & RELATION_BIT) == RELATION_BIT;
+    }
+    
+    public static boolean isIdFromSplit(long id) {
+        return id > 0 && (id & SPLIT_BIT) == SPLIT_BIT;
     }
     
 }
