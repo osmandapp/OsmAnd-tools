@@ -65,17 +65,19 @@ public class SearchService {
     
     public static class PoiSearchData {
         
-        public PoiSearchData(List<String> categories, String northWest, String southEast, String savedNorthWest, String savedSouthEast) {
+        public PoiSearchData(List<String> categories, String northWest, String southEast, String savedNorthWest, String savedSouthEast, int prevCategoriesCount) {
             this.categories = categories;
             this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
             if (savedNorthWest != null && savedSouthEast != null) {
                 this.savedBbox = getBboxCoords(Arrays.asList(savedNorthWest, savedSouthEast));
             }
+            this.prevCategoriesCount = prevCategoriesCount;
         }
         
         public List<String> categories;
         public List<LatLon> bbox;
         public List<LatLon> savedBbox;
+        public int prevCategoriesCount;
         
         private static List<LatLon> getBboxCoords(List<String> coords) {
             List<LatLon> bbox = new ArrayList<>();
@@ -108,7 +110,7 @@ public class SearchService {
     }
     
     public synchronized PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
-        if (data.savedBbox != null && isContainsBbox(data)) {
+        if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
         
