@@ -156,9 +156,9 @@ public class SearchService {
             return null;
         }
         SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-    
-        searchUICore.init();
-        searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
+        MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
+        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
         searchUICore.setTotalLimit(limit);
         
         SearchSettings settings = searchUICore.getPhrase().getSettings();
