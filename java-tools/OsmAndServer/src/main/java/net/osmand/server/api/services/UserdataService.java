@@ -113,6 +113,7 @@ public class UserdataService {
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
     public static final String FILE_TYPE_SETTINGS = "SETTINGS";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
+    public static final String FILE_TYPE_PROFILE = "PROFILE";
     public static final String FILE_TYPE_GPX = "GPX";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
@@ -124,9 +125,9 @@ public class UserdataService {
         }
         String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
 		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
-			if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_SETTINGS)) {
+			if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_SETTINGS) && !type.equals(FILE_TYPE_PROFILE)) {
 				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION,
-						String.format("Free account can upload files with type %s and %s, this file type is %s!", FILE_TYPE_FAVOURITES, FILE_TYPE_SETTINGS, type));
+						String.format("Free account can upload files with type %s, %s and %s, this file type is %s!", FILE_TYPE_FAVOURITES, FILE_TYPE_SETTINGS, FILE_TYPE_PROFILE, type));
 			}
 			if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
                 throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
