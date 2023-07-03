@@ -229,7 +229,7 @@ public class RoutingController {
 	}
 	
 	@RequestMapping(path = "/geocoding", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> geocoding(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
+	public ResponseEntity<String> geocoding(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return osmAndMapsService.errorConfig();
 		}
@@ -250,7 +250,7 @@ public class RoutingController {
 	}
 	
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routing(@RequestParam String[] points,
+	public ResponseEntity<String> routing(@RequestParam String[] points,
 	                                 @RequestParam(defaultValue = "car") String routeMode,
 	                                 @RequestParam(required = false) String[] avoidRoads,
 	                                 @RequestParam int maxDist) throws IOException {
