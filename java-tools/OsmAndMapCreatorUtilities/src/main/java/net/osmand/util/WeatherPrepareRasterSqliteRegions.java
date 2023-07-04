@@ -318,7 +318,7 @@ public class WeatherPrepareRasterSqliteRegions {
 									.readBytesFromInputStream(new GZIPInputStream(new FileInputStream(imageGzip)));
 							if (image != null) {
 								psinsnew.setInt(1, x);
-								psinsnew.setInt(2, y);
+								psinsnew.setInt(2, 15 - y);
 								psinsnew.setInt(3, z);
 								psinsnew.setString(4, dtFolder.getName() + ":" + source);
 								psinsnew.setBytes(5, image);
