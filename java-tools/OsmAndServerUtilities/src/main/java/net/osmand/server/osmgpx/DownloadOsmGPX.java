@@ -347,13 +347,13 @@ public class DownloadOsmGPX {
 					return parseZip(gzipIs);
 				}
 				return Algorithms.readFromInputStream(gzipIs).toString();
-			} else if (type.equals("application/x-zip")) {
+			} else if (type.equals("application/x-zip") || type.equals("application/zip")) {
 				return parseZip(inputStream);
 			} else if (type.equals("application/gpx+xml")) {
 				return Algorithms.readFromInputStream(inputStream).toString();
 			} else if (type.equals("application/x-bzip2")) {
 				BZip2CompressorInputStream bzis = new BZip2CompressorInputStream(inputStream);
-				if(zip) {
+				if (zip) {
 					return parseZip(bzis);
 				}
 				return Algorithms.readFromInputStream(bzis).toString();
