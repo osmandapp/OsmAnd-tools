@@ -42,6 +42,8 @@ import javax.net.ssl.X509TrustManager;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
@@ -355,6 +357,9 @@ public class DownloadOsmGPX {
 					return parseZip(bzis);
 				}
 				return Algorithms.readFromInputStream(bzis).toString();
+			} else if (type.equals("application/x-tar+gzip")) {
+				TarArchiveInputStream tarIs = new TarArchiveInputStream(new GZIPInputStream(inputStream));
+				return parseTar(tarIs);
 			}
 			throw new UnsupportedOperationException("Unsupported content-type: " + type);
 		} finally {
@@ -375,7 +380,18 @@ public class DownloadOsmGPX {
 		}
 		return null;
 	}
-	
+
+	private String parseTar(TarArchiveInputStream inputStream) throws IOException {
+		TarArchiveEntry tarEntry = inputStream.getNextTarEntry();
+		while (tarEntry != null) {
+			if (tarEntry.getName().endsWith(".gpx")) {
+				return readFromInputStream(inputStream).toString();
+			}
+			tarEntry = inputStream.getNextTarEntry();
+		}
+		return null;
+	}
+
 	protected void redownloadTagsDescription() throws SQLException, IOException {
 		PreparedStatementWrapper wgpx = new PreparedStatementWrapper();
 		preparedStatements[PS_UPDATE_GPX_DETAILS] = wgpx;
