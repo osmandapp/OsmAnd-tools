@@ -209,8 +209,8 @@ get_raw_gfs_files() {
     fi
     # Round down HOURS to 0/6/12/18
     local RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
-    local URL_BASE="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${RNDHOURS}/$LAYER/"
-
+    # local URL_BASE="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${RNDHOURS}/$LAYER/"
+    local URL_BASE="https://s3.amazonaws.com/noaa-gfs-bdp-pds/gfs.${DATE}/${RNDHOURS}/$LAYER/"
 
     for (( c=${HOURS_START}; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
