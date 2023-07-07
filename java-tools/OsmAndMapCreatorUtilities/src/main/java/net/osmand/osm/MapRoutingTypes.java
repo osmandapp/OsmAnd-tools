@@ -288,13 +288,14 @@ public class MapRoutingTypes {
 	}
 
 	public void encodePointTypes(Way e, TLongObjectHashMap<TIntArrayList> pointTypes,
-			TLongObjectHashMap<TIntObjectHashMap<String>> pointNames, boolean base) {
+			TLongObjectHashMap<TIntObjectHashMap<String>> pointNames, 
+			RelationTagsPropagation tagsTransformer, MapRenderingTypesEncoder renderingTypes, boolean base) {
 		pointTypes.clear();
 		for (Node nd : e.getNodes()) {
 			if (nd != null) {
 				boolean accept = false;
-				Map<String, String> ntags = encoder.transformTags(nd.getTags(), EntityType.NODE,
-						EntityConvertApplyType.ROUTING);
+				Map<String, String> ntags = tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.ROUTING, nd, nd.getTags());
+				ntags = encoder.transformTags(ntags, EntityType.NODE, EntityConvertApplyType.ROUTING);
 				for (Entry<String, String> es : ntags.entrySet()) {
 					String tag = es.getKey();
 					String value = converBooleanValue(es.getValue());

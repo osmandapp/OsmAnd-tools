@@ -66,7 +66,7 @@ public class IndexRouteRelationCreator {
 	
 	private void processRouteRelation(Relation e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.MAP);
-		String rt = e.getTag(OSMTagKey.ROUTE);
+		String rt = tags.get(OSMTagKey.ROUTE.name());
 		boolean publicTransport = IndexTransportCreator.acceptedPublicTransportRoute(rt);
 		boolean road = "road".equals(rt);
 		boolean railway = "railway".equals(rt);
@@ -93,8 +93,6 @@ public class IndexRouteRelationCreator {
 					icc.calcRegionTag(e, true);
 				}
 				w.replaceTags(tags);
-				icc.translitJapaneseNames(e, settings.addRegionTag);
-				icc.translitChineseNames(e, settings.addRegionTag);
 				for (int level = 0; level < mapZooms.size(); level++) {
 					icc.getIndexMapCreator().processMainEntity(w, w.getId(), w.getId(), level, tags);
 				}

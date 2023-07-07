@@ -228,23 +228,25 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		return new QuadRect(bbox.left, bbox.bottom, bbox.right, bbox.top);
 	}
 	
-	private void addLowEmissionZoneTag(Way e) {
+	private Map<String, String> addLowEmissionZoneTag(Way e, Map<String, String> tags) {
 		Node n = null;
 		// get first not null node
 		for (int i = 0; i < e.getNodes().size() && n == null; i++) {
 			n = e.getNodes().get(i);
 		}
 		if (n == null) {
-			return;
+			return tags;
 		}
 		List<Multipolygon> results = lowEmissionZones.queryInBox(
 				new QuadRect(n.getLongitude(), n.getLatitude(), n.getLongitude(), n.getLatitude()), new ArrayList<>(0));
 		for (Multipolygon m : results) {
 			if (m.containsPoint(n.getLatitude(), n.getLongitude())) {
-				e.putTag("low_emission_zone", "true");
+				tags =  new LinkedHashMap<String, String>(tags);
+				tags.put("low_emission_zone", "true");
 				break;
 			}
 		}
+		return tags;
 	}
 
 	public void iterateMainEntity(Entity es, OsmDbAccessorContext ctx) throws SQLException {
@@ -257,18 +259,16 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			if (settings.addRegionTag) {
 				icc.calcRegionTag(e, true);
 			}
-			addLowEmissionZoneTag(e);
-			tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.ROUTING, e);
-			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.WAY, EntityConvertApplyType.ROUTING);
+			Map<String, String> tags = e.getTags();
+			tags = addLowEmissionZoneTag(e, tags);
+			tags = tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.ROUTING, e, tags);
+			tags = renderingTypes.transformTags(tags, EntityType.WAY, EntityConvertApplyType.ROUTING);
 			boolean encoded = routeTypes.encodeEntity(tags, outTypes, names)
 					&& e.getNodes().size() >= 2;
 			if (encoded) {
 				// Load point with tags!
 				ctx.loadEntityWay(e);
-				for (Node n : e.getNodes()) {
-					tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.ROUTING, n);
-				}
-				routeTypes.encodePointTypes(e, pointTypes, pointNames, false);
+				routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
 			if (settings.generateLowLevel) {
@@ -278,7 +278,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					// NEVER remove this simplify route due to memory limits in routing(task 11770)
 					long id = e.getId();
 					List<Node> result = simplifyRouteForBaseSection(source, id);
-					routeTypes.encodePointTypes(e, pointTypes, pointNames, true);
+					routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, true);
 					addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes,
 							pointNames, names);
 					// generalizeWay(e);

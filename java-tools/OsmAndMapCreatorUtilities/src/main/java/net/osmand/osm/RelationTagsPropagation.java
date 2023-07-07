@@ -202,19 +202,20 @@ public class RelationTagsPropagation {
 	
 	
 	
-	public void addPropogatedTags(MapRenderingTypesEncoder renderingTypes, EntityConvertApplyType tp, Entity e) {
+	public Map<String, String> addPropogatedTags(MapRenderingTypesEncoder renderingTypes, EntityConvertApplyType tp, Entity e, Map<String, String> tags) {
 		EntityId eid = EntityId.valueOf(e);
 		PropagateEntityTags proptags = propogatedTags.get(eid);
 		if (proptags != null) {
+			tags = new LinkedHashMap<String, String>(tags);
 			Iterator<Entry<String, String>> iterator = proptags.putThroughTags.entrySet().iterator();
 			while (iterator.hasNext()) {
 				Entry<String, String> ts = iterator.next();
-				if (e.getTag(ts.getKey()) == null) {
+				if (tags.get(ts.getKey()) == null) {
 					String vl = ts.getValue();
 					if(vl != null) {
 						vl = vl.replaceAll(SPLIT_VALUE, ", ");
 					}
-					e.putTag(ts.getKey(), vl);
+					tags.put(ts.getKey(), vl);
 				}
 			}
 			for (List<PropagateTagGroup> groups : proptags.relationGroupTags.values()) {
@@ -246,7 +247,8 @@ public class RelationTagsPropagation {
 					mod++;
 				}
 			}
-		}		
+		}	
+		return tags;
 	}
 	
 	

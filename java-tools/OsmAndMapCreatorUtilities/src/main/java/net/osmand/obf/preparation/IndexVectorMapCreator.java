@@ -716,50 +716,39 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
     public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
         if ((e instanceof Way || e instanceof Node) && !settings.keepOnlyRouteRelationObjects) {
-            if (settings.addRegionTag) {
-                icc.calcRegionTag(e, true);
-            }
-            icc.translitJapaneseNames(e, settings.addRegionTag);
-            icc.translitChineseNames(e, settings.addRegionTag);
-            tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e);
+            Map<String, String> tags = tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e, e.getTags());
             // manipulate what kind of way to load
             long originalId = e.getId();
             long assignedId = e.getId();
-            List<Map<String, String>> splitTags = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
-            Map<String, String> tags = splitTags == null ? e.getModifiableTags() : splitTags.get(0);
+            // split doesn't work correctly with OsmAnd Live so it was disabled
+//            List<Map<String, String>> splitTags = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
             for (int level = 0; level < mapZooms.size(); level++) {
                 processMainEntity(e, originalId, assignedId, level, tags);
             }
 
-            if (splitTags != null) {
-                EntityId eid = EntityId.valueOf(e);
-                for (int i = 1; i < splitTags.size(); i++) {
-                    assignedId = assignIdBasedOnOriginalSplit(eid);
-                    Map<String, String> stags = splitTags.get(i);
-                    for (int level = 0; level < mapZooms.size(); level++) {
-                        processMainEntity(e, originalId, assignedId, level, stags);
-                    }
-                }
-            }
-
-            // create center node for island/islet with coastline
-            if (e instanceof Way && tags.size() > 2 && "coastline".equals(tags.get("natural"))
-                    && ("island".equals(tags.get("place")) || "islet".equals(tags.get("place")))) {
-                QuadRect bbox = ((Way) e).getLatLonBBox();
-                if (bbox != null) {
-                    Node node = new Node(bbox.centerY(), bbox.centerX(), e.getId());
-                    node.copyTags(e);
-                    node.removeTag("natural");
-                    Map<String, String> nodeTags = node.getTags();
-                    EntityId eid = EntityId.valueOf(e);
-                    assignedId = assignIdBasedOnOriginalSplit(eid);
-                    for (int level = 0; level < mapZooms.size(); level++) {
-                        processMainEntity(node, originalId, assignedId, level, nodeTags);
-                    }
-                }
-            }
+            createCenterNodeForSmallIsland(e, tags, originalId);
         }
     }
+
+	private void createCenterNodeForSmallIsland(Entity e, Map<String, String> tags, long originalId)
+			throws SQLException {
+		long assignedId;
+		if (e instanceof Way && tags.size() > 2 && "coastline".equals(tags.get("natural"))
+		        && ("island".equals(tags.get("place")) || "islet".equals(tags.get("place")))) {
+		    QuadRect bbox = ((Way) e).getLatLonBBox();
+		    if (bbox != null) {
+		        Node node = new Node(bbox.centerY(), bbox.centerX(), e.getId());
+		        node.copyTags(e);
+		        node.removeTag("natural");
+		        Map<String, String> nodeTags = node.getTags();
+		        EntityId eid = EntityId.valueOf(e);
+		        assignedId = assignIdBasedOnOriginalSplit(eid);
+		        for (int level = 0; level < mapZooms.size(); level++) {
+		            processMainEntity(node, originalId, assignedId, level, nodeTags);
+		        }
+		    }
+		}
+	}
 
     protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
             throws SQLException {
