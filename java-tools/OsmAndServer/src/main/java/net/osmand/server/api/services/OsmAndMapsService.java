@@ -113,6 +113,10 @@ public class OsmAndMapsService {
 	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 14;
 	private static final String SEARCH_LOCALE = "en";
 	
+	// counts only files open for Java (doesn't fit for rendering / routing)
+	private static final int MAXIMUM_OPEN_FILES = 3;
+	
+	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
 	CachedOsmandIndexes cacheFiles = null; 
@@ -136,8 +140,64 @@ public class OsmAndMapsService {
 
 	public static class BinaryMapIndexReaderReference {
 		File file;
+		// TODO remove single usage and lockReader
 		BinaryMapIndexReader reader;
+
+		private static final int WAIT_LOCK_CHECK = 50;
+		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
+
+		private synchronized BinaryMapIndexReader lockAvailableResource() {
+			Iterator<Entry<BinaryMapIndexReader, Boolean>> it = readers.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<BinaryMapIndexReader, Boolean> r = it.next();
+				if (r.getValue()) {
+					r.setValue(false);
+					return r.getKey();
+				}
+			}
+			return null;
+		}
+
+		public BinaryMapIndexReader lockReader(int maxWaitMs) {
+			BinaryMapIndexReader res = lockAvailableResource();
+			if (res != null) {
+				return res;
+			}
+			if (readers.size() < MAXIMUM_OPEN_FILES) {
+				// TODO allocate new
+			}
+			int ms = 0;
+			try {
+				while (ms < maxWaitMs) {
+					Thread.sleep(WAIT_LOCK_CHECK);
+					ms += WAIT_LOCK_CHECK;
+					res = lockAvailableResource();
+					if (res != null) {
+						return res;
+					}
+				}
+			} catch (InterruptedException e) {
+				LOGGER.error(e.getMessage(), e);
+			}
+			return res;
+		}
+
+		public int getOpenFiles() {
+			int cnt = 0;
+			for (Boolean b : readers.values()) {
+				if (b.booleanValue()) {
+					cnt++;
+				}
+			}
+			return cnt;
+		}
+
+		public void unlockReader(BinaryMapIndexReader ret) {
+			if (ret != null) {
+				readers.put(ret, true);
+			}
+		}
 	}
 	
 	
@@ -146,6 +206,15 @@ public class OsmAndMapsService {
 		public String url;
 		public String name;
 		public String profile = "car";
+	}
+	
+	
+	public int getCurrentOpenJavaFiles() {
+		int cnt = 0;
+		for(BinaryMapIndexReaderReference r: obfFiles.values()) {
+			cnt+= r.getOpenFiles();
+		}
+		return cnt;
 	}
 	
 	@Configuration
