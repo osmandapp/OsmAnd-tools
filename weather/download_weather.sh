@@ -209,8 +209,8 @@ get_raw_gfs_files() {
     fi
     # Round down HOURS to 0/6/12/18
     local RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
-    local URL_BASE="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${RNDHOURS}/$LAYER/"
-
+    # local URL_BASE="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${RNDHOURS}/$LAYER/"
+    local URL_BASE="https://s3.amazonaws.com/noaa-gfs-bdp-pds/gfs.${DATE}/${RNDHOURS}/$LAYER/"
 
     for (( c=${HOURS_START}; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
@@ -233,7 +233,7 @@ get_raw_gfs_files() {
 
         # Download index file
         cd $DOWNLOAD_FOLDER; 
-        sleep 5
+        sleep 1
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
@@ -246,7 +246,7 @@ get_raw_gfs_files() {
 
                 # Make partial download for needed band data only  
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-                sleep 3
+                sleep 1
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then  
