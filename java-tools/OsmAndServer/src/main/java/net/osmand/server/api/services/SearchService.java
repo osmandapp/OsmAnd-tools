@@ -109,7 +109,7 @@ public class SearchService {
         return r.getCurrentSearchResults();
     }
     
-    public synchronized PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -164,7 +164,7 @@ public class SearchService {
         return List.of();
     }
     
-    public synchronized SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList) throws IOException {
+    public SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
