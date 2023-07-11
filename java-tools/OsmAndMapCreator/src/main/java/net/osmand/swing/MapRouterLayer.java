@@ -995,10 +995,10 @@ public class MapRouterLayer implements MapPanelLayer {
 				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 				// config.ZOOM_TO_LOAD_TILES = 14;
 				try {
-					float minPointApproximation;
-					minPointApproximation = Float.parseFloat(paramsR.get("minPointApproximation"));
-					config.minPointApproximation = minPointApproximation;
+					config.minPointApproximation = RoutingConfiguration.parseSilentFloat(
+							paramsR.get("minPointApproximation"), config.minPointApproximation);
 				} catch (NumberFormatException e){
+					e.printStackTrace();
 				}
 				try {
 					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
