@@ -91,6 +91,8 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.MapsCollection;
 
+import static net.osmand.util.MapUtils.rhumbDestinationPoint;
+
 @Service
 public class OsmAndMapsService {
 	private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
@@ -105,15 +107,9 @@ public class OsmAndMapsService {
 	
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
 	
-	private static final int SEARCH_RADIUS_LEVEL = 1;
-	private static final double SEARCH_RADIUS_DEGREE = 1.5;
-	private static final int TOTAL_LIMIT_POI = 400;
-	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 7;
-	private static final String SEARCH_LOCALE = "en";
-	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
-	CachedOsmandIndexes cacheFiles = null; 
+	CachedOsmandIndexes cacheFiles = null;
 
 	AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -544,30 +540,9 @@ public class OsmAndMapsService {
 				.append('/').append(x).append('/').append(y).toString();
 	}
 	
-	public synchronized List<SearchResult> search(double lat, double lon, String text) throws IOException, InterruptedException {
-		if (!validateAndInitConfig()) {
-			return null;
-		}
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-		searchUICore.getSearchSettings().setRegions(osmandRegions);
-		QuadRect points = points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE), 
-				new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
-		searchUICore.getSearchSettings().setOfflineIndexes(list);
-	    searchUICore.init();
-	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-	    
-	    SearchSettings settings = searchUICore.getPhrase().getSettings();
-	    searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
-		SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
-		List<SearchResult> results = r.getCurrentSearchResults();
-		
-	    return results;
-	}
-	
 	public synchronized List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
+		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points, null));
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null);
 		GeocodingUtilities su = new GeocodingUtilities();
@@ -599,7 +574,7 @@ public class OsmAndMapsService {
 		return route;
 	}
 
-	private List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router, 
+	private List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
 			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
@@ -617,7 +592,7 @@ public class OsmAndMapsService {
 		return route;
 	}
 
-	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router, 
+	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router,
 			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds) throws IOException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
@@ -672,7 +647,7 @@ public class OsmAndMapsService {
 					: RouteCalculationMode.NORMAL;
 		}
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				getObfReaders(points), paramMode); // RouteCalculationMode.BASE
+				getObfReaders(points, null), paramMode); // RouteCalculationMode.BASE
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
@@ -708,7 +683,7 @@ public class OsmAndMapsService {
 				polyline.add(new LatLon(p.lat, p.lon));
 			}
 			return approximate(ctx, router, props, polyline);
-		} else { 
+		} else {
 			PrecalculatedRouteDirection precalculatedRouteDirection = null;
 			List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 			putResultProps(ctx, route, props);
@@ -814,13 +789,14 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 	
-	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
+	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect, List<LatLon> bbox) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReader> files = new ArrayList<>();
 		MapsCollection mapsCollection = new MapsCollection(true);
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			boolean intersects;
-			fileOverlaps: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
+			fileOverlaps:
+			for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
 				for (RoutingSubregion s : rp.getSubregionsList()) {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
@@ -831,17 +807,78 @@ public class OsmAndMapsService {
 				}
 			}
 		}
-		for (File f : mapsCollection.getFilesToUse()) {
-			BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
-			if (ref.reader == null) {
-				long val = System.currentTimeMillis();
-				RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-				ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
-				LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+		List<File> filesToUse = mapsCollection.getFilesToUse();
+		
+		if (!filesToUse.isEmpty() && bbox != null) {
+			filesToUse = filterMapsByName(filesToUse, bbox);
+		}
+		
+		if (!filesToUse.isEmpty()) {
+			for (File f : filesToUse) {
+				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+				if (ref.reader == null) {
+					long val = System.currentTimeMillis();
+					RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+					ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
+					LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+				}
+				files.add(ref.reader);
 			}
-			files.add(ref.reader);
 		}
 		return files.toArray(new BinaryMapIndexReader[0]);
+	}
+	
+	public List<File> filterMapsByName(List<File> filesToUse, List<LatLon> bbox) throws IOException {
+		List<File> res = new ArrayList<>();
+		HashSet<String> regions = getRegionsNameByBbox(bbox);
+		for (File f : filesToUse) {
+			OsmAndMapsService.BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+			String name = ref.file.getName().toLowerCase().replace("_2.obf", "");
+			if (regions.contains(name)) {
+				res.add(f);
+			}
+		}
+		return res;
+	}
+	
+	private HashSet<String> getRegionsNameByBbox(List<LatLon> bbox) throws IOException {
+		HashSet<String> regions = new HashSet<>();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		for (LatLon point : getPointsByBbox(bbox)) {
+			List<String> res = new ArrayList<>();
+			res = osmandRegions.getRegionsToDownload(point.getLatitude(), point.getLongitude(), res);
+			regions.addAll(res);
+		}
+		return regions;
+	}
+	
+	private List<LatLon> getPointsByBbox(List<LatLon> bbox) {
+		final int POINT_STEP_M = 8000;
+		
+		List<LatLon> points = new ArrayList<>(bbox);
+		LatLon p1 = bbox.get(0);
+		LatLon p2 = bbox.get(1);
+		
+		LatLon start = p1;
+		LatLon pointStep = start;
+		while (pointStep != null) {
+			LatLon res = rhumbDestinationPoint(pointStep, POINT_STEP_M, 180);
+			if (res.getLatitude() > p2.getLatitude()) {
+				points.add(res);
+				pointStep = res;
+			} else {
+				start = rhumbDestinationPoint(start, POINT_STEP_M, 90);
+				if (start.getLongitude() < p2.getLongitude()) {
+					pointStep = start;
+				} else {
+					pointStep = null;
+				}
+			}
+		}
+		return points;
 	}
 	
 	public synchronized void initObfReaders() throws IOException {
@@ -870,7 +907,7 @@ public class OsmAndMapsService {
 		}
 	}
 	
-	public ResponseEntity<?> errorConfig() {
+	public ResponseEntity<String> errorConfig() {
 		VectorTileServerConfig config = getConfig();
 		return ResponseEntity.badRequest()
 				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
@@ -897,152 +934,5 @@ public class OsmAndMapsService {
 		}
 		
 		return targetObf;
-	}
-	
-	public Map<String, List<String>> searchPoiCategories() {
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-		List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
-		Map<String, List<String>> res = new HashMap<>();
-		categoriesList.forEach(poiCategory -> {
-			String category = poiCategory.getKeyName();
-			List<PoiType> poiTypes = poiCategory.getPoiTypes();
-			List<String> typesNames = new ArrayList<>();
-			poiTypes.forEach(type -> typesNames.add(type.getOsmValue()));
-			res.put(category, typesNames);
-			
-		});
-		return res;
-	}
-	
-	public List<String> getTopFilters() {
-		List<String> filters = new ArrayList<>();
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
-		searchUICore.getPoiTypes().getTopVisibleFilters().forEach(f -> filters.add(f.getKeyName()));
-		return filters;
-	}
-	
-	
-	public Map<String, Map<String, String>> searchPoiCategories(String search) throws IOException {
-		Map<String, Map<String, String>> searchRes = new HashMap<>();
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
-		searchUICore.init();
-		List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
-				.getCurrentSearchResults();
-		results.forEach(res -> searchRes.put(res.localeName, getTags(res.object)));
-		return searchRes;
-	}
-	
-	private Map<String, String> getTags(Object obj) {
-		final String KEY_NAME = "keyName";
-		final String OSM_TAG = "osmTag";
-		final String OSM_VALUE = "osmValue";
-		final String ICON_NAME = "iconName";
-		Map<String, String> tags = new HashMap<>();
-		if (obj instanceof PoiType) {
-			PoiType type = (PoiType) obj;
-			tags.put(KEY_NAME, type.getKeyName());
-			tags.put(OSM_TAG, type.getOsmTag());
-			tags.put(OSM_VALUE, type.getOsmValue());
-			tags.put(ICON_NAME, type.getIconKeyName());
-		} else if (obj instanceof PoiCategory) {
-			PoiCategory type = (PoiCategory) obj;
-			tags.put(KEY_NAME, type.getKeyName());
-			tags.put(ICON_NAME, type.getIconKeyName());
-		} else if (obj instanceof PoiFilter) {
-			PoiFilter type = (PoiFilter) obj;
-			tags.put(KEY_NAME, type.getKeyName());
-		}
-		return tags;
-	}
-	
-	public synchronized RoutingController.FeatureCollection searchPoi(double lat, double lon, List<String> categories, QuadRect searchBbox, int zoom) throws IOException {
-		List<RoutingController.Feature> features = new ArrayList<>();
-		int leftoverLimit = 0;
-		int limit = TOTAL_LIMIT_POI/categories.size();
-		for (String category : categories) {
-			List<SearchResult> res = searchPoiByCategory(lat, lon, category,searchBbox, limit + leftoverLimit, zoom);
-			if (!res.isEmpty()) {
-				leftoverLimit = limit - res.size();
-				prepareSearchResult(res, features);
-			}
-		}
-		if (!features.isEmpty()) {
-			return new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0]));
-		} else {
-			return null;
-		}
-	}
-	
-	private void prepareSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) {
-		for (SearchResult result : res) {
-			if (result.objectType == ObjectType.POI) {
-				Amenity amenity = (Amenity) result.object;
-				PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-				RoutingController.Feature feature;
-				if (poiType != null) {
-					feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
-							.prop("name", amenity.getName())
-							.prop("color", amenity.getColor())
-							.prop("iconKeyName", poiType.getIconKeyName())
-							.prop("typeOsmTag", poiType.getOsmTag())
-							.prop("typeOsmValue", poiType.getOsmValue())
-							.prop("iconName", getIconName(poiType))
-							.prop("type", amenity.getType().getKeyName())
-							.prop("subType", amenity.getSubType());
-					
-					for (String e : amenity.getAdditionalInfoKeys()) {
-						feature.prop(e, amenity.getAdditionalInfo(e));
-					}
-					features.add(feature);
-				}
-			}
-		}
-	}
-	
-	public synchronized List<SearchResult> searchPoiByCategory(double lat, double lon, String text, QuadRect searchBbox, int limit, int zoom) throws IOException {
-		if (!validateAndInitConfig()) {
-			return null;
-		}
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-		searchUICore.getSearchSettings().setRegions(osmandRegions);
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(searchBbox));
-		searchUICore.getSearchSettings().setOfflineIndexes(list);
-		searchUICore.init();
-		searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-		SearchSettings settings = searchUICore.getPhrase().getSettings();
-		if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
-			searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-		} else {
-			searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
-		}
-		searchUICore.setTotalLimit(limit);
-		SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
-		return r.getCurrentSearchResults();
-	}
-	
-	public QuadRect getSearchBbox(Map<String, Object> data, int zoom, double lat, double lon) {
-		LatLon point1;
-		LatLon point2;
-		if (zoom >= MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI) {
-			point1 = new LatLon((double) data.get("latBboxPoint1"), (double) data.get("lngBboxPoint1"));
-			point2 = new LatLon((double) data.get("latBboxPoint2"), (double) data.get("lngBboxPoint2"));
-		} else {
-			point1 = new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE);
-			point2 = new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE);
-		}
-		return points(null, point1, point2);
-	}
-	
-	private String getIconName(PoiType poiType) {
-		if (poiType != null) {
-			if (poiType.getParentType() != null) {
-				return poiType.getParentType().getIconKeyName();
-			} else if (poiType.getFilter() != null) {
-				return poiType.getFilter().getIconKeyName();
-			} else if (poiType.getCategory() != null) {
-				return poiType.getCategory().getIconKeyName();
-			}
-		}
-		return null;
 	}
 }

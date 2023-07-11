@@ -50,6 +50,7 @@
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
                 <parameter k="cmd_3" v="--max-height-tiles-in-ram=100" />
 				<parameter k="env" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
+				<filter exclude="world_seamarks" />
 			</job>
 			<job queue="gen-docker-large" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="900" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
@@ -57,6 +58,7 @@
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
 
 				<parameter k="env" v="JAVA_OPTS=-Xms2048M -Xmx32000M "/>
+				<filter exclude="world_seamarks" />
 			</job>
 		</external>
 	</process>

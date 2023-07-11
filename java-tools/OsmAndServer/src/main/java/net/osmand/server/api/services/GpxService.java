@@ -50,8 +50,11 @@ public class GpxService {
         GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
         gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
         gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
-        if (!gpxData.tracks.isEmpty() && analysis != null && !analysis.getElevationData().getAttributes().isEmpty()) {
-            webGpxParser.addDistance(gpxData.tracks, analysis);
+        if (analysis != null) {
+            boolean addSpeed = analysis.avgSpeed != 0.0 && !analysis.hasSpeedInTrack;
+            if (!gpxData.tracks.isEmpty() && (!analysis.getElevationData().getAttributes().isEmpty() || addSpeed)) {
+                webGpxParser.addAdditionalInfo(gpxData.tracks, analysis, addSpeed);
+            }
         }
         return gpxData;
     }
@@ -69,7 +72,7 @@ public class GpxService {
             trackData.analysis.put("maxElevationSrtm", srtmAnalysis.maxElevation);
             webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
             if (trackData.analysis.get("elevationData") == null) {
-                webGpxParser.addDistance(trackData.tracks, srtmAnalysis);
+                webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);
             }
         }
         return trackData;
@@ -83,8 +86,9 @@ public class GpxService {
                 trackData.analysis = new LinkedHashMap<>();
             }
             trackData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
-            if (trackData.analysis.get("elevationData") != null) {
-                webGpxParser.addDistance(trackData.tracks, analysis);
+            boolean addSpeed = trackData.analysis.get("avgSpeed") != null && trackData.analysis.get("hasSpeedInTrack") == "false";
+            if (addSpeed || trackData.analysis.get("elevationData") != null) {
+                webGpxParser.addAdditionalInfo(trackData.tracks, analysis, addSpeed);
             }
         }
         return trackData;

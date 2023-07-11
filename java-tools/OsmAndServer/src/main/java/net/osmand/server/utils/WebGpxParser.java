@@ -204,6 +204,7 @@ public class WebGpxParser {
         public double lng;
         public double ele = Double.NaN;
         public double srtmEle = Double.NaN;
+        public double speed;
         public double distance;
         public String profile;
         public List<Point> geometry;
@@ -227,6 +228,11 @@ public class WebGpxParser {
             if (!Double.isNaN(point.ele) || point.ele != NAN_MARKER) {
                 ele = point.ele;
                 point.ele = Double.NaN;
+            }
+    
+            if (!Double.isNaN(point.speed)) {
+                speed = point.speed;
+                point.speed = Double.NaN;
             }
             
             Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
@@ -346,7 +352,7 @@ public class WebGpxParser {
         if (srtmAnalysis != null) {
             tracks.forEach(track -> track.points.forEach(point -> {
                 if (point.geometry != null) {
-                    point.geometry.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
+                    point.geometry.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(point.geometry.indexOf(p)).value);
                 } else {
                     track.points.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
                 }
@@ -354,19 +360,25 @@ public class WebGpxParser {
         }
     }
     
-    public void addDistance(List<Track> tracks, GPXTrackAnalysis analysis) {
+    public void addAdditionalInfo(List<Track> tracks, GPXTrackAnalysis analysis, boolean addSpeed) {
         tracks.forEach(track -> track.points.forEach(point -> {
             if (point.geometry != null) {
                 point.geometry.forEach(p -> {
                     int ind = point.geometry.indexOf(p);
                     if (ind < analysis.getElevationData().getAttributes().size()) {
                         p.distance = analysis.getElevationData().getPointAttribute(ind).distance;
+                        if (addSpeed) {
+                            p.speed = analysis.getSpeedData().getPointAttribute(ind).value;
+                        }
                     }
                 });
             } else {
                 int ind = track.points.indexOf(point);
                 if (ind < analysis.getElevationData().getAttributes().size()) {
                     point.distance = analysis.getElevationData().getPointAttribute(ind).distance;
+                    if (addSpeed) {
+                        point.speed = analysis.getSpeedData().getPointAttribute(ind).value;
+                    }
                 }
             }
         }));
@@ -588,6 +600,7 @@ public class WebGpxParser {
             }
             filePoint.lat = point.lat;
             filePoint.lon = point.lng;
+            filePoint.speed = point.speed;
             filePoint.ele = (!isNanEle && point.ele != NAN_MARKER) ? point.ele : Double.NaN;
 
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {

@@ -8,7 +8,7 @@ DOWNLOAD_FOLDER="raw"
 TIFF_FOLDER="tiff"
 TIFF_TEMP_FOLDER="tiff_temp"
 FULL_MODE='full_mode'
-LATEST_MODE='lstest_mode'
+LATEST_MODE='latest_mode'
 
 GFS_BANDS_FULL_NAMES=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
@@ -19,7 +19,7 @@ ECMWF_BANDS_SHORT_NAMES_SAVING=("temperature" "pressure" "precip" "windspeed_u" 
 
 MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-1800} # 30 hours
 HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
-HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-180}
+HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-192}
 
 OS=$(uname -a)
 TIME_ZONE="GMT"
@@ -209,8 +209,8 @@ get_raw_gfs_files() {
     fi
     # Round down HOURS to 0/6/12/18
     local RNDHOURS=$(printf "%02d" $(( $HOURS / 6 * 6 )))
-    local URL_BASE="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${RNDHOURS}/$LAYER/"
-
+    # local URL_BASE="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${RNDHOURS}/$LAYER/"
+    local URL_BASE="https://s3.amazonaws.com/noaa-gfs-bdp-pds/gfs.${DATE}/${RNDHOURS}/$LAYER/"
 
     for (( c=${HOURS_START}; c<=${HOURS_ALL}; c+=${HOURS_INC} ))
     do
@@ -233,7 +233,7 @@ get_raw_gfs_files() {
 
         # Download index file
         cd $DOWNLOAD_FOLDER; 
-        sleep 5
+        sleep 1
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
@@ -246,7 +246,7 @@ get_raw_gfs_files() {
 
                 # Make partial download for needed band data only  
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-                sleep 5
+                sleep 1
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then  
@@ -256,6 +256,7 @@ get_raw_gfs_files() {
                         echo "Partial downloading success. Start gdal_translate"
                         mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
                         gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                        TZ=UTC touch -t "${DATE}${RNDHOURS}00" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff"
                     else
                         echo "Fatal Error: Partial downloaded data contains HTML content. May be we are blocked."
                         cat "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
@@ -279,31 +280,6 @@ get_raw_gfs_files() {
 }
 
 
-generate_bands_tiff() {
-    echo "============================= generate_bands_tiff() ==================================="
-    for WFILE in ${DOWNLOAD_FOLDER}/*.gt
-    do
-        local FILE_NAME=$WFILE
-        if [[ $OS =~ "Darwin" ]]; then
-            FILE_NAME="${FILE_NAME//"raw"}"
-            FILE_NAME="${FILE_NAME//".gt"}"
-            FILE_NAME="${FILE_NAME:1}"
-        else
-            FILE_NAME="${FILE_NAME//"raw/"}"
-            FILE_NAME="${FILE_NAME//".gt"}"
-        fi
-
-        local FOLDER_NAME=$FILE_NAME
-        for i in ${!GFS_BANDS_SHORT_NAMES[@]}; do
-            FOLDER_NAME="${FOLDER_NAME//"${GFS_BANDS_SHORT_NAMES[$i]}_"}"
-        done
-
-        mkdir -p $TIFF_TEMP_FOLDER/$FOLDER_NAME
-        gdal_translate $WFILE $TIFF_TEMP_FOLDER/$FOLDER_NAME/${FILE_NAME}.tiff -ot Float32 -stats  || echo "Error of gdal_translate"
-    done
-}
-
-
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
     MODE=$1
@@ -319,27 +295,29 @@ join_tiff_files() {
 
     mkdir -p $TIFF_FOLDER/
     cd $TIFF_TEMP_FOLDER
-    for CHANNELS_FOLDER in *
+    for DATE_FOLDER in *
     do
-        if [ ! -d "$CHANNELS_FOLDER" ]; then
-            echo "Error: Directory $CHANNELS_FOLDER not exist. Skip"
+        if [ ! -d "${DATE_FOLDER}" ]; then
+            echo "Error: Directory ${DATE_FOLDER} not exist. Skip"
             continue
         fi
-        cd $CHANNELS_FOLDER
+        cd $DATE_FOLDER
 
         # Create channels list in correct order
         touch settings.txt
         local ALL_CHANNEL_FILES_EXISTS=1
+        local FILE_DATE_CP
         for i in ${!BANDS_SHORT_NAMES[@]}; do
-            if [ ! -f "${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff" ]; then
+            if [ ! -f "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" ]; then
                 ALL_CHANNEL_FILES_EXISTS=0
                 break
             fi
-            echo "${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff" >> settings.txt
+            FILE_DATE_CP=${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff
+            echo "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" >> settings.txt
         done
 
         if [ $ALL_CHANNEL_FILES_EXISTS == 0 ]; then
-            echo "Joining Error:  ${BANDS_SHORT_NAMES[$i]}_$CHANNELS_FOLDER.tiff  not exists. Skip joining."
+            echo "Joining Error:  ${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff  not exists. Skip joining."
             cd ..
             continue
         fi
@@ -347,10 +325,11 @@ join_tiff_files() {
         # Create "Virtual Tiff" with layers order from settings.txt
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
         # Create joined tiff from "Virtual Tiff"
-        gdal_translate bigtiff.vrt ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff -ot Float32 -stats  || echo "Error of gdal_translate"
+        local TARGET_FILE=../../${TIFF_FOLDER}/${DATE_FOLDER}.tiff
+        gdal_translate bigtiff.vrt $TARGET_FILE -ot Float32 -stats  || echo "Error of gdal_translate"
         
         # # Write tiff layers names
-        local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py ../../$TIFF_FOLDER/$CHANNELS_FOLDER.tiff '
+        local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py $TARGET_FILE '
         for i in ${!BANDS_DESCRIPTIONS[@]}; do
             NUMBER=$(( $i + 1))
             DESCRIPTION="${BANDS_DESCRIPTIONS[$i]}"
@@ -360,6 +339,7 @@ join_tiff_files() {
             BANDS_RENAMING_COMMAND+='" '
         done
         eval $BANDS_RENAMING_COMMAND
+        touch -r $FILE_DATE_CP $TARGET_FILE
 
         rm settings.txt
         rm bigtiff.vrt
@@ -390,6 +370,7 @@ split_tiles() {
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
+        find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec touch -r ${JOINED_TIFF_NAME}.tiff "{}" \;    
         find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;    
 
         rm ${JOINED_TIFF_NAME}.tiff.gz || true
@@ -489,10 +470,21 @@ get_raw_ecmwf_files() {
                 # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
                 local SAVING_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$FILETIME"
                 download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
-
+		GRIB_SIZE=$(wc -c "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" | awk '{print $1}')
+		if (( $GRIB_SIZE < 5000 )); then
+			echo "Warning! Looks like $SAVING_FILENAME.grib2 is empty or contains invalid data"
+			continue
+		fi
+		cnvgrib2to1 "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" || echo "cnvgrib2to1 error"
+		rm "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2"
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
-                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
+                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "gdal_translate error"
+		if [[ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "precip" ]] ; then
+			echo "Converting precipitation to match GFS"
+			gdal_calc.py -A "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="A/10" --overwrite
+		fi
+                TZ=UTC touch -t "${FORECAST_DATE}${FORECAST_RND_TIME}00" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff"
             done
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
@@ -527,7 +519,7 @@ elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
 
     # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
-    # Overrite "yesterday's" full forecatst with all existing "today's" files. If it needed.
+    # Overrite yesterday's full forecasts with all existing today's files. If it needed.
     LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
     if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
         get_raw_ecmwf_files $LATEST_FORECAST_SEARCH_RESULT

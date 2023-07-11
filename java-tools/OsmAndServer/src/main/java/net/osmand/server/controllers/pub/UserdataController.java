@@ -159,14 +159,18 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		String errorMsg = userSubService.checkOrderIdPremium(orderid);
-		if (errorMsg != null) {
-			logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-		}
-		PremiumUser otherUser = usersRepository.findByOrderid(orderid);
-		if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
-			String hideEmail = userdataService.hideEmail(otherUser.email);
-			logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
+		// we allow to reset order id to null 
+		if (orderid != null) {
+			String errorMsg = userSubService.checkOrderIdPremium(orderid);
+			if (errorMsg != null) {
+				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+			}
+			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+			if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
+				String hideEmail = userdataService.hideEmail(otherUser.email);
+				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+						"user was already signed up as " + hideEmail);
+			}
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
@@ -194,10 +198,10 @@ public class UserdataController {
 			// keep old order id
 		} else {
 			if (orderid != null) {
-				String error = userSubService.checkOrderIdPremium(orderid);
-				if (error != null) {
-					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
-				}
+//				String error = userSubService.checkOrderIdPremium(orderid);
+//				if (error != null) {
+//					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
+//				}
 				PremiumUser otherUser = usersRepository.findByOrderid(orderid);
 				if (otherUser != null) {
 					String hideEmail = userdataService.hideEmail(otherUser.email);
@@ -283,7 +287,6 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		userdataService.validateUser(usersRepository.findById(dev.userid));
 		return userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
 	}
 
@@ -381,6 +384,21 @@ public class UserdataController {
 				return userdataService.tokenNotValid();
 			}
 			return userdataService.deleteAccount(us, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+	
+	@PostMapping(path = {"/send-code"})
+	@ResponseBody
+	public ResponseEntity<String> sendCode(@RequestBody MapApiController.EmailSenderInfo data,
+	                                       @RequestParam(name = "deviceid") int deviceId,
+	                                       @RequestParam String accessToken) {
+		if (emailSender.isEmail(data.email)) {
+			PremiumUserDevice dev = checkToken(deviceId, accessToken);
+			if (dev == null) {
+				return userdataService.tokenNotValid();
+			}
+			return userdataService.sendCode(data.email, data.action, dev);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

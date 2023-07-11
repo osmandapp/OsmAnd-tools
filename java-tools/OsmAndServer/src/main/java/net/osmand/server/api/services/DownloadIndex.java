@@ -8,7 +8,6 @@ import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
-import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 public class DownloadIndex {
@@ -102,9 +101,8 @@ public class DownloadIndex {
 	
 	
 	public String getHttpParam() {
-		DownloadServerSpecialty sp = DownloadServerSpecialty.getSpecialtyByDownloadType(type);
-		if (sp != null && sp.httpParams != null && sp.httpParams.length > 0) {
-			return sp.httpParams[0];
+		if (type.getHeaders().length > 0) {
+			return type.getHeaders()[0];
 		}
 		return "standard";
 	}
@@ -213,6 +211,8 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.HILLSHADE;
 			} else if (v.equals("heightmap")) {
 				dt = DownloadIndexesService.DownloadType.HEIGHTMAP;
+			} else if (v.equals("weather")) {
+				dt = DownloadIndexesService.DownloadType.WEATHER;
 			} else if (v.equals("geotiff")) {
 				dt = DownloadIndexesService.DownloadType.GEOTIFF;
 			} else if (v.equals("slope")) {

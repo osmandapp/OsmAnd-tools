@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -101,15 +102,15 @@ public class IndexCreationContext {
         return false;
     }
 	
-	public void translitJapaneseNames(Entity e, boolean addRegionTag) {
-		if (needTranslitName(e, addRegionTag, translitJapaneseNames, JAPAN)) {
+	public void translitJapaneseNames(Entity e) {
+		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPAN)) {
 			e.putTag(OSMTagKey.NAME_EN.getValue(),
 					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 		}
 	}
 	
-	public void translitChineseNames(Entity e, boolean addRegionTag) {
-		if (needTranslitName(e, addRegionTag, translitChineseNames, CHINA)) {
+	public void translitChineseNames(Entity e) {
+		if (needTranslitName(e, e.getTags(), translitChineseNames, CHINA)) {
 			try {
 				String pinyinNameTag = "name:zh_pinyin";
 				if (e.getNameTags().containsKey(pinyinNameTag)) {
@@ -124,19 +125,15 @@ public class IndexCreationContext {
 		}
 	}
 	
-	private boolean needTranslitName(Entity e, boolean addRegionTag, boolean translitByRegionName, String region) {
-		if (!Algorithms.isEmpty(e.getTag(OSMTagKey.NAME_EN.getValue()))
-				|| Algorithms.isEmpty(e.getTag(OSMTagKey.NAME.getValue()))) {
+	private boolean needTranslitName(Entity e, Map<String, String> etags, boolean translitByRegionName, String region) {
+		if (!Algorithms.isEmpty(etags.get(OSMTagKey.NAME_EN.getValue()))
+				|| Algorithms.isEmpty(etags.get(OSMTagKey.NAME.getValue()))) {
 			return false;
 		}
 		if (translitByRegionName) {
 			return true;
-		} else if (addRegionTag) {
-			for (String s : calcRegionTag(e, false)) {
-				if (s.toLowerCase().startsWith(region)) {
-					return true;
-				}
-			}
+		} else if (!Algorithms.isEmpty(etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG))) {
+			return etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG).contains(region);
 		}
 		return false;
 	}

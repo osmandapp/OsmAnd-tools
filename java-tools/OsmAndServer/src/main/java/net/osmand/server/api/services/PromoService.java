@@ -126,7 +126,8 @@ public class PromoService {
                 deviceSub.purchaseToken += " (email sent & registered)";
                 emailSender.sendOsmAndCloudPromoEmail(email, deviceSub.orderId);
             } else {
-                if (existingUser.orderid == null || !isValid(existingUser.orderid)) {
+                if (existingUser.orderid == null || 
+						userSubService.checkOrderIdPremium(existingUser.orderid) != null) {
                     existingUser.orderid = deviceSub.orderId;
                     usersRepository.saveAndFlush(existingUser);
                     deviceSub.purchaseToken += " (new PRO subscription is updated)";
@@ -146,9 +147,6 @@ public class PromoService {
         return new PromoResponse(deviceSub, true);
     }
     
-    private boolean isValid(String orderid) {
-        return userSubService.checkOrderIdPremium(orderid) == null;
-    }
     
     public static class PromoResponse {
         public DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub;

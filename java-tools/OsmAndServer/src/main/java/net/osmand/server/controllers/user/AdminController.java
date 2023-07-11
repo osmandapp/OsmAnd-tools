@@ -31,6 +31,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -66,6 +67,8 @@ public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
 
 	private static final String ACCESS_LOG_REPORTS_FOLDER = "reports";
+	
+	private static final String RELEASES_FOLDER = "osm-releases";
 
 	@Autowired
 	private MotdService motdService;
@@ -1489,6 +1492,60 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_message", "Promo registered");
 		
 		return "redirect:info#promo";
+	}
+	
+	public static class ReleaseInfo {
+		
+		public static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+		public String name;
+		public String size;
+		public String date;
+		public long timestamp;
+		public String version;
+		public String type;
+		public long length;
+		public ReleaseInfo(File f) {
+			name = f.getName();
+			size = String.format("%.2f MB", f.length() / 1024.0 / 1024.0);
+			length = f.length();
+			timestamp = f.lastModified();
+			date = sdf.format(new Date(f.lastModified()));
+			int i1 = name.indexOf('-');
+			int i2 = name.indexOf('-', i1 + 1);
+			if (i2 > 0) {
+				version = name.substring(i1 + 1, i2);
+			}
+		}
+	}
+	@GetMapping(path = {"/releases"})
+	public String releasesPage(Model model) {
+		List<ReleaseInfo> releases = new ArrayList<>();
+		File fld = new File(filesLocation, RELEASES_FOLDER);
+		if (fld.exists()) {
+			for (File f : fld.listFiles()) {
+				releases.add(new ReleaseInfo(f));
+			}
+		}
+		Collections.sort(releases, new Comparator<ReleaseInfo>() {
+
+			@Override
+			public int compare(ReleaseInfo o1, ReleaseInfo o2) {
+				return -Long.compare(o1.timestamp, o2.timestamp);
+			}
+		});
+		model.addAttribute("releases", releases);
+		return "admin/releases";
+	}
+	
+	@GetMapping(path = {"/download-release"})
+	public ResponseEntity<FileSystemResource> releaseDownload(String file) {
+		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file) ;
+		HttpHeaders headers = new HttpHeaders();
+        // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fl.getName());
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		headers.add(HttpHeaders.CONTENT_LENGTH, fl.length() + "");
+		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
 	
 }

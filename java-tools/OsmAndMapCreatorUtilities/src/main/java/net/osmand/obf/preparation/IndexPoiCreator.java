@@ -105,11 +105,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
-		tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e);
-		icc.translitJapaneseNames(e, settings.addRegionTag);
-		icc.translitChineseNames(e, settings.addRegionTag);
-		Map<String, String> tags = e.getTags();
-		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
+		Map<String, String> etags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
+		
+		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		boolean privateReg = "private".equals(e.getTag("access"));
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {

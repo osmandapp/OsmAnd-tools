@@ -126,6 +126,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if (tg != null) {
 				ec.ifNotRegionName.addAll(Arrays.asList(tg.split("\\,")));
 			}
+			ec.lang = "true".equals(mp.get("lang"));
 			ec.verbose = "true".equals(mp.get("verbose")); //$NON-NLS-1$
 			parseConvertCol(mp, ec.ifTags, "if_");
 			parseConvertCol(mp, ec.ifStartsTags, "if_starts_with_");
@@ -339,7 +340,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
 		if (listToTransform != null) {
 			for (EntityConvert ec : listToTransform) {
-				applyTagTransforms(rtags, ec, entity, tags);
+				applyTagTransforms(rtags, ec, tags);
 			}
 		}
 		if (listToCombine != null) {
@@ -868,23 +869,36 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
+	private void applyTagTransforms(Map<String, String> resultTags, EntityConvert ec, Map<String, String> originalTags) {
+		applyTagTransforms(resultTags, ec, originalTags, "");
+		if (ec.lang) {
+			for (String lang : langs) {
+				applyTagTransforms(resultTags, ec, originalTags, lang);
+			}
+			applyTagTransforms(resultTags, ec, originalTags, "en");
+		}
+	}
 
-	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, EntityType entity,
-			Map<String, String> originaltags) {
-		String fromValue =  originaltags.get(ec.fromTag.tag);
-		tags.remove(ec.fromTag.tag);
-		for(TagValuePattern ift : ec.toTags) {
+	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, Map<String, String> originaltags,
+	                                String lang) {
+		String langSuffix = lang.isEmpty() ? "" : ":" + lang;
+		String fromTag = ec.fromTag.tag + langSuffix;
+		String fromValue = originaltags.get(fromTag);
+		if (tags.remove(fromTag) == null) {
+			return;
+		}
+		for (TagValuePattern ift : ec.toTags) {
 			String vl = ift.value;
 			if (vl == null) {
 				vl = fromValue;
 			}
 			vl = processSubstr(ift, vl);
-			if(ift.tagPrefix != null) {
-				for(String vlSplit : fromValue.split(";")) {
-					tags.put(ift.tagPrefix+vlSplit.trim(), vl);
+			if (ift.tagPrefix != null) {
+				for (String vlSplit : fromValue.split(";")) {
+					tags.put(ift.tagPrefix + vlSplit.trim(), vl);
 				}
 			} else {
-				tags.put(ift.tag, vl);
+				tags.put(ift.tag + langSuffix, vl);
 			}
 		}
 	}
@@ -1624,5 +1638,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> ifTagsNotLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public boolean lang;
 	}
 }

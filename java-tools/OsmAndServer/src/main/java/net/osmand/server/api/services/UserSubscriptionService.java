@@ -52,9 +52,10 @@ public class UserSubscriptionService {
 	private AmazonIAPHelper amazonIAPHelper;
 
 
+	// returns null if ok
 	public String checkOrderIdPremium(String orderid) {
 		if (Algorithms.isEmpty(orderid)) {
-			return "no subscription provided";
+			return null;
 		}
 		String errorMsg = "no subscription present";
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);

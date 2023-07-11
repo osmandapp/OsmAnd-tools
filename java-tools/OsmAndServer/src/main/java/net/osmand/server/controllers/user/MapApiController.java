@@ -140,6 +140,11 @@ public class MapApiController {
 		public String password;
 		public String token;
 	}
+	
+	public static class EmailSenderInfo {
+		public String email;
+		public String action;
+	}
 
 	@GetMapping(path = { "/auth/loginForm" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
@@ -252,7 +257,6 @@ public class MapApiController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		userdataService.validateUser(usersRepository.findById(dev.userid));
 		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
 		
 		return okStatus();
@@ -365,7 +369,6 @@ public class MapApiController {
 		userdataService.getFile(response, request, name, type, updatetime, dev);
 	}
 	
-	@SuppressWarnings("unchecked")
 	@GetMapping(value = "/get-gpx-info")
 	@ResponseBody
 	public ResponseEntity<String> getGpxInfo(HttpServletResponse response, HttpServletRequest request,
@@ -430,7 +433,6 @@ public class MapApiController {
 		PremiumUserDevice dev = checkUser();
 		InputStream bin = null;
 		try {
-			@SuppressWarnings("unchecked")
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(SRTM_ANALYSIS))));
@@ -556,13 +558,13 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/send-code"})
 	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestBody String email) {
-		if (emailSender.isEmail(email)) {
+	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) {
+		if (emailSender.isEmail(data.email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
-			return userdataService.sendCode(email, dev);
+			return userdataService.sendCode(data.email, data.action, dev);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

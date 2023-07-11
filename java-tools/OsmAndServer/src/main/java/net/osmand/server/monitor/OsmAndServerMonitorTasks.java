@@ -69,7 +69,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
-			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net", "dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
+			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
 			"maptile.osmand.net" };
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
@@ -627,38 +627,12 @@ public class OsmAndServerMonitorTasks {
 			msg += r.fullString(urlToRestart) + "\n";
 		}
 		msg += getTileServerMessage();
-		msg += getOpenPlaceReviewsMessage();
 		return msg;
 	}
 
-	private String getOpenPlaceReviewsMessage() {
-		return String.format("\n<a href='https://r2.openplacereviews.org:890'>OpenPlaceReviews</a>: "
-				+ "<a href='https://openplacereviews.org/api/admin'>%s</a> (test <a href='https://test.openplacereviews.org/api/admin'>%s</a>).",
-				getOprSyncStatus("openplacereviews.org"),  getOprSyncStatus("test.openplacereviews.org"));
-	}
+	
 
-	private String getOprSyncStatus(String url) {
-		long minTimestamp = 0;
-		try {
-			JSONObject object = new JSONObject(new JSONTokener(
-					new URL("https://" + url + "/api/objects-by-id?type=sys.bot&key=osm-sync").openStream()));
-			JSONArray jsonArray = object.getJSONArray("objects");
-			if (jsonArray.length() > 0) {
-				JSONObject osmTags = jsonArray.getJSONObject(0).getJSONObject("bot-state").getJSONObject("osm-tags");
-				for (String key : osmTags.keySet()) {
-					String dt = osmTags.getJSONObject(key).getString("date");
-					long tm = TIMESTAMP_FORMAT_OPR.parse(dt).getTime();
-					if (minTimestamp == 0 || minTimestamp > tm) {
-						minTimestamp = tm;
-					}
-				}
-			}
-			return minTimestamp == 0 ? "failed" : timeAgo(minTimestamp);
-		} catch (Exception e) {
-			LOG.warn(e.getMessage(), e);
-			return "Error: " + e.getMessage();
-		}
-	}
+	
 
 	private String timeAgo(long tm) {
 		float hr = (float) ((System.currentTimeMillis() - tm) / (60 * 60 * 1000.0));

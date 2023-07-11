@@ -5,8 +5,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.List;
@@ -18,7 +16,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -38,8 +35,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 @Controller
 public class DownloadIndexController {
@@ -171,47 +167,25 @@ public class DownloadIndexController {
 
 	private Resource findFileResource(MultiValueMap<String, String> params) throws FileNotFoundException {
 		String filename = getFileOrThrow(params);
-		if (params.containsKey("srtm")) {
-			return getFileAsResource("srtm", filename);
-		}
-		if (params.containsKey("srtmcountry")) {
-			return getFileAsResource("srtm-countries", filename);
-		}
-		if (params.containsKey("road")) {
-			return getFileAsResource("road-indexes", filename);
-		}
 		if (params.containsKey("aosmc") || params.containsKey("osmc")) {
 			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 			return getFileAsResource("aosmc" + File.separator + folder, filename);
 		}
-		if (params.containsKey("wiki")) {
-			return getFileAsResource("wiki", filename);
+//		if (params.containsKey("inapp")) {
+//			String type = params.getFirst("inapp");
+//			return getFileAsResource("indexes/inapp/"+type, filename);
+//		}
+		
+		for (DownloadType type : DownloadType.values()) {
+			for (String httpParam : type.getHeaders()) {
+				if (isContainAndEqual(httpParam, params)) {
+					return getFileAsResource(type.getPath(), filename);
+				}
+			}
 		}
-		if (params.containsKey("hillshade")) {
-			return getFileAsResource("hillshade", filename);
-		}
-		if (params.containsKey("slope")) {
-			return getFileAsResource("slope", filename);
-		}
-		if (params.containsKey("heightmap")) {
-			return getFileAsResource("heightmap", filename);
-		}
-		if (params.containsKey("depth")) {
-			return getFileAsResource("depth", filename);
-		}
-		if (params.containsKey("inapp")) {
-			String type = params.getFirst("inapp");
-			return getFileAsResource("indexes/inapp/"+type, filename);
-		}
-		if (params.containsKey("wikivoyage")) {
-			return getFileAsResource("wikivoyage", filename);
-		}
-		if (params.containsKey("fonts")) {
-			return getFileAsResource("indexes/fonts", filename);
-		}
-		Resource res = getFileAsResource("indexes", filename);
+		Resource res = getFileAsResource(DownloadType.MAP.getPath(), filename);
 		if (res.exists()) {
-			return getFileAsResource("indexes", filename);
+			return getFileAsResource(DownloadType.MAP.getPath(), filename);
 		}
 		String msg = "Requested resource is missing or request is incorrect.\nRequest parameters: " + params;
 		LOGGER.error(msg);
@@ -259,17 +233,21 @@ public class DownloadIndexController {
 				}
 			}
 			String host = null;
+			boolean headerFound = false;
 			for (DownloadServerSpecialty dss : DownloadServerSpecialty.values()) {
-				for (String httpParam : dss.httpParams) {
-					if (isContainAndEqual(httpParam, params)) {
-						host = servers.getServer(dss, remoteAddr);
-						if (host != null) {
-							break;
+				for (DownloadType type : dss.types) {
+					for (String httpParam : type.getHeaders()) {
+						if (isContainAndEqual(httpParam, params)) {
+							headerFound = true;
+							host = servers.getServer(dss, remoteAddr);
+							if (host != null) {
+								break;
+							}
 						}
 					}
 				}
 			}
-			if (host == null) {
+			if (host == null && !headerFound) {
 				host = servers.getServer(DownloadServerSpecialty.MAIN, remoteAddr);
 			}
 			if (host != null) {

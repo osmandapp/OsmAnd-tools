@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
@@ -32,7 +31,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,12 +39,12 @@ import org.springframework.web.multipart.MultipartFile;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
-import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.controllers.pub.UserdataController;
@@ -92,48 +90,69 @@ public class UserdataService {
     public static final String ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE = "File is not available";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PREMIUM_USERS = 100;
-    public static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
-    public static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
-    private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
     private static final long MB = 1024 * 1024;
+    public static final int BUFFER_SIZE = 1024 * 512;
     private static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
-    private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
-    private static final int ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED = 4 + ERROR_CODE_PREMIUM_USERS;
-    private static final int ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID = 5 + ERROR_CODE_PREMIUM_USERS;
-    //    private static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
-    private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
-    public static final int BUFFER_SIZE = 1024 * 512;
+    
+    
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
-    
+    public static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
+    private static final int ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED = 4 + ERROR_CODE_PREMIUM_USERS;
+    public static final int ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID = 5 + ERROR_CODE_PREMIUM_USERS;
     public static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
+    public static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
+    private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
+//    private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
+    private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
     
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
     private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
-    private static final String FILE_TYPE_SETTINGS = "SETTINGS";
-    private static final String FILE_TYPE_GPX = "GPX";
-    private static final String FILE_TYPE_FILE = "FILE";
+    public static final String FILE_TYPE_GLOBAL = "GLOBAL";
+    public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
+    public static final String FILE_TYPE_PROFILE = "PROFILE";
+    public static final String FILE_TYPE_GPX = "GPX";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
-    public void validateUser(PremiumUsersRepository.PremiumUser user) {
+    public void validateUserForUpload(PremiumUserDevicesRepository.PremiumUserDevice dev, String type, long fileSize) {
+    	PremiumUser user = usersRepository.findById(dev.userid);
         if (user == null) {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
         }
         String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
-        if (errorMsg != null) {
-            throw new OsmAndPublicApiException(ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT,
-                    "Subscription is not valid any more: " + errorMsg);
-        }
+		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
+			if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_GLOBAL) && !type.equals(FILE_TYPE_PROFILE)) {
+				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION,
+						String.format("Free account can upload files with type %s, %s and %s, this file type is %s!", FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, type));
+			}
+			if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
+                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+            }
+		}
+        
         UserdataController.UserFilesResults res = generateFiles(user.id, null, null, false, false);
         if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
             throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
                     "Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
                             + " MB. Please contact support in order to investigate possible solutions.");
         }
+        
+		if (Algorithms.isEmpty(user.orderid)) {
+			if (res.totalFiles > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
+				throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
+						"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
+								+ " MB. Please contact support in order to investigate possible solutions.");
+			}
+		}
+		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
+			if (res.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
+                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+            }
+		}
     }
     
     public UserdataController.UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
@@ -179,14 +198,14 @@ public class UserdataService {
     }
     
     public static class ResponseFileStatus {
-    	private long filesize;
-        private long zipfilesize;
-        private long updatetime;
-        private long clienttime;
-        private String type;
-        private String name;
-        private JsonObject details;
-        private String status = "ok";
+    	protected long filesize;
+    	protected long zipfilesize;
+    	protected long updatetime;
+    	protected long clienttime;
+    	protected String type;
+    	protected String name;
+    	protected JsonObject details;
+    	protected String status = "ok";
     	
     	public ResponseFileStatus(UserFile f) {
     		filesize = f.filesize;
@@ -205,12 +224,6 @@ public class UserdataService {
     
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-    
-        ResponseEntity<String> error = validateFreeAccount(pu, type);
-        if (error != null) {
-            return error;
-        }
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -222,43 +235,12 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
-        error = validateFreeAccountFile(pu, zipfile);
-        if (error != null) {
-            return error;
-        }
-        
+		validateUserForUpload(dev, type, zipfile.getSize());
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
     
-    private ResponseEntity<String> validateFreeAccount(PremiumUsersRepository.PremiumUser pu, String type) {
-        if (pu.orderid == null) {
-            Iterable<UserFile> files = filesRepository.findAllByUserid(pu.id);
-            if (IterableUtils.size(files) > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
-                return ResponseEntity.badRequest().body(String.format("File limit reached (%d)!", MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
-            }
-            if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_SETTINGS)) {
-                return ResponseEntity.badRequest().body(String.format("Free account can upload files with type %s and %s, this file type is %s!",
-                        FILE_TYPE_FAVOURITES, FILE_TYPE_SETTINGS, type));
-            }
-        }
-        return null;
-    }
     
-    private ResponseEntity<String> validateFreeAccountFile(PremiumUsersRepository.PremiumUser pu, InternalZipFile zipfile) {
-        if (pu.orderid == null) {
-            long fileSize = zipfile.getSize();
-            if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
-                return ResponseEntity.badRequest().body(String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
-            }
-            UserdataController.UserFilesResults res = generateFiles(pu.id, null, null, false, false);
-            if (res.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
-                return ResponseEntity.badRequest()
-                        .body(String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
-            }
-        }
-        return null;
-    }
-
+    
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
 		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
@@ -320,19 +302,18 @@ public class UserdataService {
 		if (pu == null) {
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-        if (pu.orderid != null) {
-            String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-            if (errorMsg != null) {
-                throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-            }
-        }
+		// we don't validate cause there are free users 
+//		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+//		if (errorMsg != null) {
+//			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+//		}
 		pu.tokendevice = TOKEN_DEVICE_WEB;
 		if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
 		}
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token);
+		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "setup");
 		return ok();
 	}
     
@@ -400,7 +381,6 @@ public class UserdataService {
         InputStream bin = null;
         File fileToDelete = null;
         try {
-            @SuppressWarnings("unchecked")
 			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
 			ServerCommonFile scf = checkThatObfFileisOnServer(name, type); 
 			boolean gzin = true, gzout;
@@ -573,19 +553,6 @@ public class UserdataService {
 		uf = filesRepository.getById(ufnd.id);
 	}
     
-    public PremiumUserDevicesRepository.PremiumUserDevice checkValidateUser() {
-        Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        PremiumUserDevicesRepository.PremiumUserDevice dev = null;
-        if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-            dev = ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
-        }
-        if (dev == null) {
-            throw new OsmAndPublicApiException(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
-        }
-        validateUser(usersRepository.findById(dev.userid));
-        
-        return dev;
-    }
     
     private boolean isSelectedType(Set<String> filterTypes, PremiumUserFilesRepository.UserFileNoData sf) {
         final String FILE_TYPE = "FILE";
@@ -758,13 +725,13 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String email, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> sendCode(String email, String action, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudWebEmail(email, token);
+        emailSender.sendOsmAndCloudWebEmail(email, token, action);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
