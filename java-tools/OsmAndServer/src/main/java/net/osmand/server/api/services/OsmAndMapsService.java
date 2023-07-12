@@ -107,13 +107,6 @@ public class OsmAndMapsService {
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 	
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
-	
-	private static final int SEARCH_RADIUS_LEVEL = 1;
-	private static final double SEARCH_RADIUS_DEGREE = 1.5;
-	private static final int TOTAL_LIMIT_POI = 400;
-	
-	private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 4;
-	private static final int MIN_ZOOM_FOR_DETAILED_BBOX_SEARCH_POI = 14;
 	private static final String SEARCH_LOCALE = "en";
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
