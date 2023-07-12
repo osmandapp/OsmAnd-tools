@@ -25,6 +25,7 @@ import javax.imageio.ImageIO;
 
 import net.osmand.IndexConstants;
 import net.osmand.data.Amenity;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
@@ -911,17 +912,48 @@ public class OsmAndMapsService {
 	}
 	
 	private List<File> prepareMaps(List<File> files,  List<LatLon> bbox, int maxNumberMaps) throws IOException {
-		MapsCollection mapsCollection = new MapsCollection(false);
-		files.forEach(mapsCollection::add);
-		List<File> filesToUse =  mapsCollection.getFilesToUse();
+		List<File> filesToUse = filterMap(files);
+		List<File> res;
 		
-		if (!filesToUse.isEmpty() && maxNumberMaps != 0 && filesToUse.size() >= maxNumberMaps && bbox != null) {
-			long time = System.currentTimeMillis();
-			filesToUse = filterMapsByName(filesToUse, bbox);
-			LOGGER.info(System.currentTimeMillis() - time);
+		if (!filesToUse.isEmpty() && maxNumberMaps != 0 && filesToUse.size() >= 4 && bbox != null) {
+			LOGGER.info("Files before filter by name " + filesToUse.size());
+			res = filterMapsByName(filesToUse, bbox);
+			LOGGER.info("Files after filter by name " + res.size());
+		} else {
+			res = filesToUse;
 		}
-		LOGGER.info("Files to use " + filesToUse.size());
-		return filesToUse;
+		LOGGER.info("Files to use " + res.size());
+		return res;
+	}
+	
+	private List<File> filterMap(List<File> files) throws IOException {
+		List<File> res = new ArrayList<>();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		TreeSet<String> allDwNames = new TreeSet<>();
+		for (File file : files) {
+			allDwNames.add(getDownloadNameByFileName(file.getName()));
+		}
+		for (File file : files) {
+			String dwName = getDownloadNameByFileName(file.getName());
+			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
+			if (wr != null && wr.getSuperregion() != null && wr.getSuperregion().getRegionDownloadName() != null
+					&& allDwNames.contains(wr.getSuperregion().getRegionDownloadName())) {
+			} else {
+				res.add(file);
+			}
+		}
+		return res;
+	}
+	
+	private String getDownloadNameByFileName(String fileName) {
+		String dwName = fileName.substring(0, fileName.indexOf('.')).toLowerCase();
+		if (dwName.endsWith("_2")) {
+			dwName = dwName.substring(0, dwName.length() - 2);
+		}
+		return dwName;
 	}
 	
 	public List<File> filterMapsByName(List<File> filesToUse, List<LatLon> bbox) throws IOException {
