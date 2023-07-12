@@ -920,6 +920,7 @@ public class OsmAndMapsService {
 			filesToUse = filterMapsByName(filesToUse, bbox);
 			LOGGER.info(System.currentTimeMillis() - time);
 		}
+		LOGGER.info("Files to use " + filesToUse.size());
 		return filesToUse;
 	}
 	
@@ -947,6 +948,7 @@ public class OsmAndMapsService {
 			res = osmandRegions.getRegionsToDownload(point.getLatitude(), point.getLongitude(), res);
 			regions.addAll(res);
 		}
+		LOGGER.info("Regions by bbox size " + regions.size());
 		return regions;
 	}
 	
