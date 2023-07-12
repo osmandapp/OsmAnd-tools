@@ -105,7 +105,7 @@ public class SearchService {
         SearchSettings settings = searchUICore.getPhrase().getSettings();
         searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
         SearchUICore.SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
-        
+        osmAndMapsService.obfFiles.values().forEach(ref -> list.forEach(ref::unlockReader));
         return r.getCurrentSearchResults();
     }
     

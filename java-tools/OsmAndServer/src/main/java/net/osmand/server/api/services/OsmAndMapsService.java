@@ -198,6 +198,24 @@ public class OsmAndMapsService {
 		}
 	}
 	
+	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
+	public void closeMapReaders() {
+		obfFiles.forEach((name, ref) -> {
+			if (!ref.readers.isEmpty()) {
+				ref.readers.forEach((reader, open) -> {
+					if (Boolean.TRUE.equals(open)) {
+						try {
+							reader.close();
+							ref.readers.remove(reader);
+						} catch (IOException e) {
+							LOGGER.error(e.getMessage(), e);
+						}
+					}
+				});
+			}
+		});
+	}
+	
 	
 	public static class RoutingServerConfigEntry {
 		public String type;
@@ -621,8 +639,7 @@ public class OsmAndMapsService {
 		GeocodingUtilities su = new GeocodingUtilities();
 		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
 		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
-//		complete.addAll(res);
-//		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
+		obfFiles.values().forEach(ref -> list.forEach(ref::unlockReader));
 		
 		return complete;
 	}
@@ -733,6 +750,7 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
 		RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds);
+		List<RouteSegmentResult> routeRes;
 		if (rsc[0] != null) {
 			StringBuilder url = new StringBuilder(rsc[0].url);
 			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
@@ -755,13 +773,14 @@ public class OsmAndMapsService {
 			for (WptPt p : trkSegment.points) {
 				polyline.add(new LatLon(p.lat, p.lon));
 			}
-			return approximate(ctx, router, props, polyline);
+			routeRes = approximate(ctx, router, props, polyline);
 		} else {
 			PrecalculatedRouteDirection precalculatedRouteDirection = null;
-			List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-			putResultProps(ctx, route, props);
-			return route;
+			routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+			putResultProps(ctx, routeRes, props);
 		}
+		obfFiles.values().forEach(ref -> Arrays.asList(ctx.getMaps()).forEach(ref::unlockReader));
+		return routeRes;
 	}
 	
 
