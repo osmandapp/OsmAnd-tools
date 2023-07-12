@@ -882,7 +882,7 @@ public class OsmAndMapsService {
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
-				BinaryMapIndexReader reader = ref.lockReader(cacheFiles, 500);
+				BinaryMapIndexReader reader = ref.lockReader(cacheFiles, 1000);
 				if (reader != null) {
 					files.add(reader);
 				}
