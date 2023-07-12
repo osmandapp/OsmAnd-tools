@@ -165,7 +165,7 @@ public class SearchService {
         return List.of();
     }
     
-    public synchronized SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList) throws IOException {
+    public SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
