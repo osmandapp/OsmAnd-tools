@@ -39,7 +39,7 @@ public class SearchService {
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
     private static final int TOTAL_LIMIT_POI = 400;
     
-    private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 4;
+    private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 5;
     private static final String SEARCH_LOCALE = "en";
     
     private static final int SHIFT_MULTIPOLYGON_IDS = 43;

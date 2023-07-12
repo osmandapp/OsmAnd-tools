@@ -116,7 +116,7 @@ public class OsmAndMapsService {
 	private static final String SEARCH_LOCALE = "en";
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
-	private static final int MAXIMUM_OPEN_FILES = 3;
+	private static final int MAXIMUM_OPEN_FILES = 5;
 	
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
