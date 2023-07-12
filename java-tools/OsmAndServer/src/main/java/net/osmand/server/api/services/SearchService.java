@@ -89,7 +89,7 @@ public class SearchService {
         }
     }
     
-    public synchronized List<SearchResult> search(double lat, double lon, String text) throws IOException {
+    public synchronized List<SearchResult> search(double lat, double lon, String text) throws IOException, InterruptedException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
@@ -97,7 +97,7 @@ public class SearchService {
         searchUICore.getSearchSettings().setRegions(osmandRegions);
         QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
-        List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(points, null));
+        List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(points, null, 0));
         searchUICore.getSearchSettings().setOfflineIndexes(list);
         searchUICore.init();
         searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
@@ -109,7 +109,7 @@ public class SearchService {
         return r.getCurrentSearchResults();
     }
     
-    public synchronized PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException, InterruptedException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -139,6 +139,7 @@ public class SearchService {
             }
             leftoverLimit = limit - res.size();
         }
+        osmAndMapsService.obfFiles.values().forEach(ref -> mapList.forEach(ref::unlockReader));
         if (!features.isEmpty()) {
             return new PoiSearchResult(useLimit, false, false, new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0])));
         } else {
@@ -152,11 +153,11 @@ public class SearchService {
         return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
     }
     
-    private List<BinaryMapIndexReader> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException {
+    private List<BinaryMapIndexReader> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException, InterruptedException {
         if (searchBbox != null) {
             SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
             searchUICore.getSearchSettings().setRegions(osmandRegions);
-            List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(searchBbox, bbox));
+            List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(searchBbox, bbox, MAX_NUMBER_OF_MAP_SEARCH_POI));
             if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
                 return list;
             }
