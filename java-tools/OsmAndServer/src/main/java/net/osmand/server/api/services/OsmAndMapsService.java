@@ -4,14 +4,7 @@ package net.osmand.server.api.services;
 
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.*;
@@ -24,18 +17,8 @@ import java.util.zip.ZipInputStream;
 import javax.imageio.ImageIO;
 
 import net.osmand.IndexConstants;
-import net.osmand.data.Amenity;
 import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.PoiCategory;
-import net.osmand.osm.PoiFilter;
-import net.osmand.osm.PoiType;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
-import net.osmand.server.controllers.pub.RoutingController;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,11 +69,8 @@ import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
-import net.osmand.search.SearchUICore;
-import net.osmand.search.SearchUICore.SearchResultCollection;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.util.MapsCollection;
 
 import static net.osmand.util.MapUtils.rhumbDestinationPoint;
 
@@ -138,7 +118,7 @@ public class OsmAndMapsService {
 		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
 		
-		private synchronized BinaryMapIndexReader lockAvailableResource() {
+		private synchronized BinaryMapIndexReader lockReader() {
 			for (Entry<BinaryMapIndexReader, Boolean> r : readers.entrySet()) {
 				if (Boolean.TRUE.equals(r.getValue())) {
 					r.setValue(false);
@@ -148,36 +128,48 @@ public class OsmAndMapsService {
 			return null;
 		}
 		
-		public BinaryMapIndexReader lockReader(CachedOsmandIndexes cacheFiles, int maxWaitMs) throws IOException, InterruptedException {
-			BinaryMapIndexReader res = lockAvailableResource();
-			if (res != null) {
-				return res;
+		public void unlockReader(BinaryMapIndexReader reader) {
+			if (reader != null && !readers.isEmpty()) {
+				readers.computeIfPresent(reader, (key, value) -> true);
+			}
+		}
+		
+		public BinaryMapIndexReader getReader(CachedOsmandIndexes cacheFiles, int maxWaitMs) throws IOException, InterruptedException {
+			BinaryMapIndexReader resReader = lockReader();
+			if (resReader != null) {
+				return resReader;
 			}
 			if (readers.size() < MAXIMUM_OPEN_FILES) {
 				if (cacheFiles == null) {
 					initObfReaders();
 				}
-				if (cacheFiles != null) {
-					long val = System.currentTimeMillis();
-					RandomAccessFile raf = new RandomAccessFile(file, "r");
-					BinaryMapIndexReader reader = cacheFiles.initReaderFromFileIndex(fileIndex, raf, file);
-					LOGGER.info("Initializing routing file " + file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
-					readers.put(reader, true);
-				} else {
-					LOGGER.info("Failed to create a reader for the file " + file.getName());
-					return null;
+				BinaryMapIndexReader newReader = createReader();
+				if (newReader != null) {
+					readers.put(newReader, true);
 				}
 			}
 			int ms = 0;
 			while (ms < maxWaitMs) {
 				Thread.sleep(WAIT_LOCK_CHECK);
 				ms += WAIT_LOCK_CHECK;
-				res = lockAvailableResource();
-				if (res != null) {
-					return res;
+				resReader = lockReader();
+				if (resReader != null) {
+					return resReader;
 				}
 			}
 			LOGGER.info("Failed to get a reader for the file " + file.getName());
+			return null;
+		}
+		
+		private BinaryMapIndexReader createReader() throws IOException {
+			if (cacheFiles != null) {
+				long val = System.currentTimeMillis();
+				RandomAccessFile raf = new RandomAccessFile(file, "r");
+				BinaryMapIndexReader reader = cacheFiles.initReaderFromFileIndex(fileIndex, raf, file);
+				LOGGER.info("Initializing file " + file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+				return reader;
+			}
+			LOGGER.info("Failed to create a reader for the file " + file.getName());
 			return null;
 		}
 		
@@ -189,12 +181,6 @@ public class OsmAndMapsService {
 				}
 			}
 			return cnt;
-		}
-		
-		public void unlockReader(BinaryMapIndexReader ret) {
-			if (ret != null && !readers.isEmpty()) {
-				readers.computeIfPresent(ret, (key, value) -> true);
-			}
 		}
 	}
 	
@@ -894,7 +880,7 @@ public class OsmAndMapsService {
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
-				BinaryMapIndexReader reader = ref.lockReader(cacheFiles, 1000);
+				BinaryMapIndexReader reader = ref.getReader(cacheFiles, 1000);
 				if (reader != null) {
 					files.add(reader);
 				}
