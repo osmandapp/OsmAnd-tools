@@ -184,6 +184,26 @@ public class OsmAndMapsService {
 		}
 	}
 	
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs) {
+		List<BinaryMapIndexReader> res = new ArrayList<>();
+		refs.forEach(ref-> {
+			BinaryMapIndexReader reader = null;
+			try {
+				reader = ref.getReader(cacheFiles, 1000);
+			} catch (IOException | InterruptedException e) {
+				LOGGER.error(e.getMessage(), e);
+			}
+			if (reader != null) {
+				res.add(reader);
+			}
+		});
+		return res;
+	}
+	
+	public void unlockReaders(List<BinaryMapIndexReader> mapsReaders) {
+		obfFiles.values().forEach(ref -> mapsReaders.forEach(ref::unlockReader));
+	}
+	
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void closeMapReaders() {
 		obfFiles.forEach((name, ref) -> {
@@ -617,26 +637,32 @@ public class OsmAndMapsService {
 				.append('/').append(x).append('/').append(y).toString();
 	}
 	
-	public synchronized List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
+	public List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points, null, 0));
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null);
-		GeocodingUtilities su = new GeocodingUtilities();
-		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
-		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
-		obfFiles.values().forEach(ref -> list.forEach(ref::unlockReader));
-		
-		return complete;
+		List<GeocodingResult> complete;
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			usedMapList = getReaders(list);
+			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+			RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null, usedMapList);
+			GeocodingUtilities su = new GeocodingUtilities();
+			List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
+			complete = su.sortGeocodingResults(usedMapList, res);
+		} finally {
+			unlockReaders(usedMapList);
+		}
+		return complete != null ? complete : Collections.emptyList();
 	}
 	
-
+	
 	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {
 			return Collections.emptyList();
 		}
+		List<RouteSegmentResult> route;
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+		List<LatLon> polyline = new ArrayList<>(trkSegment.points.size());
 		for (WptPt p : trkSegment.points) {
 			polyline.add(new LatLon(p.lat, p.lon));
 		}
@@ -645,9 +671,15 @@ public class OsmAndMapsService {
 			return Collections.emptyList();
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null);
-		List<RouteSegmentResult> route = approximate(ctx, router, props, polyline);
-		obfFiles.values().forEach(ref -> Arrays.asList(ctx.getMaps()).forEach(ref::unlockReader));
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			usedMapList = getReaders(list);
+			RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null, usedMapList);
+			route = approximate(ctx, router, props, polyline);
+		} finally {
+			unlockReaders(usedMapList);
+		}
 		return route;
 	}
 
@@ -670,7 +702,7 @@ public class OsmAndMapsService {
 	}
 
 	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router,
-			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds) throws IOException, InterruptedException {
+			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
@@ -724,49 +756,55 @@ public class OsmAndMapsService {
 					: RouteCalculationMode.NORMAL;
 		}
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				getObfReaders(points, null, 0), paramMode); // RouteCalculationMode.BASE
+				usedMapList.toArray(new BinaryMapIndexReader[0]), paramMode); // RouteCalculationMode.BASE
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
 	
 	
-	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
-			LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
+	public List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
+	                                        LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
 			throws IOException, InterruptedException {
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds);
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		List<RouteSegmentResult> routeRes;
-		if (rsc[0] != null) {
-			StringBuilder url = new StringBuilder(rsc[0].url);
-			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
-			url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
-			
-	        RestTemplate restTemplate = new RestTemplate();
-	        restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			usedMapList = getReaders(list);
+			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
+			if (rsc[0] != null) {
+				StringBuilder url = new StringBuilder(rsc[0].url);
+				url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
+				url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
 				
-				@Override
-				public void handleError(ClientHttpResponse response) throws IOException {
-					LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
-					super.handleError(response);
+				RestTemplate restTemplate = new RestTemplate();
+				restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+					
+					@Override
+					public void handleError(ClientHttpResponse response) throws IOException {
+						LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
+						super.handleError(response);
+					}
+				});
+				String gpx = restTemplate.getForObject(url.toString(), String.class);
+				
+				GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
+				TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+				List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+				for (WptPt p : trkSegment.points) {
+					polyline.add(new LatLon(p.lat, p.lon));
 				}
-			});
-	        String gpx = restTemplate.getForObject(url.toString(), String.class);
-	        
-	        GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-			for (WptPt p : trkSegment.points) {
-				polyline.add(new LatLon(p.lat, p.lon));
+				routeRes = approximate(ctx, router, props, polyline);
+			} else {
+				PrecalculatedRouteDirection precalculatedRouteDirection = null;
+				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+				putResultProps(ctx, routeRes, props);
 			}
-			routeRes = approximate(ctx, router, props, polyline);
-		} else {
-			PrecalculatedRouteDirection precalculatedRouteDirection = null;
-			routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-			putResultProps(ctx, routeRes, props);
+		} finally {
+			unlockReaders(usedMapList);
 		}
-		obfFiles.values().forEach(ref -> Arrays.asList(ctx.getMaps()).forEach(ref::unlockReader));
 		return routeRes;
 	}
 	
@@ -872,22 +910,17 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 	
-	public BinaryMapIndexReader[] getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException, InterruptedException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
 		initObfReaders();
-		List<BinaryMapIndexReader> files = new ArrayList<>();
-		
+		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
 		List<File> filesToUse = getMaps(quadRect, bbox, maxNumberMaps);
-		
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
-				BinaryMapIndexReader reader = ref.getReader(cacheFiles, 1000);
-				if (reader != null) {
-					files.add(reader);
-				}
+				files.add(ref);
 			}
 		}
-		return files.toArray(new BinaryMapIndexReader[0]);
+		return files;
 	}
 	
 	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {

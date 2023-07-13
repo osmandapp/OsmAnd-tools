@@ -89,27 +89,33 @@ public class SearchService {
         }
     }
     
-    public synchronized List<SearchResult> search(double lat, double lon, String text) throws IOException, InterruptedException {
+    public List<SearchResult> search(double lat, double lon, String text) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
         SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
         searchUICore.getSearchSettings().setRegions(osmandRegions);
+        SearchUICore.SearchResultCollection res;
         QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
-        List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(points, null, 0));
-        searchUICore.getSearchSettings().setOfflineIndexes(list);
-        searchUICore.init();
-        searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-        
-        SearchSettings settings = searchUICore.getPhrase().getSettings();
-        searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
-        SearchUICore.SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
-        osmAndMapsService.obfFiles.values().forEach(ref -> list.forEach(ref::unlockReader));
-        return r.getCurrentSearchResults();
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0);
+            usedMapList = osmAndMapsService.getReaders(list);
+            searchUICore.getSearchSettings().setOfflineIndexes(usedMapList);
+            searchUICore.init();
+            searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
+            
+            SearchSettings settings = searchUICore.getPhrase().getSettings();
+            searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
+            res = searchUICore.immediateSearch(text, new LatLon(lat, lon));
+        } finally {
+            osmAndMapsService.unlockReaders(usedMapList);
+        }
+        return res != null ? res.getCurrentSearchResults() : Collections.emptyList();
     }
     
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException, InterruptedException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -119,27 +125,31 @@ public class SearchService {
         int limit = TOTAL_LIMIT_POI / data.categories.size();
         boolean useLimit = false;
         QuadRect searchBbox = getSearchBbox(data.bbox);
-        List<BinaryMapIndexReader> mapList = getMapsForSearch(data.bbox, searchBbox);
-        if (mapList.isEmpty()) {
-            return new PoiSearchResult(false, true, false, null);
-        }
-        
-        for (String category : data.categories) {
-            int sumLimit = limit + leftoverLimit;
-            SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, mapList);
-            List<SearchResult> res = new ArrayList<>();
-            if (resultCollection != null) {
-                res = resultCollection.getCurrentSearchResults();
-                if (!res.isEmpty()) {
-                    if (resultCollection.getUseLimit()) {
-                        useLimit = true;
-                    }
-                    saveSearchResult(res, features);
-                }
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox);
+            if (mapList.isEmpty()) {
+                return new PoiSearchResult(false, true, false, null);
             }
-            leftoverLimit = limit - res.size();
+            usedMapList = osmAndMapsService.getReaders(mapList);
+            for (String category : data.categories) {
+                int sumLimit = limit + leftoverLimit;
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList);
+                List<SearchResult> res = new ArrayList<>();
+                if (resultCollection != null) {
+                    res = resultCollection.getCurrentSearchResults();
+                    if (!res.isEmpty()) {
+                        if (resultCollection.getUseLimit()) {
+                            useLimit = true;
+                        }
+                        saveSearchResult(res, features);
+                    }
+                }
+                leftoverLimit = limit - res.size();
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(usedMapList);
         }
-        osmAndMapsService.obfFiles.values().forEach(ref -> mapList.forEach(ref::unlockReader));
         if (!features.isEmpty()) {
             return new PoiSearchResult(useLimit, false, false, new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0])));
         } else {
@@ -153,11 +163,11 @@ public class SearchService {
         return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
     }
     
-    private List<BinaryMapIndexReader> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException, InterruptedException {
+    private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException {
         if (searchBbox != null) {
             SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
             searchUICore.getSearchSettings().setRegions(osmandRegions);
-            List<BinaryMapIndexReader> list = Arrays.asList(osmAndMapsService.getObfReaders(searchBbox, bbox, MAX_NUMBER_OF_MAP_SEARCH_POI));
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
             if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
                 return list;
             }
