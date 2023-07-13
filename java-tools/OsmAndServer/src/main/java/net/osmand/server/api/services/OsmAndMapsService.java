@@ -647,6 +647,7 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null);
 		List<RouteSegmentResult> route = approximate(ctx, router, props, polyline);
+		obfFiles.values().forEach(ref -> Arrays.asList(ctx.getMaps()).forEach(ref::unlockReader));
 		return route;
 	}
 
