@@ -762,7 +762,7 @@ public class OsmAndMapsService {
 	}
 	
 	
-	public List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
+	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
 	                                        LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
 			throws IOException, InterruptedException {
 		QuadRect points = points(intermediates, start, end);
