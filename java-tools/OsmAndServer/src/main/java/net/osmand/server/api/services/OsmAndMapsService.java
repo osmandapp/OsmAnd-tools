@@ -1015,7 +1015,7 @@ public class OsmAndMapsService {
 			res = osmandRegions.getRegionsToDownload(point.getLatitude(), point.getLongitude(), res);
 			regions.addAll(res);
 		}
-		LOGGER.info("Regions by bbox size " + regions.size());
+		LOGGER.debug("Regions by bbox size " + regions.size());
 		return regions;
 	}
 	
