@@ -118,6 +118,19 @@ public class OsmAndMapsService {
 		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
 		
+		private synchronized void closeUnusedReaders() {
+			readers.forEach((reader, open) -> {
+				if (Boolean.TRUE.equals(open)) {
+					try {
+						reader.close();
+						readers.remove(reader);
+					} catch (IOException e) {
+						LOGGER.error(e.getMessage(), e);
+					}
+				}
+			});
+		}
+		
 		private synchronized BinaryMapIndexReader lockReader() {
 			for (Entry<BinaryMapIndexReader, Boolean> r : readers.entrySet()) {
 				if (Boolean.TRUE.equals(r.getValue())) {
@@ -208,16 +221,7 @@ public class OsmAndMapsService {
 	public void closeMapReaders() {
 		obfFiles.forEach((name, ref) -> {
 			if (!ref.readers.isEmpty()) {
-				ref.readers.forEach((reader, open) -> {
-					if (Boolean.TRUE.equals(open)) {
-						try {
-							reader.close();
-							ref.readers.remove(reader);
-						} catch (IOException e) {
-							LOGGER.error(e.getMessage(), e);
-						}
-					}
-				});
+				ref.closeUnusedReaders();
 			}
 		});
 	}
