@@ -3,9 +3,7 @@ package net.osmand.wiki.wikidata;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import org.apache.commons.logging.Log;
-import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -21,25 +19,23 @@ public class OsmWikiMap {
 	private static final Log log = PlatformUtil.getLog(OsmWikiMap.class);
 
 	public static final int MB = 1 << 20;
-	Map<String, LatLon> map = new HashMap<>();
+	Map<String, LatLon> wikiOsmCoordinates = new HashMap<>();
 	Map<Long, Node> mapNodes = new HashMap<>();
 	int wayCount = 0;
 	int nodeCount = 0;
-	Runtime runtime = Runtime.getRuntime();
-	OsmWikiWayHandler wayHandler = new OsmWikiWayHandler(this);
 
 	void parse(File wikiOsm) {
 		SAXParserFactory factory = SAXParserFactory.newInstance();
-		OsmWikiHandler handler = new OsmWikiHandler();
+		OsmWikiHandler osmWikiHandler = new OsmWikiHandler(this);
 		try {
 			SAXParser saxParser = factory.newSAXParser();
 			GZIPInputStream is = new GZIPInputStream(new FileInputStream(wikiOsm));
-			saxParser.parse(is, handler);
+			saxParser.parse(is, osmWikiHandler);
 			is.close();
 			is = new GZIPInputStream(new FileInputStream(wikiOsm));
-			saxParser.parse(is, wayHandler);
+			saxParser.parse(is, osmWikiHandler);
 			is.close();
-			addWaysCoordinates();
+			addWaysCoordinates(osmWikiHandler);
 		} catch (SAXException | ParserConfigurationException | IOException e) {
 			throw new IllegalArgumentException("Error parsing osm_wiki.xml file", e);
 		}
@@ -47,89 +43,34 @@ public class OsmWikiMap {
 		Runtime runtime = Runtime.getRuntime();
 		long usedMem1 = runtime.totalMemory() - runtime.freeMemory();
 		log.info(String.format("Total parsed: nodes %d , ways %d", nodeCount, wayCount));
-		log.info(String.format("Coordinates found: %d", map.size()));
-		log.info(String.format("Unique nodes %d memory used = %d total memory= %d", mapNodes.size(), usedMem1/MB,
-				runtime.maxMemory()/MB));
+		log.info(String.format("Coordinates found: %d", wikiOsmCoordinates.size()));
+		log.info(String.format("Unique nodes %d memory used = %d total memory= %d", mapNodes.size(), usedMem1 / MB,
+				runtime.maxMemory() / MB));
 	}
 
-	private void addWaysCoordinates() {
-		List<Way> wayList = wayHandler.allWays;
+	private void addWaysCoordinates(OsmWikiHandler osmWikiHandler) {
+		List<Way> wayList = osmWikiHandler.allWays;
 		for (Way way : wayList) {
 			net.osmand.osm.edit.Way osmWay = new net.osmand.osm.edit.Way(way.id);
-			for(Node node:way.nodes) {
+			for (Node node : way.nodes) {
 				net.osmand.osm.edit.Node osmNode = new net.osmand.osm.edit.Node(node.lat, node.lon, node.id);
 				osmWay.addNode(osmNode);
 			}
 			LatLon latlon = getWeightCenterForWay(osmWay);
-			map.put(way.getWikiKey(), latlon);
+			wikiOsmCoordinates.put(way.getWikiKey(), latlon);
 		}
 	}
 
 	public LatLon getCoordinates(String title, String lang, String articleTitle) {
-		LatLon latLon = map.get(title + "#" + lang + ":" + articleTitle);
+		LatLon latLon = wikiOsmCoordinates.get(title + "#" + lang + ":" + articleTitle);
 		if (latLon == null) {
-			latLon = map.get("#" + lang + ":" + articleTitle);
+			latLon = wikiOsmCoordinates.get("#" + lang + ":" + articleTitle);
 		}
 		return latLon;
 	}
 
 	public LatLon getCoordinates(String title) {
-		return map.get(title);
-	}
-
-	class OsmWikiHandler extends DefaultHandler {
-
-		private final StringBuilder nameKey = new StringBuilder();
-		private final StringBuilder wikidataValue = new StringBuilder();
-		private final StringBuilder wikipediaValue = new StringBuilder();
-		LatLon latlon;
-		long id;
-
-		@Override
-		public void startElement(String uri, String localName, String qName, Attributes attributes) {
-			if (qName.equalsIgnoreCase("node")) {
-				nodeCount++;
-				if (nodeCount % 1000000 == 0) {
-					long usedMem1 = runtime.totalMemory() - runtime.freeMemory();
-					log.info(String.format("Node %d memory used = %d",nodeCount, usedMem1/ MB));
-				}
-				String idStr = attributes.getValue("id");
-				if(idStr != null) {
-					id = Long.parseLong(idStr);
-				}
-				String lat = attributes.getValue("lat");
-				String lon = attributes.getValue("lon");
-				if (lat != null && lon != null) {
-					latlon = new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
-				}
-			} else if (qName.equalsIgnoreCase("tag")) {
-				if (attributes.getValue("k").equals("wikipedia")) {
-					wikipediaValue.append(attributes.getValue("v"));
-				} else if (attributes.getValue("k").equals("wikidata")) {
-					wikidataValue.append(attributes.getValue("v"));
-				}
-			}
-		}
-
-		@Override
-		public void endElement(String uri, String localName, String qName) {
-			if (qName.equalsIgnoreCase("node") && (wikidataValue.length() > 0 || wikipediaValue.length() > 0)) {
-				nameKey.append(wikidataValue).append("#").append(wikipediaValue);
-				map.put(nameKey.toString(), latlon);
-				Node n = mapNodes.get(id);
-				if(n == null){
-					mapNodes.put(id,new Node(latlon.getLatitude(), latlon.getLongitude(), id));
-				}
-				wikidataValue.setLength(0);
-				wikipediaValue.setLength(0);
-				nameKey.setLength(0);
-			} else if (qName.equalsIgnoreCase("node") && (wikidataValue.length() == 0 && wikipediaValue.length() == 0)) {
-				Node n = mapNodes.get(id);
-				if(n == null){
-					mapNodes.put(id, new Node(latlon.getLatitude(), latlon.getLongitude(), id));
-				}
-			}
-		}
+		return wikiOsmCoordinates.get(title);
 	}
 
 	public static class Way {
