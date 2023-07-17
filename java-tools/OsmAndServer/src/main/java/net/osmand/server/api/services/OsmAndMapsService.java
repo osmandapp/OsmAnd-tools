@@ -4,14 +4,7 @@ package net.osmand.server.api.services;
 
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.*;
@@ -24,17 +17,8 @@ import java.util.zip.ZipInputStream;
 import javax.imageio.ImageIO;
 
 import net.osmand.IndexConstants;
-import net.osmand.data.Amenity;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.PoiCategory;
-import net.osmand.osm.PoiFilter;
-import net.osmand.osm.PoiType;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
-import net.osmand.server.controllers.pub.RoutingController;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,11 +69,8 @@ import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
-import net.osmand.search.SearchUICore;
-import net.osmand.search.SearchUICore.SearchResultCollection;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.util.MapsCollection;
 
 import static net.osmand.util.MapUtils.rhumbDestinationPoint;
 
@@ -106,6 +87,10 @@ public class OsmAndMapsService {
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 	
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
+	
+	// counts only files open for Java (doesn't fit for rendering / routing)
+	private static final int MAXIMUM_OPEN_FILES = 5;
+	
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
@@ -126,12 +111,119 @@ public class OsmAndMapsService {
 	RoutingServerConfig routingConfig;
 
 	OsmandRegions osmandRegions;
-
-
-	public static class BinaryMapIndexReaderReference {
+	
+	public class BinaryMapIndexReaderReference {
 		File file;
-		BinaryMapIndexReader reader;
+		private static final int WAIT_LOCK_CHECK = 10;
+		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
+		
+		private synchronized void closeUnusedReaders() {
+			readers.forEach((reader, open) -> {
+				if (Boolean.TRUE.equals(open)) {
+					try {
+						reader.close();
+						readers.remove(reader);
+					} catch (IOException e) {
+						LOGGER.error(e.getMessage(), e);
+					}
+				}
+			});
+		}
+		
+		private synchronized BinaryMapIndexReader lockReader() {
+			for (Entry<BinaryMapIndexReader, Boolean> r : readers.entrySet()) {
+				if (Boolean.TRUE.equals(r.getValue())) {
+					r.setValue(false);
+					return r.getKey();
+				}
+			}
+			return null;
+		}
+		
+		public void unlockReader(BinaryMapIndexReader reader) {
+			if (reader != null && !readers.isEmpty()) {
+				readers.computeIfPresent(reader, (key, value) -> true);
+			}
+		}
+		
+		public BinaryMapIndexReader getReader(CachedOsmandIndexes cacheFiles, int maxWaitMs) throws IOException, InterruptedException {
+			BinaryMapIndexReader resReader = lockReader();
+			if (resReader != null) {
+				return resReader;
+			}
+			if (readers.size() < MAXIMUM_OPEN_FILES) {
+				if (cacheFiles == null) {
+					initObfReaders();
+				}
+				BinaryMapIndexReader newReader = createReader();
+				if (newReader != null) {
+					readers.put(newReader, true);
+				}
+			}
+			int ms = 0;
+			while (ms < maxWaitMs) {
+				Thread.sleep(WAIT_LOCK_CHECK);
+				ms += WAIT_LOCK_CHECK;
+				resReader = lockReader();
+				if (resReader != null) {
+					return resReader;
+				}
+			}
+			LOGGER.info("Failed to get a reader for the file " + file.getName());
+			return null;
+		}
+		
+		private BinaryMapIndexReader createReader() throws IOException {
+			if (cacheFiles != null) {
+				long val = System.currentTimeMillis();
+				RandomAccessFile raf = new RandomAccessFile(file, "r");
+				BinaryMapIndexReader reader = cacheFiles.initReaderFromFileIndex(fileIndex, raf, file);
+				LOGGER.info("Initializing file " + file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+				return reader;
+			}
+			LOGGER.info("Failed to create a reader for the file " + file.getName());
+			return null;
+		}
+		
+		public int getOpenFiles() {
+			int cnt = 0;
+			for (Boolean b : readers.values()) {
+				if (Boolean.TRUE.equals(b)) {
+					cnt++;
+				}
+			}
+			return cnt;
+		}
+	}
+	
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs) {
+		List<BinaryMapIndexReader> res = new ArrayList<>();
+		refs.forEach(ref-> {
+			BinaryMapIndexReader reader = null;
+			try {
+				reader = ref.getReader(cacheFiles, 1000);
+			} catch (IOException | InterruptedException e) {
+				LOGGER.error(e.getMessage(), e);
+			}
+			if (reader != null) {
+				res.add(reader);
+			}
+		});
+		return res;
+	}
+	
+	public void unlockReaders(List<BinaryMapIndexReader> mapsReaders) {
+		obfFiles.values().forEach(ref -> mapsReaders.forEach(ref::unlockReader));
+	}
+	
+	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
+	public void closeMapReaders() {
+		obfFiles.forEach((name, ref) -> {
+			if (!ref.readers.isEmpty()) {
+				ref.closeUnusedReaders();
+			}
+		});
 	}
 	
 	
@@ -140,6 +232,15 @@ public class OsmAndMapsService {
 		public String url;
 		public String name;
 		public String profile = "car";
+	}
+	
+	
+	public int getCurrentOpenJavaFiles() {
+		int cnt = 0;
+		for(BinaryMapIndexReaderReference r: obfFiles.values()) {
+			cnt+= r.getOpenFiles();
+		}
+		return cnt;
 	}
 	
 	@Configuration
@@ -540,27 +641,32 @@ public class OsmAndMapsService {
 				.append('/').append(x).append('/').append(y).toString();
 	}
 	
-	public synchronized List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
+	public List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points, null));
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null);
-		GeocodingUtilities su = new GeocodingUtilities();
-		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
-		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
-//		complete.addAll(res);
-//		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
-		
-		return complete;
+		List<GeocodingResult> complete;
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			usedMapList = getReaders(list);
+			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+			RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null, usedMapList);
+			GeocodingUtilities su = new GeocodingUtilities();
+			List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
+			complete = su.sortGeocodingResults(usedMapList, res);
+		} finally {
+			unlockReaders(usedMapList);
+		}
+		return complete != null ? complete : Collections.emptyList();
 	}
 	
-
+	
 	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {
 			return Collections.emptyList();
 		}
+		List<RouteSegmentResult> route;
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+		List<LatLon> polyline = new ArrayList<>(trkSegment.points.size());
 		for (WptPt p : trkSegment.points) {
 			polyline.add(new LatLon(p.lat, p.lon));
 		}
@@ -569,8 +675,15 @@ public class OsmAndMapsService {
 			return Collections.emptyList();
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null);
-		List<RouteSegmentResult> route = approximate(ctx, router, props, polyline);
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			usedMapList = getReaders(list);
+			RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null, usedMapList);
+			route = approximate(ctx, router, props, polyline);
+		} finally {
+			unlockReaders(usedMapList);
+		}
 		return route;
 	}
 
@@ -593,7 +706,7 @@ public class OsmAndMapsService {
 	}
 
 	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router,
-			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds) throws IOException {
+			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
@@ -647,48 +760,56 @@ public class OsmAndMapsService {
 					: RouteCalculationMode.NORMAL;
 		}
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				getObfReaders(points, null), paramMode); // RouteCalculationMode.BASE
+				usedMapList.toArray(new BinaryMapIndexReader[0]), paramMode); // RouteCalculationMode.BASE
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
 	
 	
 	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
-			LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
+	                                        LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
 			throws IOException, InterruptedException {
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds);
-		if (rsc[0] != null) {
-			StringBuilder url = new StringBuilder(rsc[0].url);
-			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
-			url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
-			
-	        RestTemplate restTemplate = new RestTemplate();
-	        restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		List<RouteSegmentResult> routeRes;
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			usedMapList = getReaders(list);
+			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
+			if (rsc[0] != null) {
+				StringBuilder url = new StringBuilder(rsc[0].url);
+				url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
+				url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
 				
-				@Override
-				public void handleError(ClientHttpResponse response) throws IOException {
-					LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
-					super.handleError(response);
+				RestTemplate restTemplate = new RestTemplate();
+				restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+					
+					@Override
+					public void handleError(ClientHttpResponse response) throws IOException {
+						LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
+						super.handleError(response);
+					}
+				});
+				String gpx = restTemplate.getForObject(url.toString(), String.class);
+				
+				GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
+				TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+				List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+				for (WptPt p : trkSegment.points) {
+					polyline.add(new LatLon(p.lat, p.lon));
 				}
-			});
-	        String gpx = restTemplate.getForObject(url.toString(), String.class);
-	        
-	        GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-			for (WptPt p : trkSegment.points) {
-				polyline.add(new LatLon(p.lat, p.lon));
+				routeRes = approximate(ctx, router, props, polyline);
+			} else {
+				PrecalculatedRouteDirection precalculatedRouteDirection = null;
+				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+				putResultProps(ctx, routeRes, props);
 			}
-			return approximate(ctx, router, props, polyline);
-		} else {
-			PrecalculatedRouteDirection precalculatedRouteDirection = null;
-			List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-			putResultProps(ctx, route, props);
-			return route;
+		} finally {
+			unlockReaders(usedMapList);
 		}
+		return routeRes;
 	}
 	
 
@@ -759,7 +880,7 @@ public class OsmAndMapsService {
 	}
 	
 
-	private synchronized void initNewObfFiles(File target, File targetTemp) throws IOException, FileNotFoundException {
+	private void initNewObfFiles(File target, File targetTemp) throws IOException {
 		initObfReaders();
 		long val = System.currentTimeMillis();
 		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
@@ -771,17 +892,21 @@ public class OsmAndMapsService {
 		if (ref.fileIndex != null) {
 			ref.fileIndex = null;
 		}
-		if (ref.reader != null) {
-			ref.reader.close();
+		
+		if (!ref.readers.isEmpty()) {
+			for (Entry<BinaryMapIndexReader, Boolean> r : ref.readers.entrySet()) {
+				r.getKey().close();
+			}
 		}
 		if (nativelib != null) {
 			nativelib.closeMapFile(target.getAbsolutePath());
 		}
 		target.delete();
 		targetTemp.renameTo(target);
-		RandomAccessFile raf = new RandomAccessFile(target, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-		ref.reader = new BinaryMapIndexReader(raf, target);
-		ref.fileIndex = cacheFiles.addToCache(ref.reader, target);
+		RandomAccessFile raf = new RandomAccessFile(target, "r");
+		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
+		ref.readers.put(reader, true);
+		ref.fileIndex = cacheFiles.addToCache(reader, target);
 		cacheFiles.writeToFile(new File(config.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
 		if (nativelib != null) {
 			nativelib.initMapFile(target.getAbsolutePath(), false);
@@ -789,10 +914,21 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 	
-	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect, List<LatLon> bbox) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
 		initObfReaders();
-		List<BinaryMapIndexReader> files = new ArrayList<>();
-		MapsCollection mapsCollection = new MapsCollection(true);
+		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
+		List<File> filesToUse = getMaps(quadRect, bbox, maxNumberMaps);
+		if (!filesToUse.isEmpty()) {
+			for (File f : filesToUse) {
+				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+				files.add(ref);
+			}
+		}
+		return files;
+	}
+	
+	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
+		List<File> files = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			boolean intersects;
 			fileOverlaps:
@@ -801,31 +937,58 @@ public class OsmAndMapsService {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						mapsCollection.add(ref.file);
+						files.add(ref.file);
 						break fileOverlaps;
 					}
 				}
 			}
 		}
-		List<File> filesToUse = mapsCollection.getFilesToUse();
+		return prepareMaps(files, bbox, maxNumberMaps);
+	}
+	
+	private List<File> prepareMaps(List<File> files,  List<LatLon> bbox, int maxNumberMaps) throws IOException {
+		List<File> filesToUse = filterMap(files);
+		List<File> res;
 		
-		if (!filesToUse.isEmpty() && bbox != null) {
-			filesToUse = filterMapsByName(filesToUse, bbox);
+		if (!filesToUse.isEmpty() && maxNumberMaps != 0 && filesToUse.size() >= 4 && bbox != null) {
+			LOGGER.info("Files before filter by name " + filesToUse.size());
+			res = filterMapsByName(filesToUse, bbox);
+			LOGGER.info("Files after filter by name " + res.size());
+		} else {
+			res = filesToUse;
 		}
-		
-		if (!filesToUse.isEmpty()) {
-			for (File f : filesToUse) {
-				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
-				if (ref.reader == null) {
-					long val = System.currentTimeMillis();
-					RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-					ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
-					LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
-				}
-				files.add(ref.reader);
+		LOGGER.info("Files to use " + res.size());
+		return res;
+	}
+	
+	private List<File> filterMap(List<File> files) throws IOException {
+		List<File> res = new ArrayList<>();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		TreeSet<String> allDwNames = new TreeSet<>();
+		for (File file : files) {
+			allDwNames.add(getDownloadNameByFileName(file.getName()));
+		}
+		for (File file : files) {
+			String dwName = getDownloadNameByFileName(file.getName());
+			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
+			if (wr != null && wr.getSuperregion() != null && wr.getSuperregion().getRegionDownloadName() != null
+					&& allDwNames.contains(wr.getSuperregion().getRegionDownloadName())) {
+			} else {
+				res.add(file);
 			}
 		}
-		return files.toArray(new BinaryMapIndexReader[0]);
+		return res;
+	}
+	
+	private String getDownloadNameByFileName(String fileName) {
+		String dwName = fileName.substring(0, fileName.indexOf('.')).toLowerCase();
+		if (dwName.endsWith("_2")) {
+			dwName = dwName.substring(0, dwName.length() - 2);
+		}
+		return dwName;
 	}
 	
 	public List<File> filterMapsByName(List<File> filesToUse, List<LatLon> bbox) throws IOException {
@@ -852,11 +1015,12 @@ public class OsmAndMapsService {
 			res = osmandRegions.getRegionsToDownload(point.getLatitude(), point.getLongitude(), res);
 			regions.addAll(res);
 		}
+		LOGGER.debug("Regions by bbox size " + regions.size());
 		return regions;
 	}
 	
 	private List<LatLon> getPointsByBbox(List<LatLon> bbox) {
-		final int POINT_STEP_M = 8000;
+		final int POINT_STEP_M = 20000;
 		
 		List<LatLon> points = new ArrayList<>(bbox);
 		LatLon p1 = bbox.get(0);
