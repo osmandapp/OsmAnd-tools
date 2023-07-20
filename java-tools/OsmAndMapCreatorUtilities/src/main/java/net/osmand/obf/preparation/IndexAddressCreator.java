@@ -113,6 +113,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
 			City city = EntityParser.parseCity((Node) e);
 			if (city != null) {
+				city.setNames(getOtherNames(e));
 				regCity(city, e);
 			}
 		}
@@ -449,6 +450,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private City createMissingCity(Entity e, CityType t) throws SQLException {
 		City c = EntityParser.parseCity(e, t);
+		c.setNames(getOtherNames(e));
 		if (c.getLocation() == null) {
 			return null;
 		}
