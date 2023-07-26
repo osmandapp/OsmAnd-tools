@@ -118,20 +118,20 @@ public class UserdataService {
     public static final String FILE_TYPE_GPX = "GPX";
     public static final String FILE_TYPE_OSM_EDITS = "OSM_EDITS";
     public static final String FILE_TYPE_OSM_NOTES = "OSM_NOTES";
+    public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
     public void validateUserForUpload(PremiumUserDevicesRepository.PremiumUserDevice dev, String type, long fileSize) {
     	PremiumUser user = usersRepository.findById(dev.userid);
-        List<String> freeTypes = Arrays.asList(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
         if (user == null) {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
         }
         String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
 		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
-			if (!freeTypes.contains(type)) {
+			if (!FREE_TYPES.contains(type)) {
 				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION,
-						String.format("Free account can upload files with types: %s. This file type is %s!", ArrayUtils.toString(freeTypes) , type));
+						String.format("Free account can upload files with types: %s. This file type is %s!", ArrayUtils.toString(FREE_TYPES) , type));
 			}
 			if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
                 throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
