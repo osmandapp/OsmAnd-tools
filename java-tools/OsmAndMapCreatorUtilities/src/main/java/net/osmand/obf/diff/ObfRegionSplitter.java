@@ -237,7 +237,8 @@ public class ObfRegionSplitter {
 			nodes.add(n);
 		}
 
-		Way way = new Way(obj.getId(), nodes);
+		Way simpleWay = new Way(obj.getId(), nodes);
+		Way restoredWay = simpleWay;
 		for (int t : obj.getTypes()) {
 			BinaryMapRouteReaderAdapter.RouteTypeRule type = obj.region.routeEncodingRules.get(t);
 			String tag = type.getTag();
@@ -245,39 +246,33 @@ public class ObfRegionSplitter {
 				// already processed tags
 				return;
 			}
-			way.putTag(tag, type.getValue());
+			// can put same tag with different values
+			restoredWay.putTag(tag, type.getValue());
 		}
-		if (!IndexHeightData.isHeightDataNeeded(way)) {
+		if (!IndexHeightData.isHeightDataNeeded(restoredWay)) {
 			return;
 		}
-		heightData.proccess(way);
+		heightData.proccess(simpleWay);
 
 		// Write result to RouteDataObject
-		if (way.getTags().size() > obj.types.length) {
-			int[] types = Arrays.copyOf(obj.types, way.getTags().size());
+		if (simpleWay.getTags().size() > 0) {
+			int[] types = Arrays.copyOf(obj.types, obj.types.length + simpleWay.getTags().size());
 			int index = obj.types.length;
-			for (Map.Entry<String, String> entry : way.getTags().entrySet()) {
+			for (Map.Entry<String, String> entry : simpleWay.getTags().entrySet()) {
 				String tag = entry.getKey();
-				if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
-					String val = entry.getValue();
-					int ruleId = obj.region.searchRouteEncodingRule(tag, val);
-					if (ruleId == -1) {
-						ruleId = obj.region.routeEncodingRules.size();
-						obj.region.initRouteEncodingRule(ruleId, tag, val);
-					}
-					if (index < types.length) {
-						types[index] = ruleId;
-					} else {
-						System.out.println("Error. Write elevation tags of way. Array index out of bounds exception");
-						break;
-					}
-					index++;
+				String val = entry.getValue();
+				int ruleId = obj.region.searchRouteEncodingRule(tag, val);
+				if (ruleId == -1) {
+					ruleId = obj.region.routeEncodingRules.size();
+					obj.region.initRouteEncodingRule(ruleId, tag, val);
 				}
+				types[index] = ruleId;
+				index++;
 			}
 			obj.types = types;
 		}
 
-		nodes = way.getNodes();
+		nodes = simpleWay.getNodes();
 		for (int i = 0; i < obj.getPointsLength(); i++) {
 			Node n = nodes.get(i);
 			Map<String, String> tags = n.getTags();
