@@ -21,6 +21,7 @@ import javax.transaction.Transactional;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -115,6 +116,9 @@ public class UserdataService {
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_TYPE_PROFILE = "PROFILE";
     public static final String FILE_TYPE_GPX = "GPX";
+    public static final String FILE_TYPE_OSM_EDITS = "OSM_EDITS";
+    public static final String FILE_TYPE_OSM_NOTES = "OSM_NOTES";
+    public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
@@ -125,9 +129,9 @@ public class UserdataService {
         }
         String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
 		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
-			if (!type.equals(FILE_TYPE_FAVOURITES) && !type.equals(FILE_TYPE_GLOBAL) && !type.equals(FILE_TYPE_PROFILE)) {
+			if (!FREE_TYPES.contains(type)) {
 				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION,
-						String.format("Free account can upload files with type %s, %s and %s, this file type is %s!", FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, type));
+						String.format("Free account can upload files with types: %s. This file type is %s!", ArrayUtils.toString(FREE_TYPES) , type));
 			}
 			if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
                 throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
