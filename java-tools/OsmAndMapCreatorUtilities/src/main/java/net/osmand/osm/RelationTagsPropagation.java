@@ -152,9 +152,10 @@ public class RelationTagsPropagation {
 		}
 		return res;
 	}
-	
-	public void handleRelationPropogatedTags(Relation relation, MapRenderingTypesEncoder renderingTypes, OsmDbAccessorContext ctx, 
-			EntityConvertApplyType at) throws SQLException {
+
+	public void handleRelationPropogatedTags(Relation relation, MapRenderingTypesEncoder renderingTypes,
+	                                         OsmDbAccessorContext ctx, EntityConvertApplyType at) throws SQLException {
+		relation.fillEmptyRouteName();
 		Map<String, String> relationTags = relation.getTags();
 		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
 		List<RelationRulePropagation> lst = processRelationTags(renderingTypes, relationTags, at);
