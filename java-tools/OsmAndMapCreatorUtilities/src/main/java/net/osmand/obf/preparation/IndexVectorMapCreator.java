@@ -755,6 +755,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         if (settings.keepOnlySeaObjects) {
             // fix issue with duplicate coastlines from seamarks
             if ("coastline".equals(tags.get("natural"))) {
+            	tags = new LinkedHashMap<>(tags);
                 tags.remove("natural", "coastline");
             }
             if (e instanceof Node && !checkBelongsToSea(Collections.singletonList((Node) e))) {
