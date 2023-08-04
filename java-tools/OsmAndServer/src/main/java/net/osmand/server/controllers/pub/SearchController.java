@@ -36,7 +36,7 @@ public class SearchController {
     SearchService searchService;
     
     @RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
-    public ResponseEntity<String> search(@RequestParam double lat, @RequestParam double lon, @RequestParam String search) throws IOException {
+    public ResponseEntity<String> search(@RequestParam double lat, @RequestParam double lon, @RequestParam String search) throws IOException, InterruptedException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
@@ -85,7 +85,7 @@ public class SearchController {
     
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData) throws IOException {
+    public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData) throws IOException, InterruptedException {
         SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }

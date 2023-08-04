@@ -286,6 +286,7 @@ public class WeatherPrepareRasterSqliteRegions {
 		Date filterTime = cal.getTime();
 		
 		int batch = 0;
+		
 		try (Connection targetConn = DBDialect.SQLITE.getDatabaseConnection(targetFile.getAbsolutePath(), LOG)) {
 			prepareNewWeatherFile(targetConn, false, ZOOM, ZOOM);
 			PreparedStatement psinsnew = targetConn.prepareStatement(
@@ -313,12 +314,14 @@ public class WeatherPrepareRasterSqliteRegions {
 							int x = unpack1(s);
 							int y = unpack2(s);
 							int z = unpack3(s);
-							File imageGzip = new File(dtFolder, z + "_" + x + "_" + y + ".tiff.gz");
+							// inverse tile
+							int maxI = (1 << z) - 1;
+							File imageGzip = new File(dtFolder, z + "_" + x + "_" + (maxI - y) + ".tiff.gz");
 							byte[] image = Algorithms
 									.readBytesFromInputStream(new GZIPInputStream(new FileInputStream(imageGzip)));
 							if (image != null) {
 								psinsnew.setInt(1, x);
-								psinsnew.setInt(2, 15 - y);
+								psinsnew.setInt(2, y);
 								psinsnew.setInt(3, z);
 								psinsnew.setString(4, dtFolder.getName() + ":" + source);
 								psinsnew.setBytes(5, image);

@@ -480,9 +480,9 @@ get_raw_ecmwf_files() {
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
                 gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "gdal_translate error"
-		if [[ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "precip" ]] ; then
-			echo "Converting precipitation to match GFS"
-			gdal_calc.py -A "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="A/10" --overwrite
+		if [[ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "temperature" ]] ; then
+			echo "Converting tmp from K to C"
+			gdal_calc.py -A "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="A-273" --overwrite
 		fi
                 TZ=UTC touch -t "${FORECAST_DATE}${FORECAST_RND_TIME}00" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff"
             done

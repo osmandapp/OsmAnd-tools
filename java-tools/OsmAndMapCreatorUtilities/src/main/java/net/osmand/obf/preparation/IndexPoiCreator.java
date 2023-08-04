@@ -205,6 +205,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
+		poiPreparedStatement.setInt(7, amenity.getOrder());
 		addBatch(poiPreparedStatement);
 	}
 
@@ -296,7 +297,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Statement stat = poiConnection.createStatement();
 		stat.executeUpdate("create table " + IndexConstants.POI_TABLE + //$NON-NLS-1$
 				" (id bigint, x int, y int,"
-				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), "
+				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), priority int, "
 				+ "primary key(id, type, subtype))");
 		stat.executeUpdate("create index poi_loc on poi (x, y, type, subtype)");
 		stat.executeUpdate("create index poi_id on poi (id, type, subtype)");
@@ -305,8 +306,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		// create prepared statment
 		poiPreparedStatement = poiConnection
-				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags) " + //$NON-NLS-1$//$NON-NLS-2$
-						"VALUES (?, ?, ?, ?, ?, ?)");
+				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority) " + //$NON-NLS-1$//$NON-NLS-2$
+						"VALUES (?, ?, ?, ?, ?, ?, ?)");
 		poiDeleteStatement = poiConnection.prepareStatement("DELETE FROM " + IndexConstants.POI_TABLE + " where id = ?");
 		pStatements.put(poiPreparedStatement, 0);
 
@@ -472,7 +473,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// not so effective probably better to load in memory one time
 		PreparedStatement prepareStatement = poiConnection
 				.prepareStatement("SELECT id, x, y, type, subtype, additionalTags from poi "
-						+ "where x >= ? AND x < ? AND y >= ? AND y < ?");
+						+ "where x >= ? AND x < ? AND y >= ? AND y < ?"
+						+ " order by priority ");
 		for (Map.Entry<PoiTileBox, List<BinaryFileReference>> entry : fpToWriteSeeks.entrySet()) {
 			int z = entry.getKey().zoom;
 			int x = entry.getKey().x;
@@ -538,9 +540,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException {
 		ResultSet rs;
 		if (useInMemoryCreator) {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi ORDER BY id");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi ORDER BY id, priority");
 		} else {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi ORDER BY id");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi ORDER BY id, priority");
 		}
 		rootZoomsTree.setNode(new PoiTileBox());
 

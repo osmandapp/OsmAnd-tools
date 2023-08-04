@@ -17,6 +17,7 @@ import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.OSMSettings;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
@@ -152,11 +153,12 @@ public class RelationTagsPropagation {
 		}
 		return res;
 	}
-	
-	public void handleRelationPropogatedTags(Relation relation, MapRenderingTypesEncoder renderingTypes, OsmDbAccessorContext ctx, 
-			EntityConvertApplyType at) throws SQLException {
+
+	public void handleRelationPropogatedTags(Relation relation, MapRenderingTypesEncoder renderingTypes,
+	                                         OsmDbAccessorContext ctx, EntityConvertApplyType at) throws SQLException {
 		Map<String, String> relationTags = relation.getTags();
 		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
+		relationTags = replaceEmptyRouteName(relationTags, relation);
 		List<RelationRulePropagation> lst = processRelationTags(renderingTypes, relationTags, at);
 		if (lst != null) {
 			if (ctx != null) {
@@ -191,6 +193,19 @@ public class RelationTagsPropagation {
 				
 			}
 		}
+	}
+
+	public Map<String, String> replaceEmptyRouteName(Map<String, String> tags, Relation relation) {
+		if (tags.containsKey(OSMSettings.OSMTagKey.ROUTE.getValue())
+				&& !tags.containsKey(OSMSettings.OSMTagKey.NAME.getValue())) {
+			tags = new LinkedHashMap<>(tags);
+			String newName = tags.get(OSMSettings.OSMTagKey.REF.getValue());
+			if (Algorithms.isEmpty(newName)) {
+				newName = "(" + relation.getId() + ")";
+			}
+			tags.put(OSMSettings.OSMTagKey.NAME.getValue(), newName);
+		}
+		return tags;
 	}
 
 	public PropagateEntityTags getPropogateTagForEntity(EntityId entityId) {
