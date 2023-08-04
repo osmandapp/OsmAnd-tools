@@ -2,6 +2,8 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
+import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
 import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
@@ -530,6 +532,7 @@ public class MapApiController {
 		final String TYPE_SUB = "type";
 		final String START_TIME_KEY = "startTime";
 		final String EXPIRE_TIME_KEY = "expireTime";
+		final String MAX_ACCOUNT_SIZE = "maxAccSize";
 		
 		PremiumUserDevice dev = checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
@@ -538,6 +541,7 @@ public class MapApiController {
 		String orderId = pu.orderid;
 		if (orderId == null) {
 			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
+			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
 		} else {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.stream()
@@ -551,6 +555,7 @@ public class MapApiController {
 				Date prepareExpireTime = DateUtils.truncate(subscription.expiretime, Calendar.SECOND);
 				info.put(START_TIME_KEY, prepareStartTime.toString());
 				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
+				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
