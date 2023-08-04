@@ -205,7 +205,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
-		//poiPreparedStatement.setInt(7, amenity.getOrder());
+		poiPreparedStatement.setInt(7, amenity.getOrder());
 		addBatch(poiPreparedStatement);
 	}
 
