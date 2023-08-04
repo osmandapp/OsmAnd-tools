@@ -93,7 +93,7 @@ public class UserdataService {
     public static final int ERROR_CODE_PREMIUM_USERS = 100;
     private static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
-    private static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
+    public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
     
@@ -110,7 +110,7 @@ public class UserdataService {
     private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
     
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
-    private static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
+    public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
     public static final String FILE_TYPE_GLOBAL = "GLOBAL";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
@@ -160,11 +160,12 @@ public class UserdataService {
     }
     
     public UserdataController.UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
+        PremiumUser user = usersRepository.findById(userId);
         List<PremiumUserFilesRepository.UserFileNoData> fl =
                 details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) :
                         filesRepository.listFilesByUserid(userId, name, type);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
-        res.maximumAccountSize = MAXIMUM_ACCOUNT_SIZE;
+        res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
         res.uniqueFiles = new ArrayList<>();
         if (allVersions) {
             res.allFiles = new ArrayList<>();
