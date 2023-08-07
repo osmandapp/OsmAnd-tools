@@ -2,6 +2,7 @@ package net.osmand.wiki.wikidata;
 
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
+import net.osmand.obf.preparation.DBDialect;
 import org.apache.commons.logging.Log;
 import org.xml.sax.SAXException;
 
@@ -9,6 +10,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.*;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
@@ -23,19 +26,31 @@ public class OsmWikiMap {
 	Map<Long, Node> mapNodes = new HashMap<>();
 	int wayCount = 0;
 	int nodeCount = 0;
+    public static void main(String[] args) {
+        File file = new File(args[0]);
+        OsmWikiMap osmWikiMap = new OsmWikiMap();
+        osmWikiMap.parse(file);
+    }
 
 	void parse(File wikiOsm) {
 		SAXParserFactory factory = SAXParserFactory.newInstance();
-		OsmWikiHandler osmWikiHandler = new OsmWikiHandler(this);
+        List<String> filteredTags = new ArrayList<>() {{
+            add("wikipedia");
+            add("wikidata");
+        }};
+		OsmWikiHandler osmWikiHandler = new OsmWikiHandler(this, filteredTags);
 		try {
+            long time = System.currentTimeMillis();
 			SAXParser saxParser = factory.newSAXParser();
 			GZIPInputStream is = new GZIPInputStream(new FileInputStream(wikiOsm));
 			saxParser.parse(is, osmWikiHandler);
 			is.close();
-			is = new GZIPInputStream(new FileInputStream(wikiOsm));
-			saxParser.parse(is, osmWikiHandler);
-			is.close();
-			addWaysCoordinates(osmWikiHandler);
+            long time2 = System.currentTimeMillis();
+            System.out.println("Parsing time:" + (time2 - time) / 1000);
+//			is = new GZIPInputStream(new FileInputStream(wikiOsm));
+//			saxParser.parse(is, osmWikiHandler);
+//			is.close();
+//			addWaysCoordinates(osmWikiHandler);
 		} catch (SAXException | ParserConfigurationException | IOException e) {
 			throw new IllegalArgumentException("Error parsing osm_wiki.xml file", e);
 		}
