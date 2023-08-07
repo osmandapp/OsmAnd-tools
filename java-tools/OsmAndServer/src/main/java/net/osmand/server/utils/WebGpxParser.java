@@ -368,8 +368,8 @@ public class WebGpxParser {
     
     public void addAdditionalInfo(List<Track> tracks, GPXTrackAnalysis analysis, boolean addSpeed) {
         tracks.forEach(track -> {
+            int pointsSize = 0;
             for (Point point : track.points) {
-                int pointsSize = 0;
                 if (point.geometry != null) {
                     for (Point p : point.geometry) {
                         int ind = point.geometry.indexOf(p);
