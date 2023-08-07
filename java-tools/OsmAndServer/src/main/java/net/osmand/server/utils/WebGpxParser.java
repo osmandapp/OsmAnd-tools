@@ -350,13 +350,19 @@ public class WebGpxParser {
     
     public void addSrtmEle(List<Track> tracks, GPXTrackAnalysis srtmAnalysis) {
         if (srtmAnalysis != null) {
-            tracks.forEach(track -> track.points.forEach(point -> {
-                if (point.geometry != null) {
-                    point.geometry.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(point.geometry.indexOf(p)).value);
-                } else {
-                    track.points.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
+            int pointsSize = 0;
+            for (Track track : tracks) {
+                for (Point point : track.points) {
+                    if (point.geometry != null) {
+                        for (Point p : point.geometry) {
+                            p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(point.geometry.indexOf(p) + pointsSize).value;
+                        }
+                        pointsSize += point.geometry.size();
+                    } else {
+                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
+                    }
                 }
-            }));
+            }
         }
     }
     
