@@ -373,7 +373,7 @@ public class WebGpxParser {
                 if (point.geometry != null) {
                     for (Point p : point.geometry) {
                         int ind = point.geometry.indexOf(p);
-                        if (ind < analysis.getElevationData().getAttributes().size()) {
+                        if (ind + pointsSize < analysis.getElevationData().getAttributes().size()) {
                             p.distance = analysis.getElevationData().getPointAttribute(ind + pointsSize).distance;
                             if (addSpeed) {
                                 p.speed = analysis.getSpeedData().getPointAttribute(ind + pointsSize).value;
