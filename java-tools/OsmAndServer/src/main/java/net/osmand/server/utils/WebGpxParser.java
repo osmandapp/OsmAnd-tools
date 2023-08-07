@@ -350,8 +350,8 @@ public class WebGpxParser {
     
     public void addSrtmEle(List<Track> tracks, GPXTrackAnalysis srtmAnalysis) {
         if (srtmAnalysis != null) {
-            int pointsSize = 0;
             for (Track track : tracks) {
+                int pointsSize = 0;
                 for (Point point : track.points) {
                     if (point.geometry != null) {
                         for (Point p : point.geometry) {
@@ -367,27 +367,31 @@ public class WebGpxParser {
     }
     
     public void addAdditionalInfo(List<Track> tracks, GPXTrackAnalysis analysis, boolean addSpeed) {
-        tracks.forEach(track -> track.points.forEach(point -> {
-            if (point.geometry != null) {
-                point.geometry.forEach(p -> {
-                    int ind = point.geometry.indexOf(p);
-                    if (ind < analysis.getElevationData().getAttributes().size()) {
-                        p.distance = analysis.getElevationData().getPointAttribute(ind).distance;
-                        if (addSpeed) {
-                            p.speed = analysis.getSpeedData().getPointAttribute(ind).value;
+        tracks.forEach(track -> {
+            for (Point point : track.points) {
+                int pointsSize = 0;
+                if (point.geometry != null) {
+                    for (Point p : point.geometry) {
+                        int ind = point.geometry.indexOf(p);
+                        if (ind < analysis.getElevationData().getAttributes().size()) {
+                            p.distance = analysis.getElevationData().getPointAttribute(ind + pointsSize).distance;
+                            if (addSpeed) {
+                                p.speed = analysis.getSpeedData().getPointAttribute(ind + pointsSize).value;
+                            }
                         }
+                        pointsSize += point.geometry.size();
                     }
-                });
-            } else {
-                int ind = track.points.indexOf(point);
-                if (ind < analysis.getElevationData().getAttributes().size()) {
-                    point.distance = analysis.getElevationData().getPointAttribute(ind).distance;
-                    if (addSpeed) {
-                        point.speed = analysis.getSpeedData().getPointAttribute(ind).value;
+                } else {
+                    int ind = track.points.indexOf(point);
+                    if (ind < analysis.getElevationData().getAttributes().size()) {
+                        point.distance = analysis.getElevationData().getPointAttribute(ind).distance;
+                        if (addSpeed) {
+                            point.speed = analysis.getSpeedData().getPointAttribute(ind).value;
+                        }
                     }
                 }
             }
-        }));
+        });
     }
     
     public Map<String, Object> getTrackAnalysis(GPXTrackAnalysis analysis, GPXTrackAnalysis srtmAnalysis) {
