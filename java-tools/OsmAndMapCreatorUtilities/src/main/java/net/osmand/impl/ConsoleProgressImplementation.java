@@ -1,13 +1,12 @@
 package net.osmand.impl;
 
 import java.text.MessageFormat;
-import java.util.Date;
+
+import org.apache.commons.logging.Log;
 
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
-
-import org.apache.commons.logging.Log;
 
 
 public class ConsoleProgressImplementation implements IProgress {
