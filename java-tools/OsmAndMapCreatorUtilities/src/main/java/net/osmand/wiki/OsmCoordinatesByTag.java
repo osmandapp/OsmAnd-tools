@@ -44,7 +44,7 @@ public class OsmCoordinatesByTag {
 	private final Set<String> filterExactTags;
 	private final String[] filterStartsWithTags;
 	
-	Map<String, Entity> coordinates = new HashMap<String, Entity>();  
+	Map<String, LatLon> coordinates = new HashMap<String, LatLon>();  
 	int registeredNodes = 0;
 	int registeredWays = 0;
 	int registeredRelations = 0;
@@ -69,11 +69,7 @@ public class OsmCoordinatesByTag {
 	}
 	
 	public LatLon getCoordinates(String tag, String value) {
-		Entity e = coordinates.get(combineTagValue(tag, value));
-		if (e != null) {
-			return OsmMapUtils.getCenter(e);
-		}
-		return null;
+		return coordinates.get(combineTagValue(tag, value));
 	}
 	
 	private boolean checkIfTagsSuitable(Entity entity) {
@@ -98,6 +94,7 @@ public class OsmCoordinatesByTag {
 	}
 
 	private void registerEntity(Entity entity) {
+		LatLon center = OsmMapUtils.getCenter(entity);
 		for (String t : entity.getTagKeySet()) {
 			if (checkTagSuitable(t)) {
 				if (entity instanceof Node) {
@@ -107,7 +104,7 @@ public class OsmCoordinatesByTag {
 				} else if (entity instanceof Relation) {
 					registeredRelations++;
 				}
-				coordinates.put(combineTagValue(t, entity.getTag(t)), entity);
+				coordinates.put(combineTagValue(t, entity.getTag(t)), center);
 //				System.out.println(OsmMapUtils.getCenter(entity) + " " + entity.getTags());
 			}
 		}
