@@ -4,6 +4,7 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +15,9 @@ import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.obf.preparation.OsmDbAccessor;
+import net.osmand.obf.preparation.OsmDbCreator;
+import net.osmand.wiki.OsmCoordinatesByTag;
 
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -21,7 +25,6 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
 public class WikiDataHandler extends DefaultHandler {
 
 	private static final Log log = PlatformUtil.getLog(WikiDataHandler.class);
@@ -54,12 +57,14 @@ public class WikiDataHandler extends DefaultHandler {
 
 	private OsmandRegions regions;
 	private List<String> keyNames = new ArrayList<>();
-	OsmWikiMap wikiOsmCoordinates;
+
+	OsmCoordinatesByTag osmWikiCoordinates;
 
 
-	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile, File wikiOsm, OsmandRegions regions)
+	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile, OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions)
 			throws SQLException {
 		this.saxParser = saxParser;
+		this.osmWikiCoordinates = osmWikiCoordinates;
 		this.regions = regions;
 		this.progress = progress;
 		DBDialect dialect = DBDialect.SQLITE;
@@ -72,11 +77,12 @@ public class WikiDataHandler extends DefaultHandler {
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
-		wikiOsmCoordinates = new OsmWikiMap();
-		wikiOsmCoordinates.parse(wikiOsm);
+		
 	}
+	
+	
 
-    public void addBatch(PreparedStatement prep, int[] bt) throws SQLException {
+	public void addBatch(PreparedStatement prep, int[] bt) throws SQLException {
         prep.addBatch();
         bt[0] = bt[0] + 1;
         int batch = bt[0];
@@ -154,7 +160,15 @@ public class WikiDataHandler extends DefaultHandler {
 						for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 							String articleTitle = siteLink.title;
 							String articleLang = siteLink.lang;
-							LatLon osmCoordinates = wikiOsmCoordinates.getCoordinates(title.toString(), articleLang, articleTitle);
+							LatLon osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia:" + articleLang,
+									articleTitle);
+							if (osmCoordinates == null) {
+								osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia",
+										articleLang + ":" + articleTitle);
+							}
+							if (osmCoordinates == null) {
+								osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia", articleTitle);
+							}
 							if (osmCoordinates != null) {
 								article.setLat(osmCoordinates.getLatitude());
 								article.setLon(osmCoordinates.getLongitude());
@@ -162,7 +176,7 @@ public class WikiDataHandler extends DefaultHandler {
 							}
 						}
 						if (article.getLat() == 0 && article.getLon() == 0) {
-							LatLon osmCoordinates = wikiOsmCoordinates.getCoordinates(title.toString());
+							LatLon osmCoordinates = osmWikiCoordinates.getCoordinates("wikidata", title.toString());
 							if (osmCoordinates != null) {
 								article.setLat(osmCoordinates.getLatitude());
 								article.setLon(osmCoordinates.getLongitude());
