@@ -8,7 +8,7 @@ import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -44,7 +44,7 @@ public class OsmCoordinatesByTag {
 	private final Set<String> filterExactTags;
 	private final String[] filterStartsWithTags;
 	
-	Map<String, Entity> coordinates = new LinkedHashMap<String, Entity>();  
+	Map<String, Entity> coordinates = new HashMap<String, Entity>();  
 	int registeredNodes = 0;
 	int registeredWays = 0;
 	int registeredRelations = 0;
@@ -61,9 +61,7 @@ public class OsmCoordinatesByTag {
 		OsmCoordinatesByTag o = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
 				new String[] { "wikipedia:" });
 		o.parseWikiOSMCoordinates(osmGz, progress, false);
-		System.out.println(String.format("Total %d registered (%d nodes, %d ways, %d relations)", o.coordinates.size(), 
-				o.registeredNodes, o.registeredWays, o.registeredRelations));
-		printMemoryConsumption("");
+		
 	}
 	
 	private static String combineTagValue(String tag, String value) {
@@ -215,6 +213,9 @@ public class OsmCoordinatesByTag {
 			// parse once again
 			parseWikiOSMCoordinates(readFile, progress, true);
 		}
+		System.out.println(String.format("Total %d registered (%d nodes, %d ways, %d relations)", coordinates.size(), 
+				registeredNodes, registeredWays, registeredRelations));
+		printMemoryConsumption("");
 	}
 	
 	private static void printMemoryConsumption(String string) {
