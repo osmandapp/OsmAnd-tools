@@ -163,7 +163,7 @@ public class OsmCoordinatesByTag {
 			OsmDbCreator dbCreator = new OsmDbCreator();
 			dbCreator.initDatabase(osmDBdialect, dbConn, true);
 			storage.getFilters().add(dbCreator);
-			progress.startTask("Reading osm file", -1);
+			progress.startTask("Reading osm file " + readFile.getName(), -1);
 			if (pbfFile) {
 				((OsmBaseStoragePbf) storage).parseOSMPbf(stream, progress, false);
 			} else {
