@@ -42,6 +42,7 @@ import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import org.xmlpull.v1.XmlPullParserException;
 import org.xwiki.component.embed.EmbeddableComponentManager;
 import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.rendering.block.Block;
@@ -72,7 +73,12 @@ public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
 
 	private static final Set<String> unitsOfDistance = new HashSet<>(Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi", "m2"));
+	public static final String WIKI_SQLITE = "wiki.sqlite";
+	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
+	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
+	public static final String OSM_WIKI_PARSER = "osm_wiki_";
 	
+
 	public static class LatLon {
 		private final double longitude;
 		private final double latitude;
@@ -717,7 +723,7 @@ public class WikiDatabasePreparation {
 
 	}
 
-	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
+	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
 		String lang = "";
 		String folder = "";
 		String mode = "";
@@ -740,9 +746,8 @@ public class WikiDatabasePreparation {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.gz";
-		final String sqliteFileName = folder + "wiki.sqlite";
-		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.gz";
+		final String sqliteFileName = folder + WIKI_SQLITE;
+		final String pathToWikiData = folder + WIKIDATA_ARTICLES_GZ;
 
 		switch (mode) {
 			case "process-wikidata-regions":
@@ -757,13 +762,13 @@ public class WikiDatabasePreparation {
 					wikiDB.delete();
 				}
 				log.info("Processing wikidata...");
-				processDump(pathToWikiData, sqliteFileName, null);
+				processDump(folder, null);
 				break;
 			case "process-wikipedia":
-				processDump(wikiPg, sqliteFileName, lang);
+				processDump(folder, lang);
 				break;
 			case "test-wikipedia":
-				processDump(wikiPg, sqliteFileName, lang, testArticleID);
+				processDump(folder, lang, testArticleID);
 				break;
 		}
 	}
@@ -814,7 +819,7 @@ public class WikiDatabasePreparation {
 	}
 
 	protected static void testContent(String lang, String folder) throws SQLException, IOException {
-		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + "wiki.sqlite", log);
+		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + WIKI_SQLITE, log);
 		ResultSet rs = conn.createStatement().executeQuery("SELECT * from wiki");
 		while(rs.next()) {
 			double lat = rs.getDouble("lat");
@@ -831,26 +836,44 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void processDump(final String wikiPg, String sqliteFileName, String lang)
-			throws SQLException, ParserConfigurationException, IOException, SAXException {
-		processDump(wikiPg, sqliteFileName,lang,0);
+	private static void processDump(final String wikiFolder, String lang)
+			throws SQLException, ParserConfigurationException, IOException, SAXException, XmlPullParserException, InterruptedException {
+		processDump(wikiFolder,lang,0);
 	}
+	
 
-	public static void  processDump(final String wikiPg, String sqliteFileName, String lang, long testArticleId)
-			throws ParserConfigurationException, SAXException, IOException, SQLException {
-		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
-		FileProgressImplementation prog = new FileProgressImplementation("Read wikidata file", new File(wikiPg));
-		InputStream streamFile = prog.openFileInputStream();
-		InputSource is = getInputSource(streamFile);
-		if (lang != null) {
-			final WikiOsmHandler handler = new WikiOsmHandler(sx, prog, lang, new File(sqliteFileName), testArticleId);
-			sx.parse(is, handler);
-			handler.finish();
+
+	public static void processDump(final String wikiFolder, String lang, long testArticleId)
+			throws ParserConfigurationException, SAXException, IOException, SQLException, XmlPullParserException, InterruptedException {
+		boolean processWikidata = lang == null;
+
+		final String wikiFile;
+		if (processWikidata) {
+			wikiFile = wikiFolder + WIKIDATA_ARTICLES_GZ;
 		} else {
+			wikiFile = wikiFolder + lang + WIKI_ARTICLES_GZ;
+		}
+		final String sqliteFileName = wikiFolder + WIKI_SQLITE;
+		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
+		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
+		InputStream streamFile = progress.openFileInputStream();
+		InputSource is = getInputSource(streamFile);
+		OsmCoordinatesByTag osmWikiCoordinates = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
+				new String[] { "wikipedia:" });
+		for (File f : new File(wikiFolder).listFiles()) {
+			if (f.getName().startsWith(OSM_WIKI_PARSER)) {
+				osmWikiCoordinates.parseWikiOSMCoordinates(f, progress, false);
+			}
+		}
+		if (processWikidata) {
 			OsmandRegions regions = new OsmandRegions();
 			regions.prepareFile();
 			regions.cacheAllCountries();
-			final WikiDataHandler handler = new WikiDataHandler(sx, prog, new File(sqliteFileName), regions);
+			final WikiDataHandler handler = new WikiDataHandler(sx, progress, new File(sqliteFileName), osmWikiCoordinates, regions);
+			sx.parse(is, handler);
+			handler.finish();
+		} else {
+			final WikiOsmHandler handler = new WikiOsmHandler(sx, progress, lang, new File(sqliteFileName), testArticleId);
 			sx.parse(is, handler);
 			handler.finish();
 		}

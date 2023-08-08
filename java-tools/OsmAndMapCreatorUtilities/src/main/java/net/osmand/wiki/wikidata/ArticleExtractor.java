@@ -14,6 +14,9 @@ import java.sql.SQLException;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import static net.osmand.wiki.WikiDatabasePreparation.WIKIDATA_ARTICLES_GZ;
+import static net.osmand.wiki.WikiDatabasePreparation.WIKI_ARTICLES_GZ;
+
 public class ArticleExtractor {
 	// for large files if error occurs:
 	// "The accumulated size of entities is "50,000,001" that exceeded the "50,000,000" limit set by "FEATURE_SECURE_PROCESSING"
@@ -21,12 +24,14 @@ public class ArticleExtractor {
 	// -Djdk.xml.totalEntitySizeLimit=2147480000
 	public static final String helpMessage = " --mode=<cut|test> --lang=<lang> --title=<title> --amount=<amount>--dir=<work_folder> " +
 			"--testID=<article_ID> --LatLon=<testLatLon>\n" +
-			"mode cut - cut out <amount> of articles, beginning with <title> from <lang>wiki-latest-pages-articles.xml.gz and create obf file \n" +
+			"mode cut without lang - cut out article with <title> (wikidata title 'Q1072074') from wikidatawiki-latest-pages-articles.xml.gz\n" +
+			"mode cut with lang - cut out <amount> of articles, beginning with <title> from <lang>wiki-latest-pages-articles.xml.gz and create obf file \n" +
 			"on the <LatLon> coordinates(lat;lon)\n" +
-			"mode test - create obf file for article with <articleID> to the <LatLon> coordinates(lat;lon)\n";
+			"mode test - creates obf file for the article with <articleID> by <LatLon> coordinates(lat;lon)\n" +
+			"results are written to a '<work_folder>/out' folder";
 
 	public static void main(String[] args) throws IOException {
-		String lang = "en";
+		String lang = null; //lang = null - process wikidata;
 		String workDir = "";
 		String mode = "test";
 		String articleID = "";
@@ -71,7 +76,13 @@ public class ArticleExtractor {
 		}
 		SAXParserFactory factory = SAXParserFactory.newInstance();
 		ArticleExtractor articleExtractor = new ArticleExtractor();
-		final String fileName = workDir + lang + "wiki-latest-pages-articles.xml.gz";
+		boolean processWikidata = lang == null;
+		final String fileName;
+		if (processWikidata) {
+			fileName = workDir + WIKIDATA_ARTICLES_GZ;
+		} else {
+			fileName = workDir + lang + WIKI_ARTICLES_GZ;
+		}
 		File inFile = new File(fileName);
 		File outputDir = new File(inFile.getParent(), "out");
 		outputDir.mkdirs();
@@ -94,19 +105,20 @@ public class ArticleExtractor {
 				System.out.println("Trim time: " + (System.currentTimeMillis() - startTime) / 1000);
 				articleID = handler.getArticleId();
 			}
-			String[] arguments = {
-					"--lang=" + lang,
-					"--dir=" + outputDir.getAbsolutePath() + File.separator,
-					"--mode=test-wikipedia",
-					"--testID=" + articleID};
-			WikiDatabasePreparation.main(arguments);
+			if (!processWikidata) {
+				String[] arguments = {
+						"--lang=" + lang,
+						"--dir=" + outputDir.getAbsolutePath() + File.separator,
+						"--mode=test-wikipedia",
+						"--testID=" + articleID};
+				WikiDatabasePreparation.main(arguments);
 
-			arguments = new String[]{
-					"generate_test_obf",
-					outputDir.getAbsolutePath() + File.separator,
-					"--testLatLon=" + articleLatLon};
-			WikipediaByCountryDivider.main(arguments);
-
+				arguments = new String[]{
+						"generate_test_obf",
+						outputDir.getAbsolutePath() + File.separator,
+						"--testLatLon=" + articleLatLon};
+				WikipediaByCountryDivider.main(arguments);
+			}
 		} catch (ComponentLookupException | ParserConfigurationException | SAXException | IOException | SQLException
 				| InterruptedException | XmlPullParserException e) {
 			e.printStackTrace();
