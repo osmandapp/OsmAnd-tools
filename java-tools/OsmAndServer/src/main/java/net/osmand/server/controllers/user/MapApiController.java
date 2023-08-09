@@ -301,7 +301,9 @@ public class MapApiController {
 			return tokenNotValid();
 		}
 		LOGGER.info("Finished checkUser: " + (System.currentTimeMillis() - startCheckUserTime) + " ms");
+		long startGenerateFiles = System.currentTimeMillis();
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, true);
+		LOGGER.info("Finished generateFiles: " + (System.currentTimeMillis() - startGenerateFiles) + " ms");
 		long startTime = System.currentTimeMillis();
 		for (UserFileNoData nd : res.uniqueFiles) {
 			long startFileTime = System.currentTimeMillis();
