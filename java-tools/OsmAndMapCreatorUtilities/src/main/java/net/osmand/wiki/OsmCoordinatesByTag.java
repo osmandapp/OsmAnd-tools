@@ -60,7 +60,7 @@ public class OsmCoordinatesByTag {
 		ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		OsmCoordinatesByTag o = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
 				new String[] { "wikipedia:" });
-		o.parseWikiOSMCoordinates(osmGz, progress, false);
+		o.parseOSMCoordinates(osmGz, progress, false);
 		
 	}
 	
@@ -111,7 +111,7 @@ public class OsmCoordinatesByTag {
 
 	}
 
-	public void parseWikiOSMCoordinates(File readFile, ConsoleProgressImplementation progress, boolean parseRelations) throws IOException, SQLException, XmlPullParserException, InterruptedException {
+	public void parseOSMCoordinates(File readFile, ConsoleProgressImplementation progress, boolean parseRelations) throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		File dbFile = new File(readFile.getParentFile(), readFile.getName() + ".db");
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		boolean[] hasRelations = new boolean[] {false};
@@ -157,7 +157,7 @@ public class OsmCoordinatesByTag {
 
 			Connection dbConn = (Connection) osmDBdialect.getDatabaseConnection(dbFile.getAbsolutePath(), log);
 			accessor.setDbConn(dbConn, osmDBdialect);
-			OsmDbCreator dbCreator = new OsmDbCreator(0, 0, false);
+			OsmDbCreator dbCreator = new OsmDbCreator(true);
 			dbCreator.initDatabase(osmDBdialect, dbConn, true);
 			storage.getFilters().add(dbCreator);
 			progress.startTask("Reading osm file " + readFile.getName(), -1);
@@ -208,7 +208,7 @@ public class OsmCoordinatesByTag {
 		}
 		if (hasRelations[0] && !parseRelations) {
 			// parse once again
-			parseWikiOSMCoordinates(readFile, progress, true);
+			parseOSMCoordinates(readFile, progress, true);
 		}
 		System.out.println(String.format("Total %d registered (%d nodes, %d ways, %d relations)", coordinates.size(), 
 				registeredNodes, registeredWays, registeredRelations));

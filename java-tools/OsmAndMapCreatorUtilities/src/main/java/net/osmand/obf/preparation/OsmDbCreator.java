@@ -63,26 +63,36 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private Connection dbConn;
 
-	private final int shiftId;
-	private final int additionId;
-	private boolean generateNewIds;
-	private long generatedId = -100;
-
+	
 	private static boolean VALIDATE_DUPLICATES = false;
 	private TLongObjectHashMap<Long> generatedIds = new TLongObjectHashMap<Long>();
 	private TLongObjectHashMap<Long> hashes = new TLongObjectHashMap<Long>();
 	private TLongSet idSet = new TLongHashSet();
 	
 
+	private final int shiftId;
+	private final int additionId;
+	private final boolean generateNewIds;
+	private long generatedId = -100;
 
-	public OsmDbCreator(int additionId, int shiftId, boolean generateNewIds) {
+
+	public OsmDbCreator(int additionId, int shiftId) {
 		this.additionId = additionId;
 		this.shiftId = shiftId;
-		this.generateNewIds = generateNewIds;
+		// TODO for srtm it was: *false* && shiftId > 0, for basemap - *true* shiftid > 0, 
+		this.generateNewIds = true;
+	}
+	
+	public OsmDbCreator(boolean generateIds) {
+		this.additionId = 0;
+		this.shiftId = 0;
+		this.generateNewIds = generateIds;
 	}
 	
 	public OsmDbCreator() {
-		this(0, 0, false);
+		this.additionId = 0;
+		this.shiftId = 0;
+		this.generateNewIds = false;
 	}
 	
 	
@@ -101,7 +111,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			long hash = 0;
 			for (int i = 0; i < lids.size(); i++) {
 				Long ld;
-				if(simpleConvertId) {
+				if (simpleConvertId) {
 					ld = getSimpleConvertId(lids.get(i), EntityType.NODE, false);
 				} else {
 					ld = getGeneratedId(lids.get(i), 0);
@@ -343,10 +353,10 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	@Override
 	public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity e) {
 		// put all nodes into temporary db to get only required nodes after loading all data
-		if(VALIDATE_DUPLICATES) {
+		if (VALIDATE_DUPLICATES) {
 			long l = (e.getId() << 2) + entityId.getType().ordinal();
-			if(!idSet.add(l)) {
-				throw new IllegalStateException("Duplicate id '" + e.getId() +"' " + entityId.getType());
+			if (!idSet.add(l)) {
+				throw new IllegalStateException("Duplicate id '" + e.getId() + "' " + entityId.getType());
 			}
 		}
 		try {

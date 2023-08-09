@@ -861,7 +861,7 @@ public class WikiDatabasePreparation {
 				new String[] { "wikipedia:" });
 		for (File f : new File(wikiFolder).listFiles()) {
 			if (f.getName().startsWith(OSM_WIKI_PARSER)) {
-				osmWikiCoordinates.parseWikiOSMCoordinates(f, cprogress, false);
+				osmWikiCoordinates.parseOSMCoordinates(f, cprogress, false);
 			}
 		}
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
