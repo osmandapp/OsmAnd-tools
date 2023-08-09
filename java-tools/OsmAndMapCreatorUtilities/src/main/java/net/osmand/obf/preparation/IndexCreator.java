@@ -320,8 +320,9 @@ public class IndexCreator {
 	}
 
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIdsForEachFile, boolean overwriteIds, boolean regeenerateNewIds)
+			boolean generateUniqueIdsForEachFile, boolean regeenerateNewIds)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
+		boolean overwriteIds = false;
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
@@ -468,7 +469,7 @@ public class IndexCreator {
 			if (settings.indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
 			}
-			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, false, true);
+			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, true);
 			// 2. Create index connections and index structure
 
 			IndexCreationContext icc = new IndexCreationContext(this, regionName, true);
@@ -553,7 +554,6 @@ public class IndexCreator {
 
 	public File generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		boolean overwriteIds = false;
 		if (logMapDataWarn == null) {
 			logMapDataWarn = log;
 		}
@@ -626,8 +626,7 @@ public class IndexCreator {
 			} else {
 				// 2. Create index connections and index structure
 				createDatabaseIndexesStructure();
-				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, overwriteIds,
-						false);
+				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, false);
 
 				// 3. Processing all entries
 				// 3.1 write all cities

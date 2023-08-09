@@ -62,7 +62,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
 
-	private boolean overwriteIds;
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
 	RelationTagsPropagation tagsTransform = new RelationTagsPropagation();
 
@@ -72,10 +71,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 	private IndexCreatorSettings settings;
 
-	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes, boolean overwriteIds) {
+	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
-		this.overwriteIds = overwriteIds;
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
 
@@ -114,7 +112,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			boolean first = true;
 			long id = e.getId();
 			if (icc.basemap) {
 				id = GENERATE_OBJ_ID--;
@@ -147,14 +144,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (a.getLocation() != null) {
 					// do not convert english name
 					// convertEnglishName(a);
-					if (overwriteIds && first) {
-						if (!ids.add(a.getId())) {
-							poiPreparedStatement.executeBatch();
-							poiDeleteStatement.setString(1, a.getId() + "");
-							poiDeleteStatement.execute();
-							first = false;
-						}
-					}
 					try {
 						insertAmenityIntoPoi(a);
 					} catch (Exception excpt) {
