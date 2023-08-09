@@ -299,11 +299,14 @@ public class MapApiController {
 			return tokenNotValid();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, true);
+		long startTime = System.currentTimeMillis();
 		for (UserFileNoData nd : res.uniqueFiles) {
+			long startFileTime = System.currentTimeMillis();
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisFavPresent(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
+				long startCreateDetailsTime = System.currentTimeMillis();
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
 					GPXTrackAnalysis trackAnalysis = null;
@@ -324,6 +327,7 @@ public class MapApiController {
 					saveAnalysis(ANALYSIS, uf, trackAnalysis);
 					nd.details = uf.details.deepCopy();
 				}
+				LOGGER.info("Finished creating details: " + nd.name + ", " + (System.currentTimeMillis() - startCreateDetailsTime) + " ms");
 			}
 			if (analysisPresent(ANALYSIS, nd.details)) {
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
@@ -333,7 +337,9 @@ public class MapApiController {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
 			}
+			LOGGER.info("File: " + nd.name + ", " + nd.type + ", " + (System.currentTimeMillis() - startFileTime) + " ms");
 		}
+		LOGGER.info("list-files time: " + (System.currentTimeMillis() - startTime) + " ms");
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
