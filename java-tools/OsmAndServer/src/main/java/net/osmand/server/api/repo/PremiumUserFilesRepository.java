@@ -4,18 +4,12 @@ package net.osmand.server.api.repo;
 import java.util.Date;
 import java.util.List;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import javax.persistence.*;
 
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -98,6 +92,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
 			@Param(value = "name") String name, @Param(value = "type") String type);
 	
+	@QueryHints(value = @QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
 	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
 			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
 			+ " from UserFile u "
