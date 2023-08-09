@@ -254,7 +254,7 @@ public class IndexCreator {
 	}
 
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, File readFile, IProgress progress,
-			IOsmStorageFilter addFilter, int additionId, int shiftId, boolean ovewriteIds, boolean generateNewIds,
+			IOsmStorageFilter addFilter, int additionId, int shiftId, boolean generateNewIds,
 			boolean createTables, OsmDbCreator previous) throws IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
@@ -287,7 +287,7 @@ public class IndexCreator {
 		});
 
 		// 1. Loading osm file
-		OsmDbCreator dbCreator = new OsmDbCreator(additionId, shiftId, ovewriteIds, generateNewIds);
+		OsmDbCreator dbCreator = new OsmDbCreator(additionId, shiftId, generateNewIds);
 		if (previous != null) {
 			dbCreator.setNodeIds(previous.getNodeIds());
 			dbCreator.setWayIds(previous.getWayIds());
@@ -322,7 +322,6 @@ public class IndexCreator {
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
 			boolean generateUniqueIdsForEachFile, boolean regeenerateNewIds)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		boolean overwriteIds = false;
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
@@ -387,11 +386,11 @@ public class IndexCreator {
 		stat.close();
 
 		accessor.setDbConn(dbConn, osmDBdialect);
-		boolean shiftIds = generateUniqueIdsForEachFile || overwriteIds;
+		boolean shiftIds = generateUniqueIdsForEachFile;
 		OsmDbCreator dbCreator = null;
 		for (File read : readFile) {
 			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, shiftIds ? mapInd : 0,
-					shiftIds ? shift : 0, overwriteIds, regeenerateNewIds, mapInd == 0, dbCreator);
+					shiftIds ? shift : 0, regeenerateNewIds, mapInd == 0, dbCreator);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + (mapInd + 1) + " file out of " + readFile.length);

@@ -50,8 +50,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Connection poiConnection;
 	private File poiIndexFile;
 	private PreparedStatement poiPreparedStatement;
-	private TLongHashSet ids = new TLongHashSet();
-	private PreparedStatement poiDeleteStatement;
 	private static final int ZOOM_TO_SAVE_END = 16;
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
@@ -297,7 +295,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement = poiConnection
 				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority) " + //$NON-NLS-1$//$NON-NLS-2$
 						"VALUES (?, ?, ?, ?, ?, ?, ?)");
-		poiDeleteStatement = poiConnection.prepareStatement("DELETE FROM " + IndexConstants.POI_TABLE + " where id = ?");
 		pStatements.put(poiPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);

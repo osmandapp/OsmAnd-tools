@@ -65,7 +65,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private final int shiftId;
 	private final int additionId;
-	private boolean ovewriteIds;
 	private boolean generateNewIds;
 	private long generatedId = -100;
 
@@ -76,21 +75,20 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	
 
 
-	public OsmDbCreator(int additionId, int shiftId, boolean ovewriteIds, boolean generateNewIds) {
+	public OsmDbCreator(int additionId, int shiftId, boolean generateNewIds) {
 		this.additionId = additionId;
 		this.shiftId = shiftId;
-		this.ovewriteIds = ovewriteIds;
 		this.generateNewIds = generateNewIds;
 	}
 	
 	public OsmDbCreator() {
-		this(0, 0, false, false);
+		this(0, 0, false);
 	}
 	
 	
 	private long convertId(Entity e) {
 		long id = e.getId();
-		boolean simpleConvertId = !ovewriteIds && shiftId > 0;
+		boolean simpleConvertId = shiftId > 0;
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
 			if (simpleConvertId) {
@@ -373,7 +371,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 						OSMAND_DELETE_VALUE);
 				delete = true;
 			}
-			if (ovewriteIds || e instanceof Relation) {
+			if (e instanceof Relation) {
 				checkEntityExists(e, id, delete);
 			}
 			if (e instanceof Node) {
