@@ -75,6 +75,7 @@ spring:
   jpa:
     properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
     properties.hibernate.jdbc.lob.non_contextual_creation: true
+    properties.hibernate.jdbc.batch_size: 10
     hibernate.ddl-auto: update
     hibernate.show_sql: true
   datasource:

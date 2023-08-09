@@ -163,7 +163,7 @@ public class UserdataService {
         PremiumUser user = usersRepository.findById(userId);
         long startTime = System.currentTimeMillis();
         List<PremiumUserFilesRepository.UserFileNoData> fl =
-                details ? filesRepository.listFilesByUseridWithDetails(userId) :
+                details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) :
                         filesRepository.listFilesByUserid(userId, name, type);
         LOG.info("Finished listFilesByUseridWithDetails: " + (System.currentTimeMillis() - startTime) + " ms");
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();

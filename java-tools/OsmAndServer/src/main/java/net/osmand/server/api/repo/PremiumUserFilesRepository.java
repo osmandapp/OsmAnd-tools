@@ -92,14 +92,13 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
     List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
                                            @Param(value = "name") String name, @Param(value = "type") String type);
     
-    @QueryHints(value = @QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
-    @Query(nativeQuery = true, value="select id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipfilesize, storage, gendetails from user_files where userid = 1035 order by updatetime desc;")
-//    @Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
-//            + " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
-//            + " from UserFile u "
-//            + " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
-//            + " order by updatetime desc")
-    List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid);
+    @Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
+            + " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
+            + " from UserFile u "
+            + " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
+            + " order by updatetime desc")
+    @QueryHints(value = { @QueryHint(name = "org.hibernate.cacheable", value = "true") })
+    List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid, @Param(value = "name") String name, @Param(value = "type") String type);
     
     // file used to be transmitted to client as is
     class UserFileNoData {
