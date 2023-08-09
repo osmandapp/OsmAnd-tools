@@ -158,7 +158,7 @@ public class OsmCoordinatesByTag {
 			Connection dbConn = (Connection) osmDBdialect.getDatabaseConnection(dbFile.getAbsolutePath(), log);
 			accessor.setDbConn(dbConn, osmDBdialect);
 			OsmDbCreator dbCreator = new OsmDbCreator(false);
-			dbCreator.initDatabase(osmDBdialect, dbConn, true);
+			dbCreator.initDatabase(osmDBdialect, dbConn, true, null);
 			storage.getFilters().add(dbCreator);
 			progress.startTask("Reading osm file " + readFile.getName(), -1);
 			if (pbfFile) {
@@ -168,7 +168,7 @@ public class OsmCoordinatesByTag {
 			}
 			dbCreator.finishLoading();
 			osmDBdialect.commitDatabase(accessor.getDbConn());
-			accessor.initDatabase(null);
+			accessor.initDatabase();
 			if (!hasRelations[0] || parseRelations) {
 				progress.startTask("Iterate over ways", -1);
 				accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
