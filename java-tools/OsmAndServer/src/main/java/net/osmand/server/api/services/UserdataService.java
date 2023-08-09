@@ -174,8 +174,10 @@ public class UserdataService {
         List<Object[]> list =
                 details ? filesRepository.listFilesByUseridWithDetails2(userId, name, type) :
                         null;
-        List<PremiumUserFilesRepository.UserFileNoData> fl = toUserFileNoData(list);
         LOG.info("Finished listFilesByUseridWithDetails: " + (System.currentTimeMillis() - startTime) + " ms");
+        long startTime2 = System.currentTimeMillis();
+        List<PremiumUserFilesRepository.UserFileNoData> fl = toUserFileNoData(list);
+        LOG.info("Finished toUserFileNoData: " + (System.currentTimeMillis() - startTime2) + " ms");
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
         res.uniqueFiles = new ArrayList<>();
