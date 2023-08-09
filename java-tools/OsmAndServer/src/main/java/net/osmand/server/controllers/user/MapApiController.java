@@ -321,9 +321,7 @@ public class MapApiController {
 							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
 						}
 					}
-					if (isGPZTrack) {
-						saveAnalysis(ANALYSIS, uf, analysis);
-					}
+					saveAnalysis(ANALYSIS, uf, analysis);
 					nd.details = uf.details.deepCopy();
 				}
 			}
