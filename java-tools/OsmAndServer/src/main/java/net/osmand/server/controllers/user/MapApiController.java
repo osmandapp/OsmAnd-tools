@@ -302,7 +302,7 @@ public class MapApiController {
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
