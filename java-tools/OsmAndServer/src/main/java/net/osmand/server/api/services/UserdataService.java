@@ -172,7 +172,6 @@ public class UserdataService {
         }
         res.userid = userId;
         Set<String> fileIds = new TreeSet<String>();
-        long startGetResTime = System.currentTimeMillis();
         for (PremiumUserFilesRepository.UserFileNoData sf : fl) {
             String fileId = sf.type + "____" + sf.name;
             if (sf.filesize >= 0) {
@@ -191,7 +190,6 @@ public class UserdataService {
                 
             }
         }
-        LOG.info("Finished getRes: " + (System.currentTimeMillis() - startGetResTime) + " ms");
         return res;
     }
     
