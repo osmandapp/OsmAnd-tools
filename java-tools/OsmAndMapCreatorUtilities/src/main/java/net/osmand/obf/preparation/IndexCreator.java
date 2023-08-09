@@ -256,7 +256,7 @@ public class IndexCreator {
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, File readFile, IProgress progress,
 			IOsmStorageFilter addFilter, int idSourceMapInd, int idShift, 
 			boolean generateNewIds, OsmDbCreator previous) throws IOException, SQLException, XmlPullParserException {
-		// TODO OsmDbCreator previous needed ? 
+		// TODO 1. OsmDbCreator previous is needed ? 
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
 		InputStream streamFile = stream;

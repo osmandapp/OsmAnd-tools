@@ -73,35 +73,40 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private final int shiftId;
 	private final int additionId;
 	private final boolean generateNewIds;
+	private final boolean addGeoHash;
+	
 	private long generatedId = -100;
 
 
 	public OsmDbCreator(int additionId, int shiftId) {
 		this.additionId = additionId;
 		this.shiftId = shiftId;
-		// TODO for srtm it was: *false* && shiftId > 0, for basemap - *true* shiftid > 0, 
+		// TODO 2. Check: for srtm it was: *false* && shiftId > 0, for basemap - *true* shiftid > 0, 
 		this.generateNewIds = true;
+		this.addGeoHash = false;
 	}
 	
-	public OsmDbCreator(boolean generateIds) {
+	public OsmDbCreator(boolean addGeoHash) {
 		this.additionId = 0;
 		this.shiftId = 0;
-		this.generateNewIds = generateIds;
+		this.generateNewIds = false;
+		this.addGeoHash = true;
 	}
 	
 	public OsmDbCreator() {
 		this.additionId = 0;
 		this.shiftId = 0;
 		this.generateNewIds = false;
+		this.addGeoHash = true;
 	}
 	
 	
 	private long convertId(Entity e) {
 		long id = e.getId();
-		boolean simpleConvertId = shiftId > 0;
+		
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
-			if (simpleConvertId) {
+			if (!addGeoHash) {
 				return getSimpleConvertId(id, EntityType.NODE, true);
 			}
 			int hash = getNodeHash(e);
@@ -111,7 +116,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			long hash = 0;
 			for (int i = 0; i < lids.size(); i++) {
 				Long ld;
-				if (simpleConvertId) {
+				if (!addGeoHash) {
 					ld = getSimpleConvertId(lids.get(i), EntityType.NODE, false);
 				} else {
 					ld = getGeneratedId(lids.get(i), 0);
@@ -124,7 +129,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					lids.set(i, ld);
 				}
 			}
-			if (simpleConvertId) {
+			if (!addGeoHash) {
 				return getSimpleConvertId(id, EntityType.WAY, true);
 			}
 			return getConvertId(id, ord, hash);
@@ -136,7 +141,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				EntityType entityType = i.getEntityId().getType();
 				if (i.getEntityId().getType() != EntityType.RELATION) {
 					Long newId ;
-					if(simpleConvertId) {
+					if (!addGeoHash) {
 						newId = getSimpleConvertId(oldId, entityType, false);
 					} else {
 						newId = getGeneratedId(oldId, entityType.ordinal());
@@ -146,7 +151,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					}
 				}
 			}
-			if (simpleConvertId) {
+			if (!addGeoHash) {
 				return getSimpleConvertId(id, EntityType.RELATION, true);
 			}
 			return id;
