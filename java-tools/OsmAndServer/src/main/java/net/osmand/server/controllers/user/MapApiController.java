@@ -306,7 +306,7 @@ public class MapApiController {
 		LOGGER.info("Finished generateFiles: " + (System.currentTimeMillis() - startGenerateFiles) + " ms");
 		long startTime = System.currentTimeMillis();
 		for (UserFileNoData nd : res.uniqueFiles) {
-			long startFileTime = System.currentTimeMillis();
+			//long startFileTime = System.currentTimeMillis();
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisFavPresent(ANALYSIS, nd.details);
@@ -342,7 +342,7 @@ public class MapApiController {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
 			}
-			LOGGER.info("File: " + nd.name + ", " + nd.type + ", " + (System.currentTimeMillis() - startFileTime) + " ms");
+			//LOGGER.info("File: " + nd.name + ", " + nd.type + ", " + (System.currentTimeMillis() - startFileTime) + " ms");
 		}
 		LOGGER.info("list-files time: " + (System.currentTimeMillis() - startTime) + " ms");
 		long startToJson = System.currentTimeMillis();
