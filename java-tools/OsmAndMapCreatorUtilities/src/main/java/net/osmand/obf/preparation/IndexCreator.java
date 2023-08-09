@@ -464,7 +464,7 @@ public class IndexCreator {
 
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes,
 					settings.zoomWaySmoothness);
-			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes, false)
+			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes)
 					: null;
 			if (settings.indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());

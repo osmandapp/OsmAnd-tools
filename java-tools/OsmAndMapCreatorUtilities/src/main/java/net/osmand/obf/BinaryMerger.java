@@ -523,11 +523,10 @@ public class BinaryMerger {
 			throws IOException, SQLException {
 		final int[] writtenPoiCount = {0};
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
-		boolean overwriteIds = false;
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexPOI = true;
 		
-		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
+		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
 		final Map<Long, List<Amenity>> amenityRelations = new HashMap<Long, List<Amenity>>();
 		final TLongHashSet set = new TLongHashSet();

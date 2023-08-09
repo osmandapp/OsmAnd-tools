@@ -197,14 +197,13 @@ public class ObfFileInMemory {
 		}
 		if (poiObjects.size() > 0) {
 			String name = "";
-			boolean overwriteIds = false;
 			if(Algorithms.isEmpty(name)) {
 				name = defName;
 			}
 			MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexPOI = true;
-			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
+			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 			File poiFile = new File(targetFile.getParentFile(), IndexCreator.getPoiFileName(name));
 			indexPoiCreator.createDatabaseStructure(poiFile);
 			for (Map<String, Amenity> mp : poiObjects.valueCollection()) {
