@@ -311,7 +311,7 @@ public class MapApiController {
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisFavPresent(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
-				long startCreateDetailsTime = System.currentTimeMillis();
+//				long startCreateDetailsTime = System.currentTimeMillis();
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
 					GPXTrackAnalysis trackAnalysis = null;
@@ -332,7 +332,7 @@ public class MapApiController {
 					saveAnalysis(ANALYSIS, uf, trackAnalysis);
 					nd.details = uf.details.deepCopy();
 				}
-				LOGGER.info("Finished creating details: " + nd.name + ", " + (System.currentTimeMillis() - startCreateDetailsTime) + " ms");
+//				LOGGER.info("Finished creating details: " + nd.name + ", " + (System.currentTimeMillis() - startCreateDetailsTime) + " ms");
 			}
 			if (analysisPresent(ANALYSIS, nd.details)) {
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
