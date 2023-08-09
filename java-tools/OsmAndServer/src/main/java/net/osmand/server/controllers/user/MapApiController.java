@@ -294,10 +294,13 @@ public class MapApiController {
 			@RequestParam(name = "name", required = false) String name,
 			@RequestParam(name = "type", required = false) String type,
 			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions) throws IOException, SQLException {
+		long startAllTime = System.currentTimeMillis();
+		long startCheckUserTime = System.currentTimeMillis();
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
 		}
+		LOGGER.info("Finished checkUser: " + (System.currentTimeMillis() - startCheckUserTime) + " ms");
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, true);
 		long startTime = System.currentTimeMillis();
 		for (UserFileNoData nd : res.uniqueFiles) {
@@ -343,6 +346,7 @@ public class MapApiController {
 		long startToJson = System.currentTimeMillis();
 		String json = gson.toJson(res);
 		LOGGER.info("Finished converting to json: " + (System.currentTimeMillis() - startToJson) + " ms");
+		LOGGER.info("Finished all: " + (System.currentTimeMillis() - startAllTime) + " ms");
 		return ResponseEntity.ok(json);
 	}
 
