@@ -302,18 +302,18 @@ public class MapApiController {
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
-			//boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
-			if (isGPZTrack) {
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisFavPresent(ANALYSIS, nd.details);
+			if (isGPZTrack || isFavorite) {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
-					GPXTrackAnalysis analysis = null;
+					GPXTrackAnalysis trackAnalysis = null;
 					UserFile uf = of.get();
 					InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
 							: userdataService.getInputStream(uf);
 					if (in != null) {
 						GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
 						if (isGPZTrack) {
-							analysis = getAnalysis(uf, gpxFile);
+							trackAnalysis = getAnalysis(uf, gpxFile);
 							if (gpxFile.metadata != null) {
 								uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
 							}
@@ -321,7 +321,7 @@ public class MapApiController {
 							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
 						}
 					}
-					saveAnalysis(ANALYSIS, uf, analysis);
+					saveAnalysis(ANALYSIS, uf, trackAnalysis);
 					nd.details = uf.details.deepCopy();
 				}
 			}
@@ -349,6 +349,11 @@ public class MapApiController {
 		return details != null && details.has(tag + DONE_SUFFIX)
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
 				&& details.has(tag) && !details.get(tag).isJsonNull();
+	}
+	
+	private boolean analysisFavPresent(String tag, JsonObject details) {
+		return details != null && details.has(tag + DONE_SUFFIX)
+				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 	
 	@GetMapping(value = "/download-file")
