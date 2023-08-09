@@ -577,7 +577,7 @@ public class IndexCreator {
 		}
 
 		this.indexTransportCreator = new IndexTransportCreator(settings);
-		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
+		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
