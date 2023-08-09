@@ -101,8 +101,10 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
 			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
 			+ " from UserFile u "
-			+ " where u.userid = :userid")
-	List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid);
+			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
+			+ " order by updatetime desc")
+	List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid,
+			@Param(value = "name") String name, @Param(value = "type") String type);
 	
 	// file used to be transmitted to client as is
 	class UserFileNoData {
