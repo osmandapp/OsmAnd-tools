@@ -162,7 +162,7 @@ public class UserdataService {
     private List<PremiumUserFilesRepository.UserFileNoData> toUserFileNoData(List<Object[]> list) {
         List<PremiumUserFilesRepository.UserFileNoData> res = new ArrayList<>();
         for (Object[] row : list) {
-            UserFileNoData file = new UserFileNoData((long) row[0], (int) row[1], (int) row[2], (String) row[3], (String) row[4], null, null, null, null, null, (JsonObject) row[10]);
+            UserFileNoData file = new UserFileNoData((long) row[0], (int) row[1], (int) row[2], (String) row[3], (String) row[4], null, null, null, null, null, (JsonObject) row[6]);
             res.add(file);
         }
         return res;
