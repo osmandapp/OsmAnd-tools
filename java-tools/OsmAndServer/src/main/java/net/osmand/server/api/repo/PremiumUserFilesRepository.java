@@ -100,6 +100,12 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
     @QueryHints(value = { @QueryHint(name = "org.hibernate.cacheable", value = "true") })
     List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid, @Param(value = "name") String name, @Param(value = "type") String type);
     
+    @Query("select u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details "
+            + " from UserFile u "
+            + " where u.userid = :userid  and (coalesce(:name, '') = '' or u.name = :name) and (coalesce(:type, '') = '' or u.type = :type) "
+            + " order by updatetime desc")
+    @QueryHints(value = { @QueryHint(name = "org.hibernate.cacheable", value = "true") })
+    List<Object[]> listFilesByUseridWithDetails2(@Param(value = "userid") int userid, @Param(value = "name") String name, @Param(value = "type") String type);
     // file used to be transmitted to client as is
     class UserFileNoData {
         public int userid;
