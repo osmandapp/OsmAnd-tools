@@ -320,7 +320,7 @@ public class IndexCreator {
 	}
 
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIds, boolean overwriteIds, boolean regeenerateNewIds)
+			boolean generateUniqueIdsForEachFile, boolean overwriteIds, boolean regeenerateNewIds)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (dbFile == null) {
@@ -386,7 +386,7 @@ public class IndexCreator {
 		stat.close();
 
 		accessor.setDbConn(dbConn, osmDBdialect);
-		boolean shiftIds = generateUniqueIds || overwriteIds;
+		boolean shiftIds = generateUniqueIdsForEachFile || overwriteIds;
 		OsmDbCreator dbCreator = null;
 		for (File read : readFile) {
 			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, shiftIds ? mapInd : 0,
@@ -548,14 +548,12 @@ public class IndexCreator {
 	public File generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		return generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false,
-				false);
+		return generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false);
 	}
 
 	public File generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds,
-			boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+		boolean overwriteIds = false;
 		if (logMapDataWarn == null) {
 			logMapDataWarn = log;
 		}
