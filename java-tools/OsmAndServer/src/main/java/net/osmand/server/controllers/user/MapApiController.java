@@ -340,7 +340,10 @@ public class MapApiController {
 			LOGGER.info("File: " + nd.name + ", " + nd.type + ", " + (System.currentTimeMillis() - startFileTime) + " ms");
 		}
 		LOGGER.info("list-files time: " + (System.currentTimeMillis() - startTime) + " ms");
-		return ResponseEntity.ok(gson.toJson(res));
+		long startToJson = System.currentTimeMillis();
+		String json = gson.toJson(res);
+		LOGGER.info("Finished converting to json: " + (System.currentTimeMillis() - startToJson) + " ms");
+		return ResponseEntity.ok(json);
 	}
 
 	private boolean analysisPresent(String tag, UserFile userFile) {
