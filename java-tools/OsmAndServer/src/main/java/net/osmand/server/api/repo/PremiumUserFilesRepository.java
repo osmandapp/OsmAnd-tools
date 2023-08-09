@@ -19,24 +19,24 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 
 @Repository
 public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long> {
-	
-	UserFile findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
-	
-	UserFile findTopByUseridAndNameAndTypeAndUpdatetime(int userid, String name, String type, Date updatetime);
-	
-	Iterable<UserFile> findAllByUserid(int userid);
-	
-	
+    
+    UserFile findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
+    
+    UserFile findTopByUseridAndNameAndTypeAndUpdatetime(int userid, String name, String type, Date updatetime);
+    
+    Iterable<UserFile> findAllByUserid(int userid);
+
+
 //	@Modifying
 //	@Query("update UserFile uf set uf.details = ?1 where uf.id = ?2")
 //	@Transactional
 //	int updateUserFileDetails(JsonObject details, long id);
-	
+    
     @Entity(name = "UserFile")
     @Table(name = "user_files")
     class UserFile {
-
-    	@Id
+        
+        @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         public long id;
         
@@ -45,13 +45,13 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         
         @Column(name = "deviceid")
         public int deviceid;
-
+        
         @Column(name = "type")
         public String type;
         
         @Column(name = "name")
         public String name;
-
+        
         @Column(name = "filesize")
         public Long filesize;
         
@@ -73,38 +73,38 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Type(type = "net.osmand.server.assist.data.JsonbType")
         public JsonObject details;
         
-//      @Fetch(FetchMode.JOIN)
-        @Column(name = "data", columnDefinition="bytea")
+        //      @Fetch(FetchMode.JOIN)
+        @Column(name = "data", columnDefinition = "bytea")
         public byte[] data;
-        
+
 //        @Lob
 //        public Blob data;
-
+    
     }
-
+    
     
     // COALESCE(length(u.data), -1))
-	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
-			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage ) "
-			+ " from UserFile u "
-			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
-			+ " order by updatetime desc")
-	List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
-			@Param(value = "name") String name, @Param(value = "type") String type);
-	
-	@QueryHints(value = @QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
-	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData("
-			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
-			+ " from UserFile u "
-			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
-			+ " order by updatetime desc")
-	List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid,
-			@Param(value = "name") String name, @Param(value = "type") String type);
-	
-	// file used to be transmitted to client as is
-	class UserFileNoData {
-		public int userid;
-		public long id;
+    @Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
+            + " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage ) "
+            + " from UserFile u "
+            + " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
+            + " order by updatetime desc")
+    List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
+                                           @Param(value = "name") String name, @Param(value = "type") String type);
+    
+    @QueryHints(value = @QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
+    @Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
+            + " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
+            + " from UserFile u "
+            + " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
+            + " order by updatetime desc")
+    List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid,
+                                                      @Param(value = "name") String name, @Param(value = "type") String type);
+    
+    // file used to be transmitted to client as is
+    class UserFileNoData {
+        public int userid;
+        public long id;
         public int deviceid;
         public long filesize;
         public String type;
@@ -113,47 +113,47 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public long updatetimems;
         public Date clienttime;
         public long clienttimems;
-		public long zipSize;
-		public String storage;
-		public JsonObject details;
-		
-		public UserFileNoData(UserFile c) {
-			this.userid = c.userid;
-			this.id = c.id;
-			this.deviceid = c.deviceid;
-			this.type = c.type;
-			this.name = c.name;
-			this.filesize = c.filesize ;
-			this.zipSize = c.zipfilesize;
-			this.updatetime = c.updatetime;
-			this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
-			this.clienttime = c.clienttime;
-			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
-			this.details = c.details;
-			this.storage = c.storage;
-		}
-		
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
-				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage) {
-			this(id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipSize, storage, null);
-		}
-		
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
-				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage, JsonObject details) {
-			this.userid = userid;
-			this.id = id;
-			this.deviceid = deviceid;
-			this.type = type;
-			this.name = name;
-			this.filesize = filesize == null ? 0 : filesize.longValue();
-			this.zipSize = zipSize == null ? 0 : zipSize.longValue();
-			this.updatetime = updatetime;
-			this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
-			this.clienttime = clienttime;
-			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
-			this.details = details;
-			this.storage = storage;
-		}
-	}
-	
+        public long zipSize;
+        public String storage;
+        public JsonObject details;
+        
+        public UserFileNoData(UserFile c) {
+            this.userid = c.userid;
+            this.id = c.id;
+            this.deviceid = c.deviceid;
+            this.type = c.type;
+            this.name = c.name;
+            this.filesize = c.filesize;
+            this.zipSize = c.zipfilesize;
+            this.updatetime = c.updatetime;
+            this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
+            this.clienttime = c.clienttime;
+            this.clienttimems = clienttime == null ? 0 : clienttime.getTime();
+            this.details = c.details;
+            this.storage = c.storage;
+        }
+        
+        public UserFileNoData(long id, int userid, int deviceid, String type, String name,
+                              Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage) {
+            this(id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipSize, storage, null);
+        }
+        
+        public UserFileNoData(long id, int userid, int deviceid, String type, String name,
+                              Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage, JsonObject details) {
+            this.userid = userid;
+            this.id = id;
+            this.deviceid = deviceid;
+            this.type = type;
+            this.name = name;
+            this.filesize = filesize == null ? 0 : filesize.longValue();
+            this.zipSize = zipSize == null ? 0 : zipSize.longValue();
+            this.updatetime = updatetime;
+            this.updatetimems = updatetime == null ? 0 : updatetime.getTime();
+            this.clienttime = clienttime;
+            this.clienttimems = clienttime == null ? 0 : clienttime.getTime();
+            this.details = details;
+            this.storage = storage;
+        }
+    }
+    
 }
