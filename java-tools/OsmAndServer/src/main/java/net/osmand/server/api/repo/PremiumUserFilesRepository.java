@@ -93,7 +93,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			@Param(value = "name") String name, @Param(value = "type") String type);
 	
 	@QueryHints(value = @QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
-	@Query("select new net.osmand.server.api.repo.UserFileNoData("
+	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData("
 			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
