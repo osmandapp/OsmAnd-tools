@@ -294,24 +294,16 @@ public class MapApiController {
 			@RequestParam(name = "name", required = false) String name,
 			@RequestParam(name = "type", required = false) String type,
 			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions) throws IOException, SQLException {
-		long startAllTime = System.currentTimeMillis();
-		long startCheckUserTime = System.currentTimeMillis();
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		LOGGER.info("Finished checkUser: " + (System.currentTimeMillis() - startCheckUserTime) + " ms");
-		long startGenerateFiles = System.currentTimeMillis();
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, true);
-		LOGGER.info("Finished generateFiles: " + (System.currentTimeMillis() - startGenerateFiles) + " ms");
-		long startTime = System.currentTimeMillis();
 		for (UserFileNoData nd : res.uniqueFiles) {
-			//long startFileTime = System.currentTimeMillis();
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisFavPresent(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
-//				long startCreateDetailsTime = System.currentTimeMillis();
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
 					GPXTrackAnalysis trackAnalysis = null;
@@ -332,7 +324,6 @@ public class MapApiController {
 					saveAnalysis(ANALYSIS, uf, trackAnalysis);
 					nd.details = uf.details.deepCopy();
 				}
-//				LOGGER.info("Finished creating details: " + nd.name + ", " + (System.currentTimeMillis() - startCreateDetailsTime) + " ms");
 			}
 			if (analysisPresent(ANALYSIS, nd.details)) {
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
@@ -342,14 +333,8 @@ public class MapApiController {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
 			}
-			//LOGGER.info("File: " + nd.name + ", " + nd.type + ", " + (System.currentTimeMillis() - startFileTime) + " ms");
 		}
-		LOGGER.info("list-files time: " + (System.currentTimeMillis() - startTime) + " ms");
-		long startToJson = System.currentTimeMillis();
-		String json = gson.toJson(res);
-		LOGGER.info("Finished converting to json: " + (System.currentTimeMillis() - startToJson) + " ms");
-		LOGGER.info("Finished all: " + (System.currentTimeMillis() - startAllTime) + " ms");
-		return ResponseEntity.ok(json);
+		return ResponseEntity.ok(gson.toJson(res));
 	}
 
 	private boolean analysisPresent(String tag, UserFile userFile) {

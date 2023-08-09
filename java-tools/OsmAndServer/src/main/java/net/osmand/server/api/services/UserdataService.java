@@ -161,11 +161,9 @@ public class UserdataService {
     
     public UserdataController.UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
         PremiumUser user = usersRepository.findById(userId);
-        long startGetListFilesTime = System.currentTimeMillis();
         List<PremiumUserFilesRepository.UserFileNoData> fl =
                 details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) :
                         filesRepository.listFilesByUserid(userId, name, type);
-        LOG.info("Finished getListFiles: " + (System.currentTimeMillis() - startGetListFilesTime) + " ms");
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
         res.uniqueFiles = new ArrayList<>();
