@@ -627,7 +627,9 @@ public class UserdataService {
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
+        long startTime = System.currentTimeMillis();
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
+        LOG.info("Finished listFilesByUserid: " + (System.currentTimeMillis() - startTime) + " ms");
 		Set<String> fileIds = new TreeSet<>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
 		String fileName = "Export_" + formatter.format(new Date());
