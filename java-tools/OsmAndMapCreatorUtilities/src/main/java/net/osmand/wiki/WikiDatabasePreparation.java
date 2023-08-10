@@ -857,13 +857,6 @@ public class WikiDatabasePreparation {
 		final String sqliteFileName = wikiFolder + WIKI_SQLITE;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		ConsoleProgressImplementation cprogress = new ConsoleProgressImplementation();
-		OsmCoordinatesByTag osmWikiCoordinates = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
-				new String[] { "wikipedia:" });
-		for (File f : new File(wikiFolder).listFiles()) {
-			if (f.getName().startsWith(OSM_WIKI_PARSER)) {
-				osmWikiCoordinates.parseOSMCoordinates(f, cprogress, false);
-			}
-		}
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
@@ -871,6 +864,13 @@ public class WikiDatabasePreparation {
 			OsmandRegions regions = new OsmandRegions();
 			regions.prepareFile();
 			regions.cacheAllCountries();
+			OsmCoordinatesByTag osmWikiCoordinates = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
+					new String[] { "wikipedia:" });
+			for (File f : new File(wikiFolder).listFiles()) {
+				if (f.getName().startsWith(OSM_WIKI_PARSER)) {
+					osmWikiCoordinates.parseOSMCoordinates(f, cprogress, f.getName().contains("multi"));
+				}
+			}
 			final WikiDataHandler handler = new WikiDataHandler(sx, progress, new File(sqliteFileName), osmWikiCoordinates, regions);
 			sx.parse(is, handler);
 			handler.finish();
