@@ -5,6 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -19,6 +20,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -35,16 +37,33 @@ public class BaseRoadNetworkProcessor {
 
 	private static long ID = -1;
 	private static final int ROUTE_POINTS = 11;
-	private static double LAT = 52.3201813;
-	private static double LON = 4.7644685;
+	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685);
+	protected static LatLon EX2 = new LatLon(52.33265, 4.77738);
+	protected static LatLon EX4 = new LatLon(52.2728791, 4.8064803);
+	protected static LatLon EX3 = new LatLon(52.27757, 4.85731);
+	
+	
 	private static String ROUTING_PROFILE = "car";
-	private static int INITIAL_LOOKUP = 50;
+	private static int INITIAL_LOOKUP = 7;
+	private static int MAX_BLOCKERS = 100;
 	
 	
 	private RoutingContext ctx;
-	private PriorityQueue<RouteSegment> graphSegments;
-	private TLongObjectHashMap<RouteSegment> visitedSegments =  new TLongObjectHashMap<RouteSegment>();
-	private TLongObjectHashMap<RouteSegment> toVisit =  new TLongObjectHashMap<RouteSegment>();
+	
+	
+	class BaseCluster {
+		PriorityQueue<RouteSegment> graphSegments = new PriorityQueue<>(new Comparator<RouteSegment>() {
+
+			@Override
+			public int compare(RouteSegment o1, RouteSegment o2) {
+				return ctx.roadPriorityComparator(o1.distanceFromStart, o1.distanceToEnd, o2.distanceFromStart,
+						o2.distanceToEnd);
+			}
+		});
+		TLongObjectHashMap<RouteSegment> visitedSegments = new TLongObjectHashMap<RouteSegment>();
+		TLongObjectHashMap<RouteSegment> toVisit = new TLongObjectHashMap<RouteSegment>();
+	}
+	
 	
 	public static void main(String[] args) throws IOException, XMLStreamException {
 		File fl = new File(System.getProperty("maps.dir") + "/Netherlands_noord-holland_europe_2.road.obf");
@@ -83,60 +102,99 @@ public class BaseRoadNetworkProcessor {
 //			List<RoutingSubregionTile> loadTiles = ctx.loadAllSubregionTiles(reader, s);
 //			tiles.addAll(loadTiles);
 //		}
-		RouteSegmentPoint pnt = router.findRouteSegment(LAT, LON, ctx, null);
-
-		return buildRoadNetworks(pnt);
+		RouteSegmentPoint pnt = router.findRouteSegment(EX3.getLatitude(), EX3.getLongitude(), ctx, null);
+		
+		BaseCluster cluster = new BaseCluster();
+		cluster.graphSegments.add(pnt);
+		buildRoadNetworks(cluster, INITIAL_LOOKUP);
+		return visualizeWays(cluster.toVisit.valueCollection(), cluster.visitedSegments);
 
 	}
 
-	private List<Entity> buildRoadNetworks(RouteSegmentPoint pnt) {
-		graphSegments = new PriorityQueue<>(new Comparator<RouteSegment>() {
-
-			@Override
-			public int compare(RouteSegment o1, RouteSegment o2) {
-				return ctx.roadPriorityComparator(o1.distanceFromStart, o1.distanceToEnd, o2.distanceFromStart, o2.distanceToEnd);
-			}
-		});
-		graphSegments.add(pnt);
-		
-		while (visitedSegments.size() < INITIAL_LOOKUP && !graphSegments.isEmpty()) {
-			RouteSegment p = graphSegments.poll();
-			proceed(p);
-			System.out.println(graphSegments.size() + " " + visitedSegments.size());
+	private void buildRoadNetworks(BaseCluster c, int init) {
+		while (c.graphSegments.size() < init && !c.graphSegments.isEmpty()) {
+			RouteSegment p = c.graphSegments.poll();
+			proceed(c, p);
+			System.out.println(c.visitedSegments.size() + " -> " + c.graphSegments.size());
 		}
+		mergeStraights(c);
+		if (init > 2) {
+			mergeConnected(c, init);
+		}
+		mergeStraights(c);
+ 		System.out.println(c.toVisit.size());
+	}
+
+	private void mergeConnected(BaseCluster c, int init) {
+		c.graphSegments.clear();
+		c.graphSegments.addAll(c.toVisit.valueCollection());
+		while (!c.graphSegments.isEmpty()) {
+			RouteSegment t = c.graphSegments.poll();
+			BaseCluster bc = new BaseCluster();
+			bc.graphSegments.add(t);
+			buildRoadNetworks(bc, init - 1);
+			int cnt = bc.toVisit.size();
+			for (long k : bc.toVisit.keys()) {
+				if (!c.visitedSegments.containsKey(k)) {
+					cnt--;
+				}
+			}
+			if (cnt < 2) {
+				// merge
+				c.visitedSegments.putAll(bc.visitedSegments);
+				for (long l : bc.visitedSegments.keys()) {
+					c.toVisit.remove(l);
+				}
+				for (long k : bc.toVisit.keys()) {
+					if (!c.visitedSegments.containsKey(k)) {
+						c.toVisit.put(k, bc.toVisit.get(k));
+					}
+				}
+				System.out.println("M " + cnt + " " + c.visitedSegments.size() + " -> " + c.toVisit.size());
+			}
+		}
+	}
+
+	private void mergeStraights(BaseCluster c) {
 		boolean foundStraights = true;
-		while (foundStraights && !graphSegments.isEmpty()) {
-			Iterator<RouteSegment> it = graphSegments.iterator();
+		while (foundStraights && !c.toVisit.isEmpty() && c.toVisit.size() < MAX_BLOCKERS) {
 			foundStraights = false;
-			while (it.hasNext()) {
-				RouteSegment segment = it.next();
-				if (goodCandidate(segment)) {
+			for(RouteSegment segment : c.toVisit.valueCollection()) {
+				if (goodCandidate(c, segment)) {
 					foundStraights = true;
-					it.remove();
-					proceed(segment);
+					c.toVisit.remove(calculateRoutePointId(segment));
+					proceed(c,segment);
 					break;
 				}
 			}
-			System.out.println(graphSegments.size() + " " + visitedSegments.size());
+			System.out.println(c.visitedSegments.size() + " -> " + c.toVisit.size());
 		}
-		System.out.println(graphSegments.size());
+	}
+
+	private boolean goodCandidate(BaseCluster c, RouteSegment segment) {
+		int cnt = countNonVisited(c, segment, segment.getSegmentEnd());
+		cnt += countNonVisited(c, segment, segment.getSegmentStart());
+		if (cnt < 2) {
+			return true;
+		}
 		
-		return visualizeWays(graphSegments, visitedSegments);
+//		// include whole segment
+//		RouteSegment opp = segment.initRouteSegment(!segment.isPositive());
+//		if (opp != null && visitedSegments.containsKey(calculateRoutePointId(opp)) && 
+//				Math.min(opp.getSegmentStart(), opp.getSegmentEnd()) > 0 &&
+//				Math.max(opp.getSegmentStart(), opp.getSegmentEnd()) < opp.getRoad().getPointsLength() - 1) {
+//			return true;
+//		}
+		return false;
 	}
 
-	private boolean goodCandidate(RouteSegment segment) {
-		int cnt = countNonVisited(segment, segment.getSegmentEnd());
-		cnt += countNonVisited(segment, segment.getSegmentStart());
-		return cnt < 3;
-	}
-
-	private int countNonVisited(RouteSegment segment, int ind) {
+	private int countNonVisited(BaseCluster c, RouteSegment segment, int ind) {
 		int x = segment.getRoad().getPoint31XTile(ind);
 		int y = segment.getRoad().getPoint31YTile(ind);
 		RouteSegment next = ctx.loadRouteSegment(x, y, 0);
 		int cnt = 0;
 		while (next != null) {
-			if (!toVisit.containsKey(calculateRoutePointId(next))  && !visitedSegments.containsKey(calculateRoutePointId(next))) {
+			if (!c.toVisit.containsKey(calculateRoutePointId(next))  && !c.visitedSegments.containsKey(calculateRoutePointId(next))) {
 				cnt++;
 			}
 			next = next.getNext();
@@ -144,7 +202,7 @@ public class BaseRoadNetworkProcessor {
 		return cnt;
 	}
 
-	private List<Entity> visualizeWays(PriorityQueue<RouteSegment> graphSegments, TLongObjectHashMap<RouteSegment> visitedSegments) {
+	private List<Entity> visualizeWays(Collection<RouteSegment> toVisit, TLongObjectHashMap<RouteSegment> visitedSegments) {
 		TLongSet viewed = new TLongHashSet();
 		List<Entity> objs = new ArrayList<>();
 		TLongObjectIterator<RouteSegment> it = visitedSegments.iterator();
@@ -170,7 +228,7 @@ public class BaseRoadNetworkProcessor {
 			}
 			it.remove();
 		}
-		for (RouteSegment r : graphSegments) {
+		for (RouteSegment r : toVisit) {
 			int x1 = r.getRoad().getPoint31XTile(r.getSegmentStart());
 			int x2 = r.getRoad().getPoint31XTile(r.getSegmentEnd());
 			int y1 = r.getRoad().getPoint31YTile(r.getSegmentStart());
@@ -208,40 +266,42 @@ public class BaseRoadNetworkProcessor {
 		return w;
 	}
 
-	private void proceed(RouteSegment segment) {
+	private void proceed(BaseCluster c, RouteSegment segment) {
 		long pntId = calculateRoutePointId(segment);
-		toVisit.remove(pntId);
-		if (visitedSegments.containsKey(pntId)) {
+		c.toVisit.remove(pntId);
+		if (c.visitedSegments.containsKey(pntId)) {
 			return;
 		}
-		visitedSegments.put(calculateRoutePointId(segment), segment);
+		c.visitedSegments.put(calculateRoutePointId(segment), segment);
 		int prevX = segment.getRoad().getPoint31XTile(segment.getSegmentStart());
 		int prevY = segment.getRoad().getPoint31YTile(segment.getSegmentStart());
 		int x = segment.getRoad().getPoint31XTile(segment.getSegmentEnd());
 		int y = segment.getRoad().getPoint31YTile(segment.getSegmentEnd());
 
 		float distFromStart = segment.distanceFromStart + (float) MapUtils.squareRootDist31(x, y, prevX, prevY);
-		addSegment(distFromStart, segment, true);
-		addSegment(distFromStart, segment, false);
+		addSegment(c, distFromStart, segment, true);
+		addSegment(c, distFromStart, segment, false);
 	}
 	
 	
-	private void addSegment(float distFromStart, RouteSegment segment, boolean end) {
+	private void addSegment(BaseCluster c, float distFromStart, RouteSegment segment, boolean end) {
 		int segmentInd = end ? segment.getSegmentEnd() : segment.getSegmentStart();
 		int x = segment.getRoad().getPoint31XTile(segmentInd);
 		int y = segment.getRoad().getPoint31YTile(segmentInd);
 		RouteSegment next = ctx.loadRouteSegment(x, y, 0);
 		while (next != null) {
-			if (next.distanceFromStart == 0 && !visitedSegments.containsKey(calculateRoutePointId(next))) {
+			// next.distanceFromStart == 0 
+			if (!c.toVisit.containsKey(calculateRoutePointId(next)) && !c.visitedSegments.containsKey(calculateRoutePointId(next))) {
+
 				next.distanceFromStart = distFromStart;
-				graphSegments.add(next);
-				toVisit.put(calculateRoutePointId(next), next);
+				c.graphSegments.add(next);
+				c.toVisit.put(calculateRoutePointId(next), next);
 			}
 			RouteSegment opp = next.initRouteSegment(!next.isPositive());
-			if (opp != null && opp.distanceFromStart == 0 && !visitedSegments.containsKey(calculateRoutePointId(opp))) {
+			if (opp != null && !c.toVisit.containsKey(calculateRoutePointId(opp)) && !c.visitedSegments.containsKey(calculateRoutePointId(opp))) {
 				opp.distanceFromStart = distFromStart;
-				graphSegments.add(opp);
-				toVisit.put(calculateRoutePointId(opp), opp);
+				c.graphSegments.add(opp);
+				c.toVisit.put(calculateRoutePointId(opp), opp);
 			}
 			next = next.getNext();
 		}
