@@ -98,6 +98,7 @@ public class PromoService {
     }
     
     public PromoResponse createPromoSubscription(String email, String key, Date expireTime) {
+    	email = email.toLowerCase().trim();
         DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
         deviceSub.sku = key;
         deviceSub.orderId = UUID.randomUUID().toString();

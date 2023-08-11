@@ -587,6 +587,9 @@ public class MapApiController {
 	@PostMapping(path = {"/auth/change-email"})
 	@ResponseBody
 	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
+		if (us.username != null) {
+			us.username = us.username.toLowerCase().trim();
+		}
 		if (emailSender.isEmail(us.username)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
