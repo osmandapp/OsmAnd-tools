@@ -83,7 +83,9 @@ public class MapApiController {
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
-	private static final long ANALYSIS_RERUN = 1692020660973l; // 14-08-2023
+
+	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
+
 	private static final String INFO_KEY = "info";
 											   
 
@@ -318,7 +320,17 @@ public class MapApiController {
 								uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
 							}
 						} else {
-							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
+							Map<String, WebGpxParser.PointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
+							Map<String, Map<String,String>> pointGroupsAnalysis = new HashMap<>();
+							groups.keySet().forEach(k -> {
+								Map<String, String> groupInfo = new HashMap<>();
+								WebGpxParser.PointsGroup group = groups.get(k);
+								groupInfo.put("color", group.color);
+								groupInfo.put("groupSize", String.valueOf(group.points.size()));
+								groupInfo.put("hidden", String.valueOf(isHidden(group)));
+								pointGroupsAnalysis.put(k, groupInfo);
+							});
+							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
 					}
 					saveAnalysis(ANALYSIS, uf, analysis);
@@ -337,6 +349,15 @@ public class MapApiController {
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+	
+	private boolean isHidden(WebGpxParser.PointsGroup group) {
+		for (WebGpxParser.Wpt wpt:  group.points) {
+			if (wpt.ext.extensions.get("hidden") != null && wpt.ext.extensions.get("hidden").equals("true")) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private boolean analysisPresent(String tag, UserFile userFile) {
