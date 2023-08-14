@@ -330,10 +330,12 @@ public class MapApiController {
 			if (analysisPresent(ANALYSIS, nd.details)) {
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("elevationData");
+				nd.details.get(ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
 			if (analysisPresent(SRTM_ANALYSIS, nd.details)) {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
+				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
@@ -414,12 +416,9 @@ public class MapApiController {
 		if (file.details == null) {
 			file.details = new JsonObject();
 		}
-		// store data in db to speed up retrieval
-		// clear speed data 
-//		if (analysis != null) {
-//			analysis.speedData.clear();
-//			analysis.elevationData.clear();
-//		}
+		if (analysis != null) {
+			analysis.pointsAttributesData.clear();
+		}
 		file.details.add(tag, gsonWithNans.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
