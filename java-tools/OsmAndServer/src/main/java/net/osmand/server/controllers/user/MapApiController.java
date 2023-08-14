@@ -350,7 +350,13 @@ public class MapApiController {
 	private boolean analysisPresent(String tag, JsonObject details) {
 		return details != null && details.has(tag + DONE_SUFFIX)
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
-				&& details.has(tag) && !details.get(tag).isJsonNull();
+				&& details.has(tag) && !details.get(tag).isJsonNull()
+				&& !containsPointsData(tag, details);
+	}
+	
+	private boolean containsPointsData(String tag, JsonObject details) {
+		return details.get(tag).getAsJsonObject().has("speedData")
+				|| details.get(tag).getAsJsonObject().has("pointsAttributesData");
 	}
 	
 	@GetMapping(value = "/download-file")
@@ -414,12 +420,9 @@ public class MapApiController {
 		if (file.details == null) {
 			file.details = new JsonObject();
 		}
-		// store data in db to speed up retrieval
-		// clear speed data 
-//		if (analysis != null) {
-//			analysis.speedData.clear();
-//			analysis.elevationData.clear();
-//		}
+		if (analysis != null) {
+			analysis.pointsAttributesData.clear();
+		}
 		file.details.add(tag, gsonWithNans.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
