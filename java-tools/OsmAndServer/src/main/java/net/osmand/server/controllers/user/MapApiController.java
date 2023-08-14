@@ -83,7 +83,7 @@ public class MapApiController {
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
-	private static final long ANALYSIS_RERUN = 1645061114000l; // 17-02-2022
+	private static final long ANALYSIS_RERUN = 1692020660973l; // 14-08-2023
 	private static final String INFO_KEY = "info";
 											   
 
@@ -302,7 +302,7 @@ public class MapApiController {
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresentFavorites(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
@@ -321,9 +321,7 @@ public class MapApiController {
 							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
 						}
 					}
-					if (isGPZTrack) {
-						saveAnalysis(ANALYSIS, uf, analysis);
-					}
+					saveAnalysis(ANALYSIS, uf, analysis);
 					nd.details = uf.details.deepCopy();
 				}
 			}
@@ -353,6 +351,11 @@ public class MapApiController {
 		return details != null && details.has(tag + DONE_SUFFIX)
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
 				&& details.has(tag) && !details.get(tag).isJsonNull();
+	}
+	
+	private boolean analysisPresentFavorites(String tag, JsonObject details) {
+		return details != null && details.has(tag + DONE_SUFFIX)
+				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 	
 	@GetMapping(value = "/download-file")
