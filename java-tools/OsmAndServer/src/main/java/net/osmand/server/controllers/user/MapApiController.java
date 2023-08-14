@@ -330,10 +330,12 @@ public class MapApiController {
 			if (analysisPresent(ANALYSIS, nd.details)) {
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("elevationData");
+				nd.details.get(ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
 			if (analysisPresent(SRTM_ANALYSIS, nd.details)) {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
+				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
@@ -350,13 +352,7 @@ public class MapApiController {
 	private boolean analysisPresent(String tag, JsonObject details) {
 		return details != null && details.has(tag + DONE_SUFFIX)
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
-				&& details.has(tag) && !details.get(tag).isJsonNull()
-				&& !containsPointsData(tag, details);
-	}
-	
-	private boolean containsPointsData(String tag, JsonObject details) {
-		return details.get(tag).getAsJsonObject().has("speedData")
-				|| details.get(tag).getAsJsonObject().has("pointsAttributesData");
+				&& details.has(tag) && !details.get(tag).isJsonNull();
 	}
 	
 	@GetMapping(value = "/download-file")
