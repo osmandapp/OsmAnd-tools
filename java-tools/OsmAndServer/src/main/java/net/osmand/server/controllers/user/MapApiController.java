@@ -83,7 +83,7 @@ public class MapApiController {
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
-	private static final long ANALYSIS_RERUN = 1892020660973l; // 14-08-2023
+	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
 	private static final String INFO_KEY = "info";
 											   
 
