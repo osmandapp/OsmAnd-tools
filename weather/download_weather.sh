@@ -443,6 +443,7 @@ get_raw_ecmwf_files() {
     # Download forecast files
     local MAX_FORECAST_HOURS=240
     local FORECAST_INCREMENT_HOURS=3
+    local PREV_FILETIME=""
     for (( FORECAST_HOUR=0; FORECAST_HOUR<=${MAX_FORECAST_HOURS}; FORECAST_HOUR+=${FORECAST_INCREMENT_HOURS} ))
     do
         local FILETIME=""
@@ -470,22 +471,29 @@ get_raw_ecmwf_files() {
                 # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
                 local SAVING_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$FILETIME"
                 download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
-		GRIB_SIZE=$(wc -c "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" | awk '{print $1}')
-		if (( $GRIB_SIZE < 5000 )); then
-			echo "Warning! Looks like $SAVING_FILENAME.grib2 is empty or contains invalid data"
-			continue
-		fi
-		cnvgrib2to1 "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" || echo "cnvgrib2to1 error"
-		rm "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2"
+                GRIB_SIZE=$(wc -c "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" | awk '{print $1}')
+                if (( $GRIB_SIZE < 5000 )); then
+                    echo "Warning! Looks like $SAVING_FILENAME.grib2 is empty or contains invalid data"
+                    continue
+                fi
+                cnvgrib2to1 "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" || echo "cnvgrib2to1 error"
+                rm "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2"
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
-                gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "gdal_translate error"
-		if [[ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "temperature" ]] ; then
-			echo "Converting tmp from K to C"
-			gdal_calc.py -A "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="A-273" --overwrite
-		fi
+                local PREV_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$PREV_FILETIME"
+                if [ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "precip" ] && [ -n "$PREV_FILETIME" ] && [ -f "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" ]; then
+                    echo "Calculate precipitation"
+                    gdal_calc.py -A "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" -B "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="(A-B)/10" --overwrite
+                else
+                    gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "gdal_translate error"
+                fi
+                if [[ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "temperature" ]] ; then
+                    echo "Converting tmp from K to C"
+                    gdal_calc.py -A "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="A-273" --overwrite
+                fi
                 TZ=UTC touch -t "${FORECAST_DATE}${FORECAST_RND_TIME}00" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff"
             done
+            PREV_FILETIME=$FILETIME 
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
         fi
