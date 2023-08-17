@@ -7,8 +7,11 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.TreeMap;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -16,7 +19,10 @@ import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
+import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
@@ -40,14 +46,21 @@ public class BaseRoadNetworkProcessor {
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738);
 	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803);
 	protected static LatLon EX4 = new LatLon(52.27757, 4.85731);
-	protected static LatLon EX = EX4; 
+	protected static LatLon EX5 = new LatLon(42.78725, 18.95036);
 	
+	protected static LatLon EX = EX5; 
+	
+	protected int VERBOSE_LEVEL = 1;
 	
 	private static String ROUTING_PROFILE = "car";
-	private static int[] INITIAL_LOOKUP = new int[] { 7, 7, 6, 5, 4, 3 };
+	private static int[] INITIAL_LOOKUP = new int[] {7,6,5} ; //new int[] { 7, 5 };
 	private static int MAX_BLOCKERS = 100;
 	private static float MAX_DIST = 100000;
 	
+	double lattop = 85;
+	double latbottom = -85;
+	double lonleft = -179.9;
+	double lonright = 179.9;	
 	
 	private RoutingContext ctx;
 	
@@ -67,7 +80,9 @@ public class BaseRoadNetworkProcessor {
 	
 	
 	public static void main(String[] args) throws IOException, XMLStreamException {
-		File fl = new File(System.getProperty("maps.dir") + "/Netherlands_noord-holland_europe_2.road.obf");
+		String name = "Montenegro_europe_2.road.obf";
+//		name = "Netherlands_noord-holland_europe_2.road.obf";
+		File fl = new File(System.getProperty("maps.dir") + "/" +name);
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		List<Entity> objects = new BaseRoadNetworkProcessor().collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 
@@ -81,7 +96,7 @@ public class BaseRoadNetworkProcessor {
 			st.registerEntity(e, null);
 		}
 		OsmStorageWriter w = new OsmStorageWriter();
-		FileOutputStream fous = new FileOutputStream(new File(System.getProperty("maps.dir") + "/Netherlands_noord-holland.road.osm"));
+		FileOutputStream fous = new FileOutputStream(new File(System.getProperty("maps.dir") + "/" + name + ".osm"));
 		w.saveStorage(fous, st, null, true);
 		fous.close();
 	}
@@ -91,7 +106,9 @@ public class BaseRoadNetworkProcessor {
 		Builder builder = RoutingConfiguration.getDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
 				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit);
+		Map<String, String> map = new TreeMap<String, String>();
+		map.put("avoid_ferries", "false");
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
 		ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },RouteCalculationMode.NORMAL);
 //		if (reader.getRoutingIndexes().size() != 1) {
 //			throw new UnsupportedOperationException();
@@ -103,12 +120,52 @@ public class BaseRoadNetworkProcessor {
 //			List<RoutingSubregionTile> loadTiles = ctx.loadAllSubregionTiles(reader, s);
 //			tiles.addAll(loadTiles);
 //		}
-		RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), ctx, null);
+		
+		RouteRegion routeRegion = reader.getRoutingIndexes().get(0);
+		List<RouteSubregion> regions = reader.searchRouteIndexTree(
+				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
+						MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
+						MapUtils.get31TileNumberY(latbottom), 16, null),
+				routeRegion.getSubregions());
 		
 		BaseCluster cluster = new BaseCluster();
-		cluster.graphSegments.add(pnt);
-		buildRoadNetworks(cluster, 0);
-		return visualizeWays(cluster.toVisit.valueCollection(), cluster.visitedSegments);
+		int[] cnt = new int[1];
+		TLongObjectHashMap<RouteSegment> blockPosts = new TLongObjectHashMap<BinaryRoutePlanner.RouteSegment>();
+		reader.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
+
+			@Override
+			public boolean publish(RouteDataObject object) {
+				if (!ctx.getRouter().acceptLine(object)) {
+					return false;
+				}
+				
+				cnt[0]++;
+				if (cnt[0] < 10000) {
+					System.out.println(String.format("%d %.2f%%: %d -> %d - %d", cnt[0], cnt[0] / 1000.0f,
+							cluster.visitedSegments.size(), blockPosts.size(), object.getId() / 64));
+					RouteSegmentPoint pnt = new RouteSegmentPoint(object, 0, 0);
+					cluster.graphSegments.add(pnt);
+					buildRoadNetworks(cluster, 0);
+					blockPosts.putAll(cluster.toVisit);
+					cluster.visitedSegments.putAll(cluster.toVisit);
+					cluster.graphSegments.clear();
+					cluster.toVisit.clear();
+					
+				}
+				return false;
+			}
+
+			@Override
+			public boolean isCancelled() {
+				return false;
+			}
+			
+		});
+		
+//		RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), ctx, null);
+//		cluster.graphSegments.add(pnt);
+//		buildRoadNetworks(cluster, 0);
+		return visualizeWays(blockPosts.valueCollection(), cluster.visitedSegments);
 
 	}
 
@@ -117,14 +174,18 @@ public class BaseRoadNetworkProcessor {
 			if (!proceed(c, c.graphSegments.poll())) {
 				break;
 			}
-//			System.out.println(c.visitedSegments.size() + " -> " + c.graphSegments.size());
+			if (VERBOSE_LEVEL >= 3) {
+				System.out.println(c.visitedSegments.size() + " -> " + c.graphSegments.size());
+			}
 		}
 		mergeStraights(c);
 		if (depth + 1 < INITIAL_LOOKUP.length) {
 			mergeConnected(c, depth + 1);
 			mergeStraights(c);
 		}
- 		System.out.println(c.toVisit.size());
+		if (VERBOSE_LEVEL >= 3) {
+			System.out.println(c.toVisit.size());
+		}
 	}
 
 	private void mergeConnected(BaseCluster c, int depth) {
@@ -135,7 +196,9 @@ public class BaseRoadNetworkProcessor {
 			int originalSize = c.toVisit.size();
 			int originalToVisit = c.visitedSegments.size();
 			long id = t.getRoad().getId() / 64;
-			System.out.println(String.format(" START[%d - %d] %d -> %d ", depth, id, c.visitedSegments.size(), c.toVisit.size()));
+			if (VERBOSE_LEVEL > 2) {
+				System.out.println(String.format(" START[%d - %d] %d -> %d ", depth, id, c.visitedSegments.size(), c.toVisit.size()));
+			}
 			BaseCluster bc = new BaseCluster();
 			bc.graphSegments.add(t);
 			bc.visitedSegments.putAll(c.visitedSegments);
@@ -165,17 +228,21 @@ public class BaseRoadNetworkProcessor {
 						c.toVisit.put(k, bc.toVisit.get(k));
 					}
 				}
-				System.out.println(String.format(" MERGE[%d - %d] %d (%d) -> %d (%d) ", depth, id,
-						c.visitedSegments.size(), originalToVisit, c.toVisit.size(), originalSize));
+				if (VERBOSE_LEVEL > 2) {
+					System.out.println(String.format(" MERGE[%d - %d] %d (%d) -> %d (%d) ", depth, id,
+							c.visitedSegments.size(), originalToVisit, c.toVisit.size(), originalSize));
+				}
 			} else {
-				System.out.println(String.format(" NOMER[%d - %d] %d (%d) -> %d (%d) ", depth, id, 
-						bc.visitedSegments.size() + originalToVisit, originalToVisit, originalSize + delta, originalSize));
+				if (VERBOSE_LEVEL > 2) {
+					System.out.println(String.format(" NOMER[%d - %d] %d (%d) -> %d (%d) ", depth, id,
+							bc.visitedSegments.size() + originalToVisit, originalToVisit, originalSize + delta, originalSize));
+				}
 			}
 		}
 	}
 
-	private double coeffToMinimize(int segments, int blocks) {
-		return blocks * (blocks - 1) * 1.0 / segments;
+	private double coeffToMinimize(int internalSegments, int boundaryPoints) {
+		return boundaryPoints * (boundaryPoints - 1) / 2.0 / internalSegments;
 	}
 
 	private void mergeStraights(BaseCluster c) {
@@ -190,7 +257,7 @@ public class BaseRoadNetworkProcessor {
 					}
 				}
 			}
-			System.out.println(c.visitedSegments.size() + " -> " + c.toVisit.size());
+//			System.out.println(c.visitedSegments.size() + " -> " + c.toVisit.size());
 		}
 	}
 
