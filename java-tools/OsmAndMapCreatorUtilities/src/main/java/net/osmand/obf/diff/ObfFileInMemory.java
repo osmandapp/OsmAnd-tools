@@ -615,7 +615,7 @@ public class ObfFileInMemory {
 				@Override
 				public boolean publish(Amenity object) {
 					if(!local.containsKey(object.getId())) {
-						local.put(object.getId(), new TreeMap<String, Amenity>());
+						local.put(object.getId(), new LinkedHashMap<String, Amenity>());
 					}
 					local.get(object.getId()).put(object.getType().getKeyName(), object);
 					return false;
