@@ -330,7 +330,7 @@ public class WebGpxParser {
         if (currTrkPointInd != 0) {
             for (Point pt : trackPoints) {
                 int pointInd = trackPoints.indexOf(pt);
-                if (pointInd >= prevTrkPointInd && pointInd <= currTrkPointInd) {
+                if (pointInd >= prevTrkPointInd && pointInd < currTrkPointInd) {
                     if (routePoint.geometry == null) {
                         routePoint.geometry = new ArrayList<>();
                     }
