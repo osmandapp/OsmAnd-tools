@@ -389,7 +389,9 @@ public class WebGpxParser {
                         }
                     }
                 }
-                pointsSize += point.geometry.size();
+                if (point.geometry != null) {
+                    pointsSize += point.geometry.size();
+                }
             }
         });
     }
