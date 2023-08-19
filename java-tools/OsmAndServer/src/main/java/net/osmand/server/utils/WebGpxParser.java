@@ -379,7 +379,6 @@ public class WebGpxParser {
                                 p.speed = analysis.getSpeedData().getPointAttribute(ind + pointsSize).value;
                             }
                         }
-                        pointsSize += point.geometry.size();
                     }
                 } else {
                     int ind = track.points.indexOf(point);
@@ -390,6 +389,7 @@ public class WebGpxParser {
                         }
                     }
                 }
+                pointsSize += point.geometry.size();
             }
         });
     }
