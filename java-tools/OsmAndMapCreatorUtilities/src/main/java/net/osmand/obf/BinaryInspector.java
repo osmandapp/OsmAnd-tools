@@ -643,6 +643,7 @@ public class BinaryInspector {
 			@Override
 			public boolean publish(RouteDataObject obj) {
 				mapObjectsCounter.value++;
+				if(true) return false;
 				if (vInfo.osm) {
 					b.setLength(0);
 					printOsmRouteDetails(obj, b);

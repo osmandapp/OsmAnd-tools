@@ -1,13 +1,18 @@
 package net.osmand.router;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -15,10 +20,13 @@ import java.util.TreeMap;
 
 import javax.xml.stream.XMLStreamException;
 
+import org.apache.commons.logging.Log;
+
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
+import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
@@ -26,11 +34,13 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.router.BinaryRoutePlanner.FinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -42,6 +52,9 @@ public class BaseRoadNetworkProcessor {
 
 	private static long ID = -1;
 	private static final int ROUTE_POINTS = 11;
+	private static final Log LOG = PlatformUtil.getLog(BaseRoadNetworkProcessor.class);
+	protected static int LIMIT = -1;
+	
 	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685);
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738);
 	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803);
@@ -49,13 +62,12 @@ public class BaseRoadNetworkProcessor {
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036);
 	
 	protected static LatLon EX = EX5; 
-	
 	protected int VERBOSE_LEVEL = 1;
 	
 	private static String ROUTING_PROFILE = "car";
-	private static int[] INITIAL_LOOKUP = new int[] {7,6,5} ; //new int[] { 7, 5 };
+	private static int[] INITIAL_LOOKUP = new int[] {7,3} ; //new int[] { 7, 5 };
 	private static int MAX_BLOCKERS = 100;
-	private static float MAX_DIST = 100000;
+	private static float MAX_DIST = 10000;
 	
 	double lattop = 85;
 	double latbottom = -85;
@@ -63,6 +75,7 @@ public class BaseRoadNetworkProcessor {
 	double lonright = 179.9;	
 	
 	private RoutingContext ctx;
+	private BinaryMapIndexReader reader;
 	
 	
 	class BaseCluster {
@@ -79,13 +92,34 @@ public class BaseRoadNetworkProcessor {
 	}
 	
 	
-	public static void main(String[] args) throws IOException, XMLStreamException {
+	public static void main(String[] args) throws Exception {
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_noord-holland_europe_2.road.obf";
-		File fl = new File(System.getProperty("maps.dir") + "/" +name);
-		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-		List<Entity> objects = new BaseRoadNetworkProcessor().collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
+		File obfFile = new File(System.getProperty("maps.dir"), name);
+		
+		RandomAccessFile raf = new RandomAccessFile(obfFile, "r"); 
+		BaseRoadNetworkProcessor proc = new BaseRoadNetworkProcessor();
+		
+		boolean collectPoints = false; 
+		NetworkDB networkDB = new NetworkDB(new File(obfFile.getParentFile(), name + ".db"), collectPoints);
+		proc.prepareContext(new BinaryMapIndexReader(raf, obfFile));
+		if (collectPoints) {
+			BaseCluster cluster = proc.new BaseCluster();
+			TLongObjectHashMap<RouteSegment> networkPoints = proc.collectNetworkPoints(cluster);
+			networkDB.insertPoints(networkPoints);
+			List<Entity> objects = proc.visualizeWays(networkPoints.valueCollection(), cluster.visitedSegments);
+			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + ".osm"));
+		} else {
+			TLongObjectHashMap<NetworkPoint> pnts = networkDB.getNetworkPoints();
+			proc.buildNetworkSegments(pnts);
+		}
+		networkDB.close();
+	}
+	
+	
 
+	private static void saveOsmFile(List<Entity> objects, File file)
+			throws FileNotFoundException, XMLStreamException, IOException {
 		OsmBaseStorage st = new OsmBaseStorage();
 		for (Entity e : objects) {
 			if (e instanceof Way) {
@@ -95,40 +129,22 @@ public class BaseRoadNetworkProcessor {
 			}
 			st.registerEntity(e, null);
 		}
+		
 		OsmStorageWriter w = new OsmStorageWriter();
-		FileOutputStream fous = new FileOutputStream(new File(System.getProperty("maps.dir") + "/" + name + ".osm"));
+		FileOutputStream fous = new FileOutputStream(file);
 		w.saveStorage(fous, st, null, true);
 		fous.close();
 	}
 
-	private List<Entity> collectDisconnectedRoads(BinaryMapIndexReader reader) throws IOException {
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		Builder builder = RoutingConfiguration.getDefault();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		Map<String, String> map = new TreeMap<String, String>();
-		map.put("avoid_ferries", "false");
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
-		ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },RouteCalculationMode.NORMAL);
-//		if (reader.getRoutingIndexes().size() != 1) {
-//			throw new UnsupportedOperationException();
-//		}
-//		RouteRegion reg = reader.getRoutingIndexes().get(0);
-//		List<RouteSubregion> baseSubregions = reg.getBaseSubregions();
-//		List<RoutingSubregionTile> tiles = new ArrayList<>();
-//		for (RouteSubregion s : baseSubregions) {
-//			List<RoutingSubregionTile> loadTiles = ctx.loadAllSubregionTiles(reader, s);
-//			tiles.addAll(loadTiles);
-//		}
-		
+	private TLongObjectHashMap<RouteSegment> collectNetworkPoints(final BaseCluster cluster) throws IOException {
+		if (reader.getRoutingIndexes().size() != 1) {
+			throw new UnsupportedOperationException();
+		}		
 		RouteRegion routeRegion = reader.getRoutingIndexes().get(0);
 		List<RouteSubregion> regions = reader.searchRouteIndexTree(
 				BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
 						MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
-						MapUtils.get31TileNumberY(latbottom), 16, null),
-				routeRegion.getSubregions());
-		
-		BaseCluster cluster = new BaseCluster();
+						MapUtils.get31TileNumberY(latbottom), 16, null),routeRegion.getSubregions());
 		int[] cnt = new int[1];
 		TLongObjectHashMap<RouteSegment> blockPosts = new TLongObjectHashMap<BinaryRoutePlanner.RouteSegment>();
 		reader.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
@@ -140,7 +156,7 @@ public class BaseRoadNetworkProcessor {
 				}
 				
 				cnt[0]++;
-				if (cnt[0] < 10000) {
+				if (LIMIT == -1 || cnt[0] < LIMIT) {
 					System.out.println(String.format("%d %.2f%%: %d -> %d - %d", cnt[0], cnt[0] / 1000.0f,
 							cluster.visitedSegments.size(), blockPosts.size(), object.getId() / 64));
 					RouteSegmentPoint pnt = new RouteSegmentPoint(object, 0, 0);
@@ -150,7 +166,8 @@ public class BaseRoadNetworkProcessor {
 					cluster.visitedSegments.putAll(cluster.toVisit);
 					cluster.graphSegments.clear();
 					cluster.toVisit.clear();
-					
+				} else {
+					System.out.println(cnt[0]);
 				}
 				return false;
 			}
@@ -165,8 +182,26 @@ public class BaseRoadNetworkProcessor {
 //		RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), ctx, null);
 //		cluster.graphSegments.add(pnt);
 //		buildRoadNetworks(cluster, 0);
-		return visualizeWays(blockPosts.valueCollection(), cluster.visitedSegments);
+		return blockPosts;
 
+	}
+
+
+
+
+
+	private void prepareContext(BinaryMapIndexReader reader) {
+		this.reader = reader;
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		Builder builder = RoutingConfiguration.getDefault();
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
+				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		Map<String, String> map = new TreeMap<String, String>();
+		map.put("avoid_ferries", "true");
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
+		config.planRoadDirection = 1;
+		config.heuristicCoefficient = 0; // dijkstra
+		ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },RouteCalculationMode.NORMAL);
 	}
 
 	private void buildRoadNetworks(BaseCluster c, int depth) {
@@ -284,45 +319,62 @@ public class BaseRoadNetworkProcessor {
 		return cnt;
 	}
 
-	private List<Entity> visualizeWays(Collection<RouteSegment> toVisit, TLongObjectHashMap<RouteSegment> visitedSegments) {
-		TLongSet viewed = new TLongHashSet();
+	private List<Entity> visualizeWays(Collection<RouteSegment> networkVertexes, TLongObjectHashMap<RouteSegment> visitedSegments) {
 		List<Entity> objs = new ArrayList<>();
-		TLongObjectIterator<RouteSegment> it = visitedSegments.iterator();
-		while (it.hasNext()) {
-			it.advance();
-			long pntKey = it.key();
-			if (!viewed.contains(pntKey)) {
-				RouteSegment s = it.value();
-				int d = (s.getSegmentStart() < s.getSegmentEnd() ? 1 : -1);
-				int segmentEnd = s.getSegmentEnd();
-				viewed.add(pntKey);
-				while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
-					RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
-					pntKey = calculateRoutePointId(nxt);
-					if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
-						break;
+		if (visitedSegments != null) {
+			TLongSet viewed = new TLongHashSet();
+			TLongObjectIterator<RouteSegment> it = visitedSegments.iterator();
+			while (it.hasNext()) {
+				it.advance();
+				long pntKey = it.key();
+				if (!viewed.contains(pntKey)) {
+					RouteSegment s = it.value();
+					if (s == null) {
+						continue;
 					}
+					int d = (s.getSegmentStart() < s.getSegmentEnd() ? 1 : -1);
+					int segmentEnd = s.getSegmentEnd();
 					viewed.add(pntKey);
-					segmentEnd +=d;
+					while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
+						RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
+						pntKey = calculateRoutePointId(nxt);
+						if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
+							break;
+						}
+						viewed.add(pntKey);
+						segmentEnd += d;
+					}
+					Way w = convertRoad(s.getRoad(), s.getSegmentStart(), segmentEnd);
+					objs.add(w);
 				}
-				Way w = convertRoad(s.getRoad(), s.getSegmentStart(), segmentEnd);
-				objs.add(w);
+//				it.remove();
 			}
-			it.remove();
 		}
-		for (RouteSegment r : toVisit) {
-			int x1 = r.getRoad().getPoint31XTile(r.getSegmentStart());
-			int x2 = r.getRoad().getPoint31XTile(r.getSegmentEnd());
-			int y1 = r.getRoad().getPoint31YTile(r.getSegmentStart());
-			int y2 = r.getRoad().getPoint31YTile(r.getSegmentEnd());
-			double lon = MapUtils.get31LongitudeX(x1 / 2 + x2 / 2);
-			double lat = MapUtils.get31LatitudeY(y1 / 2 + y2 / 2);
-			Node n = new Node(lat, lon, ID--);
-			n.putTag("highway", "stop");
-			n.putTag("name", r.getRoad().getId() / 64 + " " + r.getSegmentStart() + " " + r.getSegmentEnd());
-			objs.add(n);
+		if (networkVertexes != null) {
+			for (RouteSegment r : networkVertexes) {
+				LatLon l = getPoint(r); 
+				Node n = new Node(l.getLatitude(), l.getLongitude(), ID--);
+				n.putTag("highway", "stop");
+				n.putTag("name", r.getRoad().getId() / 64 + " " + r.getSegmentStart() + " " + r.getSegmentEnd());
+				objs.add(n);
+			}
 		}
 		return objs;
+	}
+
+
+
+
+
+	private static LatLon getPoint(RouteSegment r) {
+		int x1 = r.getRoad().getPoint31XTile(r.getSegmentStart());
+		int x2 = r.getRoad().getPoint31XTile(r.getSegmentEnd());
+		int y1 = r.getRoad().getPoint31YTile(r.getSegmentStart());
+		int y2 = r.getRoad().getPoint31YTile(r.getSegmentEnd());
+		double lon = MapUtils.get31LongitudeX(x1 / 2 + x2 / 2);
+		double lat = MapUtils.get31LatitudeY(y1 / 2 + y2 / 2);
+		LatLon l = new LatLon(lat, lon);
+		return l;
 	}
 
 	private Way convertRoad(RouteDataObject road, int st, int end) {
@@ -357,7 +409,7 @@ public class BaseRoadNetworkProcessor {
 		if (c.visitedSegments.containsKey(pntId)) {
 			return true;
 		}
-		c.visitedSegments.put(calculateRoutePointId(segment), segment);
+		c.visitedSegments.put(calculateRoutePointId(segment), null); // segment
 		int prevX = segment.getRoad().getPoint31XTile(segment.getSegmentStart());
 		int prevY = segment.getRoad().getPoint31YTile(segment.getSegmentStart());
 		int x = segment.getRoad().getPoint31XTile(segment.getSegmentEnd());
@@ -394,22 +446,200 @@ public class BaseRoadNetworkProcessor {
 	}
 
 
-	private long calculateRoutePointInternalId(final RouteDataObject road, int pntId, int nextPntId) {
+	private static long calculateRoutePointInternalId(final RouteDataObject road, int pntId, int nextPntId) {
 		int positive = nextPntId - pntId;
 		int pntLen = road.getPointsLength();
-		if (pntId < 0 || nextPntId < 0 || pntId >= pntLen || nextPntId >= pntLen || (positive != -1 && positive != 1)) {
+		if (pntId < 0 || nextPntId < 0 || pntId >= pntLen || nextPntId >= pntLen || (positive != -1 && positive != 1) ||
+				pntLen > (1 << ROUTE_POINTS)) {
 			// should be assert
 			throw new IllegalStateException("Assert failed");
 		}
 		return (road.getId() << ROUTE_POINTS) + (pntId << 1) + (positive > 0 ? 1 : 0);
 	}
+	
+	private static long calculateRoutePointInternalId(long id, int pntId, int nextPntId) {
+		int positive = nextPntId - pntId;
+		return (id << ROUTE_POINTS) + (pntId << 1) + (positive > 0 ? 1 : 0);
+	}
 
-	private long calculateRoutePointId(RouteSegment segm) {
+	private static long calculateRoutePointId(RouteSegment segm) {
 		if (segm.getSegmentStart() < segm.getSegmentEnd()) {
 			return calculateRoutePointInternalId(segm.getRoad(), segm.getSegmentStart(), segm.getSegmentEnd());
 		} else {
 			return calculateRoutePointInternalId(segm.getRoad(), segm.getSegmentEnd(), segm.getSegmentStart());
 		}
 	}
+	
+	
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	
+	private static class NetworkPoint {
+		long id;
+		public long roadId;
+		public int start;
+		public int end;
+		public int startX;
+		public int startY;
+	}
+	private static class NetworkDB {
+
+		private Connection conn;
+		private static int BATCH = 1000;
+
+		public NetworkDB(File file, boolean recreate) throws SQLException {
+			if (file.exists() && recreate) {
+				file.delete();
+			}
+			this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
+			if (recreate) {
+				Statement st = conn.createStatement();
+				st.execute("CREATE TABLE points(idPoint, roadId, start, end, x31, y31, lat, lon)");
+				st.close();
+			}
+		}
+		
+		public TLongObjectHashMap<NetworkPoint> getNetworkPoints() throws SQLException {
+			Statement st = conn.createStatement();
+			ResultSet rs = st.executeQuery("SELECT idPoint, roadId, start, end, x31, y31 from points");
+			TLongObjectHashMap<NetworkPoint> mp = new TLongObjectHashMap<>();
+			while (rs.next()) {
+				NetworkPoint pnt = new NetworkPoint();
+				pnt.id = rs.getLong(1);
+				pnt.roadId = rs.getLong(2);
+				pnt.start = rs.getInt(3);
+				pnt.end = rs.getInt(4);
+				pnt.startX = rs.getInt(5);
+				pnt.startY = rs.getInt(6);
+				mp.put(pnt.id, pnt);
+			}
+			rs.close();
+			st.close();
+			return mp;
+		}
+
+		public void insertPoints(TLongObjectHashMap<RouteSegment> networkPoints) throws SQLException {
+			PreparedStatement s = conn.prepareStatement("INSERT INTO points(idPoint, roadId, start, end, x31, y31, lat, lon) "
+					+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
+			int ind = 0;
+			TLongObjectIterator<RouteSegment> it = networkPoints.iterator();
+			while (it.hasNext()) {
+				it.advance();
+				int p= 1;
+				s.setLong(p++, it.key());
+				RouteSegment obj = it.value();
+				LatLon pnt = getPoint(obj);
+				s.setLong(p++, obj.getRoad().getId());
+				s.setLong(p++, obj.getSegmentStart());
+				s.setLong(p++, obj.getSegmentEnd());
+				s.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
+				s.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
+				s.setDouble(p++, pnt.getLatitude());
+				s.setDouble(p++, pnt.getLongitude());
+				s.addBatch();
+				if (ind++ > BATCH) {
+					s.executeBatch();
+					ind = 0;
+				}
+			}
+			s.executeBatch();
+			s.close();
+		}
+
+		public void close() throws SQLException {
+			conn.close();
+		}
+
+	}
+	
+	private void buildNetworkSegments(TLongObjectHashMap<NetworkPoint> pnts) throws InterruptedException, IOException {
+		double sz = pnts.size() / 100.0;
+		int ind = 0;
+		long tm = System.currentTimeMillis();
+		TLongObjectHashMap<RouteSegment> segments = new  TLongObjectHashMap<>(); 
+		for (NetworkPoint pnt : pnts.valueCollection()) {
+			segments.put(pnt.id, new RouteSegment(null, pnt.start, pnt.end));
+			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start), new RouteSegment(null, pnt.end, pnt.start));
+		}
+		for (NetworkPoint pnt : pnts.valueCollection()) {
+			long nt = System.nanoTime();
+			RouteSegment s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
+			while (s != null && s.getRoad().getId() != pnt.roadId && s.getSegmentStart() != pnt.start
+					&& s.getSegmentEnd() != pnt.end) {
+				s = s.getNext();
+			}
+			if (s == null) {
+				System.err.println("Error on segment " + pnt.roadId / 64);
+				continue;
+			}
+			RouteSegment rm = segments.remove(pnt.id);
+			runDijsktra(s, segments);
+			segments.put(pnt.id, rm);
+			double timeLeft = (System.currentTimeMillis() - tm) / 1000.0 * (pnts.size() / (ind + 1) - 1);
+			System.out
+					.println(String.format("%.2f%% Process %d  - %.1f ms left %.1f sec", ind++ / sz, s.getRoad().getId() / 64, (System.nanoTime() - nt) / 1.0e6, timeLeft));
+			if (ind > 3) {
+				break;
+			}
+		}
+		System.out.println(pnts.size());
+	}
+
+
+
+	private void runDijsktra(RouteSegment s, TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
+		BinaryRoutePlanner brp = new BinaryRoutePlanner();
+		ctx.calculationProgress = new RouteCalculationProgress();
+		FinalRouteSegment frs = brp.searchRouteInternal(ctx, new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), 0), null, null, 
+				segments);
+		System.out.println(ctx.calculationProgress.getInfo(null));
+		System.out.println(frs + " " + frs.getSegmentStart());
+		RouteSegment ex = segments.get(calculateRoutePointId(frs));
+//		int ind = segment.getSegmentStart();
+//		RouteDataObject road = segment.getRoad();
+//		long pid = calculateRoutePointId(s);
+//		final long pid = calcPointIdUnique(segment.getRoad(), ind);
+//		if(visited.contains(pid)) {
+//			return null;
+//		}
+//		visited.add(pid);
+//		double distFromStart = segment.getDistanceFromStart();
+//		while (true) {
+//			int py = road.getPoint31YTile(ind);
+//			int px = road.getPoint31XTile(ind);
+//			if (direction) {
+//				ind++;
+//			} else {
+//				ind--;
+//			}
+//			if (ind < 0 || ind >= segment.getRoad().getPointsLength()) {
+//				break;
+//			}
+//			
+//			visited.add(calcPointIdUnique(segment.getRoad(), ind));
+//			int x = road.getPoint31XTile(ind);
+//			int y = road.getPoint31YTile(ind);
+//			float spd = ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
+//			if (spd > ctx.getRouter().getMaxSpeed()) {
+//				spd = ctx.getRouter().getMaxSpeed();
+//			}
+//			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) / spd;
+//			RouteSegment rs = ctx.loadRouteSegment(x, y, 0);
+//			while (rs != null) {
+//				if (!visited.contains(calcPointIdUnique(rs.getRoad(), rs.getSegmentStart()))) {
+//					if (!queue.contains(rs) || rs.getDistanceFromStart() > distFromStart) {
+//						rs.setDistanceFromStart((float) distFromStart);
+//						rs.setParentRoute(segment);
+//						queue.remove(rs);
+//						queue.add(rs);
+//					}
+//				}
+//				rs = rs.getNext();
+//			}
+//		}
+		
+	}	
+	
+	
+	
 
 }
