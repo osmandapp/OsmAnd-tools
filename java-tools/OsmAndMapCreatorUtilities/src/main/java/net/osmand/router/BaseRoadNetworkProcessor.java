@@ -560,6 +560,10 @@ public class BaseRoadNetworkProcessor {
 			segments.put(pnt.id, new RouteSegment(null, pnt.start, pnt.end));
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start), new RouteSegment(null, pnt.end, pnt.start));
 		}
+		int maxDirectedPointsGraph = 0;
+		int maxFinalSegmentsFound = 0;
+		int totalFinalSegmentsFound = 0;
+		int totalVisitedDirectSegments = 0;
 		for (NetworkPoint pnt : pnts.valueCollection()) {
 			long nt = System.nanoTime();
 			RouteSegment s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
@@ -571,71 +575,42 @@ public class BaseRoadNetworkProcessor {
 				System.err.println("Error on segment " + pnt.roadId / 64);
 				continue;
 			}
-			RouteSegment rm = segments.remove(pnt.id);
+			long pnt1 = calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start);
+			long pnt2 = calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end);
+			RouteSegment rm1 = segments.remove(pnt1);
+			RouteSegment rm2 = segments.remove(pnt2);
 			runDijsktra(s, segments);
-			segments.put(pnt.id, rm);
+			if (rm1 != null) {
+				segments.put(pnt1, rm1);
+			}
+			if (rm2 != null) {
+				segments.put(pnt2, rm2);
+			}
+			maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph, ctx.calculationProgress.visitedDirectSegments);
+			totalVisitedDirectSegments += ctx.calculationProgress.visitedDirectSegments;
+			maxFinalSegmentsFound = Math.max(maxFinalSegmentsFound, ctx.calculationProgress.finalSegmentsFound);
+			totalFinalSegmentsFound += ctx.calculationProgress.finalSegmentsFound;
+			
 			double timeLeft = (System.currentTimeMillis() - tm) / 1000.0 * (pnts.size() / (ind + 1) - 1);
 			System.out
 					.println(String.format("%.2f%% Process %d  - %.1f ms left %.1f sec", ind++ / sz, s.getRoad().getId() / 64, (System.nanoTime() - nt) / 1.0e6, timeLeft));
-			if (ind > 3) {
+			if (ind > 100000) {
 				break;
 			}
 		}
-		System.out.println(pnts.size());
+		System.out.println(String.format("Total segments %d: max sub graph %d, avg sub graph %d, max shortcuts %d, average shortcuts %d", 
+				segments.size(), maxDirectedPointsGraph, totalVisitedDirectSegments  / ind, maxFinalSegmentsFound, totalFinalSegmentsFound / ind));
 	}
 
 
 
 	private void runDijsktra(RouteSegment s, TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
 		BinaryRoutePlanner brp = new BinaryRoutePlanner();
+//		ctx.unloadAllData();
 		ctx.calculationProgress = new RouteCalculationProgress();
-		FinalRouteSegment frs = brp.searchRouteInternal(ctx, new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), 0), null, null, 
+		brp.searchRouteInternal(ctx, new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), 0), null, null, 
 				segments);
 		System.out.println(ctx.calculationProgress.getInfo(null));
-		System.out.println(frs + " " + frs.getSegmentStart());
-		RouteSegment ex = segments.get(calculateRoutePointId(frs));
-//		int ind = segment.getSegmentStart();
-//		RouteDataObject road = segment.getRoad();
-//		long pid = calculateRoutePointId(s);
-//		final long pid = calcPointIdUnique(segment.getRoad(), ind);
-//		if(visited.contains(pid)) {
-//			return null;
-//		}
-//		visited.add(pid);
-//		double distFromStart = segment.getDistanceFromStart();
-//		while (true) {
-//			int py = road.getPoint31YTile(ind);
-//			int px = road.getPoint31XTile(ind);
-//			if (direction) {
-//				ind++;
-//			} else {
-//				ind--;
-//			}
-//			if (ind < 0 || ind >= segment.getRoad().getPointsLength()) {
-//				break;
-//			}
-//			
-//			visited.add(calcPointIdUnique(segment.getRoad(), ind));
-//			int x = road.getPoint31XTile(ind);
-//			int y = road.getPoint31YTile(ind);
-//			float spd = ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
-//			if (spd > ctx.getRouter().getMaxSpeed()) {
-//				spd = ctx.getRouter().getMaxSpeed();
-//			}
-//			distFromStart += MapUtils.squareDist31TileMetric(px, py, x, y) / spd;
-//			RouteSegment rs = ctx.loadRouteSegment(x, y, 0);
-//			while (rs != null) {
-//				if (!visited.contains(calcPointIdUnique(rs.getRoad(), rs.getSegmentStart()))) {
-//					if (!queue.contains(rs) || rs.getDistanceFromStart() > distFromStart) {
-//						rs.setDistanceFromStart((float) distFromStart);
-//						rs.setParentRoute(segment);
-//						queue.remove(rs);
-//						queue.add(rs);
-//					}
-//				}
-//				rs = rs.getNext();
-//			}
-//		}
 		
 	}	
 	
