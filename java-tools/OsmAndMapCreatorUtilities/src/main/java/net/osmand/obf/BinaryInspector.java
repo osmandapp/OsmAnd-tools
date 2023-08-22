@@ -643,7 +643,7 @@ public class BinaryInspector {
 			@Override
 			public boolean publish(RouteDataObject obj) {
 				mapObjectsCounter.value++;
-				if(true) return false;
+				mapObjectsCounter.pntValue += obj.getPointsLength();
 				if (vInfo.osm) {
 					b.setLength(0);
 					printOsmRouteDetails(obj, b);
@@ -733,7 +733,7 @@ public class BinaryInspector {
 				return false;
 			}
 		});
-		println("\tTotal map objects: " + mapObjectsCounter.value);
+		println("\tTotal map objects: " + mapObjectsCounter.value + " points " + mapObjectsCounter.pntValue);
 		if (vInfo.osm) {
 			printToFile("</osm >\n");
 		}
@@ -811,6 +811,7 @@ public class BinaryInspector {
 
 	private static class DamnCounter {
 		int value;
+		int pntValue;
 	}
 
 	private static class MapStatKey {
@@ -980,6 +981,7 @@ public class BinaryInspector {
 					@Override
 					public boolean publish(BinaryMapDataObject obj) {
 						mapObjectsCounter.value++;
+						mapObjectsCounter.pntValue += obj.getPointsLength();
 						if (vInfo.isVStats()) {
 							mapObjectStats.process(obj);
 						} else if (vInfo.vmapObjects) {

@@ -41,6 +41,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.router.BinaryRoutePlanner.FinalRouteSegment;
+import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -111,7 +112,8 @@ public class BaseRoadNetworkProcessor {
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + ".osm"));
 		} else {
 			TLongObjectHashMap<NetworkPoint> pnts = networkDB.getNetworkPoints();
-			proc.buildNetworkSegments(pnts);
+			List<Entity> objects = proc.buildNetworkSegments(pnts);
+			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-hh.osm"));
 		}
 		networkDB.close();
 	}
@@ -551,7 +553,7 @@ public class BaseRoadNetworkProcessor {
 
 	}
 	
-	private void buildNetworkSegments(TLongObjectHashMap<NetworkPoint> pnts) throws InterruptedException, IOException {
+	private List<Entity> buildNetworkSegments(TLongObjectHashMap<NetworkPoint> pnts) throws InterruptedException, IOException {
 		double sz = pnts.size() / 100.0;
 		int ind = 0;
 		long tm = System.currentTimeMillis();
@@ -560,6 +562,7 @@ public class BaseRoadNetworkProcessor {
 			segments.put(pnt.id, new RouteSegment(null, pnt.start, pnt.end));
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start), new RouteSegment(null, pnt.end, pnt.start));
 		}
+		List<Entity> osmObjects = new ArrayList<Entity>();
 		int maxDirectedPointsGraph = 0;
 		int maxFinalSegmentsFound = 0;
 		int totalFinalSegmentsFound = 0;
@@ -579,7 +582,7 @@ public class BaseRoadNetworkProcessor {
 			long pnt2 = calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end);
 			RouteSegment rm1 = segments.remove(pnt1);
 			RouteSegment rm2 = segments.remove(pnt2);
-			runDijsktra(s, segments);
+			runDijsktra(osmObjects, s, segments);
 			if (rm1 != null) {
 				segments.put(pnt1, rm1);
 			}
@@ -592,26 +595,54 @@ public class BaseRoadNetworkProcessor {
 			totalFinalSegmentsFound += ctx.calculationProgress.finalSegmentsFound;
 			
 			double timeLeft = (System.currentTimeMillis() - tm) / 1000.0 * (pnts.size() / (ind + 1) - 1);
-			System.out
-					.println(String.format("%.2f%% Process %d  - %.1f ms left %.1f sec", ind++ / sz, s.getRoad().getId() / 64, (System.nanoTime() - nt) / 1.0e6, timeLeft));
+			System.out.println(String.format("%.2f%% Process %d  - %.1f ms left %.1f sec",
+							ind++ / sz, s.getRoad().getId() / 64, (System.nanoTime() - nt) / 1.0e6, timeLeft));
 			if (ind > 100000) {
 				break;
 			}
 		}
 		System.out.println(String.format("Total segments %d: max sub graph %d, avg sub graph %d, max shortcuts %d, average shortcuts %d", 
 				segments.size(), maxDirectedPointsGraph, totalVisitedDirectSegments  / ind, maxFinalSegmentsFound, totalFinalSegmentsFound / ind));
+		return osmObjects;
 	}
 
 
 
-	private void runDijsktra(RouteSegment s, TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
+	private void runDijsktra(List<Entity> osmObjects, RouteSegment s, TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
 		BinaryRoutePlanner brp = new BinaryRoutePlanner();
-//		ctx.unloadAllData();
+		ctx.unloadAllData();
 		ctx.calculationProgress = new RouteCalculationProgress();
-		brp.searchRouteInternal(ctx, new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), 0), null, null, 
+		
+		LatLon l = getPoint(s); 
+		Node n = new Node(l.getLatitude(), l.getLongitude(), ID--);
+		n.putTag("highway", "stop");
+		n.putTag("name", s.getRoad().getId() / 64 + " " + s.getSegmentStart() + " " + s.getSegmentEnd());
+		osmObjects.add(n);
+		ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart());
+		ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart());
+		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) brp.searchRouteInternal(ctx, new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), 0), null, null, 
 				segments);
+		if (frs != null) {
+			System.out.println(frs.others.size() + 1 + " --- ");
+			addW(osmObjects, frs, l);
+			for (RouteSegment o : frs.others) {
+				addW(osmObjects, o, l);
+			}
+		}
 		System.out.println(ctx.calculationProgress.getInfo(null));
 		
+	}
+
+
+
+	private void addW(List<Entity> osmObjects, RouteSegment s, LatLon l) {
+		Way w = new Way(ID--);
+		w.putTag("highway", "secondary");
+		w.addNode(new Node(l.getLatitude(), l.getLongitude(), ID--));
+		LatLon m = getPoint(s);
+		w.addNode(new Node(m.getLatitude(), m.getLongitude(), ID--));
+		w.putTag("oid", (s.getRoad().getId() / 64) + "");
+		osmObjects.add(w);
 	}	
 	
 	
