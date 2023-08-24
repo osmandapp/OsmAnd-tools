@@ -89,6 +89,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private MapRoutingTypes routeTypes;
 	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 
+	private TLongArrayList nodePropagatedIds = new TLongArrayList();
+	private Map<Long, Map<String, String>> nodePropagatedTags = new HashMap<>();
+	private final List<String> WATERWAY_RESTRICTION = List.of("weir", "dam");
+
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
 	
 	// flipped quad tree cause bottom > top
@@ -268,6 +272,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			if (encoded) {
 				// Load point with tags!
 				ctx.loadEntityWay(e);
+				propagateRestrictionNodeTags(e.getNodes());
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
@@ -1222,6 +1227,34 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			ay.addAll(by);
 			gw.px = ax;
 			gw.py = ay;
+		}
+	}
+
+	public void registerRestrictionNodes(Entity entity) {
+		if (entity instanceof Way) {
+			String waterway = entity.getTag("waterway");
+			if (waterway != null && WATERWAY_RESTRICTION.contains(waterway)) {
+				Way w = (Way) entity;
+				TLongArrayList ids = w.getNodeIds();
+				nodePropagatedIds.addAll(ids);
+				for (long id : ids.toArray()) {
+					nodePropagatedTags.put(id, w.getTags());
+				}
+			}
+		}
+	}
+
+	private void propagateRestrictionNodeTags (List<Node> nodes) {
+		for (Node n : nodes) {
+			long nodeId = n.getId() >> OsmDbCreator.SHIFT_ID;
+			if (nodePropagatedIds.contains(nodeId)) {
+				Map<String, String> tags = nodePropagatedTags.get(nodeId);
+				for (Map.Entry<String, String> entry : tags.entrySet()) {
+					if (n.getTag(entry.getKey()) == null) {
+						n.putTag(entry.getKey(), entry.getValue());
+					}
+				}
+			}
 		}
 	}
 
