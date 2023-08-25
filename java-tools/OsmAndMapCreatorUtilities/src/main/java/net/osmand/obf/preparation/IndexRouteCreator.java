@@ -1245,6 +1245,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	private void propagateRestrictionNodeTags (List<Node> nodes) {
+		if (nodePropagatedIds.size() == 0) {
+			return;
+		}
 		for (Node n : nodes) {
 			long nodeId = n.getId() >> OsmDbCreator.SHIFT_ID;
 			if (nodePropagatedIds.contains(nodeId)) {
