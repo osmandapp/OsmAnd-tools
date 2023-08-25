@@ -53,9 +53,9 @@ public class BaseRoadNetworkProcessor {
 	private static long ID = -1;
 	private static final int ROUTE_POINTS = 11;
 	private static final Log LOG = PlatformUtil.getLog(BaseRoadNetworkProcessor.class);
-	private static final boolean ALL_VERTICIES = true;
+	private static final boolean ALL_VERTICES = false;
 	protected static int LIMIT_START = 100;//100
-	protected static int LIMIT = 150;
+	protected static int LIMIT = -1;
 	
 	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685);
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738);
@@ -64,7 +64,7 @@ public class BaseRoadNetworkProcessor {
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036);
 	
 	protected static LatLon EX = null; // for all - null; otherwise specific point 
-	protected int VERBOSE_LEVEL = 1;
+	protected int VERBOSE_LEVEL = 0;
 	
 	private static String ROUTING_PROFILE = "car";
 	private static int[] INITIAL_LOOKUP = new int[] {7,6,5,4} ; //new int[] { 7, 5,3 };
@@ -107,24 +107,17 @@ public class BaseRoadNetworkProcessor {
 			return this;
 		}
 		
-				
-		public RouteSegment testIfNetworkPoint(long pntId) {
+		public boolean testIfNetworkPoint(long pntId) {
 			if (existingNetworkPoints.contains(pntId)) {
-				return existingNetworkPoints.get(pntId);
+				return true;
 			}
 			if (parent != null) {
 				return parent.testIfNetworkPoint(pntId);
 			}
-			return null;
+			return false;
 		}
 		
 		public boolean testIfVisited(long pntId, boolean checkToVisit) {
-			if (markAsReached) {
-				RouteSegment segment = testIfNetworkPoint(pntId);
-				if (segment != null) {
-					reachedNetworkPoints.put(pntId, segment);
-				}
-			}
 			if (visitedVertices.containsKey(pntId)) {
 				return true;
 			}
@@ -132,7 +125,7 @@ public class BaseRoadNetworkProcessor {
 				return true;
 			}
 			if (parent != null) {
-				return parent.testIfVisited(pntId, checkToVisit, false);
+				return parent.testIfVisited(pntId, checkToVisit);
 			}
 			return false;
 		}
@@ -249,7 +242,6 @@ public class BaseRoadNetworkProcessor {
 				if(cnt[0] < LIMIT_START || isCancelled()) {
 					System.out.println("SKIP PROCESS " + cnt[0]);
 				} else {
-					cluster.reachedNetworkPoints.clear();
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, 0, 0);
 					buildRoadNetworkIsland(cluster.addSegmentToQueue(pntAround), 0);
 					for (long pntKey : cluster.toVisitVertices.keys()) {
@@ -259,15 +251,8 @@ public class BaseRoadNetworkProcessor {
 								addNetworkPointConnection(networkPointsConnections, pntKey,
 										cluster.toVisitVertices.get(pntKeyConn));
 						}
-						for (long pntKeyConn : cluster.reachedNetworkPoints.keys()) {
-							if (pntKeyConn != pntKey)
-								addNetworkPointConnection(networkPointsConnections, pntKey,
-										cluster.reachedNetworkPoints.get(pntKeyConn));
-						}
-						
 					}
 					cluster.fixToVisitVerticesAsNetworkPoints();
-					
 					System.out.println(String.format("%d %.2f%%: %d -> %d - %d", cnt[0], cnt[0] / 1000.0f,
 							cluster.visitedVerticesSize(), networkPoints.size(), object.getId() / 64));
 				}
@@ -356,10 +341,9 @@ public class BaseRoadNetworkProcessor {
 			}
 			// it could only increase by 1 (1->2)
 			if ((incPointsAfterMerge <= 2 || coeffToMinimize(c.visitedVerticesSize(),
-					parentToVisit) > coeffToMinimize(bc.visitedVerticesSize(), parentToVisit + incPointsAfterMerge))) {
+					parentToVisit) > coeffToMinimize(bc.visitedVerticesSize(), parentToVisit + incPointsAfterMerge) - 0.8)) {
 				int sz = c.visitedVerticesSize();
 				c.visitedVertices.putAll(bc.visitedVertices);
-				c.reachedNetworkPoints.putAll(bc.reachedNetworkPoints);
 				for (long l : bc.visitedVertices.keys()) {
 					c.toVisitVertices.remove(l);
 				}
@@ -368,7 +352,7 @@ public class BaseRoadNetworkProcessor {
 						c.toVisitVertices.put(k, bc.toVisitVertices.get(k));
 					}
 				}
-				c.printCurentState(incPointsAfterMerge == 0 ? " IGNORE": " MERGED", 2, String.format(" - before %d -> %d", sz, parentToVisit));
+				c.printCurentState(incPointsAfterMerge == 0 ? "IGNORE": " MERGED", 2, String.format(" - before %d -> %d", sz, parentToVisit));
 			} else {
 				c.printCurentState(" NOMERGE", 3, String.format(" - %d -> %d", bc.visitedVerticesSize(),
 						parentToVisit + incPointsAfterMerge));
@@ -385,7 +369,7 @@ public class BaseRoadNetworkProcessor {
 		while (foundStraights && !c.toVisitVertices.isEmpty() && c.toVisitVertices.size() < MAX_BLOCKERS) {
 			foundStraights = false;
 			for (RouteSegment segment : c.toVisitVertices.valueCollection()) {
-				if (nonVisitedSegmentsLess(c, segment, 1)) {
+				if (!c.testIfNetworkPoint(calculateRoutePointId(segment)) && nonVisitedSegmentsLess(c, segment, 1)) {
 					if (proceed(c, segment, queue)) {
 						foundStraights = true;
 						break;
@@ -411,7 +395,7 @@ public class BaseRoadNetworkProcessor {
 		RouteSegment next = ctx.loadRouteSegment(x, y, 0);
 		int cnt = 0;
 		while (next != null) {
-			if (!c.testIfVisited(calculateRoutePointId(next), true, false)) {
+			if (!c.testIfVisited(calculateRoutePointId(next), true)) {
 				cnt++;
 			}
 			next = next.getNext();
@@ -525,15 +509,15 @@ public class BaseRoadNetworkProcessor {
 			return false;
 		}
 		long pntId = calculateRoutePointId(segment);
-		if (c.existingNetworkPoints.containsKey(pntId)) {
+		if (c.testIfNetworkPoint(pntId)) {
 			return true;
 		}
 		c.toVisitVertices.remove(pntId);
-		if (c.testIfVisited(pntId, false, true)) {
-			throw new IllegalStateException();
-//			return true;
+		if (c.testIfVisited(pntId, false)) {
+//			throw new IllegalStateException(); // TODO
+			return true;
 		}
-		c.visitedVertices.put(calculateRoutePointId(segment),  ALL_VERTICIES ? segment : null);
+		c.visitedVertices.put(calculateRoutePointId(segment),  ALL_VERTICES ? segment : null);
 		int prevX = segment.getRoad().getPoint31XTile(segment.getSegmentStart());
 		int prevY = segment.getRoad().getPoint31YTile(segment.getSegmentStart());
 		int x = segment.getRoad().getPoint31XTile(segment.getSegmentEnd());
@@ -553,7 +537,7 @@ public class BaseRoadNetworkProcessor {
 		RouteSegment next = ctx.loadRouteSegment(x, y, 0);
 		while (next != null) {
 			// next.distanceFromStart == 0
-			if (!c.testIfVisited(calculateRoutePointId(next), true, true)) {
+			if (!c.testIfVisited(calculateRoutePointId(next), true)) {
 				next.distanceFromStart = distFromStart;
 				if (queue != null) {
 					queue.add(next);
@@ -561,7 +545,7 @@ public class BaseRoadNetworkProcessor {
 				c.toVisitVertices.put(calculateRoutePointId(next), next);
 			}
 			RouteSegment opp = next.initRouteSegment(!next.isPositive());
-			if (opp != null && !c.testIfVisited(calculateRoutePointId(opp), true, true)) {
+			if (opp != null && !c.testIfVisited(calculateRoutePointId(opp), true)) {
 				opp.distanceFromStart = distFromStart;
 				if (queue != null) {
 					queue.add(opp);
