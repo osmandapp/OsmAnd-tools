@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -689,8 +690,7 @@ public class BaseRoadNetworkProcessor {
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
 			segments.put(pnt.id, new RouteSegment(null, pnt.start, pnt.end));
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start), new RouteSegment(null, pnt.end, pnt.start));
-			
-			addNode(osmObjects, pnt, "highway", "stop");
+			addNode(osmObjects, pnt, null, "highway", "stop");
 		}
 		int maxDirectedPointsGraph = 0;
 		int maxFinalSegmentsFound = 0;
@@ -707,10 +707,10 @@ public class BaseRoadNetworkProcessor {
 				System.err.println("Error on segment " + pnt.roadId / 64);
 				continue;
 			}
-			addNode(osmObjects, pnt, "place", "city");
+			
+			addNode(osmObjects, pnt, getPoint(s), "place", "city");
 			
 			List<RouteSegment> res = runDijsktra(s, segments);
-//			System.out.println(" - " + Arrays.toString(pnt.indexes) + " " + s);
 			for (RouteSegment t : res) {
 				NetworkDBSegment segment = new NetworkDBSegment();
 				segment.start = pnt;
@@ -721,12 +721,13 @@ public class BaseRoadNetworkProcessor {
 				pnt.connected.add(segment);
 				while (t != null) {
 					segment.geometry.add(getPoint(t));
-					addW(osmObjects, t);
+//					addW(osmObjects, t); // original route
 					t = t.getParentRoute();
 				}
+				Collections.reverse(segment.geometry);
+				addWay(osmObjects, segment, "highway", "secondary");
 			}
 			networkDB.insertSegments(pnt.connected);
-//				System.out.println(" -> " + Arrays.toString(apnt.indexes) + " " + t);
 			
 			
 			maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph, ctx.calculationProgress.visitedDirectSegments);
@@ -749,14 +750,18 @@ public class BaseRoadNetworkProcessor {
 
 
 
-	private void addNode(TLongObjectHashMap<Entity> osmObjects, NetworkDBPoint pnt, String tag, String val) {
-		Node n = new Node(MapUtils.get31LatitudeY(pnt.startY), MapUtils.get31LongitudeX(pnt.startX), ID--);
+	private void addNode(TLongObjectHashMap<Entity> osmObjects, NetworkDBPoint pnt, LatLon l, String tag, String val) {
+		if (l == null) {
+			l = new LatLon(MapUtils.get31LatitudeY(pnt.startY / 2 + pnt.endY / 2),
+					MapUtils.get31LongitudeX(pnt.startX / 2 + pnt.endX / 2));
+		}
+		Node n = new Node(l.getLatitude(), l.getLongitude(), ID--);
 		n.putTag(tag, val);
-		n.putTag("name", pnt.roadId / 64 + " " + pnt.start + " " + pnt.end);
+		n.putTag("name", pnt.index + " " + pnt.roadId / 64 + " " + pnt.start + " " + pnt.end);
 		osmObjects.put(pnt.roadId, n);
 	}
 	
-	private void addW(TLongObjectHashMap<Entity> osmObjects, RouteSegment s) {
+	void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment s) {
 		Way w = new Way(ID--);
 		int[] tps = s.getRoad().getTypes();
 		for (int i = 0; i < tps.length; i++) {
@@ -771,7 +776,16 @@ public class BaseRoadNetworkProcessor {
 		w.addNode(new Node(MapUtils.get31LatitudeY(ys), MapUtils.get31LongitudeX(xs), ID--));
 		w.putTag("oid", (s.getRoad().getId() / 64) + "");
 		osmObjects.put(calculateRoutePointId(s), w);
-	}	
+	}
+	
+	void addWay(TLongObjectHashMap<Entity> osmObjects, NetworkDBSegment segment, String tag, String value) {
+		Way w = new Way(ID--);
+		w.putTag("name", segment.start.index + " -> "  + segment.end.index + " " + segment.dist);
+		for(LatLon l : segment.geometry) {
+			w.addNode(new Node(l.getLatitude(), l.getLongitude(), ID--));
+		}
+		osmObjects.put(w.getId(), w);
+	}
 
 	private List<RouteSegment> runDijsktra(RouteSegment s, TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
 		

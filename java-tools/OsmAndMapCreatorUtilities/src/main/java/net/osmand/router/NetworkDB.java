@@ -39,7 +39,7 @@ class NetworkDB {
 		}
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
 		Statement st = conn.createStatement();
-		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, x31, y31, lat, lon, indexes)");
+		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes)");
 		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, geometry)");
 		if (recreate == RECREATE_SEGMENTS) {
 			insertIntoSegment = conn.prepareStatement(
@@ -94,7 +94,7 @@ class NetworkDB {
 
 	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints() throws SQLException {
 		Statement st = conn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT idPoint, ind, roadId, start, end, x31, y31, indexes from points");
+		ResultSet rs = st.executeQuery("SELECT idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes from points");
 		TLongObjectHashMap<NetworkDBPoint> mp = new TLongObjectHashMap<>();
 		while (rs.next()) {
 			NetworkDBPoint pnt = new NetworkDBPoint();
@@ -106,6 +106,8 @@ class NetworkDB {
 			pnt.end = rs.getInt(p++);
 			pnt.startX = rs.getInt(p++);
 			pnt.startY = rs.getInt(p++);
+			pnt.endX = rs.getInt(p++);
+			pnt.endY = rs.getInt(p++);
 			pnt.indexes = Algorithms.stringToArray(rs.getString(p++));
 			mp.put(pnt.id, pnt);
 		}
@@ -118,7 +120,7 @@ class NetworkDB {
 
 	public void insertPoints(FullNetwork network) throws SQLException {
 		PreparedStatement s = conn
-				.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, x31, y31, lat, lon, indexes) "
+				.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		int ind = 0;
 		TLongObjectIterator<List<NetworkIsland>> it = network.networkPointsCluster.iterator();
@@ -129,14 +131,13 @@ class NetworkDB {
 			s.setLong(p++, ind++);
 			RouteSegment obj = network.toVisitVertices.get(it.key());
 			List<NetworkIsland> islands = it.value();
-			LatLon pnt = BaseRoadNetworkProcessor.getPoint(obj);
 			s.setLong(p++, obj.getRoad().getId());
 			s.setLong(p++, obj.getSegmentStart());
 			s.setLong(p++, obj.getSegmentEnd());
 			s.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
 			s.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
-			s.setDouble(p++, pnt.getLatitude());
-			s.setDouble(p++, pnt.getLongitude());
+			s.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
+			s.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
 			int[] arrs = new int[islands.size()];
 			for (int i = 0; i < islands.size(); i++) {
 				arrs[i] = islands.get(i).index;
@@ -171,6 +172,8 @@ class NetworkDB {
 		public int end;
 		public int startX;
 		public int startY;
+		public int endX;
+		public int endY;
 		public int[] indexes;
 		List<NetworkDBSegment> connected = new ArrayList<NetworkDBSegment>();
 	}
