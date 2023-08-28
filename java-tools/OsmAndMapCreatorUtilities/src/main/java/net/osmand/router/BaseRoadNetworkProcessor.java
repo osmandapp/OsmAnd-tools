@@ -20,6 +20,7 @@ import javax.xml.stream.XMLStreamException;
 
 import org.apache.commons.logging.Log;
 
+
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
@@ -58,8 +59,9 @@ public class BaseRoadNetworkProcessor {
 	
 	private static final boolean ALL_VERTICES = false;
 	protected static int LIMIT_START = 0;//100
-	protected static int LIMIT = 100;
+	protected static int LIMIT = -1;
 	protected static int PROCESS = BUILD_SHORTCUTS;
+	protected static boolean LOAD_GEOMETRY = false;
 	
 	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685); // 337 - 4
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 - 12
@@ -244,16 +246,32 @@ public class BaseRoadNetworkProcessor {
 					network.visitedVertices);
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + ".osm"));
 		} else if (PROCESS == BUILD_SHORTCUTS) {
-			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints();
+			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
 			Collection<Entity> objects = proc.buildNetworkSegments(pnts, networkDB);
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-hh.osm"));
 		} else if (PROCESS == RUN_ROUTING) {
-			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints();
+			long startTime = System.nanoTime();
+			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+			networkDB.loadNetworkSegments(pnts, LOAD_GEOMETRY);
+			NetworkDBPoint start = pnts.get(1263);
+			NetworkDBPoint end = pnts.get(1143);
+			long loadTime = System.nanoTime() - startTime;
+			// Routing
+			Collection<Entity> objects = proc.runDijkstraRouting(pnts, start, end);
+			long routingTime = System.nanoTime() - startTime - loadTime;
+			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-rt.osm"));
+			System.out.println(String.format("Routing finished %.2f ms, load data %.2f ms", routingTime / 1e6, loadTime / 1e6));
+			
 		}
 		networkDB.close();
 	}
 	
 	
+
+
+
+
+
 	//////////////////////// UTILITIES /////////////////
 
 	private void prepareContext(BinaryMapIndexReader reader) {
@@ -752,13 +770,20 @@ public class BaseRoadNetworkProcessor {
 
 	private void addNode(TLongObjectHashMap<Entity> osmObjects, NetworkDBPoint pnt, LatLon l, String tag, String val) {
 		if (l == null) {
-			l = new LatLon(MapUtils.get31LatitudeY(pnt.startY / 2 + pnt.endY / 2),
-					MapUtils.get31LongitudeX(pnt.startX / 2 + pnt.endX / 2));
+			l = getPoint(pnt);
 		}
 		Node n = new Node(l.getLatitude(), l.getLongitude(), ID--);
 		n.putTag(tag, val);
 		n.putTag("name", pnt.index + " " + pnt.roadId / 64 + " " + pnt.start + " " + pnt.end);
 		osmObjects.put(pnt.roadId, n);
+	}
+
+
+
+
+	private LatLon getPoint(NetworkDBPoint pnt) {
+		return new LatLon(MapUtils.get31LatitudeY(pnt.startY / 2 + pnt.endY / 2),
+				MapUtils.get31LongitudeX(pnt.startX / 2 + pnt.endX / 2));
 	}
 	
 	void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment s) {
@@ -780,8 +805,14 @@ public class BaseRoadNetworkProcessor {
 	
 	void addWay(TLongObjectHashMap<Entity> osmObjects, NetworkDBSegment segment, String tag, String value) {
 		Way w = new Way(ID--);
-		w.putTag("name", segment.start.index + " -> "  + segment.end.index + " " + segment.dist);
-		for(LatLon l : segment.geometry) {
+		w.putTag("name", String.format("%d -> %d %.1f", segment.start.index, segment.end.index, segment.dist));
+		if (segment.geometry.size() < 3) {
+			// TODO this bug in geometry & dist
+			segment.geometry.clear();
+			segment.geometry.add(getPoint(segment.start));
+			segment.geometry.add(getPoint(segment.end));
+		}
+		for (LatLon l : segment.geometry) {
 			w.addNode(new Node(l.getLatitude(), l.getLongitude(), ID--));
 		}
 		osmObjects.put(w.getId(), w);
@@ -826,4 +857,50 @@ public class BaseRoadNetworkProcessor {
 	
 	////////////////////////////////////// ROUTING ////////////////////////////////////////////////	
 
+	private Collection<Entity> runDijkstraRouting(TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
+			NetworkDBPoint end) {
+		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<>();
+		int visited = 0;
+		double smallDelta = 0.1; 
+		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
+
+			@Override
+			public int compare(NetworkDBSegment o1, NetworkDBSegment o2) {
+//				return Double.compare(o1DistanceFromStart + heuristicCoefficient * o1DistanceToEnd, 
+//						o2DistanceFromStart + heuristicCoefficient *  o2DistanceToEnd);
+				return Double.compare(o1.start.rtDistanceFromStart + o1.dist + smallDelta, o2.start.rtDistanceFromStart + o2.dist + smallDelta);
+			}
+		});
+		start.rtDistanceFromStart = smallDelta;
+		queue.addAll(start.connected);
+		while (!queue.isEmpty()) {
+			
+			NetworkDBSegment segment = queue.poll();
+			// already visited
+			if (segment.end.rtDistanceFromStart > 0) { // segment.end.rtRouteToPoint != null
+				continue;
+			}
+			visited++;
+			System.out.printf("Visit Point %d from %d (%.1f m from start)\n" , segment.end.index, segment.start.index, 
+					(segment.start.rtDistanceFromStart + segment.dist + smallDelta));
+			if (segment.end.index == end.index) {
+				end.rtRouteToPoint = segment;
+				break;
+			}
+			segment.end.rtRouteToPoint = segment;
+			segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist + smallDelta;
+			queue.addAll(segment.end.connected);
+		}
+		if (end.rtRouteToPoint != null) {
+			NetworkDBSegment parent = end.rtRouteToPoint;
+			while (parent != null) {
+				System.out.printf("Route %d <- %d (%.2f) \n", parent.end.index, parent.start.index, parent.dist );
+				addWay(entities, parent, "highway", "secondary");
+				parent = parent.start.rtRouteToPoint;
+			}
+			
+		}
+		System.out.println(String.format("Found final route %d depth, visited %d vertices", entities.size(), visited));
+		return entities.valueCollection();
+	}
 }

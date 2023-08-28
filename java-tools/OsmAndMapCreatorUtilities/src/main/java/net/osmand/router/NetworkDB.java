@@ -54,6 +54,7 @@ class NetworkDB {
 			insertIntoSegment.setLong(1, s.start.index);
 			insertIntoSegment.setLong(2, s.end.index);
 			insertIntoSegment.setDouble(3, s.dist);
+//			byte[] coordinates = new byte[0];
 			byte[] coordinates = new byte[8 * s.geometry.size()];
 			for (int t = 0; t < s.geometry.size(); t++) {
 				LatLon l = s.geometry.get(t);
@@ -66,25 +67,27 @@ class NetworkDB {
 		insertIntoSegment.executeBatch();
 	}
 	
-	public void loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points) throws SQLException {
+	public void loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points, boolean geometry) throws SQLException {
 		TLongObjectHashMap<NetworkDBPoint> pntsById = new TLongObjectHashMap<>();
 		for (NetworkDBPoint p : points.valueCollection()) {
 			pntsById.put(p.index, p);
 		}
 		Statement st = conn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT idPoint, idConnPoint, dist, geometry from segments");
+		ResultSet rs = st.executeQuery("SELECT idPoint, idConnPoint, dist" + (geometry ? ", geometry" : "")+ " from segments");
 		while (rs.next()) {
 			NetworkDBPoint point = pntsById.get(rs.getLong(1));
 			NetworkDBSegment segment = new NetworkDBSegment();
 			segment.dist = rs.getDouble(3);
 			segment.start = point;
 			segment.end = pntsById.get(rs.getLong(2));
-			byte[] geom = rs.getBytes(4);
-			for (int k = 0; k < geom.length; k += 4) {
-				int x = Algorithms.parseIntFromBytes(geom, k);
-				int y = Algorithms.parseIntFromBytes(geom, k + 4);
-				LatLon latlon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
-				segment.geometry.add(latlon);
+			if (geometry) {
+				byte[] geom = rs.getBytes(4);
+				for (int k = 0; k < geom.length; k += 8) {
+					int x = Algorithms.parseIntFromBytes(geom, k);
+					int y = Algorithms.parseIntFromBytes(geom, k + 4);
+					LatLon latlon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
+					segment.geometry.add(latlon);
+				}
 			}
 			point.connected.add(segment);
 		}
@@ -92,7 +95,7 @@ class NetworkDB {
 		st.close();
 	}
 
-	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints() throws SQLException {
+	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints(boolean byId) throws SQLException {
 		Statement st = conn.createStatement();
 		ResultSet rs = st.executeQuery("SELECT idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes from points");
 		TLongObjectHashMap<NetworkDBPoint> mp = new TLongObjectHashMap<>();
@@ -109,7 +112,7 @@ class NetworkDB {
 			pnt.endX = rs.getInt(p++);
 			pnt.endY = rs.getInt(p++);
 			pnt.indexes = Algorithms.stringToArray(rs.getString(p++));
-			mp.put(pnt.id, pnt);
+			mp.put(byId ? pnt.id : pnt.index, pnt);
 		}
 		rs.close();
 		st.close();
@@ -162,6 +165,10 @@ class NetworkDB {
 		NetworkDBPoint end;
 		double dist;
 		List<LatLon> geometry = new ArrayList<>();
+		
+		// for routing
+		
+		
 	}
 
 	static class NetworkDBPoint {
@@ -176,6 +183,10 @@ class NetworkDB {
 		public int endY;
 		public int[] indexes;
 		List<NetworkDBSegment> connected = new ArrayList<NetworkDBSegment>();
+		
+		// for routing
+		NetworkDBSegment rtRouteToPoint;
+		double rtDistanceFromStart;
 	}
 
 
