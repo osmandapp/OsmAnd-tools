@@ -247,7 +247,7 @@ public class BaseRoadNetworkProcessor {
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + ".osm"));
 		} else if (PROCESS == BUILD_SHORTCUTS) {
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
-			Collection<Entity> objects = proc.buildNetworkSegments(pnts, networkDB);
+			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-hh.osm"));
 		} else if (PROCESS == RUN_ROUTING) {
 			long startTime = System.nanoTime();
@@ -260,7 +260,7 @@ public class BaseRoadNetworkProcessor {
 			Collection<Entity> objects = proc.runDijkstraRouting(pnts, start, end);
 			long routingTime = System.nanoTime() - startTime - loadTime;
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-rt.osm"));
-			System.out.println(String.format("Routing finished %.2f ms, load data %.2f ms", routingTime / 1e6, loadTime / 1e6));
+			System.out.printf("Routing finished %.2f ms, load data %.2f ms\n", routingTime / 1e6, loadTime / 1e6);
 			
 		}
 		networkDB.close();
@@ -346,8 +346,8 @@ public class BaseRoadNetworkProcessor {
 			}
 		}
 		
-		System.out.println(String.format("Total visited roads %d, total vertices %d, total stop %d connections - %.1f %% ",
-				ways1, nodes, ways2, (ways2 / 2.0d) / (nodes * (nodes - 1) / 2.0) * 100.0 )) ;
+		System.out.printf("Total visited roads %d, total vertices %d, total stop %d connections - %.1f %% \n",
+				ways1, nodes, ways2, (ways2 / 2.0d) / (nodes * (nodes - 1) / 2.0) * 100.0 );
 		return objs;
 	}
 
@@ -699,7 +699,7 @@ public class BaseRoadNetworkProcessor {
 	
 	///////////////////////////////////////////// BUILD SHORTCUTS //////////////////////////////////////////
 	
-	private Collection<Entity> buildNetworkSegments(TLongObjectHashMap<NetworkDBPoint> networkPoints, NetworkDB networkDB) throws InterruptedException, IOException, SQLException {
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPoints, NetworkDB networkDB) throws InterruptedException, IOException, SQLException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = networkPoints.size() / 100.0;
 		int ind = 0;
@@ -739,11 +739,12 @@ public class BaseRoadNetworkProcessor {
 				pnt.connected.add(segment);
 				while (t != null) {
 					segment.geometry.add(getPoint(t));
-//					addW(osmObjects, t); // original route
 					t = t.getParentRoute();
 				}
 				Collections.reverse(segment.geometry);
-				addWay(osmObjects, segment, "highway", "secondary");
+				if (ALL_VERTICES) {
+					addWay(osmObjects, segment, "highway", "secondary");
+				}
 			}
 			networkDB.insertSegments(pnt.connected);
 			
@@ -806,12 +807,12 @@ public class BaseRoadNetworkProcessor {
 	void addWay(TLongObjectHashMap<Entity> osmObjects, NetworkDBSegment segment, String tag, String value) {
 		Way w = new Way(ID--);
 		w.putTag("name", String.format("%d -> %d %.1f", segment.start.index, segment.end.index, segment.dist));
-		if (segment.geometry.size() < 3) {
-			// TODO this bug in geometry & dist
-			segment.geometry.clear();
-			segment.geometry.add(getPoint(segment.start));
-			segment.geometry.add(getPoint(segment.end));
-		}
+//		if (segment.geometry.size() < 3) {
+//			// TODO this bug in geometry & dist
+//			segment.geometry.clear();
+//			segment.geometry.add(getPoint(segment.start));
+//			segment.geometry.add(getPoint(segment.end));
+//		}
 		for (LatLon l : segment.geometry) {
 			w.addNode(new Node(l.getLatitude(), l.getLongitude(), ID--));
 		}
@@ -835,8 +836,7 @@ public class BaseRoadNetworkProcessor {
 		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) brp.searchRouteInternal(ctx, new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), 0), null, null, 
 				segments);
 		if (frs != null) {
-			res.add(frs);
-			for (RouteSegment o : frs.others) {
+			for (RouteSegment o : frs.all) {
 				res.add(o);
 			}
 		}
