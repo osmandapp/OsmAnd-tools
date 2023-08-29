@@ -28,6 +28,7 @@ class NetworkDB {
 
 	private Connection conn;
 	private PreparedStatement insertIntoSegment;
+	private PreparedStatement loadGeometry;
 	private static int BATCH = 1000;
 	public static final int FULL_RECREATE = 0;
 	public static final int RECREATE_SEGMENTS = 1;
@@ -39,13 +40,15 @@ class NetworkDB {
 		}
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
 		Statement st = conn.createStatement();
-		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes)");
-		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, geometry)");
+		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes, primary key (idPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, geometry, PRIMARY key (idPoint, idConnPoint))");
 		if (recreate == RECREATE_SEGMENTS) {
 			insertIntoSegment = conn.prepareStatement(
 					"INSERT INTO segments(idPoint, idConnPoint, dist, geometry) " + " VALUES(?, ?, ?, ?)");
 			st.execute("DELETE FROM segments");
 		}
+		loadGeometry = conn.prepareStatement(
+				"SELECT geometry FROM segments WHERE idPoint = ? AND  idConnPoint =? ");
 		st.close();
 	}
 
@@ -67,6 +70,15 @@ class NetworkDB {
 		insertIntoSegment.executeBatch();
 	}
 	
+	public void loadGeometry(NetworkDBSegment segment) throws SQLException {
+		loadGeometry.setLong(1, segment.start.index);
+		loadGeometry.setLong(2, segment.end.index);
+		ResultSet rs = loadGeometry.executeQuery();
+		if(rs.next()) {
+			parseGeometry(segment, rs.getBytes(1));
+		}
+	}
+	
 	public void loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points, boolean geometry) throws SQLException {
 		TLongObjectHashMap<NetworkDBPoint> pntsById = new TLongObjectHashMap<>();
 		for (NetworkDBPoint p : points.valueCollection()) {
@@ -81,18 +93,21 @@ class NetworkDB {
 			segment.start = point;
 			segment.end = pntsById.get(rs.getLong(2));
 			if (geometry) {
-				byte[] geom = rs.getBytes(4);
-				for (int k = 0; k < geom.length; k += 8) {
-					int x = Algorithms.parseIntFromBytes(geom, k);
-					int y = Algorithms.parseIntFromBytes(geom, k + 4);
-					LatLon latlon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
-					segment.geometry.add(latlon);
-				}
+				parseGeometry(segment, rs.getBytes(4));
 			}
 			point.connected.add(segment);
 		}
 		rs.close();
 		st.close();
+	}
+
+	private void parseGeometry(NetworkDBSegment segment, byte[] geom) {
+		for (int k = 0; k < geom.length; k += 8) {
+			int x = Algorithms.parseIntFromBytes(geom, k);
+			int y = Algorithms.parseIntFromBytes(geom, k + 4);
+			LatLon latlon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
+			segment.geometry.add(latlon);
+		}
 	}
 
 	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints(boolean byId) throws SQLException {

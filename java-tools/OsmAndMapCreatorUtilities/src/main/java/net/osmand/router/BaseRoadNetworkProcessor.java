@@ -60,7 +60,7 @@ public class BaseRoadNetworkProcessor {
 	private static final boolean ALL_VERTICES = false;
 	protected static int LIMIT_START = 0;//100
 	protected static int LIMIT = -1;
-	protected static int PROCESS = BUILD_SHORTCUTS;
+	protected static int PROCESS = RUN_ROUTING;
 	protected static boolean LOAD_GEOMETRY = false;
 	
 	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685); // 337 - 4
@@ -257,7 +257,7 @@ public class BaseRoadNetworkProcessor {
 			NetworkDBPoint end = pnts.get(1143);
 			long loadTime = System.nanoTime() - startTime;
 			// Routing
-			Collection<Entity> objects = proc.runDijkstraRouting(pnts, start, end);
+			Collection<Entity> objects = proc.runDijkstraRouting(networkDB, pnts, start, end);
 			long routingTime = System.nanoTime() - startTime - loadTime;
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-rt.osm"));
 			System.out.printf("Routing finished %.2f ms, load data %.2f ms\n", routingTime / 1e6, loadTime / 1e6);
@@ -857,8 +857,8 @@ public class BaseRoadNetworkProcessor {
 	
 	////////////////////////////////////// ROUTING ////////////////////////////////////////////////	
 
-	private Collection<Entity> runDijkstraRouting(TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
-			NetworkDBPoint end) {
+	private Collection<Entity> runDijkstraRouting(NetworkDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
+			NetworkDBPoint end) throws SQLException {
 		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<>();
 		int visited = 0;
 		double smallDelta = 0.1; 
@@ -868,13 +868,12 @@ public class BaseRoadNetworkProcessor {
 			public int compare(NetworkDBSegment o1, NetworkDBSegment o2) {
 //				return Double.compare(o1DistanceFromStart + heuristicCoefficient * o1DistanceToEnd, 
 //						o2DistanceFromStart + heuristicCoefficient *  o2DistanceToEnd);
-				return Double.compare(o1.start.rtDistanceFromStart + o1.dist + smallDelta, o2.start.rtDistanceFromStart + o2.dist + smallDelta);
+				return Double.compare(o1.start.rtDistanceFromStart + o1.dist, o2.start.rtDistanceFromStart + o2.dist);
 			}
 		});
 		start.rtDistanceFromStart = smallDelta;
 		queue.addAll(start.connected);
 		while (!queue.isEmpty()) {
-			
 			NetworkDBSegment segment = queue.poll();
 			// already visited
 			if (segment.end.rtDistanceFromStart > 0) { // segment.end.rtRouteToPoint != null
@@ -882,17 +881,17 @@ public class BaseRoadNetworkProcessor {
 			}
 			visited++;
 			System.out.printf("Visit Point %d from %d (%.1f m from start)\n" , segment.end.index, segment.start.index, 
-					(segment.start.rtDistanceFromStart + segment.dist + smallDelta));
-			if (segment.end.index == end.index) {
-				end.rtRouteToPoint = segment;
-				break;
-			}
+					(segment.start.rtDistanceFromStart + segment.dist));
 			segment.end.rtRouteToPoint = segment;
 			segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist + smallDelta;
+			if (segment.end.index == end.index) {
+				break;
+			}
 			queue.addAll(segment.end.connected);
 		}
 		if (end.rtRouteToPoint != null) {
 			NetworkDBSegment parent = end.rtRouteToPoint;
+			networkDB.loadGeometry(parent);
 			while (parent != null) {
 				System.out.printf("Route %d <- %d (%.2f) \n", parent.end.index, parent.start.index, parent.dist );
 				addWay(entities, parent, "highway", "secondary");
@@ -900,7 +899,7 @@ public class BaseRoadNetworkProcessor {
 			}
 			
 		}
-		System.out.println(String.format("Found final route %d depth, visited %d vertices", entities.size(), visited));
+		System.out.println(String.format("Found final route - cost %.2f, %d depth, visited %d vertices", end.rtDistanceFromStart, entities.size(), visited));
 		return entities.valueCollection();
 	}
 }
