@@ -74,7 +74,7 @@ class NetworkDB {
 		loadGeometry.setLong(1, segment.start.index);
 		loadGeometry.setLong(2, segment.end.index);
 		ResultSet rs = loadGeometry.executeQuery();
-		if(rs.next()) {
+		if (rs.next()) {
 			parseGeometry(segment, rs.getBytes(1));
 		}
 	}
@@ -181,8 +181,10 @@ class NetworkDB {
 		double dist;
 		List<LatLon> geometry = new ArrayList<>();
 		
-		// for routing
-		
+		@Override
+		public String toString() {
+			return String.format("Segment %s -> %s", start, end);
+		}
 		
 	}
 
@@ -202,6 +204,11 @@ class NetworkDB {
 		// for routing
 		NetworkDBSegment rtRouteToPoint;
 		double rtDistanceFromStart;
+		
+		@Override
+		public String toString() {
+			return String.format("Point %d (%d %d-%d)", index, roadId / 64, start, end);
+		}
 	}
 
 
