@@ -149,7 +149,7 @@ public class EmailSenderMain {
         for (BlockedUser user : users) {
             ps.setString(1, user.getEmail());
             ps.setString(2, "all");
-            ps.setTimestamp(3, new Timestamp(Long.parseLong(System.currentTimeMillis())));
+            ps.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
             ps.setString(4, user.getEmail());
             ps.setString(5, "all");
             ps.addBatch();
@@ -202,7 +202,7 @@ public class EmailSenderMain {
         for (BlockedUser user : users) {
             ps.setString(1, user.getEmail());
             ps.setString(2, user.getReason());
-            ps.setTimestamp(3, new Timestamp(Long.parseLong(System.currentTimeMillis())));
+            ps.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
             ps.setString(4, user.getEmail());
             ps.addBatch();
             if (++batchSize > 500) {
