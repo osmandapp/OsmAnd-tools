@@ -92,7 +92,9 @@ public class BaseRoadNetworkProcessor {
 	final static int PROCESS_SET_NETWORK_POINTS = 1;
 	final static int PROCESS_BUILD_NETWORK_SEGMENTS = 2;
 	final static int PROCESS_RUN_ROUTING = 3;
-	static int PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
+	static int PROCESS = PROCESS_RUN_ROUTING;
+	static LatLon PROCESS_START = null;
+	static LatLon PROCESS_END = null;
 	
 	static boolean DEBUG_STORE_ALL_ROADS = false;
 	static int DEBUG_LIMIT_START_OFFSET = 0;
@@ -124,9 +126,36 @@ public class BaseRoadNetworkProcessor {
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
 	}
+
+	private static void sourceLatLons() {
+		// "Netherlands_europe_2.road.obf"
+		PROCESS_START = new LatLon(52.34800, 4.86206); // AMS
+//		PROCESS_END = new LatLon(51.57803, 4.79922); // Breda
+		PROCESS_END = new LatLon(51.35076, 5.45141); // ~Eindhoven
+		
+		// "Montenegro_europe_2.road.obf"
+//		PROCESS_START = new LatLon(43.15274, 19.55169); 
+//		PROCESS_END= new LatLon(42.45166, 18.54425);
+	}
 	
 	public static void main(String[] args) throws Exception {
-		File obfFile = sourceFile();
+		sourceLatLons();
+		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
+		for (String a : args) {
+			if (a.equals("--setup-network-points")) {
+				PROCESS = PROCESS_SET_NETWORK_POINTS;
+			} else if (a.equals("--build-network-shortcuts")) {
+				PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
+			} else if (a.equals("--run-routing")) {
+				PROCESS = PROCESS_RUN_ROUTING;
+			} else if (a.startsWith("--start=")) {
+				String[] latLons = a.substring("--start=".length()).split(",");
+				PROCESS_START = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
+			} else if (a.startsWith("--end=")) {
+				String[] latLons = a.substring("--end=".length()).split(",");
+				PROCESS_START = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
+			}
+		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getName();
 		
@@ -159,14 +188,6 @@ public class BaseRoadNetworkProcessor {
 			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-hh.osm"));
 		} else if (PROCESS == PROCESS_RUN_ROUTING) {
-			// "Netherlands_europe_2.road.obf"
-			LatLon start = new LatLon(52.34800, 4.86206); // AMS
-//			LatLon end = new LatLon(51.57803, 4.79922); // Breda
-			LatLon end = new LatLon(51.35076, 5.45141); // ~Eindhoven
-			
-			// "Montenegro_europe_2.road.obf"
-//			LatLon start = new LatLon(43.15274, 19.55169); 
-//			LatLon end = new LatLon(42.45166, 18.54425); 
 			long startTime = System.nanoTime();
 			System.out.print("Loading points... ");
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
@@ -176,10 +197,10 @@ public class BaseRoadNetworkProcessor {
 				if (startPnt == null) {
 					startPnt = endPnt = pnt;
 				}
-				if (MapUtils.getDistance(start, getPoint(pnt)) < MapUtils.getDistance(start, getPoint(startPnt))) {
+				if (MapUtils.getDistance(PROCESS_START, getPoint(pnt)) < MapUtils.getDistance(PROCESS_START, getPoint(startPnt))) {
 					startPnt = pnt;
 				}
-				if (MapUtils.getDistance(end, getPoint(pnt)) < MapUtils.getDistance(end, getPoint(endPnt))) {
+				if (MapUtils.getDistance(PROCESS_END, getPoint(pnt)) < MapUtils.getDistance(PROCESS_END, getPoint(endPnt))) {
 					endPnt = pnt;
 				}
 			}

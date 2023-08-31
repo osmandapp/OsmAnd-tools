@@ -31,6 +31,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
+import net.osmand.router.BaseRoadNetworkProcessor;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -106,6 +107,8 @@ public class MainUtilities {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? subArgsArray[1] : null);
 			} else if (utl.equals("create-sqlitedb")) {
 				SQLiteBigPlanetIndex.main(subArgsArray);
+			} else if (utl.equals("network-routing")) {
+				BaseRoadNetworkProcessor.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("test-icons")) {
