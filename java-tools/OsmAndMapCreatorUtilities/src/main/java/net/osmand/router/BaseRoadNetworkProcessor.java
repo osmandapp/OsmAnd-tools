@@ -63,6 +63,26 @@ import net.osmand.util.MapUtils;
 // 2nd phase - improvements
 // 2.1 Merge islands that are isolated
 // 2.2 Better points distribution
+
+// 3rd phase - speedup & Test
+// 3.1 Speed up processing NL [400 MB - ~ 1-1.5% of World data] - [8 min + 9 min = 17 min]
+//     ~ World processing - 1 360 min - ~ 22h ?
+// 3.2 Make process parallelized 
+// 3.3? Make process rerunable ? (so you could stop any point)
+// 3.4 Generate Germany / World for testing speat
+
+// 4th phase - complex routing / data
+// 4.1 Implement final routing algorithm including start / end segment search 
+// 4.2 Save data structure optimally by access time
+// 4.3 Save data structure optimally by size
+// 4.4 Implement border crossing issue
+
+// 5 Future
+// 5.1 Introduce 3/4 level
+// 5.2 Alternative routes
+// 5.3 Avoid specific road
+// 5.4 Deprioritize or exclude roads
+// 5.5 Live data (think about it)
 public class BaseRoadNetworkProcessor {
 
 	private static long ID = -1;
