@@ -222,6 +222,9 @@ class NetworkDB {
 		NetworkDBSegment rtRouteToPoint;
 		double rtDistanceFromStart;
 		
+		NetworkDBSegment rtRouteToPointRev;
+		double rtDistanceFromStartRev;
+		
 		
 		@Override
 		public String toString() {

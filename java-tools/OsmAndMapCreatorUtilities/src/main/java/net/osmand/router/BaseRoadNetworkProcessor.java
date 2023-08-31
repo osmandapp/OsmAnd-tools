@@ -160,9 +160,10 @@ public class BaseRoadNetworkProcessor {
 			
 			// Routing
 			System.out.printf(" %.2fms\nRouting...\n", (loadTime - startTime) / 1e6);
-			RoutingStats stats = proc.runDijkstraNetworkRouting(networkDB, pnts, start, end);
+			RoutingStats stats = new RoutingStats();
+			NetworkDBPoint pnt = proc.runDijkstraNetworkRouting(networkDB, pnts, start, end, stats);
 			long routingTime = System.nanoTime() ;
-			Collection<Entity> objects = proc.prepareRoutingResults(networkDB, start, end, new TLongObjectHashMap<>(), stats);
+			Collection<Entity> objects = proc.prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
 			long prepTime = System.nanoTime();
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-rt.osm"));
 			System.out.printf("Routing finished %.2f ms: load data %.2f ms, route %.2f ms, prep result %.2f ms\n", 
@@ -908,7 +909,7 @@ public class BaseRoadNetworkProcessor {
 	
 	////////////////////////////////////// ROUTING ////////////////////////////////////////////////	
 	static float HEURISTIC_COEFFICIENT = 1; // A* - 1, Dijkstra - 0
-	static float DIJKSTRA_DIRECTION = -1; // 0 - 2 directions, 1 - positive, -1 - reverse 
+	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse 
 
 	static class RoutingStats {
 		int visitedVertices = 0;
@@ -923,16 +924,17 @@ public class BaseRoadNetworkProcessor {
 	}
 	
 	private double rtSegmentCost(NetworkDBSegment o1) {
-		return o1.start.rtDistanceFromStart + o1.dist + HEURISTIC_COEFFICIENT * o1.rtDistanceToEnd;
+		return o1.start.rtDistanceFromStart + o1.dist +
+				HEURISTIC_COEFFICIENT * (o1.end.rtDistanceFromStartRev > 0 ? o1.end.rtDistanceFromStartRev :  o1.rtDistanceToEnd);
 	}
 	
 	private double rtSegmentCostRev(NetworkDBSegment o1) {
-		return o1.end.rtDistanceFromStart + o1.dist + HEURISTIC_COEFFICIENT * o1.rtDistanceToEnd;
+		return o1.end.rtDistanceFromStartRev + o1.dist + 
+				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  o1.rtDistanceToEnd);
 	}
 	
-	private RoutingStats runDijkstraNetworkRouting(NetworkDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
-			NetworkDBPoint end) throws SQLException {
-		RoutingStats stats = new RoutingStats();
+	private NetworkDBPoint runDijkstraNetworkRouting(NetworkDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
+			NetworkDBPoint end, RoutingStats stats) throws SQLException {
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override
@@ -947,11 +949,12 @@ public class BaseRoadNetworkProcessor {
 				return Double.compare(rtSegmentCostRev(o1), rtSegmentCostRev(o2));
 			}
 		});
-		if (DIJKSTRA_DIRECTION > 0) {
-			start.rtDistanceFromStart = 0.1; // visited
+		start.rtDistanceFromStart = 0.1; // visited
+		end.rtDistanceFromStartRev = 0.1; // visited
+		if (DIJKSTRA_DIRECTION >= 0) {
 			addToQueue(queue, start, end, false, stats);
-		} else {
-			end.rtDistanceFromStart = 0.1; // visited
+		} 
+		if (DIJKSTRA_DIRECTION <= 0) {
 			addToQueue(queueReverse, end, start, true, stats);
 		}
 
@@ -961,62 +964,72 @@ public class BaseRoadNetworkProcessor {
 			if(!queue.isEmpty() && !queueReverse.isEmpty()) {
 				dir = rtSegmentCost(queue.peek()) <= rtSegmentCostRev(queueReverse.peek());  
 			}
+			NetworkDBSegment segment = dir ? queue.poll() : queueReverse.poll();
 			if (dir) {
-				NetworkDBSegment segment = queue.poll();
-				// already visited
 				if (segment.end.rtDistanceFromStart > 0) { // segment.end.rtRouteToPoint != null
 					continue;
 				}
-				System.out.printf("Visit Point %d from %d (%.1f m from start) %.5f/%.5f - %d\n", segment.end.index,
-						segment.start.index, (segment.start.rtDistanceFromStart + segment.dist),
-						MapUtils.get31LatitudeY(segment.end.startY), MapUtils.get31LongitudeX(segment.end.startX),
-						segment.end.roadId / 64);
+				printPoint(segment, false);
 				segment.end.rtRouteToPoint = segment;
 				segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist;
-				if (segment.end.index == end.index) {
-					break;
+				if (segment.end.rtDistanceFromStartRev > 0 && segment.end.rtDistanceFromStart > 0) { 
+					return segment.end;
 				}
 				addToQueue(queue, segment.end, end, false, stats);
 			} else {
-				NetworkDBSegment segment = queueReverse.poll();
-				// already visited
-				if (segment.start.rtDistanceFromStart > 0) { // segment.end.rtRouteToPoint != null
+				if (segment.start.rtDistanceFromStartRev > 0) { // segment.end.rtRouteToPoint != null
 					continue;
 				}
-				System.out.printf("Visit Point %d from %d (%.1f m from start, %.2f) %.5f/%.5f - %d\n",
-						segment.start.index, segment.end.index, (segment.end.rtDistanceFromStart + segment.dist),
-						segment.dist, MapUtils.get31LatitudeY(segment.start.startY),
-						MapUtils.get31LongitudeX(segment.start.startX), segment.start.roadId / 64);
-				segment.start.rtRouteToPoint = segment;
-				segment.start.rtDistanceFromStart = segment.end.rtDistanceFromStart + segment.dist;
-				if (segment.start.index == start.index) {
-					System.out.println(segment.start.rtDistanceFromStart);
-					break;
+				printPoint(segment, true);
+				segment.start.rtRouteToPointRev = segment;
+				segment.start.rtDistanceFromStartRev = segment.end.rtDistanceFromStartRev + segment.dist;
+				if (segment.start.rtDistanceFromStartRev > 0 && segment.start.rtDistanceFromStart > 0) { 
+					return segment.start;
 				}
 				addToQueue(queueReverse, segment.start, start, true, stats);
 			}
+			
 			stats.visitedVertices++;
 		}
-		return stats;
+		return null;
+		
 	}
 
 
 
-	private Collection<Entity> prepareRoutingResults(NetworkDB networkDB, NetworkDBPoint start, NetworkDBPoint end,
+	private void printPoint(NetworkDBSegment segment, boolean reverse) {
+		if (DEBUG_VERBOSE_LEVEL > 1) {
+			String symbol;
+			if (!reverse) {
+				symbol = "-> " + segment.end.index + " (from " + segment.start.index + ")";
+			} else {
+				symbol = "<- " + segment.start.index + " (from " + segment.end.index + ")";
+			}
+			double cost = (reverse ? segment.end.rtDistanceFromStartRev : segment.start.rtDistanceFromStart) + segment.dist;
+			NetworkDBPoint pnt = reverse ? segment.start : segment.end;
+			System.out.printf("Visit Point %s (%.1f s from start) %.5f/%.5f - %d\n", 
+					symbol, cost, MapUtils.get31LatitudeY(pnt.startY), MapUtils.get31LongitudeX(pnt.startX),
+					pnt.roadId / 64);
+		}
+	}
+
+
+
+	private Collection<Entity> prepareRoutingResults(NetworkDB networkDB, NetworkDBPoint pnt,
 			TLongObjectHashMap<Entity> entities, RoutingStats stats) throws SQLException {
 		System.out.println("-----");
 		LinkedList<NetworkDBSegment> segments = new LinkedList<>();
-		if (start.rtRouteToPoint != null) {
-			NetworkDBSegment parent = start.rtRouteToPoint;
+		if (pnt != null && pnt.rtRouteToPointRev != null) {
+			NetworkDBSegment parent = pnt.rtRouteToPointRev;
 			while (parent != null) {
 				networkDB.loadGeometry(parent);
 				segments.add(parent);
 				addWay(entities, parent, "highway", "secondary");
-				parent = parent.end.rtRouteToPoint;
+				parent = parent.end.rtRouteToPointRev;
 			}
 		}
-		if (end.rtRouteToPoint != null) {
-			NetworkDBSegment parent = end.rtRouteToPoint;
+		if (pnt != null && pnt.rtRouteToPoint != null) {
+			NetworkDBSegment parent = pnt.rtRouteToPoint;
 			while (parent != null) {
 				networkDB.loadGeometry(parent);
 				segments.addFirst(parent);
