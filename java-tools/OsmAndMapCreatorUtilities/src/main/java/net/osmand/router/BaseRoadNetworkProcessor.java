@@ -87,7 +87,7 @@ public class BaseRoadNetworkProcessor {
 
 	final static Log LOG = PlatformUtil.getLog(BaseRoadNetworkProcessor.class);
 	
-	final static int PROCESS_BUILD_NETWORK_POINTS = 1;
+	final static int PROCESS_SET_NETWORK_POINTS = 1;
 	final static int PROCESS_BUILD_NETWORK_SEGMENTS = 2;
 	final static int PROCESS_RUN_ROUTING = 3;
 	static int PROCESS = PROCESS_RUN_ROUTING;
@@ -116,6 +116,189 @@ public class BaseRoadNetworkProcessor {
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
 	
 	
+	public static void main(String[] args) throws Exception {
+		String name = "Montenegro_europe_2.road.obf";
+		name = "Netherlands_europe_2.road.obf";
+//		name = "Ukraine_europe_2.road.obf";
+		File obfFile = new File(System.getProperty("maps.dir"), name);
+		
+		RandomAccessFile raf = new RandomAccessFile(obfFile, "r"); 
+		BaseRoadNetworkProcessor proc = new BaseRoadNetworkProcessor();
+		
+		NetworkDB networkDB = new NetworkDB(new File(obfFile.getParentFile(), name + ".db"),
+				PROCESS == PROCESS_SET_NETWORK_POINTS ? NetworkDB.FULL_RECREATE
+						: PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS ? NetworkDB.RECREATE_SEGMENTS : NetworkDB.READ);
+		proc.prepareContext(new BinaryMapIndexReader(raf, obfFile));
+		if (PROCESS == PROCESS_SET_NETWORK_POINTS) {
+			FullNetwork network = proc.new FullNetwork();
+			proc.collectNetworkPoints(network);
+			networkDB.insertPoints(network);
+			List<Entity> objects = proc.visualizeWays(network.visualPoints(), network.visualConnections(), 
+					network.visitedVertices);
+			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + ".osm"));
+		} else if (PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS) {
+			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
+			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
+			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-hh.osm"));
+		} else if (PROCESS == PROCESS_RUN_ROUTING) {
+			long startTime = System.nanoTime();
+			System.out.print("Loading points... ");
+			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+			long loadTime = System.nanoTime();
+			System.out.printf(" %.2fms\nLoading segments...", (loadTime - startTime) / 1e6);
+			networkDB.loadNetworkSegments(pnts);
+			loadTime = System.nanoTime();
+			
+			// "Netherlands_europe_2.road.obf"
+			NetworkDBPoint start = pnts.get(45928); // 52.34800, 4.86206 - 7381563 - Ams
+////			NetworkDBPoint end = pnts.get(45074); // 51.57803, 4.79922 - 690258632 - Breda
+			NetworkDBPoint end = pnts.get(13273); // 51.35076, 5.45141 - 551932122 - ~Eindhoven
+			
+			// "Montenegro_europe_2.road.obf"
+//			NetworkDBPoint start = pnts.get(1263);// 43.15274, 19.55169
+//			NetworkDBPoint end = pnts.get(1143); // 42.45166, 18.54425
+			
+			// Routing
+			int[] visited = new int[1];
+			System.out.printf(" %.2fms\nRouting...\n", (loadTime - startTime) / 1e6);
+			NetworkDBPoint endS = proc.runDijkstraNetworkRouting(networkDB, pnts, start, end, visited);
+			long routingTime = System.nanoTime() ;
+			Collection<Entity> objects = proc.prepareRoutingResults(networkDB, endS, new TLongObjectHashMap<>(), visited[0]);
+			long prepTime = System.nanoTime();
+			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-rt.osm"));
+			System.out.printf("Routing finished %.2f ms: load data %.2f ms, route %.2f ms, prep result %.2f ms\n", 
+					(prepTime - startTime) / 1e6, (loadTime - startTime) / 1e6, (routingTime - loadTime) / 1e6,
+					(prepTime - routingTime) / 1e6);
+			
+		}
+		networkDB.close();
+	}
+
+
+
+	//////////////////////// UTILITIES /////////////////
+
+	private void prepareContext(BinaryMapIndexReader reader) {
+		this.reader = reader;
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		Builder builder = RoutingConfiguration.getDefault();
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
+				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		Map<String, String> map = new TreeMap<String, String>();
+		map.put("avoid_ferries", "true");
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
+		config.planRoadDirection = 1;
+		config.heuristicCoefficient = 0; // dijkstra
+		ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },RouteCalculationMode.NORMAL);
+	}
+
+	private List<Entity> visualizeWays(TLongObjectHashMap<RouteSegment> networkPoints, 
+			TLongObjectHashMap<List<RouteSegment>> networkPointsConnections , TLongObjectHashMap<RouteSegment> visitedSegments) {
+		List<Entity> objs = new ArrayList<>();
+		int nodes = 0;
+		int ways1 = 0;
+		int ways2 = 0;
+		if (visitedSegments != null) {
+			TLongSet viewed = new TLongHashSet();
+			TLongObjectIterator<RouteSegment> it = visitedSegments.iterator();
+			while (it.hasNext()) {
+				it.advance();
+				long pntKey = it.key();
+				if (!viewed.contains(pntKey)) {
+					RouteSegment s = it.value();
+					if (s == null) {
+						continue;
+					}
+					int d = (s.getSegmentStart() < s.getSegmentEnd() ? 1 : -1);
+					int segmentEnd = s.getSegmentEnd();
+					viewed.add(pntKey);
+					while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
+						RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
+						pntKey = calculateRoutePointInternalId(nxt);
+						if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
+							break;
+						}
+						viewed.add(pntKey);
+						segmentEnd += d;
+					}
+					Way w = convertRoad(s.getRoad(), s.getSegmentStart(), segmentEnd);
+					objs.add(w);
+					ways1++;
+				}
+			}
+		}
+		if (networkPoints != null) {
+			for (long key : networkPoints.keys()) {
+				RouteSegment r  = networkPoints.get(key);
+				LatLon l = getPoint(r); 
+				Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
+				n.putTag("highway", "stop");
+				n.putTag("name", r.getRoad().getId() / 64 + " " + r.getSegmentStart() + " " + r.getSegmentEnd());
+				objs.add(n);
+				nodes++;
+				if (networkPointsConnections != null && networkPointsConnections.containsKey(key)) {
+					for (RouteSegment conn : networkPointsConnections.get(key)) {
+						LatLon ln = getPoint(conn);
+						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
+						objs.add(n2);
+						Way w = new Way(DEBUG_OSM_ID--, Arrays.asList(n, n2));
+						w.putTag("highway", "motorway");
+						objs.add(w);
+						ways2++;
+					}
+				}
+			}
+		}
+		
+		System.out.printf("Total visited roads %d, total vertices %d, total stop %d connections - %.1f %% \n",
+				ways1, nodes, ways2, (ways2 / 2.0d) / (nodes * (nodes - 1) / 2.0) * 100.0 );
+		return objs;
+	}
+
+
+	private Way convertRoad(RouteDataObject road, int st, int end) {
+		Way w = new Way(DEBUG_OSM_ID--);
+		int[] tps = road.getTypes();
+		for (int i = 0; i < tps.length; i++) {
+			RouteTypeRule rtr = road.region.quickGetEncodingRule(tps[i]);
+			w.putTag(rtr.getTag(), rtr.getValue());
+		}
+		w.putTag("oid", (road.getId() / 64) + "");
+		while (true) {
+			double lon = MapUtils.get31LongitudeX(road.getPoint31XTile(st));
+			double lat = MapUtils.get31LatitudeY(road.getPoint31YTile(st));
+			w.addNode(new Node(lat, lon, DEBUG_OSM_ID--));
+			if (st == end) {
+				break;
+			} else if (st < end) {
+				st++;
+			} else {
+				st--;
+			}
+		}
+		return w;
+	}
+
+	private static void saveOsmFile(Collection<Entity> objects, File file)
+			throws FileNotFoundException, XMLStreamException, IOException {
+		OsmBaseStorage st = new OsmBaseStorage();
+		for (Entity e : objects) {
+			if (e instanceof Way) {
+				for (Node n : ((Way) e).getNodes()) {
+					st.registerEntity(n, null);
+				}
+			}
+			st.registerEntity(e, null);
+		}
+		
+		OsmStorageWriter w = new OsmStorageWriter();
+		FileOutputStream fous = new FileOutputStream(file);
+		w.saveStorage(fous, st, null, true);
+		fous.close();
+	}
+
+	//////////////////////////// BUILD NETWORK ////////////////////////
+
 	class NetworkIsland {
 		final NetworkIsland parent;
 		final RouteSegment start;
@@ -258,188 +441,6 @@ public class BaseRoadNetworkProcessor {
 		
 	}
 	
-	
-	public static void main(String[] args) throws Exception {
-		String name = "Montenegro_europe_2.road.obf";
-		name = "Netherlands_europe_2.road.obf";
-//		name = "Ukraine_europe_2.road.obf";
-		File obfFile = new File(System.getProperty("maps.dir"), name);
-		
-		RandomAccessFile raf = new RandomAccessFile(obfFile, "r"); 
-		BaseRoadNetworkProcessor proc = new BaseRoadNetworkProcessor();
-		
-		NetworkDB networkDB = new NetworkDB(new File(obfFile.getParentFile(), name + ".db"),
-				PROCESS == PROCESS_BUILD_NETWORK_POINTS ? NetworkDB.FULL_RECREATE
-						: PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS ? NetworkDB.RECREATE_SEGMENTS : NetworkDB.READ);
-		proc.prepareContext(new BinaryMapIndexReader(raf, obfFile));
-		if (PROCESS == PROCESS_BUILD_NETWORK_POINTS) {
-			FullNetwork network = proc.new FullNetwork();
-			proc.collectNetworkPoints(network);
-			networkDB.insertPoints(network);
-			List<Entity> objects = proc.visualizeWays(network.visualPoints(), network.visualConnections(), 
-					network.visitedVertices);
-			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + ".osm"));
-		} else if (PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS) {
-			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
-			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
-			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-hh.osm"));
-		} else if (PROCESS == PROCESS_RUN_ROUTING) {
-			long startTime = System.nanoTime();
-			System.out.println("Loading points...");
-			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
-			System.out.println("Loading segments...");
-			networkDB.loadNetworkSegments(pnts, false);
-			long loadTime = System.nanoTime();
-			
-			// "Netherlands_europe_2.road.obf"
-			NetworkDBPoint start = pnts.get(45928); // 52.34800, 4.86206 - 7381563 - Ams
-////			NetworkDBPoint end = pnts.get(45074); // 51.57803, 4.79922 - 690258632 - Breda
-			NetworkDBPoint end = pnts.get(13273); // 51.35076, 5.45141 - 551932122 - ~Eindhoven
-			
-			// "Montenegro_europe_2.road.obf"
-//			NetworkDBPoint start = pnts.get(1263);// 43.15274, 19.55169
-//			NetworkDBPoint end = pnts.get(1143); // 42.45166, 18.54425
-			
-			// Routing
-			int[] visited = new int[1];
-			System.out.println("Routing...");
-			NetworkDBPoint endS = proc.runDijkstraNetworkRouting(networkDB, pnts, start, end, visited);
-			long routingTime = System.nanoTime() ;
-			Collection<Entity> objects = proc.prepareRoutingResults(networkDB, endS, new TLongObjectHashMap<>(), visited[0]);
-			long prepTime = System.nanoTime();
-			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-rt.osm"));
-			System.out.printf("Routing finished %.2f ms: load data %.2f ms, route %.2f ms, prep result %.2f ms\n", 
-					(prepTime - startTime) / 1e6, (loadTime - startTime) / 1e6, (routingTime - loadTime) / 1e6,
-					(prepTime - routingTime) / 1e6);
-			
-		}
-		networkDB.close();
-	}
-
-
-
-	//////////////////////// UTILITIES /////////////////
-
-	private void prepareContext(BinaryMapIndexReader reader) {
-		this.reader = reader;
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		Builder builder = RoutingConfiguration.getDefault();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		Map<String, String> map = new TreeMap<String, String>();
-		map.put("avoid_ferries", "true");
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
-		config.planRoadDirection = 1;
-		config.heuristicCoefficient = 0; // dijkstra
-		ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },RouteCalculationMode.NORMAL);
-	}
-
-	private List<Entity> visualizeWays(TLongObjectHashMap<RouteSegment> networkPoints, 
-			TLongObjectHashMap<List<RouteSegment>> networkPointsConnections , TLongObjectHashMap<RouteSegment> visitedSegments) {
-		List<Entity> objs = new ArrayList<>();
-		int nodes = 0;
-		int ways1 = 0;
-		int ways2 = 0;
-		if (visitedSegments != null) {
-			TLongSet viewed = new TLongHashSet();
-			TLongObjectIterator<RouteSegment> it = visitedSegments.iterator();
-			while (it.hasNext()) {
-				it.advance();
-				long pntKey = it.key();
-				if (!viewed.contains(pntKey)) {
-					RouteSegment s = it.value();
-					if (s == null) {
-						continue;
-					}
-					int d = (s.getSegmentStart() < s.getSegmentEnd() ? 1 : -1);
-					int segmentEnd = s.getSegmentEnd();
-					viewed.add(pntKey);
-					while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
-						RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
-						pntKey = calculateRoutePointInternalId(nxt);
-						if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
-							break;
-						}
-						viewed.add(pntKey);
-						segmentEnd += d;
-					}
-					Way w = convertRoad(s.getRoad(), s.getSegmentStart(), segmentEnd);
-					objs.add(w);
-					ways1++;
-				}
-			}
-		}
-		if (networkPoints != null) {
-			for (long key : networkPoints.keys()) {
-				RouteSegment r  = networkPoints.get(key);
-				LatLon l = getPoint(r); 
-				Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
-				n.putTag("highway", "stop");
-				n.putTag("name", r.getRoad().getId() / 64 + " " + r.getSegmentStart() + " " + r.getSegmentEnd());
-				objs.add(n);
-				nodes++;
-				if (networkPointsConnections != null && networkPointsConnections.containsKey(key)) {
-					for (RouteSegment conn : networkPointsConnections.get(key)) {
-						LatLon ln = getPoint(conn);
-						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
-						objs.add(n2);
-						Way w = new Way(DEBUG_OSM_ID--, Arrays.asList(n, n2));
-						w.putTag("highway", "motorway");
-						objs.add(w);
-						ways2++;
-					}
-				}
-			}
-		}
-		
-		System.out.printf("Total visited roads %d, total vertices %d, total stop %d connections - %.1f %% \n",
-				ways1, nodes, ways2, (ways2 / 2.0d) / (nodes * (nodes - 1) / 2.0) * 100.0 );
-		return objs;
-	}
-
-
-	private Way convertRoad(RouteDataObject road, int st, int end) {
-		Way w = new Way(DEBUG_OSM_ID--);
-		int[] tps = road.getTypes();
-		for (int i = 0; i < tps.length; i++) {
-			RouteTypeRule rtr = road.region.quickGetEncodingRule(tps[i]);
-			w.putTag(rtr.getTag(), rtr.getValue());
-		}
-		w.putTag("oid", (road.getId() / 64) + "");
-		while (true) {
-			double lon = MapUtils.get31LongitudeX(road.getPoint31XTile(st));
-			double lat = MapUtils.get31LatitudeY(road.getPoint31YTile(st));
-			w.addNode(new Node(lat, lon, DEBUG_OSM_ID--));
-			if (st == end) {
-				break;
-			} else if (st < end) {
-				st++;
-			} else {
-				st--;
-			}
-		}
-		return w;
-	}
-
-	private static void saveOsmFile(Collection<Entity> objects, File file)
-			throws FileNotFoundException, XMLStreamException, IOException {
-		OsmBaseStorage st = new OsmBaseStorage();
-		for (Entity e : objects) {
-			if (e instanceof Way) {
-				for (Node n : ((Way) e).getNodes()) {
-					st.registerEntity(n, null);
-				}
-			}
-			st.registerEntity(e, null);
-		}
-		
-		OsmStorageWriter w = new OsmStorageWriter();
-		FileOutputStream fous = new FileOutputStream(file);
-		w.saveStorage(fous, st, null, true);
-		fous.close();
-	}
-
-	//////////////////////////// BUILD NETWORK ////////////////////////
 	private void collectNetworkPoints(final FullNetwork network) throws IOException {
 		if (EX != null) {
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -778,12 +779,10 @@ public class BaseRoadNetworkProcessor {
 			addNode(osmObjects, pnt, getPoint(s), "highway", "stop"); //"place", "city");
 			List<RouteSegment> result = runDijsktra(brp, s, segments);
 			for (RouteSegment t : result) {
-				NetworkDBSegment segment = new NetworkDBSegment();
-				segment.start = pnt;
-				segment.dist = t.getDistanceFromStart();
-				segment.end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
+				NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
 						Math.min(t.getSegmentStart(), t.getSegmentEnd()),
 						Math.max(t.getSegmentStart(), t.getSegmentEnd())));
+				NetworkDBSegment segment = new NetworkDBSegment(t.getDistanceFromStart(), true, pnt, end);
 				pnt.connected.add(segment);
 				while (t != null) {
 					segment.geometry.add(getPoint(t));

@@ -27,8 +27,11 @@ class NetworkDB {
 
 
 	private Connection conn;
-	private PreparedStatement insertIntoSegment;
+	private PreparedStatement insertSegment;
+	private PreparedStatement insertGeometry;
 	private PreparedStatement loadGeometry;
+
+
 	private static int BATCH = 1000;
 	public static final int FULL_RECREATE = 0;
 	public static final int RECREATE_SEGMENTS = 1;
@@ -41,22 +44,23 @@ class NetworkDB {
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
 		Statement st = conn.createStatement();
 		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes, primary key (idPoint))");
-		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, geometry, PRIMARY key (idPoint, idConnPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, PRIMARY key (idPoint, idConnPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, PRIMARY key (idPoint, idConnPoint))");
 		if (recreate == RECREATE_SEGMENTS) {
-			insertIntoSegment = conn.prepareStatement(
-					"INSERT INTO segments(idPoint, idConnPoint, dist, geometry) " + " VALUES(?, ?, ?, ?)");
+			insertSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist) " + " VALUES(?, ?, ?)");
+			insertGeometry = conn.prepareStatement("INSERT INTO geometry(idPoint, idConnPoint, geometry) " + " VALUES(?, ?, ?)");
 			st.execute("DELETE FROM segments");
 		}
-		loadGeometry = conn.prepareStatement(
-				"SELECT geometry FROM segments WHERE idPoint = ? AND  idConnPoint =? ");
+		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint =? ");
 		st.close();
 	}
 
 	public void insertSegments(List<NetworkDBSegment> segments) throws SQLException {
 		for (NetworkDBSegment s : segments) {
-			insertIntoSegment.setLong(1, s.start.index);
-			insertIntoSegment.setLong(2, s.end.index);
-			insertIntoSegment.setDouble(3, s.dist);
+			insertSegment.setLong(1, s.start.index);
+			insertSegment.setLong(2, s.end.index);
+			insertSegment.setDouble(3, s.dist);
+			insertSegment.addBatch();
 //			byte[] coordinates = new byte[0];
 			byte[] coordinates = new byte[8 * s.geometry.size()];
 			for (int t = 0; t < s.geometry.size(); t++) {
@@ -64,10 +68,13 @@ class NetworkDB {
 				Algorithms.putIntToBytes(coordinates, 8 * t, MapUtils.get31TileNumberX(l.getLongitude()));
 				Algorithms.putIntToBytes(coordinates, 8 * t + 4, MapUtils.get31TileNumberY(l.getLatitude()));
 			}
-			insertIntoSegment.setBytes(4, coordinates);
-			insertIntoSegment.addBatch();
+			insertGeometry.setLong(1, s.start.index);
+			insertGeometry.setLong(2, s.end.index);
+			insertGeometry.setBytes(3, coordinates);
+			insertGeometry.addBatch();
 		}
-		insertIntoSegment.executeBatch();
+		insertSegment.executeBatch();
+		insertGeometry.executeBatch();
 	}
 	
 	public void loadGeometry(NetworkDBSegment segment) throws SQLException {
@@ -79,23 +86,21 @@ class NetworkDB {
 		}
 	}
 	
-	public void loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points, boolean geometry) throws SQLException {
+	public void loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points) throws SQLException {
 		TLongObjectHashMap<NetworkDBPoint> pntsById = new TLongObjectHashMap<>();
 		for (NetworkDBPoint p : points.valueCollection()) {
 			pntsById.put(p.index, p);
 		}
 		Statement st = conn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT idPoint, idConnPoint, dist" + (geometry ? ", geometry" : "")+ " from segments");
+		ResultSet rs = st.executeQuery("SELECT idPoint, idConnPoint, dist from segments");
 		while (rs.next()) {
-			NetworkDBPoint point = pntsById.get(rs.getLong(1));
-			NetworkDBSegment segment = new NetworkDBSegment();
-			segment.dist = rs.getDouble(3);
-			segment.start = point;
-			segment.end = pntsById.get(rs.getLong(2));
-			if (geometry) {
-				parseGeometry(segment, rs.getBytes(4));
-			}
-			point.connected.add(segment);
+			NetworkDBPoint start = pntsById.get(rs.getLong(1));
+			NetworkDBPoint end = pntsById.get(rs.getLong(2));
+			double dist = rs.getDouble(3);
+			NetworkDBSegment segment = new NetworkDBSegment(dist, true, start, end);
+			NetworkDBSegment rev = new NetworkDBSegment(dist, false, end, start);
+			start.connected.add(segment);
+			start.connectedReverse.add(rev);
 		}
 		rs.close();
 		st.close();
@@ -176,9 +181,18 @@ class NetworkDB {
 	
 	
 	static class NetworkDBSegment {
-		NetworkDBPoint start;
-		NetworkDBPoint end;
-		double dist;
+		final boolean direction;
+		final NetworkDBPoint start;
+		final NetworkDBPoint end;
+		final double dist;
+		
+		public NetworkDBSegment(double dist, boolean direction, NetworkDBPoint start, NetworkDBPoint end) {
+			this.direction = direction;
+			this.start = start;
+			this.end = end;
+			this.dist = dist;
+		}
+		
 		double rtDistanceToEnd; // added once in queue
 		List<LatLon> geometry = new ArrayList<>();
 		
@@ -200,7 +214,9 @@ class NetworkDB {
 		public int endX;
 		public int endY;
 		public int[] indexes;
+		
 		List<NetworkDBSegment> connected = new ArrayList<NetworkDBSegment>();
+		List<NetworkDBSegment> connectedReverse = new ArrayList<NetworkDBSegment>();
 		
 		// for routing
 		NetworkDBSegment rtRouteToPoint;
