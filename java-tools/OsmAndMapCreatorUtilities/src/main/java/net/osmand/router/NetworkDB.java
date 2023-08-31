@@ -179,6 +179,7 @@ class NetworkDB {
 		NetworkDBPoint start;
 		NetworkDBPoint end;
 		double dist;
+		double rtDistanceToEnd; // added once in queue
 		List<LatLon> geometry = new ArrayList<>();
 		
 		@Override
@@ -204,6 +205,7 @@ class NetworkDB {
 		// for routing
 		NetworkDBSegment rtRouteToPoint;
 		double rtDistanceFromStart;
+		
 		
 		@Override
 		public String toString() {

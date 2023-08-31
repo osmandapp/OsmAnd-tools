@@ -890,21 +890,28 @@ public class BaseRoadNetworkProcessor {
 	
 	////////////////////////////////////// ROUTING ////////////////////////////////////////////////	
 
+
+	private double distanceToEnd(NetworkDBPoint s, NetworkDBPoint end) {
+		LatLon p1 = getPoint(end);
+		LatLon p2 = getPoint(s);
+		return MapUtils.getDistance(p1, p2) / ctx.getRouter().getMaxSpeed();
+	}
+	
 	private Collection<Entity> runDijkstraNetworkRouting(NetworkDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
 			NetworkDBPoint end) throws SQLException {
 		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<>();
 		int visited = 0;
+		final float heuristicCoefficient = 1;
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override
 			public int compare(NetworkDBSegment o1, NetworkDBSegment o2) {
-//				return Double.compare(o1DistanceFromStart + heuristicCoefficient * o1DistanceToEnd, 
-//						o2DistanceFromStart + heuristicCoefficient *  o2DistanceToEnd);
-				return Double.compare(o1.start.rtDistanceFromStart + o1.dist, o2.start.rtDistanceFromStart + o2.dist);
+				return Double.compare(o1.start.rtDistanceFromStart + o1.dist + heuristicCoefficient * o1.rtDistanceToEnd,
+						o2.start.rtDistanceFromStart + o2.dist + heuristicCoefficient * o2.rtDistanceToEnd);
 			}
 		});
-		start.rtDistanceFromStart = 0.1;
-		queue.addAll(start.connected);
+		start.rtDistanceFromStart = 0.1; // visited
+		addToQueue(queue, start, end);
 		while (!queue.isEmpty()) {
 			NetworkDBSegment segment = queue.poll();
 			// already visited
@@ -912,16 +919,23 @@ public class BaseRoadNetworkProcessor {
 				continue;
 			}
 			visited++;
-			System.out.printf("Visit Point %d from %d (%.1f m from start) %.5f/%.5f - %d\n" , segment.end.index, segment.start.index, 
-					(segment.start.rtDistanceFromStart + segment.dist), 
+			
+			System.out.printf("Visit Point %d from %d (%.1f m from start) %.5f/%.5f - %d\n", segment.end.index, segment.start.index, (segment.start.rtDistanceFromStart + segment.dist),
 					MapUtils.get31LatitudeY(segment.end.startY), MapUtils.get31LongitudeX(segment.end.startX), segment.end.roadId / 64);
 			segment.end.rtRouteToPoint = segment;
 			segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist;
 			if (segment.end.index == end.index) {
 				break;
 			}
-			queue.addAll(segment.end.connected);
+			addToQueue(queue, segment.end, end);
 		}
+		return prepareRoutingResults(networkDB, end, entities, visited);
+	}
+
+
+
+	private Collection<Entity> prepareRoutingResults(NetworkDB networkDB, NetworkDBPoint end,
+			TLongObjectHashMap<Entity> entities, int visited) throws SQLException {
 		System.out.println("-----");
 		if (end.rtRouteToPoint != null) {
 			NetworkDBSegment parent = end.rtRouteToPoint;
@@ -942,5 +956,15 @@ public class BaseRoadNetworkProcessor {
 		}
 		System.out.println(String.format("Found final route - cost %.2f, %d depth, visited %d vertices", end.rtDistanceFromStart, entities.size(), visited));
 		return entities.valueCollection();
+	}
+
+
+
+
+	private void addToQueue(PriorityQueue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish) {
+		for (NetworkDBSegment connected : start.connected) {
+			connected.rtDistanceToEnd = distanceToEnd(connected.end, finish);
+			queue.add(connected);
+		}
 	}
 }
