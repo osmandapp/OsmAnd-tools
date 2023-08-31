@@ -98,9 +98,9 @@ class NetworkDB {
 			NetworkDBPoint end = pntsById.get(rs.getLong(2));
 			double dist = rs.getDouble(3);
 			NetworkDBSegment segment = new NetworkDBSegment(dist, true, start, end);
-			NetworkDBSegment rev = new NetworkDBSegment(dist, false, end, start);
+			NetworkDBSegment rev = new NetworkDBSegment(dist, false, start, end);
 			start.connected.add(segment);
-			start.connectedReverse.add(rev);
+			end.connectedReverse.add(rev);
 		}
 		rs.close();
 		st.close();
