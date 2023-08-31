@@ -281,12 +281,17 @@ public class BaseRoadNetworkProcessor {
 //			NetworkDBPoint end = pnts.get(1143); // 42.45166, 18.54425
 			
 			
-			long loadTime = System.nanoTime() - startTime;
+			long loadTime = System.nanoTime();
 			// Routing
-			Collection<Entity> objects = proc.runDijkstraNetworkRouting(networkDB, pnts, start, end);
-			long routingTime = System.nanoTime() - startTime - loadTime;
+			int[] visited = new int[1];
+			NetworkDBPoint endS = proc.runDijkstraNetworkRouting(networkDB, pnts, start, end, visited);
+			long routingTime = System.nanoTime() ;
+			Collection<Entity> objects = proc.prepareRoutingResults(networkDB, endS, new TLongObjectHashMap<>(), visited[0]);
+			long prepTime = System.nanoTime();
 			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-rt.osm"));
-			System.out.printf("Routing finished %.2f ms, load data %.2f ms\n", routingTime / 1e6, loadTime / 1e6);
+			System.out.printf("Routing finished %.2f ms: load data %.2f ms, route %.2f ms, prep result %.2f ms\n", 
+					(prepTime - startTime) / 1e6, (loadTime - startTime) / 1e6, (routingTime - loadTime) / 1e6,
+					(prepTime - routingTime) / 1e6);
 			
 		}
 		networkDB.close();
@@ -897,10 +902,10 @@ public class BaseRoadNetworkProcessor {
 		return MapUtils.getDistance(p1, p2) / ctx.getRouter().getMaxSpeed();
 	}
 	
-	private Collection<Entity> runDijkstraNetworkRouting(NetworkDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
-			NetworkDBPoint end) throws SQLException {
-		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<>();
-		int visited = 0;
+	private NetworkDBPoint runDijkstraNetworkRouting(NetworkDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
+			NetworkDBPoint end, int[] visited ) throws SQLException {
+		
+		
 		final float heuristicCoefficient = 1;
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
@@ -918,7 +923,7 @@ public class BaseRoadNetworkProcessor {
 			if (segment.end.rtDistanceFromStart > 0) { // segment.end.rtRouteToPoint != null
 				continue;
 			}
-			visited++;
+			visited[0]++;
 			
 			System.out.printf("Visit Point %d from %d (%.1f m from start) %.5f/%.5f - %d\n", segment.end.index, segment.start.index, (segment.start.rtDistanceFromStart + segment.dist),
 					MapUtils.get31LatitudeY(segment.end.startY), MapUtils.get31LongitudeX(segment.end.startX), segment.end.roadId / 64);
@@ -929,7 +934,7 @@ public class BaseRoadNetworkProcessor {
 			}
 			addToQueue(queue, segment.end, end);
 		}
-		return prepareRoutingResults(networkDB, end, entities, visited);
+		return end;
 	}
 
 
