@@ -75,7 +75,7 @@ public class BaseRoadNetworkProcessor {
 	private static final boolean ALL_VERTICES = false;
 	protected static int LIMIT_START = 0;//100
 	protected static int LIMIT = -1;
-	protected static int PROCESS = BUILD_NETWORK_POINTS;
+	protected static int PROCESS = RUN_ROUTING;
 	
 	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685); // 337 - 4
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 - 12
@@ -241,7 +241,8 @@ public class BaseRoadNetworkProcessor {
 	public static void main(String[] args) throws Exception {
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_noord-holland_europe_2.road.obf";
-		name = "Ukraine_europe_2.road.obf";
+		name = "Netherlands_europe_2.road.obf";
+//		name = "Ukraine_europe_2.road.obf";
 		File obfFile = new File(System.getProperty("maps.dir"), name);
 		
 		RandomAccessFile raf = new RandomAccessFile(obfFile, "r"); 
@@ -267,12 +268,19 @@ public class BaseRoadNetworkProcessor {
 			long startTime = System.nanoTime();
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
 			networkDB.loadNetworkSegments(pnts, false);
-			NetworkDBPoint start = pnts.get(1263);// 43.15274, 19.55169
-//			NetworkDBPoint start = pnts.get(1659);// 42.4542877, 18.5585636
-//			NetworkDBPoint end = pnts.get(253); // 43.16624, 19.55463
-//			NetworkDBPoint end = pnts.get(1861); // 43.11556 19.45290 
-//			 NetworkDBPoint end = pnts.get(1733); // 42.955495, 19.0972263
-			NetworkDBPoint end = pnts.get(1143); // 42.45166, 18.54425
+			
+			// "Netherlands_europe_2.road.obf"
+			NetworkDBPoint start = pnts.get(45928); // 52.34800, 4.86206 - 7381563 - Ams
+//			NetworkDBPoint end = pnts.get(45074); // 51.57803, 4.79922 - 690258632 - Breda
+			NetworkDBPoint end = pnts.get(13273); // 51.35076, 5.45141 - 551932122 - ~Eindhoven
+			
+			// "Montenegro_europe_2.road.obf"
+//			NetworkDBPoint start = pnts.get(1263);// 43.15274, 19.55169
+////			NetworkDBPoint start = pnts.get(1659);// 42.4542877, 18.5585636
+////			NetworkDBPoint end = pnts.get(1861); // 43.11556 19.45290 
+//			NetworkDBPoint end = pnts.get(1143); // 42.45166, 18.54425
+			
+			
 			long loadTime = System.nanoTime() - startTime;
 			// Routing
 			Collection<Entity> objects = proc.runDijkstraNetworkRouting(networkDB, pnts, start, end);
@@ -431,7 +439,7 @@ public class BaseRoadNetworkProcessor {
 							MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
 							MapUtils.get31TileNumberY(latbottom), 16, null), routeRegion.getSubregions());
 			int[] cnt = new int[1];
-			final int estimatedRoads = 1 + routeRegion.getLength() / 200; // 5 000 / 1 MB - 1 per 200 Byte 
+			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte 
 			reader.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
 
 				@Override
@@ -771,7 +779,9 @@ public class BaseRoadNetworkProcessor {
 				}
 			}
 			networkDB.insertSegments(pnt.connected);
-			
+			if (VERBOSE_LEVEL >= 2) {
+				System.out.println(ctx.calculationProgress.getInfo(null));
+			}
 			
 			maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph, ctx.calculationProgress.visitedDirectSegments);
 			totalVisitedDirectSegments += ctx.calculationProgress.visitedDirectSegments;
@@ -779,8 +789,10 @@ public class BaseRoadNetworkProcessor {
 			totalFinalSegmentsFound += ctx.calculationProgress.finalSegmentsFound;
 			
 			double timeLeft = (System.currentTimeMillis() - tm) / 1000.0 * (networkPoints.size() / (ind + 1) - 1);
-			System.out.println(String.format("%.2f%% Process %d (%d shortcuts) - %.1f ms left %.1f sec",
+			if (VERBOSE_LEVEL >= 1) {
+				System.out.println(String.format("%.2f%% Process %d (%d shortcuts) - %.1f ms left %.1f sec",
 							ind++ / sz, s.getRoad().getId() / 64, result.size(), (System.nanoTime() - nt) / 1.0e6, timeLeft));
+			}
 			if (ind > LIMIT && LIMIT != -1) {
 				break;
 			}
@@ -863,7 +875,6 @@ public class BaseRoadNetworkProcessor {
 			}
 		}
 		
-		System.out.println(ctx.calculationProgress.getInfo(null));
 		if (rm1 != null) {
 			segments.put(pnt1, rm1);
 		}
