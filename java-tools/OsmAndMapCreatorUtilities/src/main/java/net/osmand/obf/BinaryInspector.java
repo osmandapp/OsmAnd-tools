@@ -92,7 +92,7 @@ public class BinaryInspector {
 //					"-latlon=50.73381,7.08721",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Montenegro_europe_2.road.obf"
+					System.getProperty("maps.dir") + "Netherlands_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -512,7 +512,7 @@ public class BinaryInspector {
 					partname = "Address";
 				}
 				String name = p.getName() == null ? "" : p.getName();
-				println(MessageFormat.format("{0} {1} data {3} - {2,number,#} bytes",
+				println(MessageFormat.format("{0} {1} data {3} - {2,number,#,###} bytes",
 						new Object[]{i, partname, p.getLength(), name}));
 				if(p instanceof TransportIndex){
 					TransportIndex ti = ((TransportIndex) p);
@@ -535,7 +535,7 @@ public class BinaryInspector {
 					int j = 1;
 					
 					for (MapRoot mi : m.getRoots()) {
-						println(MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2,number,#} bytes \n\t\tBounds {3}",
+						println(MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2,number,#,###} bytes \n\t\tBounds {3}",
 								new Object[] {
 								mi.getMinZoom(), mi.getMaxZoom(), mi.getLength(), 
 								formatBounds(mi.getLeft(), mi.getRight(), mi.getTop(), mi.getBottom()), 

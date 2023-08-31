@@ -75,7 +75,7 @@ public class BaseRoadNetworkProcessor {
 	private static final boolean ALL_VERTICES = false;
 	protected static int LIMIT_START = 0;//100
 	protected static int LIMIT = -1;
-	protected static int PROCESS = RUN_ROUTING;
+	protected static int PROCESS = BUILD_NETWORK_POINTS;
 	
 	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685); // 337 - 4
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 - 12
@@ -241,7 +241,7 @@ public class BaseRoadNetworkProcessor {
 	public static void main(String[] args) throws Exception {
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_noord-holland_europe_2.road.obf";
-//		name = "Ukraine_europe_2.road.obf";
+		name = "Ukraine_europe_2.road.obf";
 		File obfFile = new File(System.getProperty("maps.dir"), name);
 		
 		RandomAccessFile raf = new RandomAccessFile(obfFile, "r"); 
@@ -421,14 +421,17 @@ public class BaseRoadNetworkProcessor {
 			network.addCluster(cluster, pnt);
 			return;
 		}
-		double lattop = 85, latbottom = -85, lonleft = -179.9, lonright = 179.9;	
+		double lattop = 85, latbottom = -85, lonleft = -179.9, lonright = 179.9;
+		int indRegion = 0;
 		for (RouteRegion routeRegion : reader.getRoutingIndexes()) {
+			System.out.println("------------------------");
+			System.out.printf("------------------------\n Region %s %d of %d \n", routeRegion.getName(), ++indRegion, reader.getRoutingIndexes().size());
 			List<RouteSubregion> regions = reader
 					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
 							MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
 							MapUtils.get31TileNumberY(latbottom), 16, null), routeRegion.getSubregions());
 			int[] cnt = new int[1];
-
+			final int estimatedRoads = 1 + routeRegion.getLength() / 200; // 5 000 / 1 MB - 1 per 200 Byte 
 			reader.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
 
 				@Override
@@ -456,7 +459,7 @@ public class BaseRoadNetworkProcessor {
 								nwPoints * (nwPoints - 1) / 2, pntAround));
 						network.addCluster(cluster, pntAround);
 						System.out.println(String.format("%d %.2f%%: %d points -> %d border points, %d clusters",
-								cnt[0], cnt[0] / 1000.0f, network.visitedPointsCluster.size(),
+								cnt[0], cnt[0] * 100.0f / estimatedRoads , network.visitedPointsCluster.size(),
 								network.networkPointsCluster.size(), network.clusters.size()));
 					}
 					return false;
