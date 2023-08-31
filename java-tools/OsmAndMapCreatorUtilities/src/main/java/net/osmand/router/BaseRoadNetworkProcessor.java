@@ -62,14 +62,14 @@ import net.osmand.util.MapUtils;
 
 // 2nd phase - improvements
 // 2.1 Merge islands that are isolated
-// 2.2 Better points distribution
+// 2.2 Better points distribution (a) island counts b) island border points c) island size)
 
 // 3rd phase - speedup & Test
 // 3.1 Speed up processing NL [400 MB - ~ 1-1.5% of World data] - [8 min + 9 min = 17 min]
 //     ~ World processing - 1 360 min - ~ 22h ?
 // 3.2 Make process parallelized 
 // 3.3? Make process rerunable ? (so you could stop any point)
-// 3.4 Generate Germany / World for testing speat
+// 3.4 Generate Germany / World for testing speed
 
 // 4th phase - complex routing / data
 // 4.1 Implement final routing algorithm including start / end segment search 
@@ -92,10 +92,10 @@ public class BaseRoadNetworkProcessor {
 	final static int BUILD_NETWORK_SEGMENTS = 2;
 	final static int RUN_ROUTING = 3;
 	
-	private static final boolean ALL_VERTICES = false;
+	private static final boolean ALL_VERTICES = true;
 	protected static int LIMIT_START = 0;//100
 	protected static int LIMIT = -1;
-	protected static int PROCESS = RUN_ROUTING;
+	protected static int PROCESS = BUILD_NETWORK_SEGMENTS;
 	
 	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685); // 337 - 4
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 - 12
@@ -261,7 +261,7 @@ public class BaseRoadNetworkProcessor {
 	public static void main(String[] args) throws Exception {
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_noord-holland_europe_2.road.obf";
-		name = "Netherlands_europe_2.road.obf";
+//		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 		File obfFile = new File(System.getProperty("maps.dir"), name);
 		
@@ -290,16 +290,17 @@ public class BaseRoadNetworkProcessor {
 			networkDB.loadNetworkSegments(pnts, false);
 			
 			// "Netherlands_europe_2.road.obf"
-			NetworkDBPoint start = pnts.get(45928); // 52.34800, 4.86206 - 7381563 - Ams
-//			NetworkDBPoint end = pnts.get(45074); // 51.57803, 4.79922 - 690258632 - Breda
-			NetworkDBPoint end = pnts.get(13273); // 51.35076, 5.45141 - 551932122 - ~Eindhoven
+//			NetworkDBPoint start = pnts.get(45928); // 52.34800, 4.86206 - 7381563 - Ams
+////			NetworkDBPoint end = pnts.get(45074); // 51.57803, 4.79922 - 690258632 - Breda
+//			NetworkDBPoint end = pnts.get(13273); // 51.35076, 5.45141 - 551932122 - ~Eindhoven
 			
 			// "Montenegro_europe_2.road.obf"
+			NetworkDBPoint start = pnts.get(454);
 //			NetworkDBPoint start = pnts.get(1263);// 43.15274, 19.55169
 ////			NetworkDBPoint start = pnts.get(1659);// 42.4542877, 18.5585636
 ////			NetworkDBPoint end = pnts.get(1861); // 43.11556 19.45290 
 //			NetworkDBPoint end = pnts.get(1143); // 42.45166, 18.54425
-			
+			NetworkDBPoint end = pnts.get(1581); 
 			
 			long loadTime = System.nanoTime();
 			// Routing
@@ -767,9 +768,9 @@ public class BaseRoadNetworkProcessor {
 		int totalFinalSegmentsFound = 0;
 		int totalVisitedDirectSegments = 0;
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
-//			if (pnt.index != 2005)   { 
-//				continue;
-//			}
+			if (pnt.index > 2000 || pnt.index < 1800)   { 
+				continue;
+			}
 			long nt = System.nanoTime();
 			RouteSegment s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
 			while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
@@ -780,7 +781,7 @@ public class BaseRoadNetworkProcessor {
 				throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
 			}
 			
-			addNode(osmObjects, pnt, getPoint(s), "place", "city");
+			addNode(osmObjects, pnt, getPoint(s), "highway", "stop"); //"place", "city");
 			List<RouteSegment> result = runDijsktra(brp, s, segments);
 			for (RouteSegment t : result) {
 				NetworkDBSegment segment = new NetworkDBSegment();
@@ -924,8 +925,6 @@ public class BaseRoadNetworkProcessor {
 	
 	private NetworkDBPoint runDijkstraNetworkRouting(NetworkDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
 			NetworkDBPoint end, int[] visited ) throws SQLException {
-		
-		
 		final float heuristicCoefficient = 1;
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
@@ -944,7 +943,6 @@ public class BaseRoadNetworkProcessor {
 				continue;
 			}
 			visited[0]++;
-			
 			System.out.printf("Visit Point %d from %d (%.1f m from start) %.5f/%.5f - %d\n", segment.end.index, segment.start.index, (segment.start.rtDistanceFromStart + segment.dist),
 					MapUtils.get31LatitudeY(segment.end.startY), MapUtils.get31LongitudeX(segment.end.startX), segment.end.roadId / 64);
 			segment.end.rtRouteToPoint = segment;
