@@ -49,6 +49,20 @@ import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
 
+
+// TODO 
+// 1st phase - investigation
+// 1.1 TODO think that island is not possible shortest way to reach boundaries
+// 1.2 TODO check toVisitVertices including depth
+// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
+// 1.4 BinaryRoutePlanner TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
+// 1.5 BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
+// 1.6 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// 1.7 BinaryRoutePlanner TODO test that routing time is different with on & off!
+
+// 2nd phase - improvements
+// 2.1 Merge islands that are isolated
+// 2.2 Better points distribution
 public class BaseRoadNetworkProcessor {
 
 	private static long ID = -1;
@@ -253,12 +267,10 @@ public class BaseRoadNetworkProcessor {
 			long startTime = System.nanoTime();
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
 			networkDB.loadNetworkSegments(pnts, false);
-			// TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
-			// TODO think that island is not possible shortest way to reach boundaries
 			NetworkDBPoint start = pnts.get(1263);// 43.15274, 19.55169
 //			NetworkDBPoint start = pnts.get(1659);// 42.4542877, 18.5585636
 //			NetworkDBPoint end = pnts.get(253); // 43.16624, 19.55463
-//			NetworkDBPoint end = pnts.get(1861); // 43.35282, 19.32487 - 1445 
+//			NetworkDBPoint end = pnts.get(1861); // 43.11556 19.45290 
 //			 NetworkDBPoint end = pnts.get(1733); // 42.955495, 19.0972263
 			NetworkDBPoint end = pnts.get(1143); // 42.45166, 18.54425
 			long loadTime = System.nanoTime() - startTime;
@@ -509,7 +521,7 @@ public class BaseRoadNetworkProcessor {
 		List<RouteSegment> potentialNetworkPoints = new ArrayList<>(c.toVisitVertices.valueCollection());
 		c.printCurentState("MERGE", 2);
 		for (RouteSegment t : potentialNetworkPoints) {
-			// TODO check toVisitVertices including depth
+			// 1.3 TODO check toVisitVertices including depth
 			if (c.toVisitVertices.size() >= MAX_BLOCKERS) {
 				break;
 			}
@@ -706,8 +718,8 @@ public class BaseRoadNetworkProcessor {
 		int ind = 0;
 		long tm = System.currentTimeMillis();
 		BinaryRoutePlanner brp = new BinaryRoutePlanner();
-		// TODO for long distance causes bugs ((pnt.index < 100 || pnt.index > 500) && pnt.index != 1263) 1263 -> 263 pnt (269 vs 299) 
-//		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
+		// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
+		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
 		TLongObjectHashMap<RouteSegment> segments = new  TLongObjectHashMap<>(); 
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end), new RouteSegment(null, pnt.start, pnt.end));
@@ -719,7 +731,7 @@ public class BaseRoadNetworkProcessor {
 		int totalFinalSegmentsFound = 0;
 		int totalVisitedDirectSegments = 0;
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
-//			if ((pnt.index < 100 || pnt.index > 500) && pnt.index != 1263)   { 
+//			if (pnt.index != 2005)   { 
 //				continue;
 //			}
 			long nt = System.nanoTime();
@@ -886,9 +898,9 @@ public class BaseRoadNetworkProcessor {
 				continue;
 			}
 			visited++;
-			System.out.printf("Visit Point %d from %d (%.1f m from start) %.5f/%.5f \n" , segment.end.index, segment.start.index, 
-					(segment.start.rtDistanceFromStart + segment.dist),
-					MapUtils.get31LatitudeY(segment.end.startY), MapUtils.get31LongitudeX(segment.end.startX));
+			System.out.printf("Visit Point %d from %d (%.1f m from start) %.5f/%.5f - %d\n" , segment.end.index, segment.start.index, 
+					(segment.start.rtDistanceFromStart + segment.dist), 
+					MapUtils.get31LatitudeY(segment.end.startY), MapUtils.get31LongitudeX(segment.end.startX), segment.end.roadId / 64);
 			segment.end.rtRouteToPoint = segment;
 			segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist;
 			if (segment.end.index == end.index) {
@@ -909,8 +921,8 @@ public class BaseRoadNetworkProcessor {
 			double sumDist = 0;
 			for (NetworkDBSegment s : segments) {
 				sumDist += s.dist;
-				System.out.printf("Route %d -> %d ( %.5f/%.5f - %.2f s) \n", s.start.index, s.end.index,
-						MapUtils.get31LatitudeY(s.end.startY), MapUtils.get31LongitudeX(s.end.startX), sumDist);
+				System.out.printf("Route %d -> %d ( %.5f/%.5f - %d - %.2f s) \n", s.start.index, s.end.index,
+						MapUtils.get31LatitudeY(s.end.startY), MapUtils.get31LongitudeX(s.end.startX), s.end.roadId / 64, sumDist);
 			}
 			
 		}
