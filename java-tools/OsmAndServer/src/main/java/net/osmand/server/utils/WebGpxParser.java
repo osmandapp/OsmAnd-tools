@@ -363,11 +363,11 @@ public class WebGpxParser {
                 for (Point point : track.points) {
                     if (point.geometry != null) {
                         for (Point p : point.geometry) {
-                            p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(point.geometry.indexOf(p) + pointsSize).value;
+                            p.srtmEle = srtmAnalysis.pointAttributes.get(point.geometry.indexOf(p) + pointsSize).elevation;
                         }
                         pointsSize += point.geometry.size();
                     } else {
-                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
+                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.pointAttributes.get(track.points.indexOf(p)).elevation);
                     }
                 }
             }
@@ -381,19 +381,19 @@ public class WebGpxParser {
                 if (point.geometry != null) {
                     for (Point p : point.geometry) {
                         int ind = point.geometry.indexOf(p);
-                        if (ind + pointsSize < analysis.getElevationData().getAttributes().size()) {
-                            p.distance = analysis.getElevationData().getPointAttribute(ind + pointsSize).distance;
+                        if (ind + pointsSize < analysis.pointAttributes.size()) {
+                            p.distance = analysis.pointAttributes.get(ind + pointsSize).distance;
                             if (addSpeed) {
-                                p.speed = analysis.getSpeedData().getPointAttribute(ind + pointsSize).value;
+                                p.speed = analysis.pointAttributes.get(ind + pointsSize).speed;
                             }
                         }
                     }
                 } else {
                     int ind = track.points.indexOf(point);
-                    if (ind < analysis.getElevationData().getAttributes().size()) {
-                        point.distance = analysis.getElevationData().getPointAttribute(ind).distance;
+                    if (ind < analysis.pointAttributes.size()) {
+                        point.distance = analysis.pointAttributes.get(ind).distance;
                         if (addSpeed) {
-                            point.speed = analysis.getSpeedData().getPointAttribute(ind).value;
+                            point.speed = analysis.pointAttributes.get(ind).speed;
                         }
                     }
                 }

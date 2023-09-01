@@ -3,7 +3,7 @@ package net.osmand.server.api.services;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.PointAttribute;
+import net.osmand.gpx.PointAttributes;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
@@ -52,7 +52,7 @@ public class GpxService {
         gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
         if (analysis != null) {
             boolean addSpeed = analysis.avgSpeed != 0.0 && !analysis.hasSpeedInTrack;
-            if (!gpxData.tracks.isEmpty() && (!analysis.getElevationData().getAttributes().isEmpty() || addSpeed)) {
+            if (!gpxData.tracks.isEmpty() && (!analysis.pointAttributes.isEmpty() || addSpeed)) {
                 webGpxParser.addAdditionalInfo(gpxData.tracks, analysis, addSpeed);
             }
         }
@@ -181,27 +181,28 @@ public class GpxService {
         }
         cleanupFromNan(analysis.locationStart);
         cleanupFromNan(analysis.locationEnd);
-        Iterator<PointAttribute.Speed> itS = analysis.getSpeedData().getAttributes().iterator();
+
+        Iterator<PointAttributes> iterator = analysis.pointAttributes.iterator();
         float sumDist = 0;
-        while (itS.hasNext()) {
-            PointAttribute.Speed sp = itS.next();
-            if (Float.isNaN(sp.value)) {
-                sumDist += sp.distance;
-                itS.remove();
+        while (iterator.hasNext()) {
+            PointAttributes attributes = iterator.next();
+            if (Float.isNaN(attributes.speed)) {
+                sumDist += attributes.distance;
+                iterator.remove();
             } else if (sumDist > 0) {
-                sp.distance += sumDist;
+                attributes.distance += sumDist;
                 sumDist = 0;
             }
         }
-        Iterator<PointAttribute.Elevation> itE = analysis.getElevationData().getAttributes().iterator();
+        iterator = analysis.pointAttributes.iterator();
         sumDist = 0;
-        while (itE.hasNext()) {
-            PointAttribute.Elevation e = itE.next();
-            if (Float.isNaN(e.value)) {
-                sumDist += e.distance;
-                itE.remove();
+        while (iterator.hasNext()) {
+            PointAttributes attributes = iterator.next();
+            if (Float.isNaN(attributes.elevation)) {
+                sumDist += attributes.distance;
+                iterator.remove();
             } else if (sumDist > 0) {
-                e.distance += sumDist;
+                attributes.distance += sumDist;
                 sumDist = 0;
             }
         }

@@ -441,7 +441,8 @@ public class MapApiController {
 			file.details = new JsonObject();
 		}
 		if (analysis != null) {
-			analysis.pointsAttributesData.clear();
+			analysis.pointAttributes.clear();
+			analysis.availableAttributes.clear();
 		}
 		file.details.add(tag, gsonWithNans.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
