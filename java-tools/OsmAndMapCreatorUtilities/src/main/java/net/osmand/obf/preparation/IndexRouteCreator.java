@@ -138,6 +138,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private PreparedStatement basemapRouteInsertStat;
 	private MapRenderingTypesEncoder renderingTypes;
 	private IndexCreatorSettings settings;
+	private Set<String> propagateToNodes = new HashSet<>();
 
 
 	private class RouteMissingPoints {
@@ -160,6 +161,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		this.logMapDataWarn = logMapDataWarn;
 		this.settings = settings;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
+		initPropagateToNodes();
 	}
 	
 	public void indexExtraRelations(OsmBaseStorage reader) {
@@ -1232,14 +1234,34 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	public void registerRestrictionNodes(Entity entity) {
 		if (entity instanceof Way) {
-			String waterway = entity.getTag("waterway");
-			if (waterway != null && WATERWAY_RESTRICTION.contains(waterway)) {
-				Way w = (Way) entity;
-				TLongArrayList ids = w.getNodeIds();
-				nodePropagatedIds.addAll(ids);
-				for (long id : ids.toArray()) {
-					nodePropagatedTags.put(id, w.getTags());
+			for (String propagate : propagateToNodes) {
+				String[] tagValue = propagate.split("/");
+				String propagateTag = tagValue[0];
+				String propagateValue = tagValue[1];
+				String entityTag = entity.getTag(propagateTag);
+				if (entityTag != null && entityTag.equals(propagateValue)) {
+					Way w = (Way) entity;
+					TLongArrayList ids = w.getNodeIds();
+					nodePropagatedIds.addAll(ids);
+					for (long id : ids.toArray()) {
+						Map<String, String> tags = nodePropagatedTags.get(id);
+						if (tags == null) {
+							tags = new HashMap<>();
+						}
+						tags.put(propagateTag, propagateValue);
+						nodePropagatedTags.put(id, tags);
+					}
 				}
+			}
+		}
+	}
+
+	private void initPropagateToNodes() {
+		Map<String, MapRenderingTypes.MapRulType> ruleTypes = renderingTypes.getEncodingRuleTypes();
+		for (Map.Entry<String, MapRenderingTypes.MapRulType> entry : ruleTypes.entrySet()) {
+			MapRenderingTypes.MapRulType ruleType = entry.getValue();
+			if (ruleType.isPropagateToNodes()) {
+				propagateToNodes.add(entry.getKey());
 			}
 		}
 	}
