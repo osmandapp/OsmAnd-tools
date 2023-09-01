@@ -20,7 +20,7 @@ import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
 
-public class HHRoutingBasePlanner {
+public class HHRoutePlanner {
 	private static String ROUTING_PROFILE = "car";
 	static int DEBUG_VERBOSE_LEVEL = 0;
 	
@@ -31,7 +31,7 @@ public class HHRoutingBasePlanner {
 
 
 	private RoutingContext ctx;
-	private HHRoutingBasePlanner(RoutingContext ctx) {
+	private HHRoutePlanner(RoutingContext ctx) {
 		this.ctx = ctx;
 	}
 	
@@ -94,7 +94,7 @@ public class HHRoutingBasePlanner {
 		String name = obfFile.getName();
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + ".db"),
 				HHRoutingPreparationDB.READ);
-		HHRoutingBasePlanner planner = new HHRoutingBasePlanner(prepareContext());
+		HHRoutePlanner planner = new HHRoutePlanner(prepareContext());
 		long startTime = System.nanoTime();
 		System.out.print("Loading points... ");
 		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);

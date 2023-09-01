@@ -12,13 +12,21 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import net.osmand.obf.*;
-import net.osmand.obf.diff.*;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.BinaryComparator;
+import net.osmand.obf.BinaryInspector;
+import net.osmand.obf.BinaryMerger;
+import net.osmand.obf.GenerateRegionTags;
+import net.osmand.obf.IconVisibility;
+import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.obf.diff.ObfDiffGenerator;
+import net.osmand.obf.diff.ObfDiffMerger;
+import net.osmand.obf.diff.ObfRegionSplitter;
+import net.osmand.obf.diff.RelationDiffGenerator;
 import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
@@ -31,7 +39,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
-import net.osmand.router.HHRoutingBasePlanner;
+import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.HHRoutingGraphCreator;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
@@ -111,7 +119,7 @@ public class MainUtilities {
 			} else if (utl.equals("hh-routing-prepare")) {
 				HHRoutingGraphCreator.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
-				HHRoutingBasePlanner.main(subArgsArray);
+				HHRoutePlanner.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("test-icons")) {
