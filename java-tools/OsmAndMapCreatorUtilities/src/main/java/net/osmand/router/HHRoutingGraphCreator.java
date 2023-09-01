@@ -1,18 +1,17 @@
 package net.osmand.router;
 
-import static net.osmand.router.HHRoutingUtilities.DEBUG_OSM_ID;
 import static net.osmand.router.HHRoutingUtilities.addWay;
 import static net.osmand.router.HHRoutingUtilities.calculateRoutePointInternalId;
 import static net.osmand.router.HHRoutingUtilities.getPoint;
 import static net.osmand.router.HHRoutingUtilities.makePositiveDir;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
+import static net.osmand.router.HHRoutingUtilities.visualizeWays;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -25,7 +24,6 @@ import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
 
-import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
@@ -34,12 +32,9 @@ import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
@@ -161,7 +156,7 @@ public class HHRoutingGraphCreator {
 			FullNetwork network = proc.new FullNetwork();
 			proc.collectNetworkPoints(network);
 			networkDB.insertPoints(network);
-			List<Entity> objects = proc.visualizeWays(network.visualPoints(), network.visualConnections(), 
+			List<Entity> objects = visualizeWays(network.visualPoints(), network.visualConnections(), 
 					network.visitedVertices);
 			saveOsmFile(objects, new File(folder, name + ".osm"));
 		} else if (PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS) {
@@ -173,12 +168,6 @@ public class HHRoutingGraphCreator {
 		networkDB.close();
 	}
 
-
-
-
-
-
-	//////////////////////// UTILITIES /////////////////
 
 	private void prepareContext(List<BinaryMapIndexReader> readers) {
 		this.readers = readers;
@@ -193,97 +182,9 @@ public class HHRoutingGraphCreator {
 		config.heuristicCoefficient = 0; // dijkstra
 		ctx = router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[readers.size()]), RouteCalculationMode.NORMAL);
 	}
-
-	private List<Entity> visualizeWays(TLongObjectHashMap<RouteSegment> networkPoints, 
-			TLongObjectHashMap<List<RouteSegment>> networkPointsConnections , TLongObjectHashMap<RouteSegment> visitedSegments) {
-		List<Entity> objs = new ArrayList<>();
-		int nodes = 0;
-		int ways1 = 0;
-		int ways2 = 0;
-		if (visitedSegments != null) {
-			TLongSet viewed = new TLongHashSet();
-			TLongObjectIterator<RouteSegment> it = visitedSegments.iterator();
-			while (it.hasNext()) {
-				it.advance();
-				long pntKey = it.key();
-				if (!viewed.contains(pntKey)) {
-					RouteSegment s = it.value();
-					if (s == null) {
-						continue;
-					}
-					int d = (s.getSegmentStart() < s.getSegmentEnd() ? 1 : -1);
-					int segmentEnd = s.getSegmentEnd();
-					viewed.add(pntKey);
-					while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
-						RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
-						pntKey = calculateRoutePointInternalId(nxt);
-						if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
-							break;
-						}
-						viewed.add(pntKey);
-						segmentEnd += d;
-					}
-					Way w = convertRoad(s.getRoad(), s.getSegmentStart(), segmentEnd);
-					objs.add(w);
-					ways1++;
-				}
-			}
-		}
-		if (networkPoints != null) {
-			for (long key : networkPoints.keys()) {
-				RouteSegment r  = networkPoints.get(key);
-				LatLon l = getPoint(r); 
-				Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
-				n.putTag("highway", "stop");
-				n.putTag("name", r.getRoad().getId() / 64 + " " + r.getSegmentStart() + " " + r.getSegmentEnd());
-				objs.add(n);
-				nodes++;
-				if (networkPointsConnections != null && networkPointsConnections.containsKey(key)) {
-					for (RouteSegment conn : networkPointsConnections.get(key)) {
-						LatLon ln = getPoint(conn);
-						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
-						objs.add(n2);
-						Way w = new Way(DEBUG_OSM_ID--, Arrays.asList(n, n2));
-						w.putTag("highway", "motorway");
-						objs.add(w);
-						ways2++;
-					}
-				}
-			}
-		}
-		
-		System.out.printf("Total visited roads %d, total vertices %d, total stop %d connections - %.1f %% \n",
-				ways1, nodes, ways2, (ways2 / 2.0d) / (nodes * (nodes - 1) / 2.0) * 100.0 );
-		return objs;
-	}
-
-
-	private Way convertRoad(RouteDataObject road, int st, int end) {
-		Way w = new Way(DEBUG_OSM_ID--);
-		int[] tps = road.getTypes();
-		for (int i = 0; i < tps.length; i++) {
-			RouteTypeRule rtr = road.region.quickGetEncodingRule(tps[i]);
-			w.putTag(rtr.getTag(), rtr.getValue());
-		}
-		w.putTag("oid", (road.getId() / 64) + "");
-		while (true) {
-			double lon = MapUtils.get31LongitudeX(road.getPoint31XTile(st));
-			double lat = MapUtils.get31LatitudeY(road.getPoint31YTile(st));
-			w.addNode(new Node(lat, lon, DEBUG_OSM_ID--));
-			if (st == end) {
-				break;
-			} else if (st < end) {
-				st++;
-			} else {
-				st--;
-			}
-		}
-		return w;
-	}
-
 	
 
-	//////////////////////////// BUILD NETWORK ////////////////////////
+	//////////////////////////// BUILD NETWORK ISLANDS ////////////////////////
 
 	class NetworkIsland {
 		final NetworkIsland parent;
@@ -711,7 +612,7 @@ public class HHRoutingGraphCreator {
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end), new RouteSegment(null, pnt.start, pnt.end));
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start), new RouteSegment(null, pnt.end, pnt.start));
-			addNode(osmObjects, pnt, null, "highway", "stop");
+			HHRoutingUtilities.addNode(osmObjects, pnt, null, "highway", "stop");
 		}
 		
 		
@@ -737,7 +638,7 @@ public class HHRoutingGraphCreator {
 				throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
 			}
 			
-			addNode(osmObjects, pnt, getPoint(s), "highway", "stop"); //"place", "city");
+			HHRoutingUtilities. addNode(osmObjects, pnt, getPoint(s), "highway", "stop"); //"place", "city");
 			List<RouteSegment> result = runDijsktra(brp, s, segments);
 			for (RouteSegment t : result) {
 				NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
@@ -786,20 +687,6 @@ public class HHRoutingGraphCreator {
 				maxDirectedPointsGraph, totalVisitedDirectSegments  / ind));
 		return osmObjects.valueCollection();
 	}
-
-
-
-	private void addNode(TLongObjectHashMap<Entity> osmObjects, NetworkDBPoint pnt, LatLon l, String tag, String val) {
-		if (l == null) {
-			l = pnt.getPoint();
-		}
-		Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
-		n.putTag(tag, val);
-		n.putTag("name", pnt.index + " " + pnt.roadId / 64 + " " + pnt.start + " " + pnt.end);
-		osmObjects.put(pnt.id, n);
-	}
-
-
 	
 	private List<RouteSegment> runDijsktra(BinaryRoutePlanner brp, RouteSegment s, TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
 		
@@ -835,9 +722,6 @@ public class HHRoutingGraphCreator {
 		}
 		return res;
 	}
-
-
-
 
 	
 }
