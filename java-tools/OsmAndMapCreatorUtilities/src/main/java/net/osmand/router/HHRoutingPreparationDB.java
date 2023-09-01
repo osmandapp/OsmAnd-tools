@@ -16,14 +16,14 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.router.BaseRoadNetworkProcessor.FullNetwork;
-import net.osmand.router.BaseRoadNetworkProcessor.NetworkIsland;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
+import net.osmand.router.HHRoutingGraphCreator.FullNetwork;
+import net.osmand.router.HHRoutingGraphCreator.NetworkIsland;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
-class NetworkDB {
-	private static final Log LOG = PlatformUtil.getLog(NetworkDB.class);
+public class HHRoutingPreparationDB {
+	private static final Log LOG = PlatformUtil.getLog(HHRoutingPreparationDB.class);
 
 
 	private Connection conn;
@@ -37,7 +37,7 @@ class NetworkDB {
 	public static final int RECREATE_SEGMENTS = 1;
 	public static final int READ = 2;
 
-	public NetworkDB(File file, int recreate) throws SQLException {
+	public HHRoutingPreparationDB(File file, int recreate) throws SQLException {
 		if (file.exists() && FULL_RECREATE == recreate) {
 			file.delete();
 		}
@@ -229,6 +229,11 @@ class NetworkDB {
 		@Override
 		public String toString() {
 			return String.format("Point %d (%d %d-%d)", index, roadId / 64, start, end);
+		}
+		
+		public LatLon getPoint() {
+			return new LatLon(MapUtils.get31LatitudeY(this.startY / 2 + this.endY / 2),
+					MapUtils.get31LongitudeX(this.startX / 2 + this.endX / 2));
 		}
 	}
 
