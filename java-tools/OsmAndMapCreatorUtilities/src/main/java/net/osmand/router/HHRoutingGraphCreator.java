@@ -132,7 +132,7 @@ public class HHRoutingGraphCreator {
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getName();
+		String name = obfFile.getCanonicalFile().getName();
 		
 		HHRoutingGraphCreator proc = new HHRoutingGraphCreator();
 		
