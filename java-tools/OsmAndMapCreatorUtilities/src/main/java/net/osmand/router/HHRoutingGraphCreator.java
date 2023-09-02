@@ -95,8 +95,8 @@ public class HHRoutingGraphCreator {
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
 	
-	final static int MEMORY_RELOAD_MB = 300 ; //
-	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 15; 
+	final static int MEMORY_RELOAD_MB = 1000 ; //
+	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120; 
 	
 	private List<File> sources = new ArrayList<File>(); 
 	private String ROUTING_PROFILE = "car";
@@ -742,6 +742,8 @@ public class HHRoutingGraphCreator {
 							ind / sz, s.getRoad().getId() / 64, result.size(), (System.nanoTime() - nt) / 1.0e6,
 							timePassed, timeLeft));
 			}
+			// clean up for gc
+			pnt.connected.clear();
 			if (ind > DEBUG_LIMIT_PROCESS && DEBUG_LIMIT_PROCESS != -1) {
 				break;
 			}
