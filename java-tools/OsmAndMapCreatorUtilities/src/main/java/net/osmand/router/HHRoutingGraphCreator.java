@@ -163,7 +163,7 @@ public class HHRoutingGraphCreator {
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
 			networkDB.loadNetworkSegments(pnts);
 			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
-			saveOsmFile(objects, new File(System.getProperty("maps.dir"), name + "-hh.osm"));
+			saveOsmFile(objects, new File(folder, name + "-hh.osm")); 
 		}
 		networkDB.close();
 	}
