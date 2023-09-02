@@ -87,7 +87,7 @@ public class HHRoutingGraphCreator {
 	final static int PROCESS_SET_NETWORK_POINTS = 1;
 	final static int PROCESS_REBUILD_NETWORK_SEGMENTS = 2;
 	final static int PROCESS_BUILD_NETWORK_SEGMENTS = 3;
-	static int PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
+	static int PROCESS = PROCESS_SET_NETWORK_POINTS;
 	
 	static boolean DEBUG_STORE_ALL_ROADS = false;
 	static int DEBUG_LIMIT_START_OFFSET = 0;
@@ -115,7 +115,7 @@ public class HHRoutingGraphCreator {
 		String name = "Montenegro_europe_2.road.obf";
 		name = "Netherlands_europe_2.road.obf";
 		name = "Ukraine_europe_2.road.obf";
-//		name = "Germany";
+		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
 	}
 
@@ -136,7 +136,7 @@ public class HHRoutingGraphCreator {
 		
 		HHRoutingGraphCreator proc = new HHRoutingGraphCreator();
 		
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + ".db"),
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT),
 				  PROCESS == PROCESS_SET_NETWORK_POINTS ? HHRoutingPreparationDB.FULL_RECREATE
 				: PROCESS == PROCESS_REBUILD_NETWORK_SEGMENTS ? HHRoutingPreparationDB.RECREATE_SEGMENTS
 								: HHRoutingPreparationDB.READ);
@@ -173,7 +173,7 @@ public class HHRoutingGraphCreator {
 		this.readers = readers;
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT,
 				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
 		Map<String, String> map = new TreeMap<String, String>();
 		// map.put("avoid_ferries", "true");
@@ -346,6 +346,7 @@ public class HHRoutingGraphCreator {
 			}
 		}
 		for (RouteRegion routeRegion : routeRegions.keySet()) {
+			ctx.unloadAllData();
 			System.out.println("------------------------");
 			System.out.printf("------------------------\n Region %s %d of %d %s \n", routeRegion.getName(), ++indRegion, 
 					routeRegions.size(), new Date().toString());

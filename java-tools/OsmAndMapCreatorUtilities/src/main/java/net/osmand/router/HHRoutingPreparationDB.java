@@ -25,6 +25,7 @@ import net.osmand.util.MapUtils;
 public class HHRoutingPreparationDB {
 	private static final Log LOG = PlatformUtil.getLog(HHRoutingPreparationDB.class);
 
+	public static final String EXT = ".hhdb";
 
 	private Connection conn;
 	private PreparedStatement insertSegment;
@@ -36,6 +37,8 @@ public class HHRoutingPreparationDB {
 	public static final int FULL_RECREATE = 0;
 	public static final int RECREATE_SEGMENTS = 1;
 	public static final int READ = 2;
+
+
 
 	public HHRoutingPreparationDB(File file, int recreate) throws SQLException {
 		if (file.exists() && FULL_RECREATE == recreate) {
@@ -194,6 +197,7 @@ public class HHRoutingPreparationDB {
 		}
 		
 		double rtDistanceToEnd; // added once in queue
+		double rtCost; // added once in queue
 		List<LatLon> geometry = new ArrayList<>();
 		
 		@Override

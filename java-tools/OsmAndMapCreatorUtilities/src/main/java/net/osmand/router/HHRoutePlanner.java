@@ -1,6 +1,7 @@
 package net.osmand.router;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Comparator;
@@ -8,6 +9,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
+
 
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -26,19 +28,28 @@ public class HHRoutePlanner {
 	
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
-	static float HEURISTIC_COEFFICIENT = 1; // A* - 1, Dijkstra - 0
-	static float DIJKSTRA_DIRECTION = -1; // 0 - 2 directions, 1 - positive, -1 - reverse 
+	static float HEURISTIC_COEFFICIENT = 0; // A* - 1, Dijkstra - 0
+	static float DIJKSTRA_DIRECTION = 1; // 0 - 2 directions, 1 - positive, -1 - reverse 
 
 
 	private RoutingContext ctx;
-	private HHRoutePlanner(RoutingContext ctx) {
+	private HHRoutingPreparationDB networkDB;
+	
+	private HHRoutePlanner(RoutingContext ctx, HHRoutingPreparationDB networkDB) {
 		this.ctx = ctx;
+		this.networkDB = networkDB;
 	}
 	
 	static class RoutingStats {
 		int visitedVertices = 0;
-		int checkedVertices = 0;
+		int visitedEdges = 0;
 		int addedEdges = 0;
+		
+		double loadPointsTime = 0;
+		double loadEdgesTime = 0;
+		double routingTime = 0;
+		double addQueueTime = 0;
+		double prepTime = 0;
 	}
 	
 	private static File sourceFile() {
@@ -49,19 +60,7 @@ public class HHRoutePlanner {
 		return new File(System.getProperty("maps.dir"), name);
 	}
 	
-	private static RoutingContext prepareContext() {
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		Builder builder = RoutingConfiguration.getDefault();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-		Map<String, String> map = new TreeMap<String, String>();
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
-		config.planRoadDirection = 1;
-		config.heuristicCoefficient = 0; // dijkstra
-		return router.buildRoutingContext(config, null, new BinaryMapIndexReader[0], RouteCalculationMode.NORMAL);
-	}
-
-	private static void sourceLatLons() {
+	private static void testLatLons() {
 		// "Netherlands_europe_2.road.obf"
 		PROCESS_START = new LatLon(52.34800, 4.86206); // AMS
 //		PROCESS_END = new LatLon(51.57803, 4.79922); // Breda
@@ -76,10 +75,14 @@ public class HHRoutePlanner {
 		PROCESS_START = new LatLon(50.01689, 36.23278); // Kharkiv
 		PROCESS_END = new LatLon(46.45597, 30.75604);   // Odessa
 		PROCESS_END = new LatLon(48.43824, 22.705723); // Mukachevo
+		
+		
+		PROCESS_START = new LatLon(50.30487, 31.29761); // 
+		PROCESS_END = new LatLon(50.30573, 28.51402); //
 	}
 	
 	public static void main(String[] args) throws Exception {
-		sourceLatLons();
+		testLatLons();
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
 		for (String a : args) {
 			if (a.startsWith("--start=")) {
@@ -87,15 +90,34 @@ public class HHRoutePlanner {
 				PROCESS_START = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
 			} else if (a.startsWith("--end=")) {
 				String[] latLons = a.substring("--end=".length()).split(",");
-				PROCESS_START = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
+				PROCESS_END = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getName();
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + ".db"),
-				HHRoutingPreparationDB.READ);
-		HHRoutePlanner planner = new HHRoutePlanner(prepareContext());
-		long startTime = System.nanoTime();
+		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(), 
+				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT), HHRoutingPreparationDB.READ));
+		Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END);
+		HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-rt.osm"));
+		planner.networkDB.close();
+	}
+
+
+	private static RoutingContext prepareContext() {
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		Builder builder = RoutingConfiguration.getDefault();
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
+				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		Map<String, String> map = new TreeMap<String, String>();
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
+		config.planRoadDirection = 1;
+		config.heuristicCoefficient = 0; // dijkstra
+		return router.buildRoutingContext(config, null, new BinaryMapIndexReader[0], RouteCalculationMode.NORMAL);
+	}
+
+	private Collection<Entity> runRouting(LatLon start, LatLon end) throws SQLException, IOException {
+		RoutingStats stats = new RoutingStats();
+		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
 		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
 		NetworkDBPoint startPnt = null;
@@ -104,36 +126,34 @@ public class HHRoutePlanner {
 			if (startPnt == null) {
 				startPnt = endPnt = pnt;
 			}
-			if (MapUtils.getDistance(PROCESS_START, pnt.getPoint()) < MapUtils.getDistance(PROCESS_START,
-					startPnt.getPoint())) {
+			if (MapUtils.getDistance(start, pnt.getPoint()) < MapUtils.getDistance(start, startPnt.getPoint())) {
 				startPnt = pnt;
 			}
-			if (MapUtils.getDistance(PROCESS_END, pnt.getPoint()) < MapUtils.getDistance(PROCESS_END,
-					endPnt.getPoint())) {
+			if (MapUtils.getDistance(end, pnt.getPoint()) < MapUtils.getDistance(end, endPnt.getPoint())) {
 				endPnt = pnt;
 			}
 		}
-		long loadTime = System.nanoTime();
-		System.out.printf(" %.2fms\nLoading segments...", (loadTime - startTime) / 1e6);
+		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
+		time = System.nanoTime();
+		System.out.printf(" %.2fms\nLoading segments...", stats.loadPointsTime);
 		networkDB.loadNetworkSegments(pnts);
-		loadTime = System.nanoTime();
+		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
+		time = System.nanoTime();
 
 		// Routing
-		System.out.printf(" %.2fms\nRouting...\n", (loadTime - startTime) / 1e6);
-		RoutingStats stats = new RoutingStats();
-		NetworkDBPoint pnt = planner.runDijkstraNetworkRouting(networkDB, pnts, startPnt, endPnt, stats);
-		long routingTime = System.nanoTime();
-		Collection<Entity> objects = planner.prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
-		long prepTime = System.nanoTime();
-		HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-rt.osm"));
-		System.out.printf("Routing finished %.2f ms: load data %.2f ms, route %.2f ms, prep result %.2f ms\n",
-				(prepTime - startTime) / 1e6, (loadTime - startTime) / 1e6, (routingTime - loadTime) / 1e6,
-				(prepTime - routingTime) / 1e6);
-
-		networkDB.close();
+		System.out.printf(" %.2fms\nRouting...\n", stats.loadEdgesTime);
+		NetworkDBPoint pnt = runDijkstraNetworkRouting(networkDB, pnts, startPnt, endPnt, stats);
+		stats.routingTime = (System.nanoTime() - time) / 1e6;
+		time = System.nanoTime();
+		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
+		stats.prepTime = (System.nanoTime() - time) / 1e6;
+		time = System.nanoTime();
+		
+		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
+				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
+				stats.addQueueTime, stats.prepTime);
+		return objects;
 	}
-
-
 
 	private double distanceToEnd(NetworkDBPoint s, NetworkDBPoint end) {
 		LatLon p1 = end.getPoint();
@@ -157,14 +177,16 @@ public class HHRoutePlanner {
 
 			@Override
 			public int compare(NetworkDBSegment o1, NetworkDBSegment o2) {
-				return Double.compare(rtSegmentCost(o1),rtSegmentCost(o2));
+//				return Double.compare(rtSegmentCost(o1),rtSegmentCost(o2));
+				return Double.compare(o1.rtCost, o2.rtCost);
 			}
 		});
 		PriorityQueue<NetworkDBSegment> queueReverse = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override
 			public int compare(NetworkDBSegment o1, NetworkDBSegment o2) {
-				return Double.compare(rtSegmentCostRev(o1), rtSegmentCostRev(o2));
+//				return Double.compare(rtSegmentCostRev(o1), rtSegmentCostRev(o2));
+				return Double.compare(o1.rtCost, o2.rtCost);
 			}
 		});
 		start.rtDistanceFromStart = 0.1; // visited
@@ -177,13 +199,38 @@ public class HHRoutePlanner {
 		}
 
 		while (!queue.isEmpty() || !queueReverse.isEmpty()) {
-			stats.checkedVertices++;
+			stats.visitedEdges++;
 			boolean dir = !queue.isEmpty();
-			if(!queue.isEmpty() && !queueReverse.isEmpty()) {
-				dir = rtSegmentCost(queue.peek()) <= rtSegmentCostRev(queueReverse.peek());  
+			if (!queue.isEmpty() && !queueReverse.isEmpty()) {
+				dir = rtSegmentCost(queue.peek()) <= rtSegmentCostRev(queueReverse.peek());
 			}
+			long tm = System.nanoTime();
 			NetworkDBSegment segment = dir ? queue.poll() : queueReverse.poll();
+			stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
 			if (dir) {
+				// 10138.95
+				if (segment.end.index == 174930) { // 10170.56
+					continue;
+				}
+				if (segment.end.index == 15961) { // 10178.26
+					continue;
+				}
+				if (segment.end.index == 140212) { // 10192.92 
+					continue;
+				}
+				if (segment.end.index == 122836) { //  10349.62 
+					continue;
+				}
+				if (segment.end.index == 133693) { //   
+					continue;
+				}
+				if (segment.end.index == 18247) { //   
+					continue;
+				}
+				
+				
+				
+				
 				if (segment.end.rtDistanceFromStart > 0) { // segment.end.rtRouteToPoint != null
 					continue;
 				}
@@ -263,8 +310,8 @@ public class HHRoutePlanner {
 					MapUtils.get31LatitudeY(s.end.startY), MapUtils.get31LongitudeX(s.end.startX), s.end.roadId / 64,
 					sumDist);
 		}
-		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %d (%d) vertices, %d edges )", 
-				sumDist, entities.size(), stats.visitedVertices, stats.checkedVertices, stats.addedEdges));
+		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d vertices, %,d (of %,d) edges )", 
+				sumDist, entities.size(), stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
 		return entities.valueCollection();
 	}
 
@@ -272,11 +319,14 @@ public class HHRoutePlanner {
 
 
 	private void addToQueue(PriorityQueue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, RoutingStats stats) {
+		long tm = System.nanoTime();
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
 			connected.rtDistanceToEnd = distanceToEnd(reverse ? connected.start : connected.end, finish);
+			connected.rtCost = reverse ? rtSegmentCostRev(connected) : rtSegmentCost(connected); 
 			queue.add(connected);
 			stats.addedEdges++;
 		}
+		stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
 	}
 
 }
