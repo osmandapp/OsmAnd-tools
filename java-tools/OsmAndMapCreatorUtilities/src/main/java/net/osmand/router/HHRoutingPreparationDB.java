@@ -89,14 +89,16 @@ public class HHRoutingPreparationDB {
 		}
 	}
 	
-	public void loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points) throws SQLException {
+	public int loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points) throws SQLException {
 		TLongObjectHashMap<NetworkDBPoint> pntsById = new TLongObjectHashMap<>();
 		for (NetworkDBPoint p : points.valueCollection()) {
 			pntsById.put(p.index, p);
 		}
 		Statement st = conn.createStatement();
 		ResultSet rs = st.executeQuery("SELECT idPoint, idConnPoint, dist from segments");
+		int x = 0;
 		while (rs.next()) {
+			x++;
 			NetworkDBPoint start = pntsById.get(rs.getLong(1));
 			NetworkDBPoint end = pntsById.get(rs.getLong(2));
 			double dist = rs.getDouble(3);
@@ -107,6 +109,7 @@ public class HHRoutingPreparationDB {
 		}
 		rs.close();
 		st.close();
+		return x;
 	}
 
 	private void parseGeometry(NetworkDBSegment segment, byte[] geom) {
@@ -229,6 +232,9 @@ public class HHRoutingPreparationDB {
 		NetworkDBSegment rtRouteToPointRev;
 		double rtDistanceFromStartRev;
 		
+		// indexing
+		int rtCnt = 0;
+		
 		
 		@Override
 		public String toString() {
@@ -238,6 +244,13 @@ public class HHRoutingPreparationDB {
 		public LatLon getPoint() {
 			return new LatLon(MapUtils.get31LatitudeY(this.startY / 2 + this.endY / 2),
 					MapUtils.get31LongitudeX(this.startX / 2 + this.endX / 2));
+		}
+
+		public void clearRouting() {
+			rtRouteToPoint = null;
+			rtDistanceFromStart = 0;
+			rtRouteToPointRev = null;
+			rtDistanceFromStartRev = 0;
 		}
 	}
 
