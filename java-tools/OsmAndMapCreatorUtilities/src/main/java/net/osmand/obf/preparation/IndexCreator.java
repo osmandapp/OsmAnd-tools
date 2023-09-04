@@ -280,6 +280,9 @@ public class IndexCreator {
 				if (indexAddressCreator != null) {
 					indexAddressCreator.registerCityIfNeeded(entity);
 				}
+				if (indexRouteCreator != null) {
+					indexRouteCreator.registerRestrictionNodes(entity);
+				}
 				// accept to allow db creator parse it
 				return true;
 			}
