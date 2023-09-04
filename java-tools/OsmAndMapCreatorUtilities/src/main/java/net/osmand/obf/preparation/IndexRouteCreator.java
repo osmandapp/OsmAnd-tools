@@ -91,7 +91,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	private TLongArrayList nodePropagatedIds = new TLongArrayList();
 	private Map<Long, Map<String, String>> nodePropagatedTags = new HashMap<>();
-	private final List<String> WATERWAY_RESTRICTION = List.of("weir", "dam");
 
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
 	
