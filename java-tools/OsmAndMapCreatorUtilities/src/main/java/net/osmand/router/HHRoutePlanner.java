@@ -36,6 +36,10 @@ public class HHRoutePlanner {
 	static float HEURISTIC_COEFFICIENT = 0; // A* - 1, Dijkstra - 0
 	static float DIJKSTRA_DIRECTION = 1; // 0 - 2 directions, 1 - positive, -1 - reverse 
 
+	static final int PROC_ROUTING = 0;
+	static final int PROC_MONTECARLO = 1;
+	static final int PROC_NEXT_LEVEL = 2;
+	static int PROCESS = PROC_NEXT_LEVEL;
 
 	static int MONTE_CARLO_BATCH = 300;
 	
@@ -108,10 +112,12 @@ public class HHRoutePlanner {
 		String name = obfFile.getName();
 		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(), 
 				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT), HHRoutingPreparationDB.READ));
-		if (false) {
+		if (PROCESS == PROC_ROUTING) {
 			Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END);
 			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-rt.osm"));
-		} else {
+		} else if (PROCESS == PROC_NEXT_LEVEL) {
+			planner.run2ndLevelRouting();
+		} else if (PROCESS == PROC_MONTECARLO) {
 			planner.runMonteCarloRouting();
 		}
 		planner.networkDB.close();
@@ -251,6 +257,85 @@ public class HHRoutePlanner {
 		}
 		return null;
 		
+	}
+	
+	private void run2ndLevelRouting() throws SQLException {
+		RoutingStats stats = new RoutingStats();
+		long time = System.nanoTime(), startTime = System.nanoTime();
+		System.out.print("Loading points... ");
+		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+		
+		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
+		time = System.nanoTime();
+		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
+		int cntEdges = networkDB.loadNetworkSegments(pnts);
+		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
+
+		// Routing
+		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
+		List<NetworkDBPoint> pntsList = new ArrayList<>(pnts.valueCollection());
+		int edges = 0, edgesPlus = 0, edgesMinus = 0;
+		
+		TLongObjectHashMap<NetworkDBPoint> exclude = new TLongObjectHashMap<>();
+		for (int i = 0; i < pntsList.size(); i++) {
+			NetworkDBPoint pnt = pntsList.get(i);
+			edges += pnt.connected.size();
+			if (i % 500 == 0) {
+				continue;
+			}
+			exclude.put(i, pnt);
+		}
+		
+		List<NetworkDBPoint> queue = new ArrayList<>();
+		TLongObjectHashMap<NetworkDBPoint> visited = new TLongObjectHashMap<>();
+		for (int i = 0; i < pntsList.size(); i++) {
+			NetworkDBPoint point = pntsList.get(i);
+			if (i % 1000 == 0) {
+				System.out.println(i);
+			}
+			if (exclude.contains(i)) {
+				edgesMinus += point.connected.size();
+			} else {
+				queue.clear();
+				visited.clear();
+				for (NetworkDBSegment s : point.connected) {
+					if (exclude.contains(s.end.index)) {
+						queue.add(s.end);
+						edgesMinus++;
+					}
+				}
+				while (!queue.isEmpty()) {
+					NetworkDBPoint last = queue.remove(queue.size() - 1);
+					if (visited.put(last.index, last) != null) {
+						continue;
+					}
+					for (NetworkDBSegment s : last.connected) {
+						if (exclude.contains(s.end.index)) {
+							queue.add(s.end);
+						} else if (visited.put(s.end.index, s.end) == null && !checkConnected(point, s.end)) {
+							edgesPlus++;
+						}
+					}
+				}
+				
+			}
+		}
+		System.out.printf("Points %,d - %,d = %d, shortcuts %,d + %,d - %,d = %,d \n", pntsList.size(), exclude.size(), pntsList.size() - exclude.size(),  
+				edges, edgesPlus, edgesMinus, edges + edgesPlus - edgesMinus);
+		time = System.nanoTime();
+		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
+				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
+				stats.addQueueTime, stats.prepTime);
+		
+	}
+
+	private boolean checkConnected(NetworkDBPoint start, NetworkDBPoint end) {
+		for (NetworkDBSegment s : start.connected) {
+			if (s.end == end) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void runMonteCarloRouting() throws SQLException {

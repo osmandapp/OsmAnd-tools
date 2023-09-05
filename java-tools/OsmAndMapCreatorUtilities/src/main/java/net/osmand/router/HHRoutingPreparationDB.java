@@ -58,6 +58,11 @@ public class HHRoutingPreparationDB {
 		st.close();
 	}
 
+	
+	public void updateLevel(NetworkDBPoint pnt) throws SQLException {
+		
+	}
+	
 	public void insertSegments(List<NetworkDBSegment> segments) throws SQLException {
 		for (NetworkDBSegment s : segments) {
 			insertSegment.setLong(1, s.start.index);
@@ -191,6 +196,7 @@ public class HHRoutingPreparationDB {
 		final NetworkDBPoint start;
 		final NetworkDBPoint end;
 		final double dist;
+		List<LatLon> geometry = new ArrayList<>();
 		
 		public NetworkDBSegment(double dist, boolean direction, NetworkDBPoint start, NetworkDBPoint end) {
 			this.direction = direction;
@@ -199,9 +205,9 @@ public class HHRoutingPreparationDB {
 			this.dist = dist;
 		}
 		
+		// routing extra info
 		double rtDistanceToEnd; // added once in queue
 		double rtCost; // added once in queue
-		List<LatLon> geometry = new ArrayList<>();
 		
 		@Override
 		public String toString() {
@@ -213,6 +219,7 @@ public class HHRoutingPreparationDB {
 	static class NetworkDBPoint {
 		long id;
 		long index;
+		int level = 0;
 		public long roadId;
 		public int start;
 		public int end;
