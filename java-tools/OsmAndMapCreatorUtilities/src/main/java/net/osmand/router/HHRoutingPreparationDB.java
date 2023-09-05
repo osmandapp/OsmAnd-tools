@@ -85,7 +85,11 @@ public class HHRoutingPreparationDB {
 		insertGeometry.executeBatch();
 	}
 	
-	public void loadGeometry(NetworkDBSegment segment) throws SQLException {
+	public void loadGeometry(NetworkDBSegment segment, boolean reload) throws SQLException {
+		if(!segment.geometry.isEmpty() && !reload) {
+			return;
+		}
+		segment.geometry.clear();
 		loadGeometry.setLong(1, segment.start.index);
 		loadGeometry.setLong(2, segment.end.index);
 		ResultSet rs = loadGeometry.executeQuery();

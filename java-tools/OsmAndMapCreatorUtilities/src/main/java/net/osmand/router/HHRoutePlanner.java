@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +44,9 @@ public class HHRoutePlanner {
 	
 	private RoutingContext ctx;
 	private HHRoutingPreparationDB networkDB;
+	private TLongObjectHashMap<NetworkDBPoint> cachePoints; 
 	
-	private HHRoutePlanner(RoutingContext ctx, HHRoutingPreparationDB networkDB) {
+	public HHRoutePlanner(RoutingContext ctx, HHRoutingPreparationDB networkDB) {
 		this.ctx = ctx;
 		this.networkDB = networkDB;
 	}
@@ -110,7 +110,7 @@ public class HHRoutePlanner {
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getName();
-		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(), 
+		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(ROUTING_PROFILE), 
 				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT), HHRoutingPreparationDB.READ));
 		if (PROCESS == PROC_ROUTING) {
 			Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END);
@@ -125,26 +125,35 @@ public class HHRoutePlanner {
 
 
 
-	private static RoutingContext prepareContext() {
+	public static RoutingContext prepareContext(String routingProfile) {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3,
 				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
 		Map<String, String> map = new TreeMap<String, String>();
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
+		RoutingConfiguration config = builder.build(routingProfile, memoryLimit, map);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
 		return router.buildRoutingContext(config, null, new BinaryMapIndexReader[0], RouteCalculationMode.NORMAL);
 	}
 
-	private Collection<Entity> runRouting(LatLon start, LatLon end) throws SQLException, IOException {
+	public Collection<Entity> runRouting(LatLon start, LatLon end) throws SQLException, IOException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
-		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+		if (cachePoints == null) {
+			cachePoints = networkDB.getNetworkPoints(false);
+			stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
+			time = System.nanoTime();
+			System.out.printf(" %,d - %.2fms\nLoading segments...", cachePoints.size(), stats.loadPointsTime);
+			int cntEdges = networkDB.loadNetworkSegments(cachePoints);
+			stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
+			System.out.printf(" %,d - %.2fms\n", cntEdges, stats.loadEdgesTime);
+		}
 		NetworkDBPoint startPnt = null;
 		NetworkDBPoint endPnt = null;
-		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+		for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
+			pnt.clearRouting();
 			if (startPnt == null) {
 				startPnt = endPnt = pnt;
 			}
@@ -155,16 +164,12 @@ public class HHRoutePlanner {
 				endPnt = pnt;
 			}
 		}
-		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
-		time = System.nanoTime();
-		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegments(pnts);
-		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
+		
 		time = System.nanoTime();
 
 		// Routing
-		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
-		NetworkDBPoint pnt = runDijkstraNetworkRouting(networkDB, pnts, startPnt, endPnt, stats);
+		System.out.printf("Routing...\n");
+		NetworkDBPoint pnt = runDijkstraNetworkRouting(networkDB, cachePoints, startPnt, endPnt, stats);
 		stats.routingTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
 		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
@@ -280,7 +285,7 @@ public class HHRoutePlanner {
 		for (int i = 0; i < pntsList.size(); i++) {
 			NetworkDBPoint pnt = pntsList.get(i);
 			edges += pnt.connected.size();
-			if (i % 500 == 0) {
+			if (i % 100 == 0) {
 				continue;
 			}
 			exclude.put(i, pnt);
@@ -290,7 +295,7 @@ public class HHRoutePlanner {
 		TLongObjectHashMap<NetworkDBPoint> visited = new TLongObjectHashMap<>();
 		for (int i = 0; i < pntsList.size(); i++) {
 			NetworkDBPoint point = pntsList.get(i);
-			if (i % 1000 == 0) {
+			if (i % 100 == 0) {
 				System.out.println(i);
 			}
 			if (exclude.contains(i)) {
@@ -437,7 +442,7 @@ public class HHRoutePlanner {
 		if (pnt != null && pnt.rtRouteToPointRev != null) {
 			NetworkDBSegment parent = pnt.rtRouteToPointRev;
 			while (parent != null) {
-				networkDB.loadGeometry(parent);
+				networkDB.loadGeometry(parent, false);
 				segments.add(parent);
 				HHRoutingUtilities.addWay(entities, parent, "highway", "secondary");
 				parent = parent.end.rtRouteToPointRev;
@@ -446,7 +451,7 @@ public class HHRoutePlanner {
 		if (pnt != null && pnt.rtRouteToPoint != null) {
 			NetworkDBSegment parent = pnt.rtRouteToPoint;
 			while (parent != null) {
-				networkDB.loadGeometry(parent);
+				networkDB.loadGeometry(parent, false);
 				segments.addFirst(parent);
 				HHRoutingUtilities.addWay(entities, parent, "highway", "secondary");
 				parent = parent.start.rtRouteToPoint;
