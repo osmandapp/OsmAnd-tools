@@ -3,20 +3,12 @@ package net.osmand.router;
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
-
 
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -30,7 +22,7 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
 
 public class HHRoutePlanner {
-	private static String ROUTING_PROFILE = "car";
+	static String ROUTING_PROFILE = "car";
 	static int DEBUG_VERBOSE_LEVEL = 0;
 	
 	static LatLon PROCESS_START = null;
@@ -39,11 +31,8 @@ public class HHRoutePlanner {
 	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse 
 
 	static final int PROC_ROUTING = 0;
-	static final int PROC_MONTECARLO = 1;
-	static final int PROC_NEXT_LEVEL = 2;
-	static int PROCESS = PROC_NEXT_LEVEL;
+	static int PROCESS = PROC_ROUTING;
 
-	static int MONTE_CARLO_BATCH = 300;
 	
 	private RoutingContext ctx;
 	private HHRoutingPreparationDB networkDB;
@@ -120,11 +109,6 @@ public class HHRoutePlanner {
 		if (PROCESS == PROC_ROUTING) {
 			Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END);
 			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-rt.osm"));
-		} else if (PROCESS == PROC_NEXT_LEVEL) {
-			planner.run2ndLevelRouting();
-		} else if (PROCESS == PROC_MONTECARLO) {
-			Collection<Entity> objects = planner.runMonteCarloRouting();
-			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-mc.osm"));
 		}
 		planner.networkDB.close();
 	}
@@ -204,8 +188,9 @@ public class HHRoutePlanner {
 				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  o1.rtDistanceToEnd);
 	}
 	
-	private NetworkDBPoint runDijkstraNetworkRouting(HHRoutingPreparationDB networkDB, TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start,
-			NetworkDBPoint end, RoutingStats stats) throws SQLException {
+	protected NetworkDBPoint runDijkstraNetworkRouting(HHRoutingPreparationDB networkDB,
+			TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats)
+			throws SQLException {
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override
@@ -269,296 +254,7 @@ public class HHRoutePlanner {
 		return null;
 		
 	}
-	
-	private class NetworkHHCluster {
-		private int clusterId;
-		private List<NetworkDBPoint> points = new ArrayList<>();
-		private List<NetworkHHCluster> neighbors = new ArrayList<>();
-		private NetworkHHCluster mergedTo = null;
-		private List<NetworkHHCluster> merged = new ArrayList<>();
 		
-		public NetworkHHCluster(int clusterId) {
-			this.clusterId = clusterId;
-		}
-		@Override
-		public String toString() {
-			return String.format("C-%d [%d, %d]", clusterId, points.size(), neighbors.size());
-		}
-		
-		
-		public void mergeWith(NetworkHHCluster c) {
-			if (c == this && neighbors.size() != 0 ) {
-				throw new IllegalStateException();
-			} else if (mergedTo != null) {
-				throw new IllegalStateException();
-			} else if (c.mergedTo != null) {
-				throw new IllegalStateException();
-			} else {
-				c.mergedTo = this;
-				
-				for (NetworkHHCluster p : c.merged) {
-					p.mergedTo = this;
-					merged.add(p);
-				}
-				merged.add(c);
-			}
-		}
-		
-		public NetworkHHCluster getMergeCluster() {
-			return mergedTo == null || mergedTo == this ? this : mergedTo.getMergeCluster() ;
-		}
-		
-		public int neighborsSize() {
-			int p = 0;
-			for (NetworkHHCluster c : neighbors) {
-				if (c.getMergeCluster() != getMergeCluster()) {
-					p++;
-				}
-			}
-			return p;
-		}
-	}
-	
-	private void run2ndLevelRouting() throws SQLException {
-		RoutingStats stats = new RoutingStats();
-		long time = System.nanoTime(), startTime = System.nanoTime();
-		System.out.print("Loading points... ");
-		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
-		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
-		
-		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
-		
-		time = System.nanoTime();
-		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegments(pnts);
-		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
-
-		// Routing
-		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
-		List<NetworkDBPoint> pntsList = new ArrayList<>(pnts.valueCollection());
-		int edgesPlus = 0, edgesMinus = 0;
-		
-		TLongObjectHashMap<NetworkDBPoint> toExclude = new TLongObjectHashMap<>();
-		boolean random = false;
-		if (random) {
-			for (int i = 0; i < pntsList.size(); i++) {
-				NetworkDBPoint pnt = pntsList.get(i);
-				if (i % 100 == 0) {
-					continue;
-				}
-				toExclude.put(pnt.index, pnt);
-			}
-		} else {
-			printStats(clusters);
-			for (NetworkHHCluster c : clusters.values()) {
-				if (c.neighbors.size() == 0) {
-					// merge itself
-					c.mergeWith(c);
-				} else if (c.neighbors.size() <= 5) {
-					for (NetworkHHCluster nm : c.neighbors) {
-						if (nm.getMergeCluster() != c) {
-							nm.getMergeCluster().mergeWith(c);
-							break;
-						}
-					}
-				}
-			}
-			printStats(clusters);
-			Set<NetworkHHCluster> exclude = new HashSet<>();
-			for (NetworkDBPoint p : pntsList) {
-				exclude.clear();
-				for (int ind : p.clusters) {
-					exclude.add(clusters.get(ind).getMergeCluster());
-				}
-				if (exclude.size() <= 1) {
-					toExclude.put(p.index, p);
-				}
-			}
-		}
-		
-		// calculate +- edges / vertexes
-		List<NetworkDBPoint> queue = new ArrayList<>();
-		TLongObjectHashMap<NetworkDBPoint> visited = new TLongObjectHashMap<>();
-		for (int i = 0; i < pntsList.size(); i++) {
-			NetworkDBPoint point = pntsList.get(i);
-			if (i % 1000 == 0) {
-				System.out.println(i);
-			}
-			if (toExclude.contains(i)) {
-				edgesMinus += point.connected.size();
-			} else {
-				queue.clear();
-				visited.clear();
-				for (NetworkDBSegment s : point.connected) {
-					if (toExclude.contains(s.end.index)) {
-						queue.add(s.end);
-						edgesMinus++;
-					}
-				}
-				while (!queue.isEmpty()) {
-					NetworkDBPoint last = queue.remove(queue.size() - 1);
-					if (visited.put(last.index, last) != null) {
-						continue;
-					}
-					for (NetworkDBSegment s : last.connected) {
-						if (toExclude.contains(s.end.index)) {
-							queue.add(s.end);
-						} else if (visited.put(s.end.index, s.end) == null && !checkConnected(point, s.end)) {
-							edgesPlus++;
-						}
-					}
-				}
-				
-			}
-		}
-		System.out.printf("Points %,d - %,d = %,d, shortcuts %,d + %,d - %,d = %,d \n", pntsList.size(), toExclude.size(), pntsList.size() - toExclude.size(),  
-				cntEdges, edgesPlus, edgesMinus, cntEdges + edgesPlus - edgesMinus);
-		time = System.nanoTime();
-		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
-				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
-				stats.addQueueTime, stats.prepTime);
-		
-	}
-
-	private void printStats(Map<Integer, NetworkHHCluster> clustersM) {
-		int islands = 0, cl = 0, pnts = 0, totIslands = 0, totPnts = 0;
-		List<NetworkHHCluster> clusters = new ArrayList<NetworkHHCluster>(clustersM.values());
-		Collections.sort(clusters, new Comparator<NetworkHHCluster>() {
-
-			@Override
-			public int compare(NetworkHHCluster o1, NetworkHHCluster o2) {
-				return Integer.compare(o1.neighborsSize(), o2.neighborsSize());
-			}
-		});
-		for (NetworkHHCluster c : clusters) {
-			if (c.mergedTo != null) {
-				continue;
-			}
-			pnts += c.points.size();
-			totPnts += c.points.size();
-			if(cl != c.neighborsSize()) {
-				System.out.printf("Neighbors %d - %d islands (%,d points) \n", cl, islands, pnts);
-				islands = 0;
-				cl = c.neighborsSize();
-				pnts = 0;
-			}
-			islands++;
-			totIslands++;
-		}
-		System.out.printf("Total %,d - %,d points\n---------------------\n", totIslands, totPnts);
-		
-	}
-
-	private Map<Integer, NetworkHHCluster> restoreClusters(TLongObjectHashMap<NetworkDBPoint> pnts) {
-		Map<Integer, NetworkHHCluster> clustersMap = new HashMap<>();
-		List<NetworkHHCluster> tmpList = new ArrayList<>();
-		for (NetworkDBPoint p : pnts.valueCollection()) {
-			tmpList.clear();
-			for (int clusterId : p.clusters) {
-				if (!clustersMap.containsKey(clusterId)) {
-					clustersMap.put(clusterId, new NetworkHHCluster(clusterId));
-				}
-				NetworkHHCluster c = clustersMap.get(clusterId);
-				tmpList.add(c);
-				c.points.add(p);
-			}
-			for (NetworkHHCluster c1 : tmpList) {
-				for (NetworkHHCluster c2 : tmpList) {
-					if (c1 != c2 && !c1.neighbors.contains(c2)) {
-						c1.neighbors.add(c2);
-					}
-				}
-			}
-		}
-
-		return clustersMap;
-	}
-
-	private boolean checkConnected(NetworkDBPoint start, NetworkDBPoint end) {
-		for (NetworkDBSegment s : start.connected) {
-			if (s.end == end) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private Collection<Entity> runMonteCarloRouting() throws SQLException {
-		RoutingStats stats = new RoutingStats();
-		long time = System.nanoTime(), startTime = System.nanoTime();
-		System.out.print("Loading points... ");
-		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
-		
-		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
-		time = System.nanoTime();
-		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegments(pnts);
-		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
-
-		// Routing
-		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
-		List<NetworkDBPoint> pntsList = new ArrayList<>(pnts.valueCollection());
-		Random rm = new Random();
-		for (int i = 0; i < MONTE_CARLO_BATCH; i++) {
-			for(NetworkDBPoint p : pntsList) {
-				p.clearRouting();
-			}
-			if ((i + 1) % 10 == 0) {
-				System.out.printf("Routing %d ...\n", i + 1);
-			}
-			time = System.nanoTime();
-			NetworkDBPoint startPnt = pntsList.get(rm.nextInt(pntsList.size() - 1));
-			NetworkDBPoint endPnt = pntsList.get(rm.nextInt(pntsList.size() - 1));
-			NetworkDBPoint pnt = runDijkstraNetworkRouting(networkDB, pnts, startPnt, endPnt, stats);
-			stats.routingTime += (System.nanoTime() - time) / 1e6;
-			if (pnt == null) {
-				continue;
-			}
-			
-			time = System.nanoTime();
-			pnt.rtCnt++;
-			if (pnt != null && pnt.rtRouteToPointRev != null) {
-				NetworkDBSegment parent = pnt.rtRouteToPointRev;
-				while (parent != null) {
-					parent.end.rtCnt++;
-					parent = parent.end.rtRouteToPointRev;
-				}
-			}
-			if (pnt != null && pnt.rtRouteToPoint != null) {
-				NetworkDBSegment parent = pnt.rtRouteToPoint;
-				while (parent != null) {
-					parent.start.rtCnt++;
-					parent = parent.start.rtRouteToPoint;
-				}
-			}
-			stats.prepTime += (System.nanoTime() - time) / 1e6;
-		}
-		
-		Collections.sort(pntsList, new Comparator<NetworkDBPoint>() {
-
-			@Override
-			public int compare(NetworkDBPoint o1, NetworkDBPoint o2) {
-				return -Integer.compare(o1.rtCnt,o2.rtCnt);
-			}
-		});
-		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
-		for (int k = 0; k < pntsList.size(); k++) {
-			NetworkDBPoint pnt = pntsList.get(k);
-			if (pnt.rtCnt > 0.01 * MONTE_CARLO_BATCH) {
-				HHRoutingUtilities.addNode(entities, pnt, null, "highway", "stop");
-				System.out.printf("%d %.4f, %.4f - %s\n", pnt.rtCnt, pnt.getPoint().getLatitude(),
-						pnt.getPoint().getLongitude(), pnt);
-
-			}
-		}
-		time = System.nanoTime();
-		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
-				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
-				stats.addQueueTime, stats.prepTime);
-		return entities.valueCollection();
-	}
-
-
 	private void printPoint(NetworkDBSegment segment, boolean reverse) {
 		if (DEBUG_VERBOSE_LEVEL > 1) {
 			String symbol;
