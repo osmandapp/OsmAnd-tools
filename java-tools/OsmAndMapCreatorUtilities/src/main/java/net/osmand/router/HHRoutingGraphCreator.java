@@ -60,6 +60,7 @@ import net.osmand.util.MapUtils;
 // 2nd phase - improvements
 // 2.1 Merge islands that are isolated
 // 2.2 Better points distribution (a) island counts b) island border points c) island size)
+// 2.3 Print edges info per vertices (stats group 1)   
 
 // 3rd phase - speedup & Test
 // 3.1 Speed up processing NL [400 MB - ~ 1-1.5% of World data] - [8 min + 9 min = 17 min]

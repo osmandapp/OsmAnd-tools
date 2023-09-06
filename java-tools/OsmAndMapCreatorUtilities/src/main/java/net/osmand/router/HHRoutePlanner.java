@@ -7,11 +7,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 
 
@@ -33,7 +36,7 @@ public class HHRoutePlanner {
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
 	static float HEURISTIC_COEFFICIENT = 0; // A* - 1, Dijkstra - 0
-	static float DIJKSTRA_DIRECTION = 1; // 0 - 2 directions, 1 - positive, -1 - reverse 
+	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse 
 
 	static final int PROC_ROUTING = 0;
 	static final int PROC_MONTECARLO = 1;
@@ -63,15 +66,12 @@ public class HHRoutePlanner {
 		double prepTime = 0;
 	}
 	
-	private static File sourceFile() {
+	private static File testData() {
 		String name = "Montenegro_europe_2.road.obf";
 		name = "Netherlands_europe";
 //		name = "Ukraine_europe";
 //		name = "Germany";
-		return new File(System.getProperty("maps.dir"), name);
-	}
-	
-	private static void testLatLons() {
+		
 		// "Netherlands_europe_2.road.obf"
 //		PROCESS_START = new LatLon(52.34800, 4.86206); // AMS
 ////		PROCESS_END = new LatLon(51.57803, 4.79922); // Breda
@@ -94,11 +94,12 @@ public class HHRoutePlanner {
 		// Germany
 //		PROCESS_START = new LatLon(53.06264, 8.79675); // Bremen 
 //		PROCESS_END = new LatLon(48.08556, 11.50811); // Munich
+		
+		return new File(System.getProperty("maps.dir"), name);
 	}
 	
 	public static void main(String[] args) throws Exception {
-		testLatLons();
-		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
+		File obfFile = args.length == 0 ? testData() : new File(args[0]);
 		for (String a : args) {
 			if (a.startsWith("--start=")) {
 				String[] latLons = a.substring("--start=".length()).split(",");
@@ -107,6 +108,10 @@ public class HHRoutePlanner {
 				String[] latLons = a.substring("--end=".length()).split(",");
 				PROCESS_END = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
 			}
+		}
+		if (PROCESS_START == null || PROCESS_END == null) {
+			System.err.println("Start / end point is not specified");
+			return;
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getName();
@@ -118,7 +123,8 @@ public class HHRoutePlanner {
 		} else if (PROCESS == PROC_NEXT_LEVEL) {
 			planner.run2ndLevelRouting();
 		} else if (PROCESS == PROC_MONTECARLO) {
-			planner.runMonteCarloRouting();
+			Collection<Entity> objects = planner.runMonteCarloRouting();
+			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-mc.osm"));
 		}
 		planner.networkDB.close();
 	}
@@ -264,13 +270,64 @@ public class HHRoutePlanner {
 		
 	}
 	
+	private class NetworkHHCluster {
+		private int clusterId;
+		private List<NetworkDBPoint> points = new ArrayList<>();
+		private List<NetworkHHCluster> neighbors = new ArrayList<>();
+		private NetworkHHCluster mergedTo = null;
+		private List<NetworkHHCluster> merged = new ArrayList<>();
+		
+		public NetworkHHCluster(int clusterId) {
+			this.clusterId = clusterId;
+		}
+		@Override
+		public String toString() {
+			return String.format("C-%d [%d, %d]", clusterId, points.size(), neighbors.size());
+		}
+		
+		
+		public void mergeWith(NetworkHHCluster c) {
+			if (c == this && neighbors.size() != 0 ) {
+				throw new IllegalStateException();
+			} else if (mergedTo != null) {
+				throw new IllegalStateException();
+			} else if (c.mergedTo != null) {
+				throw new IllegalStateException();
+			} else {
+				c.mergedTo = this;
+				
+				for (NetworkHHCluster p : c.merged) {
+					p.mergedTo = this;
+					merged.add(p);
+				}
+				merged.add(c);
+			}
+		}
+		
+		public NetworkHHCluster getMergeCluster() {
+			return mergedTo == null || mergedTo == this ? this : mergedTo.getMergeCluster() ;
+		}
+		
+		public int neighborsSize() {
+			int p = 0;
+			for (NetworkHHCluster c : neighbors) {
+				if (c.getMergeCluster() != getMergeCluster()) {
+					p++;
+				}
+			}
+			return p;
+		}
+	}
+	
 	private void run2ndLevelRouting() throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
 		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
-		
 		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
+		
+		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
+		
 		time = System.nanoTime();
 		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
 		int cntEdges = networkDB.loadNetworkSegments(pnts);
@@ -279,32 +336,61 @@ public class HHRoutePlanner {
 		// Routing
 		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
 		List<NetworkDBPoint> pntsList = new ArrayList<>(pnts.valueCollection());
-		int edges = 0, edgesPlus = 0, edgesMinus = 0;
+		int edgesPlus = 0, edgesMinus = 0;
 		
-		TLongObjectHashMap<NetworkDBPoint> exclude = new TLongObjectHashMap<>();
-		for (int i = 0; i < pntsList.size(); i++) {
-			NetworkDBPoint pnt = pntsList.get(i);
-			edges += pnt.connected.size();
-			if (i % 100 == 0) {
-				continue;
+		TLongObjectHashMap<NetworkDBPoint> toExclude = new TLongObjectHashMap<>();
+		boolean random = false;
+		if (random) {
+			for (int i = 0; i < pntsList.size(); i++) {
+				NetworkDBPoint pnt = pntsList.get(i);
+				if (i % 100 == 0) {
+					continue;
+				}
+				toExclude.put(pnt.index, pnt);
 			}
-			exclude.put(i, pnt);
+		} else {
+			printStats(clusters);
+			for (NetworkHHCluster c : clusters.values()) {
+				if (c.neighbors.size() == 0) {
+					// merge itself
+					c.mergeWith(c);
+				} else if (c.neighbors.size() <= 5) {
+					for (NetworkHHCluster nm : c.neighbors) {
+						if (nm.getMergeCluster() != c) {
+							nm.getMergeCluster().mergeWith(c);
+							break;
+						}
+					}
+				}
+			}
+			printStats(clusters);
+			Set<NetworkHHCluster> exclude = new HashSet<>();
+			for (NetworkDBPoint p : pntsList) {
+				exclude.clear();
+				for (int ind : p.clusters) {
+					exclude.add(clusters.get(ind).getMergeCluster());
+				}
+				if (exclude.size() <= 1) {
+					toExclude.put(p.index, p);
+				}
+			}
 		}
 		
+		// calculate +- edges / vertexes
 		List<NetworkDBPoint> queue = new ArrayList<>();
 		TLongObjectHashMap<NetworkDBPoint> visited = new TLongObjectHashMap<>();
 		for (int i = 0; i < pntsList.size(); i++) {
 			NetworkDBPoint point = pntsList.get(i);
-			if (i % 100 == 0) {
+			if (i % 1000 == 0) {
 				System.out.println(i);
 			}
-			if (exclude.contains(i)) {
+			if (toExclude.contains(i)) {
 				edgesMinus += point.connected.size();
 			} else {
 				queue.clear();
 				visited.clear();
 				for (NetworkDBSegment s : point.connected) {
-					if (exclude.contains(s.end.index)) {
+					if (toExclude.contains(s.end.index)) {
 						queue.add(s.end);
 						edgesMinus++;
 					}
@@ -315,7 +401,7 @@ public class HHRoutePlanner {
 						continue;
 					}
 					for (NetworkDBSegment s : last.connected) {
-						if (exclude.contains(s.end.index)) {
+						if (toExclude.contains(s.end.index)) {
 							queue.add(s.end);
 						} else if (visited.put(s.end.index, s.end) == null && !checkConnected(point, s.end)) {
 							edgesPlus++;
@@ -325,13 +411,67 @@ public class HHRoutePlanner {
 				
 			}
 		}
-		System.out.printf("Points %,d - %,d = %d, shortcuts %,d + %,d - %,d = %,d \n", pntsList.size(), exclude.size(), pntsList.size() - exclude.size(),  
-				edges, edgesPlus, edgesMinus, edges + edgesPlus - edgesMinus);
+		System.out.printf("Points %,d - %,d = %,d, shortcuts %,d + %,d - %,d = %,d \n", pntsList.size(), toExclude.size(), pntsList.size() - toExclude.size(),  
+				cntEdges, edgesPlus, edgesMinus, cntEdges + edgesPlus - edgesMinus);
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
 				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
 				stats.addQueueTime, stats.prepTime);
 		
+	}
+
+	private void printStats(Map<Integer, NetworkHHCluster> clustersM) {
+		int islands = 0, cl = 0, pnts = 0, totIslands = 0, totPnts = 0;
+		List<NetworkHHCluster> clusters = new ArrayList<NetworkHHCluster>(clustersM.values());
+		Collections.sort(clusters, new Comparator<NetworkHHCluster>() {
+
+			@Override
+			public int compare(NetworkHHCluster o1, NetworkHHCluster o2) {
+				return Integer.compare(o1.neighborsSize(), o2.neighborsSize());
+			}
+		});
+		for (NetworkHHCluster c : clusters) {
+			if (c.mergedTo != null) {
+				continue;
+			}
+			pnts += c.points.size();
+			totPnts += c.points.size();
+			if(cl != c.neighborsSize()) {
+				System.out.printf("Neighbors %d - %d islands (%,d points) \n", cl, islands, pnts);
+				islands = 0;
+				cl = c.neighborsSize();
+				pnts = 0;
+			}
+			islands++;
+			totIslands++;
+		}
+		System.out.printf("Total %,d - %,d points\n---------------------\n", totIslands, totPnts);
+		
+	}
+
+	private Map<Integer, NetworkHHCluster> restoreClusters(TLongObjectHashMap<NetworkDBPoint> pnts) {
+		Map<Integer, NetworkHHCluster> clustersMap = new HashMap<>();
+		List<NetworkHHCluster> tmpList = new ArrayList<>();
+		for (NetworkDBPoint p : pnts.valueCollection()) {
+			tmpList.clear();
+			for (int clusterId : p.clusters) {
+				if (!clustersMap.containsKey(clusterId)) {
+					clustersMap.put(clusterId, new NetworkHHCluster(clusterId));
+				}
+				NetworkHHCluster c = clustersMap.get(clusterId);
+				tmpList.add(c);
+				c.points.add(p);
+			}
+			for (NetworkHHCluster c1 : tmpList) {
+				for (NetworkHHCluster c2 : tmpList) {
+					if (c1 != c2 && !c1.neighbors.contains(c2)) {
+						c1.neighbors.add(c2);
+					}
+				}
+			}
+		}
+
+		return clustersMap;
 	}
 
 	private boolean checkConnected(NetworkDBPoint start, NetworkDBPoint end) {
@@ -343,7 +483,7 @@ public class HHRoutePlanner {
 		return false;
 	}
 
-	private void runMonteCarloRouting() throws SQLException {
+	private Collection<Entity> runMonteCarloRouting() throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
@@ -401,19 +541,21 @@ public class HHRoutePlanner {
 				return -Integer.compare(o1.rtCnt,o2.rtCnt);
 			}
 		});
-		for (int k = 0; k < 100 && k < pntsList.size(); k++) {
+		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+		for (int k = 0; k < pntsList.size(); k++) {
 			NetworkDBPoint pnt = pntsList.get(k);
-			if (pnt.rtCnt == 0) {
-				break;
+			if (pnt.rtCnt > 0.01 * MONTE_CARLO_BATCH) {
+				HHRoutingUtilities.addNode(entities, pnt, null, "highway", "stop");
+				System.out.printf("%d %.4f, %.4f - %s\n", pnt.rtCnt, pnt.getPoint().getLatitude(),
+						pnt.getPoint().getLongitude(), pnt);
+
 			}
-			System.out.printf("%d %.4f, %.4f - %s\n", pnt.rtCnt, pnt.getPoint().getLatitude(),
-					pnt.getPoint().getLongitude(), pnt);
 		}
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
 				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
 				stats.addQueueTime, stats.prepTime);
-		
+		return entities.valueCollection();
 	}
 
 

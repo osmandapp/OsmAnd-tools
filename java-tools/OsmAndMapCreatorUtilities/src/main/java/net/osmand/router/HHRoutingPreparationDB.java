@@ -146,7 +146,7 @@ public class HHRoutingPreparationDB {
 			pnt.startY = rs.getInt(p++);
 			pnt.endX = rs.getInt(p++);
 			pnt.endY = rs.getInt(p++);
-			pnt.indexes = Algorithms.stringToArray(rs.getString(p++));
+			pnt.clusters = Algorithms.stringToArray(rs.getString(p++));
 			mp.put(byId ? pnt.id : pnt.index, pnt);
 		}
 		rs.close();
@@ -231,7 +231,7 @@ public class HHRoutingPreparationDB {
 		public int startY;
 		public int endX;
 		public int endY;
-		public int[] indexes;
+		public int[] clusters;
 		
 		List<NetworkDBSegment> connected = new ArrayList<NetworkDBSegment>();
 		List<NetworkDBSegment> connectedReverse = new ArrayList<NetworkDBSegment>();
