@@ -14,7 +14,6 @@ import java.util.Random;
 import java.util.Set;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
-import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
@@ -68,7 +67,8 @@ public class HHRoutingTopGraphCreator {
 	private class NetworkHHCluster {
 		private int clusterId;
 		private List<NetworkDBPoint> points = new ArrayList<>();
-		private List<NetworkHHCluster> neighbors = new ArrayList<>();
+		private Set<NetworkHHCluster> neighbors = new HashSet<>();
+		// 
 		private NetworkHHCluster mergedTo = null;
 		private List<NetworkHHCluster> merged = new ArrayList<>();
 		
@@ -81,7 +81,7 @@ public class HHRoutingTopGraphCreator {
 		}
 		
 		
-		public void mergeWith(NetworkHHCluster c) {
+		public void adoptMerge(NetworkHHCluster c) {
 			if (c == this && neighbors.size() != 0 ) {
 				throw new IllegalStateException();
 			} else if (mergedTo != null) {
@@ -90,12 +90,14 @@ public class HHRoutingTopGraphCreator {
 				throw new IllegalStateException();
 			} else {
 				c.mergedTo = this;
-				// TODO recalculate neighbors
-				for (NetworkHHCluster p : c.merged) {
-					p.mergedTo = this;
-					merged.add(p);
+				if (c != this) {
+					for (NetworkHHCluster p : c.merged) {
+						p.mergedTo = this;
+						merged.add(p);
+					}
+					c.merged.clear();
+					merged.add(c);
 				}
-				merged.add(c);
 			}
 		}
 		
@@ -104,13 +106,7 @@ public class HHRoutingTopGraphCreator {
 		}
 		
 		public int neighborsSize() {
-			int p = 0;
-			for (NetworkHHCluster c : neighbors) {
-				if (c.getMergeCluster() != getMergeCluster()) {
-					p++;
-				}
-			}
-			return p;
+			return neighbors.size();
 		}
 	}
 
@@ -145,29 +141,14 @@ public class HHRoutingTopGraphCreator {
 				toExclude.put(pnt.index, pnt);
 			}
 		} else {
-			printStats(clusters);
-			for (NetworkHHCluster c : clusters.values()) {
-				if (c.neighbors.size() == 0) {
-					// merge itself
-					c.mergeWith(c);
-				} else if (c.neighbors.size() <= 15) {
-					for (NetworkHHCluster nm : c.neighbors) {
-						if (nm.getMergeCluster() != c) {
-							nm.getMergeCluster().mergeWith(c);
-							break;
-						}
-					}
-				}
-			}
-			printStats(clusters);
-			Set<NetworkHHCluster> exclude = new HashSet<>();
-			for (NetworkDBPoint p : pntsList) {
-				exclude.clear();
-				for (int ind : p.clusters) {
-					exclude.add(clusters.get(ind).getMergeCluster());
-				}
-				if (exclude.size() <= 1) {
-					toExclude.put(p.index, p);
+			int origPnts = printStats(clusters);
+			for (int k = 0; k < 50; k++) {
+//				mergeClusters(clusters, 9);
+				mergeClustersHalf(clusters);
+				recalculatePointsNeighboors(clusters, pntsList, toExclude);
+				int pntst = printStats(clusters);
+				if (pntst * 100 < origPnts) {
+					break;
 				}
 			}
 		}
@@ -178,6 +159,99 @@ public class HHRoutingTopGraphCreator {
 				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
 				stats.addQueueTime, stats.prepTime);
 		
+	}
+
+
+	private void recalculatePointsNeighboors(Map<Integer, NetworkHHCluster> clusters, List<NetworkDBPoint> pntsList,
+			TLongObjectHashMap<NetworkDBPoint> toExclude) {
+		Set<NetworkHHCluster> set = new HashSet<>();
+		for (NetworkHHCluster c : clusters.values()) {
+			c.neighbors.clear();
+			c.points.clear();
+		}
+		
+		for (NetworkDBPoint pnt : pntsList) {
+			if (toExclude.contains(pnt.index)) {
+				continue;
+			}
+			set.clear();
+			for (int ind : pnt.clusters) {
+				set.add(clusters.get(ind).getMergeCluster());
+			}
+			if (set.size() <= 1) {
+				toExclude.put(pnt.index, pnt);
+			} else {
+				for (NetworkHHCluster cl : set) {
+					cl.points.add(pnt);
+					for (NetworkHHCluster cl2 : set) {
+						if (cl != cl2) {
+							cl.neighbors.add(cl2);
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	private void mergeClustersHalf(Map<Integer, NetworkHHCluster> clustersM) {
+		List<NetworkHHCluster> clusters = new ArrayList<NetworkHHCluster>(clustersM.values());
+		Collections.sort(clusters, new Comparator<NetworkHHCluster>() {
+
+			@Override
+			public int compare(NetworkHHCluster o1, NetworkHHCluster o2) {
+				return Integer.compare(o1.neighborsSize(), o2.neighborsSize());
+			}
+		});
+		int totPnts = 0, totI = 0;
+		for (NetworkHHCluster c : clusters) {
+			if (c.mergedTo != null) {
+				continue;
+			}
+			totPnts += c.points.size();
+			totI ++;
+		}
+		int pnts = 0, isl = 0;
+		for (NetworkHHCluster c : clusters) {
+			if (c.mergedTo != null) {
+				continue;
+			}
+			pnts += c.points.size();
+			isl++;
+			if(pnts >= totPnts / 2 || isl >= totI / 2) {
+				break;
+			}
+			if (c.neighbors.size() == 0) {
+				// merge itself
+				c.adoptMerge(c);
+			} else {
+				for (NetworkHHCluster nm : c.neighbors) {
+					if (nm.getMergeCluster() != c) {
+						nm.getMergeCluster().adoptMerge(c);
+						break;
+					}
+				}
+			}
+		}
+	}
+	
+	private void mergeClusters(Map<Integer, NetworkHHCluster> clusters, int max) {
+		for (NetworkHHCluster c : clusters.values()) {
+			if (c.mergedTo != null) {
+				continue;
+			}
+			if (c.neighbors.size() == 0) {
+				// merge itself
+				c.adoptMerge(c);
+			} else if (c.neighbors.size() <= max) {
+				for (NetworkHHCluster nm : c.neighbors) {
+					if (nm.getMergeCluster() != c) {
+						nm.getMergeCluster().adoptMerge(c);
+						break;
+					}
+				}
+			}
+		}
 	}
 
 
@@ -223,7 +297,7 @@ public class HHRoutingTopGraphCreator {
 				cntEdges, edgesPlus, edgesMinus, cntEdges + edgesPlus - edgesMinus);
 	}
 	
-	private void printStats(Map<Integer, NetworkHHCluster> clustersM) {
+	private int printStats(Map<Integer, NetworkHHCluster> clustersM) {
 		int islands = 0, cl = 0, pnts = 0, totIslands = 0, totPnts = 0;
 		List<NetworkHHCluster> clusters = new ArrayList<NetworkHHCluster>(clustersM.values());
 		Collections.sort(clusters, new Comparator<NetworkHHCluster>() {
@@ -237,18 +311,20 @@ public class HHRoutingTopGraphCreator {
 			if (c.mergedTo != null) {
 				continue;
 			}
-			pnts += c.points.size();
-			totPnts += c.points.size();
 			if(cl != c.neighborsSize()) {
 				System.out.printf("Neighbors %d - %d islands (%,d points) \n", cl, islands, pnts);
 				islands = 0;
 				cl = c.neighborsSize();
 				pnts = 0;
 			}
+			pnts += c.points.size();
+			totPnts += c.points.size();
 			islands++;
 			totIslands++;
 		}
+		System.out.printf("Neighbors %d - %d islands (%,d points) \n", cl, islands, pnts);
 		System.out.printf("Total %,d - %,d points\n---------------------\n", totIslands, totPnts);
+		return totPnts;
 		
 	}
 
@@ -267,7 +343,7 @@ public class HHRoutingTopGraphCreator {
 			}
 			for (NetworkHHCluster c1 : tmpList) {
 				for (NetworkHHCluster c2 : tmpList) {
-					if (c1 != c2 && !c1.neighbors.contains(c2)) {
+					if (c1 != c2) {
 						c1.neighbors.add(c2);
 					}
 				}
