@@ -142,12 +142,12 @@ public class HHRoutingTopGraphCreator {
 			}
 		} else {
 			int origPnts = printStats(clusters);
-			for (int k = 0; k < 50; k++) {
+			for (int k = 0; k < 6; k++) {
 //				mergeClusters(clusters, 9);
 				mergeClustersHalf(clusters);
 				recalculatePointsNeighboors(clusters, pntsList, toExclude);
 				int pntst = printStats(clusters);
-				if (pntst * 100 < origPnts) {
+				if (pntst * 500 < origPnts) {
 					break;
 				}
 			}
