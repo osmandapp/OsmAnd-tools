@@ -275,7 +275,7 @@ public class HHRoutingPreparationDB {
 		}
 
 		public void unload() {
-			if (this.visitedVertices.size() > 1000) {
+			if (this.visitedVertices != null && this.visitedVertices.size() > 1000) {
 				this.points = this.visitedVertices.size();
 				this.visitedVertices = null;
 			}
