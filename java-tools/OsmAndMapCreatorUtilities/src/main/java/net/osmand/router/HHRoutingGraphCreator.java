@@ -95,7 +95,9 @@ public class HHRoutingGraphCreator {
 	static int DEBUG_VERBOSE_LEVEL = 0;
 	
 	final static int MEMORY_RELOAD_MB = 1000 ; //
-	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120; 
+	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
+	static final boolean GC_ALWAYS = false; 
+
 	
 	private List<File> sources = new ArrayList<File>(); 
 	private String ROUTING_PROFILE = "car";
@@ -180,7 +182,8 @@ public class HHRoutingGraphCreator {
 	private long lastMemoryReload = System.currentTimeMillis();
 	private RoutingContext checkMemoryLimitToUnloadAll(RoutingContext ctx) throws IOException {
 		long usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-		if (usedMemory > MEMORY_RELOAD_MB && (System.currentTimeMillis() - lastMemoryReload) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000) {
+		if (GC_ALWAYS || (
+				usedMemory > MEMORY_RELOAD_MB && (System.currentTimeMillis() - lastMemoryReload) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
 			System.gc();
 			usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 			ctx = prepareContext(initReaders(), ctx);
@@ -464,7 +467,7 @@ public class HHRoutingGraphCreator {
 						}
 						stats.maxPnts = Math.max(stats.maxPnts, cluster.visitedVertices.size());
 						stats.minPnts = Math.min(stats.minPnts, cluster.visitedVertices.size());
-						cluster.visitedVertices.clear();
+						cluster.visitedVertices = new TLongObjectHashMap<RouteSegment>(); // clear for gc
 					}
 					return false;
 				}
@@ -476,7 +479,7 @@ public class HHRoutingGraphCreator {
 
 			});
 		}
-//		network.ctx = checkMemoryLimitToUnloadAll(network.ctx);
+		network.ctx = checkMemoryLimitToUnloadAll(network.ctx);
 		for (NetworkIsland c : network.clusters) {
 			int borderPoints = c.toVisitVertices.size();
 			stats.maxBorder = Math.max(stats.maxBorder, borderPoints);
