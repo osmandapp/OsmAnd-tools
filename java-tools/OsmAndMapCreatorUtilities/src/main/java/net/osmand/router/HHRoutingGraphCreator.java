@@ -401,23 +401,22 @@ public class HHRoutingGraphCreator {
 		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
 		
 		public int getTotalPoints(FullNetwork network) {
-			
-//			int totalPoints = 0;
-//			for (NetworkRouteRegion r : routeRegions) {
-//				totalPoints += r.getPoints();
-//			}
-//			return totalPoints;
-			return network.visitedVertices.size();
+			int totalPoints = 0;
+			for (NetworkRouteRegion r : routeRegions) {
+				totalPoints += r.getPoints();
+			}
+			return totalPoints;
 		}
 	}
 	
 	
 	
-	private void collectNetworkPoints(final FullNetwork network, HHRoutingPreparationDB networkDB) throws IOException {
+	private void collectNetworkPoints(final FullNetwork network, HHRoutingPreparationDB networkDB) throws IOException, SQLException {
 		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx();
 		for (RouteRegion r : network.ctx.reverseMap.keySet()) {
 			ctx.routeRegions.add(new NetworkRouteRegion(r, network.ctx.reverseMap.get(r).getFile()));
 		}
+		networkDB.insertRegions(ctx.routeRegions);
 		if (EX != null) {
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), network.ctx, null);
@@ -429,12 +428,20 @@ public class HHRoutingGraphCreator {
 		double lattop = 85, latbottom = -85, lonleft = -179.9, lonright = 179.9;
 		int indRegion = 0;
 		// force to have clean RouteRegion 
+		
 		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
 			System.out.printf("------------------------\n Region %s %d of %d %s \n", nrouteRegion.region.getName(), ++indRegion, 
 					ctx.routeRegions.size(), new Date().toString());
 
+			network.visitedVertices = new TLongObjectHashMap<>();
+			for (NetworkRouteRegion nr : ctx.routeRegions) {
+				if (nr.intersects(nrouteRegion)) {
+					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
+				}
+			}
+					
 			network.ctx = gcMemoryLimitToUnloadAll(network.ctx, false);
 			RouteRegion routeRegion = null;
 			for (RouteRegion rr : network.ctx.reverseMap.keySet()) {
@@ -443,14 +450,15 @@ public class HHRoutingGraphCreator {
 					break;
 				}
 			}
+
+
+			
 			BinaryMapIndexReader reader = network.ctx.reverseMap.get(routeRegion);
 			List<RouteSubregion> regions = reader
 					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
 							MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
 							MapUtils.get31TileNumberY(latbottom), 16, null), routeRegion.getSubregions());
 			
-			// TODO reinit
-			// network.visitedVertices
 			
 			
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte 
@@ -481,16 +489,18 @@ public class HHRoutingGraphCreator {
 									nwPoints * (nwPoints - 1) / 2, pntAround));
 						}
 						network.addCluster(cluster, pntAround);
+						// GC optimizations
+						ctx.maxPnts = Math.max(ctx.maxPnts, cluster.visitedVertices.size());
+						ctx.minPnts = Math.min(ctx.minPnts, cluster.visitedVertices.size());
+						nrouteRegion.visitedVertices.putAll(cluster.visitedVertices);
+						cluster.visitedVertices = new TLongObjectHashMap<RouteSegment>();
 						if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 							prevPrintInd = indProc;
 							System.out.println(String.format("%,d %.2f%%: %,d points -> %,d border points, %,d clusters",
 									indProc, indProc * 100.0f / estimatedRoads , ctx.getTotalPoints(network),
 									network.networkPointsCluster.size(), network.clusters.size()));
 						}
-						ctx.maxPnts = Math.max(ctx.maxPnts, cluster.visitedVertices.size());
-						ctx.minPnts = Math.min(ctx.minPnts, cluster.visitedVertices.size());
-						// GC optimizations
-						cluster.visitedVertices = new TLongObjectHashMap<RouteSegment>(); 
+						 
 					}
 					return false;
 				}
@@ -501,7 +511,11 @@ public class HHRoutingGraphCreator {
 				}
 
 			});
+			System.out.printf("Saving visited %,d points from %s to db...", nrouteRegion.getPoints(), nrouteRegion.region.getName());
+			networkDB.insertVisitedVertices(nrouteRegion, true);
+			System.out.printf(" done\n");
 		}
+		
 		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
 		network.visitedVertices = new TLongObjectHashMap<>();
 		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);

@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 
@@ -17,6 +18,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.HHRoutingGraphCreator.FullNetwork;
@@ -63,8 +65,35 @@ public class HHRoutingPreparationDB {
 	}
 
 	
-	public void updateLevel(NetworkDBPoint pnt) throws SQLException {
-		
+	public void loadVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
+		PreparedStatement ps = conn.prepareStatement("SELECT pntId FROM routeRegionPoints WHERE id = ? ");
+		ResultSet rs = ps.executeQuery();
+		if(networkRouteRegion.visitedVertices != null) {
+			throw new IllegalStateException();
+		}
+		networkRouteRegion.visitedVertices = new TLongObjectHashMap<>();
+		while(rs.next()) {
+			networkRouteRegion.visitedVertices.put(rs.getLong(1), null);
+		}
+		networkRouteRegion.points = -1;		
+	}
+	
+	public void insertVisitedVertices(NetworkRouteRegion networkRouteRegion, boolean unload) throws SQLException {
+		PreparedStatement ps = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId) VALUES (?, ?)");
+		int ind = 0;
+		for (long k : networkRouteRegion.visitedVertices.keys()) {
+			ps.setLong(1, networkRouteRegion.id);
+			ps.setLong(2, k);
+			ps.addBatch();
+			if (ind++ > 10000) {
+				ps.executeBatch();
+			}
+		}
+		ps.executeBatch();
+		if (unload) {
+			networkRouteRegion.points = networkRouteRegion.visitedVertices.size();
+			networkRouteRegion.visitedVertices = null;
+		}
 	}
 	
 	public void insertSegments(List<NetworkDBSegment> segments) throws SQLException {
@@ -166,10 +195,10 @@ public class HHRoutingPreparationDB {
 		int ind = 0;
 		for(NetworkRouteRegion nr : regions) {
 			int p = 1;
-			s.setLong(p++, ind++);
+			nr.id = ind++;
+			s.setLong(p++, nr.id);
 			s.setString(p++, nr.region.getName());
 			s.setLong(p++, nr.region.getFilePointer());
-			s.setLong(p++, nr.region.getLength());
 			s.setLong(p++, nr.region.getLength());
 			s.setString(p++, nr.file.getName());
 			s.setDouble(p++, nr.region.getLeftLongitude());
@@ -221,23 +250,36 @@ public class HHRoutingPreparationDB {
 	}
 	
 	
-	static class NetworkRouteRegion { 
+	static class NetworkRouteRegion {
+		int id = 0;
 		RouteRegion region;
 		File file;
-		// TLongObjectHashMap<NetworkIsland> visitedPointsCluster = new TLongObjectHashMap<>();
-		TLongHashSet visitedPointsCluster = new TLongHashSet();
 		int points = -1; // -1 loaded points
+		TLongObjectHashMap<RouteSegment> visitedVertices = new TLongObjectHashMap<>();
 
-		
 		public NetworkRouteRegion(RouteRegion r, File f) {
 			region = r;
 			this.file = f;
-			
+
 		}
 
-
 		public int getPoints() {
-			return points < 0 ? visitedPointsCluster.size() : points;
+			return points < 0 ? visitedVertices.size() : points;
+		}
+
+		public QuadRect getRect() {
+			return new QuadRect(region.getLeftLongitude(), region.getTopLatitude(), region.getRightLongitude(), region.getBottomLatitude());
+		}
+
+		public boolean intersects(NetworkRouteRegion nrouteRegion) {
+			return QuadRect.intersects(getRect(), nrouteRegion.getRect());
+		}
+
+		public TLongObjectHashMap<RouteSegment> getVisitedVertices(HHRoutingPreparationDB networkDB) throws SQLException {
+			if (points > 0) {
+				networkDB.loadVisitedVertices(this);
+			}
+			return visitedVertices;
 		}
 	}
 	
@@ -311,6 +353,7 @@ public class HHRoutingPreparationDB {
 			rtDistanceFromStartRev = 0;
 		}
 	}
+
 
 
 }
