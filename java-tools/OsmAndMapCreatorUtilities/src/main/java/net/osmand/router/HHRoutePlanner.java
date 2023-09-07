@@ -159,7 +159,7 @@ public class HHRoutePlanner {
 
 		// Routing
 		System.out.printf("Routing...\n");
-		NetworkDBPoint pnt = runDijkstraNetworkRouting(networkDB, cachePoints, startPnt, endPnt, stats);
+		NetworkDBPoint pnt = runDijkstraNetworkRouting(startPnt, endPnt, stats);
 		stats.routingTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
 		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
@@ -188,9 +188,8 @@ public class HHRoutePlanner {
 				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  o1.rtDistanceToEnd);
 	}
 	
-	protected NetworkDBPoint runDijkstraNetworkRouting(HHRoutingPreparationDB networkDB,
-			TLongObjectHashMap<NetworkDBPoint> pnts, NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats)
-			throws SQLException {
+	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats)
+			{
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override

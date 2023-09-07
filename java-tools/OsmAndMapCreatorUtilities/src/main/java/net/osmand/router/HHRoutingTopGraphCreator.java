@@ -67,6 +67,7 @@ public class HHRoutingTopGraphCreator {
 	private class NetworkHHCluster {
 		private int clusterId;
 		private List<NetworkDBPoint> points = new ArrayList<>();
+		private List<NetworkDBPoint> expoints = new ArrayList<>();
 		private Set<NetworkHHCluster> neighbors = new HashSet<>();
 		// 
 		private NetworkHHCluster mergedTo = null;
@@ -80,6 +81,14 @@ public class HHRoutingTopGraphCreator {
 			return String.format("C-%d [%d, %d]", clusterId, points.size(), neighbors.size());
 		}
 		
+		public void clearRouting() {
+			for (NetworkDBPoint p : points) {
+				p.clearRouting();
+			}
+			for (NetworkDBPoint p : expoints) {
+				p.clearRouting();
+			}
+		}
 		
 		public void adoptMerge(NetworkHHCluster c) {
 			if (c == this && neighbors.size() != 0 ) {
@@ -142,8 +151,7 @@ public class HHRoutingTopGraphCreator {
 			}
 		} else {
 			int origPnts = printStats(clusters);
-			for (int k = 0; k < 6; k++) {
-//				mergeClusters(clusters, 9);
+			for (int k = 0; k < 3; k++) {
 				mergeClustersHalf(clusters);
 				recalculatePointsNeighboors(clusters, pntsList, toExclude);
 				int pntst = printStats(clusters);
@@ -153,6 +161,7 @@ public class HHRoutingTopGraphCreator {
 			}
 		}
 		
+		calculateEdgeSize(clusters, pntsList, toExclude);
 		calculateNewGraphSize(cntEdges, pntsList, toExclude);
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
@@ -162,12 +171,59 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
+	private void calculateEdgeSize(Map<Integer, NetworkHHCluster> clusters, List<NetworkDBPoint> pntsList,
+			TLongObjectHashMap<NetworkDBPoint> toExclude) {
+		int p = 0;
+		int clusteInd = 0;
+		for (NetworkHHCluster c : clusters.values()) {
+			if (c.mergedTo == null) {
+				clusteInd++;
+				RoutingStats stats = new RoutingStats();
+				int ind = 0, total = 0;
+				
+				for (NetworkDBPoint pnt1 : c.points) {
+					for (NetworkDBPoint pnt2 : c.points) {
+						c.clearRouting();
+						if (pnt1 != pnt2) {
+							total++;
+							NetworkDBPoint res = routePlanner.runDijkstraNetworkRouting(pnt1, pnt2, stats);
+							if (res != null) {
+								ind++;
+								
+								if (res != null && res.rtRouteToPointRev != null) {
+									NetworkDBSegment parent = res.rtRouteToPointRev;
+									while (parent != null) {
+										parent.end.rtCnt++; // TODO
+										parent = parent.end.rtRouteToPointRev;
+									}
+								}
+								if (res != null && res.rtRouteToPoint != null) {
+									NetworkDBSegment parent = res.rtRouteToPoint;
+									while (parent != null) {
+										parent.start.rtCnt++; // TODO
+										parent = parent.start.rtRouteToPoint;
+									}
+								}
+							}
+						}
+					}
+				}
+				p += ind;
+				System.out.println(String.format("Cluster %d: found %d (%d) final routes ( visited %,d vertices, %,d (of %,d) edges )",
+						clusteInd, ind, total, stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
+			}
+		}
+		System.out.println(p + " --- ");
+	}
+
+
 	private void recalculatePointsNeighboors(Map<Integer, NetworkHHCluster> clusters, List<NetworkDBPoint> pntsList,
 			TLongObjectHashMap<NetworkDBPoint> toExclude) {
 		Set<NetworkHHCluster> set = new HashSet<>();
 		for (NetworkHHCluster c : clusters.values()) {
 			c.neighbors.clear();
 			c.points.clear();
+			c.expoints.clear();
 		}
 		
 		for (NetworkDBPoint pnt : pntsList) {
@@ -179,6 +235,7 @@ public class HHRoutingTopGraphCreator {
 				set.add(clusters.get(ind).getMergeCluster());
 			}
 			if (set.size() <= 1) {
+				set.iterator().next().expoints.add(pnt);
 				toExclude.put(pnt.index, pnt);
 			} else {
 				for (NetworkHHCluster cl : set) {
@@ -235,25 +292,6 @@ public class HHRoutingTopGraphCreator {
 		}
 	}
 	
-	private void mergeClusters(Map<Integer, NetworkHHCluster> clusters, int max) {
-		for (NetworkHHCluster c : clusters.values()) {
-			if (c.mergedTo != null) {
-				continue;
-			}
-			if (c.neighbors.size() == 0) {
-				// merge itself
-				c.adoptMerge(c);
-			} else if (c.neighbors.size() <= max) {
-				for (NetworkHHCluster nm : c.neighbors) {
-					if (nm.getMergeCluster() != c) {
-						nm.getMergeCluster().adoptMerge(c);
-						break;
-					}
-				}
-			}
-		}
-	}
-
 
 	private void calculateNewGraphSize(int cntEdges, List<NetworkDBPoint> pntsList,
 			TLongObjectHashMap<NetworkDBPoint> toExclude) {
@@ -388,7 +426,7 @@ public class HHRoutingTopGraphCreator {
 			time = System.nanoTime();
 			NetworkDBPoint startPnt = pntsList.get(rm.nextInt(pntsList.size() - 1));
 			NetworkDBPoint endPnt = pntsList.get(rm.nextInt(pntsList.size() - 1));
-			NetworkDBPoint pnt = routePlanner.runDijkstraNetworkRouting(networkDB, pnts, startPnt, endPnt, stats);
+			NetworkDBPoint pnt = routePlanner.runDijkstraNetworkRouting(startPnt, endPnt, stats);
 			stats.routingTime += (System.nanoTime() - time) / 1e6;
 			if (pnt == null) {
 				continue;

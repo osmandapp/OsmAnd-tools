@@ -19,7 +19,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.apache.commons.logging.Log;
 
@@ -413,8 +415,13 @@ public class HHRoutingGraphCreator {
 	
 	private void collectNetworkPoints(final FullNetwork network, HHRoutingPreparationDB networkDB) throws IOException, SQLException {
 		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx();
+		Set<String> routeRegionNames = new TreeSet<>();
 		for (RouteRegion r : network.ctx.reverseMap.keySet()) {
-			ctx.routeRegions.add(new NetworkRouteRegion(r, network.ctx.reverseMap.get(r).getFile()));
+			if(routeRegionNames.add(r.getName())) {
+				ctx.routeRegions.add(new NetworkRouteRegion(r, network.ctx.reverseMap.get(r).getFile()));
+			} else {
+				System.out.printf("Ignore route region %s as duplicate\n", r.getName());
+			}
 		}
 		networkDB.insertRegions(ctx.routeRegions);
 		if (EX != null) {
