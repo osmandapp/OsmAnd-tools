@@ -13,7 +13,9 @@ import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
@@ -49,6 +51,8 @@ public class HHRoutingPreparationDB {
 		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes, primary key (idPoint))");
 		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, PRIMARY key (idPoint, idConnPoint))");
 		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, PRIMARY key (idPoint, idConnPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
+		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
 		if (recreate == RECREATE_SEGMENTS) {
 			st.execute("DELETE FROM segments");
 		}
@@ -155,6 +159,28 @@ public class HHRoutingPreparationDB {
 	}
 	
 	
+	public void insertRegions(List<NetworkRouteRegion> regions) throws SQLException {
+		PreparedStatement s = conn
+				.prepareStatement("INSERT INTO routeRegions(id, name, filePointer, size, filename, left, right, top, bottom) "
+						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+		int ind = 0;
+		for(NetworkRouteRegion nr : regions) {
+			int p = 1;
+			s.setLong(p++, ind++);
+			s.setString(p++, nr.region.getName());
+			s.setLong(p++, nr.region.getFilePointer());
+			s.setLong(p++, nr.region.getLength());
+			s.setLong(p++, nr.region.getLength());
+			s.setString(p++, nr.file.getName());
+			s.setDouble(p++, nr.region.getLeftLongitude());
+			s.setDouble(p++, nr.region.getRightLongitude());
+			s.setDouble(p++, nr.region.getTopLatitude());
+			s.setDouble(p++, nr.region.getBottomLatitude());
+			s.addBatch();
+		}
+		s.executeBatch();
+		s.close();
+	}
 
 	public void insertPoints(FullNetwork network) throws SQLException {
 		PreparedStatement s = conn
@@ -195,6 +221,27 @@ public class HHRoutingPreparationDB {
 	}
 	
 	
+	static class NetworkRouteRegion { 
+		RouteRegion region;
+		File file;
+		// TLongObjectHashMap<NetworkIsland> visitedPointsCluster = new TLongObjectHashMap<>();
+		TLongHashSet visitedPointsCluster = new TLongHashSet();
+		int points = -1; // -1 loaded points
+
+		
+		public NetworkRouteRegion(RouteRegion r, File f) {
+			region = r;
+			this.file = f;
+			
+		}
+
+
+		public int getPoints() {
+			return points < 0 ? visitedPointsCluster.size() : points;
+		}
+	}
+	
+	
 	static class NetworkDBSegment {
 		final boolean direction;
 		final NetworkDBPoint start;
@@ -219,7 +266,7 @@ public class HHRoutingPreparationDB {
 		}
 		
 	}
-
+	
 	static class NetworkDBPoint {
 		long id;
 		long index;
