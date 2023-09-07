@@ -516,9 +516,9 @@ public class HHRoutingGraphCreator {
 			System.out.printf(" done\n");
 		}
 		
-		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
-		network.visitedVertices = new TLongObjectHashMap<>();
-		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
+//		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
+//		network.visitedVertices = new TLongObjectHashMap<>();
+//		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
 		
 		
 		for (NetworkIsland c : network.clusters) {
