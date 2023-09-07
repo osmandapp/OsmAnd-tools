@@ -122,7 +122,7 @@ public class HHRoutingGraphCreator {
 
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
-//		name = "Netherlands_europe_2.road.obf";
+		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
@@ -426,13 +426,12 @@ public class HHRoutingGraphCreator {
 			return;
 		}
 		double lattop = 85, latbottom = -85, lonleft = -179.9, lonright = 179.9;
-		int indRegion = 0;
 		// force to have clean RouteRegion 
-		
 		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
+		
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
-			System.out.printf("------------------------\n Region %s %d of %d %s \n", nrouteRegion.region.getName(), ++indRegion, 
+			System.out.printf("------------------------\n Region %s %d of %d %s \n", nrouteRegion.region.getName(), nrouteRegion.id + 1, 
 					ctx.routeRegions.size(), new Date().toString());
 
 			network.visitedVertices = new TLongObjectHashMap<>();
@@ -458,8 +457,6 @@ public class HHRoutingGraphCreator {
 					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
 							MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
 							MapUtils.get31TileNumberY(latbottom), 16, null), routeRegion.getSubregions());
-			
-			
 			
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte 
 			reader.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
@@ -513,7 +510,7 @@ public class HHRoutingGraphCreator {
 			});
 			System.out.printf("Saving visited %,d points from %s to db...", nrouteRegion.getPoints(), nrouteRegion.region.getName());
 			networkDB.insertVisitedVertices(nrouteRegion, true);
-			System.out.printf(" done\n");
+			System.out.printf(" done - %,d\n", ctx.getTotalPoints(network));
 		}
 		
 //		network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);

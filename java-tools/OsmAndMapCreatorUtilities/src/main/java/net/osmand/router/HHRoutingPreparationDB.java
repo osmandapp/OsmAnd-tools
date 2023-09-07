@@ -67,6 +67,7 @@ public class HHRoutingPreparationDB {
 	
 	public void loadVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
 		PreparedStatement ps = conn.prepareStatement("SELECT pntId FROM routeRegionPoints WHERE id = ? ");
+		ps.setLong(1, networkRouteRegion.id);
 		ResultSet rs = ps.executeQuery();
 		if(networkRouteRegion.visitedVertices != null) {
 			throw new IllegalStateException();
@@ -76,6 +77,7 @@ public class HHRoutingPreparationDB {
 			networkRouteRegion.visitedVertices.put(rs.getLong(1), null);
 		}
 		networkRouteRegion.points = -1;		
+		rs.close();
 	}
 	
 	public void insertVisitedVertices(NetworkRouteRegion networkRouteRegion, boolean unload) throws SQLException {
