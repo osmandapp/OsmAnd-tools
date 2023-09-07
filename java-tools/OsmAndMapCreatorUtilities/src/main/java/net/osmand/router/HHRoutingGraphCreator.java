@@ -436,12 +436,15 @@ public class HHRoutingGraphCreator {
 
 			network.visitedVertices = new TLongObjectHashMap<>();
 			for (NetworkRouteRegion nr : ctx.routeRegions) {
+				nr.unload();
+			}
+			for (NetworkRouteRegion nr : ctx.routeRegions) {
 				if (nr.intersects(nrouteRegion)) {
 					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
 				}
 			}
 					
-			network.ctx = gcMemoryLimitToUnloadAll(network.ctx, false);
+			network.ctx = gcMemoryLimitToUnloadAll(network.ctx, true);
 			RouteRegion routeRegion = null;
 			for (RouteRegion rr : network.ctx.reverseMap.keySet()) {
 				if (rr.getFilePointer() == nrouteRegion.region.getFilePointer() && nrouteRegion.region.getName().equals(rr.getName())) {
@@ -509,7 +512,8 @@ public class HHRoutingGraphCreator {
 
 			});
 			System.out.printf("Saving visited %,d points from %s to db...", nrouteRegion.getPoints(), nrouteRegion.region.getName());
-			networkDB.insertVisitedVertices(nrouteRegion, true);
+			networkDB.insertVisitedVertices(nrouteRegion);
+			nrouteRegion.unload();
 			System.out.printf(" done - %,d\n", ctx.getTotalPoints(network));
 		}
 		

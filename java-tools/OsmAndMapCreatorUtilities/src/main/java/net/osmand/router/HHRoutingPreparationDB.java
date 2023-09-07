@@ -80,7 +80,7 @@ public class HHRoutingPreparationDB {
 		rs.close();
 	}
 	
-	public void insertVisitedVertices(NetworkRouteRegion networkRouteRegion, boolean unload) throws SQLException {
+	public void insertVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
 		PreparedStatement ps = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId) VALUES (?, ?)");
 		int ind = 0;
 		for (long k : networkRouteRegion.visitedVertices.keys()) {
@@ -92,10 +92,7 @@ public class HHRoutingPreparationDB {
 			}
 		}
 		ps.executeBatch();
-		if (unload) {
-			networkRouteRegion.points = networkRouteRegion.visitedVertices.size();
-			networkRouteRegion.visitedVertices = null;
-		}
+		
 	}
 	
 	public void insertSegments(List<NetworkDBSegment> segments) throws SQLException {
@@ -277,6 +274,13 @@ public class HHRoutingPreparationDB {
 			return QuadRect.intersects(getRect(), nrouteRegion.getRect());
 		}
 
+		public void unload() {
+			if (this.visitedVertices.size() > 1000) {
+				this.points = this.visitedVertices.size();
+				this.visitedVertices = null;
+			}
+		}
+		
 		public TLongObjectHashMap<RouteSegment> getVisitedVertices(HHRoutingPreparationDB networkDB) throws SQLException {
 			if (points > 0) {
 				networkDB.loadVisitedVertices(this);
