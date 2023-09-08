@@ -50,40 +50,46 @@ import net.osmand.util.MapUtils;
 
 
 // TODO 
-// 1st phase - investigation
-// 1.1 TODO think that island is not possible shortest way to reach boundaries
-// 1.2 TODO check toVisitVertices including depth
+// 1st phase - bugs routing
 // 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
 // 1.4 BinaryRoutePlanner TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.5 BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
 // 1.6 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.7 BinaryRoutePlanner TODO test that routing time is different with on & off!
 
-// 2nd phase - improvements
-// 2.1 Merge islands that are isolated
-// 2.2 Better points distribution (a) island counts b) island border points c) island size)
-// 2.3 Print edges info per vertices (stats group 1)   
+// 2nd phase - points selection
+// 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 2.2 Merge single point exit islands (up to a limit?)
+// 2.3 Exclude & merge non exit islands (up to a limit)
+// 2.4 Play with Heuristics [MAX_VERT_DEPTH_LOOKUP, MAX_NEIGHBOORS_N_POINTS, ... ] to achieve Better points distribution:
+///    - Smaller edges (!)
+///    - Smaller nodes 
+///    - Max points in island = LIMIT = 50K (needs to be measured with Dijkstra randomly)
 
-// 3rd phase - speedup & Test
-// 3.1 Speed up processing NL [400 MB - ~ 1-1.5% of World data] - [8 min + 9 min = 17 min]
-//     ~ World processing - 1 360 min - ~ 22h ?
-//     - don't unload routing (clean up)
-// 3.2 Make process parallelized 
-// 3.3? Make process rerunable ? (so you could stop any point)
-// 3.4 Generate Germany / World for testing speed
+// 3rd phase - Generate Planet ~4h (per profile)
+// 3.1 Reduce memory usage TODO store network points inside NetworkRouteRegion and retrieve similar to visited points
+// 3.2 Calculate points in parallel (Planet)
+// 3.3 Calculate shortcuts in parallel (Planet)
+// 3.4 Make process rerunnable ? 
 
-// 4th phase - complex routing / data
-// 4.1 Implement final routing algorithm including start / end segment search 
-// 4.2 Save data structure optimally by access time
-// 4.3 Save data structure optimally by size
-// 4.4 Implement border crossing issue
+// 4 Introduce 3/4 level (test on Europe)
+// 4.1 Merge islands - Introduce 3rd level of points
+// 4.2 Implement routing algorithm 2->3->4
+// 4.3 Introduce / reuse points that are center for many shorcuts to reduce edges N*N -> 2*n
+// 4.4 Optimize time / space comparing to 2nd level
 
-// 5 Future
-// 5.1 Introduce 3/4 level
-// 5.2 Alternative routes
-// 5.3 Avoid specific road
-// 5.4 Deprioritize or exclude roads
-// 5.5 Live data (think about it)
+// 5th phase - complex routing / data
+// 5.1 Implement final routing algorithm including start / end segment search 
+// 5.2 Save data structure optimally by access time
+// 5.3 Save data structure optimally by size
+// 5.4 Implement border crossing issue
+
+// 6 Future
+// 6.1 Alternative routes (distribute initial points better)
+// 6.2 Avoid specific road
+// 6.3 Deprioritize or exclude roads
+// 6.4 Live data (think about it)
+
 public class HHRoutingGraphCreator {
 
 	final static Log LOG = PlatformUtil.getLog(HHRoutingGraphCreator.class);
@@ -114,7 +120,7 @@ public class HHRoutingGraphCreator {
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036); // 391 - 8
 	protected static LatLon EX = null; // for all - null; otherwise specific point
 	
-	// heuristics building network points
+	// Heuristics building network points
 	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] {15,10,5} ; //new int[] {7,7,7,7};
 	private static int MAX_NEIGHBOORS_N_POINTS = 50;
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
@@ -314,10 +320,8 @@ public class HHRoutingGraphCreator {
 			}
 			int pnt = (parent == null ? 0 : parent.toVisitVerticesSize());
 			for (long l : visitedVertices.keys()) {
-				if(parent.testIfPossibleNetworkPoint(l)) {
-					if (parent.testIfNetworkPoint(l)) {
-						throw new IllegalStateException("Assert");
-					}
+				if (parent.testIfPossibleNetworkPoint(l)) {
+					// if (parent.testIfNetworkPoint(l))  assert false; 
 					pnt--;
 				}
 			}
@@ -516,7 +520,7 @@ public class HHRoutingGraphCreator {
 			for (NetworkRouteRegion nr : subRegions) {
 				if (nr != nrouteRegion) {
 					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
-					// TODO store network points inside NetworkRouteRegion and retrieve similar to visited points
+					// 3.1 TODO store network points inside NetworkRouteRegion and retrieve similar to visited points
 					network.networkPointsCluster = this.networkPointsCluster; // ! use by reference
 //					network.networkPointsCluster.putAll(nr.getNetworkPoints(networkDB));
 				}
@@ -690,8 +694,8 @@ public class HHRoutingGraphCreator {
 		List<RouteSegment> potentialNetworkPoints = new ArrayList<>(c.toVisitVertices.valueCollection());
 		c.printCurentState("MERGE", 2);
 		for (RouteSegment t : potentialNetworkPoints) {
-			// 1.3 TODO check toVisitVertices including depth
-			if (c.toVisitVertices.size() >= MAX_NEIGHBOORS_N_POINTS) {
+			int curPoints = c.toVisitVerticesSize();
+			if (curPoints >= MAX_NEIGHBOORS_N_POINTS) {
 				break;
 			}
 			if (!c.toVisitVertices.contains(calculateRoutePointInternalId(t))) {
@@ -702,10 +706,10 @@ public class HHRoutingGraphCreator {
 			buildRoadNetworkIsland(bc);
 			
 			// it could only increase by 1 (1->2)
-			int prevPoints = c.toVisitVerticesSize();
+
 			int newPoints = bc.toVisitVerticesSize();
-			if (((newPoints - prevPoints) <= 2 || 
-					coeffToMinimize(c.visitedVerticesSize(), prevPoints) > coeffToMinimize(bc.visitedVerticesSize(), newPoints) )) {
+			if (((newPoints - curPoints) <= 2 || 
+					coeffToMinimize(c.visitedVerticesSize(), curPoints) > coeffToMinimize(bc.visitedVerticesSize(), newPoints) )) {
 				int sz = c.visitedVerticesSize();
 				c.visitedVertices.putAll(bc.visitedVertices);
 				for (long l : bc.visitedVertices.keys()) {
@@ -716,7 +720,7 @@ public class HHRoutingGraphCreator {
 						c.toVisitVertices.put(k, bc.toVisitVertices.get(k));
 					}
 				}
-				c.printCurentState(prevPoints == newPoints ? "IGNORE": " MERGED", 2, String.format(" - before %d -> %d", sz, prevPoints));
+				c.printCurentState(curPoints == newPoints ? "IGNORE": " MERGED", 2, String.format(" - before %d -> %d", sz, curPoints));
 			} else {
 				c.printCurentState(" NOMERGE", 3, String.format(" - %d -> %d", bc.visitedVerticesSize(), newPoints));
 			}
