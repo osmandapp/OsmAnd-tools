@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -185,9 +186,9 @@ public class HHRoutingGraphCreator {
 				usedMemory > MEMORY_RELOAD_MB && (System.currentTimeMillis() - lastMemoryReload) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
 			System.gc();
 			usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-			List<File> fls = null; 
+			Set<File> fls = null; 
 			if (subRegions != null) {
-				fls = new ArrayList<File>();
+				fls = new LinkedHashSet<>();
 				for (NetworkRouteRegion r : subRegions) {
 					fls.add(r.file);
 				}
@@ -213,7 +214,7 @@ public class HHRoutingGraphCreator {
 	}
 
 
-	private List<BinaryMapIndexReader> initReaders(List<File> hints) throws IOException {
+	private List<BinaryMapIndexReader> initReaders(Collection<File> hints) throws IOException {
 		List<BinaryMapIndexReader> readers = new ArrayList<BinaryMapIndexReader>();
 		for (File source : (hints != null ? hints : sources)) {
 			BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source);
@@ -222,7 +223,7 @@ public class HHRoutingGraphCreator {
 		return readers;
 	}
 	
-	private RoutingContext prepareContext(List<File> fileSources, RoutingContext oldCtx) throws IOException {
+	private RoutingContext prepareContext(Collection<File> fileSources, RoutingContext oldCtx) throws IOException {
 		List<BinaryMapIndexReader> readers = initReaders(fileSources);
 		if (oldCtx != null) {
 			for (BinaryMapIndexReader r : oldCtx.map.keySet()) {
@@ -548,6 +549,7 @@ public class HHRoutingGraphCreator {
 		}
 
 		public void finishRegionProcess() throws SQLException {
+			logf("Tiles " + rctx.calculationProgress.getInfo(null).get("tiles"));
 			logf("Saving visited %,d points from %s to db...", currentProcessingRegion.getPoints(), currentProcessingRegion.region.getName());
 			networkDB.insertVisitedVertices(currentProcessingRegion);
 			currentProcessingRegion.unload();
@@ -597,7 +599,6 @@ public class HHRoutingGraphCreator {
 				network.addCluster(cluster, pntAround);
 				if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 					prevPrintInd = indProc;
-					System.out.println(network.ctx.calculationProgress.getInfo(null).get("tiles"));
 					logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters",
 							indProc, indProc * 100.0f / estimatedRoads , ctx.getTotalPoints(),
 							ctx.borderPointsSize(),  ctx.clusterSize());
@@ -638,7 +639,6 @@ public class HHRoutingGraphCreator {
 		}
 		networkDB.insertRegions(ctx.routeRegions);
 		FullNetwork network = null;
-		double lattop = 85, latbottom = -85, lonleft = -179.9, lonright = 179.9;
 
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
@@ -652,12 +652,9 @@ public class HHRoutingGraphCreator {
 			}
 			BinaryMapIndexReader reader = network.ctx.reverseMap.get(routeRegion);
 			List<RouteSubregion> regions = reader
-//					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude() - 1),
-//							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude() + 1), MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude() + 1),
-//							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude() - 1), 16, null), routeRegion.getSubregions());
-					  .searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
-							MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
-							MapUtils.get31TileNumberY(latbottom), 16, null), routeRegion.getSubregions());
+					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude() - 1),
+							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude() + 1), MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude() + 1),
+							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude() - 1), 16, null), routeRegion.getSubregions());
 			
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte 
 			reader.loadRouteIndexData(regions, new RouteDataObjectProcessor(network, ctx, estimatedRoads));
@@ -888,7 +885,6 @@ public class HHRoutingGraphCreator {
 				if (DEBUG_STORE_ALL_ROADS) {
 					addWay(osmObjects, segment, "highway", "secondary");
 				}
-//				System.out.println(segment + " " + segment.dist);
 				if (segment.dist < 0) {
 					throw new IllegalStateException(segment + " dist < " + segment.dist);
 				}
