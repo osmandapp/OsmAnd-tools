@@ -80,9 +80,10 @@ import net.osmand.util.MapUtils;
 
 // 5th phase - complex routing / data
 // 5.1 Implement final routing algorithm including start / end segment search 
-// 5.2 Save data structure optimally by access time
-// 5.3 Save data structure optimally by size
-// 5.4 Implement border crossing issue
+// 5.2 Retrieve route details and turn information
+// 5.3 Save data structure optimally by access time
+// 5.4 Save data structure optimally by size
+// 5.5 Implement border crossing issue
 
 // 6 Future
 // 6.1 Alternative routes (distribute initial points better)
