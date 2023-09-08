@@ -461,8 +461,6 @@ public class HHRoutingGraphCreator {
 		NetworkRouteRegion currentProcessingRegion;
 		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
 		RoutingContext rctx;
-		
-		// TODO store network points inside NetworkRouteRegion and retrieve similar to visited points
 		TLongObjectHashMap<Integer> networkPointsCluster = new TLongObjectHashMap<>();
 		
 		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
@@ -518,6 +516,7 @@ public class HHRoutingGraphCreator {
 			for (NetworkRouteRegion nr : subRegions) {
 				if (nr != nrouteRegion) {
 					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
+					// TODO store network points inside NetworkRouteRegion and retrieve similar to visited points
 					network.networkPointsCluster = this.networkPointsCluster; // ! use by reference
 //					network.networkPointsCluster.putAll(nr.getNetworkPoints(networkDB));
 				}
