@@ -185,7 +185,15 @@ public class HHRoutingGraphCreator {
 				usedMemory > MEMORY_RELOAD_MB && (System.currentTimeMillis() - lastMemoryReload) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
 			System.gc();
 			usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-			ctx = prepareContext(ctx);
+			
+			List<File> fls = null; 
+			if (subRegions != null) {
+				fls = new ArrayList<File>();
+				for (NetworkRouteRegion r : subRegions) {
+					fls.add(r.file);
+				}
+			}
+			ctx = prepareContext(fls, ctx);
 			System.gc();
 			long nwusedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;;
 			lastMemoryReload = System.currentTimeMillis();
@@ -205,17 +213,17 @@ public class HHRoutingGraphCreator {
 	}
 
 
-	private List<BinaryMapIndexReader> initReaders() throws IOException {
+	private List<BinaryMapIndexReader> initReaders(List<File> hints) throws IOException {
 		List<BinaryMapIndexReader> readers = new ArrayList<BinaryMapIndexReader>();
-		for (File source : sources) {
+		for (File source : (hints != null ? hints : sources)) {
 			BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source);
 			readers.add(reader);
 		}
 		return readers;
 	}
 	
-	private RoutingContext prepareContext(RoutingContext oldCtx) throws IOException {
-		List<BinaryMapIndexReader> readers = initReaders();
+	private RoutingContext prepareContext(List<File> fileSources, RoutingContext oldCtx) throws IOException {
+		List<BinaryMapIndexReader> readers = initReaders(fileSources);
 		if (oldCtx != null) {
 			for (BinaryMapIndexReader r : oldCtx.map.keySet()) {
 				r.close();
@@ -490,9 +498,8 @@ public class HHRoutingGraphCreator {
 	}
 	
 	
-	
 	private FullNetwork collectNetworkPoints(HHRoutingPreparationDB networkDB) throws IOException, SQLException {
-		FullNetwork network = new FullNetwork(prepareContext(null));
+		FullNetwork network = new FullNetwork(prepareContext(null, null));
 		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx();
 		Set<String> routeRegionNames = new TreeSet<>();
 		for (RouteRegion r : network.ctx.reverseMap.keySet()) {
@@ -524,10 +531,11 @@ public class HHRoutingGraphCreator {
 			}
 			List<NetworkRouteRegion> subRegions = new ArrayList<>();
 			for (NetworkRouteRegion nr : ctx.routeRegions) {
-				if (nr.intersects(nrouteRegion)) {
+				if (nr != nrouteRegion && nr.intersects(nrouteRegion)) {
 					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
 				}
 			}
+			subRegions.add(nrouteRegion);
 			// force to have clean RouteRegion (important first time)
 			network.ctx = gcMemoryLimitToUnloadAll(network.ctx, subRegions, true);
 			RouteRegion routeRegion = null;
@@ -769,7 +777,7 @@ public class HHRoutingGraphCreator {
 		int maxFinalSegmentsFound = 0;
 		int totalFinalSegmentsFound = 0;
 		int totalVisitedDirectSegments = 0;
-		RoutingContext ctx = prepareContext(null);
+		RoutingContext ctx = prepareContext(null, null);
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
 			ind++;
 //			if (pnt.index > 2000 || pnt.index < 1800)   { 
