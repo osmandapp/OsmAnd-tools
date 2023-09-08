@@ -361,6 +361,7 @@ public class HHRoutingGraphCreator {
 		}
 		
 		public int visitedVerticesSize() {
+			// don't count top level so it's not used for cluster optimizations
 			return 0;
 		}
 		
