@@ -19,7 +19,6 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
-import net.osmand.router.HHRoutingGraphCreator.FullNetwork;
 import net.osmand.router.HHRoutingGraphCreator.NetworkIsland;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -48,7 +47,8 @@ public class HHRoutingPreparationDB {
 		}
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
 		Statement st = conn.createStatement();
-		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes, primary key (idPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes, PRIMARY key (idPoint))"); // ind unique
+		st.execute("CREATE TABLE IF NOT EXISTS clusters(idPoint, indPoint, clusterInd, PRIMARY key (indPoint, clusterInd))");
 		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, PRIMARY key (idPoint, idConnPoint))");
 		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, PRIMARY key (idPoint, idConnPoint))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
@@ -208,41 +208,46 @@ public class HHRoutingPreparationDB {
 		s.close();
 	}
 
-	public void insertPoints(FullNetwork network) throws SQLException {
-		PreparedStatement s = conn
-				.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes) "
-						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-		int ind = 0;
-		TLongObjectIterator<List<NetworkIsland>> it = network.networkPointsCluster.iterator();
+	public void insertCluster(NetworkIsland cluster, TLongObjectHashMap<Integer> mp) throws SQLException {
+		PreparedStatement insPoint = conn
+				.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
+						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+		PreparedStatement insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd ) VALUES(?, ?, ?)");
+		TLongObjectIterator<RouteSegment> it = cluster.toVisitVertices.iterator();
 		while (it.hasNext()) {
-			if (ind < 0) {
-				throw new IllegalStateException();
-			}
 			it.advance();
-			int p = 1;
-			s.setLong(p++, it.key());
-			s.setInt(p++, ind++);
-			RouteSegment obj = network.toVisitVertices.get(it.key());
-			List<NetworkIsland> islands = it.value();
-			s.setLong(p++, obj.getRoad().getId());
-			s.setLong(p++, obj.getSegmentStart());
-			s.setLong(p++, obj.getSegmentEnd());
-			s.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
-			s.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
-			s.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
-			s.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
-			int[] arrs = new int[islands.size()];
-			for (int i = 0; i < islands.size(); i++) {
-				arrs[i] = islands.get(i).index;
+			long pntId = it.key();
+			RouteSegment obj = it.value();
+			int pointInd;
+			if (!mp.contains(pntId)) {
+				pointInd = mp.size();
+				mp.put(pntId, pointInd);
+				int p = 1;
+				insPoint.setLong(p++, pntId);
+				insPoint.setInt(p++, pointInd);
+				insPoint.setLong(p++, obj.getRoad().getId());
+				insPoint.setLong(p++, obj.getSegmentStart());
+				insPoint.setLong(p++, obj.getSegmentEnd());
+				insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
+				insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
+				insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
+				insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
+				insPoint.addBatch();
+			} else {
+				pointInd = mp.get(pntId);
 			}
-			s.setString(p++, Algorithms.arrayToString(arrs));
-			s.addBatch();
-			if (ind % BATCH == 0) {
-				s.executeBatch();
-			}
+			
+			int p2 = 1;
+			insCluster.setLong(p2++, pntId);
+			insCluster.setInt(p2++, pointInd);
+			insCluster.setInt(p2++, cluster.index);
+			insCluster.addBatch();
+
 		}
-		s.executeBatch();
-		s.close();
+		insPoint.executeBatch();
+		insPoint.close();
+		insCluster.executeBatch();
+		insCluster.close();
 	}
 
 	public void close() throws SQLException {
@@ -288,6 +293,7 @@ public class HHRoutingPreparationDB {
 			}
 			return visitedVertices;
 		}
+		
 	}
 	
 	

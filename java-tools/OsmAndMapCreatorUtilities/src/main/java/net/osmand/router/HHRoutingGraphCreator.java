@@ -280,15 +280,22 @@ public class HHRoutingGraphCreator {
 			return false;
 		}
 		
-		public boolean testIfVisited(long pntId, boolean checkToVisit) {
-			if (visitedVertices.containsKey(pntId)) {
-				return true;
-			}
-			if (checkToVisit && toVisitVertices.containsKey(pntId)) {
+		public boolean testIfPossibleNetworkPoint(long pntId) {
+			if (toVisitVertices.containsKey(pntId)) {
 				return true;
 			}
 			if (parent != null) {
-				return parent.testIfVisited(pntId, checkToVisit);
+				return parent.testIfPossibleNetworkPoint(pntId);
+			}
+			return false;
+		}
+		
+		public boolean testIfVisited(long pntId) {
+			if (visitedVertices.containsKey(pntId)) {
+				return true;
+			}
+			if (parent != null) {
+				return parent.testIfVisited(pntId);
 			}
 			return false;
 		}
@@ -323,10 +330,10 @@ public class HHRoutingGraphCreator {
 	
 	class FullNetwork extends NetworkIsland {
 
-		List<NetworkIsland> clusters = new ArrayList<NetworkIsland>();
 		RoutingContext ctx;
-		TLongObjectHashMap<List<NetworkIsland>> networkPointsCluster = new TLongObjectHashMap<>();
-		
+		// uses global entity by reference
+		TLongObjectHashMap<Integer> networkPointsCluster = new TLongObjectHashMap<>();
+		List<NetworkIsland> visualClusters = new ArrayList<>();
 		FullNetwork(RoutingContext ctx) {
 			super(null, null);
 			this.ctx = ctx;
@@ -354,28 +361,24 @@ public class HHRoutingGraphCreator {
 			return super.testIfNetworkPoint(pntId);
 		}
 		
+		public boolean testIfPossibleNetworkPoint(long pntId) {
+			return testIfNetworkPoint(pntId);
+		}
+		
 		public void addCluster(NetworkIsland cluster, RouteSegmentPoint centerPoint) {
-			toVisitVertices.putAll(cluster.toVisitVertices);
-			for (long key : cluster.toVisitVertices.keys()) {
-				List<NetworkIsland> lst = networkPointsCluster.get(key);
-				if (lst == null) {
-					lst = new ArrayList<NetworkIsland>();
-					networkPointsCluster.put(key, lst);
-				}
-				lst.add(cluster);
+			// KISS: keep toVisitVertices - empty and use only networkPointsCluster
+			if (DEBUG_STORE_ALL_ROADS) {
+				visualClusters.add(cluster);
+				toVisitVertices.putAll(cluster.toVisitVertices);
 			}
+			// no need to copy it's done before
+			// networkPointsCluster.put(toVisitVertices)
 			for (long key : cluster.visitedVertices.keys()) {
-//				if (visitedPointsCluster.contains(key)) {
-//					throw new IllegalStateException();
-//				}
-//				visitedPointsCluster.add(key);
 				if (visitedVertices.containsKey(key)) {
 					throw new IllegalStateException();
 				}
 				visitedVertices.put(key, cluster.visitedVertices.get(key)); // reduce memory usage
 			}
-			cluster.index = clusters.size();
-			clusters.add(cluster);
 		}
 		
 		@Override
@@ -385,7 +388,7 @@ public class HHRoutingGraphCreator {
 
 		public TLongObjectHashMap<List<RouteSegment>> visualConnections() {
 			TLongObjectHashMap<List<RouteSegment>> conn = new TLongObjectHashMap<>();
-			for (NetworkIsland island : clusters) {
+			for (NetworkIsland island : visualClusters) {
 				List<RouteSegment> lst = new ArrayList<>();
 				conn.put(calculateRoutePointInternalId(island.start), lst);
 				for (RouteSegment border : island.toVisitVertices.valueCollection()) {
@@ -398,24 +401,16 @@ public class HHRoutingGraphCreator {
 		public TLongObjectHashMap<RouteSegment> visualPoints() {
 			TLongObjectHashMap<RouteSegment> visualPoints = new TLongObjectHashMap<>();
 			visualPoints.putAll(toVisitVertices);
-			for (NetworkIsland island : clusters) {
+			for (NetworkIsland island : visualClusters) {
 				visualPoints.put(calculateRoutePointInternalId(island.start), island.start);
 			}
 			return visualPoints;
 		}
 
-		public int clusterSize() {
-			return clusters.size();
-		}
-
-		public int borderPointsSize() {
-			return networkPointsCluster.size();
-		}
-		
 	}
 	
 	
-	private static class NetworkCollectPointCtx {
+	private class NetworkCollectPointCtx {
 		int totalBorderPoints = 0;
 		int maxBorder = 0;
 		int minBorder = 10000;
@@ -423,15 +418,107 @@ public class HHRoutingGraphCreator {
 		int minPnts = 10000;
 		int isolatedIslands = 0;
 		int shortcuts = 0;
-		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
+		int clusterInd = 0;
 		
-		public int getTotalPoints(FullNetwork network) {
+		HHRoutingPreparationDB networkDB;
+		NetworkRouteRegion currentProcessingRegion;
+		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
+		RoutingContext rctx;
+		
+		// TODO store network points inside NetworkRouteRegion and retrieve similar to visited points
+		TLongObjectHashMap<Integer> networkPointsCluster = new TLongObjectHashMap<>();
+		
+		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
+			this.rctx = rctx;
+			this.networkDB = networkDB;
+		}
+
+		public int getTotalPoints() {
 			int totalPoints = 0;
 			for (NetworkRouteRegion r : routeRegions) {
 				totalPoints += r.getPoints();
 			}
 			return totalPoints;
 		}
+		
+		public int clusterSize() {
+			return clusterInd;
+		}
+
+		public int borderPointsSize() {
+			return networkPointsCluster.size();
+		}
+
+
+		public void printStatsNetworks() {
+			// calculate stats
+			logf("RESULT %d points -> %d border points, %d clusters (%d isolated), %d est shortcuts",
+					getTotalPoints(), borderPointsSize(), clusterSize(), isolatedIslands, shortcuts);
+			logf("       %.1f avg / %d min / %d max border points per cluster, %.1f avg / %d min / %d max points in cluster", 
+					totalBorderPoints * 1.0 / clusterSize(), minBorder, maxBorder, 
+					getTotalPoints() * 1.0 / clusterSize(), minPnts, maxPnts );
+		}
+
+		public FullNetwork startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
+			currentProcessingRegion = nrouteRegion;
+			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, 
+					routeRegions.size(), new Date().toString());
+			for (NetworkRouteRegion nr : routeRegions) {
+				nr.unload();
+			}
+			List<NetworkRouteRegion> subRegions = new ArrayList<>();
+			for (NetworkRouteRegion nr : routeRegions) {
+				if (nr != nrouteRegion && nr.intersects(nrouteRegion)) {
+					subRegions.add(nr);
+				}
+			}
+			
+			subRegions.add(nrouteRegion);
+			// force to have clean RouteRegion (important first time)
+			rctx = gcMemoryLimitToUnloadAll(rctx, subRegions, true);
+			
+			FullNetwork network = new FullNetwork(rctx);
+			for (NetworkRouteRegion nr : subRegions) {
+				if (nr != nrouteRegion) {
+					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
+					network.networkPointsCluster = this.networkPointsCluster; // ! use by reference
+//					network.networkPointsCluster.putAll(nr.getNetworkPoints(networkDB));
+				}
+			}
+			return network;
+		}
+		
+		public void addCluster(NetworkIsland cluster, FullNetwork network, RouteSegmentPoint pntAround) {
+			cluster.index = clusterInd++;
+			if (currentProcessingRegion != null) {
+				currentProcessingRegion.visitedVertices.putAll(cluster.visitedVertices);
+			}
+			try {
+				networkDB.insertCluster(cluster, networkPointsCluster);
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
+			}
+			int borderPoints = cluster.toVisitVertices.size();
+			if (borderPoints == 0) {
+				this.isolatedIslands++;
+			} else {
+				this.minBorder = Math.min(this.minBorder, borderPoints);
+			}
+			this.maxBorder = Math.max(this.maxBorder, borderPoints);
+			this.totalBorderPoints += borderPoints;
+			this.shortcuts += borderPoints * (borderPoints - 1) / 2;
+			this.maxPnts = Math.max(this.maxPnts, cluster.visitedVertices.size());
+			this.minPnts = Math.min(this.minPnts, cluster.visitedVertices.size());
+		}
+
+		public void finishRegionProcess() throws SQLException {
+			logf("Saving visited %,d points from %s to db...", currentProcessingRegion.getPoints(), currentProcessingRegion.region.getName());
+			networkDB.insertVisitedVertices(currentProcessingRegion);
+			currentProcessingRegion.unload();
+			logf("     saved - total %,d points", getTotalPoints());
+			
+		}
+
 	}
 	
 	
@@ -439,14 +526,12 @@ public class HHRoutingGraphCreator {
 		int indProc = 0, prevPrintInd = 0;
 		private float estimatedRoads;
 		private FullNetwork network;
-		private NetworkRouteRegion nrouteRegion;
 		private NetworkCollectPointCtx ctx;
 		
-		public RouteDataObjectProcessor(FullNetwork network, NetworkCollectPointCtx ctx, NetworkRouteRegion nrouteRegion, float estimatedRoads) {
+		public RouteDataObjectProcessor(FullNetwork network, NetworkCollectPointCtx ctx, float estimatedRoads) {
+			this.estimatedRoads = estimatedRoads;
 			this.network = network;
 			this.ctx = ctx;
-			this.nrouteRegion = nrouteRegion;
-			this.estimatedRoads = estimatedRoads;
 		}
 		
 		@Override
@@ -467,24 +552,19 @@ public class HHRoutingGraphCreator {
 				}
 				NetworkIsland cluster = new NetworkIsland(network, pntAround);
 				buildRoadNetworkIsland(cluster);
-				int nwPoints = cluster.toVisitVertices.size();
 				if (DEBUG_VERBOSE_LEVEL >= 1) {
+					int nwPoints = cluster.toVisitVertices.size();
 					logf("CLUSTER: %2d border <- %4d points (%d segments) - %s",
-							cluster.toVisitVertices.size(), cluster.visitedVertices.size(),
-							nwPoints * (nwPoints - 1) / 2, pntAround);
+							nwPoints, cluster.visitedVertices.size(), nwPoints * (nwPoints - 1), pntAround);
 				}
+				ctx.addCluster(cluster, network, pntAround);				
 				network.addCluster(cluster, pntAround);
-				// GC optimizations
-				ctx.maxPnts = Math.max(ctx.maxPnts, cluster.visitedVertices.size());
-				ctx.minPnts = Math.min(ctx.minPnts, cluster.visitedVertices.size());
-				nrouteRegion.visitedVertices.putAll(cluster.visitedVertices);
-				cluster.visitedVertices = new TLongObjectHashMap<RouteSegment>();
 				
 				if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 					prevPrintInd = indProc;
 					logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters",
-							indProc, indProc * 100.0f / estimatedRoads , ctx.getTotalPoints(network),
-							network.borderPointsSize(),  network.clusterSize());
+							indProc, indProc * 100.0f / estimatedRoads , ctx.getTotalPoints(),
+							ctx.borderPointsSize(),  ctx.clusterSize());
 				}
 				 
 			}
@@ -499,45 +579,32 @@ public class HHRoutingGraphCreator {
 	
 	
 	private FullNetwork collectNetworkPoints(HHRoutingPreparationDB networkDB) throws IOException, SQLException {
-		FullNetwork network = new FullNetwork(prepareContext(null, null));
-		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx();
-		Set<String> routeRegionNames = new TreeSet<>();
-		for (RouteRegion r : network.ctx.reverseMap.keySet()) {
-			if(routeRegionNames.add(r.getName())) {
-				ctx.routeRegions.add(new NetworkRouteRegion(r, network.ctx.reverseMap.get(r).getFile()));
-			} else {
-				logf("Ignore route region %s as duplicate", r.getName());
-			}
-		}
-		networkDB.insertRegions(ctx.routeRegions);
+		RoutingContext rctx = prepareContext(null, null);
 		if (EX != null) {
+			DEBUG_STORE_ALL_ROADS = true;
+			FullNetwork network = new FullNetwork(rctx);
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), network.ctx, null);
 			NetworkIsland cluster = new NetworkIsland(network, pnt);
 			buildRoadNetworkIsland(cluster);
 			network.addCluster(cluster, pnt);
+			networkDB.insertCluster(cluster, network.networkPointsCluster);
 			return network;
 		}
-		double lattop = 85, latbottom = -85, lonleft = -179.9, lonright = 179.9;
-
+		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx(rctx, networkDB);
+		Set<String> routeRegionNames = new TreeSet<>();
+		for (RouteRegion r : rctx.reverseMap.keySet()) {
+			if (routeRegionNames.add(r.getName())) {
+				ctx.routeRegions.add(new NetworkRouteRegion(r, rctx.reverseMap.get(r).getFile()));
+			} else {
+				logf("Ignore route region %s as duplicate", r.getName());
+			}
+		}
+		networkDB.insertRegions(ctx.routeRegions);
+		FullNetwork network = null;
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
-			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, 
-					ctx.routeRegions.size(), new Date().toString());
-
-			network.visitedVertices = new TLongObjectHashMap<>();
-			for (NetworkRouteRegion nr : ctx.routeRegions) {
-				nr.unload();
-			}
-			List<NetworkRouteRegion> subRegions = new ArrayList<>();
-			for (NetworkRouteRegion nr : ctx.routeRegions) {
-				if (nr != nrouteRegion && nr.intersects(nrouteRegion)) {
-					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
-				}
-			}
-			subRegions.add(nrouteRegion);
-			// force to have clean RouteRegion (important first time)
-			network.ctx = gcMemoryLimitToUnloadAll(network.ctx, subRegions, true);
+			network = ctx.startRegionProcess(nrouteRegion);
 			RouteRegion routeRegion = null;
 			for (RouteRegion rr : network.ctx.reverseMap.keySet()) {
 				if (rr.getFilePointer() == nrouteRegion.region.getFilePointer() && nrouteRegion.region.getName().equals(rr.getName())) {
@@ -545,49 +612,23 @@ public class HHRoutingGraphCreator {
 					break;
 				}
 			}
-			
 			BinaryMapIndexReader reader = network.ctx.reverseMap.get(routeRegion);
 			List<RouteSubregion> regions = reader
-					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(lonleft),
-							MapUtils.get31TileNumberX(lonright), MapUtils.get31TileNumberY(lattop),
-							MapUtils.get31TileNumberY(latbottom), 16, null), routeRegion.getSubregions());
+					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude() - 1),
+							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude() + 1), MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude() + 1),
+							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude() - 1), 16, null), routeRegion.getSubregions());
 			
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte 
-			reader.loadRouteIndexData(regions, new RouteDataObjectProcessor(network, ctx, nrouteRegion, estimatedRoads));
-			logf("Saving visited %,d points from %s to db...", nrouteRegion.getPoints(), nrouteRegion.region.getName());
-			networkDB.insertVisitedVertices(nrouteRegion);
-			nrouteRegion.unload();
-			logf("     saved - total %,d points", ctx.getTotalPoints(network));
+			reader.loadRouteIndexData(regions, new RouteDataObjectProcessor(network, ctx, estimatedRoads));
+			
+			ctx.finishRegionProcess();
 		}
-		networkDB.insertPoints(network);
-		
-		printStatsNetworks(network, ctx);
-		
-		
+		ctx.printStatsNetworks();
 		return network;
 	}
 
 
-	private void printStatsNetworks(FullNetwork network, NetworkCollectPointCtx ctx) {
-		// calculate stats
-		for (NetworkIsland c : network.clusters) {
-			int borderPoints = c.toVisitVertices.size();
-			ctx.maxBorder = Math.max(ctx.maxBorder, borderPoints);
-			if (borderPoints == 0) {
-				ctx.isolatedIslands++;
-			} else {
-				ctx.minBorder = Math.min(ctx.minBorder, borderPoints);
-			}
-			ctx.totalBorderPoints += borderPoints;
-			ctx.shortcuts += borderPoints * (borderPoints - 1) / 2;
-		}
-		
-		logf("RESULT %d points -> %d border points, %d clusters (%d isolated), %d est shortcuts",
-				ctx.getTotalPoints(network), network.borderPointsSize(), network.clusterSize(), ctx.isolatedIslands, ctx.shortcuts);
-		logf("       %.1f avg / %d min / %d max border points per cluster, %.1f avg / %d min / %d max points in cluster", 
-				ctx.totalBorderPoints * 1.0 / network.clusters.size(), ctx.minBorder, ctx.maxBorder, 
-				ctx.getTotalPoints(network) * 1.0 / network.clusters.size(), ctx.minPnts, ctx.maxPnts );
-	}
+	
 
 
 	private void buildRoadNetworkIsland(NetworkIsland c) {
@@ -690,7 +731,8 @@ public class HHRoutingGraphCreator {
 		RouteSegment next = c.getCtx().loadRouteSegment(x, y, 0);
 		int cnt = 0;
 		while (next != null) {
-			if (!c.testIfVisited(calculateRoutePointInternalId(next), true)) {
+			long pntId = calculateRoutePointInternalId(next);
+			if (!c.testIfVisited(pntId) && !c.testIfPossibleNetworkPoint(pntId)) {
 				cnt++;
 			}
 			next = next.getNext();
@@ -708,7 +750,7 @@ public class HHRoutingGraphCreator {
 			return true;
 		}
 		c.toVisitVertices.remove(pntId);
-		if (c.testIfVisited(pntId, false)) {
+		if (c.testIfVisited(pntId)) {
 			throw new IllegalStateException();
 		}
 		c.visitedVertices.put(pntId,  DEBUG_STORE_ALL_ROADS ? segment : null);
@@ -734,7 +776,7 @@ public class HHRoutingGraphCreator {
 			RouteSegment test = makePositiveDir(next); 
 			long nextPnt = calculateRoutePointInternalId(test);
 			
-			if (!c.testIfVisited(nextPnt, false) && !c.toVisitVertices.containsKey(nextPnt)) {
+			if (!c.testIfVisited(nextPnt) && !c.toVisitVertices.containsKey(nextPnt)) {
 //				System.out.println(" + " + test);
 				test.distanceFromStart = distFromStart;
 				if (queue != null) {
@@ -744,7 +786,7 @@ public class HHRoutingGraphCreator {
 			}
 			RouteSegment opp = makePositiveDir(next.initRouteSegment(!next.isPositive()));
 			long oppPnt = opp == null ? 0 : calculateRoutePointInternalId(opp);
-			if (opp != null && !c.testIfVisited(oppPnt, false) && !c.toVisitVertices.containsKey(oppPnt)) {
+			if (opp != null && !c.testIfVisited(oppPnt) && !c.toVisitVertices.containsKey(oppPnt)) {
 //				System.out.println(" + " + opp);
 				opp.distanceFromStart = distFromStart;
 				if (queue != null) {
