@@ -14,6 +14,7 @@ import java.util.Random;
 import java.util.Set;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
@@ -151,7 +152,7 @@ public class HHRoutingTopGraphCreator {
 			}
 		} else {
 			int origPnts = printStats(clusters);
-			for (int k = 0; k < 3; k++) {
+			for (int k = 0; k < 4; k++) {
 				mergeClustersHalf(clusters);
 				recalculatePointsNeighboors(clusters, pntsList, toExclude);
 				int pntst = printStats(clusters);
@@ -178,42 +179,108 @@ public class HHRoutingTopGraphCreator {
 		for (NetworkHHCluster c : clusters.values()) {
 			if (c.mergedTo == null) {
 				clusteInd++;
-				RoutingStats stats = new RoutingStats();
-				int ind = 0, total = 0;
+				p += calculateEdgesForCluster(clusteInd, c);
 				
-				for (NetworkDBPoint pnt1 : c.points) {
-					for (NetworkDBPoint pnt2 : c.points) {
-						c.clearRouting();
-						if (pnt1 != pnt2) {
-							total++;
-							NetworkDBPoint res = routePlanner.runDijkstraNetworkRouting(pnt1, pnt2, stats);
-							if (res != null) {
-								ind++;
-								
-								if (res != null && res.rtRouteToPointRev != null) {
-									NetworkDBSegment parent = res.rtRouteToPointRev;
-									while (parent != null) {
-										parent.end.rtCnt++; // TODO
-										parent = parent.end.rtRouteToPointRev;
-									}
-								}
-								if (res != null && res.rtRouteToPoint != null) {
-									NetworkDBSegment parent = res.rtRouteToPoint;
-									while (parent != null) {
-										parent.start.rtCnt++; // TODO
-										parent = parent.start.rtRouteToPoint;
-									}
-								}
-							}
-						}
-					}
-				}
-				p += ind;
-				System.out.println(String.format("Cluster %d: found %d (%d) final routes ( visited %,d vertices, %,d (of %,d) edges )",
-						clusteInd, ind, total, stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
 			}
 		}
 		System.out.println(p + " --- ");
+	}
+	
+	private long link(NetworkDBPoint pnt1, NetworkDBPoint pnt2) {
+		return (((long)pnt1.index) << 32) + pnt2.index;
+	}
+
+
+	private int calculateEdgesForCluster(int clusteInd, NetworkHHCluster c) {
+		RoutingStats stats = new RoutingStats();
+		int total = 0;
+		Map<NetworkDBPoint, List<NetworkDBPoint>> totPoints = new HashMap<>();
+		TLongHashSet shortcuts = new TLongHashSet();
+		TLongHashSet shortcutMids = new TLongHashSet();
+		TLongHashSet existing = new TLongHashSet();
+		for (NetworkDBPoint pnt1 : c.points) {
+			if (totPoints.containsKey(pnt1)) {
+				// TODO ? this wrong situation how merge clusters (easier make hex grid?)
+//				System.out.println(c.points);
+//				System.out.println(pnt1 + " " + totPoints.get(pnt1));
+//				throw new IllegalStateException();
+			}
+			for (NetworkDBPoint pnt2 : c.points) {
+				if (pnt1 == pnt2) {
+					continue;
+				}
+				total++;
+				if (checkConnected(pnt1, pnt2)) {
+					existing.add(link(pnt1, pnt2));
+					continue;
+				}
+				c.clearRouting();
+
+				NetworkDBPoint res = routePlanner.runDijkstraNetworkRouting(pnt1, pnt2, stats);
+				if (res != null) {
+					shortcuts.add(link(pnt1, pnt2));
+					NetworkDBSegment parent = res.rtRouteToPointRev;
+					while (parent != null) {
+						addPnt(totPoints, parent.end, pnt1, pnt2);
+						parent = parent.end.rtRouteToPointRev;
+					}
+					parent = res.rtRouteToPoint;
+					while (parent != null) {
+						addPnt(totPoints, parent.start, pnt1, pnt2);
+						parent = parent.start.rtRouteToPoint;
+					}
+				}
+			}
+		}
+		List<NetworkDBPoint> centerPoints = new ArrayList<>(totPoints.keySet());
+		Collections.sort(centerPoints, new Comparator<NetworkDBPoint>() {
+
+			@Override
+			public int compare(NetworkDBPoint o1, NetworkDBPoint o2) {
+				return -Integer.compare(totPoints.get(o1).size(), totPoints.get(o2).size());
+			}
+		});
+		for (NetworkDBPoint p : centerPoints) {
+			List<NetworkDBPoint> startEnds = totPoints.get(p);
+			if (c.points.contains(p)) {
+				for (int i = 0; i < startEnds.size(); i += 2) {
+					if (shortcuts.remove(link(startEnds.get(0), startEnds.get(1)))) {
+						existing.add(link(startEnds.get(0), startEnds.get(1)));
+					}
+				}
+				continue;
+			}
+			if (startEnds.size() < 10) {
+				continue;
+			}
+			for (int i = 0; i < startEnds.size(); i += 2) {
+				if (shortcuts.remove(link(startEnds.get(0), startEnds.get(1)))) {
+					shortcutMids.add(link(startEnds.get(0), p));
+					shortcutMids.add(link(p, startEnds.get(1)));
+				}
+			}
+		}
+		System.out.println(String.format("Cluster %d: new shortcuts %d (total %d, existing %d) final routes ( visited %,d vertices, %,d (of %,d) edges )",
+				clusteInd, shortcuts.size() + shortcutMids.size(), total, existing.size(), stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
+		return shortcuts.size() + shortcutMids.size();
+	}
+
+
+	
+
+
+	private void addPnt(Map<NetworkDBPoint, List<NetworkDBPoint>> totPoints, NetworkDBPoint inter, NetworkDBPoint pnt1,
+			NetworkDBPoint pnt2) {
+		if (inter == pnt1 || inter == pnt2) {
+			return;
+		}
+		List<NetworkDBPoint> lst = totPoints.get(inter);
+		if (lst == null) {
+			lst = new ArrayList<>();
+			totPoints.put(inter, lst);
+		}
+		lst.add(pnt1);
+		lst.add(pnt2);
 	}
 
 

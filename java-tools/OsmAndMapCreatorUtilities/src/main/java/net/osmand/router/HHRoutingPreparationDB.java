@@ -8,13 +8,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
@@ -170,7 +168,7 @@ public class HHRoutingPreparationDB {
 			NetworkDBPoint pnt = new NetworkDBPoint();
 			int p = 1;
 			pnt.id = rs.getLong(p++);
-			pnt.index = rs.getLong(p++);
+			pnt.index = rs.getInt(p++);
 			pnt.roadId = rs.getLong(p++);
 			pnt.start = rs.getInt(p++);
 			pnt.end = rs.getInt(p++);
@@ -217,10 +215,13 @@ public class HHRoutingPreparationDB {
 		int ind = 0;
 		TLongObjectIterator<List<NetworkIsland>> it = network.networkPointsCluster.iterator();
 		while (it.hasNext()) {
+			if (ind < 0) {
+				throw new IllegalStateException();
+			}
 			it.advance();
 			int p = 1;
 			s.setLong(p++, it.key());
-			s.setLong(p++, ind++);
+			s.setInt(p++, ind++);
 			RouteSegment obj = network.toVisitVertices.get(it.key());
 			List<NetworkIsland> islands = it.value();
 			s.setLong(p++, obj.getRoad().getId());
@@ -317,7 +318,7 @@ public class HHRoutingPreparationDB {
 	
 	static class NetworkDBPoint {
 		long id;
-		long index;
+		int index;
 		int level = 0;
 		public long roadId;
 		public int start;
