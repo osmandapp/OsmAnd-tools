@@ -33,8 +33,9 @@ public class HHRoutingPreparationDB {
 	private PreparedStatement insertGeometry;
 	private PreparedStatement loadGeometry;
 
+	private final int BATCH_SIZE = 10000;
+	private int batchInsPoint = 0;
 	private PreparedStatement insCluster;
-
 	private PreparedStatement insPoint;
 
 
@@ -91,11 +92,13 @@ public class HHRoutingPreparationDB {
 			ps.setLong(1, networkRouteRegion.id);
 			ps.setLong(2, k);
 			ps.addBatch();
-			if (ind++ > 10000) {
+			if (ind++ > BATCH_SIZE) {
 				ps.executeBatch();
 			}
 		}
 		ps.executeBatch();
+		insPoint.executeBatch();
+		insCluster.executeBatch();
 		
 	}
 	
@@ -215,9 +218,9 @@ public class HHRoutingPreparationDB {
 	}
 
 	public void insertCluster(NetworkIsland cluster, TLongObjectHashMap<Integer> mp) throws SQLException {
-		
 		TLongObjectIterator<RouteSegment> it = cluster.toVisitVertices.iterator();
 		while (it.hasNext()) {
+			batchInsPoint++;
 			it.advance();
 			long pntId = it.key();
 			RouteSegment obj = it.value();
@@ -247,8 +250,12 @@ public class HHRoutingPreparationDB {
 			insCluster.addBatch();
 
 		}
-		insPoint.executeBatch();
-		insCluster.executeBatch();
+		if (batchInsPoint > BATCH_SIZE) {
+			batchInsPoint = 0;
+			insPoint.executeBatch();
+			insCluster.executeBatch();
+		}
+
 	}
 
 	public void close() throws SQLException {

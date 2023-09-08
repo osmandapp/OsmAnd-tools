@@ -185,7 +185,6 @@ public class HHRoutingGraphCreator {
 				usedMemory > MEMORY_RELOAD_MB && (System.currentTimeMillis() - lastMemoryReload) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
 			System.gc();
 			usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-			
 			List<File> fls = null; 
 			if (subRegions != null) {
 				fls = new ArrayList<File>();
