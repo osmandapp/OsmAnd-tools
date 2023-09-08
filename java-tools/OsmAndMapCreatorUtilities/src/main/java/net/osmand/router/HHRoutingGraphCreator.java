@@ -125,7 +125,7 @@ public class HHRoutingGraphCreator {
 
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
-//		name = "Netherlands_europe_2.road.obf";
+		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
@@ -300,10 +300,33 @@ public class HHRoutingGraphCreator {
 		}
 
 		public int visitedVerticesSize() {
+			if (parent instanceof FullNetwork) {
+				return visitedVertices.size();
+			}
 			return visitedVertices.size() + (parent == null ? 0 : parent.visitedVerticesSize());
 		}
-
 		
+		public int toVisitVerticesSize() {
+			if (parent instanceof FullNetwork) {
+				return toVisitVertices.size();
+			}
+			int pnt = (parent == null ? 0 : parent.toVisitVerticesSize());
+			for (long l : visitedVertices.keys()) {
+				if(parent.testIfPossibleNetworkPoint(l)) {
+					if (parent.testIfNetworkPoint(l)) {
+						throw new IllegalStateException("Assert");
+					}
+					pnt--;
+				}
+			}
+			for (long l : toVisitVertices.keys()) {
+				if (!parent.testIfPossibleNetworkPoint(l)) {
+					pnt++;
+				}
+			}
+			return pnt;
+		}
+
 		public int depth() {
 			return 1 + (parent == null ? 0 : parent.depth());
 		}
@@ -325,6 +348,8 @@ public class HHRoutingGraphCreator {
 		public RoutingContext getCtx() {
 			return parent.getCtx();
 		}
+
+		
 	}
 	
 	class FullNetwork extends NetworkIsland {
@@ -361,6 +386,12 @@ public class HHRoutingGraphCreator {
 		}
 		
 		public int visitedVerticesSize() {
+			// don't count top level so it's not used for cluster optimizations
+			return 0;
+		}
+		
+		@Override
+		public int toVisitVerticesSize() {
 			// don't count top level so it's not used for cluster optimizations
 			return 0;
 		}
@@ -663,24 +694,15 @@ public class HHRoutingGraphCreator {
 			if (!c.toVisitVertices.contains(calculateRoutePointInternalId(t))) {
 				continue;
 			}
-			int parentToVisit = c.toVisitVertices.size();
 			// long id = t.getRoad().getId() / 64;
-			NetworkIsland bc = new NetworkIsland(c,t );
+			NetworkIsland bc = new NetworkIsland(c, t);
 			buildRoadNetworkIsland(bc);
-			int incPointsAfterMerge = 0;
-			for (long l : bc.visitedVertices.keys()) {
-				if (c.toVisitVertices.containsKey(l)) {
-					incPointsAfterMerge--;
-				}
-			}
-			for (long l : bc.toVisitVertices.keys()) {
-				if (!c.toVisitVertices.containsKey(l)) {
-					incPointsAfterMerge++;
-				}
-			}
+			
 			// it could only increase by 1 (1->2)
-			if ((incPointsAfterMerge <= 2 || coeffToMinimize(c.visitedVerticesSize(),
-					parentToVisit) > coeffToMinimize(bc.visitedVerticesSize(), parentToVisit + incPointsAfterMerge) )) {
+			int prevPoints = c.toVisitVerticesSize();
+			int newPoints = bc.toVisitVerticesSize();
+			if (((newPoints - prevPoints) <= 2 || 
+					coeffToMinimize(c.visitedVerticesSize(), prevPoints) > coeffToMinimize(bc.visitedVerticesSize(), newPoints) )) {
 				int sz = c.visitedVerticesSize();
 				c.visitedVertices.putAll(bc.visitedVertices);
 				for (long l : bc.visitedVertices.keys()) {
@@ -691,10 +713,9 @@ public class HHRoutingGraphCreator {
 						c.toVisitVertices.put(k, bc.toVisitVertices.get(k));
 					}
 				}
-				c.printCurentState(incPointsAfterMerge == 0 ? "IGNORE": " MERGED", 2, String.format(" - before %d -> %d", sz, parentToVisit));
+				c.printCurentState(prevPoints == newPoints ? "IGNORE": " MERGED", 2, String.format(" - before %d -> %d", sz, prevPoints));
 			} else {
-				c.printCurentState(" NOMERGE", 3, String.format(" - %d -> %d", bc.visitedVerticesSize(),
-						parentToVisit + incPointsAfterMerge));
+				c.printCurentState(" NOMERGE", 3, String.format(" - %d -> %d", bc.visitedVerticesSize(), newPoints));
 			}
 		}
 	}
