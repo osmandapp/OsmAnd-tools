@@ -34,7 +34,6 @@ public class HHRoutingPreparationDB {
 	private PreparedStatement loadGeometry;
 
 
-	private static int BATCH = 1000;
 	public static final int FULL_RECREATE = 0;
 	public static final int RECREATE_SEGMENTS = 1;
 	public static final int READ = 2;
