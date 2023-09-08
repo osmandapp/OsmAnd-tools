@@ -33,6 +33,10 @@ public class HHRoutingPreparationDB {
 	private PreparedStatement insertGeometry;
 	private PreparedStatement loadGeometry;
 
+	private PreparedStatement insCluster;
+
+	private PreparedStatement insPoint;
+
 
 	public static final int FULL_RECREATE = 0;
 	public static final int RECREATE_SEGMENTS = 1;
@@ -55,6 +59,9 @@ public class HHRoutingPreparationDB {
 		if (recreate == RECREATE_SEGMENTS) {
 			st.execute("DELETE FROM segments");
 		}
+		insPoint = conn.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
+						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+		insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd ) VALUES(?, ?, ?)");
 		insertSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist) " + " VALUES(?, ?, ?)");
 		insertGeometry = conn.prepareStatement("INSERT INTO geometry(idPoint, idConnPoint, geometry) " + " VALUES(?, ?, ?)");
 		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint =? ");
@@ -208,10 +215,7 @@ public class HHRoutingPreparationDB {
 	}
 
 	public void insertCluster(NetworkIsland cluster, TLongObjectHashMap<Integer> mp) throws SQLException {
-		PreparedStatement insPoint = conn
-				.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
-						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
-		PreparedStatement insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd ) VALUES(?, ?, ?)");
+		
 		TLongObjectIterator<RouteSegment> it = cluster.toVisitVertices.iterator();
 		while (it.hasNext()) {
 			it.advance();
@@ -244,9 +248,7 @@ public class HHRoutingPreparationDB {
 
 		}
 		insPoint.executeBatch();
-		insPoint.close();
 		insCluster.executeBatch();
-		insCluster.close();
 	}
 
 	public void close() throws SQLException {
