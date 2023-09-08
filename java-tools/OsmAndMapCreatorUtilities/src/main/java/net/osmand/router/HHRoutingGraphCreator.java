@@ -300,7 +300,7 @@ public class HHRoutingGraphCreator {
 		}
 
 		public int visitedVerticesSize() {
-			return visitedVertices.size() + ( parent == null ? 0 : parent.visitedVerticesSize());
+			return visitedVertices.size() + (parent == null ? 0 : parent.visitedVerticesSize());
 		}
 
 		
@@ -358,6 +358,10 @@ public class HHRoutingGraphCreator {
 				return true;
 			}
 			return super.testIfNetworkPoint(pntId);
+		}
+		
+		public int visitedVerticesSize() {
+			return 0;
 		}
 		
 		public boolean testIfPossibleNetworkPoint(long pntId) {
@@ -558,7 +562,6 @@ public class HHRoutingGraphCreator {
 				}
 				ctx.addCluster(cluster, network, pntAround);				
 				network.addCluster(cluster, pntAround);
-				
 				if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 					prevPrintInd = indProc;
 					logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters",
