@@ -39,16 +39,9 @@ public class HHRoutingPreparationDB {
 	private PreparedStatement insPoint;
 
 
-	public static final int FULL_RECREATE = 0;
-	public static final int RECREATE_SEGMENTS = 1;
-	public static final int READ = 2;
 
-
-
-	public HHRoutingPreparationDB(File file, int recreate) throws SQLException {
-		if (file.exists() && FULL_RECREATE == recreate) {
-			file.delete();
-		}
+	public HHRoutingPreparationDB(File file) throws SQLException {
+		
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
 		Statement st = conn.createStatement();
 		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes, PRIMARY key (idPoint))"); // ind unique
@@ -58,9 +51,7 @@ public class HHRoutingPreparationDB {
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
 		st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
-		if (recreate == RECREATE_SEGMENTS) {
-			st.execute("DELETE FROM segments");
-		}
+		
 		insPoint = conn.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd ) VALUES(?, ?, ?)");
@@ -69,7 +60,36 @@ public class HHRoutingPreparationDB {
 		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint =? ");
 		st.close();
 	}
+	
+	public void recreateSegments() throws SQLException {
+		Statement st = conn.createStatement();
+ 		st.execute("DELETE FROM segments");
+ 		st.close();
+	}
 
+	
+	public void loadNetworkPoints(TLongObjectHashMap<Integer> networkPointsCluster) throws SQLException {
+		Statement s = conn.createStatement();
+		ResultSet rs = s.executeQuery("SELECT idPoint, ind FROM points ");
+		while(rs.next()) {
+			networkPointsCluster.put(rs.getLong(1), rs.getInt(2));
+		}
+		rs.close();
+		s.close();
+	}
+	
+	public boolean hasVisitedPoints(NetworkRouteRegion nrouteRegion) throws SQLException {
+		PreparedStatement ps = conn.prepareStatement("SELECT pntId FROM routeRegionPoints WHERE id = ? ");
+		ps.setLong(1, nrouteRegion.id);
+		ResultSet rs = ps.executeQuery();
+		boolean has = false;
+		while (rs.next()) {
+			has = true;
+		}
+		rs.close();
+		ps.close();
+		return has;
+	}
 	
 	public void loadVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
 		PreparedStatement ps = conn.prepareStatement("SELECT pntId FROM routeRegionPoints WHERE id = ? ");
@@ -196,26 +216,36 @@ public class HHRoutingPreparationDB {
 	
 	
 	public void insertRegions(List<NetworkRouteRegion> regions) throws SQLException {
-		PreparedStatement s = conn
+		PreparedStatement check = conn.prepareStatement("SELECT id from routeRegions where name = ? "); // and filePointer = ?
+		PreparedStatement ins = conn
 				.prepareStatement("INSERT INTO routeRegions(id, name, filePointer, size, filename, left, right, top, bottom) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		int ind = 0;
 		for(NetworkRouteRegion nr : regions) {
+			// name is enough
+			check.setString(1, nr.region.getName());
+//			check.setInt(2, nr.region.getFilePointer());
+			ResultSet ls = check.executeQuery();
+			if (ls.next()) {
+				nr.id = ls.getInt(1);
+				continue;
+			}
+			
 			int p = 1;
 			nr.id = ind++;
-			s.setLong(p++, nr.id);
-			s.setString(p++, nr.region.getName());
-			s.setLong(p++, nr.region.getFilePointer());
-			s.setLong(p++, nr.region.getLength());
-			s.setString(p++, nr.file.getName());
-			s.setDouble(p++, nr.region.getLeftLongitude());
-			s.setDouble(p++, nr.region.getRightLongitude());
-			s.setDouble(p++, nr.region.getTopLatitude());
-			s.setDouble(p++, nr.region.getBottomLatitude());
-			s.addBatch();
+			ins.setLong(p++, nr.id);
+			ins.setString(p++, nr.region.getName());
+			ins.setLong(p++, nr.region.getFilePointer());
+			ins.setLong(p++, nr.region.getLength());
+			ins.setString(p++, nr.file.getName());
+			ins.setDouble(p++, nr.region.getLeftLongitude());
+			ins.setDouble(p++, nr.region.getRightLongitude());
+			ins.setDouble(p++, nr.region.getTopLatitude());
+			ins.setDouble(p++, nr.region.getBottomLatitude());
+			ins.addBatch();
 		}
-		s.executeBatch();
-		s.close();
+		ins.executeBatch();
+		ins.close();
 	}
 
 	public void insertCluster(NetworkIsland cluster, TLongObjectHashMap<Integer> mp) throws SQLException {
@@ -375,7 +405,6 @@ public class HHRoutingPreparationDB {
 			rtDistanceFromStartRev = 0;
 		}
 	}
-
 
 
 }

@@ -147,22 +147,27 @@ public class HHRoutingGraphCreator {
 	
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
+		boolean clean = false;
 		for (String a : args) {
 			if (a.equals("--setup-network-points")) {
 				PROCESS = PROCESS_SET_NETWORK_POINTS;
 			} else if (a.equals("--build-network-shortcuts")) {
 				PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
-			} else if (a.equals("--rebuild-network-shortcuts")) {
-				PROCESS = PROCESS_REBUILD_NETWORK_SEGMENTS;
+			} else if (a.equals("--clean")) {
+				clean = true;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName();
 		
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT),
-				  PROCESS == PROCESS_SET_NETWORK_POINTS ? HHRoutingPreparationDB.FULL_RECREATE
-				: PROCESS == PROCESS_REBUILD_NETWORK_SEGMENTS ? HHRoutingPreparationDB.RECREATE_SEGMENTS
-								: HHRoutingPreparationDB.READ);
+		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
+		if (clean && PROCESS == PROCESS_SET_NETWORK_POINTS && dbFile.exists()) {
+			dbFile.delete();
+		}
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
+		if (clean && PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS && dbFile.exists()) {
+			networkDB.recreateSegments();
+		}
 		List<File> sources = new ArrayList<File>();
 		if (obfFile.isDirectory()) {
 			for (File f : obfFile.listFiles()) {
@@ -505,8 +510,7 @@ public class HHRoutingGraphCreator {
 
 		public FullNetwork startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
 			currentProcessingRegion = nrouteRegion;
-			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, 
-					routeRegions.size(), new Date().toString());
+			
 			for (NetworkRouteRegion nr : routeRegions) {
 				nr.unload();
 			}
@@ -637,6 +641,7 @@ public class HHRoutingGraphCreator {
 			return network;
 		}
 		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx(rctx, networkDB);
+		networkDB.loadNetworkPoints(ctx.networkPointsCluster);
 		Set<String> routeRegionNames = new TreeSet<>();
 		for (RouteRegion r : rctx.reverseMap.keySet()) {
 			if (routeRegionNames.add(r.getName())) {
@@ -650,6 +655,7 @@ public class HHRoutingGraphCreator {
 
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
+			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, ctx.routeRegions.size(), new Date().toString());
 			network = ctx.startRegionProcess(nrouteRegion);
 			RouteRegion routeRegion = null;
 			for (RouteRegion rr : network.ctx.reverseMap.keySet()) {

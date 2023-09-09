@@ -105,7 +105,7 @@ public class HHRoutePlanner {
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getName();
 		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(ROUTING_PROFILE), 
-				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT), HHRoutingPreparationDB.READ));
+				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT)));
 		if (PROCESS == PROC_ROUTING) {
 			Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END);
 			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-rt.osm"));

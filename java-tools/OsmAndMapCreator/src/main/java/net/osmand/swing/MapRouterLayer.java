@@ -964,7 +964,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				File hhFile = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_HH);
 				final RoutingContext ctx = prepareRoutingContext(null, RouteCalculationMode.NORMAL,
 						new BinaryMapIndexReader[0], new RoutePlannerFrontEnd());
-				hhPlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile, HHRoutingPreparationDB.READ));
+				hhPlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
 			}
 
 			return hhPlanner.runRouting(startRoute, endRoute);
