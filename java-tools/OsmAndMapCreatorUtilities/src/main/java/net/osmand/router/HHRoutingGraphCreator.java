@@ -58,6 +58,7 @@ import net.osmand.util.MapUtils;
 // 1.7 BinaryRoutePlanner TODO test that routing time is different with on & off!
 
 // 2nd phase - points selection
+// 2.0 print stats about initial routing graph (points / edges / distribution % edges / point)
 // 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.2 Merge single point exit islands (up to a limit?)
 // 2.3 Exclude & merge non exit islands (up to a limit)
@@ -108,6 +109,8 @@ public class HHRoutingGraphCreator {
 	
 	final static int MEMORY_RELOAD_MB = 1000 ; //
 	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
+	static final int ROUTING_MEMORY_LIMIT = 1024;
+
 
 	
 	private List<File> sources = new ArrayList<File>(); 
@@ -239,8 +242,7 @@ public class HHRoutingGraphCreator {
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT,
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(ROUTING_MEMORY_LIMIT, ROUTING_MEMORY_LIMIT);
 		Map<String, String> map = new TreeMap<String, String>();
 		// map.put("avoid_ferries", "true");
 		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
