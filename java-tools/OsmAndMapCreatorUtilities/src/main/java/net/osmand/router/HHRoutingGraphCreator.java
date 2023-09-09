@@ -110,6 +110,8 @@ public class HHRoutingGraphCreator {
 	final static int MEMORY_RELOAD_MB = 1000 ; //
 	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
 	static final int ROUTING_MEMORY_LIMIT = 1024;
+	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
+	static long MEMORY_LAST_USED_MB;
 
 
 	
@@ -189,11 +191,11 @@ public class HHRoutingGraphCreator {
 
 
 
-	private long lastMemoryReload = System.currentTimeMillis();
+
 	private RoutingContext gcMemoryLimitToUnloadAll(RoutingContext ctx, List<NetworkRouteRegion> subRegions, boolean force) throws IOException {
 		long usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 		if (force || (
-				usedMemory > MEMORY_RELOAD_MB && (System.currentTimeMillis() - lastMemoryReload) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
+				(usedMemory - MEMORY_LAST_USED_MB) > MEMORY_RELOAD_MB && (System.currentTimeMillis() - MEMEORY_LAST_RELOAD) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
 			System.gc();
 			usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 			Set<File> fls = null; 
@@ -206,10 +208,10 @@ public class HHRoutingGraphCreator {
 			ctx = prepareContext(fls, ctx);
 			ctx.calculationProgress = new RouteCalculationProgress();
 			System.gc();
-			long nwusedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;;
-			lastMemoryReload = System.currentTimeMillis();
+			MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;;
+			MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 			logf("***** Reload memory used before %d MB - after gc and reload %d MB *****\n", 
-					usedMemory, nwusedMemory);
+					usedMemory, MEMORY_LAST_USED_MB);
 		}
 		return ctx;
 	}
@@ -464,10 +466,10 @@ public class HHRoutingGraphCreator {
 		int shortcuts = 0;
 		int clusterInd = 0;
 		
-		HHRoutingPreparationDB networkDB;
-		NetworkRouteRegion currentProcessingRegion;
-		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
 		RoutingContext rctx;
+		HHRoutingPreparationDB networkDB;
+		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
+		NetworkRouteRegion currentProcessingRegion;
 		TLongObjectHashMap<Integer> networkPointsCluster = new TLongObjectHashMap<>();
 		
 		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
@@ -859,7 +861,7 @@ public class HHRoutingGraphCreator {
 //			if (pnt.index > 2000 || pnt.index < 1800)   { 
 //				continue;
 //			}
-			if (ind % 100 == 0 ) {
+			if (ind % 1000 == 0 ) {
 				ctx = gcMemoryLimitToUnloadAll(ctx, null, false);
 			}
 			if (pnt.connected.size() > 0) {
