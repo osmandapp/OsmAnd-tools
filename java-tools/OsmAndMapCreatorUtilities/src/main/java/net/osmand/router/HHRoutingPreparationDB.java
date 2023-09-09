@@ -69,7 +69,7 @@ public class HHRoutingPreparationDB {
 
 	public int getMaxClusterId() throws SQLException {
 		Statement s = conn.createStatement();
-		ResultSet rs = s.executeQuery("select max(clusterInd) from points");
+		ResultSet rs = s.executeQuery("select max(clusterInd) from clusters");
 		if (rs.next()) {
 			return rs.getInt(1) + 1;
 		}
