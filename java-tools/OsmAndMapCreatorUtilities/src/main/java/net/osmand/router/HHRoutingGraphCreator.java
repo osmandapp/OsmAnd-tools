@@ -651,11 +651,17 @@ public class HHRoutingGraphCreator {
 			}
 		}
 		networkDB.insertRegions(ctx.routeRegions);
+		ctx.clusterInd = networkDB.getMaxClusterId();
 		FullNetwork network = null;
 
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
 			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, ctx.routeRegions.size(), new Date().toString());
+			if (networkDB.hasVisitedPoints(nrouteRegion)) {
+				System.out.println("Already processed");
+				continue;
+			}
+			
 			network = ctx.startRegionProcess(nrouteRegion);
 			RouteRegion routeRegion = null;
 			for (RouteRegion rr : network.ctx.reverseMap.keySet()) {

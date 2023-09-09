@@ -67,6 +67,16 @@ public class HHRoutingPreparationDB {
  		st.close();
 	}
 
+	public int getMaxClusterId() throws SQLException {
+		Statement s = conn.createStatement();
+		ResultSet rs = s.executeQuery("select max(clusterInd) from points");
+		if (rs.next()) {
+			return rs.getInt(1) + 1;
+		}
+		rs.close();
+		s.close();
+		return 0;
+	}
 	
 	public void loadNetworkPoints(TLongObjectHashMap<Integer> networkPointsCluster) throws SQLException {
 		Statement s = conn.createStatement();
@@ -83,7 +93,7 @@ public class HHRoutingPreparationDB {
 		ps.setLong(1, nrouteRegion.id);
 		ResultSet rs = ps.executeQuery();
 		boolean has = false;
-		while (rs.next()) {
+		if (rs.next()) {
 			has = true;
 		}
 		rs.close();
@@ -405,6 +415,8 @@ public class HHRoutingPreparationDB {
 			rtDistanceFromStartRev = 0;
 		}
 	}
+
+	
 
 
 }
