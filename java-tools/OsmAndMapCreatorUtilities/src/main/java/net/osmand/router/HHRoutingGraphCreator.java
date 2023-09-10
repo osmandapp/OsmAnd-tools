@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -23,9 +24,17 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
@@ -47,7 +56,6 @@ import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
-
 
 // TODO 
 // 1st phase - bugs routing
@@ -95,56 +103,50 @@ import net.osmand.util.MapUtils;
 public class HHRoutingGraphCreator {
 
 	final static Log LOG = PlatformUtil.getLog(HHRoutingGraphCreator.class);
-	
+
 	final static int PROCESS_SET_NETWORK_POINTS = 1;
-	final static int PROCESS_REBUILD_NETWORK_SEGMENTS = 2;
-	final static int PROCESS_BUILD_NETWORK_SEGMENTS = 3;
-	static int PROCESS = PROCESS_SET_NETWORK_POINTS;
-	
+	final static int PROCESS_BUILD_NETWORK_SEGMENTS = 2;
+	static int PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
+
 	static boolean DEBUG_STORE_ALL_ROADS = false;
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
 	static long startTime = 0;
-	
-	final static int MEMORY_RELOAD_MB = 1000 ; //
+
+	final static int MEMORY_RELOAD_MB = 1000; //
 	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
 	static final int ROUTING_MEMORY_LIMIT = 1024;
 	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 	static long MEMORY_LAST_USED_MB;
 
+	private static List<File> sources = new ArrayList<File>();
+	private static String ROUTING_PROFILE = "car";
+	private static int BATCH_SIZE = 1000;
+	private static int THREAD_POOL = 10;
 
-	
-	private List<File> sources = new ArrayList<File>(); 
-	private String ROUTING_PROFILE = "car";
-	
-	// Constants / Tests for splitting building network points {7,7,7,7} - 50 - 50000
-	protected static LatLon EX1 = new LatLon(52.3201813,4.7644685); // 337 - 4
+	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
+	// 50000
+	protected static LatLon EX1 = new LatLon(52.3201813, 4.7644685); // 337 - 4
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 - 12
 	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803); // 632 - 14
 	protected static LatLon EX4 = new LatLon(52.27757, 4.85731); // 218 - 7
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036); // 391 - 8
 	protected static LatLon EX = null; // for all - null; otherwise specific point
-	
+
 	// Heuristics building network points
-	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] {15,10,5} ; //new int[] {7,7,7,7};
+	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] { 15, 10, 5 }; // new int[] {7,7,7,7};
 	private static int MAX_NEIGHBOORS_N_POINTS = 50;
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
-	
-	public HHRoutingGraphCreator(List<File> sources) {
-		this.sources = sources;
-	}
-
 
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Netherlands_europe_2.road.obf";
+//		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
 	}
 
-	
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
 		boolean clean = false;
@@ -153,13 +155,17 @@ public class HHRoutingGraphCreator {
 				PROCESS = PROCESS_SET_NETWORK_POINTS;
 			} else if (a.equals("--build-network-shortcuts")) {
 				PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
+			} else if (a.startsWith("--routing_profile=")) {
+				ROUTING_PROFILE = a.substring("--routing_profile=".length());
+			} else if (a.startsWith("--threads=")) {
+				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
 			} else if (a.equals("--clean")) {
 				clean = true;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName();
-		
+
 		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
 		if (clean && PROCESS == PROCESS_SET_NETWORK_POINTS && dbFile.exists()) {
 			dbFile.delete();
@@ -168,7 +174,6 @@ public class HHRoutingGraphCreator {
 		if (clean && PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS && dbFile.exists()) {
 			networkDB.recreateSegments();
 		}
-		List<File> sources = new ArrayList<File>();
 		if (obfFile.isDirectory()) {
 			for (File f : obfFile.listFiles()) {
 				if (!f.getName().endsWith(".obf")) {
@@ -179,35 +184,33 @@ public class HHRoutingGraphCreator {
 		} else {
 			sources.add(obfFile);
 		}
-		HHRoutingGraphCreator proc = new HHRoutingGraphCreator(sources);
+		HHRoutingGraphCreator proc = new HHRoutingGraphCreator();
 		if (PROCESS == PROCESS_SET_NETWORK_POINTS) {
 			FullNetwork network = proc.collectNetworkPoints(networkDB);
-			List<Entity> objects = visualizeWays(network.visualPoints(), network.visualConnections(), 
+			List<Entity> objects = visualizeWays(network.visualPoints(), network.visualConnections(),
 					network.visitedVertices);
 			saveOsmFile(objects, new File(folder, name + ".osm"));
 		} else if (PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS) {
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
 			networkDB.loadNetworkSegments(pnts);
 			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
-			saveOsmFile(objects, new File(folder, name + "-hh.osm")); 
+			saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		}
 		networkDB.close();
 	}
 
-
-
-
-	private RoutingContext gcMemoryLimitToUnloadAll(RoutingContext ctx, List<NetworkRouteRegion> subRegions, boolean force) throws IOException {
+	private RoutingContext gcMemoryLimitToUnloadAll(RoutingContext ctx, List<NetworkRouteRegion> subRegions,
+			boolean force) throws IOException {
 		long usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-		if (force || (
-				(usedMemory - MEMORY_LAST_USED_MB) > MEMORY_RELOAD_MB && (System.currentTimeMillis() - MEMEORY_LAST_RELOAD) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
+		if (force || ((usedMemory - MEMORY_LAST_USED_MB) > MEMORY_RELOAD_MB
+				&& (System.currentTimeMillis() - MEMEORY_LAST_RELOAD) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
 			long nt = System.nanoTime();
 			System.gc();
 			long ntusedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 			if (!force && (ntusedMemory - MEMORY_LAST_USED_MB) < MEMORY_RELOAD_MB) {
 				return ctx;
 			}
-			Set<File> fls = null; 
+			Set<File> fls = null;
 			if (subRegions != null) {
 				fls = new LinkedHashSet<>();
 				for (NetworkRouteRegion r : subRegions) {
@@ -217,23 +220,23 @@ public class HHRoutingGraphCreator {
 			ctx = prepareContext(fls, ctx);
 			ctx.calculationProgress = new RouteCalculationProgress();
 			System.gc();
-			MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;;
+			MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
+			;
 			MEMEORY_LAST_RELOAD = System.currentTimeMillis();
-			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f ms) *****\n", 
-					usedMemory, ntusedMemory, MEMORY_LAST_USED_MB, (System.nanoTime() - nt) / 1e9);
+			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f ms) *****\n", usedMemory,
+					ntusedMemory, MEMORY_LAST_USED_MB, (System.nanoTime() - nt) / 1e9);
 		}
 		return ctx;
 	}
-	
+
 	private static void logf(String string, Object... a) {
-		if(startTime == 0) {
+		if (startTime == 0) {
 			startTime = System.currentTimeMillis();
 		}
 		String ms = String.format("%3.1fs ", (System.currentTimeMillis() - startTime) / 1000.f);
 		System.out.printf(ms + string + "\n", a);
-		
-	}
 
+	}
 
 	private List<BinaryMapIndexReader> initReaders(Collection<File> hints) throws IOException {
 		List<BinaryMapIndexReader> readers = new ArrayList<BinaryMapIndexReader>();
@@ -243,7 +246,7 @@ public class HHRoutingGraphCreator {
 		}
 		return readers;
 	}
-	
+
 	private RoutingContext prepareContext(Collection<File> fileSources, RoutingContext oldCtx) throws IOException {
 		List<BinaryMapIndexReader> readers = initReaders(fileSources);
 		if (oldCtx != null) {
@@ -259,20 +262,20 @@ public class HHRoutingGraphCreator {
 		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
-		return router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[readers.size()]), RouteCalculationMode.NORMAL);
+		return router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[readers.size()]),
+				RouteCalculationMode.NORMAL);
 	}
-	
 
 	//////////////////////////// BUILD NETWORK ISLANDS ////////////////////////
 
 	class NetworkIsland {
 		final NetworkIsland parent;
 		final RouteSegment start;
-		final PriorityQueue<RouteSegment> queue ;
+		final PriorityQueue<RouteSegment> queue;
 		int index;
 		TLongObjectHashMap<RouteSegment> visitedVertices = new TLongObjectHashMap<RouteSegment>();
 		TLongObjectHashMap<RouteSegment> toVisitVertices = new TLongObjectHashMap<RouteSegment>();
-		
+
 		NetworkIsland(NetworkIsland parent, RouteSegment start) {
 			this.parent = parent;
 			this.start = start;
@@ -285,22 +288,20 @@ public class HHRoutingGraphCreator {
 		protected Comparator<RouteSegment> getExpandIslandComparator() {
 			return parent.getExpandIslandComparator();
 		}
-		
 
 		private NetworkIsland addSegmentToQueue(RouteSegment s) {
 			queue.add(s);
 			toVisitVertices.put(calculateRoutePointInternalId(s), s);
 			return this;
 		}
-		
-		
+
 		public boolean testIfNetworkPoint(long pntId) {
 			if (parent != null) {
 				return parent.testIfNetworkPoint(pntId);
 			}
 			return false;
 		}
-		
+
 		public boolean testIfPossibleNetworkPoint(long pntId) {
 			if (toVisitVertices.containsKey(pntId)) {
 				return true;
@@ -310,7 +311,7 @@ public class HHRoutingGraphCreator {
 			}
 			return false;
 		}
-		
+
 		public boolean testIfVisited(long pntId) {
 			if (visitedVertices.containsKey(pntId)) {
 				return true;
@@ -327,7 +328,7 @@ public class HHRoutingGraphCreator {
 			}
 			return visitedVertices.size() + (parent == null ? 0 : parent.visitedVerticesSize());
 		}
-		
+
 		public int toVisitVerticesSize() {
 			if (parent instanceof FullNetwork) {
 				return toVisitVertices.size();
@@ -335,7 +336,7 @@ public class HHRoutingGraphCreator {
 			int pnt = (parent == null ? 0 : parent.toVisitVerticesSize());
 			for (long l : visitedVertices.keys()) {
 				if (parent.testIfPossibleNetworkPoint(l)) {
-					// if (parent.testIfNetworkPoint(l))  assert false; 
+					// if (parent.testIfNetworkPoint(l)) assert false;
 					pnt--;
 				}
 			}
@@ -354,14 +355,15 @@ public class HHRoutingGraphCreator {
 		public void printCurentState(String string, int lvl) {
 			printCurentState(string, lvl, "");
 		}
-		
+
 		public void printCurentState(String string, int lvl, String extra) {
 			if (DEBUG_VERBOSE_LEVEL >= (parent == null ? lvl - 1 : lvl)) {
 				StringBuilder tabs = new StringBuilder();
-				for(int k = 0 ; k < depth(); k++) {
+				for (int k = 0; k < depth(); k++) {
 					tabs.append("   ");
 				}
-				System.out.println(String.format(" %s %-8s %d -> %d %s", tabs.toString(), string, visitedVerticesSize(), toVisitVertices.size(), extra));
+				System.out.println(String.format(" %s %-8s %d -> %d %s", tabs.toString(), string, visitedVerticesSize(),
+						toVisitVertices.size(), extra));
 			}
 		}
 
@@ -369,24 +371,24 @@ public class HHRoutingGraphCreator {
 			return parent.getCtx();
 		}
 
-		
 	}
-	
+
 	class FullNetwork extends NetworkIsland {
 
 		RoutingContext ctx;
 		// uses global entity by reference
 		TLongObjectHashMap<Integer> networkPointsCluster = new TLongObjectHashMap<>();
 		List<NetworkIsland> visualClusters = new ArrayList<>();
+
 		FullNetwork(RoutingContext ctx) {
 			super(null, null);
 			this.ctx = ctx;
 		}
-		
+
 		public RoutingContext getCtx() {
 			return ctx;
 		}
-		
+
 		protected Comparator<RouteSegment> getExpandIslandComparator() {
 			return new Comparator<RouteSegment>() {
 
@@ -397,29 +399,29 @@ public class HHRoutingGraphCreator {
 				}
 			};
 		}
-		
+
 		public boolean testIfNetworkPoint(long pntId) {
 			if (networkPointsCluster.contains(pntId)) {
 				return true;
 			}
 			return super.testIfNetworkPoint(pntId);
 		}
-		
+
 		public int visitedVerticesSize() {
 			// don't count top level so it's not used for cluster optimizations
 			return 0;
 		}
-		
+
 		@Override
 		public int toVisitVerticesSize() {
 			// don't count top level so it's not used for cluster optimizations
 			return 0;
 		}
-		
+
 		public boolean testIfPossibleNetworkPoint(long pntId) {
 			return testIfNetworkPoint(pntId);
 		}
-		
+
 		public void addCluster(NetworkIsland cluster, RouteSegmentPoint centerPoint) {
 			// KISS: keep toVisitVertices - empty and use only networkPointsCluster
 			if (DEBUG_STORE_ALL_ROADS) {
@@ -435,7 +437,7 @@ public class HHRoutingGraphCreator {
 				visitedVertices.put(key, cluster.visitedVertices.get(key)); // reduce memory usage
 			}
 		}
-		
+
 		@Override
 		public int depth() {
 			return 0;
@@ -452,7 +454,7 @@ public class HHRoutingGraphCreator {
 			}
 			return conn;
 		}
-		
+
 		public TLongObjectHashMap<RouteSegment> visualPoints() {
 			TLongObjectHashMap<RouteSegment> visualPoints = new TLongObjectHashMap<>();
 			visualPoints.putAll(toVisitVertices);
@@ -463,8 +465,7 @@ public class HHRoutingGraphCreator {
 		}
 
 	}
-	
-	
+
 	private class NetworkCollectPointCtx {
 		int totalBorderPoints = 0;
 		int maxBorder = 0;
@@ -474,13 +475,13 @@ public class HHRoutingGraphCreator {
 		int isolatedIslands = 0;
 		int shortcuts = 0;
 		int clusterInd = 0;
-		
+
 		RoutingContext rctx;
 		HHRoutingPreparationDB networkDB;
 		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
 		NetworkRouteRegion currentProcessingRegion;
 		TLongObjectHashMap<Integer> networkPointsCluster = new TLongObjectHashMap<>();
-		
+
 		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
 			this.rctx = rctx;
 			this.networkDB = networkDB;
@@ -493,7 +494,7 @@ public class HHRoutingGraphCreator {
 			}
 			return totalPoints;
 		}
-		
+
 		public int clusterSize() {
 			return clusterInd;
 		}
@@ -502,19 +503,18 @@ public class HHRoutingGraphCreator {
 			return networkPointsCluster.size();
 		}
 
-
 		public void printStatsNetworks() {
 			// calculate stats
-			logf("RESULT %d points -> %d border points, %d clusters (%d isolated), %d est shortcuts",
-					getTotalPoints(), borderPointsSize(), clusterSize(), isolatedIslands, shortcuts);
-			logf("       %.1f avg / %d min / %d max border points per cluster, %.1f avg / %d min / %d max points in cluster", 
-					totalBorderPoints * 1.0 / clusterSize(), minBorder, maxBorder, 
-					getTotalPoints() * 1.0 / clusterSize(), minPnts, maxPnts );
+			logf("RESULT %d points -> %d border points, %d clusters (%d isolated), %d est shortcuts", getTotalPoints(),
+					borderPointsSize(), clusterSize(), isolatedIslands, shortcuts);
+			logf("       %.1f avg / %d min / %d max border points per cluster, %.1f avg / %d min / %d max points in cluster",
+					totalBorderPoints * 1.0 / clusterSize(), minBorder, maxBorder,
+					getTotalPoints() * 1.0 / clusterSize(), minPnts, maxPnts);
 		}
 
 		public FullNetwork startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
 			currentProcessingRegion = nrouteRegion;
-			
+
 			for (NetworkRouteRegion nr : routeRegions) {
 				nr.unload();
 			}
@@ -524,23 +524,24 @@ public class HHRoutingGraphCreator {
 					subRegions.add(nr);
 				}
 			}
-			
+
 			subRegions.add(nrouteRegion);
 			// force cause subregions could change
 			rctx = gcMemoryLimitToUnloadAll(rctx, subRegions, true);
-			
+
 			FullNetwork network = new FullNetwork(rctx);
 			for (NetworkRouteRegion nr : subRegions) {
 				if (nr != nrouteRegion) {
 					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
-					// 3.1 TODO store network points inside NetworkRouteRegion and retrieve similar to visited points
+					// 3.1 TODO store network points inside NetworkRouteRegion and retrieve similar
+					// to visited points
 					network.networkPointsCluster = this.networkPointsCluster; // ! use by reference
 //					network.networkPointsCluster.putAll(nr.getNetworkPoints(networkDB));
 				}
 			}
 			return network;
 		}
-		
+
 		public void addCluster(NetworkIsland cluster, FullNetwork network, RouteSegmentPoint pntAround) {
 			cluster.index = clusterInd++;
 			if (currentProcessingRegion != null) {
@@ -566,28 +567,28 @@ public class HHRoutingGraphCreator {
 
 		public void finishRegionProcess() throws SQLException {
 			logf("Tiles " + rctx.calculationProgress.getInfo(null).get("tiles"));
-			logf("Saving visited %,d points from %s to db...", currentProcessingRegion.getPoints(), currentProcessingRegion.region.getName());
+			logf("Saving visited %,d points from %s to db...", currentProcessingRegion.getPoints(),
+					currentProcessingRegion.region.getName());
 			networkDB.insertVisitedVertices(currentProcessingRegion);
 			currentProcessingRegion.unload();
 			logf("     saved - total %,d points", getTotalPoints());
-			
+
 		}
 
 	}
-	
-	
+
 	private class RouteDataObjectProcessor implements ResultMatcher<RouteDataObject> {
 		int indProc = 0, prevPrintInd = 0;
 		private float estimatedRoads;
 		private FullNetwork network;
 		private NetworkCollectPointCtx ctx;
-		
+
 		public RouteDataObjectProcessor(FullNetwork network, NetworkCollectPointCtx ctx, float estimatedRoads) {
 			this.estimatedRoads = estimatedRoads;
 			this.network = network;
 			this.ctx = ctx;
 		}
-		
+
 		@Override
 		public boolean publish(RouteDataObject object) {
 			if (!network.ctx.getRouter().acceptLine(object)) {
@@ -608,18 +609,18 @@ public class HHRoutingGraphCreator {
 				buildRoadNetworkIsland(cluster);
 				if (DEBUG_VERBOSE_LEVEL >= 1) {
 					int nwPoints = cluster.toVisitVertices.size();
-					logf("CLUSTER: %2d border <- %4d points (%d segments) - %s",
-							nwPoints, cluster.visitedVertices.size(), nwPoints * (nwPoints - 1), pntAround);
+					logf("CLUSTER: %2d border <- %4d points (%d segments) - %s", nwPoints,
+							cluster.visitedVertices.size(), nwPoints * (nwPoints - 1), pntAround);
 				}
-				ctx.addCluster(cluster, network, pntAround);				
+				ctx.addCluster(cluster, network, pntAround);
 				network.addCluster(cluster, pntAround);
 				if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 					prevPrintInd = indProc;
-					logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters",
-							indProc, indProc * 100.0f / estimatedRoads , ctx.getTotalPoints(),
-							ctx.borderPointsSize(),  ctx.clusterSize());
+					logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters", indProc,
+							indProc * 100.0f / estimatedRoads, ctx.getTotalPoints(), ctx.borderPointsSize(),
+							ctx.clusterSize());
 				}
-				 
+
 			}
 			return false;
 		}
@@ -629,8 +630,7 @@ public class HHRoutingGraphCreator {
 			return DEBUG_LIMIT_PROCESS != -1 && indProc >= DEBUG_LIMIT_PROCESS;
 		}
 	}
-	
-	
+
 	private FullNetwork collectNetworkPoints(HHRoutingPreparationDB networkDB) throws IOException, SQLException {
 		RoutingContext rctx = prepareContext(null, null);
 		if (EX != null) {
@@ -660,38 +660,39 @@ public class HHRoutingGraphCreator {
 
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
-			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, ctx.routeRegions.size(), new Date().toString());
+			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, ctx.routeRegions.size(),
+					new Date().toString());
 			if (networkDB.hasVisitedPoints(nrouteRegion)) {
 				System.out.println("Already processed");
 				continue;
 			}
-			
+
 			network = ctx.startRegionProcess(nrouteRegion);
 			RouteRegion routeRegion = null;
 			for (RouteRegion rr : network.ctx.reverseMap.keySet()) {
-				if (rr.getFilePointer() == nrouteRegion.region.getFilePointer() && nrouteRegion.region.getName().equals(rr.getName())) {
+				if (rr.getFilePointer() == nrouteRegion.region.getFilePointer()
+						&& nrouteRegion.region.getName().equals(rr.getName())) {
 					routeRegion = rr;
 					break;
 				}
 			}
 			BinaryMapIndexReader reader = network.ctx.reverseMap.get(routeRegion);
-			List<RouteSubregion> regions = reader
-					.searchRouteIndexTree(BinaryMapIndexReader.buildSearchRequest(MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude() - 1),
-							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude() + 1), MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude() + 1),
-							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude() - 1), 16, null), routeRegion.getSubregions());
-			
-			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte 
+			List<RouteSubregion> regions = reader.searchRouteIndexTree(
+					BinaryMapIndexReader.buildSearchRequest(
+							MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude() - 1),
+							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude() + 1),
+							MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude() + 1),
+							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude() - 1), 16, null),
+					routeRegion.getSubregions());
+
+			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
 			reader.loadRouteIndexData(regions, new RouteDataObjectProcessor(network, ctx, estimatedRoads));
-			
+
 			ctx.finishRegionProcess();
 		}
 		ctx.printStatsNetworks();
 		return network;
 	}
-
-
-	
-
 
 	private void buildRoadNetworkIsland(NetworkIsland c) {
 		c.printCurentState("START", 2);
@@ -725,12 +726,12 @@ public class HHRoutingGraphCreator {
 			// long id = t.getRoad().getId() / 64;
 			NetworkIsland bc = new NetworkIsland(c, t);
 			buildRoadNetworkIsland(bc);
-			
+
 			// it could only increase by 1 (1->2)
 
 			int newPoints = bc.toVisitVerticesSize();
-			if (((newPoints - curPoints) <= 2 || 
-					coeffToMinimize(c.visitedVerticesSize(), curPoints) > coeffToMinimize(bc.visitedVerticesSize(), newPoints) )) {
+			if (((newPoints - curPoints) <= 2 || coeffToMinimize(c.visitedVerticesSize(),
+					curPoints) > coeffToMinimize(bc.visitedVerticesSize(), newPoints))) {
 				int sz = c.visitedVerticesSize();
 				c.visitedVertices.putAll(bc.visitedVertices);
 				for (long l : bc.visitedVertices.keys()) {
@@ -741,7 +742,8 @@ public class HHRoutingGraphCreator {
 						c.toVisitVertices.put(k, bc.toVisitVertices.get(k));
 					}
 				}
-				c.printCurentState(curPoints == newPoints ? "IGNORE": " MERGED", 2, String.format(" - before %d -> %d", sz, curPoints));
+				c.printCurentState(curPoints == newPoints ? "IGNORE" : " MERGED", 2,
+						String.format(" - before %d -> %d", sz, curPoints));
 			} else {
 				c.printCurentState(" NOMERGE", 3, String.format(" - %d -> %d", bc.visitedVerticesSize(), newPoints));
 			}
@@ -757,7 +759,8 @@ public class HHRoutingGraphCreator {
 		while (foundStraights && !c.toVisitVertices.isEmpty() && c.toVisitVertices.size() < MAX_NEIGHBOORS_N_POINTS) {
 			foundStraights = false;
 			for (RouteSegment segment : c.toVisitVertices.valueCollection()) {
-				if (!c.testIfNetworkPoint(calculateRoutePointInternalId(segment)) && nonVisitedSegmentsLess(c, segment, 1)) {
+				if (!c.testIfNetworkPoint(calculateRoutePointInternalId(segment))
+						&& nonVisitedSegmentsLess(c, segment, 1)) {
 					if (proceed(c, segment, queue)) {
 						foundStraights = true;
 						break;
@@ -791,7 +794,7 @@ public class HHRoutingGraphCreator {
 		}
 		return cnt;
 	}
-	
+
 	private boolean proceed(NetworkIsland c, RouteSegment segment, PriorityQueue<RouteSegment> queue) {
 		if (segment.distanceFromStart > MAX_RADIUS_ISLAND) {
 			return false;
@@ -805,7 +808,7 @@ public class HHRoutingGraphCreator {
 		if (c.testIfVisited(pntId)) {
 			throw new IllegalStateException();
 		}
-		c.visitedVertices.put(pntId,  DEBUG_STORE_ALL_ROADS ? segment : null);
+		c.visitedVertices.put(pntId, DEBUG_STORE_ALL_ROADS ? segment : null);
 		int prevX = segment.getRoad().getPoint31XTile(segment.getSegmentStart());
 		int prevY = segment.getRoad().getPoint31YTile(segment.getSegmentStart());
 		int x = segment.getRoad().getPoint31XTile(segment.getSegmentEnd());
@@ -816,18 +819,18 @@ public class HHRoutingGraphCreator {
 		addSegment(c, distFromStart, segment, false, queue);
 		return true;
 	}
-	
-	
-	private void addSegment(NetworkIsland c, float distFromStart, RouteSegment segment, boolean end, PriorityQueue<RouteSegment> queue) {
+
+	private void addSegment(NetworkIsland c, float distFromStart, RouteSegment segment, boolean end,
+			PriorityQueue<RouteSegment> queue) {
 		int segmentInd = end ? segment.getSegmentEnd() : segment.getSegmentStart();
 		int x = segment.getRoad().getPoint31XTile(segmentInd);
 		int y = segment.getRoad().getPoint31YTile(segmentInd);
 		RouteSegment next = c.getCtx().loadRouteSegment(x, y, 0);
 		while (next != null) {
 			// next.distanceFromStart == 0
-			RouteSegment test = makePositiveDir(next); 
+			RouteSegment test = makePositiveDir(next);
 			long nextPnt = calculateRoutePointInternalId(test);
-			
+
 			if (!c.testIfVisited(nextPnt) && !c.toVisitVertices.containsKey(nextPnt)) {
 //				System.out.println(" + " + test);
 				test.distanceFromStart = distFromStart;
@@ -849,14 +852,99 @@ public class HHRoutingGraphCreator {
 			next = next.getNext();
 		}
 	}
+
+	///////////////////////////////////////////// BUILD SHORTCUTS ///////////////////////////////////////////
+	                            //////////////////////////////////////////
 	
-	///////////////////////////////////////////// BUILD SHORTCUTS //////////////////////////////////////////
-	
-	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPoints, HHRoutingPreparationDB networkDB) throws InterruptedException, IOException, SQLException {
+
+	private static class BuildNetworkShortcutResult {
+		List<NetworkDBPoint> points = new ArrayList<>();
+		List<RouteCalculationProgress> progress = new ArrayList<>();
+		TIntArrayList shortcuts = new TIntArrayList();
+		TLongArrayList roadIds = new TLongArrayList();
+		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
+		double totalTime;
+		int taskId;
+
+	}
+
+	private static class BuildNetworkShortcutTask implements Callable<BuildNetworkShortcutResult> {
+
+		private static ThreadLocal<RoutingContext> context = new ThreadLocal<>();
+
+		private List<NetworkDBPoint> batch;
+		private TLongObjectHashMap<RouteSegment> segments;
+		private HHRoutingGraphCreator creator;
+		private TLongObjectHashMap<NetworkDBPoint> networkPoints;
+		private int taskId;
+
+		public BuildNetworkShortcutTask(HHRoutingGraphCreator creator, List<NetworkDBPoint> batch,
+				TLongObjectHashMap<RouteSegment> segments, TLongObjectHashMap<NetworkDBPoint> networkPoints, int taskId) {
+			this.creator = creator;
+			this.batch = batch;
+			this.segments = segments;
+			this.networkPoints = networkPoints;
+			this.taskId = taskId;
+		}
+
+		@Override
+		public BuildNetworkShortcutResult call() throws Exception {
+			RoutingContext ctx = context.get();
+			ctx = creator.gcMemoryLimitToUnloadAll(context.get(), null, ctx == null);
+			context.set(ctx);
+			BuildNetworkShortcutResult res = new BuildNetworkShortcutResult();
+			res.taskId = taskId;
+			long nt = System.nanoTime();
+			for (NetworkDBPoint pnt : batch) {
+				ctx.calculationProgress = new RouteCalculationProgress();
+				long nt2 = System.nanoTime();
+				RouteSegment s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
+				while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
+						|| s.getSegmentEnd() != pnt.end)) {
+					s = s.getNext();
+				}
+				if (s == null) {
+					throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
+				}
+
+				HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place", "city");
+				List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
+				for (RouteSegment t : result) {
+					NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
+							Math.min(t.getSegmentStart(), t.getSegmentEnd()),
+							Math.max(t.getSegmentStart(), t.getSegmentEnd())));
+					NetworkDBSegment segment = new NetworkDBSegment(t.getDistanceFromStart(), true, pnt, end);
+					pnt.connected.add(segment);
+					while (t != null) {
+						segment.geometry.add(getPoint(t));
+						t = t.getParentRoute();
+					}
+					Collections.reverse(segment.geometry);
+					if (DEBUG_STORE_ALL_ROADS) {
+						addWay(res.osmObjects, segment, "highway", "secondary");
+					}
+					if (segment.dist < 0) {
+						throw new IllegalStateException(segment + " dist < " + segment.dist);
+					}
+				}
+				pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e9;
+				res.points.add(pnt);
+				res.progress.add(ctx.calculationProgress);
+				res.shortcuts.add(result.size());
+				res.roadIds.add(s.getRoad().getId() / 64);
+
+				
+			}
+			res.totalTime = (System.nanoTime() - nt) / 1e9;
+			return res;
+		}
+
+	}
+
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPoints, HHRoutingPreparationDB networkDB) throws InterruptedException, IOException, SQLException, ExecutionException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = networkPoints.size() / 100.0;
 		int ind = 0, prevPrintInd = 0;
-		long tm = System.currentTimeMillis();
 		// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
 		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
 		TLongObjectHashMap<RouteSegment> segments = new  TLongObjectHashMap<>();
@@ -867,101 +955,101 @@ public class HHRoutingGraphCreator {
 		}
 		
 		
+		ExecutorService service = Executors.newFixedThreadPool(THREAD_POOL);
+		List<Future<BuildNetworkShortcutResult>> results = new ArrayList<>();
+		List<NetworkDBPoint> batch = new ArrayList<>();
+		int taskId = 0;
+		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
+			ind++;
+			if (pnt.connected.size() > 0) {
+				pnt.connected.clear(); // for gc
+				continue;
+			}
+//			if (pnt.index > 2000 || pnt.index < 1800)  continue;
+			if(ind < DEBUG_LIMIT_START_OFFSET) {
+				continue;
+			}			
+			batch.add(pnt);
+			if (ind > DEBUG_LIMIT_PROCESS && DEBUG_LIMIT_PROCESS != -1) {
+				break;
+			}
+			if (batch.size() == BATCH_SIZE) {
+				results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
+				batch = new ArrayList<>();
+			}
+		}
+		results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
+		logf("Scheduled %d tasks", taskId);
 		int maxDirectedPointsGraph = 0;
 		int maxFinalSegmentsFound = 0;
 		int totalFinalSegmentsFound = 0;
 		int totalVisitedDirectSegments = 0;
-		RoutingContext ctx = prepareContext(null, null);
-		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
-			ind++;
-//			if (pnt.index > 2000 || pnt.index < 1800)   { 
-//				continue;
-//			}
-			if (ind % 1000 == 0 ) {
-				ctx = gcMemoryLimitToUnloadAll(ctx, null, false);
-			}
-			if (pnt.connected.size() > 0) {
-				continue;
-			}
-			long nt = System.nanoTime();
-			RouteSegment s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
-			while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
-					|| s.getSegmentEnd() != pnt.end)) {
-				s = s.getNext();
-			}
-			if (s == null) {
-				throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
-			}
-			
-			HHRoutingUtilities.addNode(osmObjects, pnt, getPoint(s), "highway", "stop"); //"place", "city");
-			List<RouteSegment> result = runDijsktra(ctx, s, segments);
-			for (RouteSegment t : result) {
-				NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
-						Math.min(t.getSegmentStart(), t.getSegmentEnd()),
-						Math.max(t.getSegmentStart(), t.getSegmentEnd())));
-				NetworkDBSegment segment = new NetworkDBSegment(t.getDistanceFromStart(), true, pnt, end);
-				pnt.connected.add(segment);
-				while (t != null) {
-					segment.geometry.add(getPoint(t));
-					t = t.getParentRoute();
+		ind = 0;
+		service.shutdown();
+		while (!results.isEmpty()) {
+			Thread.sleep(5000);
+			Iterator<Future<BuildNetworkShortcutResult>> it = results.iterator();
+			while (it.hasNext()) {
+				Future<BuildNetworkShortcutResult> future = it.next();
+				if (future.isDone()) {
+					BuildNetworkShortcutResult res = future.get();
+					for (int k = 0; k < res.points.size(); k++) {
+						NetworkDBPoint rpnt = res.points.get(k);
+						RouteCalculationProgress calculationProgress = res.progress.get(k);
+						ind++;
+						if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 200) {
+							prevPrintInd = ind;
+							logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, res.roadIds.get(k),
+									res.shortcuts.get(k), rpnt.rtDistanceFromStart);
+						}
+						networkDB.insertSegments(rpnt.connected);
+						if (DEBUG_VERBOSE_LEVEL >= 2) {
+							System.out.println(calculationProgress.getInfo(null));
+						}
+
+						maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph,
+								calculationProgress.visitedDirectSegments);
+						totalVisitedDirectSegments += calculationProgress.visitedDirectSegments;
+						maxFinalSegmentsFound = Math.max(maxFinalSegmentsFound, calculationProgress.finalSegmentsFound);
+						totalFinalSegmentsFound += calculationProgress.finalSegmentsFound;
+
+						// clean up for gc
+						rpnt.connected.clear();
+					}
+					osmObjects.putAll(res.osmObjects);
+					it.remove();
+					logf("Task id %d executed %.1f seconds - %d (of %d) waiting completion", res.taskId, res.totalTime,
+							results.size(), taskId);
 				}
-				Collections.reverse(segment.geometry);
-				if (DEBUG_STORE_ALL_ROADS) {
-					addWay(osmObjects, segment, "highway", "secondary");
-				}
-				if (segment.dist < 0) {
-					throw new IllegalStateException(segment + " dist < " + segment.dist);
-				}
-			}
-			networkDB.insertSegments(pnt.connected);
-			if (DEBUG_VERBOSE_LEVEL >= 2) {
-				System.out.println(ctx.calculationProgress.getInfo(null));
-			}
-			
-			maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph, ctx.calculationProgress.visitedDirectSegments);
-			totalVisitedDirectSegments += ctx.calculationProgress.visitedDirectSegments;
-			maxFinalSegmentsFound = Math.max(maxFinalSegmentsFound, ctx.calculationProgress.finalSegmentsFound);
-			totalFinalSegmentsFound += ctx.calculationProgress.finalSegmentsFound;
-			
-			
-			if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 500) {
-				double timePassed = (System.currentTimeMillis() - tm) / 1000.0; 
-				double timeLeft = networkPoints.size() * timePassed / (ind + 1) - timePassed;
-				prevPrintInd = ind;
-				System.out.println(String.format("%.2f%% Process %d (%d shortcuts) - %.1f ms, passed %.1f sec, left %.1f sec",
-							ind / sz, s.getRoad().getId() / 64, result.size(), (System.nanoTime() - nt) / 1.0e6,
-							timePassed, timeLeft));
-			}
-			// clean up for gc
-			pnt.connected.clear();
-			if (ind > DEBUG_LIMIT_PROCESS && DEBUG_LIMIT_PROCESS != -1) {
-				break;
 			}
 		}
+		service.awaitTermination(5, TimeUnit.MINUTES);
+		
+		
 		System.out.println(String.format("Total segments %d: %d total shorcuts, per border point max %d, avergage %d shortcuts (routing sub graph max %d, avg %d segments)", 
 				segments.size(), totalFinalSegmentsFound, maxFinalSegmentsFound, totalFinalSegmentsFound / ind,
 				maxDirectedPointsGraph, totalVisitedDirectSegments  / ind));
 		return osmObjects.valueCollection();
 	}
-	
 
-	private List<RouteSegment> runDijsktra(RoutingContext ctx,
-			RouteSegment s, TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
-		
+	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegment s,
+			TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
+
 		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		RouteSegment rm1 = segments.remove(pnt1);
 		RouteSegment rm2 = segments.remove(pnt2);
-		
+
 		List<RouteSegment> res = new ArrayList<>();
-		
+
 		ctx.unloadAllData(); // needed for proper multidijsktra work
 		ctx.calculationProgress = new RouteCalculationProgress();
-		ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd()) ;
-		ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd()) ;
+		ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
+		ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd());
 		RouteSegmentPoint pnt = new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), s.getSegmentEnd(), 0);
-		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, pnt, null, null, segments);
-		
+		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, pnt,
+				null, null, segments);
+
 		if (frs != null) {
 			TLongSet set = new TLongHashSet();
 			for (RouteSegment o : frs.all) {
@@ -972,7 +1060,7 @@ public class HHRoutingGraphCreator {
 				}
 			}
 		}
-		
+
 		if (rm1 != null) {
 			segments.put(pnt1, rm1);
 		}
@@ -982,5 +1070,4 @@ public class HHRoutingGraphCreator {
 		return res;
 	}
 
-	
 }
