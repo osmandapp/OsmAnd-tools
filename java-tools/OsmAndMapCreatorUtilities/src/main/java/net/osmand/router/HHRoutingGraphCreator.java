@@ -122,7 +122,7 @@ public class HHRoutingGraphCreator {
 
 	private static List<File> sources = new ArrayList<File>();
 	private static String ROUTING_PROFILE = "car";
-	private static int BATCH_SIZE = 1000;
+	private static int BATCH_SIZE = 100;
 	private static int THREAD_POOL = 10;
 
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
@@ -881,7 +881,7 @@ public class HHRoutingGraphCreator {
 				TLongObjectHashMap<RouteSegment> segments, TLongObjectHashMap<NetworkDBPoint> networkPoints, int taskId) {
 			this.creator = creator;
 			this.batch = batch;
-			this.segments = segments;
+			this.segments = new TLongObjectHashMap<>(segments); // concurrency
 			this.networkPoints = networkPoints;
 			this.taskId = taskId;
 		}
