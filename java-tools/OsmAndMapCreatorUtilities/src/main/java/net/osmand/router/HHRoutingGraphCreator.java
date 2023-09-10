@@ -927,7 +927,7 @@ public class HHRoutingGraphCreator {
 						throw new IllegalStateException(segment + " dist < " + segment.dist);
 					}
 				}
-				pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e9;
+				pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
 				res.points.add(pnt);
 				res.progress.add(ctx.calculationProgress);
 				res.shortcuts.add(result.size());
