@@ -201,8 +201,12 @@ public class HHRoutingGraphCreator {
 		long usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 		if (force || (
 				(usedMemory - MEMORY_LAST_USED_MB) > MEMORY_RELOAD_MB && (System.currentTimeMillis() - MEMEORY_LAST_RELOAD) > MEMORY_RELOAD_TIMEOUT_SECONDS * 1000)) {
+			long nt = System.nanoTime();
 			System.gc();
-			usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
+			long ntusedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
+			if (!force && (ntusedMemory - MEMORY_LAST_USED_MB) < MEMORY_RELOAD_MB) {
+				return ctx;
+			}
 			Set<File> fls = null; 
 			if (subRegions != null) {
 				fls = new LinkedHashSet<>();
@@ -215,8 +219,8 @@ public class HHRoutingGraphCreator {
 			System.gc();
 			MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;;
 			MEMEORY_LAST_RELOAD = System.currentTimeMillis();
-			logf("***** Reload memory used before %d MB - after gc and reload %d MB *****\n", 
-					usedMemory, MEMORY_LAST_USED_MB);
+			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f ms) *****\n", 
+					usedMemory, ntusedMemory, MEMORY_LAST_USED_MB, (System.nanoTime() - nt) / 1e9);
 		}
 		return ctx;
 	}
@@ -522,7 +526,7 @@ public class HHRoutingGraphCreator {
 			}
 			
 			subRegions.add(nrouteRegion);
-			// force to have clean RouteRegion (important first time)
+			// force cause subregions could change
 			rctx = gcMemoryLimitToUnloadAll(rctx, subRegions, true);
 			
 			FullNetwork network = new FullNetwork(rctx);
@@ -922,7 +926,7 @@ public class HHRoutingGraphCreator {
 			
 			if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 500) {
 				double timePassed = (System.currentTimeMillis() - tm) / 1000.0; 
-				double timeLeft = timePassed * (networkPoints.size() / (ind + 1) - 1);
+				double timeLeft = networkPoints.size() * timePassed / (ind + 1) - timePassed;
 				prevPrintInd = ind;
 				System.out.println(String.format("%.2f%% Process %d (%d shortcuts) - %.1f ms, passed %.1f sec, left %.1f sec",
 							ind / sz, s.getRoad().getId() / 64, result.size(), (System.nanoTime() - nt) / 1.0e6,
