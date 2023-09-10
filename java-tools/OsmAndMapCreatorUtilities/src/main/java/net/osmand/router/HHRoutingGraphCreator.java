@@ -221,7 +221,6 @@ public class HHRoutingGraphCreator {
 			ctx.calculationProgress = new RouteCalculationProgress();
 			System.gc();
 			MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-			;
 			MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f ms) *****\n", usedMemory,
 					ntusedMemory, MEMORY_LAST_USED_MB, (System.nanoTime() - nt) / 1e9);
@@ -255,7 +254,7 @@ public class HHRoutingGraphCreator {
 			}
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		Builder builder = RoutingConfiguration.getDefault();
+		Builder builder = RoutingConfiguration.parseDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(ROUTING_MEMORY_LIMIT, ROUTING_MEMORY_LIMIT);
 		Map<String, String> map = new TreeMap<String, String>();
 		// map.put("avoid_ferries", "true");
@@ -890,7 +889,7 @@ public class HHRoutingGraphCreator {
 		@Override
 		public BuildNetworkShortcutResult call() throws Exception {
 			RoutingContext ctx = context.get();
-			ctx = creator.gcMemoryLimitToUnloadAll(context.get(), null, ctx == null);
+			ctx = creator.gcMemoryLimitToUnloadAll(ctx, null, ctx == null);
 			context.set(ctx);
 			BuildNetworkShortcutResult res = new BuildNetworkShortcutResult();
 			res.taskId = taskId;
@@ -1007,8 +1006,7 @@ public class HHRoutingGraphCreator {
 							System.out.println(calculationProgress.getInfo(null));
 						}
 
-						maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph,
-								calculationProgress.visitedDirectSegments);
+						maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph, calculationProgress.visitedDirectSegments);
 						totalVisitedDirectSegments += calculationProgress.visitedDirectSegments;
 						maxFinalSegmentsFound = Math.max(maxFinalSegmentsFound, calculationProgress.finalSegmentsFound);
 						totalFinalSegmentsFound += calculationProgress.finalSegmentsFound;
