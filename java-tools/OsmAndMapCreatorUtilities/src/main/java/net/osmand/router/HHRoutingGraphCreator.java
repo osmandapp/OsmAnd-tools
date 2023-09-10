@@ -122,7 +122,7 @@ public class HHRoutingGraphCreator {
 
 	private static List<File> sources = new ArrayList<File>();
 	private static String ROUTING_PROFILE = "car";
-	private static int BATCH_SIZE = 100;
+	private static int BATCH_SIZE = 500;
 	private static int THREAD_POOL = 10;
 
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
