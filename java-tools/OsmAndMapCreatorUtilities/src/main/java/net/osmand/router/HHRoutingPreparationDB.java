@@ -64,6 +64,7 @@ public class HHRoutingPreparationDB {
 	public void recreateSegments() throws SQLException {
 		Statement st = conn.createStatement();
  		st.execute("DELETE FROM segments");
+ 		st.execute("DELETE FROM geometry");
  		st.close();
 	}
 
