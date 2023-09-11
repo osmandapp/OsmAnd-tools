@@ -146,6 +146,9 @@ public class GenerateYMLFromAndroidTranslations {
 			if (vl.charAt(i) == '“') {
 				vl.setCharAt(i, '"');
 			}
+			if (vl.charAt(i) == '”') {
+				vl.setCharAt(i, '"');
+			}
 			if (vl.charAt(i) == '"' && vl.charAt(i - 1) != '\\') {
 				vl.insert(i, '\\');
 			} else if (vl.charAt(i) == '\'' && vl.charAt(i - 1) == '\\') {
