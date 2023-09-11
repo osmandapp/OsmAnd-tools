@@ -33,9 +33,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 
+import gnu.trove.function.TObjectFunction;
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.procedure.TLongObjectProcedure;
+import gnu.trove.procedure.TLongProcedure;
+import gnu.trove.procedure.TObjectProcedure;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
@@ -222,7 +228,7 @@ public class HHRoutingGraphCreator {
 			System.gc();
 			MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 			MEMEORY_LAST_RELOAD = System.currentTimeMillis();
-			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f ms) *****\n", usedMemory,
+			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f s) *****\n", usedMemory,
 					ntusedMemory, MEMORY_LAST_USED_MB, (System.nanoTime() - nt) / 1e9);
 		}
 		return ctx;
@@ -889,7 +895,6 @@ public class HHRoutingGraphCreator {
 		@Override
 		public BuildNetworkShortcutResult call() throws Exception {
 			RoutingContext ctx = context.get();
-			segments = new TLongObjectHashMap<>(segments);
 			
 			ctx = creator.gcMemoryLimitToUnloadAll(ctx, null, ctx == null);
 			context.set(ctx);
@@ -1033,14 +1038,15 @@ public class HHRoutingGraphCreator {
 		return osmObjects.valueCollection();
 	}
 
+	
+	
 	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegment s,
-			TLongObjectHashMap<RouteSegment> segments) throws InterruptedException, IOException {
+			TLongObjectMap<RouteSegment> segments) throws InterruptedException, IOException {
 
 		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
-		RouteSegment rm1 = segments.remove(pnt1);
-		RouteSegment rm2 = segments.remove(pnt2);
-
+		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt1, pnt2);
+		
 		List<RouteSegment> res = new ArrayList<>();
 
 		ctx.unloadAllData(); // needed for proper multidijsktra work
@@ -1062,12 +1068,6 @@ public class HHRoutingGraphCreator {
 			}
 		}
 
-		if (rm1 != null) {
-			segments.put(pnt1, rm1);
-		}
-		if (rm2 != null) {
-			segments.put(pnt2, rm2);
-		}
 		return res;
 	}
 
