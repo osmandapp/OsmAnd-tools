@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
@@ -862,11 +861,9 @@ public class HHRoutingGraphCreator {
 		List<NetworkDBPoint> points = new ArrayList<>();
 		List<RouteCalculationProgress> progress = new ArrayList<>();
 		TIntArrayList shortcuts = new TIntArrayList();
-		TLongArrayList roadIds = new TLongArrayList();
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double totalTime;
 		int taskId;
-
 	}
 
 	private static class BuildNetworkShortcutTask implements Callable<BuildNetworkShortcutResult> {
@@ -902,42 +899,48 @@ public class HHRoutingGraphCreator {
 				if (Thread.interrupted()) {
 					return res;
 				}
-				ctx.calculationProgress = new RouteCalculationProgress();
-				long nt2 = System.nanoTime();
-				RouteSegment s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
-				while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
-						|| s.getSegmentEnd() != pnt.end)) {
-					s = s.getNext();
-				}
-				if (s == null) {
-					throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
-				}
+				RouteSegment s = null;
+				try {
+					ctx.calculationProgress = new RouteCalculationProgress();
+					long nt2 = System.nanoTime();
+					s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
+					while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
+							|| s.getSegmentEnd() != pnt.end)) {
+						s = s.getNext();
+					}
+					if (s == null) {
+						throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
+					}
 
-				HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place", "city");
-				List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
-				for (RouteSegment t : result) {
-					NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
-							Math.min(t.getSegmentStart(), t.getSegmentEnd()),
-							Math.max(t.getSegmentStart(), t.getSegmentEnd())));
-					NetworkDBSegment segment = new NetworkDBSegment(t.getDistanceFromStart(), true, pnt, end);
-					pnt.connected.add(segment);
-					while (t != null) {
-						segment.geometry.add(getPoint(t));
-						t = t.getParentRoute();
+					HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
+					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
+					for (RouteSegment t : result) {
+						NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
+								Math.min(t.getSegmentStart(), t.getSegmentEnd()),
+								Math.max(t.getSegmentStart(), t.getSegmentEnd())));
+						NetworkDBSegment segment = new NetworkDBSegment(t.getDistanceFromStart(), true, pnt, end);
+						pnt.connected.add(segment);
+						while (t != null) {
+							segment.geometry.add(getPoint(t));
+							t = t.getParentRoute();
+						}
+						Collections.reverse(segment.geometry);
+						if (DEBUG_STORE_ALL_ROADS) {
+							addWay(res.osmObjects, segment, "highway", "secondary");
+						}
+						if (segment.dist < 0) {
+							throw new IllegalStateException(segment + " dist < " + segment.dist);
+						}
 					}
-					Collections.reverse(segment.geometry);
-					if (DEBUG_STORE_ALL_ROADS) {
-						addWay(res.osmObjects, segment, "highway", "secondary");
-					}
-					if (segment.dist < 0) {
-						throw new IllegalStateException(segment + " dist < " + segment.dist);
-					}
+					pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
+					res.points.add(pnt);
+					res.progress.add(ctx.calculationProgress);
+					res.shortcuts.add(result.size());
+				} catch (RuntimeException e) {
+					logf("Error %s while processing %d road - %s (%d)", e.getMessage(), pnt.roadId / 64, pnt.getPoint(),
+							pnt.index);
+					throw e;
 				}
-				pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
-				res.points.add(pnt);
-				res.progress.add(ctx.calculationProgress);
-				res.shortcuts.add(result.size());
-				res.roadIds.add(s.getRoad().getId() / 64);
 
 			}
 			segments = null;
@@ -1011,7 +1014,7 @@ public class HHRoutingGraphCreator {
 							ind++;
 							if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 200) {
 								prevPrintInd = ind;
-								logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, res.roadIds.get(k),
+								logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, rpnt.roadId / 64,
 										res.shortcuts.get(k), rpnt.rtDistanceFromStart);
 							}
 							networkDB.insertSegments(rpnt.connected);
