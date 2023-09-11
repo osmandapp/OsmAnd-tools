@@ -33,15 +33,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 
-import gnu.trove.function.TObjectFunction;
-import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.procedure.TLongObjectProcedure;
-import gnu.trove.procedure.TLongProcedure;
-import gnu.trove.procedure.TObjectProcedure;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
@@ -55,9 +50,9 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
-import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
+import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
@@ -112,13 +107,12 @@ public class HHRoutingGraphCreator {
 
 	final static int PROCESS_SET_NETWORK_POINTS = 1;
 	final static int PROCESS_BUILD_NETWORK_SEGMENTS = 2;
-	static int PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
 
 	static boolean DEBUG_STORE_ALL_ROADS = false;
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
-	static long startTime = 0;
+	static long DEBUG_START_TIME = 0;
 
 	final static int MEMORY_RELOAD_MB = 1000; //
 	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
@@ -126,10 +120,13 @@ public class HHRoutingGraphCreator {
 	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 	static long MEMORY_LAST_USED_MB;
 
-	private static List<File> sources = new ArrayList<File>();
+	static int PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
 	private static String ROUTING_PROFILE = "car";
+	private static List<File> FILE_SOURCES = new ArrayList<File>();
+	private static boolean CLEAN = true;
+
 	private static int BATCH_SIZE = 500;
-	private static int THREAD_POOL = 10;
+	private static int THREAD_POOL = 2;
 
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
 	// 50000
@@ -155,7 +152,6 @@ public class HHRoutingGraphCreator {
 
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
-		boolean clean = false;
 		for (String a : args) {
 			if (a.equals("--setup-network-points")) {
 				PROCESS = PROCESS_SET_NETWORK_POINTS;
@@ -166,18 +162,18 @@ public class HHRoutingGraphCreator {
 			} else if (a.startsWith("--threads=")) {
 				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
 			} else if (a.equals("--clean")) {
-				clean = true;
+				CLEAN = true;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName();
 
 		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
-		if (clean && PROCESS == PROCESS_SET_NETWORK_POINTS && dbFile.exists()) {
+		if (CLEAN && PROCESS == PROCESS_SET_NETWORK_POINTS && dbFile.exists()) {
 			dbFile.delete();
 		}
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
-		if (clean && PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS && dbFile.exists()) {
+		if (CLEAN && PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS && dbFile.exists()) {
 			networkDB.recreateSegments();
 		}
 		if (obfFile.isDirectory()) {
@@ -185,10 +181,10 @@ public class HHRoutingGraphCreator {
 				if (!f.getName().endsWith(".obf")) {
 					continue;
 				}
-				sources.add(f);
+				FILE_SOURCES.add(f);
 			}
 		} else {
-			sources.add(obfFile);
+			FILE_SOURCES.add(obfFile);
 		}
 		HHRoutingGraphCreator proc = new HHRoutingGraphCreator();
 		if (PROCESS == PROCESS_SET_NETWORK_POINTS) {
@@ -235,17 +231,17 @@ public class HHRoutingGraphCreator {
 	}
 
 	private static void logf(String string, Object... a) {
-		if (startTime == 0) {
-			startTime = System.currentTimeMillis();
+		if (DEBUG_START_TIME == 0) {
+			DEBUG_START_TIME = System.currentTimeMillis();
 		}
-		String ms = String.format("%3.1fs ", (System.currentTimeMillis() - startTime) / 1000.f);
+		String ms = String.format("%3.1fs ", (System.currentTimeMillis() - DEBUG_START_TIME) / 1000.f);
 		System.out.printf(ms + string + "\n", a);
 
 	}
 
 	private List<BinaryMapIndexReader> initReaders(Collection<File> hints) throws IOException {
 		List<BinaryMapIndexReader> readers = new ArrayList<BinaryMapIndexReader>();
-		for (File source : (hints != null ? hints : sources)) {
+		for (File source : (hints != null ? hints : FILE_SOURCES)) {
 			BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source);
 			readers.add(reader);
 		}
@@ -858,9 +854,9 @@ public class HHRoutingGraphCreator {
 		}
 	}
 
-	///////////////////////////////////////////// BUILD SHORTCUTS ///////////////////////////////////////////
-	                            //////////////////////////////////////////
-	
+	///////////////////////////////////////////// BUILD SHORTCUTS
+	///////////////////////////////////////////// ///////////////////////////////////////////
+	//////////////////////////////////////////
 
 	private static class BuildNetworkShortcutResult {
 		List<NetworkDBPoint> points = new ArrayList<>();
@@ -884,7 +880,8 @@ public class HHRoutingGraphCreator {
 		private int taskId;
 
 		public BuildNetworkShortcutTask(HHRoutingGraphCreator creator, List<NetworkDBPoint> batch,
-				TLongObjectHashMap<RouteSegment> segments, TLongObjectHashMap<NetworkDBPoint> networkPoints, int taskId) {
+				TLongObjectHashMap<RouteSegment> segments, TLongObjectHashMap<NetworkDBPoint> networkPoints,
+				int taskId) {
 			this.creator = creator;
 			this.batch = batch;
 			this.segments = segments;
@@ -895,13 +892,16 @@ public class HHRoutingGraphCreator {
 		@Override
 		public BuildNetworkShortcutResult call() throws Exception {
 			RoutingContext ctx = context.get();
-			
+
 			ctx = creator.gcMemoryLimitToUnloadAll(ctx, null, ctx == null);
 			context.set(ctx);
 			BuildNetworkShortcutResult res = new BuildNetworkShortcutResult();
 			res.taskId = taskId;
 			long nt = System.nanoTime();
 			for (NetworkDBPoint pnt : batch) {
+				if (Thread.interrupted()) {
+					return res;
+				}
 				ctx.calculationProgress = new RouteCalculationProgress();
 				long nt2 = System.nanoTime();
 				RouteSegment s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
@@ -939,7 +939,6 @@ public class HHRoutingGraphCreator {
 				res.shortcuts.add(result.size());
 				res.roadIds.add(s.getRoad().getId() / 64);
 
-				
 			}
 			segments = null;
 			res.totalTime = (System.nanoTime() - nt) / 1e9;
@@ -948,20 +947,24 @@ public class HHRoutingGraphCreator {
 
 	}
 
-	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPoints, HHRoutingPreparationDB networkDB) throws InterruptedException, IOException, SQLException, ExecutionException {
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPoints,
+			HHRoutingPreparationDB networkDB)
+			throws InterruptedException, IOException, SQLException, ExecutionException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = networkPoints.size() / 100.0;
 		int ind = 0, prevPrintInd = 0;
-		// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
+		// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 }
+		// - 3372.75 vs 2598
 		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
-		TLongObjectHashMap<RouteSegment> segments = new  TLongObjectHashMap<>();
+		TLongObjectHashMap<RouteSegment> segments = new TLongObjectHashMap<>();
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
-			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end), new RouteSegment(null, pnt.start, pnt.end));
-			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start), new RouteSegment(null, pnt.end, pnt.start));
+			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end),
+					new RouteSegment(null, pnt.start, pnt.end));
+			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start),
+					new RouteSegment(null, pnt.end, pnt.start));
 			HHRoutingUtilities.addNode(osmObjects, pnt, null, "highway", "stop");
 		}
-		
-		
+
 		ExecutorService service = Executors.newFixedThreadPool(THREAD_POOL);
 		List<Future<BuildNetworkShortcutResult>> results = new ArrayList<>();
 		List<NetworkDBPoint> batch = new ArrayList<>();
@@ -973,15 +976,16 @@ public class HHRoutingGraphCreator {
 				continue;
 			}
 //			if (pnt.index > 2000 || pnt.index < 1800)  continue;
-			if(ind < DEBUG_LIMIT_START_OFFSET) {
+			if (ind < DEBUG_LIMIT_START_OFFSET) {
 				continue;
-			}			
+			}
 			batch.add(pnt);
 			if (ind > DEBUG_LIMIT_PROCESS && DEBUG_LIMIT_PROCESS != -1) {
 				break;
 			}
 			if (batch.size() == BATCH_SIZE) {
-				results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
+				results.add(
+						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
 				batch = new ArrayList<>();
 			}
 		}
@@ -993,60 +997,65 @@ public class HHRoutingGraphCreator {
 		int totalVisitedDirectSegments = 0;
 		ind = 0;
 		service.shutdown();
-		while (!results.isEmpty()) {
-			Thread.sleep(5000);
-			Iterator<Future<BuildNetworkShortcutResult>> it = results.iterator();
-			while (it.hasNext()) {
-				Future<BuildNetworkShortcutResult> future = it.next();
-				if (future.isDone()) {
-					BuildNetworkShortcutResult res = future.get();
-					for (int k = 0; k < res.points.size(); k++) {
-						NetworkDBPoint rpnt = res.points.get(k);
-						RouteCalculationProgress calculationProgress = res.progress.get(k);
-						ind++;
-						if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 200) {
-							prevPrintInd = ind;
-							logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, res.roadIds.get(k),
-									res.shortcuts.get(k), rpnt.rtDistanceFromStart);
-						}
-						networkDB.insertSegments(rpnt.connected);
-						if (DEBUG_VERBOSE_LEVEL >= 2) {
-							System.out.println(calculationProgress.getInfo(null));
-						}
+		try {
+			while (!results.isEmpty()) {
+				Thread.sleep(5000);
+				Iterator<Future<BuildNetworkShortcutResult>> it = results.iterator();
+				while (it.hasNext()) {
+					Future<BuildNetworkShortcutResult> future = it.next();
+					if (future.isDone()) {
+						BuildNetworkShortcutResult res = future.get();
+						for (int k = 0; k < res.points.size(); k++) {
+							NetworkDBPoint rpnt = res.points.get(k);
+							RouteCalculationProgress calculationProgress = res.progress.get(k);
+							ind++;
+							if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 200) {
+								prevPrintInd = ind;
+								logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, res.roadIds.get(k),
+										res.shortcuts.get(k), rpnt.rtDistanceFromStart);
+							}
+							networkDB.insertSegments(rpnt.connected);
+							if (DEBUG_VERBOSE_LEVEL >= 2) {
+								System.out.println(calculationProgress.getInfo(null));
+							}
 
-						maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph, calculationProgress.visitedDirectSegments);
-						totalVisitedDirectSegments += calculationProgress.visitedDirectSegments;
-						maxFinalSegmentsFound = Math.max(maxFinalSegmentsFound, calculationProgress.finalSegmentsFound);
-						totalFinalSegmentsFound += calculationProgress.finalSegmentsFound;
+							maxDirectedPointsGraph = Math.max(maxDirectedPointsGraph,
+									calculationProgress.visitedDirectSegments);
+							totalVisitedDirectSegments += calculationProgress.visitedDirectSegments;
+							maxFinalSegmentsFound = Math.max(maxFinalSegmentsFound,
+									calculationProgress.finalSegmentsFound);
+							totalFinalSegmentsFound += calculationProgress.finalSegmentsFound;
 
-						// clean up for gc
-						rpnt.connected.clear();
+							// clean up for gc
+							rpnt.connected.clear();
+						}
+						osmObjects.putAll(res.osmObjects);
+						it.remove();
+						logf("Task id %d executed %.1f seconds - %d (of %d) waiting completion", res.taskId,
+								res.totalTime, results.size(), taskId);
 					}
-					osmObjects.putAll(res.osmObjects);
-					it.remove();
-					logf("Task id %d executed %.1f seconds - %d (of %d) waiting completion", res.taskId, res.totalTime,
-							results.size(), taskId);
 				}
 			}
+		} finally {
+			List<Runnable> runnable = service.shutdownNow();
+			logf("!!! %d runnable were not executed: exception occurred", runnable == null ? 0 : runnable.size());
+			service.awaitTermination(5, TimeUnit.MINUTES);
 		}
-		service.awaitTermination(5, TimeUnit.MINUTES);
-		
-		
-		System.out.println(String.format("Total segments %d: %d total shorcuts, per border point max %d, avergage %d shortcuts (routing sub graph max %d, avg %d segments)", 
+
+		System.out.println(String.format(
+				"Total segments %d: %d total shorcuts, per border point max %d, avergage %d shortcuts (routing sub graph max %d, avg %d segments)",
 				segments.size(), totalFinalSegmentsFound, maxFinalSegmentsFound, totalFinalSegmentsFound / ind,
-				maxDirectedPointsGraph, totalVisitedDirectSegments  / ind));
+				maxDirectedPointsGraph, totalVisitedDirectSegments / ind));
 		return osmObjects.valueCollection();
 	}
 
-	
-	
-	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegment s,
-			TLongObjectMap<RouteSegment> segments) throws InterruptedException, IOException {
+	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegment s, TLongObjectMap<RouteSegment> segments)
+			throws InterruptedException, IOException {
 
 		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt1, pnt2);
-		
+
 		List<RouteSegment> res = new ArrayList<>();
 
 		ctx.unloadAllData(); // needed for proper multidijsktra work
