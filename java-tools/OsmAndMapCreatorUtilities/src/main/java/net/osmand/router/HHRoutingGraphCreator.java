@@ -881,7 +881,7 @@ public class HHRoutingGraphCreator {
 				TLongObjectHashMap<RouteSegment> segments, TLongObjectHashMap<NetworkDBPoint> networkPoints, int taskId) {
 			this.creator = creator;
 			this.batch = batch;
-			this.segments = new TLongObjectHashMap<>(segments); // concurrency
+			this.segments = segments;
 			this.networkPoints = networkPoints;
 			this.taskId = taskId;
 		}
@@ -889,6 +889,8 @@ public class HHRoutingGraphCreator {
 		@Override
 		public BuildNetworkShortcutResult call() throws Exception {
 			RoutingContext ctx = context.get();
+			segments = new TLongObjectHashMap<>(segments);
+			
 			ctx = creator.gcMemoryLimitToUnloadAll(ctx, null, ctx == null);
 			context.set(ctx);
 			BuildNetworkShortcutResult res = new BuildNetworkShortcutResult();
@@ -934,6 +936,7 @@ public class HHRoutingGraphCreator {
 
 				
 			}
+			segments = null;
 			res.totalTime = (System.nanoTime() - nt) / 1e9;
 			return res;
 		}
