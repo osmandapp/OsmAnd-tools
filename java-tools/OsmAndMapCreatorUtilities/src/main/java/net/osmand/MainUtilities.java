@@ -28,6 +28,7 @@ import net.osmand.obf.preparation.OceanTilesCreator;
 import net.osmand.osm.FilterOsmByTags;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.render.OsmAndTestStyleRenderer;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
@@ -70,6 +71,8 @@ public class MainUtilities {
 				BinaryComparator.main(subArgsArray);
 			} else if (utl.equals("merge-index")) {
 				BinaryMerger.main(subArgsArray);
+			} else if (utl.equals("test-style-rendering")) {
+				OsmAndTestStyleRenderer.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-obf-files-in-batch")) {
