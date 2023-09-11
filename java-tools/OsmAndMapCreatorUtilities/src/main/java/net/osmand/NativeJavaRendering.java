@@ -536,7 +536,9 @@ public class NativeJavaRendering extends NativeLibrary {
 				defaultLoadedLibrary.initFilesInDir(obfFiles, map);
 			}
 			log.info(String.format("Init native library with maps: %d ms", System.currentTimeMillis() - now));
-			defaultLoadedLibrary.loadFontData(new File(fontsFolder));
+			if (fontsFolder != null) {
+				defaultLoadedLibrary.loadFontData(new File(fontsFolder));
+			}
 		}
 		return defaultLoadedLibrary;
 	}
