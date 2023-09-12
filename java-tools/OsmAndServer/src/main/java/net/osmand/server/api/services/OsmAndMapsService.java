@@ -661,7 +661,7 @@ public class OsmAndMapsService {
 	}
 	
 	
-	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
+	public List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {
 			return Collections.emptyList();
 		}
@@ -673,7 +673,7 @@ public class OsmAndMapsService {
 		return approximateByPolyline(polyline, routeMode, props);
 	}
 	
-	public synchronized List<RouteSegmentResult> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
+	public List<RouteSegmentResult> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
 		List<LatLon> polyline = new ArrayList<>(points.size());
 		for (WebGpxParser.Point p : points) {
 			polyline.add(new LatLon(p.lat, p.lng));
@@ -682,7 +682,7 @@ public class OsmAndMapsService {
 		return approximateByPolyline(polyline, routeMode, props);
 	}
 	
-	private List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
+	private synchronized List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
 		List<RouteSegmentResult> route;
 		QuadRect quadRect = points(polyline, null, null);
 		if (!validateAndInitConfig()) {
