@@ -32,6 +32,8 @@ public class HHRoutingPreparationDB {
 	private PreparedStatement insertSegment;
 	private PreparedStatement insertGeometry;
 	private PreparedStatement loadGeometry;
+	private PreparedStatement loadSegmentEnd;
+	private PreparedStatement loadSegmentStart;
 
 	private final int BATCH_SIZE = 10000;
 	private int batchInsPoint = 0;
@@ -58,6 +60,9 @@ public class HHRoutingPreparationDB {
 		insertSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist) " + " VALUES(?, ?, ?)");
 		insertGeometry = conn.prepareStatement("INSERT INTO geometry(idPoint, idConnPoint, geometry) " + " VALUES(?, ?, ?)");
 		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint =? ");
+		loadSegmentEnd = conn.prepareStatement("SELECT idPoint, idConnPoint, dist from segments where idPoint = ?  ");
+		loadSegmentStart = conn.prepareStatement("SELECT idPoint, idConnPoint, dist from segments where idConnPoint = ?  ");
+
 		st.close();
 	}
 	
@@ -167,6 +172,46 @@ public class HHRoutingPreparationDB {
 		if (rs.next()) {
 			parseGeometry(segment, rs.getBytes(1));
 		}
+	}
+	
+	public int loadNetworkSegmentEnd(TLongObjectHashMap<NetworkDBPoint> pntsById, NetworkDBPoint point) throws SQLException {
+		if(point.connected != null) {
+			return 0;
+		}
+		point.connected = new ArrayList<>();
+		loadSegmentEnd.setInt(1, point.index);
+		ResultSet rs = loadSegmentEnd.executeQuery();
+		int x = 0;
+		while (rs.next()) {
+			x++;
+			NetworkDBPoint start = pntsById.get(rs.getLong(1));
+			NetworkDBPoint end = pntsById.get(rs.getLong(2));
+			double dist = rs.getDouble(3);
+			NetworkDBSegment segment = new NetworkDBSegment(dist, true, start, end);
+			point.connected.add(segment);
+		}
+		rs.close();
+		return x;
+	}
+	
+	public int loadNetworkSegmentStart(TLongObjectHashMap<NetworkDBPoint> pntsById, NetworkDBPoint point) throws SQLException {
+		if (point.connectedReverse != null) {
+			return 0;
+		}
+		point.connectedReverse = new ArrayList<>();
+		loadSegmentStart.setInt(1, point.index);
+		ResultSet rs = loadSegmentStart.executeQuery();
+		int x = 0;
+		while (rs.next()) {
+			x++;
+			NetworkDBPoint start = pntsById.get(rs.getLong(1));
+			NetworkDBPoint end = pntsById.get(rs.getLong(2));
+			double dist = rs.getDouble(3);
+			NetworkDBSegment rev = new NetworkDBSegment(dist, false, start, end);
+			end.connectedReverse.add(rev);
+		}
+		rs.close();
+		return x;
 	}
 	
 	public int loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points) throws SQLException {
@@ -398,6 +443,10 @@ public class HHRoutingPreparationDB {
 		// indexing
 		int rtCnt = 0;
 		
+		public void markSegmentsNotLoaded() {
+			connected = null;
+			connectedReverse = null;
+		}
 		
 		@Override
 		public String toString() {

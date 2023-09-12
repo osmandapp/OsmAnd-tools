@@ -173,7 +173,7 @@ public class HHRoutingTopGraphCreator {
 
 
 	private void calculateEdgeSize(Map<Integer, NetworkHHCluster> clusters, List<NetworkDBPoint> pntsList,
-			TLongObjectHashMap<NetworkDBPoint> toExclude) {
+			TLongObjectHashMap<NetworkDBPoint> toExclude) throws SQLException {
 		int p = 0;
 		int clusteInd = 0;
 		for (NetworkHHCluster c : clusters.values()) {
@@ -191,7 +191,7 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private int calculateEdgesForCluster(int clusteInd, NetworkHHCluster c) {
+	private int calculateEdgesForCluster(int clusteInd, NetworkHHCluster c) throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		int total = 0;
 		Map<NetworkDBPoint, List<NetworkDBPoint>> totPoints = new HashMap<>();
