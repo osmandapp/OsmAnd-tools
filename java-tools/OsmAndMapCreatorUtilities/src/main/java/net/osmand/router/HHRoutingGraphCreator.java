@@ -84,7 +84,7 @@ import net.osmand.util.MapUtils;
 // 4 Introduce 3/4 level (test on Europe)
 // 4.1 Merge islands - Introduce 3rd level of points
 // 4.2 Implement routing algorithm 2->3->4
-// 4.3 Introduce / reuse points that are center for many shorcuts to reduce edges N*N -> 2*n
+// 4.3 Introduce / reuse points that are center for many shortcuts to reduce edges N*N -> 2*n
 // 4.4 Optimize time / space comparing to 2nd level
 
 // 5th phase - complex routing / data
@@ -1041,7 +1041,9 @@ public class HHRoutingGraphCreator {
 			}
 		} finally {
 			List<Runnable> runnable = service.shutdownNow();
-			logf("!!! %d runnable were not executed: exception occurred", runnable == null ? 0 : runnable.size());
+			if (!results.isEmpty()) {
+				logf("!!! %d runnable were not executed: exception occurred", runnable == null ? 0 : runnable.size());
+			}
 			service.awaitTermination(5, TimeUnit.MINUTES);
 		}
 

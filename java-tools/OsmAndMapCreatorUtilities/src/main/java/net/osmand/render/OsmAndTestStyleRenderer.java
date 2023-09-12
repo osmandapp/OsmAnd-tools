@@ -102,9 +102,9 @@ public class OsmAndTestStyleRenderer {
 				// left, top, right, bottom
 				String[] bbox = a.substring("-bbox=".length()).split(",");
 				pms.leftLon = Double.parseDouble(bbox[0]);
-				pms.topLat = Double.parseDouble(bbox[1]);
+				pms.bottomLat = Double.parseDouble(bbox[1]);
 				pms.rightLon = Double.parseDouble(bbox[2]);
-				pms.bottomLat = Double.parseDouble(bbox[3]);
+				pms.topLat  = Double.parseDouble(bbox[3]);
 			} else if (a.startsWith("-zoom=")) {
 				pms.zoom = Integer.parseInt(a.substring("-zoom=".length()));
 			} else if (a.startsWith("-output=")) {
@@ -125,7 +125,7 @@ public class OsmAndTestStyleRenderer {
 			return;
 		}
 		if(pms.leftLon == pms.rightLon || pms.topLat == pms.bottomLat) {
-			System.out.println("Please specify --bbox in format 'leftlon,toplat,rightlon,bottomlat'");
+			System.out.println("Please specify --bbox in format 'leftlon,bottomlat,rightlon,toplat'");
 			return;
 		}
 
