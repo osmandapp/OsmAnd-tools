@@ -36,7 +36,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private static Log log = PlatformUtil.getLog(MapRenderingTypesEncoder.class);
 	// stored information to convert from osm tags to int type
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
-	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
+	private Map<String, List<EntityConvert>> convertTags = new LinkedHashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
 	private String regionName;
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
@@ -112,7 +112,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		String[] ls = seq.split(":");
 		for (int ind = Integer.parseInt(ls[0]); ind <= Integer.parseInt(ls[1]); ind++) {
-			Map<String, String> mp = new HashMap<String, String>();
+			Map<String, String> mp = new LinkedHashMap<String, String>();
 			for (int i = 0; i < parser.getAttributeCount(); i++) {
 				String at = parser.getAttributeName(i);
 				mp.put(at, parser.getAttributeValue("", at).replace("*", ind + ""));

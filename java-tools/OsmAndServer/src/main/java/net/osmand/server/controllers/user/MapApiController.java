@@ -83,7 +83,9 @@ public class MapApiController {
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
-	private static final long ANALYSIS_RERUN = 1645061114000l; // 17-02-2022
+
+	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
+
 	private static final String INFO_KEY = "info";
 											   
 
@@ -302,7 +304,7 @@ public class MapApiController {
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresentFavorites(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
@@ -318,25 +320,44 @@ public class MapApiController {
 								uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
 							}
 						} else {
-							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
+							Map<String, WebGpxParser.PointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
+							Map<String, Map<String,String>> pointGroupsAnalysis = new HashMap<>();
+							groups.keySet().forEach(k -> {
+								Map<String, String> groupInfo = new HashMap<>();
+								WebGpxParser.PointsGroup group = groups.get(k);
+								groupInfo.put("color", group.color);
+								groupInfo.put("groupSize", String.valueOf(group.points.size()));
+								groupInfo.put("hidden", String.valueOf(isHidden(group)));
+								pointGroupsAnalysis.put(k, groupInfo);
+							});
+							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
 					}
-					if (isGPZTrack) {
-						saveAnalysis(ANALYSIS, uf, analysis);
-					}
+					saveAnalysis(ANALYSIS, uf, analysis);
 					nd.details = uf.details.deepCopy();
 				}
 			}
 			if (analysisPresent(ANALYSIS, nd.details)) {
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(ANALYSIS).getAsJsonObject().remove("elevationData");
+				nd.details.get(ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
 			if (analysisPresent(SRTM_ANALYSIS, nd.details)) {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
+				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+	
+	private boolean isHidden(WebGpxParser.PointsGroup group) {
+		for (WebGpxParser.Wpt wpt:  group.points) {
+			if (wpt.ext.extensions.get("hidden") != null && wpt.ext.extensions.get("hidden").equals("true")) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private boolean analysisPresent(String tag, UserFile userFile) {
@@ -351,6 +372,11 @@ public class MapApiController {
 		return details != null && details.has(tag + DONE_SUFFIX)
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
 				&& details.has(tag) && !details.get(tag).isJsonNull();
+	}
+	
+	private boolean analysisPresentFavorites(String tag, JsonObject details) {
+		return details != null && details.has(tag + DONE_SUFFIX)
+				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 	
 	@GetMapping(value = "/download-file")
@@ -414,12 +440,10 @@ public class MapApiController {
 		if (file.details == null) {
 			file.details = new JsonObject();
 		}
-		// store data in db to speed up retrieval
-		// clear speed data 
-//		if (analysis != null) {
-//			analysis.speedData.clear();
-//			analysis.elevationData.clear();
-//		}
+		if (analysis != null) {
+			analysis.pointAttributes.clear();
+			analysis.availableAttributes.clear();
+		}
 		file.details.add(tag, gsonWithNans.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
@@ -587,6 +611,9 @@ public class MapApiController {
 	@PostMapping(path = {"/auth/change-email"})
 	@ResponseBody
 	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
+		if (us.username != null) {
+			us.username = us.username.toLowerCase().trim();
+		}
 		if (emailSender.isEmail(us.username)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {

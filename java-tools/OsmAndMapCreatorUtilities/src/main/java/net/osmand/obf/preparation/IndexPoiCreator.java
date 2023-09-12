@@ -104,7 +104,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<String, String> etags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
 		
 		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
-		boolean privateReg = "private".equals(e.getTag("access"));
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if (e instanceof Relation) {
@@ -124,10 +123,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			for (Amenity a : tempAmenityList) {
-				if (a.getType().getKeyName().equals("entertainment") && privateReg) {
-					// don't index private swimming pools
-					continue;
-				}
 				if (icc.basemap) {
 					PoiType st = a.getType().getPoiTypeByKeyName(a.getSubType());
 					if (st == null || !a.getType().containsBasemapPoi(st)) {

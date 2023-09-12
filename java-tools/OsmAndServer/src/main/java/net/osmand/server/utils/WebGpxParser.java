@@ -269,24 +269,31 @@ public class WebGpxParser {
             List<Point> routePoints = new ArrayList<>();
             int index = gpxFile.routes.indexOf(route);
             List<Point> trackPoints = getPointsFromSegmentIndex(gpxData, index);
-            int prevTrkPointInd = 0;
-            for (GPXUtilities.WptPt p : route.points) {
-                Point routePoint = new Point(p);
-                int currTrkPointInd;
-                if (routePoint.geometrySize == -1) {
-                    currTrkPointInd = findNearestPoint(trackPoints, routePoint);
-                } else {
-                    currTrkPointInd = routePoint.geometrySize;
+            if (trackPoints.isEmpty()) {
+                //case with only one route points
+                if (route.points.size() == 1) {
+                    routePoints.add(new Point(route.points.get(0)));
+                    trackPointsMap.put(0, routePoints);
                 }
-                
-                prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
-            }
-            int indTrack = getTrackBySegmentIndex(gpxData, index);
-            List<Point> routeP = trackPointsMap.get(indTrack);
-            if (routeP != null) {
-                routeP.addAll(routePoints);
             } else {
-                trackPointsMap.put(indTrack, routePoints);
+                int prevTrkPointInd = 0;
+                for (GPXUtilities.WptPt p : route.points) {
+                    Point routePoint = new Point(p);
+                    int currTrkPointInd;
+                    if (routePoint.geometrySize == -1) {
+                        currTrkPointInd = findNearestPoint(trackPoints, routePoint);
+                    } else {
+                        currTrkPointInd = routePoint.geometrySize;
+                    }
+                    prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
+                }
+                int indTrack = getTrackBySegmentIndex(gpxData, index);
+                List<Point> routeP = trackPointsMap.get(indTrack);
+                if (routeP != null) {
+                    routeP.addAll(routePoints);
+                } else {
+                    trackPointsMap.put(indTrack, routePoints);
+                }
             }
         });
         gpxData.tracks.forEach(track -> track.points = trackPointsMap.get(gpxData.tracks.indexOf(track)));
@@ -295,7 +302,8 @@ public class WebGpxParser {
     public List<Point> getPointsFromSegmentIndex(TrackData gpxData, int index) {
         List<List<Point>> segments = new ArrayList<>();
         gpxData.tracks.forEach(track -> segments.addAll(track.segments));
-        return segments.get(index);
+        
+        return segments.isEmpty() ? Collections.emptyList() : segments.get(index);
     }
     
     public int getTrackBySegmentIndex(TrackData gpxData, int index) {
@@ -330,7 +338,7 @@ public class WebGpxParser {
         if (currTrkPointInd != 0) {
             for (Point pt : trackPoints) {
                 int pointInd = trackPoints.indexOf(pt);
-                if (pointInd >= prevTrkPointInd && pointInd <= currTrkPointInd) {
+                if (pointInd >= prevTrkPointInd && pointInd < currTrkPointInd) {
                     if (routePoint.geometry == null) {
                         routePoint.geometry = new ArrayList<>();
                     }
@@ -355,11 +363,11 @@ public class WebGpxParser {
                 for (Point point : track.points) {
                     if (point.geometry != null) {
                         for (Point p : point.geometry) {
-                            p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(point.geometry.indexOf(p) + pointsSize).value;
+                            p.srtmEle = srtmAnalysis.pointAttributes.get(point.geometry.indexOf(p) + pointsSize).elevation;
                         }
                         pointsSize += point.geometry.size();
                     } else {
-                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.getElevationData().getPointAttribute(track.points.indexOf(p)).value);
+                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.pointAttributes.get(track.points.indexOf(p)).elevation);
                     }
                 }
             }
@@ -373,22 +381,24 @@ public class WebGpxParser {
                 if (point.geometry != null) {
                     for (Point p : point.geometry) {
                         int ind = point.geometry.indexOf(p);
-                        if (ind + pointsSize < analysis.getElevationData().getAttributes().size()) {
-                            p.distance = analysis.getElevationData().getPointAttribute(ind + pointsSize).distance;
+                        if (ind + pointsSize < analysis.pointAttributes.size()) {
+                            p.distance = analysis.pointAttributes.get(ind + pointsSize).distance;
                             if (addSpeed) {
-                                p.speed = analysis.getSpeedData().getPointAttribute(ind + pointsSize).value;
+                                p.speed = analysis.pointAttributes.get(ind + pointsSize).speed;
                             }
                         }
-                        pointsSize += point.geometry.size();
                     }
                 } else {
                     int ind = track.points.indexOf(point);
-                    if (ind < analysis.getElevationData().getAttributes().size()) {
-                        point.distance = analysis.getElevationData().getPointAttribute(ind).distance;
+                    if (ind < analysis.pointAttributes.size()) {
+                        point.distance = analysis.pointAttributes.get(ind).distance;
                         if (addSpeed) {
-                            point.speed = analysis.getSpeedData().getPointAttribute(ind).value;
+                            point.speed = analysis.pointAttributes.get(ind).speed;
                         }
                     }
+                }
+                if (point.geometry != null) {
+                    pointsSize += point.geometry.size();
                 }
             }
         });

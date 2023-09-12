@@ -525,9 +525,9 @@ int main(int argc, char** argv)
         style,
         density,
         mapScale,
-        symbolsScale,
-        "ru",
-        OsmAnd::MapPresentationEnvironment::LanguagePreference::LocalizedOrTransliterated));
+        symbolsScale));
+    mapPresentationEnvironment->setLocaleLanguageId("ru");
+    mapPresentationEnvironment->setLanguagePreference(OsmAnd::MapPresentationEnvironment::LanguagePreference::LocalizedOrTransliterated);
     primitivizer.reset(new OsmAnd::MapPrimitiviser(mapPresentationEnvironment));
 
     OsmAnd::MapRendererSetupOptions rendererSetup;
