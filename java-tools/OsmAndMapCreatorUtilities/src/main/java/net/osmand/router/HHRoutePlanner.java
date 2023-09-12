@@ -32,6 +32,7 @@ public class HHRoutePlanner {
 
 	static final int PROC_ROUTING = 0;
 	static int PROCESS = PROC_ROUTING;
+	static boolean PRELOAD_SEGMENTS = false;
 
 	
 	private RoutingContext ctx;
@@ -49,6 +50,7 @@ public class HHRoutePlanner {
 		int addedEdges = 0;
 		
 		double loadPointsTime = 0;
+		int loadEdgesCnt;
 		double loadEdgesTime = 0;
 		double routingTime = 0;
 		double addQueueTime = 0;
@@ -134,11 +136,19 @@ public class HHRoutePlanner {
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
 			stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
-			time = System.nanoTime();
-			System.out.printf(" %,d - %.2fms\nLoading segments...", cachePoints.size(), stats.loadPointsTime);
-			int cntEdges = networkDB.loadNetworkSegments(cachePoints);
-			stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
-			System.out.printf(" %,d - %.2fms\n", cntEdges, stats.loadEdgesTime);
+			System.out.printf(" %,d - %.2fms\n", cachePoints.size(), stats.loadPointsTime);
+			if (PRELOAD_SEGMENTS) {
+				time = System.nanoTime();
+				System.out.printf("Loading segments...");
+				int cntEdges = networkDB.loadNetworkSegments(cachePoints);
+				stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
+				System.out.printf(" %,d - %.2fms\n", cntEdges, stats.loadEdgesTime);
+				stats.loadEdgesCnt = cntEdges;
+			} else {
+				for (NetworkDBPoint p : cachePoints.valueCollection()) {
+					p.markSegmentsNotLoaded();
+				}
+			}
 		}
 		NetworkDBPoint startPnt = null;
 		NetworkDBPoint endPnt = null;
@@ -166,8 +176,8 @@ public class HHRoutePlanner {
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
 		
-		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
-				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
+		System.out.printf("Routing finished %.2f ms: load data %.2f ms (%d edges), routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
+				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime,
 				stats.addQueueTime, stats.prepTime);
 		return objects;
 	}
@@ -188,8 +198,7 @@ public class HHRoutePlanner {
 				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  o1.rtDistanceToEnd);
 	}
 	
-	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats)
-			{
+	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats) throws SQLException {
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override
@@ -209,7 +218,7 @@ public class HHRoutePlanner {
 		start.rtDistanceFromStart = 0.1; // visited
 		end.rtDistanceFromStartRev = 0.1; // visited
 		if (DIJKSTRA_DIRECTION >= 0) {
-			addToQueue(queue, start, end, false, stats);
+			addToQueue( queue, start, end, false, stats);
 		} 
 		if (DIJKSTRA_DIRECTION <= 0) {
 			addToQueue(queueReverse, end, start, true, stats);
@@ -309,8 +318,19 @@ public class HHRoutePlanner {
 
 
 
-	private void addToQueue(PriorityQueue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, RoutingStats stats) {
+	private void addToQueue(PriorityQueue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, RoutingStats stats) throws SQLException {
 		long tm = System.nanoTime();
+		int c;
+		if (reverse) {
+			c = networkDB.loadNetworkSegmentStart(cachePoints, start);
+		} else {
+			c = networkDB.loadNetworkSegmentEnd(cachePoints, start);
+		}
+		if (c > 0) {
+			stats.loadEdgesCnt += c;
+			stats.loadEdgesTime += (System.nanoTime() - tm) / 1e6;
+			tm = System.nanoTime();
+		}
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
 			connected.rtDistanceToEnd = distanceToEnd(reverse ? connected.start : connected.end, finish);
 			connected.rtCost = reverse ? rtSegmentCostRev(connected) : rtSegmentCost(connected); 

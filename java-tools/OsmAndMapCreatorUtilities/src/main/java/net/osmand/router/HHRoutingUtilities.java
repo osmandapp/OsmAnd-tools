@@ -1,9 +1,5 @@
 package net.osmand.router;
 
-import static net.osmand.router.HHRoutingUtilities.DEBUG_OSM_ID;
-import static net.osmand.router.HHRoutingUtilities.calculateRoutePointInternalId;
-import static net.osmand.router.HHRoutingUtilities.getPoint;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -19,8 +15,8 @@ import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
-import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
+import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
