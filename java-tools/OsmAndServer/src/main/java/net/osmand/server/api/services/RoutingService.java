@@ -9,6 +9,7 @@ import java.util.TreeMap;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import net.osmand.router.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,9 +19,6 @@ import net.osmand.binary.RouteDataBundle;
 import net.osmand.binary.StringBundle;
 import net.osmand.data.LatLon;
 import net.osmand.gpx.GPXUtilities;
-import net.osmand.router.GeneralRouter;
-import net.osmand.router.RouteDataResources;
-import net.osmand.router.RouteSegmentResult;
 import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
@@ -39,7 +37,6 @@ public class RoutingService {
     @Autowired
     WebGpxParser webGpxParser;
     
-    Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
     
     public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode, boolean hasRouting, boolean isLongDist) throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
@@ -63,6 +60,18 @@ public class RoutingService {
             addDistance(pointsRes);
         }
         return pointsRes;
+    }
+    
+    public synchronized List<WebGpxParser.Point> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
+        List<Location> locations = new ArrayList<>();
+        List<RouteSegmentResult> approximateResult = osmAndMapsService.approximateRoute(points, routeMode);
+        List<WebGpxParser.Point> gpxPoints = getPoints(approximateResult, locations);
+        if (!gpxPoints.isEmpty()) {
+            GPXUtilities.TrkSegment seg = generateRouteSegments(approximateResult, locations);
+            webGpxParser.addRouteSegmentsToPoints(seg, gpxPoints);
+            addDistance(gpxPoints);
+        }
+        return gpxPoints;
     }
     
     public List<WebGpxParser.Point> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
