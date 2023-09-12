@@ -19,6 +19,7 @@ import javax.imageio.ImageIO;
 import net.osmand.IndexConstants;
 import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -664,22 +665,35 @@ public class OsmAndMapsService {
 		if (!file.hasTrkPt()) {
 			return Collections.emptyList();
 		}
-		List<RouteSegmentResult> route;
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
 		List<LatLon> polyline = new ArrayList<>(trkSegment.points.size());
 		for (WptPt p : trkSegment.points) {
 			polyline.add(new LatLon(p.lat, p.lon));
 		}
-		QuadRect points = points(polyline, null, null);
-		if (!validateAndInitConfig() || points == null) {
+		return approximateByPolyline(polyline, routeMode, props);
+	}
+	
+	public synchronized List<RouteSegmentResult> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
+		List<LatLon> polyline = new ArrayList<>(points.size());
+		for (WebGpxParser.Point p : points) {
+			polyline.add(new LatLon(p.lat, p.lng));
+		}
+		Map<String, Object> props = new HashMap<>();
+		return approximateByPolyline(polyline, routeMode, props);
+	}
+	
+	private List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
+		List<RouteSegmentResult> route;
+		QuadRect quadRect = points(polyline, null, null);
+		if (!validateAndInitConfig()) {
 			return Collections.emptyList();
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0);
 			usedMapList = getReaders(list);
-			RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null, usedMapList);
+			RoutingContext ctx = prepareRouterContext(routeMode, quadRect, router, null, null, usedMapList);
 			route = approximate(ctx, router, props, polyline);
 		} finally {
 			unlockReaders(usedMapList);
