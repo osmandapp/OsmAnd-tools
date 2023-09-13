@@ -8,7 +8,9 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.imageio.ImageIO;
 import javax.xml.parsers.ParserConfigurationException;
@@ -44,41 +46,51 @@ public class OsmAndTestStyleRenderer {
  	}
 	
 	protected static class TileSourceGenTemplate {
-		String template = null;
+		String url = null;
 		boolean echo = false;
 		boolean vector = false;
 		String vectorStyle ="";
 		int vectorSize = 256;
+		String suffix;
 		
 		public static TileSourceGenTemplate raster(String rasterTemplate) {
 			TileSourceGenTemplate t = new TileSourceGenTemplate();
-			t.template = rasterTemplate;
+			Map<String, String> params = getParams(rasterTemplate);
+			t.url = params.get("url");
+			t.suffix = params.get("suffix");
 			return t;
 		}
 		
 		public static TileSourceGenTemplate echo(String rasterTemplate) {
 			TileSourceGenTemplate t = new TileSourceGenTemplate();
-			t.template = rasterTemplate;
+			Map<String, String> params = getParams(rasterTemplate);
+			t.url = params.get("url");
+			t.suffix = params.get("suffix");
 			t.echo = true;
 			return t;
 		}
 		
 		public static TileSourceGenTemplate vector(String input) {
 			TileSourceGenTemplate t = new TileSourceGenTemplate();
+			Map<String, String> params = getParams(input);
 			t.vector = true;
-			for(String a :input.split(":")) {
-				String[] keys = a.split("-");
-				if (keys.length > 1) {
-					String key = keys[0];
-					String value = keys[1];
-					if (key.equals("style")) {
-						t.vectorStyle = value;
-					} else if (key.equals("sz")) {
-						t.vectorSize = Integer.parseInt(value);
-					}
-				}
+			t.vectorStyle = params.get("style");
+			t.suffix = params.get("suffix");
+			if (params.containsKey("size")) {
+				t.vectorSize = Integer.parseInt(params.get("size"));
 			}
 			return t;
+		}
+
+		private static Map<String, String> getParams(String input) {
+			Map<String, String> parms = new HashMap<>();
+			for (String a : input.split("::")) {
+				int indexOf = a.indexOf("-");
+				if(indexOf > 0) {
+					parms.put(a.substring(0, indexOf), a.substring(indexOf + 1));
+				}
+			}
+			return parms;
 		}
 		
 		
@@ -102,9 +114,9 @@ public class OsmAndTestStyleRenderer {
 				// left, top, right, bottom
 				String[] bbox = a.substring("-bbox=".length()).split(",");
 				pms.leftLon = Double.parseDouble(bbox[0]);
-				pms.topLat = Double.parseDouble(bbox[1]);
+				pms.bottomLat = Double.parseDouble(bbox[1]);
 				pms.rightLon = Double.parseDouble(bbox[2]);
-				pms.bottomLat = Double.parseDouble(bbox[3]);
+				pms.topLat = Double.parseDouble(bbox[3]);
 			} else if (a.startsWith("-zoom=")) {
 				pms.zoom = Integer.parseInt(a.substring("-zoom=".length()));
 			} else if (a.startsWith("-output=")) {
@@ -125,7 +137,7 @@ public class OsmAndTestStyleRenderer {
 			return;
 		}
 		if(pms.leftLon == pms.rightLon || pms.topLat == pms.bottomLat) {
-			System.out.println("Please specify --bbox in format 'leftlon,toplat,rightlon,bottomlat'");
+			System.out.println("Please specify --bbox in format 'leftlon,bottomlat,rightlon,toplat'");
 			return;
 		}
 
@@ -152,8 +164,13 @@ public class OsmAndTestStyleRenderer {
 		int rightx = (int) Math.ceil(MapUtils.getTileNumberX(pms.zoom, pms.rightLon));
 		int topY = (int) Math.floor(MapUtils.getTileNumberY(pms.zoom, pms.topLat));
 		int bottomY = (int) Math.ceil(MapUtils.getTileNumberY(pms.zoom, pms.bottomLat));
+		int cnt = (rightx - leftx) * (bottomY - topY);
+		int ind = 0;
+		System.out.printf("Downloading %d tiles...\n", cnt);
 		for (int x = leftx; x <= rightx; x++) {
 			for (int y = topY; y <= bottomY; y++) {
+				ind++;
+				System.out.printf("Downloading %.2f (%d / %d tiles)...\n", ind * 100.0 / cnt, ind, cnt);
 				downloadTiles(x, y, pms.zoom, pms);
 			}
 		}
@@ -164,6 +181,7 @@ public class OsmAndTestStyleRenderer {
 		int ind = 0;
 		for (TileSourceGenTemplate t : pms.tilesource) {
 			ind++;
+			String suffix = t.suffix == null ? ind + "" : t.suffix;
 			if (t.vector) {
 //				RenderingImageContext ctx = new RenderingImageContext(x << (31 - zoom), (x + 1) << (31 - zoom),
 //						y << (31 - zoom), (y + 1) << (31 - zoom), zoom);
@@ -181,16 +199,16 @@ public class OsmAndTestStyleRenderer {
 				}
 				BufferedImage img = pms.nsr.renderImage(ctx);
 				String ext = "png";
-				ImageIO.write(img, ext, new File(pms.outputDir, formatTile(pms.zoom, x, y, ind, ext)));
+				ImageIO.write(img, ext, new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext)));
 			} else {
-				String template = TileSourceTemplate.normalizeUrl(t.template);
+				String template = TileSourceTemplate.normalizeUrl(t.url);
 				int bingQuadKeyParamIndex = template.indexOf(TileSourceManager.PARAM_BING_QUAD_KEY);
 				if (bingQuadKeyParamIndex != -1) {
 					template = template.replace(TileSourceManager.PARAM_BING_QUAD_KEY,
 							TileSourceTemplate.eqtBingQuadKey(zoom, x, y));
 				}
 				String tileUrl = MessageFormat.format(template, pms.zoom + "", x + "", y + "");
-				System.out.println("Downloading " + tileUrl + " ...");
+				System.out.println("  Downloading " + tileUrl + " ...");
 				if (t.isFile() && pms.outputDir != null) {
 					URL url = new URL(tileUrl);
 					URLConnection cn = url.openConnection();
@@ -198,7 +216,7 @@ public class OsmAndTestStyleRenderer {
 					if (ext.indexOf("?") != -1) {
 						ext = ext.substring(0, ext.indexOf('?'));
 					}
-					File f = new File(pms.outputDir, formatTile(pms.zoom, x, y, ind, ext));
+					File f = new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext));
 					FileOutputStream fous = new FileOutputStream(f);
 					Algorithms.streamCopy(cn.getInputStream(), fous);
 					fous.close();
@@ -207,8 +225,8 @@ public class OsmAndTestStyleRenderer {
 		}
 	}
 
-	private static String formatTile(int zoom, int x, int y, int ind, String ext) {
-		return String.format("%d_%d_%d_%d.%s", zoom, x, y, ind, ext);
+	private static String formatTile(int zoom, int x, int y, String suffix, String ext) {
+		return String.format("%d_%d_%d_%s.%s", zoom, x, y, suffix, ext);
 	}
 
 
