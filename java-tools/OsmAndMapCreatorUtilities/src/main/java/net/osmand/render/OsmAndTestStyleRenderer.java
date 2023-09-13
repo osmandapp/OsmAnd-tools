@@ -164,13 +164,13 @@ public class OsmAndTestStyleRenderer {
 		int rightx = (int) Math.ceil(MapUtils.getTileNumberX(pms.zoom, pms.rightLon));
 		int topY = (int) Math.floor(MapUtils.getTileNumberY(pms.zoom, pms.topLat));
 		int bottomY = (int) Math.ceil(MapUtils.getTileNumberY(pms.zoom, pms.bottomLat));
-		int cnt = (rightx - leftx) * (bottomY - topY);
+		int cnt = (rightx - leftx + 1) * (bottomY - topY + 1);
 		int ind = 0;
 		System.out.printf("Downloading %d tiles...\n", cnt);
 		for (int x = leftx; x <= rightx; x++) {
 			for (int y = topY; y <= bottomY; y++) {
 				ind++;
-				System.out.printf("Downloading %.2f (%d / %d tiles)...\n", ind * 100.0 / cnt, ind, cnt);
+				System.out.printf("Downloading %.2f%% (%d / %d tiles)...\n", ind * 100.0 / cnt, ind, cnt);
 				downloadTiles(x, y, pms.zoom, pms);
 			}
 		}
