@@ -1,5 +1,6 @@
-FROM openjdk:11
+# FROM openjdk:11
+FROM ubuntu:22.04
+RUN apt update && apt install -y openjdk-11-jdk
 WORKDIR /home/work
-RUN apt-get update && apt-get install libstdc++6
 COPY OsmAndMapCreator/ /home/OsmAndMapCreator/
 ENTRYPOINT ["/bin/bash","/home/OsmAndMapCreator/utilities.sh"]
