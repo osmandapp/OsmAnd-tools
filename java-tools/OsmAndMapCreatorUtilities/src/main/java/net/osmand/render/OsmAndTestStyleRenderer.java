@@ -29,7 +29,7 @@ public class OsmAndTestStyleRenderer {
 		double bottomLat = 0;
 		double rightLon = 0;
 		int zoom = 0;
-		boolean overwrite = true;
+		boolean overwrite = false;
 		String nativeLib = null;
 		String fontsFolder;
 		File obf = null;
