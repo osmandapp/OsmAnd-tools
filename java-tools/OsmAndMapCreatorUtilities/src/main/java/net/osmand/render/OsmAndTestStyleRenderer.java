@@ -35,6 +35,7 @@ public class OsmAndTestStyleRenderer {
 		double bottomLat = 0;
 		double rightLon = 0;
 		int zoom = 0;
+		boolean overwrite = true;
 		String nativeLib = null;
 		String fontsFolder;
 		File obf = null;
@@ -97,6 +98,19 @@ public class OsmAndTestStyleRenderer {
 		public boolean isFile() {
 			return !echo;
 		}
+
+		public String getExt() {
+			if(vector) {
+				return "png";
+			} else {
+				String ext = url.substring(url.lastIndexOf('.') + 1);
+				if (ext.indexOf("?") != -1) {
+					ext = ext.substring(0, ext.indexOf('?'));
+				}
+				return ext;
+			}
+			
+		}
 		
 	}
 
@@ -110,6 +124,8 @@ public class OsmAndTestStyleRenderer {
 				pms.fontsFolder = a.substring("-fonts=".length());
 			} else if (a.startsWith("-obf=")) {
 				pms.obf = new File(a.substring("-obf=".length()));
+			} else if (a.equals("-overwrite")) {
+				pms.overwrite = true;
 			} else if (a.startsWith("-bbox=")) {
 				// left, top, right, bottom
 				String[] bbox = a.substring("-bbox=".length()).split(",");
@@ -182,6 +198,11 @@ public class OsmAndTestStyleRenderer {
 		for (TileSourceGenTemplate t : pms.tilesource) {
 			ind++;
 			String suffix = t.suffix == null ? ind + "" : t.suffix;
+			String ext = t.getExt();
+			File outFile = new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext));
+			if (outFile.exists() && !pms.overwrite) {
+				continue;
+			}
 			if (t.vector) {
 //				RenderingImageContext ctx = new RenderingImageContext(x << (31 - zoom), (x + 1) << (31 - zoom),
 //						y << (31 - zoom), (y + 1) << (31 - zoom), zoom);
@@ -198,8 +219,7 @@ public class OsmAndTestStyleRenderer {
 					pms.nsr.setRenderingProps(props);
 				}
 				BufferedImage img = pms.nsr.renderImage(ctx);
-				String ext = "png";
-				ImageIO.write(img, ext, new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext)));
+				ImageIO.write(img, ext, outFile);
 			} else {
 				String template = TileSourceTemplate.normalizeUrl(t.url);
 				int bingQuadKeyParamIndex = template.indexOf(TileSourceManager.PARAM_BING_QUAD_KEY);
@@ -212,12 +232,7 @@ public class OsmAndTestStyleRenderer {
 				if (t.isFile() && pms.outputDir != null) {
 					URL url = new URL(tileUrl);
 					URLConnection cn = url.openConnection();
-					String ext = tileUrl.substring(tileUrl.lastIndexOf('.') + 1);
-					if (ext.indexOf("?") != -1) {
-						ext = ext.substring(0, ext.indexOf('?'));
-					}
-					File f = new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext));
-					FileOutputStream fous = new FileOutputStream(f);
+					FileOutputStream fous = new FileOutputStream(outFile);
 					Algorithms.streamCopy(cn.getInputStream(), fous);
 					fous.close();
 				}
@@ -226,7 +241,8 @@ public class OsmAndTestStyleRenderer {
 	}
 
 	private static String formatTile(int zoom, int x, int y, String suffix, String ext) {
-		return String.format("%d_%d_%d_%s.%s", zoom, x, y, suffix, ext);
+//		return String.format("%d_%d_%d_%s.%s", zoom, x, y, suffix, ext);
+		return String.format("%d/%d/%d_%s.%s", zoom, x, y, suffix, ext);
 	}
 
 
