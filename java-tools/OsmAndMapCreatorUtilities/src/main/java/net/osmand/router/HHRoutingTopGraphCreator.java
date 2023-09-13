@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import gnu.trove.iterator.TIntIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.osm.edit.Entity;
@@ -298,8 +299,9 @@ public class HHRoutingTopGraphCreator {
 				continue;
 			}
 			set.clear();
-			for (int ind : pnt.clusters) {
-				set.add(clusters.get(ind).getMergeCluster());
+			TIntIterator it = pnt.clusters.iterator();
+			while (it.hasNext()) {
+				set.add(clusters.get(it.next()).getMergeCluster());
 			}
 			if (set.size() <= 1) {
 				set.iterator().next().expoints.add(pnt);
@@ -433,12 +435,13 @@ public class HHRoutingTopGraphCreator {
 		
 	}
 
-	private Map<Integer, NetworkHHCluster> restoreClusters(TLongObjectHashMap<NetworkDBPoint> pnts) {
+	private Map<Integer, NetworkHHCluster> restoreClusters(TLongObjectHashMap<NetworkDBPoint> pnts) throws SQLException {
 		Map<Integer, NetworkHHCluster> clustersMap = new HashMap<>();
 		List<NetworkHHCluster> tmpList = new ArrayList<>();
+		networkDB.loadClusterData(pnts, false);
 		for (NetworkDBPoint p : pnts.valueCollection()) {
 			tmpList.clear();
-			for (int clusterId : p.clusters) {
+			for (int clusterId : p.clusters.toArray()) {
 				if (!clustersMap.containsKey(clusterId)) {
 					clustersMap.put(clusterId, new NetworkHHCluster(clusterId));
 				}

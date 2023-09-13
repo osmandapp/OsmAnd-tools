@@ -12,6 +12,7 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TLongObjectIterator;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
@@ -92,6 +93,43 @@ public class HHRoutingPreparationDB {
 		}
 		rs.close();
 		s.close();
+	}
+	
+	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints(boolean byId) throws SQLException {
+		Statement st = conn.createStatement();
+		ResultSet rs = st.executeQuery("SELECT idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes from points");
+		TLongObjectHashMap<NetworkDBPoint> mp = new TLongObjectHashMap<>();
+		while (rs.next()) {
+			NetworkDBPoint pnt = new NetworkDBPoint();
+			int p = 1;
+			pnt.id = rs.getLong(p++);
+			pnt.index = rs.getInt(p++);
+			pnt.roadId = rs.getLong(p++);
+			pnt.start = rs.getInt(p++);
+			pnt.end = rs.getInt(p++);
+			pnt.startX = rs.getInt(p++);
+			pnt.startY = rs.getInt(p++);
+			pnt.endX = rs.getInt(p++);
+			pnt.endY = rs.getInt(p++);
+			mp.put(byId ? pnt.id : pnt.index, pnt);
+		}
+		rs.close();
+		st.close();
+		return mp;
+	}
+	
+	public void loadClusterData(TLongObjectHashMap<NetworkDBPoint> pnts, boolean byId) throws SQLException {
+		Statement st = conn.createStatement();
+		ResultSet rs = st.executeQuery("SELECT " + (byId ? "idPoint" : "indPoint") + ", clusterInd from clusters");
+		while (rs.next()) {
+			NetworkDBPoint pnt = pnts.get(rs.getLong(1));
+			if (pnt.clusters == null) {
+				pnt.clusters = new TIntArrayList();
+			}
+			pnt.clusters.add(rs.getInt(2));
+		}
+		rs.close();
+		st.close();		
 	}
 	
 	public boolean hasVisitedPoints(NetworkRouteRegion nrouteRegion) throws SQLException {
@@ -246,29 +284,7 @@ public class HHRoutingPreparationDB {
 		}
 	}
 
-	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints(boolean byId) throws SQLException {
-		Statement st = conn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31, indexes from points");
-		TLongObjectHashMap<NetworkDBPoint> mp = new TLongObjectHashMap<>();
-		while (rs.next()) {
-			NetworkDBPoint pnt = new NetworkDBPoint();
-			int p = 1;
-			pnt.id = rs.getLong(p++);
-			pnt.index = rs.getInt(p++);
-			pnt.roadId = rs.getLong(p++);
-			pnt.start = rs.getInt(p++);
-			pnt.end = rs.getInt(p++);
-			pnt.startX = rs.getInt(p++);
-			pnt.startY = rs.getInt(p++);
-			pnt.endX = rs.getInt(p++);
-			pnt.endY = rs.getInt(p++);
-			pnt.clusters = Algorithms.stringToArray(rs.getString(p++));
-			mp.put(byId ? pnt.id : pnt.index, pnt);
-		}
-		rs.close();
-		st.close();
-		return mp;
-	}
+	
 	
 	
 	public void insertRegions(List<NetworkRouteRegion> regions) throws SQLException {
@@ -428,7 +444,6 @@ public class HHRoutingPreparationDB {
 		public int startY;
 		public int endX;
 		public int endY;
-		public int[] clusters;
 		
 		List<NetworkDBSegment> connected = new ArrayList<NetworkDBSegment>();
 		List<NetworkDBSegment> connectedReverse = new ArrayList<NetworkDBSegment>();
@@ -442,6 +457,7 @@ public class HHRoutingPreparationDB {
 		
 		// indexing
 		int rtCnt = 0;
+		public TIntArrayList clusters;
 		
 		public void markSegmentsNotLoaded() {
 			connected = null;
@@ -465,6 +481,10 @@ public class HHRoutingPreparationDB {
 			rtDistanceFromStartRev = 0;
 		}
 	}
+
+	
+
+	
 
 	
 

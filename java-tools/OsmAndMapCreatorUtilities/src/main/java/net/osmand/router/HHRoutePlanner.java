@@ -32,7 +32,7 @@ public class HHRoutePlanner {
 
 	static final int PROC_ROUTING = 0;
 	static int PROCESS = PROC_ROUTING;
-	static boolean PRELOAD_SEGMENTS = false;
+	static boolean PRELOAD_SEGMENTS = true;
 
 	
 	private RoutingContext ctx;
