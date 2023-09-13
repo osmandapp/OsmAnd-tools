@@ -3,7 +3,6 @@ package net.osmand.render;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.MessageFormat;
@@ -13,11 +12,6 @@ import java.util.List;
 import java.util.Map;
 
 import javax.imageio.ImageIO;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerException;
-
-import org.xml.sax.SAXException;
-import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
@@ -114,7 +108,7 @@ public class OsmAndTestStyleRenderer {
 		
 	}
 
-	public static void main(String[] args) throws IOException, XmlPullParserException, SAXException, ParserConfigurationException, TransformerException {
+	public static void main(String[] args) throws Exception {
 		OsmAndTestStyleRendererParams pms = new OsmAndTestStyleRendererParams();
 		for (String a : args) {
 			a = a.trim();
@@ -193,50 +187,59 @@ public class OsmAndTestStyleRenderer {
 	}
 	
 
-	private static void downloadTiles(int x, int y, int zoom, OsmAndTestStyleRendererParams pms) throws IOException, XmlPullParserException, SAXException {
+	private static void downloadTiles(int x, int y, int zoom, OsmAndTestStyleRendererParams pms) throws Exception {
 		int ind = 0;
-		for (TileSourceGenTemplate t : pms.tilesource) {
-			ind++;
-			String suffix = t.suffix == null ? ind + "" : t.suffix;
-			String ext = t.getExt();
-			File outFile = new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext));
-			if (outFile.exists() && !pms.overwrite) {
-				continue;
-			}
-			if (t.vector) {
+		File outFile = null;
+		try {
+			for (TileSourceGenTemplate t : pms.tilesource) {
+				ind++;
+				String suffix = t.suffix == null ? ind + "" : t.suffix;
+				String ext = t.getExt();
+				outFile = new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext));
+				outFile.getParentFile().mkdirs();
+				if (outFile.exists() && !pms.overwrite) {
+					continue;
+				}
+				if (t.vector) {
 //				RenderingImageContext ctx = new RenderingImageContext(x << (31 - zoom), (x + 1) << (31 - zoom),
 //						y << (31 - zoom), (y + 1) << (31 - zoom), zoom);
-				
-				RenderingImageContext ctx = new RenderingImageContext(MapUtils.getLatitudeFromTile(zoom, y + 0.5),
-						MapUtils.getLongitudeFromTile(zoom, x + 0.5),
-						t.vectorSize, t.vectorSize, zoom, t.vectorSize / 256);
+
+					RenderingImageContext ctx = new RenderingImageContext(MapUtils.getLatitudeFromTile(zoom, y + 0.5),
+							MapUtils.getLongitudeFromTile(zoom, x + 0.5), t.vectorSize, t.vectorSize, zoom,
+							t.vectorSize / 256);
 //				String props = String.format("density=%d,textScale=%d", 1 << tile.tileSizeLog, 1 << tile.tileSizeLog);
-				String props = "density=1";
-				if (!Algorithms.stringsEqual(t.vectorStyle, pms.selectedVectorStyle)) {
-					pms.nsr.loadRuleStorage(t.vectorStyle, props);
-					pms.selectedVectorStyle = t.vectorStyle;
+					String props = "density=1";
+					if (!Algorithms.stringsEqual(t.vectorStyle, pms.selectedVectorStyle)) {
+						pms.nsr.loadRuleStorage(t.vectorStyle, props);
+						pms.selectedVectorStyle = t.vectorStyle;
+					} else {
+						pms.nsr.setRenderingProps(props);
+					}
+					BufferedImage img = pms.nsr.renderImage(ctx);
+					ImageIO.write(img, ext, outFile);
 				} else {
-					pms.nsr.setRenderingProps(props);
-				}
-				BufferedImage img = pms.nsr.renderImage(ctx);
-				ImageIO.write(img, ext, outFile);
-			} else {
-				String template = TileSourceTemplate.normalizeUrl(t.url);
-				int bingQuadKeyParamIndex = template.indexOf(TileSourceManager.PARAM_BING_QUAD_KEY);
-				if (bingQuadKeyParamIndex != -1) {
-					template = template.replace(TileSourceManager.PARAM_BING_QUAD_KEY,
-							TileSourceTemplate.eqtBingQuadKey(zoom, x, y));
-				}
-				String tileUrl = MessageFormat.format(template, pms.zoom + "", x + "", y + "");
-				System.out.println("  Downloading " + tileUrl + " ...");
-				if (t.isFile() && pms.outputDir != null) {
-					URL url = new URL(tileUrl);
-					URLConnection cn = url.openConnection();
-					FileOutputStream fous = new FileOutputStream(outFile);
-					Algorithms.streamCopy(cn.getInputStream(), fous);
-					fous.close();
+					String template = TileSourceTemplate.normalizeUrl(t.url);
+					int bingQuadKeyParamIndex = template.indexOf(TileSourceManager.PARAM_BING_QUAD_KEY);
+					if (bingQuadKeyParamIndex != -1) {
+						template = template.replace(TileSourceManager.PARAM_BING_QUAD_KEY,
+								TileSourceTemplate.eqtBingQuadKey(zoom, x, y));
+					}
+					String tileUrl = MessageFormat.format(template, pms.zoom + "", x + "", y + "");
+					System.out.println("  Downloading " + tileUrl + " ...");
+					if (t.isFile() && pms.outputDir != null) {
+						URL url = new URL(tileUrl);
+						URLConnection cn = url.openConnection();
+						FileOutputStream fous = new FileOutputStream(outFile);
+						Algorithms.streamCopy(cn.getInputStream(), fous);
+						fous.close();
+					}
 				}
 			}
+		} catch (Exception e) {
+			System.err.printf("Error dealing with tile %s \n",
+					outFile != null ? outFile.getAbsolutePath() : pms.zoom + "/" + x + "/" + y);
+			throw e;
+
 		}
 	}
 
