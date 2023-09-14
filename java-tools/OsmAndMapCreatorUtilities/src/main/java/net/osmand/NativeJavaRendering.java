@@ -369,6 +369,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		ImageReader reader = readers.next();
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
+		AllocationUtil.freeDirectBuffer(bitmapBuffer);
 		return img;
 	}
 
