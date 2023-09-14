@@ -180,7 +180,8 @@ public class OsmAndTestStyleRenderer {
 		for (int x = leftx; x <= rightx; x++) {
 			for (int y = topY; y <= bottomY; y++) {
 				ind++;
-				System.out.printf("Downloading %.2f%% (%d / %d tiles)...\n", ind * 100.0 / cnt, ind, cnt);
+				System.out.printf("Downloading %.2f%% (%d / %d tiles) %d/%d/%d...\n",
+						ind * 100.0 / cnt, ind, cnt, pms.zoom, x, y);
 				downloadTiles(x, y, pms.zoom, pms);
 			}
 		}
