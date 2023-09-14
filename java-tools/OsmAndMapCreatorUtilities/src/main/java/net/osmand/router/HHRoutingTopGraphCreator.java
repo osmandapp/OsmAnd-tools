@@ -14,6 +14,7 @@ import java.util.Random;
 import java.util.Set;
 
 import gnu.trove.iterator.TIntIterator;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.osm.edit.Entity;
@@ -57,7 +58,8 @@ public class HHRoutingTopGraphCreator {
 				HHRoutePlanner.ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
 		if (PROCESS == PROC_NEXT_LEVEL) {
-			planner.run2ndLevelRouting();
+			planner.calculateMidPoints();
+//			planner.run2ndLevelRouting();
 		} else if (PROCESS == PROC_MONTECARLO) {
 			Collection<Entity> objects = planner.runMonteCarloRouting();
 			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-mc.osm"));
@@ -120,8 +122,46 @@ public class HHRoutingTopGraphCreator {
 			return neighbors.size();
 		}
 	}
+	
+	private void calculateMidPoints() throws SQLException {
+		RoutingStats stats = new RoutingStats();
+		long time = System.nanoTime(), startTime = System.nanoTime();
+		System.out.print("Loading points... ");
+		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
+		
+		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
+		
+		time = System.nanoTime();
+		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
+		int cntEdges = networkDB.loadNetworkSegments(pnts);
+		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
+
+		// Routing
+		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
+		List<NetworkDBPoint> pntsList = new ArrayList<>(pnts.valueCollection());
+		
+		Random rm = new Random();
+		NetworkDBPoint startPnt = pntsList.get(rm.nextInt(pntsList.size() - 1));
+		runDijkstra(startPnt);
+		
+//		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+//			pnt.clearRouting();
+//		}
+		time = System.nanoTime();
+		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
+				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
+				stats.addQueueTime, stats.prepTime);
+		
+	}
 
 	
+	private void runDijkstra(NetworkDBPoint startPnt) {
+		// TODO Auto-generated method stub
+		TLongObjectHashMap<TIntArrayList> routes = new TLongObjectHashMap<TIntArrayList>();
+	}
+
+
 	private void run2ndLevelRouting() throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
