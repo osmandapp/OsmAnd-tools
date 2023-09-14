@@ -347,8 +347,7 @@ public class OsmAndImageRendering {
 	}
 
 	private static void initMaps(String dirWithObf, String backup, String gpxFile, String maps, NativeJavaRendering nsr,
-			List<File> initFiles)
-			throws FileNotFoundException, IOException {
+			List<File> initFiles) throws IOException {
 		for(String map : maps.split(",")) {
 			map = map.trim();
 			File targetFile = new File(new File(gpxFile).getParentFile(), map + ".obf");
