@@ -146,7 +146,7 @@ public class HHRoutingTopGraphCreator {
 		// Routing
 		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
 		
-		int randomPoints = Math.min(20, pnts.size() / 2);
+		int randomPoints = Math.min(250, pnts.size() / 2);
 		Random random = new Random();
 		int threshold = 10;
 		while (randomPoints > 0) {
@@ -182,15 +182,16 @@ public class HHRoutingTopGraphCreator {
 			int maxIncrease = 0, countIncrease = 0, maxTop = 0;
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
 				// calculate max increase
-				if(pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < threshold) {
+				if (pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < threshold) {
 					countIncrease++;
 					maxIncrease = Math.max(pnt.rtCnt - pnt.rtPrevCnt, maxIncrease);
-					maxTop = Math.max(pnt.rtCnt , maxTop);
+					maxTop = Math.max(pnt.rtCnt, maxTop);
 				}
 				pnt.rtPrevCnt = pnt.rtCnt;
 				pnt.clearRouting();
 			}
-			System.out.printf("Increased %d points, max diff increase %d, max top %d \n", countIncrease, maxIncrease);
+			System.out.printf("Increased %d points, max diff increase %d, max top %d \n", countIncrease, maxIncrease,
+					maxTop);
 		}
 		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
 		Collections.sort(pointsList, new Comparator<NetworkDBPoint>() {

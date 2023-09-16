@@ -549,6 +549,15 @@ public class HHRoutingPreparationDB {
 			rtRouteToPointRev = null;
 			rtDistanceFromStartRev = 0;
 		}
+
+		public int getDepth(boolean dir) {
+			if(dir && rtRouteToPoint != null) {
+				return rtRouteToPoint.start.getDepth(dir) + 1;
+			} else if(dir && rtRouteToPointRev != null) {
+				return rtRouteToPointRev.end.getDepth(dir) + 1;
+			}
+			return 0;
+		}
 	}
 
 

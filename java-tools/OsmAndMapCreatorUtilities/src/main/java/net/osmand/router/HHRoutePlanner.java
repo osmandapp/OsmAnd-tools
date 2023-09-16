@@ -28,11 +28,13 @@ public class HHRoutePlanner {
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
 	static float HEURISTIC_COEFFICIENT = 0; // A* - 1, Dijkstra - 0
-	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse 
+	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
+	
+	static boolean USE_MIDPOINT = true;
+	static boolean PRELOAD_SEGMENTS = false;
 
 	static final int PROC_ROUTING = 0;
 	static int PROCESS = PROC_ROUTING;
-	static boolean PRELOAD_SEGMENTS = true;
 
 	
 	private RoutingContext ctx;
@@ -135,6 +137,7 @@ public class HHRoutePlanner {
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
+			networkDB.loadMidPointsIndex(cachePoints, false);
 			stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
 			System.out.printf(" %,d - %.2fms\n", cachePoints.size(), stats.loadPointsTime);
 			if (PRELOAD_SEGMENTS) {
@@ -201,9 +204,10 @@ public class HHRoutePlanner {
 				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  o1.rtDistanceToEnd);
 	}
 	
+	// delete rtDistanceToEnd as it's not used (carefully)
+	// TODO speedup cost could be updated once reverse search covers the road
+	// TODO better PriorityQueue could be used 4ary-heaps 
 	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats) throws SQLException {
-		// TODO speedup cost could be updated once reverse search covers the road
-		// TODO better PriorityQueue could be used 4ary-heaps 
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override
@@ -225,7 +229,7 @@ public class HHRoutePlanner {
 			end.rtDistanceFromStartRev = 0.1; // visited
 		}
 		if (DIJKSTRA_DIRECTION >= 0) {
-			addToQueue( queue, start, end, false, stats);
+			addToQueue(queue, start, end, false, stats);
 		} 
 		if (DIJKSTRA_DIRECTION <= 0) {
 			addToQueue(queueReverse, end, start, true, stats);
@@ -330,6 +334,7 @@ public class HHRoutePlanner {
 			return;
 		}
 		long tm = System.nanoTime();
+		int depth = USE_MIDPOINT ? start.getDepth(!reverse) : 0;
 		int c;
 		if (reverse) {
 			c = networkDB.loadNetworkSegmentStart(cachePoints, start);
@@ -342,8 +347,13 @@ public class HHRoutePlanner {
 			tm = System.nanoTime();
 		}
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
-			connected.rtDistanceToEnd = distanceToEnd(reverse ? connected.start : connected.end, finish);
-			connected.rtCost = reverse ? rtSegmentCostRev(connected) : rtSegmentCost(connected); 
+			NetworkDBPoint nextPoint = reverse ? connected.start : connected.end;
+			if (USE_MIDPOINT && depth > nextPoint.rtCnt + 3) {
+				continue;
+			}
+			connected.rtDistanceToEnd = distanceToEnd(nextPoint, finish);
+			connected.rtCost = reverse ? rtSegmentCostRev(connected) : rtSegmentCost(connected);
+			
 			queue.add(connected);
 			stats.addedEdges++;
 		}
