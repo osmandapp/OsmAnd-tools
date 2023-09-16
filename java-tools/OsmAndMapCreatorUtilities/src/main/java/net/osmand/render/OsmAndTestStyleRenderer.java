@@ -192,10 +192,10 @@ public class OsmAndTestStyleRenderer {
 			int cnt = (rightx - leftx + 1) * (bottomY - topY + 1);
 			int ind = 0;
 			if (pms.total > 1) {
-				System.out.printf("Generating %d tiles zoom %z ...\n", cnt, z);
+				System.out.printf("Generating %d tiles zoom %d ...\n", cnt, z);
 			} else {
 				cnt = cnt / pms.total;
-				System.out.printf("Generating %d tiles zoom %z - part %d / %d ...\n", cnt, z, (pms.partTotal + 1),
+				System.out.printf("Generating %d tiles zoom %d - part %d / %d ...\n", cnt, z, (pms.partTotal + 1),
 						pms.total);
 			}
 
