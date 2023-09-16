@@ -145,91 +145,70 @@ public class HHRoutingTopGraphCreator {
 		// Routing
 		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
 		
-		NetworkHHCluster rmCluster = null; 
-		while (rmCluster == null) {
-			rmCluster = clusters.get(new Random().nextInt(clusters.size() - 1));
-		}
-		System.out.printf("Random cluster %d with %d points \n", rmCluster.clusterId, rmCluster.points.size());
-		
-		NetworkDBPoint anyPoint = null;
-		for (NetworkDBPoint startPnt : rmCluster.points) {
-			anyPoint = startPnt;
-			System.out.println("Iterate with " + startPnt);
+		int randomPoints = Math.min(100, pnts.size() / 2);
+		Random random = new Random();
+		int threshold = 10;
+		while (randomPoints > 0) {
+			NetworkDBPoint startPnt = pnts.get(random.nextInt(pnts.size()));
+			if (startPnt.rtIndex > 0) {
+				continue;
+			}
+			System.out.println("Routing " + startPnt);
+			randomPoints--;
+			startPnt.rtIndex = 1;
 			HHRoutePlanner.HEURISTIC_COEFFICIENT = 0;
 			routePlanner.runDijkstraNetworkRouting(startPnt, null, stats);
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
+				pnt.rtLevel = 0;
 				if (pnt.rtRouteToPoint != null) {
-					TLongHashSet route = new TLongHashSet();
+					pnt.rtLevel++;
 					NetworkDBPoint p = pnt;
 					while ((p = p.rtRouteToPoint.start) != startPnt) {
-						route.add(p.index);
-					}
-					for (int clusterId : pnt.clusters.toArray()) {
-						NetworkHHCluster c = clusters.get(clusterId);
-						if (c.routeMidPoints == null) {
-							c.routeMidPoints = route;
-						} else {
-							c.routeMidPoints.retainAll(route);
-						}
+						pnt.rtLevel++;
 					}
 				}
-				
 			}
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
+				if (pnt.rtRouteToPoint != null) {
+					int k = 0;
+					NetworkDBPoint p = pnt;
+					while ((p = p.rtRouteToPoint.start) != startPnt) {
+						k++;
+						p.rtCnt = Math.max(p.rtCnt, Math.min(k, p.rtLevel));
+					}
+				}
+			}
+			int maxIncrease = 0, countIncrease = 0;
+			for (NetworkDBPoint pnt : pnts.valueCollection()) {
+				// calculate max increase
+				if(pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < threshold) {
+					countIncrease++;
+					maxIncrease = Math.max(pnt.rtCnt - pnt.rtPrevCnt, maxIncrease);
+				}
+				pnt.rtPrevCnt = pnt.rtCnt;
 				pnt.clearRouting();
 			}
+			System.out.printf("Increased %d points, max increase %d\n", countIncrease, maxIncrease);
 		}
-		
-		
-		List<NetworkHHCluster> clustersList = new ArrayList<>(clusters.values());
-		resort(clustersList);
-		int k = 5000;
-		boolean merged = true;
-		while (k-- > 0 && merged) {
-			resort(clustersList);
-			merged = false;
-			NetworkHHCluster c1 = null;
-			NetworkHHCluster c2 = null;
-			int max = 0;
-			for (NetworkHHCluster p : clustersList) {
-				if (p.mergedTo != null || p.routeMidPoints == null) {
-					continue;
-				}
-				if (c1 == null) {
-					c1 = p;
-				} else {
-					int cnt = 0;
-					TLongIterator i = p.routeMidPoints.iterator();
-					while (i.hasNext()) {
-						if (c1.routeMidPoints.contains(i.next())) {
-							cnt++;
-						}
-					}
-					if (cnt > max) {
-						c2 = p;
-						max = cnt;
-					}
-				}
+		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
+		Collections.sort(pointsList, new Comparator<NetworkDBPoint>() {
+
+			@Override
+			public int compare(NetworkDBPoint o1, NetworkDBPoint o2) {
+				return -Integer.compare(o1.rtCnt, o2.rtCnt);
 			}
-			if (max > 0) {
-				System.out.printf("Merge %d with %d (%d join) \n", c1.clusterId, c2.clusterId, max);
-				c1.adoptMerge(c2);
-				c1.routeMidPoints.retainAll(c2.routeMidPoints);
-				merged = true;
+		});
+		int prev = 0;
+		for (int k = 0; k < pointsList.size(); k++) {
+			NetworkDBPoint p = pointsList.get(k);
+			if (k > 0 && pointsList.get(k - 1).rtCnt == p.rtCnt) {
+				prev++;
+				continue;
 			}
+			System.out.printf("\n (^%d) %d depth: %s", prev, p.rtCnt, p.toString());
+			//prev = 0;
 		}
-		
-		int tot = 0;
-		for (NetworkHHCluster o : clustersList) {
-			if (o.routeMidPoints != null && o.mergedTo == null) {
-				tot++;
-				System.out.printf("%d MID with %d cluster id (merged %d): - %d points %.1f km dist\n ", o.routeMidPoints.size(), o.clusterId,
-						o.merged. size(),
-						o.points.size(),
-						MapUtils.getDistance(o.points.get(0).getPoint(), anyPoint.getPoint())/ 1000.0);
-			}
-		}
-		System.out.printf("Clusters %d from %d", tot, clusters.values().size());
+		System.out.printf("\n (^%d) ", prev);
 		
 		
 		time = System.nanoTime();
@@ -240,18 +219,6 @@ public class HHRoutingTopGraphCreator {
 				0.0, 0, stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
 	}
 
-
-	private void resort(List<NetworkHHCluster> clustersList) {
-		Collections.sort(clustersList, new Comparator<NetworkHHCluster>() {
-
-			@Override
-			public int compare(NetworkHHCluster o1, NetworkHHCluster o2) {
-				int i1 = o1.routeMidPoints == null ? 0 : o1.routeMidPoints.size();
-				int i2 = o2.routeMidPoints == null ? 0 : o2.routeMidPoints.size();
-				return -Integer.compare(i1, i2);
-			}
-		});
-	}
 
 	
 

@@ -436,7 +436,6 @@ public class HHRoutingPreparationDB {
 	static class NetworkDBPoint {
 		long id;
 		int index;
-		int level = 0;
 		public long roadId;
 		public int start;
 		public int end;
@@ -457,6 +456,9 @@ public class HHRoutingPreparationDB {
 		
 		// indexing
 		int rtCnt = 0;
+		int rtPrevCnt = 0;
+		int rtLevel = 0;
+		int rtIndex = 0;
 		public TIntArrayList clusters;
 		
 		public void markSegmentsNotLoaded() {
