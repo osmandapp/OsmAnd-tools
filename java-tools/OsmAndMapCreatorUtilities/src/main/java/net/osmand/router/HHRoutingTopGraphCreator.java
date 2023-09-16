@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -21,6 +22,7 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
+import net.osmand.util.MapUtils;
 
 public class HHRoutingTopGraphCreator {
 	static int DEBUG_VERBOSE_LEVEL = 0;
@@ -143,24 +145,45 @@ public class HHRoutingTopGraphCreator {
 		
 		Random rm = new Random();
 		NetworkDBPoint startPnt = pntsList.get(rm.nextInt(pntsList.size() - 1));
-		runDijkstra(startPnt);
+		HHRoutePlanner.HEURISTIC_COEFFICIENT = 0;
+		routePlanner.runDijkstraNetworkRouting(startPnt, null, stats);
 		
-//		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+		Map<NetworkDBPoint, Integer> pointStats = new LinkedHashMap<>();
+		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+			if (pnt.rtRouteToPoint != null) {
+				List<NetworkDBPoint> route = new ArrayList<>()
+				NetworkDBPoint p = pnt.rtRouteToPoint.start;
+				while (p != startPnt) {
+					if (!pointStats.containsKey(p)) {
+						pointStats.put(p, 0);
+					}
+					pointStats.put(p, pointStats.get(p) + 1);
+					p = p.rtRouteToPoint.start;
+				}
+			}
 //			pnt.clearRouting();
-//		}
+		}
+		List<NetworkDBPoint> l = new ArrayList<>(pointStats.keySet());
+		Collections.sort(l, new Comparator<NetworkDBPoint>() {
+
+			@Override
+			public int compare(NetworkDBPoint o1, NetworkDBPoint o2) {
+				return -Integer.compare(pointStats.get(o1), pointStats.get(o2));
+			}
+		});
+		System.out.println(startPnt + " ");
+		for(NetworkDBPoint p : l) {
+			System.out.printf("%d - %.1f %s\n", pointStats.get(p), MapUtils.getDistance(p.getPoint(), startPnt.getPoint()), p.toString());
+		}
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
 				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
 				stats.addQueueTime, stats.prepTime);
-		
+		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d vertices, %,d (of %,d) edges )", 
+				0.0, 0, stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
 	}
 
 	
-	private void runDijkstra(NetworkDBPoint startPnt) {
-		// TODO Auto-generated method stub
-		TLongObjectHashMap<TIntArrayList> routes = new TLongObjectHashMap<TIntArrayList>();
-	}
-
 
 	private void run2ndLevelRouting() throws SQLException {
 		RoutingStats stats = new RoutingStats();

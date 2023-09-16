@@ -183,6 +183,9 @@ public class HHRoutePlanner {
 	}
 
 	private double distanceToEnd(NetworkDBPoint s, NetworkDBPoint end) {
+		if (end == null || s == null) {
+			return 0;
+		}
 		LatLon p1 = end.getPoint();
 		LatLon p2 = s.getPoint();
 		return MapUtils.getDistance(p1, p2) / ctx.getRouter().getMaxSpeed();
@@ -216,7 +219,9 @@ public class HHRoutePlanner {
 			}
 		});
 		start.rtDistanceFromStart = 0.1; // visited
-		end.rtDistanceFromStartRev = 0.1; // visited
+		if (end != null) {
+			end.rtDistanceFromStartRev = 0.1; // visited
+		}
 		if (DIJKSTRA_DIRECTION >= 0) {
 			addToQueue( queue, start, end, false, stats);
 		} 
@@ -319,6 +324,9 @@ public class HHRoutePlanner {
 
 
 	private void addToQueue(PriorityQueue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, RoutingStats stats) throws SQLException {
+		if (start == null) {
+			return;
+		}
 		long tm = System.nanoTime();
 		int c;
 		if (reverse) {
