@@ -31,6 +31,7 @@ public class HHRoutePlanner {
 	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
 	
 	static boolean USE_MIDPOINT = true;
+	static int MIDPOINT_ERROR = 1;
 	static boolean PRELOAD_SEGMENTS = false;
 
 	static final int PROC_ROUTING = 0;
@@ -134,6 +135,8 @@ public class HHRoutePlanner {
 	public Collection<Entity> runRouting(LatLon start, LatLon end) throws SQLException, IOException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
+		USE_MIDPOINT = true;
+		MIDPOINT_ERROR = 2;
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
@@ -348,7 +351,7 @@ public class HHRoutePlanner {
 		}
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
 			NetworkDBPoint nextPoint = reverse ? connected.start : connected.end;
-			if (USE_MIDPOINT && depth > nextPoint.rtCnt + 3) {
+			if (USE_MIDPOINT && depth > nextPoint.rtCnt + MIDPOINT_ERROR) {
 				continue;
 			}
 			connected.rtDistanceToEnd = distanceToEnd(nextPoint, finish);
