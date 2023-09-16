@@ -183,7 +183,7 @@ public class HHRoutePlanner {
 	}
 
 	private double distanceToEnd(NetworkDBPoint s, NetworkDBPoint end) {
-		if (end == null || s == null) {
+		if(end == null || s == null) {
 			return 0;
 		}
 		LatLon p1 = end.getPoint();
@@ -202,6 +202,8 @@ public class HHRoutePlanner {
 	}
 	
 	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats) throws SQLException {
+		// TODO speedup cost could be updated once reverse search covers the road
+		// TODO better PriorityQueue could be used 4ary-heaps 
 		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
 
 			@Override

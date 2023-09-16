@@ -464,6 +464,20 @@ public class HHRoutingPreparationDB {
 			connectedReverse = null;
 		}
 		
+		public String printRoute(boolean dir) {
+			String s = toString() + "\n";
+			if (dir) {
+				if (rtRouteToPoint != null) {
+					s += rtRouteToPoint.start.printRoute(dir);
+				}
+			} else {
+				if (rtRouteToPointRev != null) {
+					s += rtRouteToPointRev.end.printRoute(dir);
+				}
+			}
+			return s;
+		}
+		
 		@Override
 		public String toString() {
 			return String.format("Point %d (%d %d-%d)", index, roadId / 64, start, end);
