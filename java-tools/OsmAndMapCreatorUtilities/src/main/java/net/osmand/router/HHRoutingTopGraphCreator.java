@@ -183,7 +183,7 @@ public class HHRoutingTopGraphCreator {
 		
 		List<NetworkHHCluster> clustersList = new ArrayList<>(clusters.values());
 		resort(clustersList);
-		int k = 10000;
+		int k = 5000;
 		boolean merged = true;
 		while (k-- > 0 && merged) {
 			resort(clustersList);
@@ -214,6 +214,7 @@ public class HHRoutingTopGraphCreator {
 			if (max > 0) {
 				System.out.printf("Merge %d with %d (%d join) \n", c1.clusterId, c2.clusterId, max);
 				c1.adoptMerge(c2);
+				c1.routeMidPoints.retainAll(c2.routeMidPoints);
 				merged = true;
 			}
 		}
