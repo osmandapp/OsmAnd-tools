@@ -13,8 +13,10 @@ import java.util.Map;
 
 import javax.imageio.ImageIO;
 
+import gnu.trove.list.array.TIntArrayList;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
+import net.osmand.binary.MapZooms;
 import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.util.Algorithms;
@@ -28,8 +30,9 @@ public class OsmAndTestStyleRenderer {
 		double leftLon = 0;
 		double bottomLat = 0;
 		double rightLon = 0;
-		int zoom = 0;
 		boolean overwrite = false;
+		MapZooms zooms;
+		int partTotal = 1, total = 1 ; // 1/1, 1/2, 0/2
 		String nativeLib = null;
 		String fontsFolder;
 		File obf = null;
@@ -120,6 +123,10 @@ public class OsmAndTestStyleRenderer {
 				pms.obf = new File(a.substring("-obf=".length()));
 			} else if (a.equals("-overwrite")) {
 				pms.overwrite = true;
+			} else if (a.startsWith("-part=")) {
+				String[] s = a.substring("-part=".length()).split("/");
+				pms.partTotal = Integer.parseInt(s[0]) - 1;
+				pms.total = Integer.parseInt(s[1]);
 			} else if (a.startsWith("-bbox=")) {
 				// left, top, right, bottom
 				String[] bbox = a.substring("-bbox=".length()).split(",");
@@ -128,7 +135,8 @@ public class OsmAndTestStyleRenderer {
 				pms.rightLon = Double.parseDouble(bbox[2]);
 				pms.topLat = Double.parseDouble(bbox[3]);
 			} else if (a.startsWith("-zoom=")) {
-				pms.zoom = Integer.parseInt(a.substring("-zoom=".length()));
+				String s = a.substring("-zoom=".length());
+				pms.zooms = MapZooms.parseZooms(s);
 			} else if (a.startsWith("-output=")) {
 				pms.outputDir = new File(a.substring("-output=".length()));
 				pms.outputDir.mkdirs();
@@ -142,7 +150,7 @@ public class OsmAndTestStyleRenderer {
 			pms.tilesource.add(TileSourceGenTemplate.echo("https://tile.osmand.net/hd/{z}/{x}/{y}.png"));
 		}
 		
-		if(pms.zoom == 0) {
+		if(pms.zooms == null) {
 			System.out.println("Please specify --zoom");
 			return;
 		}
@@ -170,19 +178,37 @@ public class OsmAndTestStyleRenderer {
 			}
 		}
 		
-		int leftx = (int) Math.floor(MapUtils.getTileNumberX(pms.zoom, pms.leftLon));
-		int rightx = (int) Math.ceil(MapUtils.getTileNumberX(pms.zoom, pms.rightLon));
-		int topY = (int) Math.floor(MapUtils.getTileNumberY(pms.zoom, pms.topLat));
-		int bottomY = (int) Math.ceil(MapUtils.getTileNumberY(pms.zoom, pms.bottomLat));
-		int cnt = (rightx - leftx + 1) * (bottomY - topY + 1);
-		int ind = 0;
-		System.out.printf("Downloading %d tiles...\n", cnt);
-		for (int x = leftx; x <= rightx; x++) {
-			for (int y = topY; y <= bottomY; y++) {
-				ind++;
-				System.out.printf("Downloading %.2f%% (%d / %d tiles) %d/%d/%d...\n",
-						ind * 100.0 / cnt, ind, cnt, pms.zoom, x, y);
-				downloadTiles(x, y, pms.zoom, pms);
+		TIntArrayList zooms = new TIntArrayList();
+		for(int k = 0; k < pms.zooms.getLevels().size(); k++) {
+			for(int z = pms.zooms.getLevel(k).getMinZoom(); z <= pms.zooms.getLevel(k).getMaxZoom(); z++) {
+				zooms.add(z);
+			}
+		}
+		for (int z : zooms.toArray()) {
+			int leftx = (int) Math.floor(MapUtils.getTileNumberX(z, pms.leftLon));
+			int rightx = (int) Math.ceil(MapUtils.getTileNumberX(z, pms.rightLon));
+			int topY = (int) Math.floor(MapUtils.getTileNumberY(z, pms.topLat));
+			int bottomY = (int) Math.ceil(MapUtils.getTileNumberY(z, pms.bottomLat));
+			int cnt = (rightx - leftx + 1) * (bottomY - topY + 1);
+			int ind = 0;
+			if (pms.total > 1) {
+				System.out.printf("Generating %d tiles zoom %z ...\n", cnt, z);
+			} else {
+				cnt = cnt / pms.total;
+				System.out.printf("Generating %d tiles zoom %z - part %d / %d ...\n", cnt, z, (pms.partTotal + 1),
+						pms.total);
+			}
+
+			for (int x = leftx; x <= rightx; x++) {
+				for (int y = topY; y <= bottomY; y++) {
+					if (pms.total > 1 && (x + y + z) % pms.total != pms.partTotal) {
+						continue;
+					}
+					ind++;
+					System.out.printf("Generating  %.2f%% (%d / %d tiles) %d/%d/%d...\n", ind * 100.0 / cnt, ind, cnt,
+							z, x, y);
+					downloadTiles(x, y, z, pms);
+				}
 			}
 		}
 	}
@@ -196,7 +222,7 @@ public class OsmAndTestStyleRenderer {
 				ind++;
 				String suffix = t.suffix == null ? ind + "" : t.suffix;
 				String ext = t.getExt();
-				outFile = new File(pms.outputDir, formatTile(pms.zoom, x, y, suffix, ext));
+				outFile = new File(pms.outputDir, formatTile(zoom, x, y, suffix, ext));
 				outFile.getParentFile().mkdirs();
 				if (outFile.exists() && !pms.overwrite) {
 					continue;
@@ -204,7 +230,6 @@ public class OsmAndTestStyleRenderer {
 				if (t.vector) {
 //				RenderingImageContext ctx = new RenderingImageContext(x << (31 - zoom), (x + 1) << (31 - zoom),
 //						y << (31 - zoom), (y + 1) << (31 - zoom), zoom);
-
 					RenderingImageContext ctx = new RenderingImageContext(MapUtils.getLatitudeFromTile(zoom, y + 0.5),
 							MapUtils.getLongitudeFromTile(zoom, x + 0.5), t.vectorSize, t.vectorSize, zoom,
 							t.vectorSize / 256);
@@ -225,7 +250,7 @@ public class OsmAndTestStyleRenderer {
 						template = template.replace(TileSourceManager.PARAM_BING_QUAD_KEY,
 								TileSourceTemplate.eqtBingQuadKey(zoom, x, y));
 					}
-					String tileUrl = MessageFormat.format(template, pms.zoom + "", x + "", y + "");
+					String tileUrl = MessageFormat.format(template, zoom + "", x + "", y + "");
 					System.out.println("  Downloading " + tileUrl + " ...");
 					if (t.isFile() && pms.outputDir != null) {
 						URL url = new URL(tileUrl);
@@ -238,7 +263,7 @@ public class OsmAndTestStyleRenderer {
 			}
 		} catch (Exception e) {
 			System.err.printf("Error dealing with tile %s \n",
-					outFile != null ? outFile.getAbsolutePath() : pms.zoom + "/" + x + "/" + y);
+					outFile != null ? outFile.getAbsolutePath() : zoom + "/" + x + "/" + y);
 			throw e;
 
 		}
