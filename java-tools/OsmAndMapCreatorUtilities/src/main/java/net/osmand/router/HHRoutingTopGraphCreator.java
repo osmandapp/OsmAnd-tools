@@ -133,9 +133,10 @@ public class HHRoutingTopGraphCreator {
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
 		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+		networkDB.loadMidPointsIndex(pnts, false);
 		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
 		
-		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
+//		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
 		
 		time = System.nanoTime();
 		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
@@ -145,7 +146,7 @@ public class HHRoutingTopGraphCreator {
 		// Routing
 		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
 		
-		int randomPoints = Math.min(100, pnts.size() / 2);
+		int randomPoints = Math.min(20, pnts.size() / 2);
 		Random random = new Random();
 		int threshold = 10;
 		while (randomPoints > 0) {
@@ -153,7 +154,7 @@ public class HHRoutingTopGraphCreator {
 			if (startPnt.rtIndex > 0) {
 				continue;
 			}
-			System.out.println("Routing " + startPnt);
+			System.out.printf("%d. Routing %s - ", randomPoints, startPnt);
 			randomPoints--;
 			startPnt.rtIndex = 1;
 			HHRoutePlanner.HEURISTIC_COEFFICIENT = 0;
@@ -178,17 +179,18 @@ public class HHRoutingTopGraphCreator {
 					}
 				}
 			}
-			int maxIncrease = 0, countIncrease = 0;
+			int maxIncrease = 0, countIncrease = 0, maxTop = 0;
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
 				// calculate max increase
 				if(pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < threshold) {
 					countIncrease++;
 					maxIncrease = Math.max(pnt.rtCnt - pnt.rtPrevCnt, maxIncrease);
+					maxTop = Math.max(pnt.rtCnt , maxTop);
 				}
 				pnt.rtPrevCnt = pnt.rtCnt;
 				pnt.clearRouting();
 			}
-			System.out.printf("Increased %d points, max increase %d\n", countIncrease, maxIncrease);
+			System.out.printf("Increased %d points, max diff increase %d, max top %d \n", countIncrease, maxIncrease);
 		}
 		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
 		Collections.sort(pointsList, new Comparator<NetworkDBPoint>() {
@@ -209,6 +211,7 @@ public class HHRoutingTopGraphCreator {
 			//prev = 0;
 		}
 		System.out.printf("\n (^%d) ", prev);
+		networkDB.loadMidPointsIndex(pnts, true);
 		
 		
 		time = System.nanoTime();

@@ -54,6 +54,7 @@ public class HHRoutingPreparationDB {
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
 		st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
+		st.execute("CREATE TABLE IF NOT EXISTS midpoints(ind, maxMidDepth, proc, PRIMARY key (ind))"); // ind unique
 		
 		insPoint = conn.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -93,6 +94,58 @@ public class HHRoutingPreparationDB {
 		}
 		rs.close();
 		s.close();
+	}
+	
+	public void loadMidPointsIndex(TLongObjectHashMap<NetworkDBPoint> pnts, boolean update) throws SQLException {
+		Statement s = conn.createStatement();
+		for (NetworkDBPoint p : pnts.valueCollection()) {
+			p.rtPrevCnt = 0;
+		}
+		PreparedStatement ps = conn.prepareStatement("UPDATE midpoints SET maxMidDepth = ?, proc = ? where ind = ?");
+		int batch = 0;
+		ResultSet rs = s.executeQuery("SELECT ind, maxMidDepth, proc  FROM midpoints ");
+		while(rs.next()) {
+			int ind = rs.getInt(1);
+			NetworkDBPoint pnt = pnts.get(ind);
+			boolean upd = false;
+			if (pnt.rtCnt > rs.getInt(2)) {
+				upd = true;
+			} else {
+				pnt.rtCnt = rs.getInt(2);
+			}
+			if (pnt.rtIndex == 1 && rs.getInt(3) == 0) {
+				upd = true;
+			} else {
+				pnt.rtIndex = rs.getInt(3);
+			}
+			if (upd) {
+				ps.setLong(1, pnt.rtCnt);
+				ps.setLong(2, pnt.rtIndex);
+				ps.setLong(3, pnt.index);
+				ps.addBatch();
+				if (batch++ > 1000) {
+					batch = 0;
+					ps.executeBatch();
+				}
+			}
+			pnt.rtPrevCnt = 1;
+		}
+		ps.executeBatch();
+		ps = conn.prepareStatement("INSERT INTO midpoints(ind, maxMidDepth, proc) VALUES(?, ?, ?)");
+		batch = 0;
+		for (NetworkDBPoint p : pnts.valueCollection()) {
+			if (p.rtPrevCnt == 0 && (p.rtCnt > 0 || p.rtIndex > 0)) {
+				ps.setLong(1, p.index);
+				ps.setLong(2, p.rtCnt);
+				ps.setLong(3, p.rtIndex);
+				ps.addBatch();
+				if (batch++ > 1000) {
+					batch = 0;
+					ps.executeBatch();
+				}
+			}
+		}
+		ps.executeBatch();
 	}
 	
 	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints(boolean byId) throws SQLException {
@@ -497,12 +550,6 @@ public class HHRoutingPreparationDB {
 			rtDistanceFromStartRev = 0;
 		}
 	}
-
-	
-
-	
-
-	
 
 
 }
