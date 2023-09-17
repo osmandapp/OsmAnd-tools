@@ -29,9 +29,10 @@ public class HHRoutingTopGraphCreator {
 	static final int PROC_2ND_LEVEL = 3;
 
 	static int MAX_ITERATIONS = 100;
-	static int LOG_THRESHOLD = 10;
-	static int LOG_MAX_DEPTH = 30;
-	static int SAVE_ITERATIONS = 5;
+	static int MAX_DEPTH = 40;
+	static int SAVE_ITERATIONS = 20;
+	static int LOG_STAT_THRESHOLD = 10;
+	static int LOG_STAT_MAX_DEPTH = 30;
 	static int PROCESS = PROC_MIDPOINTS;
 
 	static long DEBUG_START_TIME = 0;
@@ -74,6 +75,8 @@ public class HHRoutingTopGraphCreator {
 				PROCESS = PROC_2ND_LEVEL;
 			} else if (a.startsWith("--iterations=")) {
 				MAX_ITERATIONS = Integer.parseInt(a.substring("--iterations=".length()));
+			} else if (a.startsWith("--maxdepth=")) {
+				MAX_DEPTH = Integer.parseInt(a.substring("--maxdepth=".length()));
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
@@ -183,6 +186,7 @@ public class HHRoutingTopGraphCreator {
 			startPnt.rtIndex = 1;
 			HHRoutePlanner.HEURISTIC_COEFFICIENT = 0;
 			HHRoutePlanner.USE_MIDPOINT = false;
+			HHRoutePlanner.MAX_DEPTH = MAX_DEPTH;
 			routePlanner.runDijkstraNetworkRouting(startPnt, null, stats);
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
 				pnt.rtLevel = 0;
@@ -207,7 +211,7 @@ public class HHRoutingTopGraphCreator {
 			int maxInc = 0, countInc = 0, maxTop = 0;
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
 				// calculate max increase
-				if (pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < LOG_THRESHOLD) {
+				if (pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < LOG_STAT_THRESHOLD) {
 					countInc++;
 					maxInc = Math.max(pnt.rtCnt - pnt.rtPrevCnt, maxInc);
 					maxTop = Math.max(pnt.rtCnt, maxTop);
@@ -217,10 +221,10 @@ public class HHRoutingTopGraphCreator {
 			}
 			System.out.printf("increased %d points - max diff %d, max top %d \n", countInc, maxInc, maxTop);
 			if (iteration % SAVE_ITERATIONS == 0) {
-				saveAndprintPoints(pnts, LOG_MAX_DEPTH);
+				saveAndPrintPoints(pnts, LOG_STAT_MAX_DEPTH);
 			}
 		}
-		saveAndprintPoints(pnts, LOG_MAX_DEPTH);
+		saveAndPrintPoints(pnts, LOG_STAT_MAX_DEPTH);
 		
 		
 		time = System.nanoTime();
@@ -232,7 +236,7 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void saveAndprintPoints(TLongObjectHashMap<NetworkDBPoint> pnts, int max) throws SQLException {
+	private void saveAndPrintPoints(TLongObjectHashMap<NetworkDBPoint> pnts, int max) throws SQLException {
 		long now = System.currentTimeMillis();
 		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
 		Collections.sort(pointsList, new Comparator<NetworkDBPoint>() {
@@ -252,7 +256,7 @@ public class HHRoutingTopGraphCreator {
 			System.out.printf("\n (^%d, %.1f%%) %d depth: %s", prev, prev * 100.0 / pointsList.size(), p.rtCnt, p.toString());
 			//prev = 0;
 		}
-		System.out.printf("\n (^%d, %.1f%%) - saving %.2f s", prev, prev * 100.0 / pointsList.size(), (System.currentTimeMillis() - now) / 1000.0);
+		System.out.printf("\n (^%d, %.1f%%) - saving %.2f s \n", prev, prev * 100.0 / pointsList.size(), (System.currentTimeMillis() - now) / 1000.0);
 		networkDB.loadMidPointsIndex(pnts, true);
 		for (NetworkDBPoint pnt : pointsList) {
 			pnt.rtPrevCnt = pnt.rtCnt;

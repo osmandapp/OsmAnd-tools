@@ -29,10 +29,11 @@ public class HHRoutePlanner {
 	static LatLon PROCESS_END = null;
 	static float HEURISTIC_COEFFICIENT = 1; // A* - 1, Dijkstra - 0
 	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
+	static int MAX_DEPTH = -1;
 	
-	static boolean USE_MIDPOINT = false;
+	static boolean USE_MIDPOINT = true;
 	static int MIDPOINT_ERROR = 1;
-	static int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
+	static int MIDPOINT_MAX_DEPTH = 30 + MIDPOINT_ERROR;
 	static boolean PRELOAD_SEGMENTS = false;
 
 	static final int PROC_ROUTING = 0;
@@ -138,9 +139,9 @@ public class HHRoutePlanner {
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		HEURISTIC_COEFFICIENT = 1;
 		DIJKSTRA_DIRECTION = 1;
-		USE_MIDPOINT = false;
+		USE_MIDPOINT = true;
 		MIDPOINT_ERROR = 5;
-		MIDPOINT_MAX_DEPTH = 25;
+		MIDPOINT_MAX_DEPTH = 20;
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
@@ -341,8 +342,11 @@ public class HHRoutePlanner {
 			return;
 		}
 		long tm = System.nanoTime();
-		int depth = USE_MIDPOINT ? start.getDepth(!reverse) : 0;
+		int depth = USE_MIDPOINT || MAX_DEPTH > 0? start.getDepth(!reverse) : 0;
 		int c;
+		if (depth >= MAX_DEPTH) {
+			return;
+		}
 		if (reverse) {
 			c = networkDB.loadNetworkSegmentStart(cachePoints, start);
 		} else {
