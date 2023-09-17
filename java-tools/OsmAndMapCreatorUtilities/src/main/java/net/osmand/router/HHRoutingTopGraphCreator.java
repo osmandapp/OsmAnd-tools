@@ -187,6 +187,7 @@ public class HHRoutingTopGraphCreator {
 			HHRoutePlanner.HEURISTIC_COEFFICIENT = 0;
 			HHRoutePlanner.USE_MIDPOINT = false;
 			HHRoutePlanner.MAX_DEPTH = MAX_DEPTH;
+			stats = new RoutingStats();
 			routePlanner.runDijkstraNetworkRouting(startPnt, null, stats);
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
 				pnt.rtLevel = 0;
@@ -219,7 +220,8 @@ public class HHRoutingTopGraphCreator {
 				pnt.rtPrevCnt = pnt.rtCnt;
 				pnt.clearRouting();
 			}
-			System.out.printf("increased %d points - max diff %d, max top %d \n", countInc, maxInc, maxTop);
+			System.out.printf("increased %d points - max diff %d, max top %d (%d vertices %d / %dedges, %.2f queue ms) \n", 
+					countInc, maxInc, maxTop, stats.visitedVertices, stats.visitedEdges, stats.addedEdges, stats.addQueueTime);
 			if (iteration % SAVE_ITERATIONS == 0) {
 				saveAndPrintPoints(pnts, LOG_STAT_MAX_DEPTH);
 			}

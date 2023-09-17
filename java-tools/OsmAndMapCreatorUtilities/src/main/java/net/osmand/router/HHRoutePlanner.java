@@ -358,12 +358,12 @@ public class HHRoutePlanner {
 		if (start == null) {
 			return;
 		}
-		long tm = System.nanoTime();
 		int depth = USE_MIDPOINT || MAX_DEPTH > 0? start.getDepth(!reverse) : 0;
 		int c;
 		if (MAX_DEPTH > 0 && depth >= MAX_DEPTH) {
 			return;
 		}
+		long tm = System.nanoTime();
 		if (reverse) {
 			c = networkDB.loadNetworkSegmentStart(cachePoints, start);
 		} else {
