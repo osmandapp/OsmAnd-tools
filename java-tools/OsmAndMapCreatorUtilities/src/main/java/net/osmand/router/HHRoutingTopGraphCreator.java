@@ -233,6 +233,7 @@ public class HHRoutingTopGraphCreator {
 
 
 	private void saveAndprintPoints(TLongObjectHashMap<NetworkDBPoint> pnts, int max) throws SQLException {
+		long now = System.currentTimeMillis();
 		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
 		Collections.sort(pointsList, new Comparator<NetworkDBPoint>() {
 
@@ -251,8 +252,11 @@ public class HHRoutingTopGraphCreator {
 			System.out.printf("\n (^%d) %d depth: %s", prev, p.rtCnt, p.toString());
 			//prev = 0;
 		}
-		System.out.printf("\n (^%d) ", prev);
+		System.out.printf("\n (^%d) - saving %.2f s", prev, (System.currentTimeMillis() - now) / 1000.0);
 		networkDB.loadMidPointsIndex(pnts, true);
+		for (NetworkDBPoint pnt : pointsList) {
+			pnt.rtPrevCnt = pnt.rtCnt;
+		}
 	}
 
 
