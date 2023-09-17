@@ -152,7 +152,7 @@ public class HHRoutePlanner {
 	public Collection<Entity> runRouting(LatLon start, LatLon end) throws SQLException, IOException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
-		if (USE_MIDPOINT) {
+		if (DEBUG_TEST_DATA) {
 			HEURISTIC_COEFFICIENT = 1;
 			DIJKSTRA_DIRECTION = 1;
 			USE_MIDPOINT = true;
