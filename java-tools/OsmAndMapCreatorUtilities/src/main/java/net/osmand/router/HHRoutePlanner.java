@@ -109,7 +109,7 @@ public class HHRoutePlanner {
 			return;
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getName();
+		String name = obfFile.getCanonicalFile().getName();
 		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(ROUTING_PROFILE), 
 				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT)));
 		if (PROCESS == PROC_ROUTING) {

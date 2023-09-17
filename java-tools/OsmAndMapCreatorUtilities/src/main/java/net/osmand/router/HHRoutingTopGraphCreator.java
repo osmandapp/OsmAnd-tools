@@ -77,7 +77,8 @@ public class HHRoutingTopGraphCreator {
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getName();
+		String name = obfFile.getCanonicalFile().getName();
+		
 		HHRoutingPreparationDB networkDB = 
 				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT));
 		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(
