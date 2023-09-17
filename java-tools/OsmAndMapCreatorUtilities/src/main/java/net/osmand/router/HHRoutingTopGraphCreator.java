@@ -8,31 +8,34 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
 import gnu.trove.iterator.TIntIterator;
-import gnu.trove.iterator.TLongIterator;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
-import net.osmand.util.MapUtils;
 
 public class HHRoutingTopGraphCreator {
 	static int DEBUG_VERBOSE_LEVEL = 0;
 
 	static final int PROC_MONTECARLO = 1;
-	static final int PROC_NEXT_LEVEL = 2;
-	static int PROCESS = PROC_NEXT_LEVEL;
+	static final int PROC_MIDPOINTS = 2;
+	static final int PROC_2ND_LEVEL = 3;
 
-	static int MONTE_CARLO_BATCH = 300;
+	static int MAX_ITERATIONS = 100;
+	static int LOG_THRESHOLD = 10;
+	static int LOG_MAX_DEPTH = 30;
+	static int SAVE_ITERATIONS = 5;
+	static int PROCESS = PROC_MIDPOINTS;
+
+	static long DEBUG_START_TIME = 0;
+	
 	private HHRoutingPreparationDB networkDB;
 	private HHRoutePlanner routePlanner;
 	
@@ -45,14 +48,34 @@ public class HHRoutingTopGraphCreator {
 	private static File testData() {
 		String name = "Montenegro_europe_2.road.obf";
 		name = "Netherlands_europe";
-//		name = "Ukraine_europe";
+		name = "Ukraine_europe";
 //		name = "Germany";
 		
 		return new File(System.getProperty("maps.dir"), name);
 	}
 	
+	private static void logf(String string, Object... a) {
+		if (DEBUG_START_TIME == 0) {
+			DEBUG_START_TIME = System.currentTimeMillis();
+		}
+		String ms = String.format("%3.1fs ", (System.currentTimeMillis() - DEBUG_START_TIME) / 1000.f);
+		System.out.printf(ms + string, a);
+
+	}
+	
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
+		for (String a : args) {
+			if (a.equals("--setup-midpoints")) {
+				PROCESS = PROC_MIDPOINTS;
+			} else if (a.equals("--proc-montecarlo")) {
+				PROCESS = PROC_MONTECARLO;
+			} else if (a.equals("--proc-2nd-level")) {
+				PROCESS = PROC_2ND_LEVEL;
+			} else if (a.startsWith("--iterations=")) {
+				MAX_ITERATIONS = Integer.parseInt(a.substring("--iterations=".length()));
+			}
+		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getName();
 		HHRoutingPreparationDB networkDB = 
@@ -60,7 +83,7 @@ public class HHRoutingTopGraphCreator {
 		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(
 				HHRoutePlanner.ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
-		if (PROCESS == PROC_NEXT_LEVEL) {
+		if (PROCESS == PROC_MIDPOINTS) {
 			planner.calculateMidPoints();
 //			planner.run2ndLevelRouting();
 		} else if (PROCESS == PROC_MONTECARLO) {
@@ -146,18 +169,19 @@ public class HHRoutingTopGraphCreator {
 		// Routing
 		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
 		
-		int randomPoints = Math.min(250, pnts.size() / 2);
+		int iteration = Math.min(MAX_ITERATIONS, pnts.size() / 2);
 		Random random = new Random();
-		int threshold = 10;
-		while (randomPoints > 0) {
+		
+		while (iteration > 0) {
 			NetworkDBPoint startPnt = pnts.get(random.nextInt(pnts.size()));
 			if (startPnt.rtIndex > 0) {
 				continue;
 			}
-			System.out.printf("%d. Routing %s - ", randomPoints, startPnt);
-			randomPoints--;
+			logf("%d. Routing %s - ", iteration, startPnt);
+			iteration--;
 			startPnt.rtIndex = 1;
 			HHRoutePlanner.HEURISTIC_COEFFICIENT = 0;
+			HHRoutePlanner.USE_MIDPOINT = false;
 			routePlanner.runDijkstraNetworkRouting(startPnt, null, stats);
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
 				pnt.rtLevel = 0;
@@ -179,20 +203,35 @@ public class HHRoutingTopGraphCreator {
 					}
 				}
 			}
-			int maxIncrease = 0, countIncrease = 0, maxTop = 0;
+			int maxInc = 0, countInc = 0, maxTop = 0;
 			for (NetworkDBPoint pnt : pnts.valueCollection()) {
 				// calculate max increase
-				if (pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < threshold) {
-					countIncrease++;
-					maxIncrease = Math.max(pnt.rtCnt - pnt.rtPrevCnt, maxIncrease);
+				if (pnt.rtCnt - pnt.rtPrevCnt > 0 && pnt.rtPrevCnt < LOG_THRESHOLD) {
+					countInc++;
+					maxInc = Math.max(pnt.rtCnt - pnt.rtPrevCnt, maxInc);
 					maxTop = Math.max(pnt.rtCnt, maxTop);
 				}
 				pnt.rtPrevCnt = pnt.rtCnt;
 				pnt.clearRouting();
 			}
-			System.out.printf("Increased %d points, max diff increase %d, max top %d \n", countIncrease, maxIncrease,
-					maxTop);
+			System.out.printf("increased %d points - max diff %d, max top %d \n", countInc, maxInc, maxTop);
+			if (iteration % SAVE_ITERATIONS == 0) {
+				saveAndprintPoints(pnts, LOG_MAX_DEPTH);
+			}
 		}
+		saveAndprintPoints(pnts, LOG_MAX_DEPTH);
+		
+		
+		time = System.nanoTime();
+		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
+				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
+				stats.addQueueTime, stats.prepTime);
+		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d vertices, %,d (of %,d) edges )", 
+				0.0, 0, stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
+	}
+
+
+	private void saveAndprintPoints(TLongObjectHashMap<NetworkDBPoint> pnts, int max) throws SQLException {
 		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
 		Collections.sort(pointsList, new Comparator<NetworkDBPoint>() {
 
@@ -204,7 +243,7 @@ public class HHRoutingTopGraphCreator {
 		int prev = 0;
 		for (int k = 0; k < pointsList.size(); k++) {
 			NetworkDBPoint p = pointsList.get(k);
-			if (k > 0 && pointsList.get(k - 1).rtCnt == p.rtCnt) {
+			if (k > 0 && Math.min(pointsList.get(k - 1).rtCnt, max) == Math.min(p.rtCnt, max)) {
 				prev++;
 				continue;
 			}
@@ -213,14 +252,6 @@ public class HHRoutingTopGraphCreator {
 		}
 		System.out.printf("\n (^%d) ", prev);
 		networkDB.loadMidPointsIndex(pnts, true);
-		
-		
-		time = System.nanoTime();
-		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
-				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
-				stats.addQueueTime, stats.prepTime);
-		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d vertices, %,d (of %,d) edges )", 
-				0.0, 0, stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
 	}
 
 
@@ -590,7 +621,7 @@ public class HHRoutingTopGraphCreator {
 		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
 		List<NetworkDBPoint> pntsList = new ArrayList<>(pnts.valueCollection());
 		Random rm = new Random();
-		for (int i = 0; i < MONTE_CARLO_BATCH; i++) {
+		for (int i = 0; i < MAX_ITERATIONS; i++) {
 			for(NetworkDBPoint p : pntsList) {
 				p.clearRouting();
 			}
@@ -635,7 +666,7 @@ public class HHRoutingTopGraphCreator {
 		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
 		for (int k = 0; k < pntsList.size(); k++) {
 			NetworkDBPoint pnt = pntsList.get(k);
-			if (pnt.rtCnt > 0.01 * MONTE_CARLO_BATCH) {
+			if (pnt.rtCnt > 0.01 * MAX_ITERATIONS) {
 				HHRoutingUtilities.addNode(entities, pnt, null, "highway", "stop");
 				System.out.printf("%d %.4f, %.4f - %s\n", pnt.rtCnt, pnt.getPoint().getLatitude(),
 						pnt.getPoint().getLongitude(), pnt);
