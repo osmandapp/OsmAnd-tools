@@ -120,10 +120,6 @@ public class HHRoutePlanner {
 			System.err.println("Start / end point is not specified");
 			return;
 		}
-		System.out.printf("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d", 
-				PROCESS_START.toString(), PROCESS_END.toString(),
-				(int) HEURISTIC_COEFFICIENT, (int) DIJKSTRA_DIRECTION,
-				USE_MIDPOINT +"", MIDPOINT_ERROR, MIDPOINT_MAX_DEPTH);
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName();
 		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(ROUTING_PROFILE), 
@@ -159,6 +155,10 @@ public class HHRoutePlanner {
 			MIDPOINT_ERROR = 5;
 			MIDPOINT_MAX_DEPTH = 20;
 		}
+		System.out.printf("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d \n", 
+				start.toString(), end.toString(),
+				(int) HEURISTIC_COEFFICIENT, (int) DIJKSTRA_DIRECTION,
+				USE_MIDPOINT +"", MIDPOINT_ERROR, MIDPOINT_MAX_DEPTH);
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
