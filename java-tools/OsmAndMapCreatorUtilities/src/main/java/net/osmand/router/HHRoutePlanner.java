@@ -31,6 +31,7 @@ public class HHRoutePlanner {
 	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
 	static int MAX_DEPTH = -1;
 	
+	static boolean DEBUG_TEST_DATA = true;
 	static boolean USE_MIDPOINT = true;
 	static int MIDPOINT_ERROR = 3;
 	static int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
@@ -103,17 +104,26 @@ public class HHRoutePlanner {
 			} else if (a.startsWith("--end=")) {
 				String[] latLons = a.substring("--end=".length()).split(",");
 				PROCESS_END = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
+			} else if (a.startsWith("--heuristic=")) {
+				HEURISTIC_COEFFICIENT = (float) Double.parseDouble(a.substring("--heuristic=".length()));
+			} else if (a.startsWith("--direction=")) {
+				DIJKSTRA_DIRECTION = (float) Double.parseDouble(a.substring("--direction=".length()));
 			} else if (a.startsWith("--midpoint=")) {
 				String[] s = a.substring("--midpoint=".length()).split(":");
 				USE_MIDPOINT = Boolean.parseBoolean(s[0]);
 				MIDPOINT_ERROR = Integer.parseInt(s[1]);
 				MIDPOINT_MAX_DEPTH = Integer.parseInt(s[2]);
+				DEBUG_TEST_DATA = false;
 			}
 		}
 		if (PROCESS_START == null || PROCESS_END == null) {
 			System.err.println("Start / end point is not specified");
 			return;
 		}
+		System.out.printf("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d", 
+				PROCESS_START.toString(), PROCESS_END.toString(),
+				HEURISTIC_COEFFICIENT, DIJKSTRA_DIRECTION,
+				USE_MIDPOINT +"", MIDPOINT_ERROR, MIDPOINT_MAX_DEPTH);
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName();
 		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(ROUTING_PROFILE), 
@@ -142,11 +152,13 @@ public class HHRoutePlanner {
 	public Collection<Entity> runRouting(LatLon start, LatLon end) throws SQLException, IOException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
-		HEURISTIC_COEFFICIENT = 1;
-		DIJKSTRA_DIRECTION = 1;
-		USE_MIDPOINT = true;
-		MIDPOINT_ERROR = 5;
-		MIDPOINT_MAX_DEPTH = 20;
+		if (USE_MIDPOINT) {
+			HEURISTIC_COEFFICIENT = 1;
+			DIJKSTRA_DIRECTION = 1;
+			USE_MIDPOINT = true;
+			MIDPOINT_ERROR = 5;
+			MIDPOINT_MAX_DEPTH = 20;
+		}
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
