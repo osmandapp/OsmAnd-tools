@@ -501,9 +501,11 @@ public class HHRoutingPreparationDB {
 		List<NetworkDBSegment> connectedReverse = new ArrayList<NetworkDBSegment>();
 		
 		// for routing
+		int rtDepth = -1;
 		NetworkDBSegment rtRouteToPoint;
 		double rtDistanceFromStart;
 		
+		int rtDepthRev = -1;
 		NetworkDBSegment rtRouteToPointRev;
 		double rtDistanceFromStartRev;
 		
@@ -544,17 +546,26 @@ public class HHRoutingPreparationDB {
 		}
 
 		public void clearRouting() {
+			rtDepth = -1;
 			rtRouteToPoint = null;
 			rtDistanceFromStart = 0;
+			rtDepthRev = -1;
 			rtRouteToPointRev = null;
 			rtDistanceFromStartRev = 0;
 		}
 
 		public int getDepth(boolean dir) {
-			if(dir && rtRouteToPoint != null) {
-				return rtRouteToPoint.start.getDepth(dir) + 1;
-			} else if(dir && rtRouteToPointRev != null) {
-				return rtRouteToPointRev.end.getDepth(dir) + 1;
+			if(dir && rtDepth > 0) {
+				return rtDepth;
+			} else if(!dir && rtDepthRev > 0) {
+				return rtDepthRev;
+			}
+			if (dir && rtRouteToPoint != null) {
+				rtDepth = rtRouteToPoint.start.getDepth(dir) + 1; 
+				return rtDepth ;
+			} else if (dir && rtRouteToPointRev != null) {
+				rtDepthRev = rtRouteToPointRev.end.getDepth(dir) + 1;
+				return rtDepthRev;
 			}
 			return 0;
 		}
