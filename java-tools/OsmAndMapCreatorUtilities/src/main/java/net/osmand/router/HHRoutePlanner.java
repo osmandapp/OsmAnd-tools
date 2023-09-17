@@ -122,7 +122,7 @@ public class HHRoutePlanner {
 		}
 		System.out.printf("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d", 
 				PROCESS_START.toString(), PROCESS_END.toString(),
-				HEURISTIC_COEFFICIENT, DIJKSTRA_DIRECTION,
+				(int) HEURISTIC_COEFFICIENT, (int) DIJKSTRA_DIRECTION,
 				USE_MIDPOINT +"", MIDPOINT_ERROR, MIDPOINT_MAX_DEPTH);
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName();
