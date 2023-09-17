@@ -162,13 +162,13 @@ public class HHRoutePlanner {
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
-			networkDB.loadMidPointsIndex(cachePoints, false);
+			networkDB.loadMidPointsIndex(cachePoints, cachePoints.valueCollection(), false);
 			stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
 			System.out.printf(" %,d - %.2fms\n", cachePoints.size(), stats.loadPointsTime);
 			if (PRELOAD_SEGMENTS) {
 				time = System.nanoTime();
 				System.out.printf("Loading segments...");
-				int cntEdges = networkDB.loadNetworkSegments(cachePoints);
+				int cntEdges = networkDB.loadNetworkSegments(cachePoints.valueCollection());
 				stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
 				System.out.printf(" %,d - %.2fms\n", cntEdges, stats.loadEdgesTime);
 				stats.loadEdgesCnt = cntEdges;

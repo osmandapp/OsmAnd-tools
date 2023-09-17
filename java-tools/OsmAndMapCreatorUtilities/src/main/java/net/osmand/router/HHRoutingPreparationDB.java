@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -96,9 +97,9 @@ public class HHRoutingPreparationDB {
 		s.close();
 	}
 	
-	public void loadMidPointsIndex(TLongObjectHashMap<NetworkDBPoint> pnts, boolean update) throws SQLException {
+	public void loadMidPointsIndex(TLongObjectHashMap<NetworkDBPoint> pntsMap, Collection<NetworkDBPoint> pointsList, boolean update) throws SQLException {
 		Statement s = conn.createStatement();
-		for (NetworkDBPoint p : pnts.valueCollection()) {
+		for (NetworkDBPoint p : pointsList) {
 			p.rtPrevCnt = 0;
 		}
 		PreparedStatement ps = conn.prepareStatement("UPDATE midpoints SET maxMidDepth = ?, proc = ? where ind = ?");
@@ -106,7 +107,7 @@ public class HHRoutingPreparationDB {
 		ResultSet rs = s.executeQuery("SELECT ind, maxMidDepth, proc  FROM midpoints ");
 		while(rs.next()) {
 			int ind = rs.getInt(1);
-			NetworkDBPoint pnt = pnts.get(ind);
+			NetworkDBPoint pnt = pntsMap.get(ind);
 			boolean upd = false;
 			if (pnt.rtCnt > rs.getInt(2)) {
 				upd = true;
@@ -133,7 +134,7 @@ public class HHRoutingPreparationDB {
 		ps.executeBatch();
 		ps = conn.prepareStatement("INSERT INTO midpoints(ind, maxMidDepth, proc) VALUES(?, ?, ?)");
 		batch = 0;
-		for (NetworkDBPoint p : pnts.valueCollection()) {
+		for (NetworkDBPoint p : pointsList) {
 			if (p.rtPrevCnt == 0 && (p.rtCnt > 0 || p.rtIndex > 0)) {
 				ps.setLong(1, p.index);
 				ps.setLong(2, p.rtCnt);
@@ -305,9 +306,9 @@ public class HHRoutingPreparationDB {
 		return x;
 	}
 	
-	public int loadNetworkSegments(TLongObjectHashMap<NetworkDBPoint> points) throws SQLException {
+	public int loadNetworkSegments(Collection<NetworkDBPoint> points) throws SQLException {
 		TLongObjectHashMap<NetworkDBPoint> pntsById = new TLongObjectHashMap<>();
-		for (NetworkDBPoint p : points.valueCollection()) {
+		for (NetworkDBPoint p : points) {
 			pntsById.put(p.index, p);
 		}
 		Statement st = conn.createStatement();

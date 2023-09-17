@@ -193,7 +193,7 @@ public class HHRoutingGraphCreator {
 			saveOsmFile(objects, new File(folder, name + ".osm"));
 		} else if (PROCESS == PROCESS_BUILD_NETWORK_SEGMENTS) {
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
-			networkDB.loadNetworkSegments(pnts);
+			networkDB.loadNetworkSegments(pnts.valueCollection());
 			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
 			saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		}
