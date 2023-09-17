@@ -361,7 +361,7 @@ public class HHRoutePlanner {
 		long tm = System.nanoTime();
 		int depth = USE_MIDPOINT || MAX_DEPTH > 0? start.getDepth(!reverse) : 0;
 		int c;
-		if (depth >= MAX_DEPTH) {
+		if (MAX_DEPTH > 0 && depth >= MAX_DEPTH) {
 			return;
 		}
 		if (reverse) {
