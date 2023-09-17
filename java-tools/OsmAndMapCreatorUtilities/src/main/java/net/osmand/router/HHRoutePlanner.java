@@ -32,8 +32,8 @@ public class HHRoutePlanner {
 	static int MAX_DEPTH = -1;
 	
 	static boolean USE_MIDPOINT = true;
-	static int MIDPOINT_ERROR = 1;
-	static int MIDPOINT_MAX_DEPTH = 30 + MIDPOINT_ERROR;
+	static int MIDPOINT_ERROR = 3;
+	static int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
 	static boolean PRELOAD_SEGMENTS = false;
 
 	static final int PROC_ROUTING = 0;
@@ -103,6 +103,11 @@ public class HHRoutePlanner {
 			} else if (a.startsWith("--end=")) {
 				String[] latLons = a.substring("--end=".length()).split(",");
 				PROCESS_END = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
+			} else if (a.startsWith("--midpoint=")) {
+				String[] s = a.substring("--midpoint=".length()).split(":");
+				USE_MIDPOINT = Boolean.parseBoolean(s[0]);
+				MIDPOINT_ERROR = Integer.parseInt(s[1]);
+				MIDPOINT_MAX_DEPTH = Integer.parseInt(s[2]);
 			}
 		}
 		if (PROCESS_START == null || PROCESS_END == null) {
