@@ -249,10 +249,10 @@ public class HHRoutingTopGraphCreator {
 				prev++;
 				continue;
 			}
-			System.out.printf("\n (^%d) %d depth: %s", prev, p.rtCnt, p.toString());
+			System.out.printf("\n (^%d, %.1f%%) %d depth: %s", prev, prev * 100.0 / pointsList.size(), p.rtCnt, p.toString());
 			//prev = 0;
 		}
-		System.out.printf("\n (^%d) - saving %.2f s", prev, (System.currentTimeMillis() - now) / 1000.0);
+		System.out.printf("\n (^%d, %.1f%%) - saving %.2f s", prev, prev * 100.0 / pointsList.size(), (System.currentTimeMillis() - now) / 1000.0);
 		networkDB.loadMidPointsIndex(pnts, true);
 		for (NetworkDBPoint pnt : pointsList) {
 			pnt.rtPrevCnt = pnt.rtCnt;
