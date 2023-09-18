@@ -61,6 +61,7 @@ public class HHRoutePlanner {
 		double loadEdgesTime = 0;
 		double routingTime = 0;
 		double addQueueTime = 0;
+		double pollQueueTime = 0;
 		double prepTime = 0;
 	}
 	
@@ -205,9 +206,9 @@ public class HHRoutePlanner {
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
 		
-		System.out.printf("Routing finished %.2f ms: load data %.2f ms (%d edges), routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
+		System.out.printf("Routing finished %.1f ms: load data %.1f ms (%,d edges), routing %.1f ms (%.1f poll ms + %.1f queue ms), prep result %.1f ms\n",
 				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime,
-				stats.addQueueTime, stats.prepTime);
+				stats.addQueueTime, stats.pollQueueTime, stats.prepTime);
 		return objects;
 	}
 
@@ -242,7 +243,7 @@ public class HHRoutePlanner {
 			}
 		};
 		Queue<NetworkDBSegment> queue = new PriorityQueue<>(cmp);
-		Queue<NetworkDBSegment> queueReverse = new PriorityQueue<>(cmp);
+		queue = new FourAryHeap<>(cmp);
 		start.rtDistanceFromStart = 0.1; // visited
 		if (end != null) {
 			end.rtDistanceFromStartRev = 0.1; // visited
@@ -251,22 +252,16 @@ public class HHRoutePlanner {
 			addToQueue(queue, start, end, false, stats);
 		} 
 		if (DIJKSTRA_DIRECTION <= 0) {
-			addToQueue(queueReverse, end, start, true, stats);
+			addToQueue(queue, end, start, true, stats);
 		}
 		
-
-		while (!queue.isEmpty() || !queueReverse.isEmpty()) {
+		while (!queue.isEmpty()) {
 			stats.visitedEdges++;
-			boolean dir = !queue.isEmpty();
+			
 			long tm = System.nanoTime();
-			if (!queue.isEmpty() && !queueReverse.isEmpty()) {
-				dir = queue.peek().rtCost <= queueReverse.peek().rtCost;
-			}
-			NetworkDBSegment segment = dir ? queue.poll() : queueReverse.poll();
-			stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
-			if(segment.direction != dir) {
-				throw new IllegalStateException();
-			}
+			NetworkDBSegment segment = queue.poll();
+			stats.pollQueueTime += (System.nanoTime() - tm) / 1e6;
+			boolean dir = segment.direction;
 			if (dir) {
 				if (segment.end.rtDistanceFromStart > 0) { // or segment.end.rtRouteToPoint != null
 					if (segment.start.rtDistanceFromStart + segment.dist < segment.end.rtDistanceFromStart
@@ -278,6 +273,7 @@ public class HHRoutePlanner {
 				printPoint(segment, false);
 				segment.end.rtRouteToPoint = segment;
 				segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist;
+				// TODO not optimal
 				if (segment.end == end) { // segment.end.rtDistanceFromStartRev > 0 
 					return segment.end;
 				}
@@ -296,7 +292,7 @@ public class HHRoutePlanner {
 				if (segment.start == start) { // segment.start.rtDistanceFromStart > 0 
 					return segment.start;
 				}
-				addToQueue(queueReverse, segment.start, start, true, stats);
+				addToQueue(queue, segment.start, start, true, stats);
 			}
 			
 			stats.visitedVertices++;
@@ -378,7 +374,6 @@ public class HHRoutePlanner {
 		if (c > 0) {
 			stats.loadEdgesCnt += c;
 			stats.loadEdgesTime += (System.nanoTime() - tm) / 1e6;
-			tm = System.nanoTime();
 		}
 		
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
@@ -388,11 +383,11 @@ public class HHRoutePlanner {
 			}
 			double rtDistanceToEnd = distanceToEnd(nextPoint, finish);
 			connected.rtCost = reverse ? rtSegmentCostRev(connected, rtDistanceToEnd) : rtSegmentCost(connected, rtDistanceToEnd);
-			
+			tm = System.nanoTime();			
 			queue.add(connected);
 			stats.addedEdges++;
+			stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
 		}
-		stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
 	}
 
 }

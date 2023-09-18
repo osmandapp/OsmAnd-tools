@@ -1,16 +1,19 @@
 package net.osmand.router;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Queue;
 
 
-public class FourAryHeap<T extends Comparable<T>> implements Queue<T> {
+public class FourAryHeap<T> implements Queue<T> {
     private List<T> heap;
+	private Comparator<T> cmp;
 
-    public FourAryHeap() {
-        heap = new ArrayList<>();
+    public FourAryHeap(Comparator<T> cmp) {
+        this.cmp = cmp;
+		heap = new ArrayList<>();
     }
 
     // Insert an element into the heap
@@ -19,7 +22,7 @@ public class FourAryHeap<T extends Comparable<T>> implements Queue<T> {
         int currentIndex = heap.size() - 1;
         int parentIndex = (currentIndex - 1) / 4;
 
-        while (currentIndex > 0 && heap.get(currentIndex).compareTo(heap.get(parentIndex)) < 0) {
+        while (currentIndex > 0 && cmp.compare(heap.get(currentIndex), heap.get(parentIndex)) < 0) {
             swap(currentIndex, parentIndex);
             currentIndex = parentIndex;
             parentIndex = (currentIndex - 1) / 4;
@@ -48,7 +51,7 @@ public class FourAryHeap<T extends Comparable<T>> implements Queue<T> {
 
         for (int i = 1; i <= 4; i++) {
             childIndex = 4 * index + i;
-            if (childIndex < heap.size() && heap.get(childIndex).compareTo(heap.get(minIndex)) < 0) {
+            if (childIndex < heap.size() && cmp.compare(heap.get(childIndex), heap.get(minIndex)) < 0) {
                 minIndex = childIndex;
             }
         }
@@ -77,7 +80,13 @@ public class FourAryHeap<T extends Comparable<T>> implements Queue<T> {
     }
 
     public static void main(String[] args) {
-        FourAryHeap<Integer> heap = new FourAryHeap<>();
+        FourAryHeap<Integer> heap = new FourAryHeap<>(new Comparator<Integer>() {
+
+			@Override
+			public int compare(Integer o1, Integer o2) {
+				return Integer.compare(o1, o2);
+			}
+		});
         heap.insert(10);
         heap.insert(5);
         heap.insert(15);
