@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.TreeMap;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -35,7 +36,7 @@ public class HHRoutePlanner {
 	static boolean USE_MIDPOINT = true;
 	static int MIDPOINT_ERROR = 3;
 	static int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
-	static boolean PRELOAD_SEGMENTS = false;
+	static boolean PRELOAD_SEGMENTS = true;
 
 	static final int PROC_ROUTING = 0;
 	static int PROCESS = PROC_ROUTING;
@@ -70,19 +71,19 @@ public class HHRoutePlanner {
 //		name = "Germany";
 		
 		// "Netherlands_europe_2.road.obf"
-//		PROCESS_START = new LatLon(52.34800, 4.86206); // AMS
+		PROCESS_START = new LatLon(52.34800, 4.86206); // AMS
 ////		PROCESS_END = new LatLon(51.57803, 4.79922); // Breda
-//		PROCESS_END = new LatLon(51.35076, 5.45141); // ~Eindhoven
+		PROCESS_END = new LatLon(51.35076, 5.45141); // ~Eindhoven
 		
 		// "Montenegro_europe_2.road.obf"
 //		PROCESS_START = new LatLon(43.15274, 19.55169); 
 //		PROCESS_END= new LatLon(42.45166, 18.54425);
 		
 		// Ukraine
-		PROCESS_START = new LatLon(50.43539, 30.48234); // Kyiv
-		PROCESS_START = new LatLon(50.01689, 36.23278); // Kharkiv
-		PROCESS_END = new LatLon(46.45597, 30.75604);   // Odessa
-		PROCESS_END = new LatLon(48.43824, 22.705723); // Mukachevo
+//		PROCESS_START = new LatLon(50.43539, 30.48234); // Kyiv
+//		PROCESS_START = new LatLon(50.01689, 36.23278); // Kharkiv
+//		PROCESS_END = new LatLon(46.45597, 30.75604);   // Odessa
+//		PROCESS_END = new LatLon(48.43824, 22.705723); // Mukachevo
 //		
 		
 //		PROCESS_START = new LatLon(50.30487, 31.29761); // 
@@ -149,10 +150,10 @@ public class HHRoutePlanner {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		if (DEBUG_TEST_DATA) {
-			HEURISTIC_COEFFICIENT = 1;
-			DIJKSTRA_DIRECTION = 1;
-			USE_MIDPOINT = true;
-			MIDPOINT_ERROR = 5;
+			HEURISTIC_COEFFICIENT = 0;
+			DIJKSTRA_DIRECTION = 0;
+			USE_MIDPOINT = false;
+			MIDPOINT_ERROR = 3;
 			MIDPOINT_MAX_DEPTH = 20;
 		}
 		System.out.printf("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d \n", 
@@ -219,36 +220,29 @@ public class HHRoutePlanner {
 		return MapUtils.getDistance(p1, p2) / ctx.getRouter().getMaxSpeed();
 	}
 	
-	private double rtSegmentCost(NetworkDBSegment o1) {
+	private double rtSegmentCost(NetworkDBSegment o1, double rtDistanceToEnd) {
 		return o1.start.rtDistanceFromStart + o1.dist +
-				HEURISTIC_COEFFICIENT * (o1.end.rtDistanceFromStartRev > 0 ? o1.end.rtDistanceFromStartRev :  o1.rtDistanceToEnd);
+				HEURISTIC_COEFFICIENT * (o1.end.rtDistanceFromStartRev > 0 ? o1.end.rtDistanceFromStartRev :  rtDistanceToEnd);
 	}
 	
-	private double rtSegmentCostRev(NetworkDBSegment o1) {
+	private double rtSegmentCostRev(NetworkDBSegment o1, double rtDistanceToEnd) {
 		return o1.end.rtDistanceFromStartRev + o1.dist + 
-				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  o1.rtDistanceToEnd);
+				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  rtDistanceToEnd);
 	}
 	
 	// delete rtDistanceToEnd as it's not used (carefully)
 	// TODO speedup cost could be updated once reverse search covers the road
 	// TODO better PriorityQueue could be used 4ary-heaps 
 	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats) throws SQLException {
-		PriorityQueue<NetworkDBSegment> queue = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
+		Comparator<NetworkDBSegment> cmp = new Comparator<NetworkDBSegment>() {
 
 			@Override
 			public int compare(NetworkDBSegment o1, NetworkDBSegment o2) {
-//				return Double.compare(rtSegmentCost(o1),rtSegmentCost(o2));
 				return Double.compare(o1.rtCost, o2.rtCost);
 			}
-		});
-		PriorityQueue<NetworkDBSegment> queueReverse = new PriorityQueue<>(new Comparator<NetworkDBSegment>() {
-
-			@Override
-			public int compare(NetworkDBSegment o1, NetworkDBSegment o2) {
-//				return Double.compare(rtSegmentCostRev(o1), rtSegmentCostRev(o2));
-				return Double.compare(o1.rtCost, o2.rtCost);
-			}
-		});
+		};
+		Queue<NetworkDBSegment> queue = new PriorityQueue<>(cmp);
+		Queue<NetworkDBSegment> queueReverse = new PriorityQueue<>(cmp);
 		start.rtDistanceFromStart = 0.1; // visited
 		if (end != null) {
 			end.rtDistanceFromStartRev = 0.1; // visited
@@ -259,35 +253,47 @@ public class HHRoutePlanner {
 		if (DIJKSTRA_DIRECTION <= 0) {
 			addToQueue(queueReverse, end, start, true, stats);
 		}
+		
 
 		while (!queue.isEmpty() || !queueReverse.isEmpty()) {
 			stats.visitedEdges++;
 			boolean dir = !queue.isEmpty();
-			if (!queue.isEmpty() && !queueReverse.isEmpty()) {
-				dir = rtSegmentCost(queue.peek()) <= rtSegmentCostRev(queueReverse.peek());
-			}
 			long tm = System.nanoTime();
+			if (!queue.isEmpty() && !queueReverse.isEmpty()) {
+				dir = queue.peek().rtCost <= queueReverse.peek().rtCost;
+			}
 			NetworkDBSegment segment = dir ? queue.poll() : queueReverse.poll();
 			stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
+			if(segment.direction != dir) {
+				throw new IllegalStateException();
+			}
 			if (dir) {
-				if (segment.end.rtDistanceFromStart > 0) { // segment.end.rtRouteToPoint != null
-					continue;
+				if (segment.end.rtDistanceFromStart > 0) { // or segment.end.rtRouteToPoint != null
+					if (segment.start.rtDistanceFromStart + segment.dist < segment.end.rtDistanceFromStart
+							&& HEURISTIC_COEFFICIENT > 1) {
+						throw new IllegalStateException();
+					}
+					continue; // already visited
 				}
 				printPoint(segment, false);
 				segment.end.rtRouteToPoint = segment;
 				segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist;
-				if (segment.end.rtDistanceFromStartRev > 0 && segment.end.rtDistanceFromStart > 0) { 
+				if (segment.end == end) { // segment.end.rtDistanceFromStartRev > 0 
 					return segment.end;
 				}
 				addToQueue(queue, segment.end, end, false, stats);
 			} else {
-				if (segment.start.rtDistanceFromStartRev > 0) { // segment.end.rtRouteToPoint != null
-					continue;
+				if (segment.start.rtDistanceFromStartRev > 0) { // or segment.end.rtRouteToPoint != null
+					if (segment.end.rtDistanceFromStartRev + segment.dist < segment.start.rtDistanceFromStartRev
+							&& HEURISTIC_COEFFICIENT > 1) {
+						throw new IllegalStateException();
+					}
+					continue; // already visited
 				}
 				printPoint(segment, true);
 				segment.start.rtRouteToPointRev = segment;
 				segment.start.rtDistanceFromStartRev = segment.end.rtDistanceFromStartRev + segment.dist;
-				if (segment.start.rtDistanceFromStartRev > 0 && segment.start.rtDistanceFromStart > 0) { 
+				if (segment.start == start) { // segment.start.rtDistanceFromStart > 0 
 					return segment.start;
 				}
 				addToQueue(queueReverse, segment.start, start, true, stats);
@@ -354,7 +360,7 @@ public class HHRoutePlanner {
 
 
 
-	private void addToQueue(PriorityQueue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, RoutingStats stats) throws SQLException {
+	private void addToQueue(Queue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, RoutingStats stats) throws SQLException {
 		if (start == null) {
 			return;
 		}
@@ -380,8 +386,8 @@ public class HHRoutePlanner {
 			if (USE_MIDPOINT && Math.min(depth, MIDPOINT_MAX_DEPTH) > nextPoint.rtCnt + MIDPOINT_ERROR) {
 				continue;
 			}
-			connected.rtDistanceToEnd = distanceToEnd(nextPoint, finish);
-			connected.rtCost = reverse ? rtSegmentCostRev(connected) : rtSegmentCost(connected);
+			double rtDistanceToEnd = distanceToEnd(nextPoint, finish);
+			connected.rtCost = reverse ? rtSegmentCostRev(connected, rtDistanceToEnd) : rtSegmentCost(connected, rtDistanceToEnd);
 			
 			queue.add(connected);
 			stats.addedEdges++;

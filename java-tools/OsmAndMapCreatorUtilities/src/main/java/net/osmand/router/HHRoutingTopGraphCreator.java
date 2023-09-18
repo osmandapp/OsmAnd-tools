@@ -104,7 +104,6 @@ public class HHRoutingTopGraphCreator {
 		private List<NetworkDBPoint> expoints = new ArrayList<>();
 		private Set<NetworkHHCluster> neighbors = new HashSet<>();
 		
-		private TLongHashSet routeMidPoints = null;
 		// 
 		private NetworkHHCluster mergedTo = null;
 		private List<NetworkHHCluster> merged = new ArrayList<>();

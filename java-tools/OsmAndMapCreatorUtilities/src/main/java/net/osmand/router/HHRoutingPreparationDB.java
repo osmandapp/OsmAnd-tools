@@ -477,7 +477,6 @@ public class HHRoutingPreparationDB {
 		}
 		
 		// routing extra info
-		double rtDistanceToEnd; // added once in queue
 		double rtCost; // added once in queue
 		
 		@Override
