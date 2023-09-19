@@ -53,7 +53,7 @@ public class HHRoutePlanner {
 		public float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
 		public int MAX_DEPTH = -1; // max depth to go to
 		public int MAX_POINTS = -1; // max points to settle
-		public boolean USE_MIDPOINT = true;
+		public boolean USE_MIDPOINT = false;
 		public int MIDPOINT_ERROR = 3;
 		public int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
 		

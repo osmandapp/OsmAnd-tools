@@ -299,6 +299,7 @@ public class HHRoutingTopGraphCreator {
 		time = System.nanoTime();
 		DijkstraConfig c = new DijkstraConfig();
 		c.DIJKSTRA_DIRECTION = 1;
+		c.USE_MIDPOINT = false;
 		c.MAX_POINTS = 15; 
 		c.visited = new ArrayList<>();
 		TIntIntHashMap edgeDiffMap = new TIntIntHashMap();
@@ -311,7 +312,7 @@ public class HHRoutingTopGraphCreator {
 		});
 		int prog = 0;
 		for (NetworkDBPoint p : list) {
-			if (prog++ % 1000 == 0) {
+			if (++prog % 1000 == 0) {
 				System.out.printf("Preparing %d...\n", prog);
 			}
 			calculateCHEdgeDiff(p, c, null, stats);
@@ -325,15 +326,16 @@ public class HHRoutingTopGraphCreator {
 		int reindex = 0;
 		List<NetworkDBSegment> allShortcuts = new ArrayList<>();
 		List<NetworkDBSegment> shortcuts = new ArrayList<>();
+		int contracted = 0;
 		while (!pq.isEmpty()) {
-			if (prog++ % 1000 == 0) {
-				System.out.printf("Contracting %d...\n", prog);
+			if (++prog % 1000 == 0) {
+				System.out.printf("Contracting %d (reindexing %d, shortcuts %d)...\n", contracted, reindex, allShortcuts.size());
 			}
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;
 			shortcuts.clear();
 			calculateCHEdgeDiff(pnt, c, shortcuts, stats);
-			if (oldIndex != pnt.rtIndex) {
+			if (oldIndex < pnt.rtIndex) {
 				pq.add(pnt);
 				reindex++;
 				continue;
@@ -343,9 +345,11 @@ public class HHRoutingTopGraphCreator {
 				sh.start.connected.add(sh);
 				sh.end.connectedReverse.add(new NetworkDBSegment(sh.dist, false, true, sh.start, sh.end));
 			}
+			pnt.chInd = contracted++;
 			pnt.rtExclude = true;
-
 		}
+		networkDB.deleteShortcuts();
+		networkDB.insertSegments(allShortcuts);
 		
 		double contractionTime = (System.nanoTime() - time) / 1e6;
 		System.out.printf("Added %d shortcuts, reindexed %d \n", allShortcuts.size(), reindex);
@@ -370,11 +374,26 @@ public class HHRoutingTopGraphCreator {
 		p.rtCnt = 0;
 		p.rtExclude = true;
 		for (NetworkDBSegment in : p.connectedReverse) {
+			if (in.start.rtExclude) {
+				continue;
+			}
 			routePlanner.runDijkstraNetworkRouting(in.start, null, c, stats);
 			for (NetworkDBSegment out : p.connected) {
+				if (out.end.rtExclude) {
+					continue;
+				}
 				if (out.end.rtDistanceFromStart == 0 || out.end.rtDistanceFromStart > out.dist) {
-					if(shortcuts != null) {
-						shortcuts.add(new NetworkDBSegment(out.end.rtDistanceFromStart, true, in.start, out.end));
+					if (shortcuts != null) {
+						NetworkDBSegment sh = new NetworkDBSegment(out.end.rtDistanceFromStart, true, true, in.start, out.end);
+						NetworkDBSegment ps = out.end.rtRouteToPoint;
+						while (true) {
+							sh.geometry.addAll(0, ps.geometry);
+							if (ps.start == in.start) {
+								break;
+							}
+							ps = ps.start.rtRouteToPoint;
+						}
+						shortcuts.add(sh);
 					}
 					p.rtCnt++;
 				}

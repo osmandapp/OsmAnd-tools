@@ -918,7 +918,7 @@ public class HHRoutingGraphCreator {
 						NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
 								Math.min(t.getSegmentStart(), t.getSegmentEnd()),
 								Math.max(t.getSegmentStart(), t.getSegmentEnd())));
-						NetworkDBSegment segment = new NetworkDBSegment(t.getDistanceFromStart(), true, pnt, end);
+						NetworkDBSegment segment = new NetworkDBSegment(t.getDistanceFromStart(), true, false, pnt, end);
 						pnt.connected.add(segment);
 						while (t != null) {
 							segment.geometry.add(getPoint(t));
