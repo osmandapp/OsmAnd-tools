@@ -107,7 +107,7 @@ public class HHRoutingUtilities {
 		Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
 		n.putTag(tag, val);
 		n.putTag("name", pnt.index + " " + pnt.roadId / 64 + " " + pnt.start + " " + pnt.end);
-		osmObjects.put(pnt.id, n);
+		osmObjects.put(pnt.pntGeoId, n);
 	}
 
 

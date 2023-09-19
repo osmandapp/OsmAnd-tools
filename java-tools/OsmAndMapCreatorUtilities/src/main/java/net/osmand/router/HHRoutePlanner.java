@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
@@ -28,14 +29,10 @@ public class HHRoutePlanner {
 	
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
-	static float HEURISTIC_COEFFICIENT = 1; // A* - 1, Dijkstra - 0
-	static float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
-	static int MAX_DEPTH = -1;
+	
 	
 	static boolean DEBUG_TEST_DATA = true;
-	static boolean USE_MIDPOINT = true;
-	static int MIDPOINT_ERROR = 3;
-	static int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
+	
 	static boolean PRELOAD_SEGMENTS = true;
 
 	static final int PROC_ROUTING = 0;
@@ -51,10 +48,36 @@ public class HHRoutePlanner {
 		this.networkDB = networkDB;
 	}
 	
+	public static class DijkstraConfig {
+		public float HEURISTIC_COEFFICIENT = 1; // A* - 1, Dijkstra - 0
+		public float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
+		public int MAX_DEPTH = -1; // max depth to go to
+		public int MAX_POINTS = -1; // max points to settle
+		public boolean USE_MIDPOINT = true;
+		public int MIDPOINT_ERROR = 3;
+		public int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
+		
+		public double MAX_COST;
+		public List<NetworkDBPoint> visited = null;
+		public List<NetworkDBPoint> visitedRev = null;
+
+		@Override
+		public String toString() {
+			return toString(null, null);
+		}
+		public String toString(LatLon start, LatLon end) {
+			return String.format("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d", 
+					start == null ? "?" : start.toString() , end == null ? "?" :  end.toString(),
+					(int) HEURISTIC_COEFFICIENT, (int) DIJKSTRA_DIRECTION,
+					USE_MIDPOINT +"", MIDPOINT_ERROR, MIDPOINT_MAX_DEPTH);
+		}
+	}
+	
 	static class RoutingStats {
 		int visitedVertices = 0;
 		int visitedEdges = 0;
 		int addedEdges = 0;
+		
 		
 		double loadPointsTime = 0;
 		int loadEdgesCnt;
@@ -99,6 +122,7 @@ public class HHRoutePlanner {
 	
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
+		DijkstraConfig c = null;
 		for (String a : args) {
 			if (a.startsWith("--start=")) {
 				String[] latLons = a.substring("--start=".length()).split(",");
@@ -107,14 +131,23 @@ public class HHRoutePlanner {
 				String[] latLons = a.substring("--end=".length()).split(",");
 				PROCESS_END = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
 			} else if (a.startsWith("--heuristic=")) {
-				HEURISTIC_COEFFICIENT = (float) Double.parseDouble(a.substring("--heuristic=".length()));
+				if (c == null) {
+					c = new DijkstraConfig();
+				}
+				c.HEURISTIC_COEFFICIENT = (float) Double.parseDouble(a.substring("--heuristic=".length()));
 			} else if (a.startsWith("--direction=")) {
-				DIJKSTRA_DIRECTION = (float) Double.parseDouble(a.substring("--direction=".length()));
+				if (c == null) {
+					c = new DijkstraConfig();
+				}
+				c.DIJKSTRA_DIRECTION = (float) Double.parseDouble(a.substring("--direction=".length()));
 			} else if (a.startsWith("--midpoint=")) {
 				String[] s = a.substring("--midpoint=".length()).split(":");
-				USE_MIDPOINT = Boolean.parseBoolean(s[0]);
-				MIDPOINT_ERROR = Integer.parseInt(s[1]);
-				MIDPOINT_MAX_DEPTH = Integer.parseInt(s[2]);
+				if (c == null) {
+					c = new DijkstraConfig();
+				}
+				c.USE_MIDPOINT = Boolean.parseBoolean(s[0]);
+				c.MIDPOINT_ERROR = Integer.parseInt(s[1]);
+				c.MIDPOINT_MAX_DEPTH = Integer.parseInt(s[2]);
 				DEBUG_TEST_DATA = false;
 			}
 		}
@@ -127,7 +160,7 @@ public class HHRoutePlanner {
 		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(ROUTING_PROFILE), 
 				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT)));
 		if (PROCESS == PROC_ROUTING) {
-			Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END);
+			Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END, c);
 			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-rt.osm"));
 		}
 		planner.networkDB.close();
@@ -147,20 +180,20 @@ public class HHRoutePlanner {
 		return router.buildRoutingContext(config, null, new BinaryMapIndexReader[0], RouteCalculationMode.NORMAL);
 	}
 
-	public Collection<Entity> runRouting(LatLon start, LatLon end) throws SQLException, IOException {
+	public Collection<Entity> runRouting(LatLon start, LatLon end, DijkstraConfig c) throws SQLException, IOException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
-		if (DEBUG_TEST_DATA) {
-			HEURISTIC_COEFFICIENT = 0;
-			DIJKSTRA_DIRECTION = 0;
-			USE_MIDPOINT = false;
-			MIDPOINT_ERROR = 3;
-			MIDPOINT_MAX_DEPTH = 20;
+		if (c == null) {
+			c = new DijkstraConfig();
+			// test data for debug swap
+			c.HEURISTIC_COEFFICIENT = 0;
+			c.DIJKSTRA_DIRECTION = 0;
+			c.USE_MIDPOINT = false;
+			c.MIDPOINT_ERROR = 3;
+			c.MIDPOINT_MAX_DEPTH = 20;
 		}
-		System.out.printf("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d \n", 
-				start.toString(), end.toString(),
-				(int) HEURISTIC_COEFFICIENT, (int) DIJKSTRA_DIRECTION,
-				USE_MIDPOINT +"", MIDPOINT_ERROR, MIDPOINT_MAX_DEPTH);
+		System.out.println(c.toString(start, end));
+		
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
@@ -199,7 +232,7 @@ public class HHRoutePlanner {
 
 		// Routing
 		System.out.printf("Routing...\n");
-		NetworkDBPoint pnt = runDijkstraNetworkRouting(startPnt, endPnt, stats);
+		NetworkDBPoint pnt = runDijkstraNetworkRouting(startPnt, endPnt, c, stats);
 		stats.routingTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
 		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
@@ -221,20 +254,11 @@ public class HHRoutePlanner {
 		return MapUtils.getDistance(p1, p2) / ctx.getRouter().getMaxSpeed();
 	}
 	
-	private double rtSegmentCost(NetworkDBSegment o1, double rtDistanceToEnd) {
-		return o1.start.rtDistanceFromStart + o1.dist +
-				HEURISTIC_COEFFICIENT * (o1.end.rtDistanceFromStartRev > 0 ? o1.end.rtDistanceFromStartRev :  rtDistanceToEnd);
-	}
-	
-	private double rtSegmentCostRev(NetworkDBSegment o1, double rtDistanceToEnd) {
-		return o1.end.rtDistanceFromStartRev + o1.dist + 
-				HEURISTIC_COEFFICIENT * (o1.start.rtDistanceFromStart > 0 ? o1.start.rtDistanceFromStart :  rtDistanceToEnd);
-	}
-	
 	// delete rtDistanceToEnd as it's not used (carefully)
 	// TODO speedup cost could be updated once reverse search covers the road
 	// TODO better PriorityQueue could be used 4ary-heaps 
-	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, RoutingStats stats) throws SQLException {
+	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, DijkstraConfig c,
+			RoutingStats stats) throws SQLException {
 		Comparator<NetworkDBSegment> cmp = new Comparator<NetworkDBSegment>() {
 
 			@Override
@@ -248,11 +272,11 @@ public class HHRoutePlanner {
 		if (end != null) {
 			end.rtDistanceFromStartRev = 0.1; // visited
 		}
-		if (DIJKSTRA_DIRECTION >= 0) {
-			addToQueue(queue, start, end, false, stats);
+		if (c.DIJKSTRA_DIRECTION >= 0) {
+			addToQueue(queue, start, end, false, c, stats);
 		} 
-		if (DIJKSTRA_DIRECTION <= 0) {
-			addToQueue(queue, end, start, true, stats);
+		if (c.DIJKSTRA_DIRECTION <= 0) {
+			addToQueue(queue, end, start, true, c, stats);
 		}
 		
 		while (!queue.isEmpty()) {
@@ -261,11 +285,14 @@ public class HHRoutePlanner {
 			long tm = System.nanoTime();
 			NetworkDBSegment segment = queue.poll();
 			stats.pollQueueTime += (System.nanoTime() - tm) / 1e6;
+			if (c.MAX_COST > 0 && segment.rtCost > c.MAX_COST) {
+				break;
+			}
 			boolean dir = segment.direction;
 			if (dir) {
 				if (segment.end.rtDistanceFromStart > 0) { // or segment.end.rtRouteToPoint != null
 					if (segment.start.rtDistanceFromStart + segment.dist < segment.end.rtDistanceFromStart
-							&& HEURISTIC_COEFFICIENT > 1) {
+							&& c.HEURISTIC_COEFFICIENT > 1) {
 						throw new IllegalStateException();
 					}
 					continue; // already visited
@@ -277,11 +304,17 @@ public class HHRoutePlanner {
 				if (segment.end == end) { // segment.end.rtDistanceFromStartRev > 0 
 					return segment.end;
 				}
-				addToQueue(queue, segment.end, end, false, stats);
+				addToQueue(queue, segment.end, end, false, c, stats);
+				if (c.MAX_POINTS > 0) {
+					c.visited.add(segment.end);
+					if (c.visited.size() > c.MAX_POINTS) {
+						break;
+					}
+				}
 			} else {
 				if (segment.start.rtDistanceFromStartRev > 0) { // or segment.end.rtRouteToPoint != null
 					if (segment.end.rtDistanceFromStartRev + segment.dist < segment.start.rtDistanceFromStartRev
-							&& HEURISTIC_COEFFICIENT > 1) {
+							&& c.HEURISTIC_COEFFICIENT > 1) {
 						throw new IllegalStateException();
 					}
 					continue; // already visited
@@ -292,10 +325,16 @@ public class HHRoutePlanner {
 				if (segment.start == start) { // segment.start.rtDistanceFromStart > 0 
 					return segment.start;
 				}
-				addToQueue(queue, segment.start, start, true, stats);
+				addToQueue(queue, segment.start, start, true, c, stats);
+				if (c.MAX_POINTS > 0) {
+					c.visitedRev.add(segment.start);
+					if (c.visitedRev.size() > c.MAX_POINTS) {
+						break;
+					}
+				}
 			}
-			
 			stats.visitedVertices++;
+			
 		}
 		return null;
 		
@@ -356,33 +395,44 @@ public class HHRoutePlanner {
 
 
 
-	private void addToQueue(Queue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, RoutingStats stats) throws SQLException {
+	private void addToQueue(Queue<NetworkDBSegment> queue, NetworkDBPoint start, NetworkDBPoint finish, boolean reverse, 
+			DijkstraConfig c, RoutingStats stats) throws SQLException {
 		if (start == null) {
 			return;
 		}
-		int depth = USE_MIDPOINT || MAX_DEPTH > 0? start.getDepth(!reverse) : 0;
-		int c;
-		if (MAX_DEPTH > 0 && depth >= MAX_DEPTH) {
+		int depth = c.USE_MIDPOINT || c.MAX_DEPTH > 0? start.getDepth(!reverse) : 0;
+		int cnt;
+		if (c.MAX_DEPTH > 0 && depth >= c.MAX_DEPTH) {
 			return;
 		}
 		long tm = System.nanoTime();
 		if (reverse) {
-			c = networkDB.loadNetworkSegmentStart(cachePoints, start);
+			cnt = networkDB.loadNetworkSegmentStart(cachePoints, start);
 		} else {
-			c = networkDB.loadNetworkSegmentEnd(cachePoints, start);
+			cnt = networkDB.loadNetworkSegmentEnd(cachePoints, start);
 		}
-		if (c > 0) {
-			stats.loadEdgesCnt += c;
+		if (cnt > 0) {
+			stats.loadEdgesCnt += cnt;
 			stats.loadEdgesTime += (System.nanoTime() - tm) / 1e6;
 		}
 		
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
 			NetworkDBPoint nextPoint = reverse ? connected.start : connected.end;
-			if (USE_MIDPOINT && Math.min(depth, MIDPOINT_MAX_DEPTH) > nextPoint.rtCnt + MIDPOINT_ERROR) {
+			if (nextPoint.rtExclude) {
+				continue;
+			}
+			if (c.USE_MIDPOINT && Math.min(depth, c.MIDPOINT_MAX_DEPTH) > nextPoint.rtCnt + c.MIDPOINT_ERROR) {
 				continue;
 			}
 			double rtDistanceToEnd = distanceToEnd(nextPoint, finish);
-			connected.rtCost = reverse ? rtSegmentCostRev(connected, rtDistanceToEnd) : rtSegmentCost(connected, rtDistanceToEnd);
+			if (reverse) {
+				// TODO here rtDistanceFromStart not needed
+				connected.rtCost = start.rtDistanceFromStartRev + connected.dist + 
+						c.HEURISTIC_COEFFICIENT * (connected.start.rtDistanceFromStart > 0 ? connected.start.rtDistanceFromStart :  rtDistanceToEnd);
+			} else {
+				connected.rtCost =  start.rtDistanceFromStart + connected.dist +
+						c.HEURISTIC_COEFFICIENT * (connected.end.rtDistanceFromStartRev > 0 ? connected.end.rtDistanceFromStartRev :  rtDistanceToEnd); 
+			}
 			tm = System.nanoTime();			
 			queue.add(connected);
 			stats.addedEdges++;
