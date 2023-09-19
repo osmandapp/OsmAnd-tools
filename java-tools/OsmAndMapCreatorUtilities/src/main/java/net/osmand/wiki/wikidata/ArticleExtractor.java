@@ -1,7 +1,10 @@
 package net.osmand.wiki.wikidata;
 
+import net.osmand.util.Algorithms;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xwiki.component.manager.ComponentLookupException;
@@ -23,8 +26,9 @@ public class ArticleExtractor {
 	// need to add three java arguments -DentityExpansionLimit=2147480000 -DtotalEntitySizeLimit=2147480000
 	// -Djdk.xml.totalEntitySizeLimit=2147480000
 	public static final String helpMessage = " --mode=<cut|test> --lang=<lang> --title=<title> --amount=<amount>--dir=<work_folder> " +
-			"--testID=<article_ID> --LatLon=<testLatLon>\n" +
-			"mode cut without lang - cut out article with <title> (wikidata title 'Q1072074') from wikidatawiki-latest-pages-articles.xml.gz\n" +
+			"--testID=<article_ID> --LatLon=<testLatLon> --f=<file>\n" +
+			"mode cut without lang - cut out article with <title> (wikidata title 'Q1072074') from <file> or from wikidatawiki-latest-pages-articles.xml.gz\n" +
+			"if --f is absent" +
 			"mode cut with lang - cut out <amount> of articles, beginning with <title> from <lang>wiki-latest-pages-articles.xml.gz and create obf file \n" +
 			"on the <LatLon> coordinates(lat;lon)\n" +
 			"mode test - creates obf file for the article with <articleID> by <LatLon> coordinates(lat;lon)\n" +
@@ -37,6 +41,7 @@ public class ArticleExtractor {
 		String articleID = "";
 		String articleLatLon = "50.45191;30.59195";
 		String articleTitle = "";
+		String fileName = "";
 		int amount = 1;
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
@@ -54,7 +59,7 @@ public class ArticleExtractor {
 				case "--amount=":
 					try {
 						amount = Integer.parseInt(val);
-					}catch (NumberFormatException e){
+					} catch (NumberFormatException e) {
 						amount = 1;
 					}
 					break;
@@ -67,6 +72,9 @@ public class ArticleExtractor {
 				case "--LatLon=":
 					articleLatLon = val;
 					break;
+				case "--f=":
+					fileName = val;
+					break;
 			}
 		}
 		if (mode.isEmpty() || !(mode.equals("cut") || mode.equals("test")) || workDir.isEmpty()
@@ -77,20 +85,23 @@ public class ArticleExtractor {
 		SAXParserFactory factory = SAXParserFactory.newInstance();
 		ArticleExtractor articleExtractor = new ArticleExtractor();
 		boolean processWikidata = lang == null;
-		final String fileName;
-		if (processWikidata) {
-			fileName = workDir + WIKIDATA_ARTICLES_GZ;
+		if (!Algorithms.isEmpty(fileName)) {
+			fileName = workDir + fileName;
 		} else {
-			fileName = workDir + lang + WIKI_ARTICLES_GZ;
+			if (processWikidata) {
+				fileName = workDir + WIKIDATA_ARTICLES_GZ;
+			} else {
+				fileName = workDir + lang + WIKI_ARTICLES_GZ;
+			}
 		}
-		File inFile = new File(fileName);
-		File outputDir = new File(inFile.getParent(), "out");
+		File readFile = new File(fileName);
+		File outputDir = new File(readFile.getParent(), "out");
 		outputDir.mkdirs();
 		try {
 			if ("cut".equals(mode)) {
-				File outFile = new File(outputDir, inFile.getName());
+				File outFile = new File(outputDir, readFile.getName());
 				ExtractorHandler handler = new ExtractorHandler(articleTitle, amount);
-				GZIPInputStream is = new GZIPInputStream(new FileInputStream(fileName));
+				InputStream is = getInputStream(readFile);
 				SAXParser saxParser = factory.newSAXParser();
 				try {
 					saxParser.parse(is, handler);
@@ -100,12 +111,15 @@ public class ArticleExtractor {
 				}
 
 				long startTime = System.currentTimeMillis();
-				articleExtractor.cutArticle(inFile, outFile, handler.getEndHeaderLine(), handler.getFirstArticleLine(),
+				if (handler.getFirstArticleLine() == 0 && handler.getEndArticleLine() == 0) {
+					System.out.printf("Article %s not found\n", articleTitle);
+				}
+				articleExtractor.cutArticle(readFile, outFile, handler.getEndHeaderLine(), handler.getFirstArticleLine(),
 						handler.getEndArticleLine());
-				System.out.println("Trim time: " + (System.currentTimeMillis() - startTime) / 1000);
+				System.out.printf("Trim time: %d sec\n", (System.currentTimeMillis() - startTime) / 1000);
 				articleID = handler.getArticleId();
 			}
-			if (!processWikidata) {
+			if (!processWikidata && !Algorithms.isEmpty(articleID)) {
 				String[] arguments = {
 						"--lang=" + lang,
 						"--dir=" + outputDir.getAbsolutePath() + File.separator,
@@ -125,12 +139,10 @@ public class ArticleExtractor {
 		}
 	}
 
-	void cutArticle(File inFile, File outFile, int endHeaderLine, int startArticleLine, int endArticleLine)
+	void cutArticle(File readFile, File outFile, int endHeaderLine, int startArticleLine, int endArticleLine)
 			throws IOException {
-
-		GZIPOutputStream zip = new GZIPOutputStream(new FileOutputStream(outFile));
-		BufferedReader br = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(inFile))));
-		PrintWriter pw = new PrintWriter(new OutputStreamWriter(zip));
+		BufferedReader br = new BufferedReader(new InputStreamReader(getInputStream(readFile)));
+		PrintWriter pw = new PrintWriter(new OutputStreamWriter(getOutputStream(outFile)));
 		String line;
 		int lineCount = 0;
 		while ((line = br.readLine()) != null && lineCount < endArticleLine) {
@@ -141,7 +153,27 @@ public class ArticleExtractor {
 			lineCount++;
 		}
 		pw.println("</mediawiki>");
-		br.close();
 		pw.close();
+		br.close();
+	}
+
+	private static InputStream getInputStream(File file) throws IOException {
+		InputStream is = new BufferedInputStream(new FileInputStream(file));
+		if (file.getName().endsWith(".bz2")) {
+			is = new BZip2CompressorInputStream(is);
+		} else if (file.getName().endsWith(".gz")) {
+			is = new GZIPInputStream(is);
+		}
+		return is;
+	}
+
+	private static OutputStream getOutputStream(File file) throws IOException {
+		OutputStream os = new FileOutputStream(file);
+		if (file.getName().endsWith(".bz2")) {
+			os = new BZip2CompressorOutputStream(os);
+		} else if (file.getName().endsWith(".gz")) {
+			os = new GZIPOutputStream(os);
+		}
+		return os;
 	}
 }
