@@ -534,7 +534,9 @@ public class HHRoutingPreparationDB {
 		final boolean shortcut;
 		final double dist;
 		List<LatLon> geometry = new ArrayList<>();
-		
+		// routing extra info
+		double rtCost; // added once in queue
+				
 		public NetworkDBSegment(NetworkDBPoint start, NetworkDBPoint end, double dist, boolean direction, boolean shortcut) {
 			this.direction = direction;
 			this.start = start;
@@ -544,12 +546,10 @@ public class HHRoutingPreparationDB {
 		}
 		
 		
-		// routing extra info
-		double rtCost; // added once in queue
 		
 		@Override
 		public String toString() {
-			return String.format("Segment %s -> %s", start, end);
+			return String.format("Segment %s -> %s [%.2f] %s", start, end, dist, shortcut ? "sh" : "bs");
 		}
 		
 	}

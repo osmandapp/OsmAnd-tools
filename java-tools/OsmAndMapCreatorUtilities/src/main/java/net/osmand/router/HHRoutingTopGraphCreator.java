@@ -293,7 +293,7 @@ public class HHRoutingTopGraphCreator {
 		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
 		int cntEdges = networkDB.loadNetworkSegments(pnts.valueCollection(), true);
 		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
-		logf(" %,d - %.2fms\nContracting nodes..", cntEdges, stats.loadEdgesTime);
+		System.out.printf(" %,d - %.2fms\nContracting nodes..", cntEdges, stats.loadEdgesTime);
 		
 		
 		time = System.nanoTime();
@@ -347,11 +347,11 @@ public class HHRoutingTopGraphCreator {
 			for (NetworkDBSegment sh : shortcuts) {
 				NetworkDBSegment dup = sh.start.getSegment(sh.end, true);
 				if (dup != null) {
-					if (dup.rtCost > sh.rtCost) {
+					if (dup.rtCost < sh.rtCost) {
 						// skip shortcut
 						continue;
 					} else {
-						if(!dup.shortcut) {
+						if (!dup.shortcut) {
 							// illegal cause first iteration should have find all shortest routes
 							throw new IllegalStateException();
 						}
@@ -362,7 +362,9 @@ public class HHRoutingTopGraphCreator {
 				}
 				allShortcuts.add(sh);
 				sh.start.connected.add(sh);
-				sh.end.connectedReverse.add(new NetworkDBSegment(sh.start, sh.end, sh.dist, !sh.direction, sh.shortcut));
+				NetworkDBSegment rev = new NetworkDBSegment(sh.start, sh.end, sh.dist, !sh.direction, sh.shortcut);
+				rev.geometry.addAll(sh.geometry);
+				sh.end.connectedReverse.add(rev);
 			}
 			pnt.chInd = contracted++;
 			pnt.rtExclude = true;

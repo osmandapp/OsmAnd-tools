@@ -188,7 +188,7 @@ public class HHRoutePlanner {
 			c.USE_CH = false;
 			c.USE_MIDPOINT = false;
 //			PRELOAD_SEGMENTS = false;
-			DEBUG_VERBOSE_LEVEL = 2;
+			DEBUG_VERBOSE_LEVEL = 0;
 			c.MIDPOINT_ERROR = 3;
 			c.MIDPOINT_MAX_DEPTH = 20;
 		}
@@ -307,7 +307,7 @@ public class HHRoutePlanner {
 				}
 				printPoint(segment, false);
 				segment.end.rtRouteToPoint = segment;
-				segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist;
+				segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist + (segment.shortcut ? 0 : 1);
 //				if (segment.end == end) { // TODO not optimal 
 				if (segment.end.rtDistanceFromStartRev > 0) { // wrong
 					return segment.end;
@@ -395,7 +395,8 @@ public class HHRoutePlanner {
 		double sumDist = 0;
 		for (NetworkDBSegment s : segments) {
 			sumDist += s.dist;
-			System.out.printf("Route %d [%d] -> %d [%d] ( %.5f/%.5f - %d - %.2f s) \n", s.start.index, s.start.chInd, s.end.index,s.end.chInd,
+			System.out.printf("Route %d [%d] -> %d [%d] %s ( %.5f/%.5f - %d - %.2f s) \n", 
+					s.start.index, s.start.chInd, s.end.index,s.end.chInd, s.shortcut ? "sh" : "bs",
 					MapUtils.get31LatitudeY(s.end.startY), MapUtils.get31LongitudeX(s.end.startX), s.end.roadId / 64,
 					sumDist);
 		}
@@ -429,6 +430,9 @@ public class HHRoutePlanner {
 		
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
 			NetworkDBPoint nextPoint = reverse ? connected.start : connected.end;
+//			if (!c.USE_CH && connected.shortcut) {
+//				continue;
+//			}
 			if (nextPoint.rtExclude) {
 				continue;
 			}
@@ -447,6 +451,7 @@ public class HHRoutePlanner {
 				connected.rtCost =  start.rtDistanceFromStart + connected.dist +
 						c.HEURISTIC_COEFFICIENT * (connected.end.rtDistanceFromStartRev > 0 ? connected.end.rtDistanceFromStartRev :  rtDistanceToEnd); 
 			}
+			connected.rtCost += (connected.shortcut ? 0 : 1);
 			tm = System.nanoTime();			
 			queue.add(connected);
 			stats.addedEdges++;
