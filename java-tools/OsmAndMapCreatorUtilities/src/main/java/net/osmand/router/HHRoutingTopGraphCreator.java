@@ -291,7 +291,7 @@ public class HHRoutingTopGraphCreator {
 		
 		time = System.nanoTime();
 		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegments(pnts.valueCollection());
+		int cntEdges = networkDB.loadNetworkSegments(pnts.valueCollection(), true);
 		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
 		System.out.printf(" %,d - %.2fms\nContracting nodes...\n", cntEdges, stats.loadEdgesTime);
 		
@@ -300,7 +300,8 @@ public class HHRoutingTopGraphCreator {
 		DijkstraConfig c = new DijkstraConfig();
 		c.DIJKSTRA_DIRECTION = 1;
 		c.USE_MIDPOINT = false;
-		c.MAX_POINTS = 15; 
+		c.HEURISTIC_COEFFICIENT = 0;
+		c.MAX_POINTS = 50; 
 		c.visited = new ArrayList<>();
 		TIntIntHashMap edgeDiffMap = new TIntIntHashMap();
 		PriorityQueue<NetworkDBPoint> pq = new PriorityQueue<>(new Comparator<NetworkDBPoint>() {
@@ -341,13 +342,29 @@ public class HHRoutingTopGraphCreator {
 				continue;
 			}
 			for (NetworkDBSegment sh : shortcuts) {
+				NetworkDBSegment dup = sh.start.getSegment(sh.end, true);
+				if (dup != null) {
+					if (dup.rtCost > sh.rtCost) {
+						// skip shortcut
+						continue;
+					} else {
+						if(!dup.shortcut) {
+							// illegal cause first iteration should have find all shortest routes
+							throw new IllegalStateException();
+						}
+						allShortcuts.remove(dup);
+						sh.start.connected.remove(dup);
+						sh.end.connectedReverse.remove(sh.end.getSegment(sh.start, false));
+					}
+				}
 				allShortcuts.add(sh);
 				sh.start.connected.add(sh);
-				sh.end.connectedReverse.add(new NetworkDBSegment(sh.dist, false, true, sh.start, sh.end));
+				sh.end.connectedReverse.add(new NetworkDBSegment(sh.start, sh.end, sh.dist, !sh.direction, sh.shortcut));
 			}
 			pnt.chInd = contracted++;
 			pnt.rtExclude = true;
 		}
+		networkDB.updatePointsCHInd(list);
 		networkDB.deleteShortcuts();
 		networkDB.insertSegments(allShortcuts);
 		
@@ -367,7 +384,7 @@ public class HHRoutingTopGraphCreator {
 
 	private void calculateCHEdgeDiff(NetworkDBPoint p, DijkstraConfig c, List<NetworkDBSegment> shortcuts, RoutingStats stats) throws SQLException {
 		c.MAX_COST = 0;
-		for (NetworkDBSegment out : p.connectedReverse) {
+		for (NetworkDBSegment out : p.connected) {
 			c.MAX_COST = Math.max(out.dist, c.MAX_COST);
 		}
 		// shortcuts
@@ -384,15 +401,16 @@ public class HHRoutingTopGraphCreator {
 				}
 				if (out.end.rtDistanceFromStart == 0 || out.end.rtDistanceFromStart > out.dist) {
 					if (shortcuts != null) {
-						NetworkDBSegment sh = new NetworkDBSegment(out.end.rtDistanceFromStart, true, true, in.start, out.end);
-						NetworkDBSegment ps = out.end.rtRouteToPoint;
-						while (true) {
-							sh.geometry.addAll(0, ps.geometry);
-							if (ps.start == in.start) {
-								break;
-							}
-							ps = ps.start.rtRouteToPoint;
+						if (DEBUG_VERBOSE_LEVEL >= 1) {
+							System.out.printf("Shortcut %d -> %d via %d %.2f cost \n ", in.start.index, out.end.index,
+									in.end.index, in.dist + out.dist);
 						}
+						NetworkDBSegment sh = new NetworkDBSegment(in.start, out.end,
+								in.dist + out.dist, true, true);
+						networkDB.loadGeometry(in, false);
+						sh.geometry.addAll(in.geometry);
+						networkDB.loadGeometry(out, false);
+						sh.geometry.addAll(out.geometry);
 						shortcuts.add(sh);
 					}
 					p.rtCnt++;

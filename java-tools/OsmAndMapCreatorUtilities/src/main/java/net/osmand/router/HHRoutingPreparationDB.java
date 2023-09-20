@@ -41,6 +41,7 @@ public class HHRoutingPreparationDB {
 
 	private final int BATCH_SIZE = 10000;
 	private int batchInsPoint = 0;
+
 	
 
 	public HHRoutingPreparationDB(File file) throws SQLException {
@@ -50,25 +51,27 @@ public class HHRoutingPreparationDB {
 		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31, indexes, PRIMARY key (idPoint))"); // ind unique
 		st.execute("CREATE TABLE IF NOT EXISTS clusters(idPoint, indPoint, clusterInd, PRIMARY key (indPoint, clusterInd))");
 		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, shortcut, PRIMARY key (idPoint, idConnPoint))");
-		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, PRIMARY key (idPoint, idConnPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, shortcut, PRIMARY key (idPoint, idConnPoint))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
 		st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
 		st.execute("CREATE TABLE IF NOT EXISTS midpoints(ind, maxMidDepth, proc, PRIMARY key (ind))"); // ind unique
 		
 		// TODO delete in the end update
-		if (!checkColumn(st, "chInd", "points")) {
+		if (!checkColumnExist(st, "chInd", "points")) {
 			st.execute("ALTER TABLE points add column chInd");
 		}
-		if (!checkColumn(st, "shortcut", "segments")) {
+		if (!checkColumnExist(st, "shortcut", "segments")) {
 			st.execute("ALTER TABLE segments add column shortcut");
+		}
+		if (!checkColumnExist(st, "shortcut", "geometry")) {
+			st.execute("ALTER TABLE geometry add column shortcut");
 		}
 		
 		insPoint = conn.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd) VALUES(?, ?, ?)");
-		insSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist, shortcut) VALUES(?, ?, ?, ?)");
-		insGeometry = conn.prepareStatement("INSERT INTO geometry(idPoint, idConnPoint, geometry) " + " VALUES(?, ?, ?)");
+		
 		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint =? ");
 		loadSegmentEnd = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idPoint = ?  ");
 		loadSegmentStart = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idConnPoint = ?  ");
@@ -76,7 +79,7 @@ public class HHRoutingPreparationDB {
 		st.close();
 	}
 
-	private boolean checkColumn(Statement st, String col, String table) throws SQLException {
+	private boolean checkColumnExist(Statement st, String col, String table) throws SQLException {
 		try {
 			return st.execute("SELECT "+ col+ " FROM " + table + " limit 1 ");
 		} catch (SQLException e) {
@@ -230,6 +233,21 @@ public class HHRoutingPreparationDB {
 		rs.close();
 	}
 	
+	public void updatePointsCHInd(Collection<NetworkDBPoint> pnts) throws SQLException {
+		PreparedStatement updCHInd = conn.prepareStatement("UPDATE  points SET chInd = ? where idPoint = ?");
+		int ind = 0;
+		for (NetworkDBPoint p : pnts) {
+			updCHInd.setLong(1, p.chInd);
+			updCHInd.setLong(2, p.pntGeoId);
+			updCHInd.addBatch();
+			if (ind++ % BATCH_SIZE == 0) {
+				updCHInd.executeBatch();
+			}
+		}
+		updCHInd.executeBatch();
+		updCHInd.close();
+	}
+	
 	public void insertVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
 		PreparedStatement ps = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId) VALUES (?, ?)");
 		int ind = 0;
@@ -250,10 +268,18 @@ public class HHRoutingPreparationDB {
 	public void deleteShortcuts() throws SQLException {
 		Statement st = conn.createStatement();
 		st.execute("DELETE from segments where shortcut > 0");
+		st.execute("DELETE from geometry where shortcut > 0");
 		st.close();
 	}
 	
 	public void insertSegments(List<NetworkDBSegment> segments) throws SQLException {
+		if (insSegment == null) {
+			insSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist, shortcut) VALUES(?, ?, ?, ?)");
+		}
+		if (insGeometry == null) {
+			insGeometry = conn.prepareStatement("INSERT INTO geometry(idPoint, idConnPoint, shortcut, geometry) " + " VALUES(?, ?, ?, ?)");
+		}
+		int ind= 0;
 		for (NetworkDBSegment s : segments) {
 			insSegment.setLong(1, s.start.index);
 			insSegment.setLong(2, s.end.index);
@@ -269,15 +295,21 @@ public class HHRoutingPreparationDB {
 			}
 			insGeometry.setLong(1, s.start.index);
 			insGeometry.setLong(2, s.end.index);
-			insGeometry.setBytes(3, coordinates);
+			insSegment.setInt(3, s.shortcut ? 1 : 0);
+			insGeometry.setBytes(4, coordinates);
+			
 			insGeometry.addBatch();
+			if (ind++ % BATCH_SIZE == 0) {
+				insSegment.executeBatch();
+				insGeometry.executeBatch();
+			}
 		}
 		insSegment.executeBatch();
 		insGeometry.executeBatch();
 	}
 	
 	public void loadGeometry(NetworkDBSegment segment, boolean reload) throws SQLException {
-		if(!segment.geometry.isEmpty() && !reload) {
+		if (!segment.geometry.isEmpty() && !reload) {
 			return;
 		}
 		segment.geometry.clear();
@@ -290,7 +322,7 @@ public class HHRoutingPreparationDB {
 	}
 	
 	public int loadNetworkSegmentEnd(TLongObjectHashMap<NetworkDBPoint> pntsById, NetworkDBPoint point) throws SQLException {
-		if(point.connected != null) {
+		if (point.connected != null) {
 			return 0;
 		}
 		point.connected = new ArrayList<>();
@@ -303,7 +335,7 @@ public class HHRoutingPreparationDB {
 			NetworkDBPoint end = pntsById.get(rs.getLong(2));
 			double dist = rs.getDouble(3);
 			boolean shortcut = rs.getInt(4) > 0;
-			NetworkDBSegment segment = new NetworkDBSegment(dist, true, shortcut, start, end);
+			NetworkDBSegment segment = new NetworkDBSegment(start, end, dist, true, shortcut);
 			point.connected.add(segment);
 		}
 		rs.close();
@@ -324,7 +356,7 @@ public class HHRoutingPreparationDB {
 			NetworkDBPoint end = pntsById.get(rs.getLong(2));
 			double dist = rs.getDouble(3);
 			boolean shortcut = rs.getInt(4) > 0;
-			NetworkDBSegment rev = new NetworkDBSegment(dist, false, shortcut, start, end);
+			NetworkDBSegment rev = new NetworkDBSegment(start, end, dist, false, shortcut);
 			end.connectedReverse.add(rev);
 		}
 		rs.close();
@@ -349,11 +381,11 @@ public class HHRoutingPreparationDB {
 			NetworkDBPoint end = pntsById.get(rs.getLong(2));
 			double dist = rs.getDouble(3);
 			boolean shortcut = rs.getInt(4) > 0;
-			if(excludeShortcuts && shortcut) {
+			if (excludeShortcuts && shortcut) {
 				continue;
 			}
-			NetworkDBSegment segment = new NetworkDBSegment(dist, true, shortcut, start, end);
-			NetworkDBSegment rev = new NetworkDBSegment(dist, false, shortcut, start, end);
+			NetworkDBSegment segment = new NetworkDBSegment(start, end, dist, true, shortcut);
+			NetworkDBSegment rev = new NetworkDBSegment(start, end, dist, false, shortcut);
 			start.connected.add(segment);
 			end.connectedReverse.add(rev);
 		}
@@ -503,13 +535,14 @@ public class HHRoutingPreparationDB {
 		final double dist;
 		List<LatLon> geometry = new ArrayList<>();
 		
-		public NetworkDBSegment(double dist, boolean shortcut, boolean direction, NetworkDBPoint start, NetworkDBPoint end) {
+		public NetworkDBSegment(NetworkDBPoint start, NetworkDBPoint end, double dist, boolean direction, boolean shortcut) {
 			this.direction = direction;
 			this.start = start;
 			this.end = end;
 			this.shortcut = shortcut;
 			this.dist = dist;
 		}
+		
 		
 		// routing extra info
 		double rtCost; // added once in queue
@@ -523,7 +556,7 @@ public class HHRoutingPreparationDB {
 	
 	static class NetworkDBPoint {
 		int index;
-		int chInd;
+		long chInd;
 		long pntGeoId;
 		public long roadId;
 		public int start;
@@ -584,6 +617,17 @@ public class HHRoutingPreparationDB {
 			return new LatLon(MapUtils.get31LatitudeY(this.startY / 2 + this.endY / 2),
 					MapUtils.get31LongitudeX(this.startX / 2 + this.endX / 2));
 		}
+		
+		public NetworkDBSegment getSegment(NetworkDBPoint target, boolean dir) {
+			for (NetworkDBSegment s : (dir ? connected : connectedReverse)) {
+				if (dir && s.end == target) {
+					return s;
+				} else if (!dir && s.start == target) {
+					return s;
+				}
+			}
+			return null;
+		}
 
 		public void clearRouting() {
 			rtDepth = -1;
@@ -609,6 +653,8 @@ public class HHRoutingPreparationDB {
 			}
 			return 0;
 		}
+
+		
 	}
 
 

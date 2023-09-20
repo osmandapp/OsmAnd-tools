@@ -967,7 +967,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				hhPlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
 			}
 
-			return hhPlanner.runRouting(startRoute, endRoute);
+			return hhPlanner.runRouting(startRoute, endRoute, null);
 		} catch (Exception e) {
 			ExceptionHandler.handle(e);
 			return new ArrayList<>();

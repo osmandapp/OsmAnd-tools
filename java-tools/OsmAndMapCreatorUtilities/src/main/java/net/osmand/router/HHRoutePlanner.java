@@ -32,7 +32,6 @@ public class HHRoutePlanner {
 	
 	
 	static boolean DEBUG_TEST_DATA = true;
-	
 	static boolean PRELOAD_SEGMENTS = true;
 
 	static final int PROC_ROUTING = 0;
@@ -267,10 +266,10 @@ public class HHRoutePlanner {
 			}
 		};
 		Queue<NetworkDBSegment> queue = new PriorityQueue<>(cmp);
-		queue = new FourAryHeap<>(cmp);
-		start.rtDistanceFromStart = 0.1; // visited
+//		queue = new FourAryHeap<>(cmp);
+		start.rtDistanceFromStart = 0.0001; // visited
 		if (end != null) {
-			end.rtDistanceFromStartRev = 0.1; // visited
+			end.rtDistanceFromStartRev = 0.0001; // visited
 		}
 		if (c.DIJKSTRA_DIRECTION >= 0) {
 			addToQueue(queue, start, end, false, c, stats);
