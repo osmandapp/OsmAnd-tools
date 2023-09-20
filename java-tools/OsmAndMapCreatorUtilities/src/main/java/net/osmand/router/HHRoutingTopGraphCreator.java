@@ -64,7 +64,7 @@ public class HHRoutingTopGraphCreator {
 			DEBUG_START_TIME = System.currentTimeMillis();
 		}
 		String ms = String.format("%3.1fs ", (System.currentTimeMillis() - DEBUG_START_TIME) / 1000.f);
-		System.out.printf(ms + string, a);
+		System.out.printf(ms + string + "\n", a);
 
 	}
 	
@@ -301,7 +301,7 @@ public class HHRoutingTopGraphCreator {
 		c.DIJKSTRA_DIRECTION = 1;
 		c.USE_MIDPOINT = false;
 		c.HEURISTIC_COEFFICIENT = 0;
-		c.MAX_POINTS = 50; 
+		c.MAX_POINTS = 15; 
 		c.visited = new ArrayList<>();
 		TIntIntHashMap edgeDiffMap = new TIntIntHashMap();
 		PriorityQueue<NetworkDBPoint> pq = new PriorityQueue<>(new Comparator<NetworkDBPoint>() {
@@ -328,16 +328,16 @@ public class HHRoutingTopGraphCreator {
 		List<NetworkDBSegment> allShortcuts = new ArrayList<>();
 		List<NetworkDBSegment> shortcuts = new ArrayList<>();
 		int contracted = 0;
+		long timeC = System.nanoTime();
 		while (!pq.isEmpty()) {
 			if (++prog % 1000 == 0) {
 				logf("Contracting %d (reindexing %d, shortcuts %d)...", contracted, reindex, allShortcuts.size());
+				printStat("Contraction stat ", stats, timeC, 1000);
+				timeC = System.nanoTime();
 			}
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;
 			shortcuts.clear();
-			if(pnt.index == 53223) {
-				System.out.println("");
-			}
 			calculateCHEdgeDiff(pnt, c, shortcuts, stats);
 			if (oldIndex < pnt.rtIndex) {
 				pq.add(pnt);
@@ -371,17 +371,22 @@ public class HHRoutingTopGraphCreator {
 		networkDB.deleteShortcuts();
 		networkDB.insertSegments(allShortcuts);
 		
-		double contractionTime = (System.nanoTime() - time) / 1e6;
 		System.out.printf("Added %d shortcuts, reindexed %d \n", allShortcuts.size(), reindex);
 		
-		System.out.println(String.format("Routing for %d - %.2f ms (%.2f mcs per node), visited %,d vertices, %,d of %,d edges ",
-				list.size(), contractionTime, contractionTime * 1e3/  list.size() ,
-				stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
-		
+		printStat("Contraction ", stats, time, list.size());
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
 				(time - startTime) / 1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
 				stats.addQueueTime, stats.prepTime);
+	}
+
+
+	private void printStat(String name, RoutingStats stats, long time, int size) {
+		double contractionTime = (System.nanoTime() - time) / 1e6;
+		System.out.println(
+				String.format(name + " for %d - %.2f ms (%.2f mcs per node), visited %,d vertices, %,d of %,d edges ",
+						size, contractionTime, contractionTime * 1e3 / size,
+				stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
 	}
 
 
