@@ -32,8 +32,6 @@ public class HHRoutingTopGraphCreator {
 	static final int PROC_2ND_LEVEL = 3;
 	static final int PROC_CH = 4;
 
-	static int MAX_ITERATIONS = 100;
-	static int MAX_DEPTH = 40;
 	static int SAVE_ITERATIONS = 20;
 	static int LOG_STAT_THRESHOLD = 10;
 	static int LOG_STAT_MAX_DEPTH = 30;
@@ -70,6 +68,8 @@ public class HHRoutingTopGraphCreator {
 	
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
+		int MAX_ITERATIONS = 100;
+		int MAX_DEPTH = 40;
 		for (String a : args) {
 			if (a.equals("--setup-midpoints")) {
 				PROCESS = PROC_MIDPOINTS;
@@ -94,9 +94,9 @@ public class HHRoutingTopGraphCreator {
 				HHRoutePlanner.ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
 		if (PROCESS == PROC_MIDPOINTS) {
-			planner.calculateMidPoints();
+			planner.calculateMidPoints(MAX_DEPTH, MAX_ITERATIONS);
 		} else if (PROCESS == PROC_CH) { 
-			planner.runContractionHierarchy();
+			planner.runContractionHierarchy(MAX_DEPTH);
 		} else if (PROCESS == PROC_2ND_LEVEL) { 
 			planner.run2ndLevelRouting();
 		} else if (PROCESS == PROC_MONTECARLO) {
@@ -166,7 +166,7 @@ public class HHRoutingTopGraphCreator {
 		}
 	}
 	
-	private void calculateMidPoints() throws SQLException {
+	private void calculateMidPoints(int MAX_DEPTH, int MAX_ITERATIONS) throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
@@ -279,7 +279,7 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void runContractionHierarchy() throws SQLException {
+	private void runContractionHierarchy(int maxPoints) throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
@@ -301,7 +301,7 @@ public class HHRoutingTopGraphCreator {
 		c.DIJKSTRA_DIRECTION = 1;
 		c.USE_MIDPOINT = false;
 		c.HEURISTIC_COEFFICIENT = 0;
-		c.MAX_POINTS = 15; 
+		c.MAX_POINTS = maxPoints; 
 		c.visited = new ArrayList<>();
 		TIntIntHashMap edgeDiffMap = new TIntIntHashMap();
 		PriorityQueue<NetworkDBPoint> pq = new PriorityQueue<>(new Comparator<NetworkDBPoint>() {
