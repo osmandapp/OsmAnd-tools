@@ -30,8 +30,6 @@ public class HHRoutePlanner {
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
 	
-	
-	static boolean DEBUG_TEST_DATA = true;
 	static boolean PRELOAD_SEGMENTS = true;
 
 	static final int PROC_ROUTING = 0;
@@ -52,6 +50,7 @@ public class HHRoutePlanner {
 		public float DIJKSTRA_DIRECTION = 0; // 0 - 2 directions, 1 - positive, -1 - reverse
 		public int MAX_DEPTH = -1; // max depth to go to
 		public int MAX_POINTS = -1; // max points to settle
+		public boolean USE_CH = false;
 		public boolean USE_MIDPOINT = false;
 		public int MIDPOINT_ERROR = 3;
 		public int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
@@ -147,7 +146,6 @@ public class HHRoutePlanner {
 				c.USE_MIDPOINT = Boolean.parseBoolean(s[0]);
 				c.MIDPOINT_ERROR = Integer.parseInt(s[1]);
 				c.MIDPOINT_MAX_DEPTH = Integer.parseInt(s[2]);
-				DEBUG_TEST_DATA = false;
 			}
 		}
 		if (PROCESS_START == null || PROCESS_END == null) {
@@ -187,7 +185,10 @@ public class HHRoutePlanner {
 			// test data for debug swap
 			c.HEURISTIC_COEFFICIENT = 0;
 			c.DIJKSTRA_DIRECTION = 0;
+			c.USE_CH = false;
 			c.USE_MIDPOINT = false;
+//			PRELOAD_SEGMENTS = false;
+			DEBUG_VERBOSE_LEVEL = 2;
 			c.MIDPOINT_ERROR = 3;
 			c.MIDPOINT_MAX_DEPTH = 20;
 		}
@@ -226,7 +227,7 @@ public class HHRoutePlanner {
 				endPnt = pnt;
 			}
 		}
-		
+		System.out.printf("Looking for route %s -> %s \n", startPnt, endPnt);
 		time = System.nanoTime();
 
 		// Routing
@@ -267,9 +268,17 @@ public class HHRoutePlanner {
 		};
 		Queue<NetworkDBSegment> queue = new PriorityQueue<>(cmp);
 //		queue = new FourAryHeap<>(cmp);
-		start.rtDistanceFromStart = 0.0001; // visited
+		if (start != null) {
+			start.rtDistanceFromStart = 0.0001; // visited
+			if (c.visited != null) {
+				c.visited.add(start);
+			}
+		}
 		if (end != null) {
 			end.rtDistanceFromStartRev = 0.0001; // visited
+			if (c.visitedRev != null) {
+				c.visitedRev.add(end);
+			}
 		}
 		if (c.DIJKSTRA_DIRECTION >= 0) {
 			addToQueue(queue, start, end, false, c, stats);
@@ -299,16 +308,16 @@ public class HHRoutePlanner {
 				printPoint(segment, false);
 				segment.end.rtRouteToPoint = segment;
 				segment.end.rtDistanceFromStart = segment.start.rtDistanceFromStart + segment.dist;
-				// TODO not optimal
-				if (segment.end == end) { // segment.end.rtDistanceFromStartRev > 0 
+//				if (segment.end == end) { // TODO not optimal 
+				if (segment.end.rtDistanceFromStartRev > 0) { // wrong
 					return segment.end;
 				}
 				addToQueue(queue, segment.end, end, false, c, stats);
-				if (c.MAX_POINTS > 0) {
+				if (c.visited != null) {
 					c.visited.add(segment.end);
-					if (c.visited.size() > c.MAX_POINTS) {
-						break;
-					}
+				}
+				if (c.MAX_POINTS > 0 && c.visited.size() > c.MAX_POINTS) {
+					break;
 				}
 			} else {
 				if (segment.start.rtDistanceFromStartRev > 0) { // or segment.end.rtRouteToPoint != null
@@ -321,15 +330,16 @@ public class HHRoutePlanner {
 				printPoint(segment, true);
 				segment.start.rtRouteToPointRev = segment;
 				segment.start.rtDistanceFromStartRev = segment.end.rtDistanceFromStartRev + segment.dist;
-				if (segment.start == start) { // segment.start.rtDistanceFromStart > 0 
+//				if (segment.start == start) { // not optimal 
+				if (segment.start.rtDistanceFromStart > 0) { // wrong
 					return segment.start;
 				}
 				addToQueue(queue, segment.start, start, true, c, stats);
-				if (c.MAX_POINTS > 0) {
+				if (c.visitedRev != null) {
 					c.visitedRev.add(segment.start);
-					if (c.visitedRev.size() > c.MAX_POINTS) {
-						break;
-					}
+				}
+				if (c.MAX_POINTS > 0 && c.visitedRev.size() > c.MAX_POINTS) {
+					break;
 				}
 			}
 			stats.visitedVertices++;
@@ -343,9 +353,11 @@ public class HHRoutePlanner {
 		if (DEBUG_VERBOSE_LEVEL > 1) {
 			String symbol;
 			if (!reverse) {
-				symbol = "-> " + segment.end.index + " (from " + segment.start.index + ")";
+				symbol = String.format("-> %d [%d] (from %d [%d])", segment.end.index, segment.end.chInd,
+						segment.start.index, segment.start.chInd);
 			} else {
-				symbol = "<- " + segment.start.index + " (from " + segment.end.index + ")";
+				symbol = String.format("<- %d [%d] (from %d [%d])", segment.start.index, segment.start.chInd,
+						segment.end.index, segment.end.chInd);
 			}
 			double cost = (reverse ? segment.end.rtDistanceFromStartRev : segment.start.rtDistanceFromStart) + segment.dist;
 			NetworkDBPoint pnt = reverse ? segment.start : segment.end;
@@ -383,7 +395,7 @@ public class HHRoutePlanner {
 		double sumDist = 0;
 		for (NetworkDBSegment s : segments) {
 			sumDist += s.dist;
-			System.out.printf("Route %d -> %d ( %.5f/%.5f - %d - %.2f s) \n", s.start.index, s.end.index,
+			System.out.printf("Route %d [%d] -> %d [%d] ( %.5f/%.5f - %d - %.2f s) \n", s.start.index, s.start.chInd, s.end.index,s.end.chInd,
 					MapUtils.get31LatitudeY(s.end.startY), MapUtils.get31LongitudeX(s.end.startX), s.end.roadId / 64,
 					sumDist);
 		}
@@ -418,6 +430,9 @@ public class HHRoutePlanner {
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
 			NetworkDBPoint nextPoint = reverse ? connected.start : connected.end;
 			if (nextPoint.rtExclude) {
+				continue;
+			}
+			if (c.USE_CH && nextPoint.chInd < start.chInd) {
 				continue;
 			}
 			if (c.USE_MIDPOINT && Math.min(depth, c.MIDPOINT_MAX_DEPTH) > nextPoint.rtCnt + c.MIDPOINT_ERROR) {

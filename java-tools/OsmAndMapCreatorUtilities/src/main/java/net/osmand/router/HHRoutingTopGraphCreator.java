@@ -335,6 +335,9 @@ public class HHRoutingTopGraphCreator {
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;
 			shortcuts.clear();
+			if(pnt.index == 53223) {
+				System.out.println("");
+			}
 			calculateCHEdgeDiff(pnt, c, shortcuts, stats);
 			if (oldIndex < pnt.rtIndex) {
 				pq.add(pnt);
