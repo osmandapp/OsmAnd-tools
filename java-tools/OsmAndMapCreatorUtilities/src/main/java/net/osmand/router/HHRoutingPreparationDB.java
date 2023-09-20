@@ -50,7 +50,9 @@ public class HHRoutingPreparationDB {
 		Statement st = conn.createStatement();
 		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31, indexes, PRIMARY key (idPoint))"); // ind unique
 		st.execute("CREATE TABLE IF NOT EXISTS clusters(idPoint, indPoint, clusterInd, PRIMARY key (indPoint, clusterInd))");
-		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, shortcut, PRIMARY key (idPoint, idConnPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, shortcut)");
+		st.execute("CREATE INDEX IF NOT EXISTS segmentsPntInd on segments(idPoint)");
+		st.execute("CREATE INDEX IF NOT EXISTS segmentsConnPntInd on segments(idConnPoint)");
 		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, shortcut, PRIMARY key (idPoint, idConnPoint))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");

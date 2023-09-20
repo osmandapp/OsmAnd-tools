@@ -69,7 +69,7 @@ public class HHRoutingTopGraphCreator {
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
 		int MAX_ITERATIONS = 100;
-		int MAX_DEPTH = 40;
+		int MAX_DEPTH = 5;
 		for (String a : args) {
 			if (a.equals("--setup-midpoints")) {
 				PROCESS = PROC_MIDPOINTS;
@@ -348,16 +348,20 @@ public class HHRoutingTopGraphCreator {
 				NetworkDBSegment dup = sh.start.getSegment(sh.end, true);
 				if (dup != null) {
 					if (dup.dist < sh.dist) {
-						// skip shortcut
+						// skip shortcut (not needed) - not enough depth for Dijkstra
 						continue;
 					} else {
 						if (!dup.shortcut) {
+							// 
 							System.err.println(String.format("Illegal state base %s > shortcut %s", dup.toString(), sh.toString()));
+						} else {
+							System.err.println(String.format("Illegal duplicate old %s < shortcut %s", dup.toString(), sh.toString()));
 							throw new IllegalStateException(dup.toString());
+
+//							allShortcuts.remove(dup);
+//							sh.start.connected.remove(dup);
+//							sh.end.connectedReverse.remove(sh.end.getSegment(sh.start, false));
 						}
-						allShortcuts.remove(dup);
-						sh.start.connected.remove(dup);
-						sh.end.connectedReverse.remove(sh.end.getSegment(sh.start, false));
 					}
 				}
 				allShortcuts.add(sh);
