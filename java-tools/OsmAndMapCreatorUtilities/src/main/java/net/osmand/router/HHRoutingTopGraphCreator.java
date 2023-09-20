@@ -100,7 +100,7 @@ public class HHRoutingTopGraphCreator {
 		} else if (PROCESS == PROC_2ND_LEVEL) { 
 			planner.run2ndLevelRouting();
 		} else if (PROCESS == PROC_MONTECARLO) {
-			Collection<Entity> objects = planner.runMonteCarloRouting();
+			Collection<Entity> objects = planner.runMonteCarloRouting(MAX_ITERATIONS);
 			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-mc.osm"));
 		}
 		planner.networkDB.close();
@@ -784,7 +784,7 @@ public class HHRoutingTopGraphCreator {
 		return false;
 	}
 	
-	private Collection<Entity> runMonteCarloRouting() throws SQLException {
+	private Collection<Entity> runMonteCarloRouting(int MAX_ITERATIONS) throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
