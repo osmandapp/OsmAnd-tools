@@ -293,7 +293,7 @@ public class HHRoutingTopGraphCreator {
 		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
 		int cntEdges = networkDB.loadNetworkSegments(pnts.valueCollection(), true);
 		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
-		System.out.printf(" %,d - %.2fms\nContracting nodes...\n", cntEdges, stats.loadEdgesTime);
+		logf(" %,d - %.2fms\nContracting nodes..", cntEdges, stats.loadEdgesTime);
 		
 		
 		time = System.nanoTime();
@@ -314,7 +314,7 @@ public class HHRoutingTopGraphCreator {
 		int prog = 0;
 		for (NetworkDBPoint p : list) {
 			if (++prog % 1000 == 0) {
-				System.out.printf("Preparing %d...\n", prog);
+				logf("Preparing %d...", prog);
 			}
 			calculateCHEdgeDiff(p, c, null, stats);
 			pq.add(p);
@@ -330,7 +330,7 @@ public class HHRoutingTopGraphCreator {
 		int contracted = 0;
 		while (!pq.isEmpty()) {
 			if (++prog % 1000 == 0) {
-				System.out.printf("Contracting %d (reindexing %d, shortcuts %d)...\n", contracted, reindex, allShortcuts.size());
+				logf("Contracting %d (reindexing %d, shortcuts %d)...", contracted, reindex, allShortcuts.size());
 			}
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;
