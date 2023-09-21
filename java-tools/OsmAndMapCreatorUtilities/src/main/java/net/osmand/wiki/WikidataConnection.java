@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 
@@ -21,13 +22,13 @@ import net.osmand.obf.preparation.DBDialect;
 
 public class WikidataConnection {
 	private static final Log log = PlatformUtil.getLog(WikidataConnection.class);
-	private Connection conn;
-	private PreparedStatement pselect;
-	private PreparedStatement pinsert;
+	private final Connection conn;
+	private final PreparedStatement pselect;
+	private final PreparedStatement pinsert;
 	private int downloadMetadata = 0;
 
 	public WikidataConnection(File f) throws SQLException {
-		conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), log);
+		conn = DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata(wikidataid text, metadata text)");
 		pselect = conn.prepareStatement("SELECT metadata FROM wikidata where wikidataid = ? ");
 		pinsert = conn.prepareStatement("INSERT INTO wikidata( wikidataid, metadata) VALUES(?, ?) ");
@@ -47,7 +48,7 @@ public class WikidataConnection {
 			while ((s = reader.readLine()) != null) {
 				metadata.append(s).append("\n");
 			}
-			obj = new JsonParser().parse(metadata.toString()).getAsJsonObject();
+			obj = JsonParser.parseString(metadata.toString()).getAsJsonObject();
 			pinsert.setString(1, id);
 			pinsert.setString(2, metadata.toString());
 			pinsert.execute();
@@ -62,7 +63,7 @@ public class WikidataConnection {
 		ResultSet rs = pselect.executeQuery();
 		try {
 			if (rs.next()) {
-				return new JsonParser().parse(rs.getString(1)).getAsJsonObject();
+				return JsonParser.parseString(rs.getString(1)).getAsJsonObject();
 			}
 		} catch (JsonSyntaxException e) {
 			e.printStackTrace();
@@ -90,6 +91,12 @@ public class WikidataConnection {
 
 				return siteLinksElement.getAsJsonObject().get(lang + "wiki").getAsJsonObject().get("title")
 						.getAsString();
+			} else {
+				for (Map.Entry<String, JsonElement> e : siteLinksElement.getAsJsonObject().entrySet()) {
+					if (!e.getKey().startsWith("commons") && e.getKey().endsWith("wiki")) {
+						return e.getValue().getAsJsonObject().get("title").getAsString();
+					}
+				}
 			}
 		} catch (IllegalStateException e) {
 			System.err.println("Error parsing wikidata Json " + wikiDataId + " " + metadata);

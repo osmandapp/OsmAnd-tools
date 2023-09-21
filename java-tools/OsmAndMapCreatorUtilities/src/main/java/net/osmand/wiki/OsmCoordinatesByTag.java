@@ -19,7 +19,6 @@ import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.PlatformUtil;
-import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.OsmDbAccessor;
@@ -37,14 +36,15 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 
+import static net.osmand.wiki.WikiDatabasePreparation.*;
+
 public class OsmCoordinatesByTag {
 
 	DBDialect osmDBdialect = DBDialect.SQLITE;
 	private static final Log log = PlatformUtil.getLog(OsmCoordinatesByTag.class);
 	private final Set<String> filterExactTags;
 	private final String[] filterStartsWithTags;
-	
-	Map<String, LatLon> coordinates = new HashMap<String, LatLon>();  
+	private final Map<String, LatLon> coordinates = new HashMap<>();
 	int registeredNodes = 0;
 	int registeredWays = 0;
 	int registeredRelations = 0;
@@ -57,10 +57,9 @@ public class OsmCoordinatesByTag {
 	public static void main(String[] args) throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_waynodes.osm.gz");
 //		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_buildings_multipolygon.osm.gz");
-		ConsoleProgressImplementation progress = new ConsoleProgressImplementation();
 		OsmCoordinatesByTag o = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
 				new String[] { "wikipedia:" });
-		o.parseOSMCoordinates(osmGz, progress, false);
+		o.parseOSMCoordinates(osmGz, null, false);
 		
 	}
 	
@@ -94,7 +93,11 @@ public class OsmCoordinatesByTag {
 	}
 
 	private void registerEntity(Entity entity) {
-		LatLon center = OsmMapUtils.getCenter(entity);
+		net.osmand.data.LatLon entityCenter = OsmMapUtils.getCenter(entity);
+		LatLon center = null;
+		if (entityCenter != null) {
+			center = new LatLon(entityCenter.getLatitude(), entityCenter.getLongitude());
+		}
 		for (String t : entity.getTagKeySet()) {
 			if (checkTagSuitable(t)) {
 				if (entity instanceof Node) {
@@ -112,6 +115,9 @@ public class OsmCoordinatesByTag {
 	}
 
 	public void parseOSMCoordinates(File readFile, ConsoleProgressImplementation progress, boolean parseRelations) throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		if (progress == null) {
+			progress = new ConsoleProgressImplementation();
+		}
 		File dbFile = new File(readFile.getParentFile(), readFile.getName() + ".db");
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		boolean[] hasRelations = new boolean[] {false};
@@ -210,8 +216,8 @@ public class OsmCoordinatesByTag {
 			// parse once again
 			parseOSMCoordinates(readFile, progress, true);
 		}
-		System.out.println(String.format("Total %d registered (%d nodes, %d ways, %d relations)", coordinates.size(), 
-				registeredNodes, registeredWays, registeredRelations));
+		System.out.printf("Total %d registered (%d nodes, %d ways, %d relations)%n", coordinates.size(),
+				registeredNodes, registeredWays, registeredRelations);
 		printMemoryConsumption("");
 	}
 	

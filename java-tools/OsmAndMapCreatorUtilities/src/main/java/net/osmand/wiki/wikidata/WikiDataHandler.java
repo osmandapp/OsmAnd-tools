@@ -4,19 +4,15 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.xml.parsers.SAXParser;
 
-import net.osmand.data.LatLon;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.obf.preparation.OsmDbAccessor;
-import net.osmand.obf.preparation.OsmDbCreator;
 import net.osmand.wiki.OsmCoordinatesByTag;
 
 import org.apache.commons.logging.Log;
@@ -25,6 +21,9 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
+import static net.osmand.wiki.WikiDatabasePreparation.*;
+
 public class WikiDataHandler extends DefaultHandler {
 
 	private static final Log log = PlatformUtil.getLog(WikiDataHandler.class);

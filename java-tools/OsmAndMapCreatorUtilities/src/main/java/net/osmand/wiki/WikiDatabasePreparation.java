@@ -63,7 +63,6 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
 import net.osmand.PlatformUtil;
-import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
@@ -108,7 +107,8 @@ public class WikiDatabasePreparation {
 
 	}
 
-	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata) throws IOException, SQLException {
+	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata,
+	                                       OsmCoordinatesByTag osmCoordinates) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
@@ -144,7 +144,9 @@ public class WikiDatabasePreparation {
 				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
-					bld.append(parseListing(val, wikidata, lang));
+					String[] stringRef = new String[]{val};
+					bld.append(parseListing(stringRef, wikidata, lang, osmCoordinates));
+					val = stringRef[0];
 				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
 					bld.append((parseRegionList(val)));
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
@@ -511,11 +513,12 @@ public class WikiDatabasePreparation {
 			blocksMap.put(key, tmp);
 		}
 	}
-	
-	private static String parseListing(String val, WikidataConnection wikiDataconn, String wikiLang) throws IOException, SQLException {
+
+	private static String parseListing(String[] val, WikidataConnection wikiDataconn, String wikiLang,
+	                                   OsmCoordinatesByTag osmCoordinates) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
-		val = val.replaceAll("\\{\\{.*}}", "");
-		String[] parts = val.split("\\|");
+		val[0] = val[0].replaceAll("\\{\\{.*}}", "");
+		String[] parts = val[0].split("\\|");
 		String lat = null;
 		String lon = null;
 		String areaCode = "";
@@ -586,7 +589,14 @@ public class WikiDatabasePreparation {
 			}
 		}
 		if (wikiLink.isEmpty() && !wikiData.isEmpty() && wikiDataconn != null) {
-			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData); 
+			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData);
+			LatLon latLon = osmCoordinates.getCoordinates("wikidata", wikiData);
+			if (latLon != null) {
+				boolean isEmptyOriginLatLon = lat == null && lon == null;
+				lat = String.valueOf(latLon.getLatitude());
+				lon = String.valueOf(latLon.getLongitude());
+				replaceLatLon(val, isEmptyOriginLatLon, lat, lon);
+			}
 		}
 		if (!wikiLink.isEmpty()) {
 			bld.append(addWikiLink(wikiLang, wikiLink, lat, lon));
@@ -597,8 +607,18 @@ public class WikiDatabasePreparation {
 		}
 		return bld.toString();
 	}
-	
 
+	private static void replaceLatLon(String[] val, boolean isEmptyOriginLatLon, String lat, String lon) {
+		if (isEmptyOriginLatLon) {
+			val[0] += "|lat=" + lat;
+			val[0] += "|long=" + lon;
+		} else {
+			int latBeginIdx = val[0].indexOf("lat=") + 4;
+			val[0] = val[0].substring(0, latBeginIdx) + lat + val[0].substring(val[0].indexOf("|", latBeginIdx));
+			int lonBeginIdx = val[0].indexOf("long=") + 5;
+			val[0] = val[0].substring(0, lonBeginIdx) + lon + val[0].substring(val[0].indexOf("|", lonBeginIdx));
+		}
+	}
 
 	public static String appendSqareBracketsIfNeeded(int i, String[] parts, String value) {
 		while (StringUtils.countMatches(value, "[[") > StringUtils.countMatches(value, "]]") && i + 1 < parts.length) {
@@ -856,7 +876,6 @@ public class WikiDatabasePreparation {
 		}
 		final String sqliteFileName = wikiFolder + WIKI_SQLITE;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
-		ConsoleProgressImplementation cprogress = new ConsoleProgressImplementation();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
@@ -868,7 +887,7 @@ public class WikiDatabasePreparation {
 					new String[] { "wikipedia:" });
 			for (File f : new File(wikiFolder).listFiles()) {
 				if (f.getName().startsWith(OSM_WIKI_PARSER)) {
-					osmWikiCoordinates.parseOSMCoordinates(f, cprogress, f.getName().contains("multi"));
+					osmWikiCoordinates.parseOSMCoordinates(f, null, f.getName().contains("multi"));
 				}
 			}
 			final WikiDataHandler handler = new WikiDataHandler(sx, progress, new File(sqliteFileName), osmWikiCoordinates, regions);
@@ -1084,7 +1103,7 @@ public class WikiDatabasePreparation {
 
 	private static String generateHtmlArticle(String contentText, String lang, WikiImageUrlStorage imageUrlStorage)
 			throws IOException, SQLException {
-		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
+		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null, null);
 		final HTMLConverter converter = new HTMLConverter(false);
 		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
 				"http://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);
