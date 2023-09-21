@@ -55,7 +55,9 @@ public class HHRoutingPreparationDB {
 		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, shortcut)");
 		st.execute("CREATE INDEX IF NOT EXISTS segmentsPntInd on segments(idPoint)");
 		st.execute("CREATE INDEX IF NOT EXISTS segmentsConnPntInd on segments(idConnPoint)");
-		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, shortcut, PRIMARY key (idPoint, idConnPoint))");
+		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, shortcut)");
+		st.execute("CREATE INDEX IF NOT EXISTS geometryPntInd on segments(idPoint)");
+		st.execute("CREATE INDEX IF NOT EXISTS geometryConnPntInd on segments(idConnPoint)");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
 		st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
