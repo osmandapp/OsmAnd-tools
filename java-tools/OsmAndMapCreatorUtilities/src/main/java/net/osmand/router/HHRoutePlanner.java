@@ -436,7 +436,8 @@ public class HHRoutePlanner {
 			if (nextPoint.rtExclude) {
 				continue;
 			}
-			if (c.USE_CH && nextPoint.chInd < start.chInd) {
+			// modify CH to not compute all top points
+			if (c.USE_CH && (nextPoint.chInd > 0 && nextPoint.chInd < start.chInd)) {
 				continue;
 			}
 			if (c.USE_MIDPOINT && Math.min(depth, c.MIDPOINT_MAX_DEPTH) > nextPoint.rtCnt + c.MIDPOINT_ERROR) {
