@@ -30,6 +30,8 @@ public class HHRoutingPreparationDB {
 
 	public static final String EXT = ".hhdb";
 
+	private static final int XY_SHORTCUT_GEOM = 0;
+
 	private Connection conn;
 	private PreparedStatement insSegment;
 	private PreparedStatement insGeometry;
@@ -289,16 +291,25 @@ public class HHRoutingPreparationDB {
 			insSegment.setInt(4, s.shortcut ? 1 : 0);
 			insSegment.addBatch();
 //			byte[] coordinates = new byte[0];
-			byte[] coordinates = new byte[8 * s.geometry.size()];
-			for (int t = 0; t < s.geometry.size(); t++) {
-				LatLon l = s.geometry.get(t);
-				Algorithms.putIntToBytes(coordinates, 8 * t, MapUtils.get31TileNumberX(l.getLongitude()));
-				Algorithms.putIntToBytes(coordinates, 8 * t + 4, MapUtils.get31TileNumberY(l.getLatitude()));
+			if (s.geometry.size() > 0) {
+				byte[] coordinates = new byte[8 * s.geometry.size()];
+				for (int t = 0; t < s.geometry.size(); t++) {
+					LatLon l = s.geometry.get(t);
+					Algorithms.putIntToBytes(coordinates, 8 * t, MapUtils.get31TileNumberX(l.getLongitude()));
+					Algorithms.putIntToBytes(coordinates, 8 * t + 4, MapUtils.get31TileNumberY(l.getLatitude()));
+				}
+				insGeometry.setBytes(4, coordinates);
+			} else if (s.segmentsStartEnd.size() > 0) {
+				byte[] coordinates = new byte[4 * s.segmentsStartEnd.size() + 8];
+				Algorithms.putIntToBytes(coordinates, 0, XY_SHORTCUT_GEOM);
+				Algorithms.putIntToBytes(coordinates, 4, XY_SHORTCUT_GEOM);
+				for (int t = 0; t < s.segmentsStartEnd.size(); t++) {
+					Algorithms.putIntToBytes(coordinates, 4 * t + 8, s.segmentsStartEnd.getQuick(t));
+				}
 			}
 			insGeometry.setLong(1, s.start.index);
 			insGeometry.setLong(2, s.end.index);
 			insSegment.setInt(3, s.shortcut ? 1 : 0);
-			insGeometry.setBytes(4, coordinates);
 			
 			insGeometry.addBatch();
 			if (ind++ % BATCH_SIZE == 0) {
@@ -315,12 +326,7 @@ public class HHRoutingPreparationDB {
 			return;
 		}
 		segment.geometry.clear();
-		loadGeometry.setLong(1, segment.start.index);
-		loadGeometry.setLong(2, segment.end.index);
-		ResultSet rs = loadGeometry.executeQuery();
-		if (rs.next()) {
-			parseGeometry(segment, rs.getBytes(1));
-		}
+		segment.geometry.addAll(parseGeometry(segment.start.index, segment.end.index));
 	}
 	
 	public int loadNetworkSegmentEnd(TLongObjectHashMap<NetworkDBPoint> pntsById, NetworkDBPoint point) throws SQLException {
@@ -396,13 +402,31 @@ public class HHRoutingPreparationDB {
 		return x;
 	}
 
-	private void parseGeometry(NetworkDBSegment segment, byte[] geom) {
-		for (int k = 0; k < geom.length; k += 8) {
-			int x = Algorithms.parseIntFromBytes(geom, k);
-			int y = Algorithms.parseIntFromBytes(geom, k + 4);
-			LatLon latlon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
-			segment.geometry.add(latlon);
+	private List<LatLon> parseGeometry(int start, int end) throws SQLException {
+		List<LatLon> l = new ArrayList<LatLon>();
+		loadGeometry.setLong(1, start);
+		loadGeometry.setLong(2, end);
+		ResultSet rs = loadGeometry.executeQuery();
+		if (rs.next()) {
+			byte[] geom = rs.getBytes(1);
+			if(geom.length > 8 &&
+					Algorithms.parseIntFromBytes(geom, 0) == XY_SHORTCUT_GEOM && 
+					Algorithms.parseIntFromBytes(geom, 4) == XY_SHORTCUT_GEOM) {
+				for (int k = 8; k < geom.length; k += 8) {
+					int st = Algorithms.parseIntFromBytes(geom, k);
+					int en = Algorithms.parseIntFromBytes(geom, k + 4);
+					List<LatLon> gg = parseGeometry(st, en);
+					l.addAll(gg);
+				}
+			} else {
+				for (int k = 0; k < geom.length; k += 8) {
+					int x = Algorithms.parseIntFromBytes(geom, k);
+					int y = Algorithms.parseIntFromBytes(geom, k + 4);
+					l.add(new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x)));
+				}
+			}
 		}
+		return l;
 	}
 
 	
@@ -536,6 +560,7 @@ public class HHRoutingPreparationDB {
 		final boolean shortcut;
 		final double dist;
 		List<LatLon> geometry = new ArrayList<>();
+		TIntArrayList segmentsStartEnd = new TIntArrayList();
 		// routing extra info
 		double rtCost; // added once in queue
 				

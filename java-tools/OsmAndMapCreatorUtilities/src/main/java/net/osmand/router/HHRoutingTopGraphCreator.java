@@ -49,8 +49,8 @@ public class HHRoutingTopGraphCreator {
 	
 	
 	private static File testData() {
-		String name = "Montenegro_europe_2.road.obf";
-		name = "Netherlands_europe";
+		String name = "Montenegro";
+//		name = "Netherlands_europe";
 //		name = "Ukraine_europe";
 //		name = "Germany";
 		
@@ -333,6 +333,7 @@ public class HHRoutingTopGraphCreator {
 			if (++prog % 1000 == 0) {
 				logf("Contracting %d (reindexing %d, shortcuts %d)...", contracted, reindex, allShortcuts.size());
 				printStat("Contraction stat ", stats, timeC, 1000);
+				stats = new RoutingStats();
 				timeC = System.nanoTime();
 			}
 			NetworkDBPoint pnt = pq.poll();
@@ -417,10 +418,18 @@ public class HHRoutingTopGraphCreator {
 						}
 						NetworkDBSegment sh = new NetworkDBSegment(in.start, out.end,
 								in.dist + out.dist, true, true);
-						networkDB.loadGeometry(in, false);
-						sh.geometry.addAll(in.geometry);
-						networkDB.loadGeometry(out, false);
-						sh.geometry.addAll(out.geometry);
+						if (in.shortcut) {
+							sh.segmentsStartEnd.addAll(in.segmentsStartEnd);
+						} else {
+							sh.segmentsStartEnd.add(in.start.index);
+							sh.segmentsStartEnd.add(in.end.index);
+						}
+						if (out.shortcut) {
+							sh.segmentsStartEnd.addAll(out.segmentsStartEnd);
+						} else {
+							sh.segmentsStartEnd.add(out.start.index);
+							sh.segmentsStartEnd.add(out.end.index);
+						}
 						shortcuts.add(sh);
 					}
 					p.rtCnt++;
