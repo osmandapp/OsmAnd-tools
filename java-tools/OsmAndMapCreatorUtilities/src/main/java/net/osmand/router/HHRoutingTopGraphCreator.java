@@ -50,7 +50,7 @@ public class HHRoutingTopGraphCreator {
 	
 	private static File testData() {
 		String name = "Montenegro";
-//		name = "Netherlands_europe";
+		name = "Netherlands_europe";
 //		name = "Ukraine_europe";
 //		name = "Germany";
 		
@@ -96,7 +96,7 @@ public class HHRoutingTopGraphCreator {
 		if (PROCESS == PROC_MIDPOINTS) {
 			planner.calculateMidPoints(MAX_DEPTH, MAX_ITERATIONS);
 		} else if (PROCESS == PROC_CH) { 
-			planner.runContractionHierarchy(MAX_DEPTH);
+			planner.runContractionHierarchy(MAX_DEPTH, 0.85);
 		} else if (PROCESS == PROC_2ND_LEVEL) { 
 			planner.run2ndLevelRouting();
 		} else if (PROCESS == PROC_MONTECARLO) {
@@ -279,7 +279,7 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void runContractionHierarchy(int maxPoints) throws SQLException {
+	private void runContractionHierarchy(int maxPoints, double percent) throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		System.out.print("Loading points... ");
@@ -335,6 +335,9 @@ public class HHRoutingTopGraphCreator {
 				printStat("Contraction stat ", stats, timeC, 1000);
 				stats = new RoutingStats();
 				timeC = System.nanoTime();
+			}
+			if (contracted * 1.0 / list.size() > percent) {
+				break;
 			}
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;

@@ -137,12 +137,12 @@ public class HHRoutingGraphCreator {
 
 	// Heuristics building network points
 	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] { 15, 10, 5 }; // new int[] {7,7,7,7};
-	private static int MAX_NEIGHBOORS_N_POINTS = 30;
+	private static int MAX_NEIGHBOORS_N_POINTS = 15;
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
 
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Netherlands_europe_2.road.obf";
+//		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
@@ -689,6 +689,7 @@ public class HHRoutingGraphCreator {
 
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
 			reader.loadRouteIndexData(regions, new RouteDataObjectProcessor(network, ctx, estimatedRoads));
+			ctx.printStatsNetworks();
 			ctx.finishRegionProcess();
 		}
 		ctx.printStatsNetworks();
