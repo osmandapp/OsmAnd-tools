@@ -110,14 +110,15 @@ public class ArticleExtractor {
 							handler.getEndHeaderLine(), handler.getFirstArticleLine(), handler.getEndArticleLine());
 				}
 
-				long startTime = System.currentTimeMillis();
 				if (handler.getFirstArticleLine() == 0 && handler.getEndArticleLine() == 0) {
 					System.out.printf("Article %s not found\n", articleTitle);
+				} else {
+					long startTime = System.currentTimeMillis();
+					articleExtractor.cutArticle(readFile, outFile, handler.getEndHeaderLine(), handler.getFirstArticleLine(),
+							handler.getEndArticleLine());
+					System.out.printf("Trim time: %d sec\n", (System.currentTimeMillis() - startTime) / 1000);
+					articleID = handler.getArticleId();
 				}
-				articleExtractor.cutArticle(readFile, outFile, handler.getEndHeaderLine(), handler.getFirstArticleLine(),
-						handler.getEndArticleLine());
-				System.out.printf("Trim time: %d sec\n", (System.currentTimeMillis() - startTime) / 1000);
-				articleID = handler.getArticleId();
 			}
 			if (!processWikidata && !Algorithms.isEmpty(articleID)) {
 				String[] arguments = {
