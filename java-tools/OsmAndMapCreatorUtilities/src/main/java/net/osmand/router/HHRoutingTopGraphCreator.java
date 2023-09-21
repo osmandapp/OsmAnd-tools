@@ -70,6 +70,7 @@ public class HHRoutingTopGraphCreator {
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
 		int MAX_ITERATIONS = 100;
 		int MAX_DEPTH = 15;
+		int PERCENT_CH = 75;
 		for (String a : args) {
 			if (a.equals("--setup-midpoints")) {
 				PROCESS = PROC_MIDPOINTS;
@@ -81,6 +82,8 @@ public class HHRoutingTopGraphCreator {
 				PROCESS = PROC_2ND_LEVEL;
 			} else if (a.startsWith("--iterations=")) {
 				MAX_ITERATIONS = Integer.parseInt(a.substring("--iterations=".length()));
+			} else if (a.startsWith("--percent=")) {
+				PERCENT_CH = Integer.parseInt(a.substring("--percent=".length()));
 			} else if (a.startsWith("--maxdepth=")) {
 				MAX_DEPTH = Integer.parseInt(a.substring("--maxdepth=".length()));
 			}
@@ -96,7 +99,7 @@ public class HHRoutingTopGraphCreator {
 		if (PROCESS == PROC_MIDPOINTS) {
 			planner.calculateMidPoints(MAX_DEPTH, MAX_ITERATIONS);
 		} else if (PROCESS == PROC_CH) { 
-			planner.runContractionHierarchy(MAX_DEPTH, 0.85);
+			planner.runContractionHierarchy(MAX_DEPTH, PERCENT_CH / 100.0);
 		} else if (PROCESS == PROC_2ND_LEVEL) { 
 			planner.run2ndLevelRouting();
 		} else if (PROCESS == PROC_MONTECARLO) {
@@ -329,16 +332,18 @@ public class HHRoutingTopGraphCreator {
 		List<NetworkDBSegment> shortcuts = new ArrayList<>();
 		int contracted = 0;
 		long timeC = System.nanoTime();
+		double toContract = list.size() * percent;
 		while (!pq.isEmpty()) {
+			if (contracted > toContract) {
+				break;
+			}
 			if (++prog % 1000 == 0) {
-				logf("Contracting %d (reindexing %d, shortcuts %d)...", contracted, reindex, allShortcuts.size());
+				logf("Contracting %d %.1f%% (reindexing %d, shortcuts %d)...", contracted, contracted / toContract * 100.0, reindex, allShortcuts.size());
 				printStat("Contraction stat ", stats, timeC, 1000);
 				stats = new RoutingStats();
 				timeC = System.nanoTime();
 			}
-			if (contracted * 1.0 / list.size() > percent) {
-				break;
-			}
+			
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;
 			shortcuts.clear();
