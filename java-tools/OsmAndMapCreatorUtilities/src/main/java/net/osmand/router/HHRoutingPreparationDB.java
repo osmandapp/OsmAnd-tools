@@ -56,8 +56,7 @@ public class HHRoutingPreparationDB {
 		st.execute("CREATE INDEX IF NOT EXISTS segmentsPntInd on segments(idPoint)");
 		st.execute("CREATE INDEX IF NOT EXISTS segmentsConnPntInd on segments(idConnPoint)");
 		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, shortcut)");
-		st.execute("CREATE INDEX IF NOT EXISTS geometryPntInd on segments(idPoint)");
-		st.execute("CREATE INDEX IF NOT EXISTS geometryConnPntInd on segments(idConnPoint)");
+		st.execute("CREATE INDEX IF NOT EXISTS geometryMainInd on geometry(idPoint,idConnPoint,shortcut)");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
 		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
 		st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
@@ -78,7 +77,7 @@ public class HHRoutingPreparationDB {
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd) VALUES(?, ?, ?)");
 		
-		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint =? ");
+		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint = ? and shortcut = ? ");
 		loadSegmentEnd = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idPoint = ?  ");
 		loadSegmentStart = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idConnPoint = ?  ");
 
@@ -308,6 +307,7 @@ public class HHRoutingPreparationDB {
 				for (int t = 0; t < s.segmentsStartEnd.size(); t++) {
 					Algorithms.putIntToBytes(coordinates, 4 * t + 8, s.segmentsStartEnd.getQuick(t));
 				}
+				insGeometry.setBytes(4, coordinates);
 			}
 			insGeometry.setLong(1, s.start.index);
 			insGeometry.setLong(2, s.end.index);
@@ -328,7 +328,7 @@ public class HHRoutingPreparationDB {
 			return;
 		}
 		segment.geometry.clear();
-		segment.geometry.addAll(parseGeometry(segment.start.index, segment.end.index));
+		segment.geometry.addAll(parseGeometry(segment.start.index, segment.end.index, segment.shortcut));
 	}
 	
 	public int loadNetworkSegmentEnd(TLongObjectHashMap<NetworkDBPoint> pntsById, NetworkDBPoint point) throws SQLException {
@@ -404,20 +404,21 @@ public class HHRoutingPreparationDB {
 		return x;
 	}
 
-	private List<LatLon> parseGeometry(int start, int end) throws SQLException {
+	private List<LatLon> parseGeometry(int start, int end, boolean shortcut) throws SQLException {
 		List<LatLon> l = new ArrayList<LatLon>();
 		loadGeometry.setLong(1, start);
 		loadGeometry.setLong(2, end);
+		loadGeometry.setInt(3, shortcut ? 1 : 0);
 		ResultSet rs = loadGeometry.executeQuery();
 		if (rs.next()) {
 			byte[] geom = rs.getBytes(1);
-			if(geom.length > 8 &&
+			if (geom.length > 8 &&
 					Algorithms.parseIntFromBytes(geom, 0) == XY_SHORTCUT_GEOM && 
 					Algorithms.parseIntFromBytes(geom, 4) == XY_SHORTCUT_GEOM) {
 				for (int k = 8; k < geom.length; k += 8) {
 					int st = Algorithms.parseIntFromBytes(geom, k);
 					int en = Algorithms.parseIntFromBytes(geom, k + 4);
-					List<LatLon> gg = parseGeometry(st, en);
+					List<LatLon> gg = parseGeometry(st, en, false);
 					l.addAll(gg);
 				}
 			} else {

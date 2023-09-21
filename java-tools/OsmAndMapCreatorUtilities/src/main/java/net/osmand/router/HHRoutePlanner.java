@@ -51,6 +51,7 @@ public class HHRoutePlanner {
 		public int MAX_DEPTH = -1; // max depth to go to
 		public int MAX_POINTS = -1; // max points to settle
 		public boolean USE_CH = false;
+		public boolean USE_CH_SHORTCUTS = false;
 		public boolean USE_MIDPOINT = false;
 		public int MIDPOINT_ERROR = 3;
 		public int MIDPOINT_MAX_DEPTH = 20 + MIDPOINT_ERROR;
@@ -183,9 +184,10 @@ public class HHRoutePlanner {
 		if (c == null) {
 			c = new DijkstraConfig();
 			// test data for debug swap
-			c.HEURISTIC_COEFFICIENT = 0;
-			c.DIJKSTRA_DIRECTION = 0;
+			c.HEURISTIC_COEFFICIENT = 1;
+			c.DIJKSTRA_DIRECTION = 1;
 			c.USE_CH = false;
+			c.USE_CH_SHORTCUTS = true;
 			c.USE_MIDPOINT = false;
 //			PRELOAD_SEGMENTS = false;
 			DEBUG_VERBOSE_LEVEL = 0;
@@ -430,9 +432,9 @@ public class HHRoutePlanner {
 		
 		for (NetworkDBSegment connected : (reverse ? start.connectedReverse : start.connected) ) {
 			NetworkDBPoint nextPoint = reverse ? connected.start : connected.end;
-//			if (!c.USE_CH && connected.shortcut) {
-//				continue;
-//			}
+			if (!c.USE_CH && !c.USE_CH_SHORTCUTS && connected.shortcut) {
+				continue;
+			}
 			if (nextPoint.rtExclude) {
 				continue;
 			}
