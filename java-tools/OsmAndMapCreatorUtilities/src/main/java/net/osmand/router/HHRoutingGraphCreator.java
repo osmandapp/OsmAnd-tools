@@ -119,7 +119,7 @@ public class HHRoutingGraphCreator {
 	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 	static long MEMORY_LAST_USED_MB;
 
-	static int PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
+	static int PROCESS = PROCESS_SET_NETWORK_POINTS;
 	private static String ROUTING_PROFILE = "car";
 	private static List<File> FILE_SOURCES = new ArrayList<File>();
 	private static boolean CLEAN = true;
@@ -127,8 +127,7 @@ public class HHRoutingGraphCreator {
 	private static int BATCH_SIZE = 500;
 	private static int THREAD_POOL = 2;
 
-	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
-	// 50000
+	// Constants / Tests for splitting building network points {7,7,7,7} - 50 - 50000
 	protected static LatLon EX1 = new LatLon(52.3201813, 4.7644685); // 337 - 4
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 - 12
 	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803); // 632 - 14
@@ -138,12 +137,12 @@ public class HHRoutingGraphCreator {
 
 	// Heuristics building network points
 	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] { 15, 10, 5 }; // new int[] {7,7,7,7};
-	private static int MAX_NEIGHBOORS_N_POINTS = 50;
+	private static int MAX_NEIGHBOORS_N_POINTS = 30;
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
 
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
-//		name = "Netherlands_europe_2.road.obf";
+		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
@@ -160,6 +159,8 @@ public class HHRoutingGraphCreator {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
 			} else if (a.startsWith("--threads=")) {
 				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
+			} else if (a.startsWith("--maxdepth=")) {
+				MAX_NEIGHBOORS_N_POINTS = Integer.parseInt(a.substring("--maxdepth=".length()));
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			}
@@ -505,7 +506,7 @@ public class HHRoutingGraphCreator {
 
 		public void printStatsNetworks() {
 			// calculate stats
-			logf("RESULT %d points -> %d border points, %d clusters (%d isolated), %d est shortcuts", getTotalPoints(),
+			logf("RESULT %d points -> %d border points, %d clusters (%d isolated), %d est shortcuts", getTotalPoints() + borderPointsSize(),
 					borderPointsSize(), clusterSize(), isolatedIslands, shortcuts);
 			logf("       %.1f avg / %d min / %d max border points per cluster, %.1f avg / %d min / %d max points in cluster",
 					totalBorderPoints * 1.0 / clusterSize(), minBorder, maxBorder,
@@ -616,8 +617,9 @@ public class HHRoutingGraphCreator {
 				network.addCluster(cluster, pntAround);
 				if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 					prevPrintInd = indProc;
+					int borderPointsSize = ctx.borderPointsSize();
 					logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters", indProc,
-							indProc * 100.0f / estimatedRoads, ctx.getTotalPoints(), ctx.borderPointsSize(),
+							indProc * 100.0f / estimatedRoads, ctx.getTotalPoints() + borderPointsSize, borderPointsSize,
 							ctx.clusterSize());
 				}
 
@@ -687,7 +689,6 @@ public class HHRoutingGraphCreator {
 
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
 			reader.loadRouteIndexData(regions, new RouteDataObjectProcessor(network, ctx, estimatedRoads));
-
 			ctx.finishRegionProcess();
 		}
 		ctx.printStatsNetworks();
@@ -717,9 +718,6 @@ public class HHRoutingGraphCreator {
 		c.printCurentState("MERGE", 2);
 		for (RouteSegment t : potentialNetworkPoints) {
 			int curPoints = c.toVisitVerticesSize();
-			if (curPoints >= MAX_NEIGHBOORS_N_POINTS) {
-				break;
-			}
 			if (!c.toVisitVertices.contains(calculateRoutePointInternalId(t))) {
 				continue;
 			}
@@ -730,6 +728,9 @@ public class HHRoutingGraphCreator {
 			// it could only increase by 1 (1->2)
 
 			int newPoints = bc.toVisitVerticesSize();
+			if (newPoints > MAX_NEIGHBOORS_N_POINTS) {
+				continue;
+			}
 			if (((newPoints - curPoints) <= 2 || coeffToMinimize(c.visitedVerticesSize(),
 					curPoints) > coeffToMinimize(bc.visitedVerticesSize(), newPoints))) {
 				int sz = c.visitedVerticesSize();

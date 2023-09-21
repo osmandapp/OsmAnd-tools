@@ -50,7 +50,7 @@ public class HHRoutingPreparationDB {
 		
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
 		Statement st = conn.createStatement();
-		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31, indexes, PRIMARY key (idPoint))"); // ind unique
+		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31,  PRIMARY key (idPoint))"); // ind unique
 		st.execute("CREATE TABLE IF NOT EXISTS clusters(idPoint, indPoint, clusterInd, PRIMARY key (indPoint, clusterInd))");
 		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, shortcut)");
 		st.execute("CREATE INDEX IF NOT EXISTS segmentsPntInd on segments(idPoint)");
@@ -173,7 +173,7 @@ public class HHRoutingPreparationDB {
 	
 	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints(boolean byGeoId) throws SQLException {
 		Statement st = conn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31, indexes from points");
+		ResultSet rs = st.executeQuery("SELECT idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31 from points");
 		TLongObjectHashMap<NetworkDBPoint> mp = new TLongObjectHashMap<>();
 		while (rs.next()) {
 			NetworkDBPoint pnt = new NetworkDBPoint();
