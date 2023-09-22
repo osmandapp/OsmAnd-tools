@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import net.osmand.data.LatLon;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -35,8 +35,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
-
-import static net.osmand.wiki.WikiDatabasePreparation.*;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 
 public class OsmCoordinatesByTag {
 
@@ -93,11 +92,7 @@ public class OsmCoordinatesByTag {
 	}
 
 	private void registerEntity(Entity entity) {
-		net.osmand.data.LatLon entityCenter = OsmMapUtils.getCenter(entity);
-		LatLon center = null;
-		if (entityCenter != null) {
-			center = new LatLon(entityCenter.getLatitude(), entityCenter.getLongitude());
-		}
+		LatLon center = OsmMapUtils.getCenter(entity);
 		for (String t : entity.getTagKeySet()) {
 			if (checkTagSuitable(t)) {
 				if (entity instanceof Node) {

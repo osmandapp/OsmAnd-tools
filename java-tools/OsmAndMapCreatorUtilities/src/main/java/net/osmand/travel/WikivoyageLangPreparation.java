@@ -27,6 +27,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.data.LatLon;
 import net.osmand.wiki.*;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
@@ -45,7 +46,6 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
-import net.osmand.wiki.WikiDatabasePreparation.LatLon;
 import org.xmlpull.v1.XmlPullParserException;
 
 import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
@@ -417,7 +417,7 @@ public class WikivoyageLangPreparation {
 						}
 						// part_of
 						prep.setString(column++, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
-						if (ll.isZero()) {
+						if (ll.getLongitude() == 0 && ll.getLatitude() == 0) {
 							prep.setNull(column++, Types.DOUBLE);
 							prep.setNull(column++, Types.DOUBLE);
 						} else {
