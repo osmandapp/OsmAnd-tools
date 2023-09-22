@@ -311,7 +311,7 @@ public class HHRoutingPreparationDB {
 			}
 			insGeometry.setLong(1, s.start.index);
 			insGeometry.setLong(2, s.end.index);
-			insSegment.setInt(3, s.shortcut ? 1 : 0);
+			insGeometry.setInt(3, s.shortcut ? 1 : 0);
 			
 			insGeometry.addBatch();
 			if (ind++ % BATCH_SIZE == 0) {

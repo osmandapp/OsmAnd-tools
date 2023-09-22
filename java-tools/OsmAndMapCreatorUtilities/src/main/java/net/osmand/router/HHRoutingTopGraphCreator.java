@@ -50,7 +50,7 @@ public class HHRoutingTopGraphCreator {
 	
 	private static File testData() {
 		String name = "Montenegro";
-		name = "Netherlands_europe";
+//		name = "Netherlands_europe";
 //		name = "Ukraine_europe";
 //		name = "Germany";
 		
@@ -70,7 +70,7 @@ public class HHRoutingTopGraphCreator {
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
 		int MAX_ITERATIONS = 100;
 		int MAX_DEPTH = 15;
-		int PERCENT_CH = 75;
+		int PERCENT_CH = 80;
 		for (String a : args) {
 			if (a.equals("--setup-midpoints")) {
 				PROCESS = PROC_MIDPOINTS;
