@@ -76,7 +76,7 @@ public class WikiDatabasePreparation {
 	public static final String WIKI_SQLITE = "wiki.sqlite";
 	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
-	public static final String OSM_WIKI_PARSER = "osm_wiki_";
+	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
 	
 
 	public static class LatLon {
@@ -885,9 +885,13 @@ public class WikiDatabasePreparation {
 			regions.cacheAllCountries();
 			OsmCoordinatesByTag osmWikiCoordinates = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
 					new String[] { "wikipedia:" });
-			for (File f : new File(wikiFolder).listFiles()) {
-				if (f.getName().startsWith(OSM_WIKI_PARSER)) {
-					osmWikiCoordinates.parseOSMCoordinates(f, null, f.getName().contains("multi"));
+			File[] listFiles = new File(wikiFolder).listFiles();
+			if (listFiles != null) {
+				for (File f : listFiles) {
+					if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX)) {
+						boolean parseRelations = f.getName().contains("multi");
+						osmWikiCoordinates.parseOSMCoordinates(f, null, parseRelations);
+					}
 				}
 			}
 			final WikiDataHandler handler = new WikiDataHandler(sx, progress, new File(sqliteFileName), osmWikiCoordinates, regions);

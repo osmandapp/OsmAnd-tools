@@ -5,7 +5,6 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,7 +48,7 @@ import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 import net.osmand.wiki.WikiDatabasePreparation.LatLon;
 import org.xmlpull.v1.XmlPullParserException;
 
-import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_PARSER;
+import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
 
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
@@ -113,8 +112,11 @@ public class WikivoyageLangPreparation {
 			XmlPullParserException, InterruptedException {
 		String lang = "";
 		String folder = "";
-		
-		if (args.length > 0) {
+		String osmWikiFolderName = "";
+		if (args.length == 0) {
+			printHelp();
+			return;
+		} else {
 			lang = args[0];
 		}
 		if (args.length > 1) {
@@ -122,6 +124,12 @@ public class WikivoyageLangPreparation {
 		}
 		if (args.length > 2) {
 			uncompressed = args[2].equals("uncompressed");
+			if (!uncompressed && !args[2].equals("compressed")) {
+				osmWikiFolderName = args[2];
+			}
+		}
+		if (args.length > 3) {
+			osmWikiFolderName = args[3];
 		}
 		final File wikiArticles = new File(folder, lang + "wikivoyage-latest-pages-articles.xml.bz2");
 		final File wikiProps = new File(folder, lang + "wikivoyage-latest-page_props.sql.gz");
@@ -133,9 +141,19 @@ public class WikivoyageLangPreparation {
 			System.out.println("Wikivoyage page props for " + lang + " doesn't exist" + wikiProps.getName());
 			return;
 		}
-		File sqliteFileName = new File(folder , (uncompressed ? "full_" : "") + "wikivoyage.sqlite");
-		processWikivoyage(wikiArticles, wikiProps, lang, sqliteFileName);
+		File sqliteFile = new File(folder, (uncompressed ? "full_" : "") + "wikivoyage.sqlite");
+		File osmWikiFolder = new File(osmWikiFolderName);
+		processWikivoyage(wikiArticles, wikiProps, lang, sqliteFile, osmWikiFolder);
 		System.out.println("Successfully generated.");
+	}
+
+	private static void printHelp() {
+		System.out.printf("Usage: <lang> <folder> <compressed|uncompressed> <osm wiki folder>%n" +
+				"<lang> - language of wikivoyage%n" +
+				"<folder> - work folder%n" +
+				"<compressed|uncompressed> - with the \"uncompressed\" argument, uncompressed content and gpx fields " +
+				"are added in the full_wikivoyage.sqlite,%n\t\tby default only gziped fields are present in the wikivoyage.sqlite%n" +
+				"<osm wiki folder> - folder with osm_wiki_*.gz files. This files with osm elements with wikidata=*, wikipedia=* tags");
 	}
 	
 	protected static class PageInfo {
@@ -144,8 +162,9 @@ public class WikivoyageLangPreparation {
 		public String image;
 		public String wikidataId;
 	}
-	
-	protected static void processWikivoyage(final File wikiPg, final File wikiProps, String lang, File wikivoyageSqlite)
+
+	protected static void processWikivoyage(final File wikiPg, final File wikiProps, String lang, File wikivoyageSqlite,
+	                                        File osmWikiFolder)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, XmlPullParserException, InterruptedException {
 
 		Map<Long, PageInfo> pageInfos = new LinkedHashMap<Long, WikivoyageLangPreparation.PageInfo>();
@@ -182,11 +201,12 @@ public class WikivoyageLangPreparation {
 		is.setEncoding("UTF-8");
 		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
 				new String[]{"wikidata"});
-		File[] listFiles = new File(wikiPg.getParent()).listFiles();
+		File[] listFiles = osmWikiFolder.listFiles();
 		if (listFiles != null) {
 			for (File f : listFiles) {
-				if (f.getName().startsWith(OSM_WIKI_PARSER)) {
-					osmCoordinates.parseOSMCoordinates(f, null, f.getName().contains("multi"));
+				if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX)) {
+					boolean parseRelations = f.getName().contains("multi");
+					osmCoordinates.parseOSMCoordinates(f, null, parseRelations);
 				}
 			}
 		}
