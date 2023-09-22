@@ -79,18 +79,6 @@ public class WikiDatabasePreparation {
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
 
-	public static void test() {
-		String lat = "6677";
-		String lon = "9999";
-		String val = "Abracadabra|lat=1234|long=1234556kdjdkjdkjddjkdj";
-		int latBeginIdx = val.indexOf("lat=") + 4;
-		val = val.substring(0, latBeginIdx) + lat + val.substring(val.indexOf("|", latBeginIdx));
-		int lonBeginIdx = val.indexOf("long=") + 5;
-		val = val.substring(0, lonBeginIdx) + lon + val.substring(val.indexOf("|", lonBeginIdx));
-		System.out.println(val);
-	}
-
-
 	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata,
 	                                       OsmCoordinatesByTag osmCoordinates) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
@@ -576,10 +564,20 @@ public class WikiDatabasePreparation {
 			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData);
 			LatLon latLon = osmCoordinates.getCoordinates("wikidata", wikiData);
 			if (latLon != null) {
-				boolean isEmptyOriginLatLon = lat == null && lon == null;
-				lat = String.valueOf(latLon.getLatitude());
-				lon = String.valueOf(latLon.getLongitude());
-				val = replaceLatLon(val, isEmptyOriginLatLon, lat, lon);
+				String newLat = String.valueOf(latLon.getLatitude());
+				String newLon = String.valueOf(latLon.getLongitude());
+				if (lat != null) {
+					val = val.replace(lat, newLat);
+				} else {
+					val += "|lat=" + newLat;
+				}
+				if (lon != null) {
+					val = val.replace(lon, newLon);
+				} else {
+					val += "|long=" + newLon;
+				}
+				lat = newLat;
+				lon = newLon;
 			}
 		}
 		if (!wikiLink.isEmpty()) {
@@ -591,19 +589,6 @@ public class WikiDatabasePreparation {
 		}
 		String[] result = {bld.toString(), val};
 		return result;
-	}
-
-	private static String replaceLatLon(String val, boolean isEmptyOriginLatLon, String lat, String lon) {
-		if (isEmptyOriginLatLon) {
-			val += "|lat=" + lat;
-			val += "|long=" + lon;
-		} else {
-			int latBeginIdx = val.indexOf("lat=") + 4;
-			val = val.substring(0, latBeginIdx) + lat + val.substring(val.indexOf("|", latBeginIdx));
-			int lonBeginIdx = val.indexOf("long=") + 5;
-			val = val.substring(0, lonBeginIdx) + lon + val.substring(val.indexOf("|", lonBeginIdx));
-		}
-		return val;
 	}
 
 	public static String appendSqareBracketsIfNeeded(int i, String[] parts, String value) {
@@ -735,11 +720,6 @@ public class WikiDatabasePreparation {
 		String folder = "";
 		String mode = "";
 		long testArticleID = 0;
-
-
-		test();
-		if (true)
-			return;
 
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);

@@ -111,7 +111,7 @@ public class WikivoyageLangPreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException,
 			XmlPullParserException, InterruptedException {
 		String lang = "";
-		String folder = "";
+		String wikivoyageFolderName = "";
 		String osmWikiFolderName = "";
 		if (args.length == 0) {
 			printHelp();
@@ -120,7 +120,7 @@ public class WikivoyageLangPreparation {
 			lang = args[0];
 		}
 		if (args.length > 1) {
-			folder = args[1];
+			wikivoyageFolderName = args[1];
 		}
 		if (args.length > 2) {
 			uncompressed = args[2].equals("uncompressed");
@@ -131,8 +131,14 @@ public class WikivoyageLangPreparation {
 		if (args.length > 3) {
 			osmWikiFolderName = args[3];
 		}
-		final File wikiArticles = new File(folder, lang + "wikivoyage-latest-pages-articles.xml.bz2");
-		final File wikiProps = new File(folder, lang + "wikivoyage-latest-page_props.sql.gz");
+		if (wikivoyageFolderName.isEmpty()) {
+			return;
+		}
+		if (osmWikiFolderName.isEmpty()) {
+			osmWikiFolderName = wikivoyageFolderName;
+		}
+		final File wikiArticles = new File(wikivoyageFolderName, lang + "wikivoyage-latest-pages-articles.xml.bz2");
+		final File wikiProps = new File(wikivoyageFolderName, lang + "wikivoyage-latest-page_props.sql.gz");
 		if (!wikiArticles.exists()) {
 			System.out.println("Wikivoyage dump for " + lang + " doesn't exist" + wikiArticles.getName());
 			return;
@@ -141,16 +147,16 @@ public class WikivoyageLangPreparation {
 			System.out.println("Wikivoyage page props for " + lang + " doesn't exist" + wikiProps.getName());
 			return;
 		}
-		File sqliteFile = new File(folder, (uncompressed ? "full_" : "") + "wikivoyage.sqlite");
+		File sqliteFile = new File(wikivoyageFolderName, (uncompressed ? "full_" : "") + "wikivoyage.sqlite");
 		File osmWikiFolder = new File(osmWikiFolderName);
 		processWikivoyage(wikiArticles, wikiProps, lang, sqliteFile, osmWikiFolder);
 		System.out.println("Successfully generated.");
 	}
 
 	private static void printHelp() {
-		System.out.printf("Usage: <lang> <folder> <compressed|uncompressed> <osm wiki folder>%n" +
+		System.out.printf("Usage: <lang> <wikivoyage folder> <compressed|uncompressed> <osm wiki folder>%n" +
 				"<lang> - language of wikivoyage%n" +
-				"<folder> - work folder%n" +
+				"<wikivoyage folder> - work folder%n" +
 				"<compressed|uncompressed> - with the \"uncompressed\" argument, uncompressed content and gpx fields " +
 				"are added in the full_wikivoyage.sqlite,%n\t\tby default only gziped fields are present in the wikivoyage.sqlite%n" +
 				"<osm wiki folder> - folder with osm_wiki_*.gz files. This files with osm elements with wikidata=*, wikipedia=* tags");
