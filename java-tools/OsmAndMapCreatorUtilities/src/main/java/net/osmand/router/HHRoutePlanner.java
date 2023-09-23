@@ -239,14 +239,13 @@ public class HHRoutePlanner {
 		if (c == null) {
 			c = new DijkstraConfig();
 			// test data for debug swap
-			c = DijkstraConfig.dijkstra(1);
-			c = DijkstraConfig.astar(1);
+			c = DijkstraConfig.dijkstra(0);
+//			c = DijkstraConfig.astar(0);
 //			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
-			DEBUG_VERBOSE_LEVEL = 2;
+			DEBUG_VERBOSE_LEVEL = 0;
 		}
 		System.out.println(c.toString(start, end));
-		
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
@@ -291,7 +290,7 @@ public class HHRoutePlanner {
 		time = System.nanoTime();
 		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
-		
+		System.out.println(c.toString(start, end));
 		System.out.printf("Routing finished %.1f ms: load data %.1f ms (%,d edges), routing %.1f ms (%.1f poll ms + %.1f queue ms), prep result %.1f ms\n",
 				(System.nanoTime() - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime,
 				stats.addQueueTime, stats.pollQueueTime, stats.prepTime);
@@ -346,7 +345,6 @@ public class HHRoutePlanner {
 			}
 		}
 		
-		
 		while (!(queue.isEmpty())) {
 			long tm = System.nanoTime();
 			NetworkDBPointCost pointCost = queue.poll();
@@ -364,8 +362,15 @@ public class HHRoutePlanner {
 				if (c.DIJKSTRA_DIRECTION == 0) {
 					// TODO check if it's correct for A*
 					for (NetworkDBPoint p : (rev ? c.visitedRev : c.visited)) {
+//						if (!p.visited(true) || !p.visited(false)) {
+//							continue;
+//						}
+						if(p.rtDistanceFromStart == 0 || p.rtDistanceFromStartRev == 0) {
+							continue;
+						}
 						if (p.rtDistanceFromStart + p.rtDistanceFromStartRev < finalPoint.rtDistanceFromStart + finalPoint.rtDistanceFromStartRev) {
 							finalPoint = p;
+							System.out.println(finalPoint + " " + ( finalPoint.rtDistanceFromStart + finalPoint.rtDistanceFromStartRev));
 						}
 					}
 				}
