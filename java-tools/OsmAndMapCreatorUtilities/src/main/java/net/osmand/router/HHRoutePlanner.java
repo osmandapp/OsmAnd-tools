@@ -239,9 +239,9 @@ public class HHRoutePlanner {
 		if (c == null) {
 			c = new DijkstraConfig();
 			// test data for debug swap
-			c = DijkstraConfig.dijkstra(0);
+//			c = DijkstraConfig.dijkstra(0);
 //			c = DijkstraConfig.astar(0);
-//			c = DijkstraConfig.ch();
+			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
 			DEBUG_VERBOSE_LEVEL = 0;
 		}
@@ -361,18 +361,8 @@ public class HHRoutePlanner {
 				NetworkDBPoint finalPoint = point;
 				if (c.DIJKSTRA_DIRECTION == 0) {
 					// TODO check if it's correct for A*
-					for (NetworkDBPoint p : (rev ? c.visitedRev : c.visited)) {
-//						if (!p.visited(true) || !p.visited(false)) {
-//							continue;
-//						}
-						if(p.rtDistanceFromStart == 0 || p.rtDistanceFromStartRev == 0) {
-							continue;
-						}
-						if (p.rtDistanceFromStart + p.rtDistanceFromStartRev < finalPoint.rtDistanceFromStart + finalPoint.rtDistanceFromStartRev) {
-							finalPoint = p;
-							System.out.println(finalPoint + " " + ( finalPoint.rtDistanceFromStart + finalPoint.rtDistanceFromStartRev));
-						}
-					}
+					finalPoint = scanFinalPoint(finalPoint, c.visited);
+					finalPoint = scanFinalPoint(finalPoint, c.visitedRev);
 				}
 				return finalPoint;
 			}
@@ -388,6 +378,18 @@ public class HHRoutePlanner {
 		}			
 		return null;
 		
+	}
+
+	private NetworkDBPoint scanFinalPoint(NetworkDBPoint finalPoint, List<NetworkDBPoint> lt) {
+		for (NetworkDBPoint p : lt) {
+			if (p.rtDistanceFromStart == 0 || p.rtDistanceFromStartRev == 0) {
+				continue;
+			}
+			if (p.rtDistanceFromStart + p.rtDistanceFromStartRev < finalPoint.rtDistanceFromStart + finalPoint.rtDistanceFromStartRev) {
+				finalPoint = p;
+			}
+		}
+		return finalPoint;
 	}
 	
 	private void addToQueue(Queue<NetworkDBPointCost> queue, NetworkDBPoint point, NetworkDBPoint target, boolean reverse, 
