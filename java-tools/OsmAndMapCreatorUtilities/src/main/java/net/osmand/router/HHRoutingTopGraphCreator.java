@@ -210,7 +210,7 @@ public class HHRoutingTopGraphCreator {
 				if (pnt.rtRouteToPoint != null) {
 					pnt.rtLevel++;
 					NetworkDBPoint p = pnt;
-					while ((p = p.rtRouteToPoint.start) != startPnt) {
+					while ((p = p.rtRouteToPoint) != startPnt) {
 						pnt.rtLevel++;
 					}
 				}
@@ -219,7 +219,7 @@ public class HHRoutingTopGraphCreator {
 				if (pnt.rtRouteToPoint != null) {
 					int k = 0;
 					NetworkDBPoint p = pnt;
-					while ((p = p.rtRouteToPoint.start) != startPnt) {
+					while ((p = p.rtRouteToPoint) != startPnt) {
 						k++;
 						p.rtCnt = Math.max(p.rtCnt, Math.min(k, p.rtLevel));
 					}
@@ -236,8 +236,8 @@ public class HHRoutingTopGraphCreator {
 				pnt.rtPrevCnt = pnt.rtCnt;
 				pnt.clearRouting();
 			}
-			System.out.printf("increased %d points - max diff %d, max top %d (%d vertices %d / %dedges, %.2f queue ms) \n", 
-					countInc, maxInc, maxTop, stats.visitedVertices, stats.visitedEdges, stats.addedEdges, stats.addQueueTime);
+			System.out.printf("increased %d points - max diff %d, max top %d (%,d (%,d unique) visited / %,d added vertices, %.2f queue ms) \n", 
+					countInc, maxInc, maxTop, stats.visitedVertices, stats.uniqueVisitedVertices, stats.addedVertices, stats.addQueueTime);
 			if (iteration % SAVE_ITERATIONS == 0) {
 				saveAndPrintPoints(pointsList, pnts, LOG_STAT_MAX_DEPTH);
 			}
@@ -249,8 +249,8 @@ public class HHRoutingTopGraphCreator {
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
 				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
 				stats.addQueueTime, stats.prepTime);
-		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d vertices, %,d (of %,d) edges )", 
-				0.0, 0, stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
+		System.out.println(String.format("Found final route - cost %.2f, %d depth ( %,d (%,d unique) visited / %,d added vertices )", 
+				0.0, 0, stats.visitedVertices, stats.uniqueVisitedVertices, stats.visitedVertices));
 	}
 
 
@@ -300,12 +300,7 @@ public class HHRoutingTopGraphCreator {
 		
 		
 		time = System.nanoTime();
-		DijkstraConfig c = new DijkstraConfig();
-		c.DIJKSTRA_DIRECTION = 1;
-		c.USE_MIDPOINT = false;
-		c.HEURISTIC_COEFFICIENT = 0;
-		c.MAX_POINTS = maxPoints; 
-		c.visited = new ArrayList<>();
+		DijkstraConfig c = DijkstraConfig.dijkstra(1).maxSettlePoints(maxPoints);
 		TIntIntHashMap edgeDiffMap = new TIntIntHashMap();
 		PriorityQueue<NetworkDBPoint> pq = new PriorityQueue<>(new Comparator<NetworkDBPoint>() {
 
@@ -395,9 +390,9 @@ public class HHRoutingTopGraphCreator {
 	private void printStat(String name, RoutingStats stats, long time, int size) {
 		double contractionTime = (System.nanoTime() - time) / 1e6;
 		System.out.println(
-				String.format(name + " for %d - %.2f ms (%.2f mcs per node), visited %,d vertices, %,d of %,d edges ",
+				String.format(name + " for %d - %.2f ms (%.2f mcs per node), visited %,d (%,d unique) of %,d added vertices",
 						size, contractionTime, contractionTime * 1e3 / size,
-				stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
+				stats.visitedVertices, stats.uniqueVisitedVertices, stats.addedVertices));
 	}
 
 
@@ -553,15 +548,15 @@ public class HHRoutingTopGraphCreator {
 				NetworkDBPoint res = routePlanner.runDijkstraNetworkRouting(pnt1, pnt2, conf, stats);
 				if (res != null) {
 					shortcuts.add(link(pnt1, pnt2));
-					NetworkDBSegment parent = res.rtRouteToPointRev;
+					NetworkDBSegment parent = res.getSegment(res.rtRouteToPointRev, true);
 					while (parent != null) {
 						addPnt(totPoints, parent.end, pnt1, pnt2);
-						parent = parent.end.rtRouteToPointRev;
+						parent = parent.end.getSegment(parent.end.rtRouteToPointRev, true);
 					}
-					parent = res.rtRouteToPoint;
+					parent = res.getSegment(res.rtRouteToPoint, false);
 					while (parent != null) {
 						addPnt(totPoints, parent.start, pnt1, pnt2);
-						parent = parent.start.rtRouteToPoint;
+						parent = parent.start.getSegment(parent.start.rtRouteToPoint, false);
 					}
 				}
 			}
@@ -594,8 +589,8 @@ public class HHRoutingTopGraphCreator {
 				}
 			}
 		}
-		System.out.println(String.format("Cluster %d: new shortcuts %d (total %d, existing %d) final routes ( visited %,d vertices, %,d (of %,d) edges )",
-				clusteInd, shortcuts.size() + shortcutMids.size(), total, existing.size(), stats.visitedVertices, stats.visitedEdges, stats.addedEdges));
+		System.out.println(String.format("Cluster %d: new shortcuts %d (total %d, existing %d) final routes ( %,d (%,d unique) visited / %,d added vertices)",
+				clusteInd, shortcuts.size() + shortcutMids.size(), total, existing.size(), stats.visitedVertices, stats.uniqueVisitedVertices, stats.addedVertices));
 		return shortcuts.size() + shortcutMids.size();
 	}
 
@@ -838,17 +833,17 @@ public class HHRoutingTopGraphCreator {
 			time = System.nanoTime();
 			pnt.rtCnt++;
 			if (pnt != null && pnt.rtRouteToPointRev != null) {
-				NetworkDBSegment parent = pnt.rtRouteToPointRev;
+				NetworkDBSegment parent = pnt.getSegment(pnt.rtRouteToPointRev, true);
 				while (parent != null) {
 					parent.end.rtCnt++;
-					parent = parent.end.rtRouteToPointRev;
+					parent = parent.end.getSegment(parent.end.rtRouteToPointRev, true);
 				}
 			}
 			if (pnt != null && pnt.rtRouteToPoint != null) {
-				NetworkDBSegment parent = pnt.rtRouteToPoint;
+				NetworkDBSegment parent = pnt.getSegment(pnt.rtRouteToPoint, false);
 				while (parent != null) {
 					parent.start.rtCnt++;
-					parent = parent.start.rtRouteToPoint;
+					parent = parent.start.getSegment(parent.start.rtRouteToPoint, false);
 				}
 			}
 			stats.prepTime += (System.nanoTime() - time) / 1e6;
