@@ -3,9 +3,11 @@ package net.osmand.router;
 import java.io.File;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -294,10 +296,11 @@ public class HHRoutingTopGraphCreator {
 		
 		time = System.nanoTime();
 		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegments(pnts.valueCollection(), true);
+		int cntEdges = networkDB.loadNetworkSegments(list, true);
 		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
 		System.out.printf(" %,d - %.2fms\nContracting nodes..\n", cntEdges, stats.loadEdgesTime);
 		
+		calculateAndPrintVertexDegree(list);
 		
 		time = System.nanoTime();
 		DijkstraConfig c = DijkstraConfig.dijkstra(1).maxSettlePoints(maxPoints);
@@ -335,6 +338,9 @@ public class HHRoutingTopGraphCreator {
 			if (++prog % 1000 == 0) {
 				logf("Contracting %d %.1f%% (reindexing %d, shortcuts %d)...", contracted, contracted / toContract * 100.0, reindex, allShortcuts.size());
 				printStat("Contraction stat ", stats, timeC, 1000);
+				if (prog % 10000 == 0) {
+					calculateAndPrintVertexDegree(list);
+				}
 				stats = new RoutingStats();
 				timeC = System.nanoTime();
 			}
@@ -387,6 +393,45 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
+	private void calculateAndPrintVertexDegree(List<NetworkDBPoint> list) {
+		TIntIntHashMap degreeIn = new TIntIntHashMap();
+		TIntIntHashMap degreeOut = new TIntIntHashMap();
+		int cnt = 0;
+		for (NetworkDBPoint p : list) {
+			if (p.rtExclude) {
+				continue;
+			}
+			cnt++;
+			degreeIn.adjustOrPutValue(p.connectedReverse.size(), 1, 1);
+			degreeOut.adjustOrPutValue(p.connected.size(), 1, 1);
+		}
+		if (cnt > 0) {
+			System.out.println("Vertex degree in - " + formatVertexDegree(degreeIn, cnt).toString());
+			System.out.println("Vertex degree out - " + formatVertexDegree(degreeOut, cnt).toString());
+		}
+	}
+
+
+	private StringBuilder formatVertexDegree(TIntIntHashMap degreeIn, int cnt) {
+		int[] keys = degreeIn.keys();
+		Arrays.sort(keys);
+		StringBuilder s = new StringBuilder();
+		int k = -1, st = 0, v = 0;
+		for (int l = 0; l <= keys.length; l++) {
+			if (l < keys.length) {
+				k = keys[l];
+				v += degreeIn.get(k);
+			}
+			if (v * 100.0 / cnt > 8 || l == keys.length) {
+				s.append(String.format("%s - %,d (%.1f%%), ", (st != k ? st + "-" : "") + k, v, v * 100.0 / cnt));
+				st = k + 1;
+				v = 0;
+			}
+		}
+		return s;
+	}
+
+
 	private void printStat(String name, RoutingStats stats, long time, int size) {
 		double contractionTime = (System.nanoTime() - time) / 1e6;
 		System.out.println(
@@ -414,6 +459,7 @@ public class HHRoutingTopGraphCreator {
 					continue;
 				}
 				if (out.end.rtDistanceFromStart == 0 || out.end.rtDistanceFromStart > out.dist) {
+					p.rtCnt++;
 					if (shortcuts != null) {
 						if (DEBUG_VERBOSE_LEVEL >= 1) {
 							System.out.printf("Shortcut %d -> %d via %d %.2f cost \n ", in.start.index, out.end.index,
@@ -435,7 +481,6 @@ public class HHRoutingTopGraphCreator {
 						}
 						shortcuts.add(sh);
 					}
-					p.rtCnt++;
 				}
 			}
 			for (NetworkDBPoint ps : c.visited) {

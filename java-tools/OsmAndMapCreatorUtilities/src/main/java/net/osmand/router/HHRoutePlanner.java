@@ -240,8 +240,8 @@ public class HHRoutePlanner {
 			c = new DijkstraConfig();
 			// test data for debug swap
 //			c = DijkstraConfig.dijkstra(0);
-//			c = DijkstraConfig.astar(0);
-			c = DijkstraConfig.ch();
+			c = DijkstraConfig.astar(0);
+//			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
 			DEBUG_VERBOSE_LEVEL = 0;
 		}
@@ -291,7 +291,7 @@ public class HHRoutePlanner {
 		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
 		System.out.println(c.toString(start, end));
-		System.out.printf("Routing finished %.1f ms: load data %.1f ms (%,d edges), routing %.1f ms (%.1f poll ms + %.1f queue ms), prep result %.1f ms\n",
+		System.out.printf("Routing finished all %.1f ms: load data %.1f ms (%,d edges), all routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
 				(System.nanoTime() - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime,
 				stats.addQueueTime, stats.pollQueueTime, stats.prepTime);
 		return objects;
@@ -431,11 +431,11 @@ public class HHRoutePlanner {
 				nextPoint.setCostParentRt(reverse, cost, point, connected.dist);
 				tm = System.nanoTime();
 				queue.add(new NetworkDBPointCost(nextPoint, cost, reverse)); // we need to add new object to not  remove / rebalance priority queue
+				stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
 				if (DEBUG_VERBOSE_LEVEL > 2) {
 					System.out.printf("Add  %s to visit - cost %.2f > prev cost %.2f \n", nextPoint, cost, exCost);
 				}
 				stats.addedVertices++;
-				stats.addQueueTime += (System.nanoTime() - tm) / 1e6;
 			}
 		}
 	}

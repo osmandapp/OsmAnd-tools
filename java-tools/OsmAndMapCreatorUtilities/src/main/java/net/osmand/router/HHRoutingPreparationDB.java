@@ -370,14 +370,14 @@ public class HHRoutingPreparationDB {
 		ResultSet rs = st.executeQuery("SELECT idPoint, idConnPoint, dist, shortcut from segments");
 		int x = 0;
 		while (rs.next()) {
-			x++;
-			NetworkDBPoint start = pntsById.get(rs.getLong(1));
-			NetworkDBPoint end = pntsById.get(rs.getLong(2));
-			double dist = rs.getDouble(3);
 			boolean shortcut = rs.getInt(4) > 0;
 			if (excludeShortcuts && shortcut) {
 				continue;
 			}
+			x++;
+			NetworkDBPoint start = pntsById.get(rs.getLong(1));
+			NetworkDBPoint end = pntsById.get(rs.getLong(2));
+			double dist = rs.getDouble(3);
 			NetworkDBSegment segment = new NetworkDBSegment(start, end, dist, true, shortcut);
 			NetworkDBSegment rev = new NetworkDBSegment(start, end, dist, false, shortcut);
 			start.connected.add(segment);
