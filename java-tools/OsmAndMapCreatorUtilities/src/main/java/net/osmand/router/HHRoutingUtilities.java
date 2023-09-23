@@ -97,7 +97,9 @@ public class HHRoutingUtilities {
 		for (LatLon l : segment.geometry) {
 			w.addNode(new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--));
 		}
-		osmObjects.put(w.getId(), w);
+		if (!segment.geometry.isEmpty()) {
+			osmObjects.put(w.getId(), w);
+		}
 	}
 
 	static void addNode(TLongObjectHashMap<Entity> osmObjects, NetworkDBPoint pnt, LatLon l, String tag, String val) {

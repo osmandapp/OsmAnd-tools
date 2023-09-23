@@ -185,9 +185,9 @@ public class HHRoutePlanner {
 			c = new DijkstraConfig();
 			// test data for debug swap
 			c.HEURISTIC_COEFFICIENT = 1;
-			c.DIJKSTRA_DIRECTION = 1;
+			c.DIJKSTRA_DIRECTION = 0;
 			c.USE_CH = false;
-			c.USE_CH_SHORTCUTS = true;
+			c.USE_CH_SHORTCUTS = false;
 			c.USE_MIDPOINT = false;
 //			PRELOAD_SEGMENTS = false;
 			DEBUG_VERBOSE_LEVEL = 0;

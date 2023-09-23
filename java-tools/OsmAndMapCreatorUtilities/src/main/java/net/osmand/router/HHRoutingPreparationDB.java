@@ -72,12 +72,13 @@ public class HHRoutingPreparationDB {
 		if (!checkColumnExist(st, "shortcut", "geometry")) {
 			st.execute("ALTER TABLE geometry add column shortcut");
 		}
+		st.execute("delete from geometry where geometry is null");
 		
 		insPoint = conn.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd) VALUES(?, ?, ?)");
 		
-		loadGeometry = conn.prepareStatement("SELECT geometry FROM geometry WHERE idPoint = ? AND idConnPoint = ? and shortcut = ? ");
+		loadGeometry = conn.prepareStatement("SELECT geometry, shortcut FROM geometry WHERE idPoint = ? AND idConnPoint = ? ");
 		loadSegmentEnd = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idPoint = ?  ");
 		loadSegmentStart = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idConnPoint = ?  ");
 
@@ -408,9 +409,12 @@ public class HHRoutingPreparationDB {
 		List<LatLon> l = new ArrayList<LatLon>();
 		loadGeometry.setLong(1, start);
 		loadGeometry.setLong(2, end);
-		loadGeometry.setInt(3, shortcut ? 1 : 0);
+		int shortcutN = shortcut ? 1 : 0;
 		ResultSet rs = loadGeometry.executeQuery();
-		if (rs.next()) {
+		while (rs.next()) {
+			if (shortcutN != rs.getShort(2)) {
+				continue;
+			}
 			byte[] geom = rs.getBytes(1);
 			if (geom.length > 8 &&
 					Algorithms.parseIntFromBytes(geom, 0) == XY_SHORTCUT_GEOM && 
@@ -428,6 +432,9 @@ public class HHRoutingPreparationDB {
 					l.add(new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x)));
 				}
 			}
+		}
+		if(l.isEmpty()) {
+			System.err.printf("Empty route geometry %d -> %d  %s\n", start, end, shortcut ? "sh" : "bs");
 		}
 		return l;
 	}
