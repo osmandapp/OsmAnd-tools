@@ -31,7 +31,7 @@ public class HHRoutePlanner {
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
 	
-	static boolean PRELOAD_SEGMENTS = true;
+	static boolean PRELOAD_SEGMENTS = false;
 
 	static final int PROC_ROUTING = 0;
 	static int PROCESS = PROC_ROUTING;
@@ -194,14 +194,17 @@ public class HHRoutePlanner {
 					c = new DijkstraConfig();
 				}
 				c.DIJKSTRA_DIRECTION = (float) Double.parseDouble(a.substring("--direction=".length()));
+			} else if (a.startsWith("--ch")) {
+				c = DijkstraConfig.ch();
+			} else if (a.startsWith("--preload")) {
+				PRELOAD_SEGMENTS = true;
 			} else if (a.startsWith("--midpoint=")) {
 				String[] s = a.substring("--midpoint=".length()).split(":");
 				if (c == null) {
 					c = new DijkstraConfig();
 				}
-				c.USE_MIDPOINT = Boolean.parseBoolean(s[0]);
+				c.MIDPOINT_MAX_DEPTH = Integer.parseInt(s[0]);
 				c.MIDPOINT_ERROR = Integer.parseInt(s[1]);
-				c.MIDPOINT_MAX_DEPTH = Integer.parseInt(s[2]);
 			}
 		}
 		if (PROCESS_START == null || PROCESS_END == null) {
@@ -240,8 +243,8 @@ public class HHRoutePlanner {
 			c = new DijkstraConfig();
 			// test data for debug swap
 //			c = DijkstraConfig.dijkstra(0);
-			c = DijkstraConfig.astar(0);
-//			c = DijkstraConfig.ch();
+//			c = DijkstraConfig.astar(1);
+			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
 			DEBUG_VERBOSE_LEVEL = 0;
 		}
@@ -326,8 +329,6 @@ public class HHRoutePlanner {
 				return Double.compare(o1.cost, o2.cost);
 			}
 		});
-		// TODO better PriorityQueue could be used 4ary-heaps ? 
-//		queue = new FourAryHeap<>(cmp);
 		if (start != null) {
 			start.setCostParentRt(false, 0.00001, null, 0);
 			start.rtVisited = true;
@@ -345,27 +346,38 @@ public class HHRoutePlanner {
 			}
 		}
 		
-		while (!(queue.isEmpty())) {
+		while (!queue.isEmpty()) {
 			long tm = System.nanoTime();
 			NetworkDBPointCost pointCost = queue.poll();
 			NetworkDBPoint point = pointCost.point;
 			boolean rev = pointCost.rev;
 			stats.pollQueueTime += (System.nanoTime() - tm) / 1e6;
 			stats.visitedVertices++;
+			if (point.visited(!rev)) {
+				if (c.HEURISTIC_COEFFICIENT == 1 && c.DIJKSTRA_DIRECTION == 0) {
+					// TODO could be improved while adding vertices ? too slow
+					double rcost = point.rtDistanceFromStart + point.rtDistanceFromStartRev;
+					if (rcost <= pointCost.cost) {
+						return point;
+					} else {
+						queue.add(new NetworkDBPointCost(point, rcost, rev));
+						point.markVisited(rev);
+						continue;
+					}
+				} else {
+					NetworkDBPoint finalPoint = point;
+					if (c.DIJKSTRA_DIRECTION == 0) {
+						finalPoint = scanFinalPoint(finalPoint, c.visited);
+						finalPoint = scanFinalPoint(finalPoint, c.visitedRev);
+					}
+					return finalPoint;
+				}
+			}
 			if (point.visited(rev)) {
 				continue;
 			}
 			stats.uniqueVisitedVertices++;
 			point.markVisited(rev);
-			if (point.visited(!rev)) {
-				NetworkDBPoint finalPoint = point;
-				if (c.DIJKSTRA_DIRECTION == 0) {
-					// TODO check if it's correct for A*
-					finalPoint = scanFinalPoint(finalPoint, c.visited);
-					finalPoint = scanFinalPoint(finalPoint, c.visitedRev);
-				}
-				return finalPoint;
-			}
 			(rev ? c.visitedRev : c.visited).add(point);
 			printPoint(point, rev);
 			if (c.MAX_COST > 0 && pointCost.cost > c.MAX_COST) {

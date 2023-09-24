@@ -339,6 +339,7 @@ public class HHRoutingPreparationDB {
 			return 0;
 		}
 		List<NetworkDBSegment> l = new ArrayList<>();
+		@SuppressWarnings("resource")
 		PreparedStatement pre = reverse ? loadSegmentStart : loadSegmentEnd;
 		pre.setInt(1, point.index);
 		ResultSet rs = pre.executeQuery();

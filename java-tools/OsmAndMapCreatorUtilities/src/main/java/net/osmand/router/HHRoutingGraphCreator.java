@@ -82,8 +82,8 @@ import net.osmand.util.MapUtils;
 // 3.4 Make process rerunnable ? 
 
 // 4 Introduce 3/4 level (test on Europe)
-// 4.1 Merge islands - Introduce 3rd level of points
-// 4.2 Implement routing algorithm 2->3->4
+// 4.1 Merge islands - Introduce 3rd level of points - FAIL
+// 4.2 Implement routing algorithm 2->3->4 - ?
 // 4.3 Introduce / reuse points that are center for many shortcuts to reduce edges N*N -> 2*n
 // 4.4 Optimize time / space comparing to 2nd level
 
@@ -143,7 +143,7 @@ public class HHRoutingGraphCreator {
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
-//		name = "Ukraine_europe_2.road.obf";
+		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -855,9 +855,7 @@ public class HHRoutingGraphCreator {
 		}
 	}
 
-	///////////////////////////////////////////// BUILD SHORTCUTS
-	///////////////////////////////////////////// ///////////////////////////////////////////
-	//////////////////////////////////////////
+	///////////////////////////////////////////// BUILD SHORTCUTS ///////////////////////////////////////////// 
 
 	private static class BuildNetworkShortcutResult {
 		List<NetworkDBPoint> points = new ArrayList<>();
