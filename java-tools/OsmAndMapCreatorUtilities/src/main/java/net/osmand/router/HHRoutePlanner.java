@@ -329,6 +329,7 @@ public class HHRoutePlanner {
 				return Double.compare(o1.cost, o2.cost);
 			}
 		});
+		// TODO revert 2 queues to fail fast in 1 direction
 		if (start != null) {
 			start.setCostParentRt(false, 0.00001, null, 0);
 			start.rtVisited = true;

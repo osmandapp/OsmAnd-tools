@@ -119,6 +119,7 @@ public class HHRoutingUtilities {
 		int nodes = 0;
 		int ways1 = 0;
 		int ways2 = 0;
+		boolean merge = false;
 		if (visitedSegments != null) {
 			TLongSet viewed = new TLongHashSet();
 			TLongObjectIterator<RouteSegment> it = visitedSegments.iterator();
@@ -133,16 +134,21 @@ public class HHRoutingUtilities {
 					int d = (s.getSegmentStart() < s.getSegmentEnd() ? 1 : -1);
 					int segmentEnd = s.getSegmentEnd();
 					viewed.add(pntKey);
-					while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
-						RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
-						pntKey = calculateRoutePointInternalId(nxt);
-						if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
-							break;
+					if (merge) {
+						while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
+							RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
+							pntKey = calculateRoutePointInternalId(nxt);
+							if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
+								break;
+							}
+							viewed.add(pntKey);
+							segmentEnd += d;
 						}
-						viewed.add(pntKey);
-						segmentEnd += d;
 					}
 					Way w = convertRoad(s.getRoad(), s.getSegmentStart(), segmentEnd);
+					if (s.distanceToEnd > 0) {
+						w.putTag("dist", "" + (int) s.distanceToEnd);
+					}
 					objs.add(w);
 					ways1++;
 				}
