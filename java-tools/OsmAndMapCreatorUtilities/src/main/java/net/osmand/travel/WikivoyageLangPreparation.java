@@ -118,11 +118,11 @@ public class WikivoyageLangPreparation {
 			String val = arg.substring(arg.indexOf("=") + 1);
 			if (arg.startsWith("--lang=")) {
 				lang = val;
-			} else if (arg.startsWith("--wikivoyageFolder=")) {
+			} else if (arg.startsWith("--wikivoyageDir=")) {
 				wikivoyageFolderName = val;
 			} else if (arg.startsWith("--compress=")) {
 				uncompressed = "no".equals(val) || "false".equals(val);
-			} else if (arg.startsWith("--wikiFolder=")) {
+			} else if (arg.startsWith("--wikidataDir=")) {
 				osmWikiFolderName = val;
 			} else if (arg.equals("--h")) {
 				help = true;
@@ -152,14 +152,15 @@ public class WikivoyageLangPreparation {
 	}
 
 	private static void printHelp() {
-		System.out.printf("Usage: --lang=<lang> --wikivoyageFolder=<wikivoyage folder> --compress=<true|false> " +
-				"--wikiFolder=<osm wiki folder>%n" +
+		System.out.printf("Usage: --lang=<lang> --wikivoyageDir=<wikivoyage folder> --compress=<true|false> " +
+				"--wikidataDir=<wikidata folder>%n" +
 				"--h - print this help%n" +
 				"<lang> - language of wikivoyage%n" +
 				"<wikivoyage folder> - work folder%n" +
 				"<compress> - with the \"false\" or \"no\" argument, uncompressed content and gpx fields " +
 				"are added in the full_wikivoyage.sqlite,%n\t\tby default only gziped fields are present in the wikivoyage.sqlite%n" +
-				"<osm wiki folder> - folder with osm_wiki_*.gz files. This files with osm elements with wikidata=*, wikipedia=* tags");
+				"<wikidata folder> - folder has osm_wiki_*.gz files. This files with osm elements with wikidata=*, wikipedia=* tags,%n" +
+				"\t\t also folder has wikidatawiki-latest-pages-articles.xml.gz file ");
 	}
 	
 	protected static class PageInfo {
