@@ -36,6 +36,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.data.LatLon;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -63,7 +64,6 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
 import net.osmand.PlatformUtil;
-import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
@@ -77,38 +77,10 @@ public class WikiDatabasePreparation {
 	public static final String WIKI_SQLITE = "wiki.sqlite";
 	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
-	public static final String OSM_WIKI_PARSER = "osm_wiki_";
-	
+	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
 
-	public static class LatLon {
-		private final double longitude;
-		private final double latitude;
-
-		public LatLon(double latitude, double longitude) {
-			this.latitude = latitude;
-			this.longitude = longitude;
-		}
-		
-		public double getLatitude() {
-			return latitude;
-		}
-		
-		public double getLongitude() {
-			return longitude;
-		}
-		
-		public boolean isZero() {
-			return (latitude == 0 && longitude == 0);
-		}
-		
-		@Override
-		public String toString() {
-			return "lat: " + latitude + " lon:" + longitude;
-		}
-
-	}
-
-	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata) throws IOException, SQLException {
+	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata,
+	                                       OsmCoordinatesByTag osmCoordinates) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
@@ -144,7 +116,9 @@ public class WikiDatabasePreparation {
 				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
-					bld.append(parseListing(val, wikidata, lang));
+					String[] stringRef = parsePoiWithAddLatLon(val, wikidata, lang, osmCoordinates);
+					bld.append(stringRef[0]);
+					val = stringRef[1];
 				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
 					bld.append((parseRegionList(val)));
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
@@ -511,8 +485,9 @@ public class WikiDatabasePreparation {
 			blocksMap.put(key, tmp);
 		}
 	}
-	
-	private static String parseListing(String val, WikidataConnection wikiDataconn, String wikiLang) throws IOException, SQLException {
+
+	private static String[] parsePoiWithAddLatLon(String val, WikidataConnection wikiDataconn, String wikiLang,
+												  OsmCoordinatesByTag osmCoordinates) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		val = val.replaceAll("\\{\\{.*}}", "");
 		String[] parts = val.split("\\|");
@@ -586,7 +561,24 @@ public class WikiDatabasePreparation {
 			}
 		}
 		if (wikiLink.isEmpty() && !wikiData.isEmpty() && wikiDataconn != null) {
-			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData); 
+			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData);
+			LatLon latLon = osmCoordinates.getCoordinates("wikidata", wikiData);
+			if (latLon != null) {
+				String newLat = String.valueOf(latLon.getLatitude());
+				String newLon = String.valueOf(latLon.getLongitude());
+				if (lat != null) {
+					val = val.replace(lat, newLat);
+				} else {
+					val += "|lat=" + newLat;
+				}
+				if (lon != null) {
+					val = val.replace(lon, newLon);
+				} else {
+					val += "|long=" + newLon;
+				}
+				lat = newLat;
+				lon = newLon;
+			}
 		}
 		if (!wikiLink.isEmpty()) {
 			bld.append(addWikiLink(wikiLang, wikiLink, lat, lon));
@@ -595,10 +587,9 @@ public class WikiDatabasePreparation {
 		if (lat != null && lon != null) {
 			bld.append(" geo:").append(lat).append(",").append(lon);
 		}
-		return bld.toString();
+		String[] result = {bld.toString(), val};
+		return result;
 	}
-	
-
 
 	public static String appendSqareBracketsIfNeeded(int i, String[] parts, String value) {
 		while (StringUtils.countMatches(value, "[[") > StringUtils.countMatches(value, "]]") && i + 1 < parts.length) {
@@ -856,7 +847,6 @@ public class WikiDatabasePreparation {
 		}
 		final String sqliteFileName = wikiFolder + WIKI_SQLITE;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
-		ConsoleProgressImplementation cprogress = new ConsoleProgressImplementation();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
@@ -866,9 +856,13 @@ public class WikiDatabasePreparation {
 			regions.cacheAllCountries();
 			OsmCoordinatesByTag osmWikiCoordinates = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
 					new String[] { "wikipedia:" });
-			for (File f : new File(wikiFolder).listFiles()) {
-				if (f.getName().startsWith(OSM_WIKI_PARSER)) {
-					osmWikiCoordinates.parseOSMCoordinates(f, cprogress, f.getName().contains("multi"));
+			File[] listFiles = new File(wikiFolder).listFiles();
+			if (listFiles != null) {
+				for (File f : listFiles) {
+					if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX)) {
+						boolean parseRelations = f.getName().contains("multi");
+						osmWikiCoordinates.parseOSMCoordinates(f, null, parseRelations);
+					}
 				}
 			}
 			final WikiDataHandler handler = new WikiDataHandler(sx, progress, new File(sqliteFileName), osmWikiCoordinates, regions);
@@ -1084,7 +1078,7 @@ public class WikiDatabasePreparation {
 
 	private static String generateHtmlArticle(String contentText, String lang, WikiImageUrlStorage imageUrlStorage)
 			throws IOException, SQLException {
-		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
+		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null, null);
 		final HTMLConverter converter = new HTMLConverter(false);
 		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
 				"http://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);

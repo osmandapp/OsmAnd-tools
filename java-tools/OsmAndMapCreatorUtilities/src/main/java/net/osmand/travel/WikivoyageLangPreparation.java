@@ -5,7 +5,6 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,6 +27,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.data.LatLon;
+import net.osmand.wiki.*;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -45,11 +46,10 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
-import net.osmand.wiki.CustomWikiModel;
-import net.osmand.wiki.WikiDatabasePreparation;
-import net.osmand.wiki.WikiDatabasePreparation.LatLon;
-import net.osmand.wiki.WikiImageUrlStorage;
-import net.osmand.wiki.WikidataConnection;
+import org.xmlpull.v1.XmlPullParserException;
+
+import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
+
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
 	private static boolean uncompressed;
@@ -65,8 +65,8 @@ public class WikivoyageLangPreparation {
 		TAG_DIRECTIONS ("directions"),
 		TAG_PRICE ("price"),
 		TAG_PHONE ("phone");
-		
-		private String tg;
+
+		private final String tg;
 
 		private WikivoyageOSMTags(String tg) {
 			this.tg = tg;
@@ -98,7 +98,7 @@ public class WikivoyageLangPreparation {
 		METRIC_DATA("metric"),
 		TRANSLATION("translation");
 
-		private String type;
+		private final String type;
 		WikivoyageTemplates(String s) {
 			type = s;
 		}
@@ -107,22 +107,36 @@ public class WikivoyageLangPreparation {
 			return type;
 		}
 	}
-	
-	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException {
+
+	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException,
+			XmlPullParserException, InterruptedException {
 		String lang = "";
-		String folder = "";
-		
-		if (args.length > 0) {
-			lang = args[0];
+		String wikivoyageFolderName = "";
+		String osmWikiFolderName = "";
+		boolean help = false;
+		for (String arg : args) {
+			String val = arg.substring(arg.indexOf("=") + 1);
+			if (arg.startsWith("--lang=")) {
+				lang = val;
+			} else if (arg.startsWith("--wikivoyageDir=")) {
+				wikivoyageFolderName = val;
+			} else if (arg.startsWith("--compress=")) {
+				uncompressed = "no".equals(val) || "false".equals(val);
+			} else if (arg.startsWith("--wikidataDir=")) {
+				osmWikiFolderName = val;
+			} else if (arg.equals("--h")) {
+				help = true;
+			}
 		}
-		if (args.length > 1) {
-			folder = args[1];
+		if (args.length == 0 || help || wikivoyageFolderName.isEmpty()) {
+			printHelp();
+			return;
 		}
-		if (args.length > 2) {
-			uncompressed = args[2].equals("uncompressed");
+		if (osmWikiFolderName.isEmpty()) {
+			osmWikiFolderName = wikivoyageFolderName;
 		}
-		final File wikiArticles = new File(folder, lang + "wikivoyage-latest-pages-articles.xml.bz2");
-		final File wikiProps = new File(folder, lang + "wikivoyage-latest-page_props.sql.gz");
+		final File wikiArticles = new File(wikivoyageFolderName, lang + "wikivoyage-latest-pages-articles.xml.bz2");
+		final File wikiProps = new File(wikivoyageFolderName, lang + "wikivoyage-latest-page_props.sql.gz");
 		if (!wikiArticles.exists()) {
 			System.out.println("Wikivoyage dump for " + lang + " doesn't exist" + wikiArticles.getName());
 			return;
@@ -131,9 +145,22 @@ public class WikivoyageLangPreparation {
 			System.out.println("Wikivoyage page props for " + lang + " doesn't exist" + wikiProps.getName());
 			return;
 		}
-		File sqliteFileName = new File(folder , (uncompressed ? "full_" : "") + "wikivoyage.sqlite");
-		processWikivoyage(wikiArticles, wikiProps, lang, sqliteFileName);
+		File sqliteFile = new File(wikivoyageFolderName, (uncompressed ? "full_" : "") + "wikivoyage.sqlite");
+		File osmWikiFolder = new File(osmWikiFolderName);
+		processWikivoyage(wikiArticles, wikiProps, lang, sqliteFile, osmWikiFolder);
 		System.out.println("Successfully generated.");
+	}
+
+	private static void printHelp() {
+		System.out.printf("Usage: --lang=<lang> --wikivoyageDir=<wikivoyage folder> --compress=<true|false> " +
+				"--wikidataDir=<wikidata folder>%n" +
+				"--h - print this help%n" +
+				"<lang> - language of wikivoyage%n" +
+				"<wikivoyage folder> - work folder%n" +
+				"<compress> - with the \"false\" or \"no\" argument, uncompressed content and gpx fields " +
+				"are added in the full_wikivoyage.sqlite,%n\t\tby default only gziped fields are present in the wikivoyage.sqlite%n" +
+				"<wikidata folder> - folder has osm_wiki_*.gz files. This files with osm elements with wikidata=*, wikipedia=* tags,%n" +
+				"\t\t also folder has wikidatawiki-latest-pages-articles.xml.gz file ");
 	}
 	
 	protected static class PageInfo {
@@ -142,9 +169,10 @@ public class WikivoyageLangPreparation {
 		public String image;
 		public String wikidataId;
 	}
-	
-	protected static void processWikivoyage(final File wikiPg, final File wikiProps, String lang, File wikivoyageSqlite)
-			throws ParserConfigurationException, SAXException, FileNotFoundException, IOException, SQLException {
+
+	protected static void processWikivoyage(final File wikiPg, final File wikiProps, String lang, File wikivoyageSqlite,
+	                                        File osmWikiFolder)
+			throws ParserConfigurationException, SAXException, IOException, SQLException, XmlPullParserException, InterruptedException {
 
 		Map<Long, PageInfo> pageInfos = new LinkedHashMap<Long, WikivoyageLangPreparation.PageInfo>();
 		SqlInsertValuesReader.readInsertValuesFile(wikiProps.getAbsolutePath(), new InsertValueProcessor() {
@@ -178,7 +206,18 @@ public class WikivoyageLangPreparation {
 		Reader reader = new InputStreamReader(zis, "UTF-8");
 		InputSource is = new InputSource(reader);
 		is.setEncoding("UTF-8");
-		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, wikivoyageSqlite, pageInfos);
+		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
+				new String[]{"wikidata"});
+		File[] listFiles = osmWikiFolder.listFiles();
+		if (listFiles != null) {
+			for (File f : listFiles) {
+				if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX)) {
+					boolean parseRelations = f.getName().contains("multi");
+					osmCoordinates.parseOSMCoordinates(f, null, parseRelations);
+				}
+			}
+		}
+		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, wikivoyageSqlite, pageInfos, osmCoordinates);
 		sx.parse(is, handler);
 		handler.finish();
 	}
@@ -221,6 +260,7 @@ public class WikivoyageLangPreparation {
 		private DBDialect dialect = DBDialect.SQLITE;
 		private Connection conn;
 		private final WikiImageUrlStorage imageUrlStorage;
+		private OsmCoordinatesByTag osmCoordinates;
 		private PreparedStatement prep;
 		private int batch = 0;
 		private final static int BATCH_SIZE = 500;
@@ -230,13 +270,15 @@ public class WikivoyageLangPreparation {
 		private String lang;
 		private WikidataConnection wikidataconn;
 		private Map<Long, PageInfo> pageInfos;
-			
-		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, File sqliteFile, Map<Long, PageInfo> pageInfos)
+
+		WikiOsmHandler(SAXParser saxParser, InputStream progIS, String lang, File sqliteFile, Map<Long,
+				PageInfo> pageInfos, OsmCoordinatesByTag osmCoordinates)
 				throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
 			this.pageInfos = pageInfos;
+			this.osmCoordinates = osmCoordinates;
 			progress.startTask("Parse wiki xml", progIS.available());
 
 			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
@@ -254,7 +296,7 @@ public class WikivoyageLangPreparation {
 				batch = 0;
 			}
 		}
-		
+
 		public void finish() throws SQLException {
 			prep.executeBatch();
 			if(!conn.getAutoCommit()) {
@@ -340,10 +382,14 @@ public class WikivoyageLangPreparation {
 
 		private void parseText(String cont) throws IOException, SQLException, SAXException {
 			Map<String, List<String>> macroBlocks = new HashMap<>();
-			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, wikidataconn);
+			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, wikidataconn, osmCoordinates);
 			try {
 				if (!macroBlocks.isEmpty()) {
-					LatLon ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
+					LatLon ll = osmCoordinates.getCoordinates("wikidata",
+							pageInfos.get(Long.parseLong(pageId.toString())).wikidataId);
+					if (ll == null) {
+						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
+					}
 					boolean accepted = !title.toString().contains(":");
 					if (accepted) {
 						int column = 1;
@@ -378,7 +424,7 @@ public class WikivoyageLangPreparation {
 						}
 						// part_of
 						prep.setString(column++, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
-						if (ll.isZero()) {
+						if (ll.getLongitude() == 0 && ll.getLatitude() == 0) {
 							prep.setNull(column++, Types.DOUBLE);
 							prep.setNull(column++, Types.DOUBLE);
 						} else {
