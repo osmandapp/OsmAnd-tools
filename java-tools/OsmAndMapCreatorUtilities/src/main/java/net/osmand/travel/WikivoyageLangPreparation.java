@@ -65,8 +65,8 @@ public class WikivoyageLangPreparation {
 		TAG_DIRECTIONS ("directions"),
 		TAG_PRICE ("price"),
 		TAG_PHONE ("phone");
-		
-		private String tg;
+
+		private final String tg;
 
 		private WikivoyageOSMTags(String tg) {
 			this.tg = tg;
@@ -98,7 +98,7 @@ public class WikivoyageLangPreparation {
 		METRIC_DATA("metric"),
 		TRANSLATION("translation");
 
-		private String type;
+		private final String type;
 		WikivoyageTemplates(String s) {
 			type = s;
 		}
@@ -113,25 +113,23 @@ public class WikivoyageLangPreparation {
 		String lang = "";
 		String wikivoyageFolderName = "";
 		String osmWikiFolderName = "";
-		if (args.length == 0) {
-			printHelp();
-			return;
-		} else {
-			lang = args[0];
-		}
-		if (args.length > 1) {
-			wikivoyageFolderName = args[1];
-		}
-		if (args.length > 2) {
-			uncompressed = args[2].equals("uncompressed");
-			if (!uncompressed && !args[2].equals("compressed")) {
-				osmWikiFolderName = args[2];
+		boolean help = false;
+		for (String arg : args) {
+			String val = arg.substring(arg.indexOf("=") + 1);
+			if (arg.startsWith("--lang=")) {
+				lang = val;
+			} else if (arg.startsWith("--wikivoyageFolder=")) {
+				wikivoyageFolderName = val;
+			} else if (arg.startsWith("--compress=")) {
+				uncompressed = "no".equals(val) || "false".equals(val);
+			} else if (arg.startsWith("--wikiFolder=")) {
+				osmWikiFolderName = val;
+			} else if (arg.equals("--h")) {
+				help = true;
 			}
 		}
-		if (args.length > 3) {
-			osmWikiFolderName = args[3];
-		}
-		if (wikivoyageFolderName.isEmpty()) {
+		if (args.length == 0 || help || wikivoyageFolderName.isEmpty()) {
+			printHelp();
 			return;
 		}
 		if (osmWikiFolderName.isEmpty()) {
@@ -154,10 +152,12 @@ public class WikivoyageLangPreparation {
 	}
 
 	private static void printHelp() {
-		System.out.printf("Usage: <lang> <wikivoyage folder> <compressed|uncompressed> <osm wiki folder>%n" +
+		System.out.printf("Usage: --lang=<lang> --wikivoyageFolder=<wikivoyage folder> --compress=<true|false> " +
+				"--wikiFolder=<osm wiki folder>%n" +
+				"--h - print this help%n" +
 				"<lang> - language of wikivoyage%n" +
 				"<wikivoyage folder> - work folder%n" +
-				"<compressed|uncompressed> - with the \"uncompressed\" argument, uncompressed content and gpx fields " +
+				"<compress> - with the \"false\" or \"no\" argument, uncompressed content and gpx fields " +
 				"are added in the full_wikivoyage.sqlite,%n\t\tby default only gziped fields are present in the wikivoyage.sqlite%n" +
 				"<osm wiki folder> - folder with osm_wiki_*.gz files. This files with osm elements with wikidata=*, wikipedia=* tags");
 	}
