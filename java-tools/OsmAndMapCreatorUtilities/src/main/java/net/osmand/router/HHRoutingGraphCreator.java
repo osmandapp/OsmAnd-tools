@@ -826,7 +826,7 @@ public class HHRoutingGraphCreator {
 				}
 			}
 		}
-		TLongObjectHashMap<RouteSegmentCustom> mincuts = runMaxFlow(vertices, BRIDGE_MIN_DEPTH, source);
+		TLongObjectHashMap<RouteSegmentCustom> mincuts = runMaxFlow(vertices, BRIDGE_MIN_DEPTH, source, pnt.toString());
 
 
 		// Debug purposes
@@ -860,8 +860,8 @@ public class HHRoutingGraphCreator {
 //			System.out.printf("MINCUT %.2f %d -> %d \n", coeffToMinimize(c.visitedVerticesSize(), c.toVisitVerticesSize()), 
 //					c.visitedVerticesSize(), c.toVisitVerticesSize());
 			if (mincuts.size() != c.toVisitVerticesSize()) {
-				String msg = String.format("Bug mincut %d != %d graph reached size", mincuts.size(),
-						c.toVisitVerticesSize());
+				String msg = String.format("Bug mincut %d != %d graph reached size: %s", mincuts.size(),
+						c.toVisitVerticesSize(), pnt.toString());
 				System.err.println(msg);
 				throw new IllegalStateException(msg);
 			}
@@ -873,7 +873,7 @@ public class HHRoutingGraphCreator {
 	}
 
 	private TLongObjectHashMap<RouteSegmentCustom> runMaxFlow(List<RouteSegmentCustom> vertices, int minDepth,
-			List<RouteSegmentCustom> sources) {
+			List<RouteSegmentCustom> sources, String errorDebug) {
 		RouteSegmentCustom source = new RouteSegmentCustom();
 		for (RouteSegmentCustom s : sources) {
 			source.addConnection(s);
@@ -968,7 +968,7 @@ public class HHRoutingGraphCreator {
 			}
 		}
 		if (sinks.size() != mincuts.size()) {
-			String msg = String.format("BUG maxflow %d != %d mincut ", sinks.size(), mincuts.size());
+			String msg = String.format("BUG maxflow %d != %d mincut: %s ", sinks.size(), mincuts.size(), errorDebug);
 			System.err.println(msg);
 //			throw new IllegalStateException(msg);
 		}
