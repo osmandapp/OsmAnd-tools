@@ -175,6 +175,7 @@ public class HHRoutingGraphCreator {
 				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
 			} else if (a.startsWith("--maxdepth=")) {
 				MAX_NEIGHBOORS_N_POINTS = Integer.parseInt(a.substring("--maxdepth=".length()));
+				BRIDGE_MAX_DEPTH = Integer.parseInt(a.substring("--maxdepth=".length()));
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			}
