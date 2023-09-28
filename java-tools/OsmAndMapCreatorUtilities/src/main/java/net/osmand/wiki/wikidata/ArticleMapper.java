@@ -45,9 +45,6 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 							.getAsJsonObject("datavalue");
 					if (imageDataValue != null) {
 						String image = imageDataValue.getAsJsonPrimitive("value").getAsString();
-						if (image.equals("Antoni Llena")) {
-							System.out.println("OK");
-						}
 						article.setImage(image);
 					}
 				}
