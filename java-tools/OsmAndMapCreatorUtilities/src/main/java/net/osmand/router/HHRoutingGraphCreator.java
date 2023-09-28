@@ -628,15 +628,15 @@ public class HHRoutingGraphCreator {
 			for (int k = 0; k < keys.length; k++) {
 				sum += distr.get(keys[k]);
 			}
-			b.append(String.format("%,d: ", sum));
+			b.append(String.format("%,d", sum));
 			int k = 0, percent = 0;
 			for (; k < keys.length; k++) {
 				percent = distr.get(keys[k]) * 100 / sum;
-				if (percent >= 5) {
+				if (percent >= 3) {
 					b.append(", ").append(keys[k]).append(suf).append(" - " + percent + "%");
 				}
 			}
-			if (percent < 5 && keys.length > 0) {
+			if (percent < 3 && keys.length > 0) {
 				b.append("... " + keys[keys.length - 1]);
 			}
 			return b.toString();
@@ -690,11 +690,11 @@ public class HHRoutingGraphCreator {
 				this.isolatedIslands++;
 			}
 			borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
-			edges += cluster.edges;
+			edges += cluster.edges / 2;
 			TIntIntIterator it = cluster.edgeDistr.iterator();
 			while (it.hasNext()) {
 				it.advance();
-				edgesDistr.adjustOrPutValue(it.key(), it.value() / 2, it.value() / 2);
+				edgesDistr.adjustOrPutValue(it.key(), it.value(), it.value());
 			}
 			pntsDistr.adjustOrPutValue((cluster.visitedVertices.size() + 500) / 1000, 1, 1);
 			this.totalBorderPoints += borderPoints;
@@ -863,7 +863,7 @@ public class HHRoutingGraphCreator {
 			if (c.toVisitVertices.contains(r.cacheId)) {
 				source.add(r);
 			} else {
-				c.edges += r.connections.size() / 2;
+				c.edges += r.connections.size();
 				c.edgeDistr.adjustOrPutValue(r.connections.size(), 1, 1);
 				vertices.add(r);
 				Iterator<RouteSegmentConn> it = r.connections.iterator();
