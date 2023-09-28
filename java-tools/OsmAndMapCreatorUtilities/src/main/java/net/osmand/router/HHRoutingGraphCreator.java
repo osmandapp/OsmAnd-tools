@@ -606,9 +606,9 @@ public class HHRoutingGraphCreator {
 			// calculate stats
 			TIntIntHashMap borderClusterDistr = new TIntIntHashMap();
 			for(int a : this.borderPntsCluster.values()) {
-				borderClusterDistr.increment(a);
+				borderClusterDistr.adjustOrPutValue(a, 1, 1);
 			}
-			logf("RESULT %d points (%d edges) -> %d border points, %d clusters (%d isolated), %d est shortcuts (%s edges distr)",
+			logf("RESULT %,d points (%,d edges) -> %d border points, %d clusters (%d isolated), %d est shortcuts (%s edges distr)",
 					getTotalPoints() + borderPointsSize(), edges, borderPointsSize(), clusterSize(), isolatedIslands,
 					shortcuts, distrString(edgesDistr, ""));
 			
@@ -628,7 +628,7 @@ public class HHRoutingGraphCreator {
 				if (k > 0) {
 					b.append(", ");
 				}
-				b.append(keys[k]).append(suf).append(" ").append(distr.get(keys[k]));
+				b.append(keys[k]).append(suf).append(" ").append(String.format("%,d", distr.get(keys[k])));
 			}
 			return b.toString();
 		}
@@ -669,7 +669,7 @@ public class HHRoutingGraphCreator {
 				currentProcessingRegion.visitedVertices.putAll(cluster.visitedVertices);
 			}
 			for (long k : cluster.toVisitVertices.keys()) {
-				borderPntsCluster.increment(k);
+				borderPntsCluster.adjustOrPutValue(k, 1, 1);
 			}
 			try {
 				networkDB.insertCluster(cluster, networkPointsCluster);
@@ -680,14 +680,14 @@ public class HHRoutingGraphCreator {
 			if (borderPoints == 0) {
 				this.isolatedIslands++;
 			}
-			borderPntsDistr.increment(borderPoints);
+			borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
 			edges += cluster.edges;
 			TIntIntIterator it = cluster.edgeDistr.iterator();
 			while (it.hasNext()) {
 				it.advance();
-				edgesDistr.adjustValue(it.key(), it.value());
+				edgesDistr.adjustOrPutValue(it.key(), it.value(), it.value());
 			}
-			pntsDistr.increment(cluster.visitedVertices.size()/1000);
+			pntsDistr.adjustOrPutValue((cluster.visitedVertices.size() + 500) / 1000, 1, 1);
 			this.totalBorderPoints += borderPoints;
 			this.shortcuts += borderPoints * (borderPoints - 1);
 			
@@ -852,7 +852,7 @@ public class HHRoutingGraphCreator {
 				source.add(r);
 			} else {
 				c.edges += r.connections.size();
-				c.edgeDistr.increment(r.connections.size());
+				c.edgeDistr.adjustOrPutValue(r.connections.size(), 1, 1);
 				vertices.add(r);
 				Iterator<RouteSegmentConn> it = r.connections.iterator();
 				while (it.hasNext()) {
