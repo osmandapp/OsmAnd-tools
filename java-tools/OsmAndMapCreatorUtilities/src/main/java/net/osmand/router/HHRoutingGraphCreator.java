@@ -131,20 +131,20 @@ public class HHRoutingGraphCreator {
 	private static int THREAD_POOL = 2;
 
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
-	// 50000
 	protected static LatLon EX1 = new LatLon(52.3201813, 4.7644685); // 337 -> 4 (1212 -> 4)
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 -> 12 (2240 -> 8)
-	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803); // 632 -> 14 (72 -> 3)
-	protected static LatLon EX4 = new LatLon(52.27757, 4.85731); // 218 -> 7 (1474 -> 6) BUG 5
+	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803); // 632 -> 14 (923 -> 11 )
+	protected static LatLon EX4 = new LatLon(52.27757, 4.85731); // 218 -> 7 (1599 -> 5) BUG 5
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036); // 391 -> 8
-	protected static LatLon EX = EX4; // for all - null; otherwise specific point
+	protected static LatLon EX = EX1; // for all - null; otherwise specific point
 
 	// Heuristics building network points
 	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] { 15, 10, 8 }; // new int[] {7,7,7,7};
 	private static int MAX_NEIGHBOORS_N_POINTS = 25;
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
-	private static int BRIDGE_MAX_DEPTH = 120;
-	private static int BRIDGE_MIN_DEPTH = 12;
+	private static boolean V2 = true;
+	private static int BRIDGE_MAX_DEPTH = 150;
+	private static int BRIDGE_MIN_DEPTH = 25;
 
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
@@ -156,14 +156,13 @@ public class HHRoutingGraphCreator {
 
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
-		boolean v2 = true;
 		for (String a : args) {
 			if (a.equals("--setup-network-points")) {
 				PROCESS = PROCESS_SET_NETWORK_POINTS;
-				v2 = false;
+				V2 = false;
 			} else if (a.equals("--setup-network-points-v2")) {
 				PROCESS = PROCESS_SET_NETWORK_POINTS;
-				v2 = true;
+				V2 = true;
 			} else if (a.equals("--build-network-shortcuts")) {
 				PROCESS = PROCESS_BUILD_NETWORK_SEGMENTS;
 			} else if (a.startsWith("--routing_profile=")) {
@@ -199,7 +198,7 @@ public class HHRoutingGraphCreator {
 		}
 		HHRoutingGraphCreator proc = new HHRoutingGraphCreator();
 		if (PROCESS == PROCESS_SET_NETWORK_POINTS) {
-			FullNetwork network = proc.collectNetworkPoints(networkDB, v2);
+			FullNetwork network = proc.collectNetworkPoints(networkDB);
 			List<Entity> objects = visualizeWays(network.visualPoints(), network.visualConnections(),
 					network.visitedVertices);
 			saveOsmFile(objects, new File(folder, name + ".osm"));
@@ -278,15 +277,26 @@ public class HHRoutingGraphCreator {
 				RouteCalculationMode.NORMAL);
 	}
 	
+	class RouteSegmentConn {
+		public RouteSegmentCustom s;
+		public RouteSegmentCustom t;
+		
+		RouteSegmentConn(RouteSegmentCustom s, RouteSegmentCustom t) {
+			this.s = s;
+			this.t = t;
+		}
+		
+		public int flow;
+	}
+	
 	class RouteSegmentCustom extends RouteSegment {
 		
-		public List<RouteSegmentCustom> connections = new ArrayList<>();
+		public List<RouteSegmentConn> connections = new ArrayList<>();
 		public int cacheDepth;
 		public long cacheId;
-		public int flow;
-		public RouteSegmentCustom flowParent;
-		public RouteSegmentCustom flowParentTemp;
-
+		public RouteSegmentConn flowParent;
+		public RouteSegmentConn flowParentTemp;
+		
 		public RouteSegmentCustom(RouteSegment s) {
 			super(s.getRoad(), s.getSegmentStart(), s.getSegmentEnd());
 		}
@@ -298,8 +308,17 @@ public class HHRoutingGraphCreator {
 
 		public void addConnection(RouteSegmentCustom pos) {
 			if (pos != this && pos != null) {
-				connections.add(pos);
+				connections.add(new RouteSegmentConn(this, pos));
 			}
+		}
+
+		public RouteSegmentConn getConnection(RouteSegmentCustom t) {
+			for (RouteSegmentConn c : connections) {
+				if (c.t == t) {
+					return c;
+				}
+			}
+			return null;
 		}
  	}
 
@@ -649,6 +668,7 @@ public class HHRoutingGraphCreator {
 	}
 
 	private class RouteDataObjectProcessor implements ResultMatcher<RouteDataObject> {
+		
 		int indProc = 0, prevPrintInd = 0;
 		private float estimatedRoads;
 		private FullNetwork network;
@@ -676,8 +696,13 @@ public class HHRoutingGraphCreator {
 					// already existing cluster
 					return false;
 				}
-				NetworkIsland cluster = new NetworkIsland(network, pntAround);
-				buildRoadNetworkIsland(cluster);
+				NetworkIsland cluster;
+				if(V2) {
+					cluster = buildRoadNetworkIslandV2(network, pntAround);
+				} else {
+					cluster = new NetworkIsland(network, pntAround);
+					buildRoadNetworkIsland(cluster);
+				}
 				if (DEBUG_VERBOSE_LEVEL >= 1) {
 					int nwPoints = cluster.toVisitVertices.size();
 					logf("CLUSTER: %2d border <- %4d points (%d segments) - %s", nwPoints,
@@ -703,7 +728,7 @@ public class HHRoutingGraphCreator {
 		}
 	}
 
-	private FullNetwork collectNetworkPoints(HHRoutingPreparationDB networkDB, boolean v2)
+	private FullNetwork collectNetworkPoints(HHRoutingPreparationDB networkDB)
 			throws IOException, SQLException {
 		RoutingContext rctx = prepareContext(null, null);
 		if (EX != null) {
@@ -712,7 +737,7 @@ public class HHRoutingGraphCreator {
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), network.ctx, null);
 			NetworkIsland cluster;
-			if (v2) {
+			if (V2) {
 				cluster = buildRoadNetworkIslandV2(network, pnt);
 			} else {
 				cluster = new NetworkIsland(network, pnt);
@@ -788,10 +813,12 @@ public class HHRoutingGraphCreator {
 				minBorders = borderPoints;
 			}
 		}
-		System.out.printf("MIN %.2f %d -> %d \n", minItValue, minVisited, minBorders);
-		c.printCurentState("Status", 0);
-		
-		
+//		if (true) {
+//			return c;
+//		}
+		if (DEBUG_VERBOSE_LEVEL > 1) {
+			System.out.printf("MINIT %.2f %d -> %d \n", minItValue, minVisited, minBorders);
+		}
 		for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
 			r.cacheId = calculateRoutePointInternalId(r);
 			r.cacheDepth = r.getDepth();
@@ -800,58 +827,68 @@ public class HHRoutingGraphCreator {
 		List<RouteSegmentCustom> source = new ArrayList<>();
 		for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
 			if (c.toVisitVertices.contains(r.cacheId)) {
-				// max depth
-				c.visitedVertices.put(r.cacheId, r);
 				source.add(r);
 			} else {
 				vertices.add(r);
-				Iterator<RouteSegmentCustom> it = r.connections.iterator();
+				Iterator<RouteSegmentConn> it = r.connections.iterator();
 				while (it.hasNext()) {
-					RouteSegmentCustom conn = it.next();
-					if (conn.cacheDepth == BRIDGE_MAX_DEPTH) {
-						conn.connections.add(r);
+					RouteSegmentConn conn = it.next();
+					if (conn.t.cacheDepth == BRIDGE_MAX_DEPTH) {
+						conn.t.addConnection(r);
 					}
 				}
 			}
 		}
+		c.toVisitVertices.clear();
+		TLongObjectHashMap<RouteSegmentCustom> mincuts = runMaxFlow(vertices, BRIDGE_MIN_DEPTH, source);
 		
-		List<RouteSegmentCustom> mincuts = runMaxFlow(vertices, BRIDGE_MIN_DEPTH, source);
-		System.out.println("Max flow " + mincuts.size());
-		TLongObjectHashMap<RouteSegmentCustom> mincutMap = new TLongObjectHashMap<>();
-		for (RouteSegmentCustom mincut : mincuts) {
-			mincutMap.put(mincut.cacheId, mincut);
-		}
+		// Debug purposes
+//		System.out.println("Max flow " + mincuts.size());
+//		c.toVisitVertices.putAll(mincuts);
 //		for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
-//			if (r.flow == 0) {
+//			int flow = 0;
+//			for (RouteSegmentConn t : r.connections) {
+//				flow = Math.max(t.flow, flow);
+//			}
+//			if (flow <= 1) {
 //				c.visitedVertices.remove(r.cacheId);
 //			}
 //		}
-		// recalculate visited points
-		c.visitedVertices.clear();
-		c.toVisitVertices.clear();
-		c.allVertices.clear();
-		c.queue.add(c.getSegment(pnt, true));
-		while (!c.queue.isEmpty()) {
-			RouteSegmentCustom ls = c.queue.poll();
-			if (mincutMap.containsKey(calculateRoutePointInternalId(ls))) {
-				continue;
+		
+		boolean recaulcateVisitedPoints = true;
+		if (recaulcateVisitedPoints) {
+			c.visitedVertices.clear();
+			c.toVisitVertices.clear();
+			c.allVertices.clear();
+			c.queue.add(c.getSegment(pnt, true));
+			while (!c.queue.isEmpty()) {
+				RouteSegmentCustom ls = c.queue.poll();
+				if (mincuts.containsKey(calculateRoutePointInternalId(ls))) {
+					continue;
+				}
+				proceed(c, ls, c.queue, BRIDGE_MAX_DEPTH);
 			}
-			proceed(c, ls, c.queue, -1);
+
+			System.out.printf("MINCUT %.2f %d -> %d \n",
+					coeffToMinimize(c.visitedVerticesSize(), c.toVisitVerticesSize()), c.visitedVerticesSize(),
+					c.toVisitVerticesSize());
+			if (mincuts.size() != c.toVisitVerticesSize()) {
+				throw new IllegalStateException(String.format("Bug min cut %d != %d graph size", mincuts.size(), c.toVisitVerticesSize()));
+			}
+
+			c.printCurentState("END", 2);
+
 		}
-		
-		System.out.printf("MIN %.2f %d -> %d \n", coeffToMinimize(c.visitedVerticesSize(), c.toVisitVerticesSize()), 
-				c.visitedVerticesSize(), c.toVisitVerticesSize());
-		
-		c.printCurentState("END", 2);
-		
 		
 		return c;
 	}
 
 
-	private List<RouteSegmentCustom> runMaxFlow(List<RouteSegmentCustom> vertices, int minDepth, List<RouteSegmentCustom> sources) {
+	private TLongObjectHashMap<RouteSegmentCustom> runMaxFlow(List<RouteSegmentCustom> vertices, int minDepth, List<RouteSegmentCustom> sources) {
 		RouteSegmentCustom source = new RouteSegmentCustom();
-		source.connections.addAll(sources);
+		for (RouteSegmentCustom s : sources) {
+			source.addConnection(s);
+		}
 		vertices.addAll(sources);
 		List<RouteSegmentCustom> sinks = new ArrayList<>();
 		RouteSegmentCustom sink = null;
@@ -864,14 +901,14 @@ public class HHRoutingGraphCreator {
 			queue.add(source);
 			while (!queue.isEmpty() && sink == null) {
 				RouteSegmentCustom seg = queue.poll();
-				for (RouteSegmentCustom conn : seg.connections) {
-					if (conn.flowParentTemp == null && conn.flow == 0) {
-						conn.flowParentTemp = seg;
-						if (conn.cacheDepth == minDepth) {
-							sink = conn;
+				for (RouteSegmentConn conn : seg.connections) {
+					if (conn.t.flowParentTemp == null && conn.flow < 1) {
+						conn.t.flowParentTemp = conn;
+						if (conn.t.cacheDepth == minDepth) {
+							sink = conn.t;
 							break;
 						} else {
-							queue.add(conn);
+							queue.add(conn.t);
 						}
 					}
 				}
@@ -879,51 +916,66 @@ public class HHRoutingGraphCreator {
 			if (sink != null) {
 				sinks.add(sink);
 				RouteSegmentCustom p = sink;
-				while (p != null) {
-					p.flow++;
+				while (true) {
 					p.flowParent = p.flowParentTemp;
-					p = p.flowParentTemp;
+					p.flowParent.flow++;
+					if (p.flowParent.s == source) {
+						break;
+					}
+					p.getConnection(p.flowParent.s).flow--;
+					p = p.flowParent.s;
 				}
 			}
 		} while (sink != null);
 		
-		LinkedList<RouteSegmentCustom> queue = new LinkedList<>();
-		queue.addAll(sources);
-		Set<RouteSegmentCustom> nonSaturated = new HashSet<>();
-		while (!queue.isEmpty()) {
-			RouteSegmentCustom ps = queue.poll();
-			if (ps.flow == 0) {
-				boolean add = nonSaturated.add(ps);
-				if(add) {
-					queue.addAll(ps.connections);
-				}
-			}
-		}
-		queue = new LinkedList<>();
-		queue.addAll(sinks);
 		for (RouteSegmentCustom rs : vertices) {
 			rs.flowParentTemp = null;
 		}
-		List<RouteSegmentCustom> mincuts = new ArrayList<>();
+		
+		TLongObjectHashMap<RouteSegmentCustom> mincuts = new TLongObjectHashMap<>();
+		// for debug purposes
+//		for (RouteSegmentCustom s : sinks) {
+//			mincuts.put(calculateRoutePointInternalId(s), s);
+//		}
+		LinkedList<RouteSegmentCustom> queue = new LinkedList<>();
+		queue.add(source);
+		Set<RouteSegmentCustom> reachableSource = new HashSet<>();
+		while (!queue.isEmpty()) {
+			RouteSegmentCustom ps = queue.poll();
+			for (RouteSegmentConn conn : ps.connections) {
+				if (conn.t.flowParentTemp == null && conn.flow < 1 ) {
+					conn.t.flowParentTemp = conn;
+					queue.add(conn.t);
+					reachableSource.add(conn.t);
+					conn.flow = 2;
+				}
+			}
+		}
+		
+		queue = new LinkedList<>();
+		queue.addAll(sinks);
 		while (!queue.isEmpty()) {
 			RouteSegmentCustom ps = queue.poll();
 			boolean mincut = false;
-			for (RouteSegmentCustom l : ps.connections) {
-				if (nonSaturated.contains(l)) {
+			for (RouteSegmentConn conn : ps.connections) {
+				if (reachableSource.contains(conn.t)) {
 					mincut = true;
 					break;
 				}
 			}
 			if (mincut) {
-				mincuts.add(ps);
+				mincuts.put(calculateRoutePointInternalId(ps), ps);
 			} else {
-				for (RouteSegmentCustom l : ps.connections) {
-					if (l.flowParentTemp == null) {
-						l.flowParentTemp = ps;
-						queue.add(l);
+				for (RouteSegmentConn conn : ps.connections) {
+					if (conn.t.flowParentTemp == null) {
+						conn.t.flowParentTemp = conn;
+						queue.add(conn.t);
 					}
 				}
 			}
+		}
+		if (sinks.size() != mincuts.size()) {
+			throw new IllegalStateException(String.format("BUG maxflow %d != %d ", sinks.size(), mincuts.size()));
 		}
 		
 		return mincuts;
