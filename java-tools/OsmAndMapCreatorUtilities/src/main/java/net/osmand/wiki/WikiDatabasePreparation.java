@@ -720,6 +720,7 @@ public class WikiDatabasePreparation {
 		String folder = "";
 		String mode = "";
 		long testArticleID = 0;
+		String database = "";
 
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
@@ -731,6 +732,8 @@ public class WikiDatabasePreparation {
 				mode = val;
 			} else if (arg.startsWith("--testID=")) {
 				testArticleID = Long.parseLong(val);
+			} else if (arg.startsWith("--result_db=")) {
+				database = val;
 			}
 		}
 		if (mode.isEmpty() || folder.isEmpty()
@@ -738,7 +741,7 @@ public class WikiDatabasePreparation {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-		final String sqliteFileName = folder + WIKI_SQLITE;
+		final String sqliteFileName = database.isEmpty() ? folder + WIKI_SQLITE : database;
 		final String pathToWikiData = folder + WIKIDATA_ARTICLES_GZ;
 
 		switch (mode) {
@@ -754,13 +757,13 @@ public class WikiDatabasePreparation {
 					wikiDB.delete();
 				}
 				log.info("Processing wikidata...");
-				processDump(folder, null);
+				processDump(folder, sqliteFileName, null);
 				break;
 			case "process-wikipedia":
-				processDump(folder, lang);
+				processDump(folder, sqliteFileName, lang);
 				break;
 			case "test-wikipedia":
-				processDump(folder, lang, testArticleID);
+				processDump(folder, sqliteFileName, lang, testArticleID);
 				break;
 		}
 	}
@@ -828,14 +831,14 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void processDump(final String wikiFolder, String lang)
+	private static void processDump(final String dataDir, final String sqliteFileName, String lang)
 			throws SQLException, ParserConfigurationException, IOException, SAXException, XmlPullParserException, InterruptedException {
-		processDump(wikiFolder,lang,0);
+		processDump(dataDir, sqliteFileName, lang,0);
 	}
 	
 
 
-	public static void processDump(final String wikiFolder, String lang, long testArticleId)
+	public static void processDump(final String wikiFolder, final String sqliteFileName, String lang, long testArticleId)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, XmlPullParserException, InterruptedException {
 		boolean processWikidata = lang == null;
 
@@ -845,7 +848,6 @@ public class WikiDatabasePreparation {
 		} else {
 			wikiFile = wikiFolder + lang + WIKI_ARTICLES_GZ;
 		}
-		final String sqliteFileName = wikiFolder + WIKI_SQLITE;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();

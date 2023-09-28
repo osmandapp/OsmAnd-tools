@@ -16,14 +16,13 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.wiki.OsmCoordinatesByTag;
 
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.DefaultHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
-import static net.osmand.wiki.WikiDatabasePreparation.*;
 
 public class WikiDataHandler extends DefaultHandler {
 
@@ -42,9 +41,11 @@ public class WikiDataHandler extends DefaultHandler {
 	private PreparedStatement coordsPrep;
 	private PreparedStatement mappingPrep;
 	private PreparedStatement wikiRegionPrep;
+	private PreparedStatement wikidataPropPrep;
 	private int[] mappingBatch = new int[]{0};
 	private int[] coordsBatch = new int[]{0};
 	private int[] regionBatch = new int[]{0};
+	private int[] wikidataPropBatch = new int[]{0};
 
 	public final static int BATCH_SIZE = 5000;
 	private final static int ARTICLE_BATCH_SIZE = 10000;
@@ -73,9 +74,11 @@ public class WikiDataHandler extends DefaultHandler {
 		conn.createStatement().execute("CREATE TABLE wiki_coords(id long, originalId text, lat double, lon double)");
 		conn.createStatement().execute("CREATE TABLE wiki_mapping(id long, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
+		conn.createStatement().execute("CREATE TABLE wikidata_properties(id long, type text, value text)");
 		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon) VALUES (?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
+		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
 		
 	}
@@ -205,6 +208,22 @@ public class WikiDataHandler extends DefaultHandler {
 								mappingPrep.setString(3, siteLink.title);
 								addBatch(mappingPrep, mappingBatch);
 							}
+						}
+						if (article.getImage() != null) {
+							String image = StringEscapeUtils.unescapeJava(article.getImage());
+							long id = Long.parseLong(title.substring(1));
+							wikidataPropPrep.setLong(1, id);
+							wikidataPropPrep.setString(2, ArticleMapper.PROP_IMAGE);
+							wikidataPropPrep.setString(3, image);
+							addBatch(wikidataPropPrep, wikidataPropBatch);
+						}
+						if (article.getCommonCat() != null) {
+							String commonCat = StringEscapeUtils.unescapeJava(article.getCommonCat());
+							long id = Long.parseLong(title.substring(1));
+							wikidataPropPrep.setLong(1, id);
+							wikidataPropPrep.setString(2, ArticleMapper.PROP_COMMON_CAT);
+							wikidataPropPrep.setString(3, commonCat);
+							addBatch(wikidataPropPrep, wikidataPropBatch);
 						}
 					} catch (Exception e) {
 						// Generally means that the field is missing in the json or the incorrect data is supplied

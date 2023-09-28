@@ -15,6 +15,9 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 	private static final long ERROR_BATCH_SIZE = 5000L;
 	private static int errorCount;
 	private static final Log log = PlatformUtil.getLog(ArticleMapper.class);
+	public static final String PROP_IMAGE = "P18";
+	public static final String PROP_COMMON_CAT = "P373";
+	private final String PROP_COMMON_COORDS = "P625";
 
 	@Override
     public Article deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
@@ -24,9 +27,9 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 			Object oClaims = obj.get("claims");
 			if (oClaims instanceof JsonObject) {
 				JsonObject claims = obj.getAsJsonObject("claims");
-				JsonArray prop625 = claims.getAsJsonArray("P625");
-				if (prop625 != null) {
-					JsonObject coordinatesDataValue = prop625.get(0).getAsJsonObject().getAsJsonObject("mainsnak")
+				JsonArray propCoords = claims.getAsJsonArray(PROP_COMMON_COORDS);
+				if (propCoords != null) {
+					JsonObject coordinatesDataValue = propCoords.get(0).getAsJsonObject().getAsJsonObject("mainsnak")
 							.getAsJsonObject("datavalue");
 					if (coordinatesDataValue != null) {
 						JsonObject coordinates = coordinatesDataValue.getAsJsonObject("value");
@@ -34,6 +37,27 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 						double lon = coordinates.getAsJsonPrimitive("longitude").getAsDouble();
 						article.setLat(lat);
 						article.setLon(lon);
+					}
+				}
+				JsonArray propImage = claims.getAsJsonArray(PROP_IMAGE);
+				if (propImage != null) {
+					JsonObject imageDataValue = propImage.get(0).getAsJsonObject().getAsJsonObject("mainsnak")
+							.getAsJsonObject("datavalue");
+					if (imageDataValue != null) {
+						String image = imageDataValue.getAsJsonPrimitive("value").getAsString();
+						if (image.equals("Antoni Llena")) {
+							System.out.println("OK");
+						}
+						article.setImage(image);
+					}
+				}
+				JsonArray propCommonCat = claims.getAsJsonArray(PROP_COMMON_CAT);
+				if (propCommonCat != null) {
+					JsonObject ccDataValue = propCommonCat.get(0).getAsJsonObject().getAsJsonObject("mainsnak")
+							.getAsJsonObject("datavalue");
+					if (ccDataValue != null) {
+						String commonCat = ccDataValue.getAsJsonPrimitive("value").getAsString();
+						article.setCommonCat(commonCat);
 					}
 				}
 			}
@@ -70,6 +94,8 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 		private List<SiteLink> siteLinks = new ArrayList<>();
 		private double lat;
 		private double lon;
+		private String image;
+		private String commonCat;
 
 		public List<SiteLink> getSiteLinks() {
 			return siteLinks;
@@ -83,6 +109,14 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 			return lat;
 		}
 
+		public String getImage() {
+			return image;
+		}
+
+		public String getCommonCat() {
+			return commonCat;
+		}
+
 		public void setLon(double lon) {
 			this.lon = lon;
 		}
@@ -93,6 +127,14 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 
 		public void setSiteLinks(List<SiteLink> siteLinks) {
 			this.siteLinks = siteLinks;
+		}
+
+		public void setImage(String img) {
+			this.image = img;
+		}
+
+		public void setCommonCat(String cc) {
+			this.commonCat = cc;
 		}
 	}
 
