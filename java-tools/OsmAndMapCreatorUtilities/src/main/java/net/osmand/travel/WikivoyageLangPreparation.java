@@ -216,6 +216,8 @@ public class WikivoyageLangPreparation {
 					osmCoordinates.parseOSMCoordinates(f, null, parseRelations);
 				}
 			}
+		} else {
+			log.error("osm_wiki_*.gz files is absent");
 		}
 		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, wikivoyageSqlite, pageInfos, osmCoordinates);
 		sx.parse(is, handler);

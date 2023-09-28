@@ -864,6 +864,8 @@ public class WikiDatabasePreparation {
 						osmWikiCoordinates.parseOSMCoordinates(f, null, parseRelations);
 					}
 				}
+			} else {
+				log.error("osm_wiki_*.gz files is absent");
 			}
 			final WikiDataHandler handler = new WikiDataHandler(sx, progress, new File(sqliteFileName), osmWikiCoordinates, regions);
 			sx.parse(is, handler);
