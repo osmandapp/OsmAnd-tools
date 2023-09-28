@@ -608,13 +608,13 @@ public class HHRoutingGraphCreator {
 			for(int a : this.borderPntsCluster.values()) {
 				borderClusterDistr.adjustOrPutValue(a, 1, 1);
 			}
-			logf("RESULT %,d points (%,d edges) -> %d border points, %d clusters (%d isolated), %d est shortcuts (%s edges distr)",
-					getTotalPoints() + borderPointsSize(), edges, borderPointsSize(), clusterSize(), isolatedIslands,
+			logf("RESULT %,d points (%,d edges) -> %d border points, %d clusters (%d isolated), %d est shortcuts (%s edges distr) \n",
+					getTotalPoints() + borderPointsSize(), edges / 2, borderPointsSize(), clusterSize(), isolatedIslands,
 					shortcuts, distrString(edgesDistr, ""));
 			
-			System.out.printf("       %.1f avg (%s) border points per cluster"
-					+ "\n     %s - shared border points between clusters "
-					+ "\n     %.1f avg (%s) points in cluster",
+			System.out.printf("       %.1f avg (%s) border points per cluster \n"
+					        + "       %s - shared border points between clusters \n"
+					        + "       %.1f avg (%s) points in cluster \n",
 					totalBorderPoints * 1.0 / clusterSize(), distrString(borderPntsDistr, ""),
 					distrString(borderClusterDistr, ""),
 					getTotalPoints() * 1.0 / clusterSize(), distrString(pntsDistr, "K"));
@@ -628,13 +628,16 @@ public class HHRoutingGraphCreator {
 			for (int k = 0; k < keys.length; k++) {
 				sum += distr.get(keys[k]);
 			}
-			b.append(String.format("TOT %,d", sum));
-			for (int k = 0; k < keys.length; k++) {
-				int percent = keys[k] * 100 / sum;
-				if (percent > 5) {
-
+			b.append(String.format("%,d: ", sum));
+			int k = 0, percent = 0;
+			for (; k < keys.length; k++) {
+				percent = distr.get(keys[k]) * 100 / sum;
+				if (percent >= 5) {
+					b.append(", ").append(keys[k]).append(suf).append(" - " + percent + "%");
 				}
-				b.append(", ").append(keys[k]).append(suf).append(" - " + percent + "%");
+			}
+			if (percent < 5 && keys.length > 0) {
+				b.append("... " + keys[keys.length - 1]);
 			}
 			return b.toString();
 		}
@@ -691,7 +694,7 @@ public class HHRoutingGraphCreator {
 			TIntIntIterator it = cluster.edgeDistr.iterator();
 			while (it.hasNext()) {
 				it.advance();
-				edgesDistr.adjustOrPutValue(it.key(), it.value(), it.value());
+				edgesDistr.adjustOrPutValue(it.key(), it.value() / 2, it.value() / 2);
 			}
 			pntsDistr.adjustOrPutValue((cluster.visitedVertices.size() + 500) / 1000, 1, 1);
 			this.totalBorderPoints += borderPoints;
