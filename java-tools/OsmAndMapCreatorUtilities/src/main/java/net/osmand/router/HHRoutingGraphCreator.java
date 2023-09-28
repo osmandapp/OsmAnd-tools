@@ -143,7 +143,7 @@ public class HHRoutingGraphCreator {
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036); // 391 -> 8
 	protected static LatLon EX6 = new LatLon(42.09664, 19.088486); //
 	// TODO 0 (Lat 42.828068 Lon 19.842607): Road (389035663) bug maxflow 5 != 4 mincut 
-	protected static LatLon EX = EX6; // for all - null; otherwise specific point
+	protected static LatLon EX = null; // for all - null; otherwise specific point
 
 	// Heuristics building network points
 	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] { 15, 10, 8 }; // new int[] {7,7,7,7};
