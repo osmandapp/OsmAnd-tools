@@ -846,8 +846,7 @@ public class HHRoutingGraphCreator {
 		while (!c.queue.isEmpty()) {
 			RouteSegmentCustom seg = c.queue.poll();
 			boolean networkPoint = proceed(c, seg, c.queue, BRIDGE_MAX_DEPTH);
-			if(networkPoint) {
-				System.out.println("dup " + seg);
+			if (networkPoint) {
 			}
 		}
 
