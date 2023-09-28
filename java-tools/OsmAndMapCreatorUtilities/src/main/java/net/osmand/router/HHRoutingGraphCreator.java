@@ -136,20 +136,21 @@ public class HHRoutingGraphCreator {
 	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803); // 632 -> 14 (923 -> 11 )
 	protected static LatLon EX4 = new LatLon(52.27757, 4.85731); // 218 -> 7 (1599 -> 5) BUG 5
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036); // 391 -> 8
-	protected static LatLon EX = EX1; // for all - null; otherwise specific point
+	protected static LatLon EX6 = null; // 
+	protected static LatLon EX = null; // for all - null; otherwise specific point
 
 	// Heuristics building network points
 	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] { 15, 10, 8 }; // new int[] {7,7,7,7};
 	private static int MAX_NEIGHBOORS_N_POINTS = 25;
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
 	private static boolean V2 = true;
-	private static int BRIDGE_MAX_DEPTH = 150;
-	private static int BRIDGE_MIN_DEPTH = 25;
+	private static int BRIDGE_MAX_DEPTH = 1500;
+	private static int BRIDGE_MIN_DEPTH = 50;
 
 	private static File sourceFile() {
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Netherlands_europe_2.road.obf";
-//		name = "Ukraine_europe_2.road.obf";
+//		name = "Netherlands_europe_2.road.obf";
+		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -697,7 +698,7 @@ public class HHRoutingGraphCreator {
 					return false;
 				}
 				NetworkIsland cluster;
-				if(V2) {
+				if (V2) {
 					cluster = buildRoadNetworkIslandV2(network, pntAround);
 				} else {
 					cluster = new NetworkIsland(network, pntAround);
@@ -800,25 +801,11 @@ public class HHRoutingGraphCreator {
 	private NetworkIsland buildRoadNetworkIslandV2(FullNetwork f, RouteSegmentPoint pnt) {
 		NetworkIsland c = new NetworkIsland(f, pnt, true);
 		c.printCurentState("START", 2);
-		double minItValue = Double.POSITIVE_INFINITY;
-		int visited = 0, minVisited = 20, minBorders = 0;
+//		double minItValue = Double.POSITIVE_INFINITY;
 		while (!c.queue.isEmpty()) {
 			proceed(c, c.queue.poll(), c.queue, BRIDGE_MAX_DEPTH);
-			visited = c.visitedVerticesSize();
-			int borderPoints = c.toVisitVerticesSize();
-			double cf = coeffToMinimize(visited, borderPoints );
-			if (cf < minItValue && minVisited < visited) {
-				minItValue = cf;
-				minVisited = visited;
-				minBorders = borderPoints;
-			}
 		}
-//		if (true) {
-//			return c;
-//		}
-		if (DEBUG_VERBOSE_LEVEL > 1) {
-			System.out.printf("MINIT %.2f %d -> %d \n", minItValue, minVisited, minBorders);
-		}
+		
 		for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
 			r.cacheId = calculateRoutePointInternalId(r);
 			r.cacheDepth = r.getDepth();
@@ -975,7 +962,7 @@ public class HHRoutingGraphCreator {
 			}
 		}
 		if (sinks.size() != mincuts.size()) {
-			throw new IllegalStateException(String.format("BUG maxflow %d != %d ", sinks.size(), mincuts.size()));
+			throw new IllegalStateException(String.format("BUG maxflow %d != mincut %d ", sinks.size(), mincuts.size()));
 		}
 		
 		return mincuts;
