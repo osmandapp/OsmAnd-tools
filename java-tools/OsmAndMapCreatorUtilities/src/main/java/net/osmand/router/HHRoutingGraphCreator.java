@@ -612,7 +612,7 @@ public class HHRoutingGraphCreator {
 					getTotalPoints() + borderPointsSize(), edges, borderPointsSize(), clusterSize(), isolatedIslands,
 					shortcuts, distrString(edgesDistr, ""));
 			
-			logf("       %.1f avg (%s) border points per cluster"
+			System.out.printf("       %.1f avg (%s) border points per cluster"
 					+ "\n     %s - shared border points between clusters "
 					+ "\n     %.1f avg (%s) points in cluster",
 					totalBorderPoints * 1.0 / clusterSize(), distrString(borderPntsDistr, ""),
@@ -624,11 +624,17 @@ public class HHRoutingGraphCreator {
 			int[] keys = distr.keys();
 			Arrays.sort(keys);
 			StringBuilder b = new StringBuilder();
+			int sum = 0;
 			for (int k = 0; k < keys.length; k++) {
-				if (k > 0) {
-					b.append(", ");
+				sum += distr.get(keys[k]);
+			}
+			b.append(String.format("TOT %,d", sum));
+			for (int k = 0; k < keys.length; k++) {
+				int percent = keys[k] * 100 / sum;
+				if (percent > 5) {
+
 				}
-				b.append(keys[k]).append(suf).append(" ").append(String.format("%,d", distr.get(keys[k])));
+				b.append(", ").append(keys[k]).append(suf).append(" - " + percent + "%");
 			}
 			return b.toString();
 		}
@@ -838,7 +844,11 @@ public class HHRoutingGraphCreator {
 		c.printCurentState("START", 2);
 //		double minItValue = Double.POSITIVE_INFINITY;
 		while (!c.queue.isEmpty()) {
-			proceed(c, c.queue.poll(), c.queue, BRIDGE_MAX_DEPTH);
+			RouteSegmentCustom seg = c.queue.poll();
+			boolean networkPoint = proceed(c, seg, c.queue, BRIDGE_MAX_DEPTH);
+			if(networkPoint) {
+				System.out.println("dup " + seg);
+			}
 		}
 
 		for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
@@ -851,7 +861,7 @@ public class HHRoutingGraphCreator {
 			if (c.toVisitVertices.contains(r.cacheId)) {
 				source.add(r);
 			} else {
-				c.edges += r.connections.size();
+				c.edges += r.connections.size() / 2;
 				c.edgeDistr.adjustOrPutValue(r.connections.size(), 1, 1);
 				vertices.add(r);
 				Iterator<RouteSegmentConn> it = r.connections.iterator();
@@ -901,6 +911,10 @@ public class HHRoutingGraphCreator {
 						c.toVisitVerticesSize(), pnt.toString());
 				System.err.println(msg);
 				throw new IllegalStateException(msg);
+			}
+			for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
+				c.edges += r.connections.size();
+				c.edgeDistr.adjustOrPutValue(r.connections.size(), 1, 1);
 			}
 		}
 		
