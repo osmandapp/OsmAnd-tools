@@ -115,7 +115,7 @@ public class HHRoutingGraphCreator {
 	final static int PROCESS_SET_NETWORK_POINTS = 1;
 	final static int PROCESS_BUILD_NETWORK_SEGMENTS = 2;
 
-	static boolean DEBUG_STORE_ALL_ROADS = false;
+	static int DEBUG_STORE_ALL_ROADS = 0; // 1 - clusters, 2 - all, 0 none
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
@@ -522,8 +522,10 @@ public class HHRoutingGraphCreator {
 
 		public void addCluster(NetworkIsland cluster, RouteSegmentPoint centerPoint) {
 			// KISS: keep toVisitVertices - empty and use only networkPointsCluster
-			if (DEBUG_STORE_ALL_ROADS) {
+			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
+			}
+			if (DEBUG_STORE_ALL_ROADS > 1) {
 				toVisitVertices.putAll(cluster.toVisitVertices);
 			}
 			// no need to copy it's done before
@@ -660,12 +662,11 @@ public class HHRoutingGraphCreator {
 			rctx = gcMemoryLimitToUnloadAll(rctx, subRegions, true);
 
 			FullNetwork network = new FullNetwork(rctx);
+			// 3.1 TODO store network points inside NetworkRouteRegion and retrieve  as visited
+			network.networkPointsCluster = this.networkPointsCluster; // ! use by reference
 			for (NetworkRouteRegion nr : subRegions) {
 				if (nr != nrouteRegion) {
 					network.visitedVertices.putAll(nr.getVisitedVertices(networkDB));
-					// 3.1 TODO store network points inside NetworkRouteRegion and retrieve similar
-					// to visited points
-					network.networkPointsCluster = this.networkPointsCluster; // ! use by reference
 //					network.networkPointsCluster.putAll(nr.getNetworkPoints(networkDB));
 				}
 			}
@@ -690,7 +691,7 @@ public class HHRoutingGraphCreator {
 				this.isolatedIslands++;
 			}
 			borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
-			edges += cluster.edges / 2;
+			edges += cluster.edges;
 			TIntIntIterator it = cluster.edgeDistr.iterator();
 			while (it.hasNext()) {
 				it.advance();
@@ -778,7 +779,7 @@ public class HHRoutingGraphCreator {
 	private FullNetwork collectNetworkPoints(HHRoutingPreparationDB networkDB) throws IOException, SQLException {
 		RoutingContext rctx = prepareContext(null, null);
 		if (EX != null) {
-			DEBUG_STORE_ALL_ROADS = true;
+			DEBUG_STORE_ALL_ROADS = 2;
 			FullNetwork network = new FullNetwork(rctx);
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), network.ctx, null);
@@ -845,11 +846,12 @@ public class HHRoutingGraphCreator {
 	private NetworkIsland buildRoadNetworkIslandV2(FullNetwork f, RouteSegmentPoint pnt) {
 		NetworkIsland c = new NetworkIsland(f, pnt, true);
 		c.printCurentState("START", 2);
-//		double minItValue = Double.POSITIVE_INFINITY;
+		TLongObjectHashMap<RouteSegment> existingVertices = new TLongObjectHashMap<RouteSegment>();  
 		while (!c.queue.isEmpty()) {
 			RouteSegmentCustom seg = c.queue.poll();
-			boolean networkPoint = proceed(c, seg, c.queue, BRIDGE_MAX_DEPTH);
-			if (networkPoint) {
+			proceed(c, seg, c.queue, BRIDGE_MAX_DEPTH);
+			if (c.testIfNetworkPoint(calculateRoutePointInternalId(seg))) {
+				existingVertices.put(calculateRoutePointInternalId(seg), seg);
 			}
 		}
 
@@ -863,8 +865,6 @@ public class HHRoutingGraphCreator {
 			if (c.toVisitVertices.contains(r.cacheId)) {
 				source.add(r);
 			} else {
-				c.edges += r.connections.size();
-				c.edgeDistr.adjustOrPutValue(r.connections.size(), 1, 1);
 				vertices.add(r);
 				Iterator<RouteSegmentConn> it = r.connections.iterator();
 				while (it.hasNext()) {
@@ -894,6 +894,7 @@ public class HHRoutingGraphCreator {
 //		}
 
 		if (RECALC_CHECK_MAXFLOW) {
+			
 			c.visitedVertices.clear();
 			c.toVisitVertices.clear();
 			c.allVertices.clear();
@@ -908,6 +909,7 @@ public class HHRoutingGraphCreator {
 
 //			System.out.printf("MINCUT %.2f %d -> %d \n", coeffToMinimize(c.visitedVerticesSize(), c.toVisitVerticesSize()), 
 //					c.visitedVerticesSize(), c.toVisitVerticesSize());
+//			c.toVisitVertices.putAll(existingVertices);
 			if (mincuts.size() != c.toVisitVerticesSize()) {
 				String msg = String.format("Bug mincut %d != %d graph reached size: %s", mincuts.size(),
 						c.toVisitVerticesSize(), pnt.toString());
@@ -1162,7 +1164,7 @@ public class HHRoutingGraphCreator {
 		if (c.testIfVisited(pntId)) {
 			throw new IllegalStateException();
 		}
-		c.visitedVertices.put(pntId, DEBUG_STORE_ALL_ROADS ? segment : null);
+		c.visitedVertices.put(pntId, DEBUG_STORE_ALL_ROADS > 1 ? segment : null);
 		float dist = segment.distanceFromStart + distSegment(segment) / 2;
 
 		addSegment(c, dist, segment, true, queue);
@@ -1273,7 +1275,7 @@ public class HHRoutingGraphCreator {
 							t = t.getParentRoute();
 						}
 						Collections.reverse(segment.geometry);
-						if (DEBUG_STORE_ALL_ROADS) {
+						if (DEBUG_STORE_ALL_ROADS > 0) {
 							addWay(res.osmObjects, segment, "highway", "secondary");
 						}
 						if (segment.dist < 0) {
