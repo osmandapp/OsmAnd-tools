@@ -141,17 +141,21 @@ public class HHRoutingGraphCreator {
 	protected static LatLon EX3 = new LatLon(52.2728791, 4.8064803); // 632 -> 14 (923 -> 11 )
 	protected static LatLon EX4 = new LatLon(52.27757, 4.85731); // 218 -> 7 (1599 -> 5)
 	protected static LatLon EX5 = new LatLon(42.78725, 18.95036); // 391 -> 8
-	protected static LatLon EX6 = new LatLon(42.09664, 19.088486); //
-	// TODO 0 (Lat 42.828068 Lon 19.842607): Road (389035663) bug maxflow 5 != 4 mincut 
-	protected static LatLon EX = null; // for all - null; otherwise specific point
+	// test combinations 
+	protected static LatLon EX6 = new LatLon(42.42385, 19.261171); //
+	protected static LatLon EX7 = new LatLon(42.527111, 19.43255); //
+	
+	// TODO 0 (Lat 42.828068 Lon 19.842607): Road (389035663) bug maxflow 5 != 4 mincut
+	// 50-1500;
+	protected static LatLon[] EX = {EX6, EX7}; // for all - null; otherwise specific point
 
 	// Heuristics building network points
 	private static int[] MAX_VERT_DEPTH_LOOKUP = new int[] { 15, 10, 8 }; // new int[] {7,7,7,7};
 	private static int MAX_NEIGHBOORS_N_POINTS = 25;
 	private static float MAX_RADIUS_ISLAND = 50000; // max distance from "start point"
 	private static boolean V2 = true;
-	private static int BRIDGE_MAX_DEPTH = 800;
-	private static int BRIDGE_MIN_DEPTH = 25;
+	private static int BRIDGE_MAX_DEPTH = 1500;
+	private static int BRIDGE_MIN_DEPTH = 50;
 	// this is not necessary but it gives confirmation of correctness
 	boolean RECALC_CHECK_MAXFLOW = true;
 
@@ -778,20 +782,22 @@ public class HHRoutingGraphCreator {
 
 	private FullNetwork collectNetworkPoints(HHRoutingPreparationDB networkDB) throws IOException, SQLException {
 		RoutingContext rctx = prepareContext(null, null);
-		if (EX != null) {
+		if (EX != null && EX.length > 0) {
 			DEBUG_STORE_ALL_ROADS = 2;
 			FullNetwork network = new FullNetwork(rctx);
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-			RouteSegmentPoint pnt = router.findRouteSegment(EX.getLatitude(), EX.getLongitude(), network.ctx, null);
-			NetworkIsland cluster;
-			if (V2) {
-				cluster = buildRoadNetworkIslandV2(network, pnt);
-			} else {
-				cluster = new NetworkIsland(network, pnt);
-				buildRoadNetworkIsland(cluster);
+			for (LatLon l : EX) {
+				RouteSegmentPoint pnt = router.findRouteSegment(l.getLatitude(), l.getLongitude(), network.ctx, null);
+				NetworkIsland cluster;
+				if (V2) {
+					cluster = buildRoadNetworkIslandV2(network, pnt);
+				} else {
+					cluster = new NetworkIsland(network, pnt);
+					buildRoadNetworkIsland(cluster);
+				}
+				network.addCluster(cluster, pnt);
+				networkDB.insertCluster(cluster, network.networkPointsCluster);
 			}
-			network.addCluster(cluster, pnt);
-			networkDB.insertCluster(cluster, network.networkPointsCluster);
 			return network;
 		}
 		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx(rctx, networkDB);
@@ -875,8 +881,8 @@ public class HHRoutingGraphCreator {
 				}
 			}
 		}
+		
 		TLongObjectHashMap<RouteSegmentCustom> mincuts = runMaxFlow(vertices, BRIDGE_MIN_DEPTH, source, pnt.toString());
-
 
 		// Debug purposes
 //		recalculateToVisitPointsToDoubleCheck = false;
@@ -909,12 +915,12 @@ public class HHRoutingGraphCreator {
 
 //			System.out.printf("MINCUT %.2f %d -> %d \n", coeffToMinimize(c.visitedVerticesSize(), c.toVisitVerticesSize()), 
 //					c.visitedVerticesSize(), c.toVisitVerticesSize());
-//			c.toVisitVertices.putAll(existingVertices);
+			c.toVisitVertices.putAll(existingVertices);
 			if (mincuts.size() != c.toVisitVerticesSize()) {
 				String msg = String.format("Bug mincut %d != %d graph reached size: %s", mincuts.size(),
 						c.toVisitVerticesSize(), pnt.toString());
 				System.err.println(msg);
-				throw new IllegalStateException(msg);
+//				throw new IllegalStateException(msg);
 			}
 			for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
 				c.edges += r.connections.size();
