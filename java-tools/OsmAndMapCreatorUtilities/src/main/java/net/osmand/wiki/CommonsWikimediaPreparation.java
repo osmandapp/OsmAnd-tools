@@ -3,6 +3,7 @@ package net.osmand.wiki;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.util.SqlInsertValuesReader;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
@@ -15,18 +16,33 @@ import javax.xml.parsers.SAXParserFactory;
 import java.io.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 public class CommonsWikimediaPreparation {
 
     public static final String COMMONSWIKI_ARTICLES_GZ = "commonswiki-latest-pages-articles.xml.gz";
+    public static final String COMMONSWIKI_CATEGORYLINKS_GZ = "commonswiki-latest-categorylinks.sql.gz";
     public static final String COMMONSWIKI_SQLITE = "commons_wiki.sqlite";
     public static final String CATEGORY_NAMESPACE = "14";
     public static final String FILE_NAMESPACE = "6";
     public static final String DEPICT_KEY = "[[d:Special:EntityPage/";
     public static final String DEPICT_KEY_END = "]]";
     private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
+    private final HashSet<String> filter = new HashSet<>(){{
+        add("GFDL");
+        add("GFDL_en");
+        add("Files_with_no_machine-readable_source");
+        add("Self-published_work");
+        add("Files_with_no_machine-readable_author");
+        add("Media_missing_infobox_template");
+        add("License_migration_redundant");
+        add("License_migration_completed");
+        add("Assumed_own_work");
+    }};
 
     public static void main(String[] args) {
         String folder = "";
@@ -49,6 +65,7 @@ public class CommonsWikimediaPreparation {
         }
 
         final String commonWikiArticles = folder + COMMONSWIKI_ARTICLES_GZ;
+        final String categoryLinksSql = folder + COMMONSWIKI_CATEGORYLINKS_GZ;
         final String sqliteFileName = database.isEmpty() ? folder + COMMONSWIKI_SQLITE : database;
         CommonsWikimediaPreparation p = new CommonsWikimediaPreparation();
         try {
@@ -57,6 +74,7 @@ public class CommonsWikimediaPreparation {
                     p.parseCommonArticles(commonWikiArticles, sqliteFileName);
                     break;
                 case "parse-categorylinks-sql":
+                    p.parseCategoryLinksSQL(categoryLinksSql, sqliteFileName);
                     // will be parse category_links.sql here
                     break;
             }
@@ -110,11 +128,11 @@ public class CommonsWikimediaPreparation {
             this.saxParser = saxParser;
             this.progress = progress;
             conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-            log.info("========= CREATE TABLES cw_depict, cw_content =========");
+            log.info("========= CREATE TABLES common_depict, common_content =========");
             conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_depict(id long, depict_qid long, depict_type text)");
-            conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_content(id long, name text)");
+            conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_content(id long, name text, ns int)");
             prepDepict = conn.prepareStatement("INSERT INTO common_depict(id, depict_qid, depict_type) VALUES (?, ?, ?)");
-            prepContent = conn.prepareStatement("INSERT INTO common_content(id, name) VALUES (?, ?)");
+            prepContent = conn.prepareStatement("INSERT INTO common_content(id, name, ns) VALUES (?, ?, ?)");
         }
 
         public void finish() throws SQLException {
@@ -123,6 +141,7 @@ public class CommonsWikimediaPreparation {
             conn.createStatement().execute("CREATE INDEX IF NOT EXISTS qid_common_depict_index on common_depict(depict_qid)");
             conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_content on common_content(id)");
             conn.createStatement().execute("CREATE INDEX IF NOT EXISTS category_name_common_content on common_content(name)");
+            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_ns_common_content on common_content(id, ns)");
 
             prepDepict.executeBatch();
             prepContent.executeBatch();
@@ -194,8 +213,11 @@ public class CommonsWikimediaPreparation {
                         }
 
                         try {
+                            String n = title.toString().replace("File: ", "");
+                            n = n.replace("Category: ", "");
                             prepContent.setLong(1, Long.parseLong(id.toString()));
                             prepContent.setString(2, title.toString());
+                            prepContent.setInt(3, Integer.parseInt(nameSpace));
                             addBatch(prepContent, contentBatch);
 
                             if (FILE_NAMESPACE.equals(nameSpace) && comment.toString().contains(DEPICT_KEY)) {
@@ -246,5 +268,85 @@ public class CommonsWikimediaPreparation {
         InputSource is = new InputSource(reader);
         is.setEncoding("UTF-8");
         return is;
+    }
+
+    private void parseCategoryLinksSQL(final String sqlFile, String sqliteFileName) throws SQLException, IOException {
+        CategoryLinksSqlHandler handler = new CategoryLinksSqlHandler(new File(sqliteFileName));
+        SqlInsertValuesReader.readInsertValuesFile(sqlFile, handler);
+        handler.finish();
+    }
+
+    private class CategoryLinksSqlHandler implements SqlInsertValuesReader.InsertValueProcessor {
+        private DBDialect dialect = DBDialect.SQLITE;
+        private Connection conn;
+        private PreparedStatement prepCategory;
+        private PreparedStatement selectPrep;
+        private int[] categoryBatch = new int[]{0};
+        public final static int BATCH_SIZE = 5000;
+        private long cnt = 0;
+
+        CategoryLinksSqlHandler(File sqliteFile) throws SQLException {
+            conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+            log.info("========= CREATE TABLE common_category_links =========");
+            conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_category_links(id long, category_name text)");
+            conn.createStatement().execute("DELETE FROM common_category_links");
+            prepCategory = conn.prepareStatement("INSERT INTO common_category_links(id, category_name) VALUES (?, ?)");
+            selectPrep = conn.prepareStatement("SELECT count(*) as cnt FROM common_content WHERE common_content.id=? AND common_content.ns=" + FILE_NAMESPACE);
+        }
+
+        @Override
+        public void process(List<String> vs) {
+            long id = Long.parseLong(vs.get(0));
+            String catName = vs.get(1);
+            String cl_type = vs.get(6);
+            if (!cl_type.equals("file")
+                    || filter.contains(catName)
+                    || catName.startsWith("CC-")
+                    || catName.startsWith("PD-")) {
+                return;
+            }
+            try {
+                selectPrep.setLong(1, id);
+                ResultSet rs = selectPrep.executeQuery();
+                int count = 0;
+                if (rs.next()) {
+                    count = rs.getInt(1);
+                }
+                selectPrep.clearParameters();
+                if (count > 0) {
+                    prepCategory.setLong(1, id);
+                    prepCategory.setString(2, catName);
+                    addBatch(prepCategory, categoryBatch);
+                }
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
+            cnt++;
+            if (cnt % 100000 == 0) {
+                System.out.println(cnt + " id:" + id + " cat:" + catName);
+            }
+        }
+
+        public void addBatch(PreparedStatement prep, int[] bt) throws SQLException {
+            prep.addBatch();
+            bt[0] = bt[0] + 1;
+            int batch = bt[0];
+            if (batch > BATCH_SIZE) {
+                prep.executeBatch();
+                bt[0] = 0;
+            }
+        }
+
+        public void finish() throws SQLException {
+            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_category_links_index on common_category_links(id)");
+            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS category_name_common_category_links on common_category_links(category_name)");
+            prepCategory.executeBatch();
+            if (!conn.getAutoCommit()) {
+                conn.commit();
+            }
+            prepCategory.close();
+            selectPrep.close();
+            conn.close();
+        }
     }
 }
