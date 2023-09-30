@@ -46,7 +46,7 @@ public class HHRoutingShortcutCreator {
 	static boolean DEBUG_STORE_ALL_ROADS = false;
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
-	static int DEBUG_VERBOSE_LEVEL = 0;
+	static int DEBUG_VERBOSE_LEVEL = 1;
 	
 	private static HHRoutingPrepareContext prepareContext;
 	
