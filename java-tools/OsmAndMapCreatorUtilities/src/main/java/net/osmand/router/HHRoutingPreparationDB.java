@@ -457,7 +457,7 @@ public class HHRoutingPreparationDB {
 		ins.close();
 	}
 
-	public void insertCluster(NetworkIsland cluster, TLongObjectHashMap<Integer> mp) throws SQLException {
+	public void insertCluster(NetworkIsland cluster, TLongObjectHashMap<Integer> pointDbInd) throws SQLException {
 		TLongObjectIterator<RouteSegment> it = cluster.toVisitVertices.iterator();
 		while (it.hasNext()) {
 			batchInsPoint++;
@@ -465,9 +465,9 @@ public class HHRoutingPreparationDB {
 			long pntId = it.key();
 			RouteSegment obj = it.value();
 			int pointInd;
-			if (!mp.contains(pntId)) {
-				pointInd = mp.size();
-				mp.put(pntId, pointInd);
+			if (!pointDbInd.contains(pntId)) {
+				pointInd = pointDbInd.size();
+				pointDbInd.put(pntId, pointInd);
 				int p = 1;
 				insPoint.setLong(p++, pntId);
 				insPoint.setInt(p++, pointInd);
@@ -480,7 +480,7 @@ public class HHRoutingPreparationDB {
 				insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
 				insPoint.addBatch();
 			} else {
-				pointInd = mp.get(pntId);
+				pointInd = pointDbInd.get(pntId);
 			}
 			
 			int p2 = 1;
