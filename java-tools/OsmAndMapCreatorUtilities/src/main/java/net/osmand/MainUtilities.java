@@ -41,7 +41,8 @@ import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
 import net.osmand.router.HHRoutePlanner;
-import net.osmand.router.HHRoutingGraphCreator;
+import net.osmand.router.HHRoutingSubGraphCreator;
+import net.osmand.router.HHRoutingShortcutCreator;
 import net.osmand.router.HHRoutingTopGraphCreator;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
@@ -123,7 +124,9 @@ public class MainUtilities {
 			} else if (utl.equals("hh-routing-2nd-level")) {
 				HHRoutingTopGraphCreator.main(subArgsArray);
 			} else if (utl.equals("hh-routing-prepare")) {
-				HHRoutingGraphCreator.main(subArgsArray);
+				HHRoutingSubGraphCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-shortcuts")) {
+				HHRoutingShortcutCreator.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
 				HHRoutePlanner.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {

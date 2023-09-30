@@ -241,6 +241,19 @@ public class HHRoutingUtilities {
 		return k;
 	}
 	
+	public static int distrCumKey(TIntIntHashMap mp, int maxEl) {
+		int sum = 0;
+		int[] keys = mp.keys();
+		Arrays.sort(keys);
+		for (int k : keys) {
+			sum += mp.get(k);
+			if (sum > maxEl) {
+				return k;
+			}
+		}
+		return -1;
+	}
+	
 	public static String distrString(TIntIntHashMap distr, String suf) {
 		return distrString(distr, suf, false, false, 3);
 	}

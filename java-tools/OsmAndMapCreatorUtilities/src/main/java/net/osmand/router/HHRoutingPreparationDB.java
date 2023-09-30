@@ -21,7 +21,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
-import net.osmand.router.HHRoutingGraphCreator.NetworkIsland;
+import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -486,7 +486,7 @@ public class HHRoutingPreparationDB {
 			int p2 = 1;
 			insCluster.setLong(p2++, pntId);
 			insCluster.setInt(p2++, pointInd);
-			insCluster.setInt(p2++, cluster.index);
+			insCluster.setInt(p2++, cluster.dbIndex);
 			insCluster.addBatch();
 
 		}

@@ -7,6 +7,7 @@ import static net.osmand.router.HHRoutingUtilities.makePositiveDir;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
 import static net.osmand.router.HHRoutingUtilities.visualizeWays;
 import static net.osmand.router.HHRoutingUtilities.distrSum;
+import static net.osmand.router.HHRoutingUtilities.distrCumKey;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,9 +85,9 @@ import net.osmand.util.MapUtils;
 
 // TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 
-public class HHRoutingGraphCreator {
+public class HHRoutingSubGraphCreator {
 
-	final static Log LOG = PlatformUtil.getLog(HHRoutingGraphCreator.class);
+	final static Log LOG = PlatformUtil.getLog(HHRoutingSubGraphCreator.class);
 	static int DEBUG_STORE_ALL_ROADS = 0; // 1 - clusters, 2 - all, 0 none
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
@@ -105,7 +106,7 @@ public class HHRoutingGraphCreator {
 	protected static LatLon EX7 = new LatLon(42.527111, 19.43255); //
 
 	// TODO 0 (Lat 42.828068 Lon 19.842607): Road (389035663) bug maxflow 5 != 4 mincut 50-1500;
-	protected static LatLon[] EX = { EX6, EX7 }; // for all - null; otherwise specific point
+	protected static LatLon[] EX = { }; // for all - null; otherwise specific point
 
 	int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 1000;
 	
@@ -145,7 +146,7 @@ public class HHRoutingGraphCreator {
 		}
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
-		HHRoutingGraphCreator proc = new HHRoutingGraphCreator();
+		HHRoutingSubGraphCreator proc = new HHRoutingSubGraphCreator();
 		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(networkDB);
 		List<Entity> objects = visualizeWays(ctx.visualPoints(), ctx.visualConnections(), ctx.allVisitedVertices);
 		saveOsmFile(objects, new File(folder, name + ".osm"));
@@ -243,8 +244,9 @@ public class HHRoutingGraphCreator {
 		c.wrapConnectionsToVisitPoints();
 
 		// prepare max flow
+		// depthDistr.get(minDepth) < TOTAL_MIN_DEPTH_POINTS
 		while (minDepth < maxDepth - incStep && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
-			minDepth += incStep;
+			minDepth ++;
 		}
 		TLongObjectHashMap<RouteSegmentVertex> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
 		recalculateClusterPointsUsingMincut(c, mincuts, existNetworkPoints, minDepth, maxDepth, depthDistr);
@@ -277,9 +279,6 @@ public class HHRoutingGraphCreator {
 			}
 			proceed(c, ls, c.queue, maxDepth);
 		}
-
-//			System.out.printf("MINCUT %.2f %d -> %d \n", coeffToMinimize(c.visitedVerticesSize(), c.toVisitVerticesSize()), 
-//					c.visitedVerticesSize(), c.toVisitVerticesSize());
 		c.toVisitVertices.putAll(existNetworkPoints);
 		if (mincuts.size() != c.toVisitVertices.size()) {
 			String msg = String.format("Bug mincut %d != %d graph reached size: %s", mincuts.size(),
@@ -294,9 +293,12 @@ public class HHRoutingGraphCreator {
 		}
 
 //		System.out.println(distrString(depthDistr, "", true, true, 5));
+		
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
-			logf("\n   Process cluster: min depth  %d (%,d) <- max depth %d (%,d) - %d flow", minDepth,
-					distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth), mincuts.size());
+			logf("\n   Process cluster: min depth  %d (%,d) <- max depth %d (%,d) - %d flow = %d (%,d size ~ %d depth)", minDepth,
+					distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth), 
+					mincuts.size(), c.toVisitVertices.size(), 
+					c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()));
 		}
 	}
 
