@@ -12,6 +12,7 @@ import java.util.List;
 import javax.xml.stream.XMLStreamException;
 
 import gnu.trove.iterator.TLongObjectIterator;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
@@ -223,5 +224,49 @@ public class HHRoutingUtilities {
 		FileOutputStream fous = new FileOutputStream(file);
 		w.saveStorage(fous, st, null, true);
 		fous.close();
+	}
+	
+	public static String distrString(TIntIntHashMap distr, String suf) {
+		return distrString(distr, suf, false, false, 3);
+	}
+	
+	public static String distrString(TIntIntHashMap distr, String suf,  
+			boolean cum, boolean valPrint, double percentMin) {
+		int[] keys = distr.keys();
+		Arrays.sort(keys);
+		StringBuilder b = new StringBuilder();
+		int sum = 0;
+		for (int k = 0; k < keys.length; k++) {
+			sum += distr.get(keys[k]);
+		}
+		b.append(String.format("%,d", sum));
+		int k = 0, val = 0, prevVal = 0;
+		double percent = 0;
+		int kMin = -1;
+		for (; k < keys.length; k++) {
+			if (kMin < 0) {
+				kMin = keys[k];
+			}
+			val += distr.get(keys[k]);
+			percent = val * 100.0 / sum;
+			if ((percent - prevVal * 100.0 / sum) >= percentMin) {
+				String d = !valPrint ? (int)percent + "%" : val + "";
+				String range = keys[k] + "";
+				if (!cum && kMin != keys[k]) {
+					range = kMin + "-" + range;
+				}
+				b.append(", ").append(range).append(suf).append(" - " + d);
+				if (!cum) {
+					val = 0;
+				} else {
+					prevVal = val;
+				}
+				kMin = -1;
+			}
+		}
+		if (percent < percentMin && keys.length > 0) {
+			b.append("... " + keys[keys.length - 1]);
+		}
+		return b.toString();
 	}
 }
