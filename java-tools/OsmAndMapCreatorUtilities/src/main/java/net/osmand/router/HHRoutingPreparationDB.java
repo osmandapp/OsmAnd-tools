@@ -44,8 +44,6 @@ public class HHRoutingPreparationDB {
 	private final int BATCH_SIZE = 10000;
 	private int batchInsPoint = 0;
 
-	
-
 	public HHRoutingPreparationDB(File file) throws SQLException {
 		
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);

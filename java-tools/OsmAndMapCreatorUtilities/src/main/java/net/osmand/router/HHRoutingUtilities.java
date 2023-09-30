@@ -11,6 +11,7 @@ import java.util.List;
 
 import javax.xml.stream.XMLStreamException;
 
+import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -224,6 +225,20 @@ public class HHRoutingUtilities {
 		FileOutputStream fous = new FileOutputStream(file);
 		w.saveStorage(fous, st, null, true);
 		fous.close();
+	}
+	
+	
+
+	public static int distrSum(TIntIntHashMap mp, int maxEl) {
+		int k = 0;
+		TIntIntIterator it = mp.iterator();
+		while (it.hasNext()) {
+			it.advance();
+			if (it.key() < maxEl || maxEl < 0) {
+				k += it.value();
+			}
+		}
+		return k;
 	}
 	
 	public static String distrString(TIntIntHashMap distr, String suf) {
