@@ -200,7 +200,9 @@ public class OsmCoordinatesByTag {
 			}
 
 		} finally {
-			osmDBdialect.closeDatabase(accessor.getDbConn());
+			if (accessor.getDbConn() != null) {
+				osmDBdialect.closeDatabase(accessor.getDbConn());
+			}
 			osmDBdialect.removeDatabase(dbFile);
 		}
 		if (hasRelations[0] && !parseRelations) {
