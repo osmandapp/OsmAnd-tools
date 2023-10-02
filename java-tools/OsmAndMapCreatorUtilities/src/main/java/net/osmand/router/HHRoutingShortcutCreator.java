@@ -46,7 +46,7 @@ public class HHRoutingShortcutCreator {
 	static boolean DEBUG_STORE_ALL_ROADS = false;
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
-	static int DEBUG_VERBOSE_LEVEL = 2;
+	static int DEBUG_VERBOSE_LEVEL = 0;
 	
 	private static HHRoutingPrepareContext prepareContext;
 	
@@ -55,6 +55,8 @@ public class HHRoutingShortcutCreator {
 	private static int THREAD_POOL = 2;
 
 	private static File sourceFile() {
+		DEBUG_VERBOSE_LEVEL = 2;
+		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
