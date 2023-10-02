@@ -765,7 +765,7 @@ public class HHRoutingSubGraphCreator {
 			}
 			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
-				if (DEBUG_STORE_ALL_ROADS > 1) {
+				if (DEBUG_STORE_ALL_ROADS >= 1) {
 					cluster.visualBorders = new TLongObjectHashMap<List<LatLon>>();
 					for (RouteSegmentVertex p : cluster.toVisitVertices.valueCollection()) {
 						List<LatLon> l = new ArrayList<LatLon>();

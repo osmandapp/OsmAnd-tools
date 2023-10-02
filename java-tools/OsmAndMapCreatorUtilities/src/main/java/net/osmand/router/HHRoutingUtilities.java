@@ -164,13 +164,13 @@ public class HHRoutingUtilities {
 				LatLon l = island.startLatLon;
 				Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
 				n.putTag("highway", "stop");
-				n.putTag("conn", island.visualBorders.size() + "");
 				n.putTag("name", island.startToString);
 				objs.add(n);
 				nodes++;
 				if (island.visualBorders == null) {
 					continue;
 				}
+				n.putTag("conn", island.visualBorders.size() + "");
 				TLongObjectIterator<List<LatLon>> it = island.visualBorders.iterator();
 				while (it.hasNext()) {
 					it.advance();
