@@ -117,6 +117,7 @@ public class HHRoutingSubGraphCreator {
 
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
+		DEBUG_STORE_ALL_ROADS = 1;
 		CLEAN = true;
 		
 		String name = "Montenegro_europe_2.road.obf";
@@ -672,15 +673,16 @@ public class HHRoutingSubGraphCreator {
 			int borderPoints = cluster.toVisitVertices.size();
 			if (borderPoints == 0) {
 				this.isolatedIslands++;
+			} else {
+				pntsDistr.adjustOrPutValue((cluster.visitedVertices.size() + 500) / 1000, 1, 1);
 			}
-			borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
 			edges += cluster.edges;
 			TIntIntIterator it = cluster.edgeDistr.iterator();
 			while (it.hasNext()) {
 				it.advance();
 				edgesDistr.adjustOrPutValue(it.key(), it.value(), it.value());
 			}
-			pntsDistr.adjustOrPutValue((cluster.visitedVertices.size() + 500) / 1000, 1, 1);
+			borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
 			this.totalBorderPoints += borderPoints;
 			this.shortcuts += borderPoints * (borderPoints - 1);			
 		}
