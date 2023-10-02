@@ -197,10 +197,6 @@ public class OsmCoordinatesByTag {
 					});
 					progress.finishTask();
 				}
-
-				osmDBdialect.closeDatabase(accessor.getDbConn());
-				osmDBdialect.removeDatabase(dbFile);
-
 			}
 
 		} finally {
