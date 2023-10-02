@@ -458,7 +458,7 @@ public class HHRoutingPreparationDB {
 	}
 
 	public void insertCluster(NetworkIsland cluster, TLongObjectHashMap<Integer> pointDbInd) throws SQLException {
-		TLongObjectIterator<RouteSegment> it = cluster.toVisitVertices.iterator();
+		TLongObjectIterator<? extends RouteSegment> it = cluster.toVisitVertices.iterator();
 		while (it.hasNext()) {
 			batchInsPoint++;
 			it.advance();

@@ -88,7 +88,7 @@ import net.osmand.util.MapUtils;
 public class HHRoutingSubGraphCreator {
 
 	final static Log LOG = PlatformUtil.getLog(HHRoutingSubGraphCreator.class);
-	static int DEBUG_STORE_ALL_ROADS = 0; // 1 - clusters, 2 - all, 0 none
+	static int DEBUG_STORE_ALL_ROADS = 1; // 1 - clusters, 2 - geometry cluster, 3 - all, 
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
@@ -117,7 +117,8 @@ public class HHRoutingSubGraphCreator {
 
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
-		DEBUG_STORE_ALL_ROADS = 1;
+		DEBUG_STORE_ALL_ROADS = 2;
+		DEBUG_LIMIT_PROCESS = 1000;
 		CLEAN = true;
 		
 		String name = "Montenegro_europe_2.road.obf";
@@ -151,17 +152,18 @@ public class HHRoutingSubGraphCreator {
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingSubGraphCreator proc = new HHRoutingSubGraphCreator();
 		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(networkDB);
-		List<Entity> objects = visualizeWays(ctx.visualPoints(), ctx.visualConnections(), ctx.allVisitedVertices);
+		List<Entity> objects = visualizeWays(ctx.visualClusters, ctx.allVisitedVertices);
 		saveOsmFile(objects, new File(folder, name + ".osm"));
 		networkDB.close();
 	}
+
 
 
 	private NetworkCollectPointCtx collectNetworkPoints(HHRoutingPreparationDB networkDB) throws IOException, SQLException {
 		RoutingContext rctx = prepareContext.prepareContext(null, null);
 		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx(rctx, networkDB);
 		if (EX != null && EX.length > 0) {
-			DEBUG_STORE_ALL_ROADS = 2;
+			DEBUG_STORE_ALL_ROADS = 3;
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			for (LatLon l : EX) {
 				RouteSegmentPoint pnt = router.findRouteSegment(l.getLatitude(), l.getLongitude(), ctx.rctx, null);
@@ -252,7 +254,7 @@ public class HHRoutingSubGraphCreator {
 			minDepth++;
 		}
 		TLongObjectHashMap<RouteSegmentVertex> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
-		recalculateClusterPointsUsingMincut(c, mincuts, minDepth, maxDepth, depthDistr);
+		recalculateClusterPointsUsingMincut(c, pnt, mincuts, minDepth, maxDepth, depthDistr);
 		
 		for (long key : c.visitedVertices.keys()) {
 			RouteSegmentVertex r = c.allVertices.get(key);
@@ -261,15 +263,18 @@ public class HHRoutingSubGraphCreator {
 		}
 //		System.out.println(distrString(depthDistr, "", true, true, 5));
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
-			logf("\n   Process cluster: min depth  %d (%,d) <- max depth %d (%,d) - %d flow, border points %d (%,d size ~ %d depth)", minDepth,
-					distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth), 
-					mincuts.size(), c.toVisitVertices.size(), 
-					c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()));
+			if (c.toVisitVertices.size() <= 2) {
+				System.err.println("Should be merged");
+			}
+			logf("Cluster: borders %d (%,d size ~ %d depth). Flow %d: depth min %d (%,d) <- max %d (%,d). Start %s",
+					c.toVisitVertices.size(), c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()), 
+					mincuts.size(), minDepth, distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth),  
+					pnt);
 		}
 		return c;
 	}
 
-	private void recalculateClusterPointsUsingMincut(NetworkIsland c, TLongObjectHashMap<RouteSegmentVertex> mincuts,
+	private void recalculateClusterPointsUsingMincut(NetworkIsland c, RouteSegmentPoint pnt, TLongObjectHashMap<RouteSegmentVertex> mincuts,
 				int minDepth, int maxDepth, TIntIntHashMap depthDistr) {
 		// Debug purposes
 //		System.out.println("Max flow " + mincuts.size());
@@ -286,8 +291,8 @@ public class HHRoutingSubGraphCreator {
 //		}
 
 		c.clearVisitedPoints();
-		c.queue.add(c.getVertex(c.start));
-		TLongObjectHashMap<RouteSegment> existNetworkPoints = new TLongObjectHashMap<RouteSegment>();
+		c.queue.add(c.getVertex(pnt));
+		TLongObjectHashMap<RouteSegmentVertex> existNetworkPoints = new TLongObjectHashMap<>();
 		while (!c.queue.isEmpty()) {
 			RouteSegmentVertex ls = c.queue.poll();
 			if (mincuts.containsKey(ls.getId())) {
@@ -301,7 +306,7 @@ public class HHRoutingSubGraphCreator {
 		}
 		if (mincuts.size() + existNetworkPoints.size() != c.toVisitVertices.size()) {
 			String msg = String.format("BUG!! mincut %d + %d network pnts != %d graph reached size: %s", mincuts.size(),
-					existNetworkPoints.size(), c.toVisitVertices.size(), c.start.toString());
+					existNetworkPoints.size(), c.toVisitVertices.size(), c.startToString);
 			System.err.println(msg);
 //				throw new IllegalStateException(msg); // TODO
 		}
@@ -319,7 +324,7 @@ public class HHRoutingSubGraphCreator {
 		if (c.testIfVisited(vertex.getId())) {
 			throw new IllegalStateException();
 		}
-		c.visitedVertices.put(vertex.getId(), DEBUG_STORE_ALL_ROADS > 1 ? vertex : null);
+		c.visitedVertices.put(vertex.getId(), DEBUG_STORE_ALL_ROADS > 2 ? vertex : null);
 		c.loadVertexConnections(vertex);
 		float distFromStart = vertex.distanceFromStart + vertex.distSegment() / 2;
 		for (RouteSegmentEdge e : vertex.connections) {
@@ -521,10 +526,19 @@ public class HHRoutingSubGraphCreator {
 			return null;
 		}
 
+		public void clearPoint() {
+			this.distanceFromStart = 0;
+			this.cDepth = 0;
+			this.parentRoute = null;
+			this.flowParent = null;
+			this.flowParentTemp = null;			
+		}
+
 	}
 
 	class NetworkIsland {
-		final RouteSegment start;
+		final LatLon startLatLon;
+		final String startToString;
 		final NetworkCollectPointCtx ctx;
 		final PriorityQueue<RouteSegmentVertex> queue;
 		
@@ -532,12 +546,16 @@ public class HHRoutingSubGraphCreator {
 		int edges = 0;
 		TIntIntHashMap edgeDistr = new TIntIntHashMap();
 		TLongObjectHashMap<RouteSegment> visitedVertices = new TLongObjectHashMap<>();
-		TLongObjectHashMap<RouteSegment> toVisitVertices = new TLongObjectHashMap<>();
+		TLongObjectHashMap<RouteSegmentVertex> toVisitVertices = new TLongObjectHashMap<>();
 		TLongObjectHashMap<RouteSegmentVertex> allVertices = new TLongObjectHashMap<>();
+		
+		TLongObjectHashMap<List<LatLon>> visualBorders = null;
 
 		NetworkIsland(NetworkCollectPointCtx ctx, RouteSegment start) {
 			this.ctx = ctx;
-			this.start = start;
+			this.startLatLon = HHRoutingUtilities.getPoint(start);
+			this.startToString = start.getRoad().getId() / 64 + " " + start.getSegmentStart() + " "
+					+ start.getSegmentEnd();
 			this.queue = new PriorityQueue<>(new Comparator<RouteSegment>() {
 
 				@Override
@@ -563,7 +581,6 @@ public class HHRoutingSubGraphCreator {
 			}
 			return routeSegment;
 		}
-		
 		
 		public void loadVertexConnections(RouteSegmentVertex segment) {
 			if (!segment.connections.isEmpty()) {
@@ -620,12 +637,9 @@ public class HHRoutingSubGraphCreator {
 		}
 
 		public void clearVisitedPoints() {
-			for(RouteSegmentVertex v : allVertices.valueCollection()) {
-				v.distanceFromStart = 0;
-				v.cDepth = 0;
-				v.parentRoute = null;
-				v.flowParent = null;
-				v.flowParentTemp = null;
+			for (RouteSegmentVertex v : allVertices.valueCollection()) {
+				v.clearPoint();
+				
 			}
 			visitedVertices.clear();
 			toVisitVertices.clear();
@@ -738,7 +752,6 @@ public class HHRoutingSubGraphCreator {
 			// force reload cause subregions could change on rerun
 			rctx = prepareContext.gcMemoryLimitToUnloadAll(rctx, subRegions, true);
 
-			// 3.1 smart 
 			this.allVisitedVertices = new TLongObjectHashMap<RouteSegment>();
 			for (NetworkRouteRegion nr : subRegions) {
 				if (nr != nrouteRegion) {
@@ -758,15 +771,32 @@ public class HHRoutingSubGraphCreator {
 				throw new RuntimeException(e);
 			}
 			stats.addCluster(cluster);
-			if (DEBUG_STORE_ALL_ROADS > 0) {
-				visualClusters.add(cluster);
-			}
-
 			for (long key : cluster.visitedVertices.keys()) {
 				if (allVisitedVertices.containsKey(key)) {
 					throw new IllegalStateException("Point was already visited");
 				}
 				allVisitedVertices.put(key, cluster.visitedVertices.get(key)); 
+			}
+			if (DEBUG_STORE_ALL_ROADS > 0) {
+				visualClusters.add(cluster);
+				if (DEBUG_STORE_ALL_ROADS > 1) {
+					cluster.visualBorders = new TLongObjectHashMap<List<LatLon>>();
+					for (RouteSegmentVertex p : cluster.toVisitVertices.valueCollection()) {
+						List<LatLon> l = new ArrayList<LatLon>();
+						RouteSegment par = p;
+						while (par != null) {
+							l.add(HHRoutingUtilities.getPoint(par));
+							par = par.parentRoute;
+							if (DEBUG_STORE_ALL_ROADS == 1) {
+								break;
+							}
+						}
+						cluster.visualBorders.put(p.getId(), l);
+					}
+				}
+				cluster.allVertices.clear();
+				cluster.toVisitVertices.clear();
+				cluster.queue.clear();
 			}
 		}
 
@@ -788,27 +818,7 @@ public class HHRoutingSubGraphCreator {
 			return false;
 		}
 
-		public TLongObjectHashMap<List<RouteSegment>> visualConnections() {
-			TLongObjectHashMap<List<RouteSegment>> conn = new TLongObjectHashMap<>();
-			for (NetworkIsland island : visualClusters) {
-				List<RouteSegment> lst = new ArrayList<>();
-				conn.put(calculateRoutePointInternalId(island.start), lst);
-				for (RouteSegment border : island.toVisitVertices.valueCollection()) {
-					lst.add(border);
-				}
-			}
-			return conn;
-		}
-
-		public TLongObjectHashMap<RouteSegment> visualPoints() {
-			TLongObjectHashMap<RouteSegment> visualPoints = new TLongObjectHashMap<>();
-			for (NetworkIsland island : visualClusters) {
-				visualPoints.putAll(island.toVisitVertices);
-				visualPoints.put(calculateRoutePointInternalId(island.start), island.start);
-			}
-			return visualPoints;
-		}
-
+		
 		public void printStatsNetworks() {
 			stats.printStatsNetworks(getTotalPoints(), clusterSize());
 		}
@@ -845,11 +855,6 @@ public class HHRoutingSubGraphCreator {
 					return false;
 				}
 				NetworkIsland cluster = buildRoadNetworkIsland(ctx, pntAround);
-				if (DEBUG_VERBOSE_LEVEL >= 1) {
-					int nwPoints = cluster.toVisitVertices.size();
-					logf("CLUSTER: %2d border <- %4d points (%d segments) - %s", nwPoints,
-							cluster.visitedVertices.size(), nwPoints * (nwPoints - 1), pntAround);
-				}
 				ctx.addCluster(cluster);
 				if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 					prevPrintInd = indProc;

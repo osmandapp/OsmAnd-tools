@@ -28,6 +28,7 @@ import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
+import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
 import net.osmand.util.MapUtils;
 
 public class HHRoutingUtilities {
@@ -115,8 +116,8 @@ public class HHRoutingUtilities {
 	}
 
 
-	public  static List<Entity> visualizeWays(TLongObjectHashMap<RouteSegment> networkPoints, 
-			TLongObjectHashMap<List<RouteSegment>> networkPointsConnections , TLongObjectHashMap<RouteSegment> visitedSegments) {
+	public  static List<Entity> visualizeWays(List<NetworkIsland> visualClusters, TLongObjectHashMap<RouteSegment> visitedSegments) {
+		
 		List<Entity> objs = new ArrayList<>();
 		int nodes = 0;
 		int ways1 = 0;
@@ -156,21 +157,52 @@ public class HHRoutingUtilities {
 				}
 			}
 		}
-		if (networkPoints != null) {
-			for (long key : networkPoints.keys()) {
-				RouteSegment r  = networkPoints.get(key);
-				LatLon l = getPoint(r); 
+		
+
+		if (visualClusters != null) {
+			TLongObjectHashMap<Node> pnts = new TLongObjectHashMap<>();
+			for (NetworkIsland island : visualClusters) {
+				LatLon l = island.startLatLon;
 				Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
 				n.putTag("highway", "stop");
-				n.putTag("name", r.getRoad().getId() / 64 + " " + r.getSegmentStart() + " " + r.getSegmentEnd());
+				n.putTag("conn", island.visualBorders.size() + "");
+				n.putTag("name", island.startToString);
 				objs.add(n);
 				nodes++;
-				if (networkPointsConnections != null && networkPointsConnections.containsKey(key)) {
-					for (RouteSegment conn : networkPointsConnections.get(key)) {
-						LatLon ln = getPoint(conn);
-						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
-						objs.add(n2);
-						Way w = new Way(DEBUG_OSM_ID--, Arrays.asList(n, n2));
+				if (island.visualBorders == null) {
+					continue;
+				}
+				TLongObjectIterator<List<LatLon>> it = island.visualBorders.iterator();
+				while (it.hasNext()) {
+					it.advance();
+					long pid = it.key();
+					List<LatLon> lls = it.value();
+					if (lls.size() > 0) {
+						List<Node> nodesList = new ArrayList<Node>();
+						nodesList.add(n);
+						for (int i = lls.size() - 2; i >= 0; i--) {
+							LatLon ln = lls.get(i);
+							Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
+							objs.add(n2);
+							nodesList.add(n2);
+						}
+						if (!pnts.containsKey(pid)) {
+							LatLon ln = lls.get(0);
+							Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
+							objs.add(n2);
+							pnts.put(pid, n2);
+						}
+						if (lls.size() > 1) {
+							nodesList.add(pnts.get(pid));
+							Way w = new Way(DEBUG_OSM_ID--, nodesList);
+							w.putTag("highway", "track");
+							objs.add(w);
+							ways2++;
+						}
+						nodesList.clear();
+						nodesList.add(n);
+						nodesList.add(pnts.get(pid));
+						Way w = new Way(DEBUG_OSM_ID--, nodesList);
 						w.putTag("highway", "motorway");
 						objs.add(w);
 						ways2++;
