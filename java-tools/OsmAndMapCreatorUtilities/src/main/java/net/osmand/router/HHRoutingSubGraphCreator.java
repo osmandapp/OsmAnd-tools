@@ -105,6 +105,7 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon EX6 = new LatLon(42.42385, 19.261171); //
 	protected static LatLon EX7 = new LatLon(42.527111, 19.43255); //
 
+	// TODO BUG maxflow 15 != 16 mincut: 0 (Lat 52.709446 Lon 6.1940145): Road (631875088) 
 	protected static LatLon[] EX = {
 //			EX6, EX7 
 	}; 
@@ -382,7 +383,7 @@ public class HHRoutingSubGraphCreator {
 		if (sinks.size() != mincuts.size()) {
 			String msg = String.format("BUG maxflow %d != %d mincut: %s ", sinks.size(), mincuts.size(), errorDebug);
 			System.err.println(msg);
-//			throw new IllegalStateException(msg); 
+//			throw new IllegalStateException(msg);  // TODO
 		}
 		return mincuts;
 	}
@@ -672,6 +673,7 @@ public class HHRoutingSubGraphCreator {
 			} else if (borderPoints <= 2) {
 				this.toMergeIslands++; 
 			} else {
+				borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
 				this.shortcuts += borderPoints * (borderPoints - 1);
 				pntsDistr.adjustOrPutValue((cluster.visitedVertices.size() + 500) / 1000, 1, 1);
 			}
@@ -681,7 +683,6 @@ public class HHRoutingSubGraphCreator {
 				it.advance();
 				edgesDistr.adjustOrPutValue(it.key(), it.value(), it.value());
 			}
-			borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
 			this.totalBorderPoints += borderPoints;
 						
 		}
