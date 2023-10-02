@@ -116,8 +116,7 @@ public class HHRoutingUtilities {
 	}
 
 
-	public  static List<Entity> visualizeWays(List<NetworkIsland> visualClusters, TLongObjectHashMap<RouteSegment> visitedSegments) {
-		
+	public static List<Entity> visualizeWays(List<NetworkIsland> visualClusters, TLongObjectHashMap<RouteSegment> visitedSegments) {
 		List<Entity> objs = new ArrayList<>();
 		int nodes = 0;
 		int ways1 = 0;

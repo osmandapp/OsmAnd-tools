@@ -51,9 +51,8 @@ import net.osmand.util.MapUtils;
 
 // TODO Important try different recursive algorithm for road separation
 // 2nd phase - points selection
-// 2.0 print stats about initial routing graph (points / edges / distribution % edges / point)
 // 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 2.2 Merge single point exit islands (up to a limit?)
+// 2.2 Merge 1-2 points !! 
 // 2.3 Exclude & merge non exit islands (up to a limit)
 // 2.4 Play with Heuristics [MAX_VERT_DEPTH_LOOKUP, MAX_NEIGHBOORS_N_POINTS, ... ] to achieve Better points distribution:
 ///    - Smaller edges (!)
@@ -118,7 +117,7 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 2;
-		DEBUG_LIMIT_PROCESS = 1000;
+//		DEBUG_LIMIT_PROCESS = 1000;
 		CLEAN = true;
 		
 		String name = "Montenegro_europe_2.road.obf";
@@ -254,7 +253,7 @@ public class HHRoutingSubGraphCreator {
 			minDepth++;
 		}
 		TLongObjectHashMap<RouteSegmentVertex> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
-		recalculateClusterPointsUsingMincut(c, pnt, mincuts, minDepth, maxDepth, depthDistr);
+		recalculateClusterPointsUsingMincut(c, pnt, mincuts);
 		
 		for (long key : c.visitedVertices.keys()) {
 			RouteSegmentVertex r = c.allVertices.get(key);
@@ -263,9 +262,6 @@ public class HHRoutingSubGraphCreator {
 		}
 //		System.out.println(distrString(depthDistr, "", true, true, 5));
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
-			if (c.toVisitVertices.size() <= 2) {
-				System.err.println("Should be merged");
-			}
 			logf("Cluster: borders %d (%,d size ~ %d depth). Flow %d: depth min %d (%,d) <- max %d (%,d). Start %s",
 					c.toVisitVertices.size(), c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()), 
 					mincuts.size(), minDepth, distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth),  
@@ -274,22 +270,8 @@ public class HHRoutingSubGraphCreator {
 		return c;
 	}
 
-	private void recalculateClusterPointsUsingMincut(NetworkIsland c, RouteSegmentPoint pnt, TLongObjectHashMap<RouteSegmentVertex> mincuts,
-				int minDepth, int maxDepth, TIntIntHashMap depthDistr) {
-		// Debug purposes
-//		System.out.println("Max flow " + mincuts.size());
-//		c.toVisitVertices.clear();
-//		c.toVisitVertices.putAll(mincuts);
-//		for (RouteSegmentCustom r : c.allVertices.valueCollection()) {
-//			int flow = 0;
-//			for (RouteSegmentConn t : r.connections) {
-//				flow = Math.max(t.flow, flow);
-//			}
-//			if (flow <= 1) {
-//				c.visitedVertices.remove(r.cacheId);
-//			}
-//		}
-
+	private void recalculateClusterPointsUsingMincut(NetworkIsland c, RouteSegmentPoint pnt, 
+			TLongObjectHashMap<RouteSegmentVertex> mincuts) {
 		c.clearVisitedPoints();
 		c.queue.add(c.getVertex(pnt));
 		TLongObjectHashMap<RouteSegmentVertex> existNetworkPoints = new TLongObjectHashMap<>();
@@ -302,13 +284,13 @@ public class HHRoutingSubGraphCreator {
 				existNetworkPoints.put(ls.getId(), ls);
 				continue;
 			}
-			proceed(c, ls, c.queue, maxDepth);
+			proceed(c, ls, c.queue, -1);
 		}
 		if (mincuts.size() + existNetworkPoints.size() != c.toVisitVertices.size()) {
 			String msg = String.format("BUG!! mincut %d + %d network pnts != %d graph reached size: %s", mincuts.size(),
 					existNetworkPoints.size(), c.toVisitVertices.size(), c.startToString);
 			System.err.println(msg);
-//				throw new IllegalStateException(msg); // TODO
+			throw new IllegalStateException(msg); 
 		}
 		c.toVisitVertices.putAll(existNetworkPoints);
 		
@@ -400,7 +382,7 @@ public class HHRoutingSubGraphCreator {
 		if (sinks.size() != mincuts.size()) {
 			String msg = String.format("BUG maxflow %d != %d mincut: %s ", sinks.size(), mincuts.size(), errorDebug);
 			System.err.println(msg);
-//			throw new IllegalStateException(msg); // TODO
+			throw new IllegalStateException(msg); 
 		}
 		return mincuts;
 	}
@@ -658,18 +640,19 @@ public class HHRoutingSubGraphCreator {
 		TIntIntHashMap edgesDistr = new TIntIntHashMap();
 		int edges;
 		int isolatedIslands = 0;
+		int toMergeIslands = 0;
 		int shortcuts = 0;
 		
 
-		public void printStatsNetworks(int totalPoints, int clusterSize ) {
+		public void printStatsNetworks(int totalPoints, int clusterSize) {
 			int borderPointsSize = borderPntsCluster.size();
 			TIntIntHashMap borderClusterDistr = new TIntIntHashMap();
 			for (int a : this.borderPntsCluster.values()) {
 				borderClusterDistr.adjustOrPutValue(a, 1, 1);
 			}
-			logf("RESULT %,d points (%,d edges) -> %d border points, %d clusters (%d isolated), %d est shortcuts (%s edges distr) \n",
-					totalPoints + borderPointsSize, edges / 2, borderPointsSize, clusterSize,
-					isolatedIslands, shortcuts, distrString(edgesDistr, ""));
+			logf("RESULT %,d points (%,d edges) -> %d border points, %d clusters + %d isolated + %d to merge, %d est shortcuts (%s edges distr) \n",
+					totalPoints + borderPointsSize, edges / 2, borderPointsSize, clusterSize - isolatedIslands - toMergeIslands,
+					isolatedIslands, toMergeIslands, shortcuts, distrString(edgesDistr, ""));
 
 			System.out.printf("       %.1f avg (%s) border points per cluster \n"
 							+ "       %s - shared border points between clusters \n"
@@ -687,7 +670,10 @@ public class HHRoutingSubGraphCreator {
 			int borderPoints = cluster.toVisitVertices.size();
 			if (borderPoints == 0) {
 				this.isolatedIslands++;
+			} else if (borderPoints <= 2) {
+				this.toMergeIslands++; 
 			} else {
+				this.shortcuts += borderPoints * (borderPoints - 1);
 				pntsDistr.adjustOrPutValue((cluster.visitedVertices.size() + 500) / 1000, 1, 1);
 			}
 			edges += cluster.edges;
@@ -698,7 +684,7 @@ public class HHRoutingSubGraphCreator {
 			}
 			borderPntsDistr.adjustOrPutValue(borderPoints, 1, 1);
 			this.totalBorderPoints += borderPoints;
-			this.shortcuts += borderPoints * (borderPoints - 1);			
+						
 		}
 
 	}
