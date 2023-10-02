@@ -243,8 +243,8 @@ public class HHRoutePlanner {
 			c = new DijkstraConfig();
 			// test data for debug swap
 //			c = DijkstraConfig.dijkstra(0);
-//			c = DijkstraConfig.astar(1);
-			c = DijkstraConfig.ch();
+			c = DijkstraConfig.astar(1);
+//			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
 			DEBUG_VERBOSE_LEVEL = 0;
 		}

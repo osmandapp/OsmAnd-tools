@@ -88,7 +88,7 @@ import net.osmand.util.MapUtils;
 public class HHRoutingSubGraphCreator {
 
 	final static Log LOG = PlatformUtil.getLog(HHRoutingSubGraphCreator.class);
-	static int DEBUG_STORE_ALL_ROADS = 1; // 1 - clusters, 2 - geometry cluster, 3 - all, 
+	static int DEBUG_STORE_ALL_ROADS = 0; // 1 - clusters, 2 - geometry cluster, 3 - all, 
 	static int DEBUG_LIMIT_START_OFFSET = 0;
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
