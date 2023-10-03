@@ -611,7 +611,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιΤμήμαΤου") || str.startsWith("commonscat") || str.startsWith("jest w")
-				|| str.startsWith("istinkat")  || str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
+				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see")

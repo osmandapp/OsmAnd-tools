@@ -731,9 +731,9 @@ public class WikivoyageLangPreparation {
 			String hemisphereOUmeridien = "";
 			try {
 				degrees = Double.parseDouble(m.group(1));
-		        minutes = Double.parseDouble(m.group(2));
-		        seconds = m.group(3).isEmpty() ? 0 :Double.parseDouble(m.group(3));
-		        hemisphereOUmeridien = m.group(4);
+				minutes = Double.parseDouble(m.group(2));
+				seconds = m.group(3).isEmpty() ? 0 : Double.parseDouble(m.group(3));
+				hemisphereOUmeridien = m.group(4);
 			} catch (Exception e) {
 				// Skip malformed strings
 			}
@@ -763,7 +763,7 @@ public class WikivoyageLangPreparation {
 				} else if (lowerCasePartOf.contains("קטגוריה")) {
 					return partOf.substring(partOf.indexOf(":") + 1).trim().replaceAll("[_\\|\\*]", "");
 				} else {
-					return partOf.substring(partOf.indexOf("|") + 1).trim().replaceAll("_", " ");
+					return partOf.split("\\|")[1].trim().replaceAll("_", " ");
 				}
 			}
 			return "";
@@ -773,14 +773,13 @@ public class WikivoyageLangPreparation {
 			String[] info = partOf.split("\\|");
 			String region = "";
 			for (String s : info) {
-				if (s.indexOf("=") != -1) {
+				if (s.contains("=")) {
 					if (!s.toLowerCase().contains("livello")) {
-						region = s.substring(s.indexOf("=") + 1, s.length()).trim();
+						region = s.substring(s.indexOf("=") + 1).trim();
 					}
 				}
 			}
 			return region;
 		}
 	}
-	
 }
