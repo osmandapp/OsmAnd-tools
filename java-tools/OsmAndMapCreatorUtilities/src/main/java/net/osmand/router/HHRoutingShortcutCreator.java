@@ -51,7 +51,7 @@ public class HHRoutingShortcutCreator {
 	private static HHRoutingPrepareContext prepareContext;
 	
 	private static boolean CLEAN;
-	private static int BATCH_SIZE = 500;
+	private static int BATCH_SIZE = 1000;
 	private static int THREAD_POOL = 2;
 
 	private static File sourceFile() {
