@@ -321,6 +321,7 @@ public class HHRoutingPreparationDB {
 		}
 		insSegment.executeBatch();
 		insGeometry.executeBatch();
+		conn.commit();
 	}
 	
 	public void loadGeometry(NetworkDBSegment segment, boolean reload) throws SQLException {

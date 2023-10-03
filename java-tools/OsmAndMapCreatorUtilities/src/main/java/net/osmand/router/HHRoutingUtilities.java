@@ -328,4 +328,11 @@ public class HHRoutingUtilities {
 		}
 		return b.toString();
 	}
+
+
+	public static void printGCInformation() {
+		System.gc();
+		long MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
+		System.out.printf("***** Memory used %d MB *****\n", MEMORY_LAST_USED_MB);		
+	}
 }

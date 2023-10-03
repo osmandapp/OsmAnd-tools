@@ -49,41 +49,35 @@ import net.osmand.util.MapUtils;
 // 1.5 BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
 // 1.6 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.7 BinaryRoutePlanner TODO test that routing time is different with on & off!
-
-// TODO Important try different recursive algorithm for road separation
+// TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 2nd phase - points selection
 // 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.2 Merge 1-2 points !! 
-// 2.3 Exclude & merge non exit islands (up to a limit)
-// 2.4 Play with Heuristics [MAX_VERT_DEPTH_LOOKUP, MAX_NEIGHBOORS_N_POINTS, ... ] to achieve Better points distribution:
-///    - Smaller edges (!)
-///    - Smaller nodes 
-///    - Max points in island = LIMIT = 50K (needs to be measured with Dijkstra randomly)
 
 // 3rd phase - Generate Planet ~4h (per profile)
 // 3.1 Calculate points in parallel (Planet)
-// 3.2 Make process rerunnable ? 
+// 3.2 Test process is rerunnable ?! 
+// 3.3 Optimize shortcut calculation process (local to use less memory) or calculate same time
 
-// 4 Introduce 3/4 level (test on Europe)
-// 4.1 Merge islands - Introduce 3rd level of points - FAIL
-// 4.2 Implement routing algorithm 2->3->4 - ?
-// 4.3 Introduce / reuse points that are center for many shortcuts to reduce edges N*N -> 2*n
-// 4.4 Optimize time / space comparing to 2nd level
+// *4* Introduce 3/4 level (if needed)!
+// 4.1 Merge islands (<=2) - FAILED merging islands > 3
+// 4.2 Implement midpoint algorithm - HARD to calculate midpoint level
+// 4.3 Implement CH algorithm - HARD to wait to finish CH
+// 4.4 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
 
 // 5th phase - complex routing / data
-// 5.1 Implement final routing algorithm including start / end segment search 
-// 5.2 Retrieve route details and turn information
-// 5.3 Save data structure optimally by access time
-// 5.4 Save data structure optimally by size
-// 5.5 Implement border crossing issue
+// 5.1! Final data structure optimal by size, access time
+// 5.2 Retrieve missing info for the route (route details / turn info)
+// 5.3 Implement final routing algorithm including start / end segment search 
+// 5.4 Implement border crossing issue
 
 // 6 Future
 // 6.1 Alternative routes (distribute initial points better)
 // 6.2 Avoid specific road
-// 6.3 Deprioritize or exclude roads
+// 6.3 Deprioritize or exclude roads (parameters)
 // 6.4 Live data (think about it)
 
-// TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
+
 
 public class HHRoutingSubGraphCreator {
 
@@ -118,11 +112,10 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 2;
-		DEBUG_LIMIT_START_OFFSET = 33000;
 		CLEAN = true;
 		
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Netherlands_europe_2.road.obf";
+//		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
 		return new File(System.getProperty("maps.dir"), name);

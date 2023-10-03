@@ -50,12 +50,13 @@ public class HHRoutingShortcutCreator {
 	
 	private static HHRoutingPrepareContext prepareContext;
 	
-	private static boolean CLEAN = true;
+	private static boolean CLEAN;
 	private static int BATCH_SIZE = 500;
 	private static int THREAD_POOL = 2;
 
 	private static File sourceFile() {
-		DEBUG_VERBOSE_LEVEL = 2;
+//		CLEAN = true;
+		DEBUG_VERBOSE_LEVEL = 1;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
@@ -86,7 +87,8 @@ public class HHRoutingShortcutCreator {
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
 		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
-		networkDB.loadNetworkSegments(pnts.valueCollection());
+		int segments = networkDB.loadNetworkSegments(pnts.valueCollection());
+		System.out.printf("Loaded %,d points, existing shortcuts %,d \n", pnts.size(), segments);
 		Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
 		saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		networkDB.close();
@@ -125,7 +127,6 @@ public class HHRoutingShortcutCreator {
 		@Override
 		public BuildNetworkShortcutResult call() throws Exception {
 			RoutingContext ctx = context.get();
-
 			ctx = prepareContext.gcMemoryLimitToUnloadAll(ctx, null, ctx == null);
 			context.set(ctx);
 			BuildNetworkShortcutResult res = new BuildNetworkShortcutResult();
@@ -147,9 +148,9 @@ public class HHRoutingShortcutCreator {
 					if (s == null) {
 						throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
 					}
-
 					HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
+					
 					for (RouteSegment t : result) {
 						NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
 								Math.min(t.getSegmentStart(), t.getSegmentEnd()),
@@ -168,6 +169,12 @@ public class HHRoutingShortcutCreator {
 						if (segment.dist < 0) {
 							throw new IllegalStateException(segment + " dist < " + segment.dist);
 						}
+					}
+					if (DEBUG_VERBOSE_LEVEL >= 2) {
+						logf("Run dijkstra %s: %.2f ms (calc %.2f ms, load %.2f ms)", s.toString(),
+								(System.nanoTime() - nt2) / 1e6,
+								ctx.calculationProgress.timeToCalculate / 1e6,
+								ctx.calculationProgress.timeToLoad / 1e6);
 					}
 					pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
 					res.points.add(pnt);
@@ -209,6 +216,7 @@ public class HHRoutingShortcutCreator {
 		List<Future<BuildNetworkShortcutResult>> results = new ArrayList<>();
 		List<NetworkDBPoint> batch = new ArrayList<>();
 		int taskId = 0;
+		int total = 0;
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
 			ind++;
 			if (pnt.connected.size() > 0) {
@@ -224,18 +232,21 @@ public class HHRoutingShortcutCreator {
 				break;
 			}
 			if (batch.size() == BATCH_SIZE) {
+				System.out.println("Schedule batch " + batch.size());
 				results.add(
 						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
+				total += batch.size();
 				batch = new ArrayList<>();
 			}
 		}
+		total += batch.size();
 		results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
-		logf("Scheduled %d tasks", taskId);
+		logf("Scheduled %d tasks, %d total points", taskId, total);
 		int maxDirectedPointsGraph = 0;
 		int maxFinalSegmentsFound = 0;
 		int totalFinalSegmentsFound = 0;
 		int totalVisitedDirectSegments = 0;
-		ind = 0;
+		ind = 1;
 		service.shutdown();
 		try {
 			while (!results.isEmpty()) {
@@ -293,7 +304,6 @@ public class HHRoutingShortcutCreator {
 
 	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegment s, TLongObjectMap<RouteSegment> segments)
 			throws InterruptedException, IOException {
-
 		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt1, pnt2);

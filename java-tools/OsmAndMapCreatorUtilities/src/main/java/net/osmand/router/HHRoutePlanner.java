@@ -297,6 +297,7 @@ public class HHRoutePlanner {
 		System.out.printf("Routing finished all %.1f ms: load data %.1f ms (%,d edges), all routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
 				(System.nanoTime() - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime,
 				stats.addQueueTime, stats.pollQueueTime, stats.prepTime);
+		HHRoutingUtilities.printGCInformation();
 		return objects;
 	}
 
