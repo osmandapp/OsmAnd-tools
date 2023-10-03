@@ -18,8 +18,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 public class CommonsWikimediaPreparation {
@@ -43,6 +45,7 @@ public class CommonsWikimediaPreparation {
         add("License_migration_completed");
         add("Assumed_own_work");
     }};
+    private Map<String, Long> categoryCashe = new HashMap<>();
 
     public static void main(String[] args) {
         String folder = "";
@@ -136,7 +139,7 @@ public class CommonsWikimediaPreparation {
         }
 
         public void finish() throws SQLException {
-            //log.info("Total accepted: " + count);
+            System.out.println("Create indexes");
             conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_depict_index on common_depict(id)");
             conn.createStatement().execute("CREATE INDEX IF NOT EXISTS qid_common_depict_index on common_depict(depict_qid)");
             conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_content on common_content(id)");
@@ -213,10 +216,10 @@ public class CommonsWikimediaPreparation {
                         }
 
                         try {
-                            String n = title.toString().replace("File: ", "");
-                            n = n.replace("Category: ", "");
+                            String n = title.toString().replace("File:", "");
+                            n = n.replace("Category:", "");
                             prepContent.setLong(1, Long.parseLong(id.toString()));
-                            prepContent.setString(2, title.toString());
+                            prepContent.setString(2, n);
                             prepContent.setInt(3, Integer.parseInt(nameSpace));
                             addBatch(prepContent, contentBatch);
 
@@ -281,6 +284,7 @@ public class CommonsWikimediaPreparation {
         private Connection conn;
         private PreparedStatement prepCategory;
         private PreparedStatement selectPrep;
+        private PreparedStatement selectCatPrep;
         private int[] categoryBatch = new int[]{0};
         public final static int BATCH_SIZE = 5000;
         private long cnt = 0;
@@ -288,10 +292,11 @@ public class CommonsWikimediaPreparation {
         CategoryLinksSqlHandler(File sqliteFile) throws SQLException {
             conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
             log.info("========= CREATE TABLE common_category_links =========");
-            conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_category_links(id long, category_name text)");
+            conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_category_links(id long, category_id long)");
             conn.createStatement().execute("DELETE FROM common_category_links");
-            prepCategory = conn.prepareStatement("INSERT INTO common_category_links(id, category_name) VALUES (?, ?)");
+            prepCategory = conn.prepareStatement("INSERT INTO common_category_links(id, category_id) VALUES (?, ?)");
             selectPrep = conn.prepareStatement("SELECT count(*) as cnt FROM common_content WHERE common_content.id=? AND common_content.ns=" + FILE_NAMESPACE);
+            selectCatPrep = conn.prepareStatement("SELECT common_content.id FROM common_content WHERE common_content.name=? AND common_content.ns=" + CATEGORY_NAMESPACE);
         }
 
         @Override
@@ -314,9 +319,23 @@ public class CommonsWikimediaPreparation {
                 }
                 selectPrep.clearParameters();
                 if (count > 0) {
-                    prepCategory.setLong(1, id);
-                    prepCategory.setString(2, catName);
-                    addBatch(prepCategory, categoryBatch);
+                    long catId = 0;
+                    if (categoryCashe.containsKey(catName)) {
+                        catId = categoryCashe.get(catName);
+                    } else {
+                        selectCatPrep.setString(1, catName);
+                        rs = selectCatPrep.executeQuery();
+                        if (rs.next()) {
+                            catId = rs.getLong(1);
+                            categoryCashe.put(catName, catId);
+                        }
+                        selectCatPrep.clearParameters();
+                    }
+                    if (catId > 0) {
+                        prepCategory.setLong(1, id);
+                        prepCategory.setLong(2, catId);
+                        addBatch(prepCategory, categoryBatch);
+                    }
                 }
             } catch (SQLException throwables) {
                 throwables.printStackTrace();
@@ -324,6 +343,9 @@ public class CommonsWikimediaPreparation {
             cnt++;
             if (cnt % 100000 == 0) {
                 System.out.println(cnt + " id:" + id + " cat:" + catName);
+            }
+            if (categoryCashe.size() > 1000) {
+                categoryCashe.clear();
             }
         }
 
@@ -338,8 +360,9 @@ public class CommonsWikimediaPreparation {
         }
 
         public void finish() throws SQLException {
+            System.out.println("Create indexes");
             conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_category_links_index on common_category_links(id)");
-            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS category_name_common_category_links on common_category_links(category_name)");
+            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS category_id_common_category_links on common_category_links(category_id)");
             prepCategory.executeBatch();
             if (!conn.getAutoCommit()) {
                 conn.commit();
