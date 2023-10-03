@@ -232,7 +232,6 @@ public class HHRoutingShortcutCreator {
 				break;
 			}
 			if (batch.size() == BATCH_SIZE) {
-				System.out.println("Schedule batch " + batch.size());
 				results.add(
 						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
 				total += batch.size();
