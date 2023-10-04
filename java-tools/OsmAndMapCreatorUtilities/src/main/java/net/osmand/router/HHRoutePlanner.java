@@ -253,7 +253,6 @@ public class HHRoutePlanner {
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
-			networkDB.loadMidPointsIndex(cachePoints, cachePoints.valueCollection(), false);
 			stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
 			System.out.printf(" %,d - %.2fms\n", cachePoints.size(), stats.loadPointsTime);
 			if (PRELOAD_SEGMENTS) {

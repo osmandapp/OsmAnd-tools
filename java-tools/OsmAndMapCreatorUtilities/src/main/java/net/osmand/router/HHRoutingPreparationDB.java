@@ -43,51 +43,52 @@ public class HHRoutingPreparationDB {
 
 	private final int BATCH_SIZE = 10000;
 	private int batchInsPoint = 0;
+
+	private boolean compactDB;
 	
 	
 	public HHRoutingPreparationDB(File file) throws SQLException {
 		
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
 		Statement st = conn.createStatement();
-		st.execute("CREATE TABLE IF NOT EXISTS points(idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31,  PRIMARY key (idPoint))"); // ind unique
-		st.execute("CREATE TABLE IF NOT EXISTS clusters(idPoint, indPoint, clusterInd, PRIMARY key (indPoint, clusterInd))");
-		st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, shortcut)");
-		st.execute("CREATE INDEX IF NOT EXISTS segmentsPntInd on segments(idPoint)");
-		st.execute("CREATE INDEX IF NOT EXISTS segmentsConnPntInd on segments(idConnPoint)");
-		st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, shortcut)");
+		compactDB = checkColumnExist(st, "ins", "segments");
+		if (!compactDB) {
+			st.execute(
+					"CREATE TABLE IF NOT EXISTS points(idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31,  PRIMARY key (idPoint))"); // ind
+																																					// unique
+			st.execute(
+					"CREATE TABLE IF NOT EXISTS clusters(idPoint, indPoint, clusterInd, PRIMARY key (indPoint, clusterInd))");
+			st.execute("CREATE TABLE IF NOT EXISTS segments(idPoint, idConnPoint, dist, shortcut)");
+			st.execute("CREATE INDEX IF NOT EXISTS segmentsPntInd on segments(idPoint)");
+			st.execute("CREATE INDEX IF NOT EXISTS segmentsConnPntInd on segments(idConnPoint)");
+			st.execute("CREATE TABLE IF NOT EXISTS geometry(idPoint, idConnPoint, geometry, shortcut)");
 
-		st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
-		st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
-		st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
-		st.execute("CREATE TABLE IF NOT EXISTS midpoints(ind, maxMidDepth, proc, PRIMARY key (ind))"); // ind unique
-		
-		// TODO start delete in the end update
-		if (!checkColumnExist(st, "chInd", "points")) {
-			st.execute("ALTER TABLE points add column chInd");
-		}
-		if (!checkColumnExist(st, "shortcut", "segments")) {
-			st.execute("ALTER TABLE segments add column shortcut");
-		}
-		if (!checkColumnExist(st, "shortcut", "geometry")) {
-			st.execute("ALTER TABLE geometry add column shortcut");
-		}
-		
-		st.execute("CREATE INDEX IF NOT EXISTS geometryMainInd on geometry(idPoint,idConnPoint,shortcut)");
-		
-		insPoint = conn.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
-						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
-		insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd) VALUES(?, ?, ?)");
-		
-		loadGeometry = conn.prepareStatement("SELECT geometry, shortcut FROM geometry WHERE idPoint = ? AND idConnPoint = ? ");
-		loadSegmentEnd = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idPoint = ?  ");
-		loadSegmentStart = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idConnPoint = ?  ");
+			st.execute(
+					"CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
+			st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
+			st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
+			st.execute("CREATE TABLE IF NOT EXISTS midpoints(ind, maxMidDepth, proc, PRIMARY key (ind))"); // ind unique
 
+			st.execute("CREATE INDEX IF NOT EXISTS geometryMainInd on geometry(idPoint,idConnPoint,shortcut)");
+
+			insPoint = conn
+					.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
+							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd) VALUES(?, ?, ?)");
+			loadGeometry = conn.prepareStatement("SELECT geometry, shortcut FROM geometry WHERE idPoint = ? AND idConnPoint = ? ");
+			loadSegmentEnd = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idPoint = ? ");
+			loadSegmentStart = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idConnPoint = ? ");
+		} else {
+			loadSegmentStart = conn.prepareStatement("SELECT id, ins, outs from segments where id = ?  ");
+		}
 		st.close();
 	}
 	
 	public static void main(String[] args) throws SQLException {
 		File f = new File(System.getProperty("maps.dir"), "__europe.hhdb");
 		File f2 = new File(System.getProperty("maps.dir"), "__europe.chdb");
+//		File f = new File(System.getProperty("maps.dir"), "Ukraine_europe.hhdb");
+//		File f2 = new File(System.getProperty("maps.dir"), "Ukraine_europe.chdb");
 		convert(DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), LOG), DBDialect.SQLITE.getDatabaseConnection(f2.getAbsolutePath(), LOG));
 		
 	}
@@ -133,15 +134,32 @@ public class HHRoutingPreparationDB {
 		while(q.next()) {
 			int conn = q.getInt(1);
 			bs.add(conn);
-			bs.add(Float.floatToIntBits(q.getFloat(2))); // distance
+			float dist = q.getFloat(2);
+			bs.add(Float.floatToIntBits(dist)); // distance
 			bs.add(q.getInt(3)); // shortcut
 		}
 		
 		byte[] bytes = new byte[bs.size() * 4];
-		for(int i = 0; i < bs.size(); i+=4) {
-			Algorithms.putIntToBytes(bytes, i, bs.get(i));
+		for (int i = 0; i < bs.size(); i ++) {
+			Algorithms.putIntToBytes(bytes, i * 4, bs.get(i));
 		}
 		return bytes;
+	}
+	
+	private List<NetworkDBSegment> parseSegments(byte[] bytes, TLongObjectHashMap<NetworkDBPoint> pntsById,
+			NetworkDBPoint pnt, boolean out) {
+		List<NetworkDBSegment> l = new ArrayList<>();
+		for (int i = 0; i < bytes.length; i += 12) {
+			int connId = Algorithms.parseIntFromBytes(bytes, i);
+			NetworkDBPoint pnt2 = pntsById.get(connId);
+			NetworkDBPoint start = out ? pnt : pnt2;
+			NetworkDBPoint end = out ? pnt2 : pnt;
+			float dist = Float.intBitsToFloat(Algorithms.parseIntFromBytes(bytes, i + 4));
+			NetworkDBSegment seg = new NetworkDBSegment(start, end, dist, out,
+					Algorithms.parseIntFromBytes(bytes, i + 8) > 0);
+			l.add(seg);
+		}
+		return l;
 	}
 
 	private boolean checkColumnExist(Statement st, String col, String table) throws SQLException {
@@ -188,7 +206,7 @@ public class HHRoutingPreparationDB {
 		PreparedStatement ps = conn.prepareStatement("UPDATE midpoints SET maxMidDepth = ?, proc = ? where ind = ?");
 		int batch = 0;
 		ResultSet rs = s.executeQuery("SELECT ind, maxMidDepth, proc  FROM midpoints ");
-		while(rs.next()) {
+		while (rs.next()) {
 			int ind = rs.getInt(1);
 			NetworkDBPoint pnt = pntsMap.get(ind);
 			boolean upd = false;
@@ -234,7 +252,8 @@ public class HHRoutingPreparationDB {
 	
 	public TLongObjectHashMap<NetworkDBPoint> getNetworkPoints(boolean byGeoId) throws SQLException {
 		Statement st = conn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31 from points");
+		String pntGeoIdCol = compactDB ? "pointGeoId, id": "idPoint, ind";
+		ResultSet rs = st.executeQuery("SELECT "+pntGeoIdCol+", chInd, roadId, start, end, sx31, sy31, ex31, ey31 from points");
 		TLongObjectHashMap<NetworkDBPoint> mp = new TLongObjectHashMap<>();
 		while (rs.next()) {
 			NetworkDBPoint pnt = new NetworkDBPoint();
@@ -387,35 +406,52 @@ public class HHRoutingPreparationDB {
 		if (!segment.geometry.isEmpty() && !reload) {
 			return;
 		}
+		if (compactDB) {
+			segment.geometry.add(segment.start.getPoint());
+			segment.geometry.add(segment.end.getPoint());
+			return;
+		}
 		segment.geometry.clear();
 		segment.geometry.addAll(parseGeometry(segment.start.index, segment.end.index, segment.shortcut));
 	}
 	
 	
-	public int loadNetworkSegmentPoint(TLongObjectHashMap<NetworkDBPoint> pntsById, NetworkDBPoint point, boolean reverse) throws SQLException {
+	public int loadNetworkSegmentPoint(TLongObjectHashMap<NetworkDBPoint> pntsById, NetworkDBPoint point,
+			boolean reverse) throws SQLException {
 		if (point.connected(reverse) != null) {
 			return 0;
 		}
-		List<NetworkDBSegment> l = new ArrayList<>();
-		@SuppressWarnings("resource")
-		PreparedStatement pre = reverse ? loadSegmentStart : loadSegmentEnd;
-		pre.setInt(1, point.index);
-		ResultSet rs = pre.executeQuery();
-		int x = 0;
-		while (rs.next()) {
-			x++;
-			NetworkDBPoint start = pntsById.get(rs.getLong(1));
-			NetworkDBPoint end = pntsById.get(rs.getLong(2));
-			double dist = rs.getDouble(3);
-			boolean shortcut = rs.getInt(4) > 0;
-			NetworkDBSegment rev = new NetworkDBSegment(start, end, dist, !reverse, shortcut);
-			l.add(rev);
+		int loadedSegs = 0;
+		if (compactDB) {
+			loadSegmentStart.setInt(1, point.index);
+			ResultSet rs = loadSegmentStart.executeQuery();
+			if (rs.next()) {
+				point.connectedSet(true, parseSegments(rs.getBytes(2), pntsById, point, false));
+				point.connectedSet(false, parseSegments(rs.getBytes(3), pntsById, point, true));
+			}
+		} else {
+			List<NetworkDBSegment> l = new ArrayList<>();
+			@SuppressWarnings("resource")
+			PreparedStatement pre = reverse ? loadSegmentStart : loadSegmentEnd;
+			pre.setInt(1, point.index);
+			ResultSet rs = pre.executeQuery();
+			while (rs.next()) {
+				loadedSegs++;
+				NetworkDBPoint start = pntsById.get(rs.getLong(1));
+				NetworkDBPoint end = pntsById.get(rs.getLong(2));
+				double dist = rs.getDouble(3);
+				boolean shortcut = rs.getInt(4) > 0;
+				NetworkDBSegment rev = new NetworkDBSegment(start, end, dist, !reverse, shortcut);
+				l.add(rev);
+			}
+			point.connectedSet(reverse, l);
+			rs.close();
 		}
-		point.connectedSet(reverse, l);
-		rs.close();
-		return x;
+		return loadedSegs;
 	}
 	
+	
+
 	public int loadNetworkSegments(Collection<NetworkDBPoint> points) throws SQLException {
 		return loadNetworkSegments(points, false);
 	}
