@@ -195,6 +195,8 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
+			System.out.println(nrouteRegion.region.getLeftLongitude() + " " + nrouteRegion.region.getRightLongitude()
+			+ " "  +nrouteRegion.region.getTopLatitude() + " " + nrouteRegion.region.getBottomLatitude());
 			if (nrouteRegion.region.getRightLongitude() - nrouteRegion.region.getLeftLongitude() > 160) {
 				if (routeRegion.getLength() < 1000) {
 					System.out.printf("Skip small region  %s - %d bytes\n", nrouteRegion.region.getName(),
