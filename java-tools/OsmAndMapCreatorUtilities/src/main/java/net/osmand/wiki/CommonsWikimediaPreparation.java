@@ -323,7 +323,7 @@ public class CommonsWikimediaPreparation {
                     if (categoryCashe.containsKey(catName)) {
                         catId = categoryCashe.get(catName);
                     } else {
-                        selectCatPrep.setString(1, catName.replace(" ", "_"));
+                        selectCatPrep.setString(1, catName.replace("_", " "));
                         rs = selectCatPrep.executeQuery();
                         if (rs.next()) {
                             catId = rs.getLong(1);
