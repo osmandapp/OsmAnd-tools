@@ -50,6 +50,7 @@ import net.osmand.util.MapUtils;
 // 1.6 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.7 BinaryRoutePlanner TODO test that routing time is different with on & off!
 // TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
+
 // 2nd phase - points selection
 // 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.2 Merge 1-2 points !! 
@@ -77,8 +78,6 @@ import net.osmand.util.MapUtils;
 // 6.3 Deprioritize or exclude roads (parameters)
 // 6.4 Live data (think about it)
 
-
-
 public class HHRoutingSubGraphCreator {
 
 	final static Log LOG = PlatformUtil.getLog(HHRoutingSubGraphCreator.class);
@@ -101,7 +100,7 @@ public class HHRoutingSubGraphCreator {
 
 	// TODO BUG maxflow 15 != 16 mincut: 0 (Lat 52.709446 Lon 6.1940145): Road (631875088) 
 	protected static LatLon[] EX = {
-//			EX6, EX7 
+//			EX6, EX7
 	}; 
 
 	int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 10000;
@@ -128,8 +127,6 @@ public class HHRoutingSubGraphCreator {
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
 				routingProfile = a.substring("--routing_profile=".length());
-			} else if (a.startsWith("--maxdepth=")) {
-//				BRIDGE_MAX_DEPTH = Integer.parseInt(a.substring("--maxdepth=".length()));
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			}
@@ -198,6 +195,14 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
+			if (nrouteRegion.region.getRightLongitude() - nrouteRegion.region.getLeftLongitude() > 160) {
+				if (routeRegion.getLength() < 1000) {
+					System.out.printf("Skip small region  %s - %d bytes\n", nrouteRegion.region.getName(),
+							routeRegion.getLength());
+					continue;
+				}
+				throw new IllegalStateException();
+			}
 			List<RouteSubregion> regions = reader.searchRouteIndexTree(
 					BinaryMapIndexReader.buildSearchRequest(
 							MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude() - 1),

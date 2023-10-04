@@ -137,6 +137,7 @@ public class HHRoutePlanner {
 		int loadEdgesCnt;
 		double loadEdgesTime = 0;
 		double routingTime = 0;
+		double searchPointsTime = 0;
 		double addQueueTime = 0;
 		double pollQueueTime = 0;
 		double prepTime = 0;
@@ -283,7 +284,7 @@ public class HHRoutePlanner {
 				endPnt = pnt;
 			}
 		}
-		
+		stats.searchPointsTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
 		System.out.printf("Looking for route %s -> %s \n", startPnt, endPnt);
 		System.out.printf("Routing...\n");
@@ -294,9 +295,10 @@ public class HHRoutePlanner {
 		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
 		System.out.println(c.toString(start, end));
-		System.out.printf("Routing finished all %.1f ms: load data %.1f ms (%,d edges), all routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
-				(System.nanoTime() - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime,
-				stats.addQueueTime, stats.pollQueueTime, stats.prepTime);
+		System.out.printf("Routing finished all %.1f ms: pnts %.1f ms, load data %.1f ms (%,d edges), routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
+				(System.nanoTime() - startTime) / 1e6, stats.searchPointsTime,
+				stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime, stats.addQueueTime,
+				stats.pollQueueTime, stats.prepTime);
 		HHRoutingUtilities.printGCInformation();
 		return objects;
 	}
