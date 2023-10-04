@@ -195,11 +195,11 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
-			System.out.println(nrouteRegion.region.getLeftLongitude() + " " + nrouteRegion.region.getRightLongitude()
-			+ " "  +nrouteRegion.region.getTopLatitude() + " " + nrouteRegion.region.getBottomLatitude());
-			if (nrouteRegion.region.getRightLongitude() - nrouteRegion.region.getLeftLongitude() > 160) {
+			System.out.println("Region bbox (l,t - r,b): " + nrouteRegion.region.getLeftLongitude() + ", " + nrouteRegion.region.getTopLatitude() + " x " + nrouteRegion.region.getRightLongitude()
+					+ ", " + nrouteRegion.region.getBottomLatitude());
+			if (nrouteRegion.region.getLeftLongitude() > nrouteRegion.region.getRightLongitude()) {
 				if (routeRegion.getLength() < 1000) {
-					System.out.printf("Skip small region  %s - %d bytes\n", nrouteRegion.region.getName(),
+					System.out.printf("Skip region  %s - %d bytes\n", nrouteRegion.region.getName(),
 							routeRegion.getLength());
 					continue;
 				}
@@ -207,10 +207,10 @@ public class HHRoutingSubGraphCreator {
 			}
 			List<RouteSubregion> regions = reader.searchRouteIndexTree(
 					BinaryMapIndexReader.buildSearchRequest(
-							MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude() - 1),
-							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude() + 1),
-							MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude() + 1),
-							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude() - 1), 16, null),
+							MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude()),
+							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude()),
+							MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude()),
+							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude()), 16, null),
 					routeRegion.getSubregions());
 
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
