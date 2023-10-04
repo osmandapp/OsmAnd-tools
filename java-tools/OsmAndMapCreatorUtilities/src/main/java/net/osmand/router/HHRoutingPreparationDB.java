@@ -43,7 +43,8 @@ public class HHRoutingPreparationDB {
 
 	private final int BATCH_SIZE = 10000;
 	private int batchInsPoint = 0;
-
+	
+	
 	public HHRoutingPreparationDB(File file) throws SQLException {
 		
 		this.conn = DBDialect.SQLITE.getDatabaseConnection(file.getAbsolutePath(), LOG);
@@ -82,6 +83,65 @@ public class HHRoutingPreparationDB {
 		loadSegmentStart = conn.prepareStatement("SELECT idPoint, idConnPoint, dist, shortcut from segments where idConnPoint = ?  ");
 
 		st.close();
+	}
+	
+	public static void main(String[] args) throws SQLException {
+		File f = new File(System.getProperty("maps.dir"), "__europe.hhdb");
+		File f2 = new File(System.getProperty("maps.dir"), "__europe.chdb");
+		convert(DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), LOG), DBDialect.SQLITE.getDatabaseConnection(f2.getAbsolutePath(), LOG));
+		
+	}
+
+	private static void convert(Connection src, Connection tgt) throws SQLException {
+		Statement st = tgt.createStatement();
+		st.execute("CREATE TABLE IF NOT EXISTS points(pointGeoId, id, chInd, roadId, start, end, sx31, sy31, ex31, ey31,  PRIMARY key (id))"); // ind unique
+		st.execute("CREATE TABLE IF NOT EXISTS segments(id, ins, outs, PRIMARY key (id))");
+		
+		PreparedStatement pIns = tgt.prepareStatement("INSERT INTO points(pointGeoId, id, chInd, roadId, start, end, sx31, sy31, ex31, ey31)  "
+				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+		ResultSet rs = src.createStatement().executeQuery(" select idPoint, ind, chInd, roadId, start, end, sx31, sy31, ex31, ey31 from points");
+		TIntArrayList ids = new TIntArrayList();
+		while(rs.next()) {
+			ids.add(rs.getInt(2));
+			for(int i = 0; i < 10; i++) {
+				pIns.setObject(i + 1, rs.getObject(i + 1));
+			}
+			pIns.addBatch();
+		}
+		pIns.executeBatch();
+		PreparedStatement sIns = tgt.prepareStatement("INSERT INTO segments(id, ins, outs)  VALUES (?, ?, ?)");
+		PreparedStatement selOut = src.prepareStatement(" select idConnPoint, dist, shortcut from segments where idPoint = ?");
+		PreparedStatement selIn = src.prepareStatement(" select idPoint, dist, shortcut from segments where idConnPoint = ?");
+		for (int id : ids.toArray()) {
+			selIn.setInt(1, id);
+			selOut.setInt(1, id);
+			sIns.setInt(1, id);
+			sIns.setBytes(2, prepareSegments(selIn));
+			sIns.setBytes(3, prepareSegments(selOut));
+			sIns.addBatch();
+		}
+		
+		sIns.executeBatch();
+		
+		tgt.close();
+		
+	}
+
+	private static byte[] prepareSegments(PreparedStatement selIn) throws SQLException {
+		TIntArrayList bs = new TIntArrayList();
+		ResultSet q = selIn.executeQuery();
+		while(q.next()) {
+			int conn = q.getInt(1);
+			bs.add(conn);
+			bs.add(Float.floatToIntBits(q.getFloat(2))); // distance
+			bs.add(q.getInt(3)); // shortcut
+		}
+		
+		byte[] bytes = new byte[bs.size() * 4];
+		for(int i = 0; i < bs.size(); i+=4) {
+			Algorithms.putIntToBytes(bytes, i, bs.get(i));
+		}
+		return bytes;
 	}
 
 	private boolean checkColumnExist(Statement st, String col, String table) throws SQLException {
