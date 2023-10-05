@@ -1,10 +1,13 @@
 package net.osmand.router;
 
+import static net.osmand.router.HHRoutingUtilities.calculateRoutePointInternalId;
+
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -14,9 +17,14 @@ import java.util.Queue;
 import java.util.TreeMap;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.TLongSet;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
+import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
+import net.osmand.router.BinaryRoutePlanner.RouteSegment;
+import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -39,7 +47,8 @@ public class HHRoutePlanner {
 	
 	private RoutingContext ctx;
 	private HHRoutingPreparationDB networkDB;
-	private TLongObjectHashMap<NetworkDBPoint> cachePoints; 
+	private TLongObjectHashMap<NetworkDBPoint> cachePoints;
+	private TLongObjectHashMap<RouteSegment> cacheBoundaries; 
 	
 	public HHRoutePlanner(RoutingContext ctx, HHRoutingPreparationDB networkDB) {
 		this.ctx = ctx;
@@ -237,7 +246,7 @@ public class HHRoutePlanner {
 		return router.buildRoutingContext(config, null, new BinaryMapIndexReader[0], RouteCalculationMode.NORMAL);
 	}
 
-	public Collection<Entity> runRouting(LatLon start, LatLon end, DijkstraConfig c) throws SQLException, IOException {
+	public Collection<Entity> runRouting(LatLon start, LatLon end, DijkstraConfig c) throws SQLException, IOException, InterruptedException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		if (c == null) {
@@ -253,6 +262,7 @@ public class HHRoutePlanner {
 		System.out.print("Loading points... ");
 		if (cachePoints == null) {
 			cachePoints = networkDB.getNetworkPoints(false);
+			cacheBoundaries = new TLongObjectHashMap<RouteSegment>(); 
 			stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
 			System.out.printf(" %,d - %.2fms\n", cachePoints.size(), stats.loadPointsTime);
 			if (PRELOAD_SEGMENTS) {
@@ -267,27 +277,21 @@ public class HHRoutePlanner {
 					p.markSegmentsNotLoaded();
 				}
 			}
+			for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
+				cacheBoundaries.put(pnt.pntGeoId, null);
+			}
 		}
-		
-		NetworkDBPoint startPnt = null;
-		NetworkDBPoint endPnt = null;
 		for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
 			pnt.clearRouting();
-			if (startPnt == null) {
-				startPnt = endPnt = pnt;
-			}
-			if (MapUtils.getDistance(start, pnt.getPoint()) < MapUtils.getDistance(start, startPnt.getPoint())) {
-				startPnt = pnt;
-			}
-			if (MapUtils.getDistance(end, pnt.getPoint()) < MapUtils.getDistance(end, endPnt.getPoint())) {
-				endPnt = pnt;
-			}
 		}
+		List<NetworkDBPoint> stPoints = initStart(start, true, false);
+		List<NetworkDBPoint> endPoints = initStart(end, true, true);
+
 		stats.searchPointsTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
-		System.out.printf("Looking for route %s -> %s \n", startPnt, endPnt);
+		System.out.printf("Looking for route %s -> %s \n", start, end);
 		System.out.printf("Routing...\n");
-		NetworkDBPoint pnt = runDijkstraNetworkRouting(startPnt, endPnt, c, stats);
+		NetworkDBPoint pnt = runDijkstraNetworkRouting(stPoints, endPoints, start, end, c, stats);
 		stats.routingTime = (System.nanoTime() - time) / 1e6;
 		
 		time = System.nanoTime();
@@ -302,11 +306,59 @@ public class HHRoutePlanner {
 		return objects;
 	}
 
-	private double distanceToEnd(NetworkDBPoint s, NetworkDBPoint end) {
+	private List<NetworkDBPoint> initStart(LatLon start, boolean simple, boolean reverse) throws IOException, InterruptedException {
+		if (simple) {
+			NetworkDBPoint st = null;
+			for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
+				if (st == null) {
+					st = pnt;
+				}
+				if (MapUtils.getDistance(start, pnt.getPoint()) < MapUtils.getDistance(start, st.getPoint())) {
+					st = pnt;
+				}
+			}
+			if (st == null) {
+				Collections.emptyList();
+			}
+			return Collections.singletonList(st);
+		}
+		RoutePlannerFrontEnd planner = new RoutePlannerFrontEnd();
+		RouteSegmentPoint s = planner.findRouteSegment(start.getLatitude(), start.getLongitude(), ctx, null);
+		if (s == null) {
+			return Collections.emptyList();
+		}
+		// TODO implement dijkstra for reverse end 
+		ctx.config.planRoadDirection = 1;
+		ctx.config.heuristicCoefficient = 0; // dijkstra
+		ctx.unloadAllData(); // needed for proper multidijsktra work
+		ctx.calculationProgress = new RouteCalculationProgress();
+		ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
+		ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd());
+
+		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
+				null, null, cacheBoundaries);
+
+		List<NetworkDBPoint> pnts = new ArrayList<>();
+		if (frs != null) {
+			TLongSet set = new TLongHashSet();
+			for (RouteSegment o : frs.all) {
+				// duplicates are possible as alternative routes
+				long pntId = calculateRoutePointInternalId(o);
+				if (set.add(pntId)) {
+					NetworkDBPoint pnt = cachePoints.get(pntId);
+					pnt.setCostParentRt(reverse, o.getDistanceFromStart(), null, 0);
+					pnt.setCostDetailedParentRt(reverse, o);
+				}
+			}
+		}
+		return pnts;
+	}
+
+	private double distanceToEnd(NetworkDBPoint s, LatLon end) {
 		if(end == null || s == null) {
 			return 0;
 		}
-		LatLon p1 = end.getPoint();
+		LatLon p1 = end;
 		LatLon p2 = s.getPoint();
 		return MapUtils.getDistance(p1, p2) / ctx.getRouter().getMaxSpeed();
 	}
@@ -325,6 +377,14 @@ public class HHRoutePlanner {
 	
 	protected NetworkDBPoint runDijkstraNetworkRouting(NetworkDBPoint start, NetworkDBPoint end, DijkstraConfig c,
 			RoutingStats stats) throws SQLException {
+		return runDijkstraNetworkRouting(start == null ? Collections.emptyList() : Collections.singletonList(start),
+				end == null ? Collections.emptyList() : Collections.singletonList(end),
+				start == null ? null : start.getPoint(), end == null ? null : end.getPoint(), c, stats);
+	}
+	
+	protected NetworkDBPoint runDijkstraNetworkRouting(Collection<NetworkDBPoint> starts, Collection<NetworkDBPoint> ends,
+			LatLon startLatLon, LatLon endLatLon, DijkstraConfig c,
+			RoutingStats stats) throws SQLException {
 		Queue<NetworkDBPointCost> queue = new PriorityQueue<>(new Comparator<NetworkDBPointCost>() {
 			@Override
 			public int compare(NetworkDBPointCost o1, NetworkDBPointCost o2) {
@@ -332,20 +392,24 @@ public class HHRoutePlanner {
 			}
 		});
 		// TODO revert 2 queues to fail fast in 1 direction
-		if (start != null) {
-			start.setCostParentRt(false, 0.00001, null, 0);
+		for (NetworkDBPoint start : starts) {
+			if (start.rtCost(false) <= 0) {
+				start.setCostParentRt(false, 0.00001, null, 0);
+			}
 			start.rtVisited = true;
 			c.visited.add(start);
 			if (c.DIJKSTRA_DIRECTION >= 0) {
-				addToQueue(queue, start, end, false, c, stats);
+				addToQueue(queue, start, endLatLon, false, c, stats);
 			} 
 		}
-		if (end != null) {
-			end.setCostParentRt(true, 0.00001, null, 0);
+		for (NetworkDBPoint end : ends) {
+			if (end.rtCost(false) <= 0) {
+				end.setCostParentRt(true, 0.00001, null, 0);
+			}
 			end.rtVisitedRev = true;
 			c.visitedRev.add(end);
 			if (c.DIJKSTRA_DIRECTION <= 0) {
-				addToQueue(queue, end, start, true, c, stats);
+				addToQueue(queue, end, startLatLon, true, c, stats);
 			}
 		}
 		
@@ -389,7 +453,7 @@ public class HHRoutePlanner {
 			if (c.MAX_SETTLE_POINTS > 0 && (rev ? c.visitedRev : c.visited).size() > c.MAX_SETTLE_POINTS) {
 				break;
 			}
-			addToQueue(queue, point, rev ? start : end, rev, c, stats);
+			addToQueue(queue, point, rev ? startLatLon : endLatLon, rev, c, stats);
 		}			
 		return null;
 		
@@ -407,7 +471,7 @@ public class HHRoutePlanner {
 		return finalPoint;
 	}
 	
-	private void addToQueue(Queue<NetworkDBPointCost> queue, NetworkDBPoint point, NetworkDBPoint target, boolean reverse, 
+	private void addToQueue(Queue<NetworkDBPointCost> queue, NetworkDBPoint point, LatLon target, boolean reverse, 
 			DijkstraConfig c, RoutingStats stats) throws SQLException {
 		int depth = c.USE_MIDPOINT || c.MAX_DEPTH > 0 ? point.getDepth(!reverse) : 0;
 		if (c.MAX_DEPTH > 0 && depth >= c.MAX_DEPTH) {

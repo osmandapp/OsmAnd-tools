@@ -322,7 +322,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		String[] hhProfiles = { "car", "bicycle", "pedestrian" };
 		for (String hhProfile : hhProfiles) {
 			if (getHHFile(hhProfile).exists()) {
-				Action hhRoute = new AbstractAction("Build HH Car route") {
+				Action hhRoute = new AbstractAction("Build HH " + hhProfile + " route") {
 					private static final long serialVersionUID = 8049712829806139142L;
 
 					@Override
@@ -966,7 +966,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			if (hhPlanner == null) {
 				File hhFile = getHHFile(profile);
 				final RoutingContext ctx = prepareRoutingContext(null, profile, RouteCalculationMode.NORMAL,
-						new BinaryMapIndexReader[0], new RoutePlannerFrontEnd());
+						DataExtractionSettings.getSettings().getObfReaders(), //new BinaryMapIndexReader[0], 
+						new RoutePlannerFrontEnd());
 				hhPlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
 			}
 

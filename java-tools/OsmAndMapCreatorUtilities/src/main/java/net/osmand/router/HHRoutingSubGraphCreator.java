@@ -53,12 +53,11 @@ import net.osmand.util.MapUtils;
 
 // 2nd phase - points selection
 // 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 2.2 Merge 1-2 points !! 
+// 2.2 Merge 1-2 points ! 
 
-// 3rd phase - Generate Planet ~4h (per profile)
+// 3rd phase - Generate Planet ~6-12h (per profile?)
 // 3.1 Calculate points in parallel (Planet)
-// 3.2 Test process is rerunnable ?! 
-// 3.3 Optimize shortcut calculation process (local to use less memory) or calculate same time
+// 3.2 Optimize shortcut calculation process (local to use less memory) or calculate same time as points
 
 // *4* Introduce 3/4 level (if needed)!
 // 4.1 Merge islands (<=2) - FAILED merging islands > 3
@@ -67,10 +66,10 @@ import net.osmand.util.MapUtils;
 // 4.4 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
 
 // 5th phase - complex routing / data
-// 5.1! Final data structure optimal by size, access time
+// 5.1! Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
 // 5.2 Retrieve missing info for the route (route details / turn info)
 // 5.3 Implement final routing algorithm including start / end segment search 
-// 5.4 Implement border crossing issue
+// 5.4 Implement border crossing issue on client
 
 // 6 Future
 // 6.1 Alternative routes (distribute initial points better)

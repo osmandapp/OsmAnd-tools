@@ -698,13 +698,15 @@ public class HHRoutingPreparationDB {
 		double rtDistanceFromStart;
 		double rtDistanceToEnd;
 		double rtCost;
+		RouteSegment rtDetailedRoute;
 		
 		int rtDepthRev = -1;
 		NetworkDBPoint rtRouteToPointRev;
+		boolean rtVisitedRev;
 		double rtDistanceFromStartRev;
 		double rtDistanceToEndRev;
 		double rtCostRev;
-		boolean rtVisitedRev;
+		RouteSegment rtDetailedRouteRev;
 		
 		// exclude from routing
 		boolean rtExclude;
@@ -772,6 +774,14 @@ public class HHRoutingPreparationDB {
 				rtDistanceFromStart = (point == null ? 0 : point.rtDistanceFromStart) + segmentDist;
 			}
 		}
+		
+		public void setCostDetailedParentRt(boolean reverse, RouteSegment r) {
+			if (reverse) {
+				rtDetailedRouteRev = r;
+			} else {
+				rtDetailedRoute = r;
+			}
+		}
 
 
 		public void markSegmentsNotLoaded() {
@@ -813,6 +823,7 @@ public class HHRoutingPreparationDB {
 			rtDistanceToEnd = 0;
 			rtCost = 0;
 			rtVisited = false;
+			rtDetailedRoute = null;
 			
 			rtDepthRev = -1;
 			rtRouteToPointRev = null;
@@ -820,6 +831,7 @@ public class HHRoutingPreparationDB {
 			rtDistanceToEndRev = 0;
 			rtCostRev = 0;
 			rtVisitedRev = false;
+			rtDetailedRouteRev = null;
 		}
 
 		public int getDepth(boolean dir) {
