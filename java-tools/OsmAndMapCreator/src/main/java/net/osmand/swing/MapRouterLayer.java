@@ -121,7 +121,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private GPXFile selectedGPXFile;
 	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
 	
-	private HHRoutePlanner hhPlanner;
+	private Map<String, HHRoutePlanner> hhPlanners = new LinkedHashMap<>();
 
 	private List<RouteSegmentResult> previousRoute;
 	public ActionListener setStartActionListener = new ActionListener(){
@@ -963,15 +963,18 @@ public class MapRouterLayer implements MapPanelLayer {
 	
 	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute, String profile) {
 		try {
-			if (hhPlanner == null) {
+			HHRoutePlanner hhRoutePlanner = hhPlanners.get(profile);
+			if (hhRoutePlanner == null) {
 				File hhFile = getHHFile(profile);
 				final RoutingContext ctx = prepareRoutingContext(null, profile, RouteCalculationMode.NORMAL,
 						DataExtractionSettings.getSettings().getObfReaders(), //new BinaryMapIndexReader[0], 
 						new RoutePlannerFrontEnd());
-				hhPlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
+				
+				hhRoutePlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
+				hhPlanners.put(profile, hhRoutePlanner);
 			}
 
-			return hhPlanner.runRouting(startRoute, endRoute, null);
+			return hhRoutePlanner.runRouting(startRoute, endRoute, null);
 		} catch (Exception e) {
 			ExceptionHandler.handle(e);
 			return new ArrayList<>();
