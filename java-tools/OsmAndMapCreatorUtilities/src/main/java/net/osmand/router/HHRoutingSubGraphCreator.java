@@ -132,7 +132,7 @@ public class HHRoutingSubGraphCreator {
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName();
+		String name = obfFile.getCanonicalFile().getName() + "_" + routingProfile;
 
 		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
 		if (CLEAN && dbFile.exists()) {
