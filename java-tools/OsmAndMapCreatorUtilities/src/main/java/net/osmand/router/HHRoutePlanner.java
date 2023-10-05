@@ -257,7 +257,7 @@ public class HHRoutePlanner {
 			c = DijkstraConfig.astar(1);
 //			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
-			DEBUG_VERBOSE_LEVEL = 2;
+			DEBUG_VERBOSE_LEVEL = 0;
 		}
 		System.out.println(c.toString(start, end));
 		System.out.print("Loading points... ");
@@ -280,14 +280,21 @@ public class HHRoutePlanner {
 				}
 			}
 			for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
-				cacheBoundaries.put(pnt.pntGeoId, null);
-				cachePointsByGeo.put(pnt.pntGeoId, pnt);
+				long pos = calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end);
+				long neg = calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start);
+				if (pos != pnt.pntGeoId && neg != pnt.pntGeoId) {
+					throw new IllegalStateException();
+				}
+				cacheBoundaries.put(pos, null);
+				cacheBoundaries.put(neg, null);
+				cachePointsByGeo.put(pos, pnt);
+				cachePointsByGeo.put(neg, pnt);
 			}
 		}
 		for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
 			pnt.clearRouting();
 		}
-		List<NetworkDBPoint> stPoints = initStart(c, start, end, true, false);
+		List<NetworkDBPoint> stPoints = initStart(c, start, end, false, false);
 		List<NetworkDBPoint> endPoints = initStart(c, end, start, true, true);
 
 		stats.searchPointsTime = (System.nanoTime() - time) / 1e6;
@@ -309,8 +316,8 @@ public class HHRoutePlanner {
 		return objects;
 	}
 
-	private List<NetworkDBPoint> initStart(DijkstraConfig c, 
-			LatLon start, LatLon e, boolean simple, boolean reverse) throws IOException, InterruptedException {
+	private List<NetworkDBPoint> initStart(DijkstraConfig c, LatLon start, LatLon e, boolean simple, boolean reverse)
+			throws IOException, InterruptedException {
 		if (simple) {
 			NetworkDBPoint st = null;
 			for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
@@ -349,7 +356,6 @@ public class HHRoutePlanner {
 				// duplicates are possible as alternative routes
 				long pntId = calculateRoutePointInternalId(o);
 				if (set.add(pntId)) {
-					System.out.println(pntId);
 					NetworkDBPoint pnt = cachePointsByGeo.get(pntId);
 					pnt.setCostParentRt(reverse, o.getDistanceFromStart() + distanceToEnd(c, reverse, pnt, e), null,
 							o.getDistanceFromStart());
@@ -542,7 +548,6 @@ public class HHRoutePlanner {
 
 	private Collection<Entity> prepareRoutingResults(HHRoutingPreparationDB networkDB, NetworkDBPoint pnt,
 			TLongObjectHashMap<Entity> entities, RoutingStats stats) throws SQLException {
-		System.out.println("-----");
 		LinkedList<NetworkDBSegment> segments = new LinkedList<>();
 		if (pnt != null) {
 			NetworkDBPoint itPnt = pnt;
@@ -562,6 +567,13 @@ public class HHRoutePlanner {
 				segments.addFirst(segment);
 				HHRoutingUtilities.addWay(entities, segment, "highway", "secondary");
 				itPnt = nextPnt;
+			}
+			if (itPnt.rtDetailedRoute != null) {
+				RouteSegment p = itPnt.rtDetailedRoute;
+				while (p != null && p.getRoad() != null) {
+					HHRoutingUtilities.addWay(entities, p, "highway", "secondary");
+					p = p.parentRoute;
+				}
 			}
 		}
 		

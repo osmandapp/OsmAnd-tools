@@ -33,7 +33,7 @@ import net.osmand.util.MapUtils;
 
 public class HHRoutingUtilities {
 	static long DEBUG_OSM_ID = -1;
-	private static final int ROUTE_POINTS = 11;
+	static final int ROUTE_POINTS = 11;
 	
 	
 	static LatLon getPoint(RouteSegment r) {
@@ -103,6 +103,23 @@ public class HHRoutingUtilities {
 		if (!segment.geometry.isEmpty()) {
 			osmObjects.put(w.getId(), w);
 		}
+	}
+	
+	static void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment segment, String tag, String value) {
+		Way w = new Way(DEBUG_OSM_ID--);
+		w.putTag("name", String.format("%d -> %d %.1f", segment.getSegmentStart(), segment.getSegmentEnd(), segment.getDistanceFromStart()));
+		int i = segment.getSegmentStart();
+		boolean pos = segment.getSegmentStart() < segment.getSegmentEnd();
+		while (true) {
+			int x = segment.getRoad().getPoint31XTile(i);
+			int y = segment.getRoad().getPoint31YTile(i);
+			w.addNode(new Node(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x), DEBUG_OSM_ID--));
+			if (i == segment.getSegmentEnd()) {
+				break;
+			}
+			i += pos ? 1 : -1;
+		}
+		osmObjects.put(w.getId(), w);
 	}
 
 	static void addNode(TLongObjectHashMap<Entity> osmObjects, NetworkDBPoint pnt, LatLon l, String tag, String val) {
