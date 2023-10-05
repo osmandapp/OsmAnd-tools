@@ -106,9 +106,6 @@ public class MapRouterLayer implements MapPanelLayer {
 	private static final double ANGLE_TO_DECLINE = 15;
 
 	private static boolean TEST_INTERMEDIATE_POINTS = false;
-	private static final String FILE_MAPS_B_HH = "Maps_bicycle.hhdb";
-	private static final String FILE_MAPS_C_HH = "Maps_car.hhdb";
-	private static final String FILE_MAPS_P_HH = "Maps_pedestrian.hhdb";
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -143,6 +140,9 @@ public class MapRouterLayer implements MapPanelLayer {
 	private boolean gpx = false;
 
 
+	private File getHHFile(String profile) {
+		return new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "Maps_"+profile+".hhdb");
+	}
 
 
 	@Override
@@ -319,47 +319,22 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(selfBaseRoute);
-		
-		if(new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_C_HH).exists()) {
-			Action hhRoute = new AbstractAction("Build HH Car route") {
-				private static final long serialVersionUID = 8049712829806139142L;
+		String[] hhProfiles = { "car", "bicycle", "pedestrian" };
+		for (String hhProfile : hhProfiles) {
+			if (getHHFile(hhProfile).exists()) {
+				Action hhRoute = new AbstractAction("Build HH Car route") {
+					private static final long serialVersionUID = 8049712829806139142L;
 
-				@Override
-				public void actionPerformed(ActionEvent e) {
-					previousRoute = null;
-					calcRoute(null, FILE_MAPS_C_HH);
-				}
-			};
-			directions.add(hhRoute);			
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						previousRoute = null;
+						calcRoute(null, hhProfile);
+					}
+				};
+				directions.add(hhRoute);
+			}
 		}
 		
-		if(new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_P_HH).exists()) {
-			Action hhRoute = new AbstractAction("Build HH Pedestrian route") {
-				private static final long serialVersionUID = 8049712829806139142L;
-
-				@Override
-				public void actionPerformed(ActionEvent e) {
-					previousRoute = null;
-					calcRoute(null, FILE_MAPS_P_HH);
-				}
-			};
-			directions.add(hhRoute);			
-		}
-		
-		if(new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_B_HH).exists()) {
-			Action hhRoute = new AbstractAction("Build HH Bicycle route") {
-				private static final long serialVersionUID = 8049712829806139142L;
-
-				@Override
-				public void actionPerformed(ActionEvent e) {
-					previousRoute = null;
-					calcRoute(null, FILE_MAPS_B_HH);
-				}
-			};
-			directions.add(hhRoute);			
-		}
-		
-
 		if (selectedGPXFile != null) {
 			Action recalculate = new AbstractAction("Calculate GPX route (OsmAnd)") {
 				private static final long serialVersionUID = 507156107455281238L;
@@ -986,11 +961,11 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	
-	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute, String hhFileN) {
+	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute, String profile) {
 		try {
 			if (hhPlanner == null) {
-				File hhFile = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), hhFileN);
-				final RoutingContext ctx = prepareRoutingContext(null, RouteCalculationMode.NORMAL,
+				File hhFile = getHHFile(profile);
+				final RoutingContext ctx = prepareRoutingContext(null, profile, RouteCalculationMode.NORMAL,
 						new BinaryMapIndexReader[0], new RoutePlannerFrontEnd());
 				hhPlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
 			}
@@ -1039,7 +1014,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				// precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
 				// precalculatedRouteDirection.setFollowNext(true);
 				
-				final RoutingContext ctx = prepareRoutingContext(previousRoute, rm, files, router);
+				final RoutingContext ctx = prepareRoutingContext(previousRoute, DataExtractionSettings.getSettings().getRouteMode(), rm, files, router);
 				final DataTileManager<Entity> points = map.getPoints();
 				map.setPoints(points);
 				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
@@ -1082,10 +1057,9 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 
-	private RoutingContext prepareRoutingContext(List<RouteSegmentResult> previousRoute, RouteCalculationMode rm,
+	private RoutingContext prepareRoutingContext(List<RouteSegmentResult> previousRoute, String routeMode, RouteCalculationMode rm,
 			BinaryMapIndexReader[] files, RoutePlannerFrontEnd router) throws IOException {
-		String m = DataExtractionSettings.getSettings().getRouteMode();
-		String[] props = m.split("\\,");
+		String[] props = routeMode.split("\\,");
 
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		for (String p : props) {
