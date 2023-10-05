@@ -219,6 +219,10 @@ public class HHRoutingShortcutCreator {
 		List<NetworkDBPoint> batch = new ArrayList<>();
 		int taskId = 0;
 		int total = 0;
+		int batchSize = BATCH_SIZE;
+		if (networkPoints.size() / THREAD_POOL < batchSize) {
+			batchSize = networkPoints.size() / THREAD_POOL + 1;
+		}
 		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
 			ind++;
 			if (pnt.connected.size() > 0) {
@@ -233,7 +237,7 @@ public class HHRoutingShortcutCreator {
 			if (ind > DEBUG_LIMIT_PROCESS && DEBUG_LIMIT_PROCESS != -1) {
 				break;
 			}
-			if (batch.size() == BATCH_SIZE) {
+			if (batch.size() == batchSize) {
 				results.add(
 						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
 				total += batch.size();
