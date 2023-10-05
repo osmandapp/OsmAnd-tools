@@ -78,7 +78,7 @@ public class HHRoutingShortcutCreator {
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName();
+		String name = obfFile.getCanonicalFile().getName() + "_" + routingProfile;
 		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
 		if (CLEAN && dbFile.exists()) {
@@ -92,6 +92,8 @@ public class HHRoutingShortcutCreator {
 		Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
 		saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		networkDB.close();
+		HHRoutingPreparationDB.compact(new File(folder, name + HHRoutingPreparationDB.EXT),
+				new File(folder, name + HHRoutingPreparationDB.CEXT));
 	}
 
 	

@@ -29,6 +29,7 @@ public class HHRoutingPreparationDB {
 	private static final Log LOG = PlatformUtil.getLog(HHRoutingPreparationDB.class);
 
 	public static final String EXT = ".hhdb";
+	public static final String CEXT = ".chdb";
 
 	private static final int XY_SHORTCUT_GEOM = 0;
 
@@ -84,16 +85,23 @@ public class HHRoutingPreparationDB {
 		st.close();
 	}
 	
+	private static String testFile() {
+		String name ="";
+		name = "__europe";
+		name = "Ukraine_europe";
+		return name;
+	}
+	
 	public static void main(String[] args) throws SQLException {
-		File f = new File(System.getProperty("maps.dir"), "__europe.hhdb");
-		File f2 = new File(System.getProperty("maps.dir"), "__europe.chdb");
-//		File f = new File(System.getProperty("maps.dir"), "Ukraine_europe.hhdb");
-//		File f2 = new File(System.getProperty("maps.dir"), "Ukraine_europe.chdb");
-		convert(DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), LOG), DBDialect.SQLITE.getDatabaseConnection(f2.getAbsolutePath(), LOG));
-		
+		String nameFile = args.length == 0 ? args[0] : System.getProperty("maps.dir") + testFile();
+		File source = new File(nameFile + EXT);
+		File target = new File(nameFile + CEXT);
+		compact(source, target);
 	}
 
-	private static void convert(Connection src, Connection tgt) throws SQLException {
+	public static void compact(File source , File target) throws SQLException {
+		Connection src = DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG);
+		Connection tgt = DBDialect.SQLITE.getDatabaseConnection(target.getAbsolutePath(), LOG);
 		Statement st = tgt.createStatement();
 		st.execute("CREATE TABLE IF NOT EXISTS points(pointGeoId, id, chInd, roadId, start, end, sx31, sy31, ex31, ey31,  PRIMARY key (id))"); // ind unique
 		st.execute("CREATE TABLE IF NOT EXISTS segments(id, ins, outs, PRIMARY key (id))");
