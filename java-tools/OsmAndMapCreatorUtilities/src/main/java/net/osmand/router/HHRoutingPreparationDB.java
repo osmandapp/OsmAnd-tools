@@ -428,7 +428,9 @@ public class HHRoutingPreparationDB {
 			if (rs.next()) {
 				point.connectedSet(true, parseSegments(rs.getBytes(2), pntsById, point, false));
 				point.connectedSet(false, parseSegments(rs.getBytes(3), pntsById, point, true));
+				return point.connected(true).size() + point.connected(false).size();
 			}
+			return 0;
 		} else {
 			List<NetworkDBSegment> l = new ArrayList<>();
 			@SuppressWarnings("resource")
@@ -686,11 +688,13 @@ public class HHRoutingPreparationDB {
 		NetworkDBPoint rtRouteToPoint;
 		boolean rtVisited;
 		double rtDistanceFromStart;
+		double rtDistanceToEnd;
 		double rtCost;
 		
 		int rtDepthRev = -1;
 		NetworkDBPoint rtRouteToPointRev;
 		double rtDistanceFromStartRev;
+		double rtDistanceToEndRev;
 		double rtCostRev;
 		boolean rtVisitedRev;
 		
@@ -711,6 +715,18 @@ public class HHRoutingPreparationDB {
 		
 		public double distanceFromStart(boolean rev) {
 			return rev ? rtDistanceFromStartRev : rtDistanceFromStart ;
+		}
+		
+		public double distanceToEnd(boolean rev) {
+			return rev ? rtDistanceToEndRev : rtDistanceToEnd ;
+		}
+		
+		public void setDistanceToEnd(boolean rev, double segmentDist) {
+			if (rev) {
+				rtDistanceToEndRev = segmentDist;
+			} else {
+				rtDistanceToEnd = segmentDist;
+			}
 		}
 		
 		public double rtCost(boolean rev) {
@@ -786,12 +802,14 @@ public class HHRoutingPreparationDB {
 			rtDepth = -1;
 			rtRouteToPoint = null;
 			rtDistanceFromStart = 0;
+			rtDistanceToEnd = 0;
 			rtCost = 0;
 			rtVisited = false;
 			
 			rtDepthRev = -1;
 			rtRouteToPointRev = null;
 			rtDistanceFromStartRev = 0;
+			rtDistanceToEndRev = 0;
 			rtCostRev = 0;
 			rtVisitedRev = false;
 		}

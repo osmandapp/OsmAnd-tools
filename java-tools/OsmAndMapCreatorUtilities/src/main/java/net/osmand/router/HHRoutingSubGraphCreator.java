@@ -638,19 +638,19 @@ public class HHRoutingSubGraphCreator {
 		TLongIntHashMap borderPntsCluster = new TLongIntHashMap();
 		TIntIntHashMap pntsDistr = new TIntIntHashMap();
 		TIntIntHashMap edgesDistr = new TIntIntHashMap();
-		int edges;
+		long edges;
 		int isolatedIslands = 0;
 		int toMergeIslands = 0;
 		int shortcuts = 0;
 		
 
-		public void printStatsNetworks(int totalPoints, int clusterSize) {
+		public void printStatsNetworks(long totalPoints, int clusterSize) {
 			int borderPointsSize = borderPntsCluster.size();
 			TIntIntHashMap borderClusterDistr = new TIntIntHashMap();
 			for (int a : this.borderPntsCluster.values()) {
 				borderClusterDistr.adjustOrPutValue(a, 1, 1);
 			}
-			logf("RESULT %,d points (%,d edges) -> %d border points, %d clusters + %d isolated + %d to merge, %d est shortcuts (%s edges distr) \n",
+			logf("RESULT %,d points (%,d edges) -> %,d border points, %,d clusters + %,d isolated + %d to merge, %,d est shortcuts (%s edges distr) \n",
 					totalPoints + borderPointsSize, edges / 2, borderPointsSize, clusterSize - isolatedIslands - toMergeIslands,
 					isolatedIslands, toMergeIslands, shortcuts, distrString(edgesDistr, ""));
 
@@ -707,8 +707,8 @@ public class HHRoutingSubGraphCreator {
 			this.networkDB = networkDB;
 		}
 
-		public int getTotalPoints() {
-			int totalPoints = 0;
+		public long getTotalPoints() {
+			long totalPoints = 0;
 			for (NetworkRouteRegion r : routeRegions) {
 				totalPoints += r.getPoints();
 			}

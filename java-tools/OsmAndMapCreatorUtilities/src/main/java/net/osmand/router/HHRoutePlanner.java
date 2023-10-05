@@ -409,16 +409,14 @@ public class HHRoutePlanner {
 	
 	private void addToQueue(Queue<NetworkDBPointCost> queue, NetworkDBPoint point, NetworkDBPoint target, boolean reverse, 
 			DijkstraConfig c, RoutingStats stats) throws SQLException {
-		int depth = c.USE_MIDPOINT || c.MAX_DEPTH > 0? point.getDepth(!reverse) : 0;
+		int depth = c.USE_MIDPOINT || c.MAX_DEPTH > 0 ? point.getDepth(!reverse) : 0;
 		if (c.MAX_DEPTH > 0 && depth >= c.MAX_DEPTH) {
 			return;
 		}
 		long tm = System.nanoTime();
 		int cnt = networkDB.loadNetworkSegmentPoint(cachePoints, point, reverse);
-		if (cnt > 0) {
-			stats.loadEdgesCnt += cnt;
-			stats.loadEdgesTime += (System.nanoTime() - tm) / 1e6;
-		}
+		stats.loadEdgesCnt += cnt;
+		stats.loadEdgesTime += (System.nanoTime() - tm) / 1e6;
 		for (NetworkDBSegment connected : point.connected(reverse)) {
 			NetworkDBPoint nextPoint = reverse ? connected.start : connected.end;
 			if (!c.USE_CH && !c.USE_CH_SHORTCUTS && connected.shortcut) {
@@ -436,7 +434,12 @@ public class HHRoutePlanner {
 			}
 			double cost = point.distanceFromStart(reverse) + connected.dist;
 			if (c.HEURISTIC_COEFFICIENT > 0) {
-				cost += c.HEURISTIC_COEFFICIENT * distanceToEnd(nextPoint, target);
+				double distanceToEnd = nextPoint.distanceToEnd(reverse);
+				if (distanceToEnd == 0) {
+					distanceToEnd = c.HEURISTIC_COEFFICIENT * distanceToEnd(nextPoint, target);
+					nextPoint.setDistanceToEnd(reverse, distanceToEnd);
+				}
+				cost += distanceToEnd;
 			}
 			double exCost = nextPoint.rtCost(reverse);
 			if (exCost == 0 || cost < exCost) {
