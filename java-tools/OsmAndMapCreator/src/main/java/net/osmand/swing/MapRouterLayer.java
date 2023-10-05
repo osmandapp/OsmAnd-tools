@@ -388,7 +388,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					calcRoute(RouteCalculationMode.NORMAL,false);
+					calcRoute(RouteCalculationMode.NORMAL, null);
 				}
 			};
 			directions.add(recalculate);
