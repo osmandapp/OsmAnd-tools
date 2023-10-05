@@ -483,7 +483,15 @@ public class BinaryInspector {
 			println("Binary OsmAnd index " + fileName + " was not found.");
 			return;
 		}
-		printFileInformation(file);
+		if (file.isDirectory()) {
+			for(File f : file.listFiles()) {
+				if(f.getName().endsWith(".obf")) {
+					printFileInformation(f);		
+				}
+			}
+		} else {
+			printFileInformation(file);
+		}
 	}
 
 	public void printFileInformation(File file) throws IOException {
