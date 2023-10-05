@@ -106,7 +106,9 @@ public class MapRouterLayer implements MapPanelLayer {
 	private static final double ANGLE_TO_DECLINE = 15;
 
 	private static boolean TEST_INTERMEDIATE_POINTS = false;
-	private static final String FILE_MAPS_HH = "Maps.hhdb";
+	private static final String FILE_MAPS_B_HH = "Maps_bicycle.hhdb";
+	private static final String FILE_MAPS_C_HH = "Maps_car.hhdb";
+	private static final String FILE_MAPS_P_HH = "Maps_pedestrian.hhdb";
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -290,7 +292,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(RouteCalculationMode.COMPLEX, false);
+				calcRoute(RouteCalculationMode.COMPLEX, null);
 			}
 		};
 		directions.add(complexRoute);
@@ -302,7 +304,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(RouteCalculationMode.NORMAL, false);
+				calcRoute(RouteCalculationMode.NORMAL, null);
 			}
 		};
 		directions.add(selfRoute);
@@ -313,19 +315,45 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(RouteCalculationMode.BASE, false);
+				calcRoute(RouteCalculationMode.BASE, null);
 			}
 		};
 		directions.add(selfBaseRoute);
 		
-		if(new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_HH).exists()) {
-			Action hhRoute = new AbstractAction("Build HH route") {
+		if(new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_C_HH).exists()) {
+			Action hhRoute = new AbstractAction("Build HH Car route") {
 				private static final long serialVersionUID = 8049712829806139142L;
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					previousRoute = null;
-					calcRoute(null, true);
+					calcRoute(null, FILE_MAPS_C_HH);
+				}
+			};
+			directions.add(hhRoute);			
+		}
+		
+		if(new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_P_HH).exists()) {
+			Action hhRoute = new AbstractAction("Build HH Pedestrian route") {
+				private static final long serialVersionUID = 8049712829806139142L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					previousRoute = null;
+					calcRoute(null, FILE_MAPS_P_HH);
+				}
+			};
+			directions.add(hhRoute);			
+		}
+		
+		if(new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_B_HH).exists()) {
+			Action hhRoute = new AbstractAction("Build HH Bicycle route") {
+				private static final long serialVersionUID = 8049712829806139142L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					previousRoute = null;
+					calcRoute(null, FILE_MAPS_B_HH);
 				}
 			};
 			directions.add(hhRoute);			
@@ -791,12 +819,12 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 
-	private void calcRoute(final RouteCalculationMode m, boolean hh) {
+	private void calcRoute(final RouteCalculationMode m, String hh) {
 		new Thread() {
 			@Override
 			public void run() {
 				map.setPoints(new DataTileManager<Entity>(11));
-				Collection<Entity> res = hh ?  hhRoute(startRoute, endRoute) : 
+				Collection<Entity> res = hh != null ?  hhRoute(startRoute, endRoute, hh) : 
 						selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
 				if (res != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
@@ -958,10 +986,10 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	
-	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute) {
+	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute, String hhFileN) {
 		try {
 			if (hhPlanner == null) {
-				File hhFile = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), FILE_MAPS_HH);
+				File hhFile = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), hhFileN);
 				final RoutingContext ctx = prepareRoutingContext(null, RouteCalculationMode.NORMAL,
 						new BinaryMapIndexReader[0], new RoutePlannerFrontEnd());
 				hhPlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
