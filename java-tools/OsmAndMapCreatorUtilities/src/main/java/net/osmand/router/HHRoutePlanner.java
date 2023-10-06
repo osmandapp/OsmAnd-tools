@@ -133,10 +133,8 @@ public class HHRoutePlanner {
 		}
 		
 		public String toString(LatLon start, LatLon end) {
-			return String.format("Routing %s -> %s (HC %d, dir %d) : midpoint %s, error %d, max %d", 
-					start == null ? "?" : start.toString() , end == null ? "?" :  end.toString(),
-					(int) HEURISTIC_COEFFICIENT, (int) DIJKSTRA_DIRECTION,
-					USE_MIDPOINT +"", MIDPOINT_ERROR, MIDPOINT_MAX_DEPTH);
+			return String.format("Routing %s -> %s (HC %d, dir %d)", start == null ? "?" : start.toString(),
+					end == null ? "?" : end.toString(), (int) HEURISTIC_COEFFICIENT, (int) DIJKSTRA_DIRECTION);
 		}
 	}
 	
@@ -321,6 +319,10 @@ public class HHRoutePlanner {
 		HHNetworkRouteRes route = prepareRoutingResults(networkDB, pnt, stats);
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
 		System.out.println(c.toString(start, end));
+		if (CALCULATE_GEOMETRY && route.detailed != null) {
+			route.detailed = new RouteResultPreparation().prepareResult(ctx, route.detailed, false);
+			RouteResultPreparation.printResults(ctx, start, end, route.detailed);
+		}
 		System.out.printf("Routing finished all %.1f ms: last mile %.1f ms, load data %.1f ms (%,d edges), routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
 				(System.nanoTime() - startTime) / 1e6, stats.searchPointsTime,
 				stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime, stats.addQueueTime,
@@ -570,7 +572,7 @@ public class HHRoutePlanner {
 	
 	public static class HHNetworkRouteRes {
 		public List<HHNetworkSegmentRes> segments = new ArrayList<>();
-		public List<RouteSegment> detailed = new ArrayList<>();
+		public List<RouteSegmentResult> detailed = new ArrayList<>();
 	}
 
 	
@@ -661,7 +663,7 @@ public class HHRoutePlanner {
 		}
 		
 		double sumDist = 0;
-		RouteSegment last = null;
+		RouteSegmentResult last = null;
 		
 		// TODO holes
 		for (HHNetworkSegmentRes res : route.segments) {
@@ -669,28 +671,32 @@ public class HHRoutePlanner {
 			if (res.list != null) {
 				for (RouteSegment r : res.list) {
 					if (last == null) {
-						last = r;
+						last = new RouteSegmentResult(r.getRoad(), r.getSegmentStart(), r.getSegmentEnd());
 					} else {
-						if (last.getRoad().getId() == r.getRoad().getId()) {
-							if(last.getSegmentEnd() == r.getSegmentStart()) {
-								last = new RouteSegment(last.getRoad(), last.getSegmentStart(), r.getSegmentEnd());
-							} else if(last.getSegmentEnd() == r.getSegmentEnd()) {
-								last = new RouteSegment(last.getRoad(), last.getSegmentStart(), r.getSegmentStart());
+						if (last.getObject().getId() == r.getRoad().getId()) {
+							if(last.getEndPointIndex() == r.getSegmentStart()) {
+								last = new RouteSegmentResult(last.getObject(), last.getStartPointIndex(), r.getSegmentEnd());
+							} else if(last.getEndPointIndex() == r.getSegmentEnd()) {
+								last = new RouteSegmentResult(last.getObject(), last.getStartPointIndex(), r.getSegmentStart());
 							} else {
-								int maxLast = Math.max(last.getSegmentEnd(), last.getSegmentStart());
+								int maxLast = Math.max(last.getEndPointIndex(), last.getStartPointIndex());
 								int maxR = Math.max(r.getSegmentEnd(), r.getSegmentStart());
-								int minLast = Math.min(last.getSegmentEnd(), last.getSegmentStart());
+								int minLast = Math.min(last.getEndPointIndex(), last.getStartPointIndex());
 								int minR = Math.min(r.getSegmentEnd(), r.getSegmentStart());
 								boolean pos = maxLast < maxR;
 								if (pos && minR - maxLast <= 1) {
-									last = new RouteSegment(last.getRoad(), minLast, maxR );
+									last = new RouteSegmentResult(last.getObject(), minLast, maxR );
 								} else if (!pos && minLast - maxR <= 1) {
-									last = new RouteSegment(last.getRoad(), maxLast, minR);
+									last = new RouteSegmentResult(last.getObject(), maxLast, minR);
 								} else {
-									if (last.getRoad().getPoint31XTile(last.getSegmentEnd()) == r.getRoad().getPoint31XTile(r.getSegmentStart())
-											&& last.getRoad().getPoint31YTile(last.getSegmentEnd()) == r.getRoad().getPoint31YTile(r.getSegmentStart())) {
+									if (last.getObject().getPoint31XTile(last.getEndPointIndex()) == r.getRoad().getPoint31XTile(r.getSegmentStart())
+											&& last.getObject().getPoint31YTile(last.getEndPointIndex()) == r.getRoad().getPoint31YTile(r.getSegmentStart())) {
 										route.detailed.add(last);
-										last = r;
+										last = new RouteSegmentResult(r.getRoad(), r.getSegmentStart(), r.getSegmentEnd());
+									} else if (last.getObject().getPoint31XTile(last.getEndPointIndex()) == r.getRoad().getPoint31XTile(r.getSegmentEnd())
+											&& last.getObject().getPoint31YTile(last.getEndPointIndex()) == r.getRoad().getPoint31YTile(r.getSegmentEnd())) {
+										route.detailed.add(last);
+										last = new RouteSegmentResult(r.getRoad(), r.getSegmentEnd(), r.getSegmentStart());
 									} else {
 										throw new IllegalStateException(
 												String.format("Problematic merge %s -> %s", last, r));
@@ -699,7 +705,7 @@ public class HHRoutePlanner {
 							}
 						} else {
 							route.detailed.add(last);
-							last = r;
+							last = new RouteSegmentResult(r.getRoad(), r.getSegmentStart(), r.getSegmentEnd());
 						}
 					}
 				}
@@ -717,6 +723,8 @@ public class HHRoutePlanner {
 		if (last != null) {
 			route.detailed.add(last);
 		}
+
+		
 		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d (%,d unique) of %,d added vertices )", 
 				sumDist, route.segments.size(), stats.visitedVertices, stats.uniqueVisitedVertices, stats.addedVertices));
 		return route;

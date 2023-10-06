@@ -87,13 +87,12 @@ public class HHRoutingPreparationDB {
 	
 	private static String testFile() {
 		String name ="";
-		name = "__europe";
-		name = "Ukraine_europe";
+		name = "__europe_car";
 		return name;
 	}
 	
 	public static void main(String[] args) throws SQLException {
-		String nameFile = args.length == 0 ? args[0] : System.getProperty("maps.dir") + testFile();
+		String nameFile = args.length > 0 ? args[0] : System.getProperty("maps.dir") + testFile();
 		File source = new File(nameFile + EXT);
 		File target = new File(nameFile + CEXT);
 		compact(source, target);

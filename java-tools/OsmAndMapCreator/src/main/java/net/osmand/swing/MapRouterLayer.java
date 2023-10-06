@@ -982,9 +982,9 @@ public class MapRouterLayer implements MapPanelLayer {
 			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
 			TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
 			if(detailed) {
-				for (RouteSegment rs : route.detailed) {
-					HHRoutingUtilities.addWay(entities, rs, "highway", "secondary");
-				}
+				List<Entity> lst = new ArrayList<Entity>();
+				calculateResult(lst, route.detailed);
+				return lst;
 			} else {
 				for (HHNetworkSegmentRes r : route.segments) {
 					if (r.list != null) {
