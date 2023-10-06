@@ -662,6 +662,8 @@ public class HHRoutePlanner {
 		
 		double sumDist = 0;
 		RouteSegment last = null;
+		
+		// TODO holes
 		for (HHNetworkSegmentRes res : route.segments) {
 			NetworkDBSegment s = res.segment;
 			if (res.list != null) {
@@ -685,10 +687,14 @@ public class HHRoutePlanner {
 								} else if (!pos && minLast - maxR <= 1) {
 									last = new RouteSegment(last.getRoad(), maxLast, minR);
 								} else {
-									System.out.println(route.detailed);
-									System.out.println(last);
-									System.out.println(r);
-									throw new IllegalStateException("Problem");
+									if (last.getRoad().getPoint31XTile(last.getSegmentEnd()) == r.getRoad().getPoint31XTile(r.getSegmentStart())
+											&& last.getRoad().getPoint31YTile(last.getSegmentEnd()) == r.getRoad().getPoint31YTile(r.getSegmentStart())) {
+										route.detailed.add(last);
+										last = r;
+									} else {
+										throw new IllegalStateException(
+												String.format("Problematic merge %s -> %s", last, r));
+									}
 								}
 							}
 						} else {
@@ -708,7 +714,7 @@ public class HHRoutePlanner {
 					MapUtils.get31LatitudeY(s.end.startY), MapUtils.get31LongitudeX(s.end.startX), s.end.roadId / 64,
 					sumDist);
 		}
-		if(last != null) {
+		if (last != null) {
 			route.detailed.add(last);
 		}
 		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d (%,d unique) of %,d added vertices )", 
