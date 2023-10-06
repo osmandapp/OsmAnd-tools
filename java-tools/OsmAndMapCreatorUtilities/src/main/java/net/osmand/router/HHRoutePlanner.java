@@ -670,25 +670,25 @@ public class HHRoutePlanner {
 						last = r;
 					} else {
 						if (last.getRoad().getId() == r.getRoad().getId()) {
-							
 							if(last.getSegmentEnd() == r.getSegmentStart()) {
 								last = new RouteSegment(last.getRoad(), last.getSegmentStart(), r.getSegmentEnd());
 							} else if(last.getSegmentEnd() == r.getSegmentEnd()) {
 								last = new RouteSegment(last.getRoad(), last.getSegmentStart(), r.getSegmentStart());
 							} else {
-								boolean pos = Math.max(last.getSegmentEnd(), last.getSegmentStart()) < Math.max(r.getSegmentEnd(), r.getSegmentStart());
-								int max = Math.max(Math.max(last.getSegmentEnd(), last.getSegmentStart()),
-										Math.max(r.getSegmentEnd(), r.getSegmentStart()));
-								int min = Math.min(Math.min(last.getSegmentEnd(), last.getSegmentStart()),
-										Math.min(r.getSegmentEnd(), r.getSegmentStart()));
-								// TODO FIXME 2 is correct but it fails
-								if (max - min <= 12) {
-									last = new RouteSegment(last.getRoad(), pos ? min : max, pos ? max : min);
+								int maxLast = Math.max(last.getSegmentEnd(), last.getSegmentStart());
+								int maxR = Math.max(r.getSegmentEnd(), r.getSegmentStart());
+								int minLast = Math.min(last.getSegmentEnd(), last.getSegmentStart());
+								int minR = Math.min(r.getSegmentEnd(), r.getSegmentStart());
+								boolean pos = maxLast < maxR;
+								if (pos && minR - maxLast <= 1) {
+									last = new RouteSegment(last.getRoad(), minLast, maxR );
+								} else if (!pos && minLast - maxR <= 1) {
+									last = new RouteSegment(last.getRoad(), maxLast, minR);
 								} else {
 									System.out.println(route.detailed);
 									System.out.println(last);
 									System.out.println(r);
-									throw new IllegalStateException();
+									throw new IllegalStateException("Problem");
 								}
 							}
 						} else {

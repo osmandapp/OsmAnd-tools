@@ -52,6 +52,7 @@ import net.osmand.util.MapUtils;
 // 1.7 BinaryRoutePlanner TODO failing tests
 // 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.9 TODO revert 2 queues to fail fast in 1 direction
+// 1.1 !!!TODO FIXME 2 is correct but it fails
 
 // 2nd SERVER: phase - points selection / Planet ~6-12h per profile
 // 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
