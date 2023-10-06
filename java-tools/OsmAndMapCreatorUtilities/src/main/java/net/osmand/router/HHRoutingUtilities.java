@@ -26,6 +26,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
+import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
@@ -94,20 +95,21 @@ public class HHRoutingUtilities {
 		osmObjects.put(calculateRoutePointInternalId(s), w);
 	}
 	
-	static void addWay(TLongObjectHashMap<Entity> osmObjects, NetworkDBSegment segment, String tag, String value) {
+	public static void addWay(TLongObjectHashMap<Entity> osmObjects, NetworkDBSegment segment, String tag, String value) {
+		if (segment.geometry.isEmpty()) {
+			return;
+		}
 		Way w = new Way(DEBUG_OSM_ID--);
 		w.putTag("name", String.format("%d -> %d %.1f", segment.start.index, segment.end.index, segment.dist));
 		for (LatLon l : segment.geometry) {
 			w.addNode(new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--));
 		}
-		if (!segment.geometry.isEmpty()) {
-			osmObjects.put(w.getId(), w);
-		}
+		osmObjects.put(w.getId(), w);
 	}
 	
-	static void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment segment, String tag, String value) {
+	public static void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment segment, String tag, String value) {
 		Way w = new Way(DEBUG_OSM_ID--);
-		w.putTag("name", String.format("%d -> %d %.1f", segment.getSegmentStart(), segment.getSegmentEnd(), segment.getDistanceFromStart()));
+		// w.putTag("name", String.format("%d -> %d %.1f", segment.getSegmentStart(), segment.getSegmentEnd(), segment.getDistanceFromStart()));
 		int i = segment.getSegmentStart();
 		boolean pos = segment.getSegmentStart() < segment.getSegmentEnd();
 		while (true) {
@@ -351,5 +353,19 @@ public class HHRoutingUtilities {
 		System.gc();
 		long MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 		System.out.printf("***** Memory used %d MB *****\n", MEMORY_LAST_USED_MB);		
+	}
+
+
+	public static RouteSegmentPoint loadPoint(RoutingContext ctx, NetworkDBPoint pnt) {
+		RouteSegment s;
+		s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
+		while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
+				|| s.getSegmentEnd() != pnt.end)) {
+			s = s.getNext();
+		}
+		if (s == null) {
+			throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
+		}
+		return new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), s.getSegmentEnd(), 0);
 	}
 }

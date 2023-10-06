@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -22,6 +21,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
+import net.osmand.router.BinaryRoutePlanner.FinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
@@ -36,6 +36,7 @@ public class HHRoutePlanner {
 	static String ROUTING_PROFILE = "car";
 	static int DEBUG_VERBOSE_LEVEL = 0;
 	static boolean USE_LAST_MILE_ROUTING = true;
+	static boolean CALCULATE_GEOMETRY = true;
 	
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
@@ -228,8 +229,18 @@ public class HHRoutePlanner {
 		HHRoutePlanner planner = new HHRoutePlanner(prepareContext(ROUTING_PROFILE), 
 				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT)));
 		if (PROCESS == PROC_ROUTING) {
-			Collection<Entity> objects = planner.runRouting(PROCESS_START, PROCESS_END, c);
-			HHRoutingUtilities.saveOsmFile(objects, new File(folder, name + "-rt.osm"));
+			HHNetworkRouteRes route = planner.runRouting(PROCESS_START, PROCESS_END, c);
+			TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+			for (HHNetworkSegmentRes r : route.segments) {
+				if (r.list != null) {
+					for (RouteSegment rs : r.list) {
+						HHRoutingUtilities.addWay(entities, rs, "highway", "secondary");
+					}
+				} else if (r.segment != null) {
+					HHRoutingUtilities.addWay(entities, r.segment, "highway", "primary");
+				}
+			}
+			HHRoutingUtilities.saveOsmFile(entities.valueCollection(), new File(folder, name + "-rt.osm"));
 		}
 		planner.networkDB.close();
 	}
@@ -248,7 +259,7 @@ public class HHRoutePlanner {
 		return router.buildRoutingContext(config, null, new BinaryMapIndexReader[0], RouteCalculationMode.NORMAL);
 	}
 
-	public Collection<Entity> runRouting(LatLon start, LatLon end, DijkstraConfig c) throws SQLException, IOException, InterruptedException {
+	public HHNetworkRouteRes runRouting(LatLon start, LatLon end, DijkstraConfig c) throws SQLException, IOException, InterruptedException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		if (c == null) {
@@ -307,7 +318,7 @@ public class HHRoutePlanner {
 		stats.routingTime = (System.nanoTime() - time) / 1e6;
 		
 		time = System.nanoTime();
-		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
+		HHNetworkRouteRes route = prepareRoutingResults(networkDB, pnt, stats);
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
 		System.out.println(c.toString(start, end));
 		System.out.printf("Routing finished all %.1f ms: last mile %.1f ms, load data %.1f ms (%,d edges), routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
@@ -315,7 +326,7 @@ public class HHRoutePlanner {
 				stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime, stats.addQueueTime,
 				stats.pollQueueTime, stats.prepTime);
 		HHRoutingUtilities.printGCInformation();
-		return objects;
+		return route;
 	}
 
 	private List<NetworkDBPoint> initStart(DijkstraConfig c, LatLon p, LatLon e, boolean simple, boolean reverse)
@@ -351,10 +362,9 @@ public class HHRoutePlanner {
 			ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
 			ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd());
 		}
-
-		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, 
+		
+		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx,
 				reverse ? null : s, reverse ? s : null, null, cacheBoundaries);
-
 		List<NetworkDBPoint> pnts = new ArrayList<>();
 		if (frs != null) {
 			TLongSet set = new TLongHashSet();
@@ -549,58 +559,161 @@ public class HHRoutePlanner {
 					MapUtils.get31LatitudeY(p.startY), MapUtils.get31LongitudeX(p.startX), p.roadId / 64);
 		}
 	}
+	
+	public static class HHNetworkSegmentRes {
+		public NetworkDBSegment segment;
+		public List<RouteSegment> list = null;
+		public HHNetworkSegmentRes(NetworkDBSegment s) {
+			segment = s;
+		}
+	}
+	
+	public static class HHNetworkRouteRes {
+		public List<HHNetworkSegmentRes> segments = new ArrayList<>();
+		public List<RouteSegment> detailed = new ArrayList<>();
+	}
+
+	
+	private HHNetworkSegmentRes runDetailedRouting(HHNetworkSegmentRes res) throws InterruptedException, IOException {
+		BinaryRoutePlanner planner = new BinaryRoutePlanner();
+		NetworkDBSegment segment = res.segment;
+		ctx.config.planRoadDirection = 0; // A* bidirectional
+		ctx.config.heuristicCoefficient = 1; 
+		ctx.unloadAllData(); // needed for proper multidijsktra work
+		RouteSegmentPoint start = HHRoutingUtilities.loadPoint(ctx, segment.start);
+		RouteSegmentPoint end = HHRoutingUtilities.loadPoint(ctx, segment.end);
+		ctx.startX = start.getRoad().getPoint31XTile(start.getSegmentStart(), start.getSegmentEnd());
+		ctx.startY = start.getRoad().getPoint31YTile(start.getSegmentStart(), start.getSegmentEnd());
+		ctx.targetX = end.getRoad().getPoint31XTile(end.getSegmentStart(), end.getSegmentEnd());
+		ctx.targetY = end.getRoad().getPoint31YTile(end.getSegmentStart(), end.getSegmentEnd());
+		// TODO use cache boundaries to speed up
+		FinalRouteSegment f = planner.searchRouteInternal(ctx, start, end, null, null);
+		res.list = new ArrayList<>();
+		RouteSegment p = f.opposite;
+		while (p != null && p.getRoad() != null) {
+			res.list.add(p);
+			p = p.parentRoute;
+		}
+		Collections.reverse(res.list);
+
+		p = f;
+		while (p != null && p.getRoad() != null) {
+			res.list.add(p);
+			p = p.parentRoute;
+		}
+		Collections.reverse(res.list);
+		return res;
+	}
+	
+	
 
 
-
-	private Collection<Entity> prepareRoutingResults(HHRoutingPreparationDB networkDB, NetworkDBPoint pnt,
-			TLongObjectHashMap<Entity> entities, RoutingStats stats) throws SQLException {
-		LinkedList<NetworkDBSegment> segments = new LinkedList<>();
+	private HHNetworkRouteRes prepareRoutingResults(HHRoutingPreparationDB networkDB, NetworkDBPoint pnt, RoutingStats stats) throws SQLException, InterruptedException, IOException {
+		HHNetworkRouteRes route = new HHNetworkRouteRes();
 		if (pnt != null) {
 			NetworkDBPoint itPnt = pnt;
 			if (itPnt.rtDetailedRouteRev != null) {
+				HHNetworkSegmentRes res = new HHNetworkSegmentRes(null);
+				res.list = new ArrayList<>();
 				RouteSegment p = itPnt.rtDetailedRouteRev;
 				while (p != null && p.getRoad() != null) {
-					HHRoutingUtilities.addWay(entities, p, "highway", "secondary");
+					res.list.add(p);
 					p = p.parentRoute;
 				}
+				route.segments.add(res);
 			}
 			while (itPnt.rtRouteToPointRev != null) {
 				NetworkDBPoint nextPnt = itPnt.rtRouteToPointRev;
 				NetworkDBSegment segment = nextPnt.getSegment(itPnt, false);
 				networkDB.loadGeometry(segment, false);
-				segments.add(segment);
-				HHRoutingUtilities.addWay(entities, segment, "highway", "secondary");
+				HHNetworkSegmentRes res = new HHNetworkSegmentRes(segment);
+				route.segments.add(res);
+				if (CALCULATE_GEOMETRY && segment.geometry.size() <= 2) {
+					runDetailedRouting(res);
+				}
 				itPnt = nextPnt;
 			}
+			Collections.reverse(route.segments);
 			itPnt = pnt;
 			while (itPnt.rtRouteToPoint != null) {
 				NetworkDBPoint nextPnt = itPnt.rtRouteToPoint;
 				NetworkDBSegment segment = nextPnt.getSegment(itPnt, true);
 				networkDB.loadGeometry(segment, false);
-				segments.addFirst(segment);
-				HHRoutingUtilities.addWay(entities, segment, "highway", "secondary");
+				HHNetworkSegmentRes res = new HHNetworkSegmentRes(segment);
+				route.segments.add(res);
+				if (CALCULATE_GEOMETRY && segment.geometry.size() <= 2) {
+					runDetailedRouting(res);
+				}
 				itPnt = nextPnt;
 			}
 			if (itPnt.rtDetailedRoute != null) {
+				HHNetworkSegmentRes res = new HHNetworkSegmentRes(null);
+				res.list = new ArrayList<>();
 				RouteSegment p = itPnt.rtDetailedRoute;
 				while (p != null && p.getRoad() != null) {
-					HHRoutingUtilities.addWay(entities, p, "highway", "secondary");
+					res.list.add(p);
 					p = p.parentRoute;
 				}
+				route.segments.add(res);
+				Collections.reverse(res.list);
 			}
+			Collections.reverse(route.segments);
 		}
 		
 		double sumDist = 0;
-		for (NetworkDBSegment s : segments) {
+		RouteSegment last = null;
+		for (HHNetworkSegmentRes res : route.segments) {
+			NetworkDBSegment s = res.segment;
+			if (res.list != null) {
+				for (RouteSegment r : res.list) {
+					if (last == null) {
+						last = r;
+					} else {
+						if (last.getRoad().getId() == r.getRoad().getId()) {
+							
+							if(last.getSegmentEnd() == r.getSegmentStart()) {
+								last = new RouteSegment(last.getRoad(), last.getSegmentStart(), r.getSegmentEnd());
+							} else if(last.getSegmentEnd() == r.getSegmentEnd()) {
+								last = new RouteSegment(last.getRoad(), last.getSegmentStart(), r.getSegmentStart());
+							} else {
+								boolean pos = Math.max(last.getSegmentEnd(), last.getSegmentStart()) < Math.max(r.getSegmentEnd(), r.getSegmentStart());
+								int max = Math.max(Math.max(last.getSegmentEnd(), last.getSegmentStart()),
+										Math.max(r.getSegmentEnd(), r.getSegmentStart()));
+								int min = Math.min(Math.min(last.getSegmentEnd(), last.getSegmentStart()),
+										Math.min(r.getSegmentEnd(), r.getSegmentStart()));
+								// TODO FIXME 2 is correct but it fails
+								if (max - min <= 12) {
+									last = new RouteSegment(last.getRoad(), pos ? min : max, pos ? max : min);
+								} else {
+									System.out.println(route.detailed);
+									System.out.println(last);
+									System.out.println(r);
+									throw new IllegalStateException();
+								}
+							}
+						} else {
+							route.detailed.add(last);
+							last = r;
+						}
+					}
+				}
+			}
+			if (s == null) {
+				System.out.printf("First / last segment \n");
+				continue;
+			}
 			sumDist += s.dist;
 			System.out.printf("Route %d [%d] -> %d [%d] %s ( %.5f/%.5f - %d - %.2f s) \n", 
 					s.start.index, s.start.chInd, s.end.index,s.end.chInd, s.shortcut ? "sh" : "bs",
 					MapUtils.get31LatitudeY(s.end.startY), MapUtils.get31LongitudeX(s.end.startX), s.end.roadId / 64,
 					sumDist);
 		}
+		if(last != null) {
+			route.detailed.add(last);
+		}
 		System.out.println(String.format("Found final route - cost %.2f, %d depth ( visited %,d (%,d unique) of %,d added vertices )", 
-				sumDist, entities.size(), stats.visitedVertices, stats.uniqueVisitedVertices, stats.addedVertices));
-		return entities.valueCollection();
+				sumDist, route.segments.size(), stats.visitedVertices, stats.uniqueVisitedVertices, stats.addedVertices));
+		return route;
 	}
 
 

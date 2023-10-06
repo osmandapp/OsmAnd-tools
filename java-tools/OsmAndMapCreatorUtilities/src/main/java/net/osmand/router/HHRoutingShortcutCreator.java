@@ -138,21 +138,13 @@ public class HHRoutingShortcutCreator {
 				if (Thread.interrupted()) {
 					return res;
 				}
-				RouteSegment s = null;
+				RouteSegmentPoint s = null;
 				try {
 					ctx.calculationProgress = new RouteCalculationProgress();
 					long nt2 = System.nanoTime();
-					s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
-					while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
-							|| s.getSegmentEnd() != pnt.end)) {
-						s = s.getNext();
-					}
-					if (s == null) {
-						throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
-					}
+					s = HHRoutingUtilities.loadPoint(ctx, pnt);
 					HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
-					
 					for (RouteSegment t : result) {
 						NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
 								Math.min(t.getSegmentStart(), t.getSegmentEnd()),
@@ -193,6 +185,7 @@ public class HHRoutingShortcutCreator {
 			res.totalTime = (System.nanoTime() - nt) / 1e9;
 			return res;
 		}
+
 
 	}
 
@@ -307,7 +300,7 @@ public class HHRoutingShortcutCreator {
 		return osmObjects.valueCollection();
 	}
 
-	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegment s, TLongObjectMap<RouteSegment> segments)
+	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegmentPoint s, TLongObjectMap<RouteSegment> segments)
 			throws InterruptedException, IOException {
 		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
@@ -319,8 +312,7 @@ public class HHRoutingShortcutCreator {
 		ctx.calculationProgress = new RouteCalculationProgress();
 		ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
 		ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd());
-		RouteSegmentPoint pnt = new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), s.getSegmentEnd(), 0);
-		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, pnt,
+		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
 				null, null, segments);
 
 		if (frs != null) {

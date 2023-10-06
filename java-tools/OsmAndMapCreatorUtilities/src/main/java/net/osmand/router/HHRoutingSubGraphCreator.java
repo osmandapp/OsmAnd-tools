@@ -68,6 +68,7 @@ import net.osmand.util.MapUtils;
 // 4.2 Avoid specific road
 // 4.3 Deprioritize or exclude roads (parameters)
 // 4.4 Live data (think about it)
+// 4.5 Improve A* finish condition
 
 // *5* Future (if needed) - Introduce 3/4 level 
 // 5.1 Merge islands (<=2) - FAILED merging islands > 3

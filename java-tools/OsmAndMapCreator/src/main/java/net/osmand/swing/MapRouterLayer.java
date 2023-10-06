@@ -61,6 +61,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.stream.JsonReader;
 
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.Location;
 import net.osmand.LocationsHolder;
 import net.osmand.PlatformUtil;
@@ -83,7 +84,10 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.HHRoutePlanner;
+import net.osmand.router.HHRoutePlanner.HHNetworkRouteRes;
+import net.osmand.router.HHRoutePlanner.HHNetworkSegmentRes;
 import net.osmand.router.HHRoutingPreparationDB;
+import net.osmand.router.HHRoutingUtilities;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.router.RouteExporter;
@@ -963,6 +967,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	
 	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute, String profile) {
 		try {
+			boolean detailed = true;
 			HHRoutePlanner hhRoutePlanner = hhPlanners.get(profile);
 			if (hhRoutePlanner == null) {
 				File hhFile = getHHFile(profile);
@@ -974,7 +979,24 @@ public class MapRouterLayer implements MapPanelLayer {
 				hhPlanners.put(profile, hhRoutePlanner);
 			}
 
-			return hhRoutePlanner.runRouting(startRoute, endRoute, null);
+			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
+			TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+			if(detailed) {
+				for (RouteSegment rs : route.detailed) {
+					HHRoutingUtilities.addWay(entities, rs, "highway", "secondary");
+				}
+			} else {
+				for (HHNetworkSegmentRes r : route.segments) {
+					if (r.list != null) {
+						for (RouteSegment rs : r.list) {
+							HHRoutingUtilities.addWay(entities, rs, "highway", "secondary");
+						}
+					} else if (r.segment != null) {
+						HHRoutingUtilities.addWay(entities, r.segment, "highway", "primary");
+					}
+				}
+			}
+			return entities.valueCollection();
 		} catch (Exception e) {
 			ExceptionHandler.handle(e);
 			return new ArrayList<>();
