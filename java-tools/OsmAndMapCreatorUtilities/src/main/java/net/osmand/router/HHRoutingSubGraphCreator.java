@@ -43,39 +43,37 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
 // TODO 
-// 1st phase - bugs routing
-// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
-// 1.4 BinaryRoutePlanner TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
-// 1.5 BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
-// 1.6 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// 1.7 BinaryRoutePlanner TODO test that routing time is different with on & off!
-// TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
+// 1st phase - BUGS routing
+// 1.2 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
+// 1.3 BinaryRoutePlanner TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
+// 1.4 BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
+// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// 1.6 BinaryRoutePlanner TODO test that routing time is different with on & off!
+// 1.7 BinaryRoutePlanner TODO failing tests
+// 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
+// 1.9 TODO revert 2 queues to fail fast in 1 direction
 
-// 2nd phase - points selection
+// 2nd SERVER: phase - points selection / Planet ~6-12h per profile
 // 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 2.2 Merge 1-2 points ! 
+// 2.2 Calculate points in parallel (Planet)
+// 2.3 Optimize shortcut calculation process (local to use less memory) or calculate same time as points
 
-// 3rd phase - Generate Planet ~6-12h (per profile?)
-// 3.1 Calculate points in parallel (Planet)
-// 3.2 Optimize shortcut calculation process (local to use less memory) or calculate same time as points
+// 3rd phase - complex routing / data
+// 3.1! Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
+// 3.2 Retrieve missing info for the route (route details / turn info)
+// 3.3 Implement border crossing issue on client
 
-// *4* Introduce 3/4 level (if needed)!
-// 4.1 Merge islands (<=2) - FAILED merging islands > 3
-// 4.2 Implement midpoint algorithm - HARD to calculate midpoint level
-// 4.3 Implement CH algorithm - HARD to wait to finish CH
-// 4.4 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
+// 4 To be prepared
+// 4.1 Alternative routes (distribute initial points better)
+// 4.2 Avoid specific road
+// 4.3 Deprioritize or exclude roads (parameters)
+// 4.4 Live data (think about it)
 
-// 5th phase - complex routing / data
-// 5.1! Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
-// 5.2 Retrieve missing info for the route (route details / turn info)
-// 5.3 Implement final routing algorithm including start / end segment search 
-// 5.4 Implement border crossing issue on client
-
-// 6 Future
-// 6.1 Alternative routes (distribute initial points better)
-// 6.2 Avoid specific road
-// 6.3 Deprioritize or exclude roads (parameters)
-// 6.4 Live data (think about it)
+// *5* Future (if needed) - Introduce 3/4 level 
+// 5.1 Merge islands (<=2) - FAILED merging islands > 3
+// 5.2 Implement midpoint algorithm - HARD to calculate midpoint level
+// 5.3 Implement CH algorithm - HARD to wait to finish CH
+// 5.4 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
 
 public class HHRoutingSubGraphCreator {
 

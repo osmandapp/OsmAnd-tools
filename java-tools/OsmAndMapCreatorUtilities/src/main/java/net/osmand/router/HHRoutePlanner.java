@@ -35,6 +35,7 @@ import net.osmand.util.MapUtils;
 public class HHRoutePlanner {
 	static String ROUTING_PROFILE = "car";
 	static int DEBUG_VERBOSE_LEVEL = 0;
+	static boolean USE_LAST_MILE_ROUTING = true;
 	
 	static LatLon PROCESS_START = null;
 	static LatLon PROCESS_END = null;
@@ -257,6 +258,7 @@ public class HHRoutePlanner {
 			c = DijkstraConfig.astar(1);
 //			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
+			USE_LAST_MILE_ROUTING = true;
 			DEBUG_VERBOSE_LEVEL = 0;
 		}
 		System.out.println(c.toString(start, end));
@@ -294,8 +296,8 @@ public class HHRoutePlanner {
 		for (NetworkDBPoint pnt : cachePoints.valueCollection()) {
 			pnt.clearRouting();
 		}
-		List<NetworkDBPoint> stPoints = initStart(c, start, end, false, false);
-		List<NetworkDBPoint> endPoints = initStart(c, end, start, true, true);
+		List<NetworkDBPoint> stPoints = initStart(c, start, end,!USE_LAST_MILE_ROUTING, false);
+		List<NetworkDBPoint> endPoints = initStart(c, end, start, !USE_LAST_MILE_ROUTING, true);
 
 		stats.searchPointsTime = (System.nanoTime() - time) / 1e6;
 		time = System.nanoTime();
@@ -308,7 +310,7 @@ public class HHRoutePlanner {
 		Collection<Entity> objects = prepareRoutingResults(networkDB, pnt, new TLongObjectHashMap<>(), stats);
 		stats.prepTime = (System.nanoTime() - time) / 1e6;
 		System.out.println(c.toString(start, end));
-		System.out.printf("Routing finished all %.1f ms: pnts %.1f ms, load data %.1f ms (%,d edges), routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
+		System.out.printf("Routing finished all %.1f ms: last mile %.1f ms, load data %.1f ms (%,d edges), routing %.1f ms (queue  - %.1f add ms + %.1f poll ms), prep result %.1f ms\n",
 				(System.nanoTime() - startTime) / 1e6, stats.searchPointsTime,
 				stats.loadEdgesTime + stats.loadPointsTime, stats.loadEdgesCnt, stats.routingTime, stats.addQueueTime,
 				stats.pollQueueTime, stats.prepTime);
@@ -316,7 +318,7 @@ public class HHRoutePlanner {
 		return objects;
 	}
 
-	private List<NetworkDBPoint> initStart(DijkstraConfig c, LatLon start, LatLon e, boolean simple, boolean reverse)
+	private List<NetworkDBPoint> initStart(DijkstraConfig c, LatLon p, LatLon e, boolean simple, boolean reverse)
 			throws IOException, InterruptedException {
 		if (simple) {
 			NetworkDBPoint st = null;
@@ -324,7 +326,7 @@ public class HHRoutePlanner {
 				if (st == null) {
 					st = pnt;
 				}
-				if (MapUtils.getDistance(start, pnt.getPoint()) < MapUtils.getDistance(start, st.getPoint())) {
+				if (MapUtils.getDistance(p, pnt.getPoint()) < MapUtils.getDistance(p, st.getPoint())) {
 					st = pnt;
 				}
 			}
@@ -334,20 +336,24 @@ public class HHRoutePlanner {
 			return Collections.singletonList(st);
 		}
 		RoutePlannerFrontEnd planner = new RoutePlannerFrontEnd();
-		RouteSegmentPoint s = planner.findRouteSegment(start.getLatitude(), start.getLongitude(), ctx, null);
+		RouteSegmentPoint s = planner.findRouteSegment(p.getLatitude(), p.getLongitude(), ctx, null);
 		if (s == null) {
 			return Collections.emptyList();
 		}
-		// TODO implement dijkstra for reverse end 
-		ctx.config.planRoadDirection = 1;
+		ctx.config.planRoadDirection = reverse ? -1 : 1;
 		ctx.config.heuristicCoefficient = 0; // dijkstra
 		ctx.unloadAllData(); // needed for proper multidijsktra work
 		ctx.calculationProgress = new RouteCalculationProgress();
-		ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
-		ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd());
+		if (reverse) {
+			ctx.targetX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
+			ctx.targetY = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
+		} else {
+			ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
+			ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd());
+		}
 
-		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
-				null, null, cacheBoundaries);
+		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, 
+				reverse ? null : s, reverse ? s : null, null, cacheBoundaries);
 
 		List<NetworkDBPoint> pnts = new ArrayList<>();
 		if (frs != null) {
@@ -551,6 +557,13 @@ public class HHRoutePlanner {
 		LinkedList<NetworkDBSegment> segments = new LinkedList<>();
 		if (pnt != null) {
 			NetworkDBPoint itPnt = pnt;
+			if (itPnt.rtDetailedRouteRev != null) {
+				RouteSegment p = itPnt.rtDetailedRouteRev;
+				while (p != null && p.getRoad() != null) {
+					HHRoutingUtilities.addWay(entities, p, "highway", "secondary");
+					p = p.parentRoute;
+				}
+			}
 			while (itPnt.rtRouteToPointRev != null) {
 				NetworkDBPoint nextPnt = itPnt.rtRouteToPointRev;
 				NetworkDBSegment segment = nextPnt.getSegment(itPnt, false);
