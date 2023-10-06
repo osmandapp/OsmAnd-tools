@@ -43,7 +43,7 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
 // TODO 
-// 1st phase - BUGS routing
+// BUGS routing
 // 1.2 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
 // 1.3 BinaryRoutePlanner TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
@@ -53,29 +53,32 @@ import net.osmand.util.MapUtils;
 // 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.9 TODO revert 2 queues to fail fast in 1 direction
 // 1.1 !!!TODO FIXME 2 is correct but it fails
+// 1.10 Routing bug disconnected roads - holes
+// 1.11 Verify client A* bidirection (route segment calc) equals to server time 
+// 1.12 TODO compact chdb even more
+// 1.13 TODO BUG maxflow 15 != 16 mincut: 0 (Lat 52.709446 Lon 6.1940145): Road (631875088)
 
-// 2nd SERVER: phase - points selection / Planet ~6-12h per profile
-// 2.1 Create tests: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 2.2 Calculate points in parallel (Planet)
-// 2.3 Optimize shortcut calculation process (local to use less memory) or calculate same time as points
+// 2nd  phase - points selection / Planet ~6-12h per profile
+// 2.1 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 2.2 SERVER: Calculate points in parallel (Planet)
+// 2.3 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
+// 2.4 FILE: Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
+// 2.5 FILE: Implement border crossing issue on client
+// 2.6 Implement route recalculation in case distance > original 10% ? 
+// 2.7 FILE: different dates for maps!
 
-// 3rd phase - complex routing / data
-// 3.1! Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
-// 3.2 Retrieve missing info for the route (route details / turn info)
-// 3.3 Implement border crossing issue on client
+// 3 Later implementation
+// 3.1 Alternative routes (distribute initial points better)
+// 3.2 Avoid specific road
+// 3.3 Deprioritize or exclude roads (parameters)
+// 3.4 Live data (think about it)
+// 3.5 Improve A* finish condition
 
-// 4 To be prepared
-// 4.1 Alternative routes (distribute initial points better)
-// 4.2 Avoid specific road
-// 4.3 Deprioritize or exclude roads (parameters)
-// 4.4 Live data (think about it)
-// 4.5 Improve A* finish condition
-
-// *5* Future (if needed) - Introduce 3/4 level 
-// 5.1 Merge islands (<=2) - FAILED merging islands > 3
-// 5.2 Implement midpoint algorithm - HARD to calculate midpoint level
-// 5.3 Implement CH algorithm - HARD to wait to finish CH
-// 5.4 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
+// *4* Future (if needed) - Introduce 3/4 level 
+// 4.1 Merge islands (<=2) - FAILED merging islands > 3
+// 4.2 Implement midpoint algorithm - HARD to calculate midpoint level
+// 4.3 Implement CH algorithm - HARD to wait to finish CH
+// 4.4 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
 
 public class HHRoutingSubGraphCreator {
 
@@ -97,7 +100,6 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon EX6 = new LatLon(42.42385, 19.261171); //
 	protected static LatLon EX7 = new LatLon(42.527111, 19.43255); //
 
-	// TODO BUG maxflow 15 != 16 mincut: 0 (Lat 52.709446 Lon 6.1940145): Road (631875088) 
 	protected static LatLon[] EX = {
 //			EX6, EX7
 	}; 
@@ -809,7 +811,6 @@ public class HHRoutingSubGraphCreator {
 		}
 
 	}
-
 	
 	
 	private class RouteDataObjectProcessor implements ResultMatcher<RouteDataObject> {
