@@ -107,6 +107,23 @@ public class HHRoutingUtilities {
 		osmObjects.put(w.getId(), w);
 	}
 	
+	public static void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegmentResult segment, String tag, String value) {
+		Way w = new Way(DEBUG_OSM_ID--);
+		// w.putTag("name", String.format("%d -> %d %.1f", segment.getSegmentStart(), segment.getSegmentEnd(), segment.getDistanceFromStart()));
+		int i = segment.getStartPointIndex();
+		boolean pos = segment.getStartPointIndex() < segment.getEndPointIndex();
+		while (true) {
+			int x = segment.getObject().getPoint31XTile(i);
+			int y = segment.getObject().getPoint31YTile(i);
+			w.addNode(new Node(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x), DEBUG_OSM_ID--));
+			if (i == segment.getEndPointIndex()) {
+				break;
+			}
+			i += pos ? 1 : -1;
+		}
+		osmObjects.put(w.getId(), w);
+	}
+	
 	public static void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment segment, String tag, String value) {
 		Way w = new Way(DEBUG_OSM_ID--);
 		// w.putTag("name", String.format("%d -> %d %.1f", segment.getSegmentStart(), segment.getSegmentEnd(), segment.getDistanceFromStart()));

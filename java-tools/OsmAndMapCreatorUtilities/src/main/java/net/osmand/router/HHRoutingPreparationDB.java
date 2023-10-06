@@ -20,6 +20,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.router.BinaryRoutePlanner.FinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
 import net.osmand.util.Algorithms;
@@ -697,7 +698,7 @@ public class HHRoutingPreparationDB {
 		double rtDistanceFromStart;
 		double rtDistanceToEnd;
 		double rtCost;
-		RouteSegment rtDetailedRoute;
+		FinalRouteSegment rtDetailedRoute;
 		
 		int rtDepthRev = -1;
 		NetworkDBPoint rtRouteToPointRev;
@@ -705,7 +706,7 @@ public class HHRoutingPreparationDB {
 		double rtDistanceFromStartRev;
 		double rtDistanceToEndRev;
 		double rtCostRev;
-		RouteSegment rtDetailedRouteRev;
+		FinalRouteSegment rtDetailedRouteRev;
 		
 		// exclude from routing
 		boolean rtExclude;
@@ -774,7 +775,7 @@ public class HHRoutingPreparationDB {
 			}
 		}
 		
-		public void setCostDetailedParentRt(boolean reverse, RouteSegment r) {
+		public void setCostDetailedParentRt(boolean reverse, FinalRouteSegment r) {
 			if (reverse) {
 				rtDetailedRouteRev = r;
 			} else {
