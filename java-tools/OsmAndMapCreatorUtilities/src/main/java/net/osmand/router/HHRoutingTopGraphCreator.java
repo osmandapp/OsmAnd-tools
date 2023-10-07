@@ -12,8 +12,12 @@ import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
 
+import org.apache.commons.logging.Log;
+
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.PlatformUtil;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.HHRoutePlanner.DijkstraConfig;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
@@ -22,6 +26,8 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
 public class HHRoutingTopGraphCreator {
 	static int DEBUG_VERBOSE_LEVEL = 0;
 
+	final static Log LOG = PlatformUtil.getLog(HHRoutingTopGraphCreator.class);
+	
 	static final int PROC_MONTECARLO = 1;
 	static final int PROC_MIDPOINTS = 2;
 	static final int PROC_2ND_LEVEL = 3;
@@ -87,7 +93,7 @@ public class HHRoutingTopGraphCreator {
 		String name = obfFile.getCanonicalFile().getName();
 		
 		HHRoutingPreparationDB networkDB = 
-				new HHRoutingPreparationDB(new File(folder, name + HHRoutingPreparationDB.EXT));
+				new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(new File(folder, name + HHRoutingPreparationDB.EXT).getAbsolutePath(), LOG));
 		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(
 				HHRoutePlanner.ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);

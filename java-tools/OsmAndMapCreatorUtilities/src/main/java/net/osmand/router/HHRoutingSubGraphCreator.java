@@ -36,6 +36,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
@@ -57,6 +58,8 @@ import net.osmand.util.MapUtils;
 // 1.12 TODO compact chdb even more
 // 1.13 TODO BUG maxflow 15 != 16 mincut: 0 (Lat 52.709446 Lon 6.1940145): Road (631875088)
 // 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn)
+// 1.15 3 - shared border points between clusters  (Bug cause only 2 directions)
+// 1.16 1 - remove 1 shared border point cluster (useless)
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.0 Run mobile test
@@ -142,7 +145,7 @@ public class HHRoutingSubGraphCreator {
 		if (CLEAN && dbFile.exists()) {
 			dbFile.delete();
 		}
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingSubGraphCreator proc = new HHRoutingSubGraphCreator();
 		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(networkDB);
@@ -163,7 +166,7 @@ public class HHRoutingSubGraphCreator {
 				RouteSegmentPoint pnt = router.findRouteSegment(l.getLatitude(), l.getLongitude(), ctx.rctx, null);
 				NetworkIsland cluster = buildRoadNetworkIsland(ctx, pnt);
 				ctx.addCluster(cluster);
-				networkDB.insertCluster(cluster, ctx.networkPointToDbInd);
+				networkDB.insertCluster(cluster.dbIndex, cluster.toVisitVertices, ctx.networkPointToDbInd);
 			}
 			return ctx;
 		}
@@ -756,7 +759,7 @@ public class HHRoutingSubGraphCreator {
 				currentProcessingRegion.visitedVertices.putAll(cluster.visitedVertices);
 			}
 			try {
-				networkDB.insertCluster(cluster, networkPointToDbInd);
+				networkDB.insertCluster(cluster.dbIndex, cluster.toVisitVertices, networkPointToDbInd);
 			} catch (SQLException e) {
 				throw new RuntimeException(e);
 			}

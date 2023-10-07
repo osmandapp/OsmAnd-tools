@@ -44,6 +44,7 @@ import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.HHRoutingSubGraphCreator;
 import net.osmand.router.HHRoutingShortcutCreator;
 import net.osmand.router.HHRoutingTopGraphCreator;
+import net.osmand.router.TestHHRouting;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -128,7 +129,7 @@ public class MainUtilities {
 			} else if (utl.equals("hh-routing-shortcuts")) {
 				HHRoutingShortcutCreator.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
-				HHRoutePlanner.main(subArgsArray);
+				TestHHRouting.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("test-icons")) {

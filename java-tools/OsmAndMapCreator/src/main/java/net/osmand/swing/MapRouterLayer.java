@@ -22,6 +22,7 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.sql.Connection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -77,6 +78,7 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXUtilities.Track;
 import net.osmand.gpx.GPXUtilities.TrkSegment;
 import net.osmand.gpx.GPXUtilities.WptPt;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -974,7 +976,8 @@ public class MapRouterLayer implements MapPanelLayer {
 						DataExtractionSettings.getSettings().getObfReaders(), //new BinaryMapIndexReader[0], 
 						new RoutePlannerFrontEnd());
 				
-				hhRoutePlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(hhFile));
+				Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
+				hhRoutePlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(conn));
 				hhPlanners.put(profile, hhRoutePlanner);
 			}
 

@@ -29,6 +29,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
@@ -62,7 +63,16 @@ public class HHRoutingShortcutCreator {
 //		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
+		
 		return new File(System.getProperty("maps.dir"), name);
+	}
+	
+	static void testCompact() throws SQLException {
+		String nameFile = System.getProperty("maps.dir");
+		nameFile += "Germany";
+		File source = new File(nameFile + HHRoutingPreparationDB.EXT);
+		File target = new File(nameFile + HHRoutingPreparationDB.CEXT);
+		compact(source, target);
 	}
 	
 	public static void main(String[] args) throws Exception {
@@ -80,7 +90,7 @@ public class HHRoutingShortcutCreator {
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName() + "_" + routingProfile;
 		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
 		if (CLEAN && dbFile.exists()) {
 			networkDB.recreateSegments();
 		}
@@ -92,8 +102,15 @@ public class HHRoutingShortcutCreator {
 		Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
 		saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		networkDB.close();
-		HHRoutingPreparationDB.compact(new File(folder, name + HHRoutingPreparationDB.EXT),
+		
+		compact(new File(folder, name + HHRoutingPreparationDB.EXT),
 				new File(folder, name + HHRoutingPreparationDB.CEXT));
+	}
+	
+	public static void compact(File source, File target) throws SQLException {
+		System.out.printf("Compacting %s -> %s...\n", source.getName(), target.getName());
+		HHRoutingPreparationDB.compact(DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG),
+				DBDialect.SQLITE.getDatabaseConnection(target.getAbsolutePath(), LOG));
 	}
 
 	

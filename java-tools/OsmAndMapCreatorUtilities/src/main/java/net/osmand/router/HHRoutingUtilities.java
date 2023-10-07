@@ -34,7 +34,7 @@ import net.osmand.util.MapUtils;
 
 public class HHRoutingUtilities {
 	static long DEBUG_OSM_ID = -1;
-	static final int ROUTE_POINTS = 11;
+	
 	
 	
 	static LatLon getPoint(RouteSegment r) {
@@ -51,30 +51,15 @@ public class HHRoutingUtilities {
 
 
 	static long calculateRoutePointInternalId(final RouteDataObject road, int pntId, int nextPntId) {
-		int positive = nextPntId - pntId;
-		int pntLen = road.getPointsLength();
-		if (positive < 0) {
-			throw new IllegalStateException("Check only positive segments are in calculation");
-		}
-		if (pntId < 0 || nextPntId < 0 || pntId >= pntLen || nextPntId >= pntLen || (positive != -1 && positive != 1) ||
-				pntLen > (1 << ROUTE_POINTS)) {
-			// should be assert
-			throw new IllegalStateException("Assert failed");
-		}
-		return (road.getId() << ROUTE_POINTS) + (pntId << 1) + (positive > 0 ? 1 : 0);
+		return HHRoutePlanner.calculateRoutePointInternalId(road, pntId, nextPntId);
 	}
 	
 	static long calculateRoutePointInternalId(long id, int pntId, int nextPntId) {
-		int positive = nextPntId - pntId;
-		return (id << ROUTE_POINTS) + (pntId << 1) + (positive > 0 ? 1 : 0);
+		return HHRoutePlanner.calculateRoutePointInternalId(id, pntId, nextPntId);
 	}
 
 	static long calculateRoutePointInternalId(RouteSegment segm) {
-		if (segm.getSegmentStart() < segm.getSegmentEnd()) {
-			return calculateRoutePointInternalId(segm.getRoad(), segm.getSegmentStart(), segm.getSegmentEnd());
-		} else {
-			return calculateRoutePointInternalId(segm.getRoad(), segm.getSegmentEnd(), segm.getSegmentStart());
-		}
+		return HHRoutePlanner.calculateRoutePointInternalId(segm);
 	}
 	
 
@@ -366,23 +351,10 @@ public class HHRoutingUtilities {
 	}
 
 
-	public static void printGCInformation() {
-		System.gc();
-		long MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-		System.out.printf("***** Memory used %d MB *****\n", MEMORY_LAST_USED_MB);		
-	}
-
-
 	public static RouteSegmentPoint loadPoint(RoutingContext ctx, NetworkDBPoint pnt) {
-		RouteSegment s;
-		s = ctx.loadRouteSegment(pnt.startX, pnt.startY, ctx.config.memoryLimitation);
-		while (s != null && (s.getRoad().getId() != pnt.roadId || s.getSegmentStart() != pnt.start
-				|| s.getSegmentEnd() != pnt.end)) {
-			s = s.getNext();
-		}
-		if (s == null) {
-			throw new IllegalStateException("Error on segment " + pnt.roadId / 64);
-		}
-		return new RouteSegmentPoint(s.getRoad(), s.getSegmentStart(), s.getSegmentEnd(), 0);
+		return HHRoutePlanner.loadPoint(ctx, pnt);
 	}
+
+
+	
 }
