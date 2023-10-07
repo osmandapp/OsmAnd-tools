@@ -967,7 +967,6 @@ public class MapRouterLayer implements MapPanelLayer {
 	
 	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute, String profile) {
 		try {
-			boolean detailed = true;
 			HHRoutePlanner hhRoutePlanner = hhPlanners.get(profile);
 			if (hhRoutePlanner == null) {
 				File hhFile = getHHFile(profile);
@@ -981,7 +980,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
 			TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
-			if (detailed) {
+			if (!route.detailed.isEmpty()) {
 				List<Entity> lst = new ArrayList<Entity>();
 				calculateResult(lst, route.detailed);
 				return lst;

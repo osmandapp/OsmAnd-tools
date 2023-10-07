@@ -268,8 +268,9 @@ public class HHRoutePlanner {
 			c = DijkstraConfig.astar(1);
 //			c = DijkstraConfig.ch();
 			PRELOAD_SEGMENTS = false;
-			USE_LAST_MILE_ROUTING = true;
-			DEBUG_VERBOSE_LEVEL = 0;
+			CALCULATE_GEOMETRY = false;
+			USE_LAST_MILE_ROUTING = false;
+			DEBUG_VERBOSE_LEVEL = 1;
 		}
 		System.out.println(c.toString(start, end));
 		System.out.print("Loading points... ");

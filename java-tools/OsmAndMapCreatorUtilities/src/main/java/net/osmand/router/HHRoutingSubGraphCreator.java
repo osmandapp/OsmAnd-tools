@@ -52,20 +52,23 @@ import net.osmand.util.MapUtils;
 // 1.7 BinaryRoutePlanner TODO failing tests
 // 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.9 TODO revert 2 queues to fail fast in 1 direction
-// 1.1 !!!TODO FIXME 2 is correct but it fails
 // 1.10 Routing bug disconnected roads - holes
 // 1.11 Verify client A* bidirection (route segment calc) equals to server time 
 // 1.12 TODO compact chdb even more
 // 1.13 TODO BUG maxflow 15 != 16 mincut: 0 (Lat 52.709446 Lon 6.1940145): Road (631875088)
+// 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn)
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
-// 2.1 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 2.2 SERVER: Calculate points in parallel (Planet)
-// 2.3 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
-// 2.4 FILE: Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
-// 2.5 FILE: Implement border crossing issue on client
-// 2.6 Implement route recalculation in case distance > original 10% ? 
-// 2.7 FILE: different dates for maps!
+// 2.0 Run mobile test
+// 2.1 BUG: give routes direction shortcuts (1.14)
+// 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
+// 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
+// 2.5 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
+// 2.6 FILE: Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
+// 2.7 FILE: Implement border crossing issue on client
+// 2.8 Implement route recalculation in case distance > original 10% ? 
+// 2.9 FILE: different dates for maps!
 
 // 3 Later implementation
 // 3.1 Alternative routes (distribute initial points better)
