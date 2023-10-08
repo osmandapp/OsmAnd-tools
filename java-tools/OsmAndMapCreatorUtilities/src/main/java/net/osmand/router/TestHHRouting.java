@@ -110,7 +110,7 @@ public class TestHHRouting {
 			}
 		}
 		HHRoutingUtilities.saveOsmFile(entities.valueCollection(), new File(folder, name + "-rt.osm"));
-		planner.networkDB.close();
+		planner.close();
 	}
 
 

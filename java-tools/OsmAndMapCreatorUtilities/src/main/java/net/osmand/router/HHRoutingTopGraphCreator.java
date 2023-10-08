@@ -19,6 +19,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.HHRoutePlanner.DijkstraConfig;
+import net.osmand.router.HHRoutePlanner.HHRoutingContext;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
@@ -42,10 +43,14 @@ public class HHRoutingTopGraphCreator {
 	
 	private HHRoutingPreparationDB networkDB;
 	private HHRoutePlanner routePlanner;
+	private RoutingStats routingStats;
+	private HHRoutingContext hctx;
 	
-	public HHRoutingTopGraphCreator(HHRoutePlanner routePlanner, HHRoutingPreparationDB networkDB) {
+	public HHRoutingTopGraphCreator(HHRoutePlanner routePlanner, HHRoutingPreparationDB networkDB) throws SQLException {
 		this.routePlanner = routePlanner;
 		this.networkDB = networkDB;
+		routingStats = new RoutingStats();
+		hctx = routePlanner.initHCtx(routingStats);
 	}
 	
 	
@@ -168,8 +173,7 @@ public class HHRoutingTopGraphCreator {
 	private void calculateMidPoints(int MAX_DEPTH, int MAX_ITERATIONS) throws SQLException {
 		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
-		System.out.print("Loading points... ");
-		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+		TLongObjectHashMap<NetworkDBPoint> pnts = hctx.pointsById;
 		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
 		networkDB.loadMidPointsIndex(pnts, pointsList, false);
 		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
@@ -200,7 +204,7 @@ public class HHRoutingTopGraphCreator {
 			startPnt.rtIndex = 1;
 			
 			stats = new RoutingStats();
-			routePlanner.runDijkstraNetworkRouting(startPnt, null, c, stats);
+			routePlanner.runDijkstraNetworkRouting(startPnt, null, c, hctx, stats);
 			for (NetworkDBPoint pnt : pointsList) {
 				pnt.rtLevel = 0;
 				if (pnt.rtRouteToPoint != null) {
@@ -279,20 +283,15 @@ public class HHRoutingTopGraphCreator {
 
 
 	private void runContractionHierarchy(int maxPoints, double percent) throws SQLException {
-		RoutingStats stats = new RoutingStats();
 		long time = System.nanoTime(), startTime = System.nanoTime();
-		System.out.print("Loading points... ");
-		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(false);
+		TLongObjectHashMap<NetworkDBPoint> pnts = hctx.pointsById;
 		List<NetworkDBPoint> list = new ArrayList<>(pnts.valueCollection());
-		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
-		
 //		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
-		
 		time = System.nanoTime();
-		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
+		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), routingStats.loadPointsTime);
 		int cntEdges = networkDB.loadNetworkSegments(list, true);
-		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
-		System.out.printf(" %,d - %.2fms\nContracting nodes..\n", cntEdges, stats.loadEdgesTime);
+		routingStats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
+		System.out.printf(" %,d - %.2fms\nContracting nodes..\n", cntEdges, routingStats.loadEdgesTime);
 		
 		calculateAndPrintVertexDegree(list);
 		
@@ -311,7 +310,7 @@ public class HHRoutingTopGraphCreator {
 			if (++prog % 1000 == 0) {
 				logf("Preparing %d...", prog);
 			}
-			calculateCHEdgeDiff(p, c, null, stats);
+			calculateCHEdgeDiff(hctx, p, c, null);
 			pq.add(p);
 			if (!edgeDiffMap.containsKey(p.rtIndex)) {
 				edgeDiffMap.put(p.rtIndex, 0);
@@ -331,18 +330,18 @@ public class HHRoutingTopGraphCreator {
 			}
 			if (++prog % 1000 == 0) {
 				logf("Contracting %d %.1f%% (reindexing %d, shortcuts %d)...", contracted, contracted / toContract * 100.0, reindex, allShortcuts.size());
-				printStat("Contraction stat ", stats, timeC, 1000);
+				printStat("Contraction stat ", routingStats, timeC, 1000);
 				if (prog % 10000 == 0) {
 					calculateAndPrintVertexDegree(list);
 				}
-				stats = new RoutingStats();
+				routingStats = new RoutingStats();
 				timeC = System.nanoTime();
 			}
 			
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;
 			shortcuts.clear();
-			calculateCHEdgeDiff(pnt, c, shortcuts, stats);
+			calculateCHEdgeDiff(hctx, pnt, c, shortcuts);
 			if (oldIndex < pnt.rtIndex) {
 				pq.add(pnt);
 				reindex++;
@@ -379,11 +378,11 @@ public class HHRoutingTopGraphCreator {
 		
 		System.out.printf("Added %d shortcuts, reindexed %d \n", allShortcuts.size(), reindex);
 		
-		printStat("Contraction ", stats, time, list.size());
+		printStat("Contraction ", routingStats, time, list.size());
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
-				(time - startTime) / 1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
-				stats.addQueueTime, stats.prepTime);
+				(time - startTime) / 1e6, routingStats.loadEdgesTime + routingStats.loadPointsTime, routingStats.routingTime,
+				routingStats.addQueueTime, routingStats.prepTime);
 	}
 
 
@@ -435,7 +434,7 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void calculateCHEdgeDiff(NetworkDBPoint p, DijkstraConfig c, List<NetworkDBSegment> shortcuts, RoutingStats stats) throws SQLException {
+	private void calculateCHEdgeDiff(HHRoutingContext hctx, NetworkDBPoint p, DijkstraConfig c, List<NetworkDBSegment> shortcuts) throws SQLException {
 		c.MAX_COST = 0;
 		for (NetworkDBSegment out : p.connected) {
 			c.MAX_COST = Math.max(out.dist, c.MAX_COST);
@@ -447,7 +446,7 @@ public class HHRoutingTopGraphCreator {
 			if (in.start.rtExclude) {
 				continue;
 			}
-			routePlanner.runDijkstraNetworkRouting(in.start, null, c, stats);
+			routePlanner.runDijkstraNetworkRouting(in.start, null, c, hctx, routingStats);
 			for (NetworkDBSegment out : p.connected) {
 				if (out.end.rtExclude) {
 					continue;
@@ -477,10 +476,7 @@ public class HHRoutingTopGraphCreator {
 					}
 				}
 			}
-			for (NetworkDBPoint ps : c.visited) {
-				ps.clearRouting();
-			}
-			c.visited.clear();
+			hctx.clearVisited();
 		}
 		// edge diff
 		p.rtIndex = p.rtCnt - p.connected.size() - p.connectedReverse.size();

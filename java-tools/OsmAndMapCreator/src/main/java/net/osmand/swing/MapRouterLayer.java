@@ -997,6 +997,17 @@ public class MapRouterLayer implements MapPanelLayer {
 						HHRoutingUtilities.addWay(entities, r.segment, "highway", "primary");
 					}
 				}
+				for (HHNetworkRouteRes altRoute : route.alternativeRoutes) {
+					for (HHNetworkSegmentRes r : altRoute.segments) {
+						if (r.list != null) {
+							for (RouteSegmentResult rs : r.list) {
+								HHRoutingUtilities.addWay(entities, rs, "highway", "tertiary");
+							}
+						} else if (r.segment != null) {
+							HHRoutingUtilities.addWay(entities, r.segment, "highway", "tertiary");
+						}
+					}
+				}
 			}
 			return entities.valueCollection();
 		} catch (Exception e) {
