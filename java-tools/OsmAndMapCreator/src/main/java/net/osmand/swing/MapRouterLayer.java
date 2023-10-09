@@ -997,7 +997,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						HHRoutingUtilities.addWay(entities, r.segment, "highway", "primary");
 					}
 				}
-				for (HHNetworkRouteRes altRoute : route.alternativeRoutes) {
+				for (HHNetworkRouteRes altRoute : route.altRoutes) {
 					for (HHNetworkSegmentRes r : altRoute.segments) {
 						if (r.list != null) {
 							for (RouteSegmentResult rs : r.list) {
