@@ -982,12 +982,13 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 
 			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
-			TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+
+			long id = -1000000;
+			List<Entity> lst = new ArrayList<Entity>();
 			if (!route.detailed.isEmpty()) {
-				List<Entity> lst = new ArrayList<Entity>();
 				calculateResult(lst, route.detailed);
-				return lst;
 			} else {
+				TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
 				for (HHNetworkSegmentRes r : route.segments) {
 					if (r.list != null) {
 						for (RouteSegmentResult rs : r.list) {
@@ -997,19 +998,23 @@ public class MapRouterLayer implements MapPanelLayer {
 						HHRoutingUtilities.addWay(entities, r.segment, "highway", "primary");
 					}
 				}
-				for (HHNetworkRouteRes altRoute : route.altRoutes) {
-					for (HHNetworkSegmentRes r : altRoute.segments) {
-						if (r.list != null) {
-							for (RouteSegmentResult rs : r.list) {
-								HHRoutingUtilities.addWay(entities, rs, "highway", "tertiary");
-							}
-						} else if (r.segment != null) {
-							HHRoutingUtilities.addWay(entities, r.segment, "highway", "tertiary");
+				lst.addAll(entities.valueCollection());
+			}
+			for (HHNetworkRouteRes altRoute : route.altRoutes) {
+				TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+				for (HHNetworkSegmentRes r : altRoute.segments) {
+					if (r.list != null) {
+						for (RouteSegmentResult rs : r.list) {
+							HHRoutingUtilities.addWay(entities, rs, "highway", "tertiary");
 						}
+					} else if (r.segment != null) {
+						HHRoutingUtilities.addWay(entities, r.segment, "highway", "tertiary");
 					}
 				}
+				lst.addAll(entities.valueCollection());
 			}
-			return entities.valueCollection();
+
+			return lst;
 		} catch (Exception e) {
 			ExceptionHandler.handle(e);
 			return new ArrayList<>();
