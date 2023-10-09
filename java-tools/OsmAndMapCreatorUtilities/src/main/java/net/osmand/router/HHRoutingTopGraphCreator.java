@@ -18,7 +18,7 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.router.HHRoutePlanner.DijkstraConfig;
+import net.osmand.router.HHRoutePlanner.HHRoutingConfig;
 import net.osmand.router.HHRoutePlanner.HHRoutingContext;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
@@ -50,7 +50,7 @@ public class HHRoutingTopGraphCreator {
 		this.routePlanner = routePlanner;
 		this.networkDB = networkDB;
 		routingStats = new RoutingStats();
-		hctx = routePlanner.initHCtx(routingStats);
+		hctx = routePlanner.initHCtx(HHRoutingConfig.dijkstra(0), routingStats);
 	}
 	
 	
@@ -77,6 +77,7 @@ public class HHRoutingTopGraphCreator {
 		int MAX_ITERATIONS = 100;
 		int MAX_DEPTH = 15;
 		int PERCENT_CH = 80;
+		String ROUTING_PROFILE = "car";
 		for (String a : args) {
 			if (a.equals("--setup-midpoints")) {
 				PROCESS = PROC_MIDPOINTS;
@@ -95,12 +96,11 @@ public class HHRoutingTopGraphCreator {
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName();
+		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		
 		HHRoutingPreparationDB networkDB = 
 				new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(new File(folder, name + HHRoutingPreparationDB.EXT).getAbsolutePath(), LOG));
-		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(
-				HHRoutePlanner.ROUTING_PROFILE), networkDB);
+		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
 		if (PROCESS == PROC_MIDPOINTS) {
 			planner.calculateMidPoints(MAX_DEPTH, MAX_ITERATIONS);
@@ -190,7 +190,7 @@ public class HHRoutingTopGraphCreator {
 		
 		int iteration = Math.min(MAX_ITERATIONS, pnts.size() / 2);
 		Random random = new Random();
-		DijkstraConfig c = new DijkstraConfig();
+		HHRoutingConfig c = new HHRoutingConfig();
 		c.HEURISTIC_COEFFICIENT = 0;
 		c.USE_MIDPOINT = false;
 		c.MAX_DEPTH = MAX_DEPTH;
@@ -296,7 +296,7 @@ public class HHRoutingTopGraphCreator {
 		calculateAndPrintVertexDegree(list);
 		
 		time = System.nanoTime();
-		DijkstraConfig c = DijkstraConfig.dijkstra(1).maxSettlePoints(maxPoints);
+		HHRoutingConfig c = HHRoutingConfig.dijkstra(1).maxSettlePoints(maxPoints);
 		TIntIntHashMap edgeDiffMap = new TIntIntHashMap();
 		PriorityQueue<NetworkDBPoint> pq = new PriorityQueue<>(new Comparator<NetworkDBPoint>() {
 
@@ -434,7 +434,7 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void calculateCHEdgeDiff(HHRoutingContext hctx, NetworkDBPoint p, DijkstraConfig c, List<NetworkDBSegment> shortcuts) throws SQLException {
+	private void calculateCHEdgeDiff(HHRoutingContext hctx, NetworkDBPoint p, HHRoutingConfig c, List<NetworkDBSegment> shortcuts) throws SQLException {
 		c.MAX_COST = 0;
 		for (NetworkDBSegment out : p.connected) {
 			c.MAX_COST = Math.max(out.dist, c.MAX_COST);

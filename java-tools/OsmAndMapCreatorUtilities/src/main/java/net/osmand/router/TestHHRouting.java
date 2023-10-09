@@ -9,7 +9,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
-import net.osmand.router.HHRoutePlanner.DijkstraConfig;
+import net.osmand.router.HHRoutePlanner.HHRoutingConfig;
 import net.osmand.router.HHRoutePlanner.HHNetworkRouteRes;
 import net.osmand.router.HHRoutePlanner.HHNetworkSegmentRes;
 
@@ -56,7 +56,8 @@ public class TestHHRouting {
 	
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
-		DijkstraConfig c = null;
+		HHRoutingConfig c = null;
+		String ROUTING_PROFILE = "car";
 		for (String a : args) {
 			if (a.startsWith("--start=")) {
 				String[] latLons = a.substring("--start=".length()).split(",");
@@ -66,24 +67,24 @@ public class TestHHRouting {
 				PROCESS_END = new LatLon(Double.parseDouble(latLons[0]), Double.parseDouble(latLons[1]));
 			} else if (a.startsWith("--heuristic=")) {
 				if (c == null) {
-					c = new DijkstraConfig();
+					c = new HHRoutingConfig();
 				}
 				c.HEURISTIC_COEFFICIENT = (float) Double.parseDouble(a.substring("--heuristic=".length()));
 			} else if (a.startsWith("--direction=")) {
 				if (c == null) {
-					c = new DijkstraConfig();
+					c = new HHRoutingConfig();
 				}
 				c.DIJKSTRA_DIRECTION = (float) Double.parseDouble(a.substring("--direction=".length()));
 			} else if (a.startsWith("--profile")) {
-				HHRoutePlanner.ROUTING_PROFILE = a.substring("--profile=".length());
+				ROUTING_PROFILE = a.substring("--profile=".length());
 			} else if (a.startsWith("--ch")) {
-				c = DijkstraConfig.ch();
+				c = HHRoutingConfig.ch();
 			} else if (a.startsWith("--preload")) {
-				HHRoutePlanner.PRELOAD_SEGMENTS = true;
+				c.preloadSegments();
 			} else if (a.startsWith("--midpoint=")) {
 				String[] s = a.substring("--midpoint=".length()).split(":");
 				if (c == null) {
-					c = new DijkstraConfig();
+					c = new HHRoutingConfig();
 				}
 				c.MIDPOINT_MAX_DEPTH = Integer.parseInt(s[0]);
 				c.MIDPOINT_ERROR = Integer.parseInt(s[1]);
@@ -94,9 +95,9 @@ public class TestHHRouting {
 			return;
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName() + "_" + HHRoutePlanner.ROUTING_PROFILE;
+		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
-		HHRoutePlanner planner = new HHRoutePlanner(HHRoutePlanner.prepareContext(HHRoutePlanner.ROUTING_PROFILE),
+		HHRoutePlanner planner = new HHRoutePlanner(HHRoutePlanner.prepareContext(ROUTING_PROFILE),
 				new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG)));
 		HHNetworkRouteRes route = planner.runRouting(PROCESS_START, PROCESS_END, c);
 		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
