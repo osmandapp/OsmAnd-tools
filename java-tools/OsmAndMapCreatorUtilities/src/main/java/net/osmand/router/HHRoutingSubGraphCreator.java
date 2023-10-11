@@ -60,6 +60,7 @@ import net.osmand.util.MapUtils;
 // 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn)
 // 1.15 3 - shared border points between clusters  (Bug cause only 2 directions)
 // 1.16 1 - remove 1 shared border point cluster (useless)
+// 1.17 Allow private roads on server calculation
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.0 Run mobile test
@@ -72,6 +73,7 @@ import net.osmand.util.MapUtils;
 // 2.7 FILE: Implement border crossing issue on client
 // 2.8 Implement route recalculation in case distance > original 10% ? 
 // 2.9 FILE: different dates for maps!
+// 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. there should be maximum visited points
 
 // 3 Later implementation
 // 3.1 Alternative routes (distribute initial points better)
