@@ -134,9 +134,6 @@ public class MapApiController {
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 	
-	@Autowired
-	protected WebService webService;
-	
 	OsmandRegions osmandRegions;
 	
 	Gson gson = new Gson();
@@ -640,17 +637,5 @@ public class MapApiController {
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
-	}
-	
-	@GetMapping(path = {"/get-styles"})
-	@ResponseBody
-	public String parseStylesXml(@RequestParam List<String> styles, @RequestParam List<String> attributes) throws XmlPullParserException, IOException, SAXException {
-		Map<String, Object> result = new HashMap<>();
-		for (String style : styles) {
-			RenderingRulesStorage storage = parseStorage(style);
-			Map<String, List<Map<String, String>>> attributesRes = webService.parseAttributes(storage, attributes);
-			result.put(style, attributesRes);
-		}
-		return gson.toJson(result);
 	}
 }
