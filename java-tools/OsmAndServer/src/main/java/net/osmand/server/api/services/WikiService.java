@@ -30,7 +30,7 @@ public class WikiService {
 		try {
 			DBDialect osmDBdialect = DBDialect.SQLITE;
 			Set<String> images = new LinkedHashSet<>();
-			File sqliteFile = new File(pathToWikiSqlite, "commonswiki.sqlite");
+			File sqliteFile = new File(pathToWikiSqlite);
 			if (sqliteFile.exists()) {
 				Connection conn = osmDBdialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
 				String articleId = request.getParameter("article");
