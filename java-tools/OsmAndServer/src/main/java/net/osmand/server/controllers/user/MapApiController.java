@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import static net.osmand.NativeJavaRendering.parseStorage;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
 import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
@@ -23,6 +24,7 @@ import javax.validation.constraints.NotNull;
 
 import com.google.gson.JsonParser;
 import net.osmand.map.OsmandRegions;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
@@ -72,6 +74,7 @@ import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.GpxController;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 @Controller
@@ -130,6 +133,9 @@ public class MapApiController {
 	
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
+	
+	@Autowired
+	protected WebService webService;
 	
 	OsmandRegions osmandRegions;
 	
@@ -634,5 +640,17 @@ public class MapApiController {
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
+	}
+	
+	@GetMapping(path = {"/get-styles"})
+	@ResponseBody
+	public String parseStylesXml(@RequestParam List<String> styles, @RequestParam List<String> attributes) throws XmlPullParserException, IOException, SAXException {
+		Map<String, Object> result = new HashMap<>();
+		for (String style : styles) {
+			RenderingRulesStorage storage = parseStorage(style);
+			Map<String, List<Map<String, String>>> attributesRes = webService.parseAttributes(storage, attributes);
+			result.put(style, attributesRes);
+		}
+		return gson.toJson(result);
 	}
 }
