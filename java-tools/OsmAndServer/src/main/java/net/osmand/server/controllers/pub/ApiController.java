@@ -79,6 +79,9 @@ public class ApiController {
 
     @Autowired
     PlacesService placesService;
+
+	@Autowired
+	WikiService wikiService;
     
     @Autowired
     MotdService motdService;
@@ -279,6 +282,13 @@ public class ApiController {
 	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
 		placesService.processPlacesAround(headers, request, response, gson, lat, lon);
+	}
+
+	@GetMapping(path = {"/wiki_place.php", "/wiki_place"})
+	public void geWikiPlace(@RequestParam(required = false) String article,
+	                        @RequestParam(required = false) String category,
+	                        @RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
+		wikiService.processWikiImages(request, response, gson);
 	}
 
     @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
