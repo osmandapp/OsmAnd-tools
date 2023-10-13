@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class WebService {
+public class MapResourcesService {
     
     public Map<String, List<Map<String, String>>> parseAttributes(RenderingRulesStorage storage, List<String> attributes) {
         Map<String, List<Map<String, String>>> res = new HashMap<>();
