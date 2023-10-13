@@ -10,10 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -25,7 +22,9 @@ import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
 import com.google.gson.GsonBuilder;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.server.api.services.GpxService;
+import net.osmand.server.api.services.MapResourcesService;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
@@ -54,6 +53,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.Gson;
@@ -80,6 +80,8 @@ import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.NativeJavaRendering.parseStorage;
+
 
 @RestController
 @RequestMapping("/gpx/")
@@ -105,6 +107,9 @@ public class GpxController {
 	
 	@Autowired
 	protected GpxService gpxService;
+	
+	@Autowired
+	protected MapResourcesService mapResourcesService;
 	
 	@Value("${osmand.srtm.location}")
 	String srtmLocation;
@@ -329,6 +334,18 @@ public class GpxController {
 		trackData = gpxService.addAnalysisData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
+	}
+	
+	@GetMapping(path = {"/get-styles"})
+	@ResponseBody
+	public String parseStylesXml(@RequestParam List<String> styles, @RequestParam List<String> attributes) throws XmlPullParserException, IOException, SAXException {
+		Map<String, Object> result = new HashMap<>();
+		for (String style : styles) {
+			RenderingRulesStorage storage = parseStorage(style);
+			Map<String, List<Map<String, String>>> attributesRes = mapResourcesService.parseAttributes(storage, attributes);
+			result.put(style, attributesRes);
+		}
+		return gson.toJson(result);
 	}
     
     private double getCommonMaxSizeFiles() {
