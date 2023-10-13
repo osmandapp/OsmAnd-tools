@@ -623,9 +623,10 @@ int main(int argc, char** argv)
 //    renderer->setZoom(8.0f);
 
     // Nice
-    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        43.5804,
-        7.1251)));
+    renderer->setMapTarget(OsmAnd::PointI(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2),
+        OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+            43.5804,
+            7.1251)));
     renderer->setZoom(14.0f);
 
     renderer->setAzimuth(0.0f);
@@ -881,7 +882,7 @@ void mouseWheelHandler(int button, int dir, int x, int y)
         const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
         const auto state = renderer->getState();
 
-        const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+        const auto zoom = state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f);
         if (dir > 0)
         {
             renderer->setZoom(zoom + step);
@@ -902,9 +903,9 @@ void keyboardHandler(unsigned char key, int x, int y)
 
     const auto state = renderer->getState();
     const auto wasdZoom = static_cast<int>(
-        state.zoomLevel + (state.visualZoom >= 1.0f
-                               ? state.visualZoom - 1.0f
-                               : (state.visualZoom - 1.0f) * 2.0f));
+        state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f
+                               ? state.surfaceVisualZoom - 1.0f
+                               : (state.surfaceVisualZoom - 1.0f) * 2.0f));
     const auto wasdStep = (1 << (31 - wasdZoom));
 
     // ' ' * + - .  0 1 2 3 4 5 6 7 8 9 A D S W [ \\ \x1B ] a b c d e f g h i j k l m n o p q r s t u v w x z
@@ -1228,7 +1229,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
     case 'z':
     {
-        auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.zoomLevel));
+        auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.surfaceZoomLevel));
         bool ok;
         double zoom = text.toDouble(&ok);
         if (ok)
@@ -1290,7 +1291,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '-':
         if (modifiers & GLUT_ACTIVE_SHIFT)
         {
-            const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+            const auto zoom = state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f);
             renderer->setZoom(zoom - 1.0f);
         }
         else
@@ -1304,7 +1305,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '+':
         if (modifiers & GLUT_ACTIVE_SHIFT)
         {
-            const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+            const auto zoom = state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f);
             renderer->setZoom(zoom + 1.0f);
         }
         else
@@ -1626,12 +1627,12 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom (mouse wheel)     : %1").arg(state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f))));
+            QString("zoom (mouse wheel)     : %1").arg(state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f))));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom level (key z)     : %1").arg(state.zoomLevel)));
+            QString("zoom level (key z)     : %1").arg(state.surfaceZoomLevel)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
