@@ -17,6 +17,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -26,6 +27,7 @@ import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -107,12 +109,16 @@ public class HHRoutingSubGraphCreator {
 	// test combinations
 	protected static LatLon EX6 = new LatLon(42.42385, 19.261171); //
 	protected static LatLon EX7 = new LatLon(42.527111, 19.43255); //
+	
+	//BUG maxflow 6 (actually 7 bug) != 7 mincut - TOTAL_MAX_POINTS = 10000; TOTAL_MIN_POINTS = 100;
+	protected static LatLon EX8 = new LatLon(42.105892, 19.089802); 
 
 	protected static LatLon[] EX = {
 //			EX6, EX7
+			EX8
 	}; 
 
-	int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 10000;
+	static int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 10000;
 	
 	static boolean CLEAN = false;
 	
@@ -121,6 +127,9 @@ public class HHRoutingSubGraphCreator {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 2;
 		CLEAN = true;
+		
+		TOTAL_MAX_POINTS = 10000;
+		TOTAL_MIN_POINTS = 100;
 		
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
@@ -132,7 +141,7 @@ public class HHRoutingSubGraphCreator {
 	public static void main(String[] args) throws Exception {
 		CLEAN = false;
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
-		String routingProfile = null;
+		String routingProfile = "car";
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
 				routingProfile = a.substring("--routing_profile=".length());
@@ -263,13 +272,35 @@ public class HHRoutingSubGraphCreator {
 			minDepth++;
 		}
 		TLongObjectHashMap<RouteSegmentVertex> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
-		recalculateClusterPointsUsingMincut(c, pnt, mincuts);
-		
-		for (long key : c.visitedVertices.keys()) {
-			RouteSegmentVertex r = c.allVertices.get(key);
-			c.edges += r.connections.size();
-			c.edgeDistr.adjustOrPutValue(r.connections.size(), 1, 1);
-		}
+//		recalculateClusterPointsUsingMincut(c, pnt, mincuts);
+//		
+//		for (long key : c.visitedVertices.keys()) {
+//			RouteSegmentVertex r = c.allVertices.get(key);
+//			c.edges += r.connections.size();
+//			c.edgeDistr.adjustOrPutValue(r.connections.size(), 1, 1);
+//		}
+		TLongObjectIterator<RouteSegment> it = c.visitedVertices.iterator();
+		while (it.hasNext()) {
+			it.advance();
+			RouteSegmentVertex sin = c.allVertices.get(it.key());
+			if (sin.flowParent == null) {
+				it.remove();
+				continue;
+			}
+			int f = 0;
+			for (RouteSegmentEdge e : sin.flowParent) {
+				f += e.flow;
+			}
+			if(f == 0 ) {
+				it.remove();
+			}
+			sin.distanceToEnd = f;
+//			if (!sin.sink) {
+//			if (it.value().getDepth() > minDepth) {
+//			}
+	}
+		System.out.println(c.visitedVertices.size());
+		c.toVisitVertices.clear();
 //		System.out.println(distrString(depthDistr, "", true, true, 5));
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
 			logf("Cluster: borders %d (%,d size ~ %d depth). Flow %d: depth min %d (%,d) <- max %d (%,d). Start %s",
@@ -300,7 +331,7 @@ public class HHRoutingSubGraphCreator {
 			String msg = String.format("BUG!! mincut %d + %d network pnts != %d graph reached size: %s", mincuts.size(),
 					existNetworkPoints.size(), c.toVisitVertices.size(), c.startToString);
 			System.err.println(msg);
-			throw new IllegalStateException(msg); 
+//			throw new IllegalStateException(msg); 
 		}
 		c.toVisitVertices.putAll(existNetworkPoints);
 		
@@ -332,6 +363,7 @@ public class HHRoutingSubGraphCreator {
 
 	private TLongObjectHashMap<RouteSegmentVertex> findMincutUsingMaxFlow(NetworkIsland c, int minDepth,
 			TLongObjectHashMap<RouteSegment> existingVertices, String errorDebug) {
+		// For maxflow / mincut algorithm RouteSegmentVertex is edge with capacity 1 connected using end boolean flag on both ends
 		List<RouteSegmentVertex> vertices = new ArrayList<>();
 		List<RouteSegmentVertex> sources = new ArrayList<>();
 		for (RouteSegmentVertex r : c.allVertices.valueCollection()) {
@@ -346,11 +378,12 @@ public class HHRoutingSubGraphCreator {
 
 		RouteSegmentVertex source = new RouteSegmentVertex();
 		for (RouteSegmentVertex s : sources) {
-			source.addConnection(s);
-			s.addConnection(source);
+			source.addConnection(true, s);
+//			s.addConnection(source);
 		}
 		vertices.addAll(sources);
 		Set<RouteSegmentVertex> sinks = new HashSet<>();
+//		List<RouteSegmentVertex> sinks = new ArrayList<>();
 		RouteSegmentVertex sink = null;
 		do {
 			for (RouteSegmentVertex rs : vertices) {
@@ -362,7 +395,9 @@ public class HHRoutingSubGraphCreator {
 			while (!queue.isEmpty() && sink == null) {
 				RouteSegmentVertex seg = queue.poll();
 				for (RouteSegmentEdge conn : seg.connections) {
-					if (conn.t.flowParentTemp == null && conn.flow < 1) {
+					if (conn.t.flowParentTemp == null && conn.flow < 1
+//							&& !sinks.contains(conn.t)
+							) {
 						conn.t.flowParentTemp = conn;
 						if (conn.t.getDepth() <= minDepth && conn.t.getDepth() > 0) {
 //							|| existingVertices.contains(conn.t.getId())
@@ -376,24 +411,44 @@ public class HHRoutingSubGraphCreator {
 			}
 			if (sink != null) {
 				sinks.add(sink);
+				sink.sink = true;
 				RouteSegmentVertex p = sink;
 				while (true) {
-					p.flowParent = p.flowParentTemp;
-					p.flowParent.flow++;
-					if (p.flowParent.s == source) {
+					if (p.flowParent == null) {
+						p.flowParent = new ArrayList<>();
+					}
+					p.flowParent.add(p.flowParentTemp);
+					p.flowParentTemp.flow++;
+					if (p.flowParentTemp.s == source) {
 						break;
 					}
-					p.getConnection(p.flowParent.s).flow--;
-					p = p.flowParent.s;
+					p.getConnection(p.flowParentTemp.s).flow--;
+					p = p.flowParentTemp.s;
 				}
 			}
+			
 		} while (sink != null);
+		for (RouteSegmentVertex s : sinks) {
+			System.out.println("?" + s);
+			for (RouteSegmentEdge e : s.flowParent) {
+				System.out.println(e.flow);
+			}
+		}
+		System.out.println(sinks.size());
 		TLongObjectHashMap<RouteSegmentVertex> mincuts = calculateMincut(vertices, source, sinks);
 		if (sinks.size() != mincuts.size()) {
+			for(RouteSegmentVertex m : mincuts.valueCollection()) {
+				System.out.println(m);
+			}
 			String msg = String.format("BUG maxflow %d != %d mincut: %s ", sinks.size(), mincuts.size(), errorDebug);
 			System.err.println(msg);
-//			throw new IllegalStateException(msg);  // TODO
+//			throw new IllegalStateException(msg);  
 		}
+//		for (RouteSegmentVertex s : sources) {
+//			// TODO not correct
+//			source.removeConnection(s);
+//			s.removeConnection(source);
+//		}
 		return mincuts;
 	}
 
@@ -452,11 +507,13 @@ public class HHRoutingSubGraphCreator {
 
 
 	class RouteSegmentEdge {
+		boolean end;
 		RouteSegmentVertex s;
 		RouteSegmentVertex t;
 		int flow;
 
-		RouteSegmentEdge(RouteSegmentVertex s, RouteSegmentVertex t) {
+		RouteSegmentEdge(boolean end, RouteSegmentVertex s, RouteSegmentVertex t) {
+			this.end = end;
 			this.s = s;
 			this.t = t;
 		}
@@ -464,10 +521,11 @@ public class HHRoutingSubGraphCreator {
 
 	class RouteSegmentVertex extends RouteSegment {
 
+		public boolean sink;
 		public List<RouteSegmentEdge> connections = new ArrayList<>();
 		public int cDepth;
 		public final long cId;
-		public RouteSegmentEdge flowParent;
+		public List<RouteSegmentEdge> flowParent;
 		public RouteSegmentEdge flowParentTemp;
 
 		public RouteSegmentVertex(RouteSegment s) {
@@ -485,9 +543,20 @@ public class HHRoutingSubGraphCreator {
 			return cId;
 		}
 
-		public void addConnection(RouteSegmentVertex pos) {
+		public void removeConnection(RouteSegmentVertex pos) {
+			Iterator<RouteSegmentEdge> it = connections.iterator();
+			while (it.hasNext()) {
+				RouteSegmentEdge e = it.next();
+				if (e.t == pos) {
+					it.remove();
+					break;
+				}
+			}
+		}
+		
+		public void addConnection(boolean end, RouteSegmentVertex pos) {
 			if (pos != this && pos != null) {
-				connections.add(new RouteSegmentEdge(this, pos));
+				connections.add(new RouteSegmentEdge(end, this, pos));
 			}
 		}
 
@@ -594,8 +663,8 @@ public class HHRoutingSubGraphCreator {
 			int y = segment.getRoad().getPoint31YTile(segmentInd);
 			RouteSegment next = ctx.rctx.loadRouteSegment(x, y, 0);
 			while (next != null) {
-				segment.addConnection(getVertex(next));
-				segment.addConnection(getVertex(next.initRouteSegment(!next.isPositive())));
+				segment.addConnection(end, getVertex(next));
+				segment.addConnection(end, getVertex(next.initRouteSegment(!next.isPositive())));
 				next = next.getNext();
 			}
 		}
@@ -621,7 +690,9 @@ public class HHRoutingSubGraphCreator {
 			for (RouteSegmentVertex r : allVertices.valueCollection()) {
 				for (RouteSegmentEdge e : r.connections) {
 					if (toVisitVertices.contains(e.t.getId())) {
-						e.t.addConnection(r);
+						boolean end = e.t.getEndPointX() == (e.end ? e.s.getEndPointX() : e.s.getStartPointX())
+								&& e.t.getEndPointY() == (e.end ? e.s.getEndPointY() : e.s.getStartPointY());
+						e.t.addConnection(end, r);
 					}
 				}
 			}
