@@ -216,7 +216,7 @@ public class MainUtilities {
 				CommonsWikimediaPreparation.main(subArgsArray);
 			} else if (utl.equals("generate-test-opengl-rendering-sh")) {
 				OsmAndTestOpenGLRenderer.generateSh(subArgsArray);
-			} else if (utl.equals("test-opengl-redndering")) {
+			} else if (utl.equals("test-opengl-rendering")) {
 				OsmAndTestOpenGLRenderer.main(subArgsArray);
 			} else {
 				printSynopsys();
