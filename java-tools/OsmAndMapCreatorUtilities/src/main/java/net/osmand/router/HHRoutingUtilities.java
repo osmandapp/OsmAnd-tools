@@ -27,8 +27,8 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
+import net.osmand.router.HHRoutingDB.NetworkDBPoint;
+import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
 import net.osmand.util.MapUtils;
 

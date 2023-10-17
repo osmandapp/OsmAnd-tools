@@ -88,7 +88,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.HHRoutePlanner.HHNetworkRouteRes;
 import net.osmand.router.HHRoutePlanner.HHNetworkSegmentRes;
-import net.osmand.router.HHRoutingPreparationDB;
+import net.osmand.router.HHRoutingDB;
 import net.osmand.router.HHRoutingUtilities;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteColorize.ColorizationType;
@@ -977,7 +977,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						new RoutePlannerFrontEnd());
 				
 				Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
-				hhRoutePlanner = new HHRoutePlanner(ctx,  new HHRoutingPreparationDB(conn));
+				hhRoutePlanner = new HHRoutePlanner(ctx,  new HHRoutingDB(conn));
 				hhPlanners.put(profile, hhRoutePlanner);
 			}
 

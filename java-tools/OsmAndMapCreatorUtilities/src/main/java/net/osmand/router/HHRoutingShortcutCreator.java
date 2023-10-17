@@ -34,8 +34,8 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
+import net.osmand.router.HHRoutingDB.NetworkDBPoint;
+import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 
 public class HHRoutingShortcutCreator {
 
@@ -70,8 +70,8 @@ public class HHRoutingShortcutCreator {
 	static void testCompact() throws SQLException {
 		String nameFile = System.getProperty("maps.dir");
 		nameFile += "Germany";
-		File source = new File(nameFile + HHRoutingPreparationDB.EXT);
-		File target = new File(nameFile + HHRoutingPreparationDB.CEXT);
+		File source = new File(nameFile + HHRoutingDB.EXT);
+		File target = new File(nameFile + HHRoutingDB.CEXT);
 		compact(source, target);
 	}
 	
@@ -89,7 +89,7 @@ public class HHRoutingShortcutCreator {
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName() + "_" + routingProfile;
-		File dbFile = new File(folder, name + HHRoutingPreparationDB.EXT);
+		File dbFile = new File(folder, name + HHRoutingDB.EXT);
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
 		if (CLEAN && dbFile.exists()) {
 			networkDB.recreateSegments();
@@ -103,8 +103,8 @@ public class HHRoutingShortcutCreator {
 		saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		networkDB.close();
 		
-		compact(new File(folder, name + HHRoutingPreparationDB.EXT),
-				new File(folder, name + HHRoutingPreparationDB.CEXT));
+		compact(new File(folder, name + HHRoutingDB.EXT),
+				new File(folder, name + HHRoutingDB.CEXT));
 	}
 	
 	public static void compact(File source, File target) throws SQLException {

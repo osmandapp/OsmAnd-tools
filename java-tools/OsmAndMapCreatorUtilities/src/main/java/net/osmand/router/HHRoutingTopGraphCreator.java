@@ -21,8 +21,8 @@ import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.HHRoutePlanner.HHRoutingConfig;
 import net.osmand.router.HHRoutePlanner.HHRoutingContext;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBPoint;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegment;
+import net.osmand.router.HHRoutingDB.NetworkDBPoint;
+import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 
 public class HHRoutingTopGraphCreator {
 	static int DEBUG_VERBOSE_LEVEL = 0;
@@ -99,7 +99,7 @@ public class HHRoutingTopGraphCreator {
 		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		
 		HHRoutingPreparationDB networkDB = 
-				new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(new File(folder, name + HHRoutingPreparationDB.EXT).getAbsolutePath(), LOG));
+				new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(new File(folder, name + HHRoutingDB.EXT).getAbsolutePath(), LOG));
 		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
 		if (PROCESS == PROC_MIDPOINTS) {
