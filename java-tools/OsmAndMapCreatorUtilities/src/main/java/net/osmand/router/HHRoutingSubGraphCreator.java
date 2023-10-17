@@ -731,27 +731,13 @@ public class HHRoutingSubGraphCreator {
 			return false;
 		}
 
-		public void wrapConnectionsToVisitPoints() {
-			for (RouteSegmentVertex r : allVertices.valueCollection()) {
-				for (RouteSegmentEdge e : r.connections) {
-					if (toVisitVertices.contains(e.t.getId())) {
-						System.out.println(r + " wrap " + e.t);
-						e.t.addConnection(e.tEnd, r);
-					}
-				}
-			}
-		}
-
 		public void clearVisitedPoints() {
 			for (RouteSegmentVertex v : allVertices.valueCollection()) {
 				v.clearPoint();
-				
 			}
 			visitedVertices.clear();
 			toVisitVertices.clear();
 		}
-
-		
 
 	}
 
