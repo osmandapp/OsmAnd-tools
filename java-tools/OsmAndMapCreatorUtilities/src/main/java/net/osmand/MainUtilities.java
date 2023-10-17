@@ -14,6 +14,7 @@ import java.util.List;
 
 import net.osmand.obf.*;
 import net.osmand.obf.diff.*;
+import net.osmand.render.*;
 import net.osmand.wiki.CommonsWikimediaPreparation;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
@@ -29,10 +30,6 @@ import net.osmand.obf.preparation.OceanTilesCreator;
 import net.osmand.osm.FilterOsmByTags;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.render.OsmAndTestStyleRenderer;
-import net.osmand.render.RenderingRulesStorage;
-import net.osmand.render.RenderingRulesStoragePrinter;
-import net.osmand.render.SvgMapLegendGenerator;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -217,6 +214,10 @@ public class MainUtilities {
 				BinaryMerger.signObfFile(subArgsArray);
 			} else if (utl.equals("parse-commonswiki")) {
 				CommonsWikimediaPreparation.main(subArgsArray);
+			} else if (utl.equals("generate-test-opengl-rendering-sh")) {
+				OsmAndTestOpenGLRenderer.generateSh(subArgsArray);
+			} else if (utl.equals("test-opengl-redndering")) {
+				OsmAndTestOpenGLRenderer.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}
