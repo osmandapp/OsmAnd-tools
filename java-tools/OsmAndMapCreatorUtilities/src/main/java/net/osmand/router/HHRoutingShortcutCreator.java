@@ -109,6 +109,7 @@ public class HHRoutingShortcutCreator {
 	
 	public static void compact(File source, File target) throws SQLException {
 		System.out.printf("Compacting %s -> %s...\n", source.getName(), target.getName());
+		target.delete();
 		HHRoutingPreparationDB.compact(DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG),
 				DBDialect.SQLITE.getDatabaseConnection(target.getAbsolutePath(), LOG));
 	}

@@ -57,7 +57,6 @@ import net.osmand.util.MapUtils;
 // 1.10 Routing bug disconnected roads - holes
 // 1.11 Verify client A* bidirection (route segment calc) equals to server time 
 // 1.12 TODO compact chdb even more
-// 1.13 TODO BUG maxflow 15 != 16 mincut: 0 (Lat 52.709446 Lon 6.1940145): Road (631875088)
 // 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn)
 // 1.15 3 - shared border points between clusters  (Bug cause only 2 directions)
 // 1.16 1 - remove 1 shared border point cluster (useless)
