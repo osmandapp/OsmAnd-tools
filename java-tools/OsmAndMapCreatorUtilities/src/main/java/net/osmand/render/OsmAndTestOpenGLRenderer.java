@@ -20,7 +20,7 @@ public class OsmAndTestOpenGLRenderer {
 
     public static void main(String[] args) {
         String testFile = null;
-        String jsonDir = null
+        String jsonDir = null;
         for (String a : args) {
             if (a.startsWith("--test=")) {
                 testFile = a.substring("--test=".length());
