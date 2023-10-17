@@ -275,6 +275,11 @@ public class HHRoutingSubGraphCreator {
 		}
 		TLongObjectHashMap<RouteSegmentVertex> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
 		recalculateClusterPointsUsingMincut(c, pnt, mincuts);
+		for (long key : c.visitedVertices.keys()) {
+			RouteSegmentVertex v = c.allVertices.get(key);
+			c.edgeDistr.adjustOrPutValue(v.connections.size(), 1, 1);
+			c.edges += v.connections.size();
+		}
 		// debug
 //		c.toVisitVertices.clear();
 //		c.toVisitVertices.putAll(mincuts);
