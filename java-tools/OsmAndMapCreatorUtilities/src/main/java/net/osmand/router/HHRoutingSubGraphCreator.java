@@ -180,7 +180,7 @@ public class HHRoutingSubGraphCreator {
 				RouteSegmentPoint pnt = router.findRouteSegment(l.getLatitude(), l.getLongitude(), ctx.rctx, null);
 				NetworkIsland cluster = buildRoadNetworkIsland(ctx, pnt);
 				ctx.addCluster(cluster);
-				networkDB.insertCluster(cluster.dbIndex, cluster.toVisitVertices, ctx.networkPointToDbInd);
+				networkDB.insertCluster(cluster.dbIndex, cluster.borderVertices, ctx.networkPointToDbInd);
 			}
 			return ctx;
 		}

@@ -16,6 +16,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
+import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentVertexDir;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -223,7 +224,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ins.close();
 	}
 
-	public void insertCluster(int clusterUniqueIndex, TLongObjectHashMap<? extends RouteSegment> borderPoints, TLongObjectHashMap<Integer> pointDbInd) throws SQLException {
+	public void insertCluster(int clusterUniqueIndex, TLongObjectHashMap<RouteSegmentVertexDir> borderPoints, TLongObjectHashMap<Integer> pointDbInd) throws SQLException {
 		TLongObjectIterator<? extends RouteSegment> it = borderPoints.iterator();
 		while (it.hasNext()) {
 			batchInsPoint++;
