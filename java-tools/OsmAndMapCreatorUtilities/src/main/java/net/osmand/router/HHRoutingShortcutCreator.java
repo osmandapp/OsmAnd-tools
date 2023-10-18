@@ -58,7 +58,7 @@ public class HHRoutingShortcutCreator {
 
 	private static File sourceFile() {
 		CLEAN = true;
-		DEBUG_VERBOSE_LEVEL = 1;
+		DEBUG_VERBOSE_LEVEL = 2;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
@@ -97,10 +97,10 @@ public class HHRoutingShortcutCreator {
 		}
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
-		TLongObjectHashMap<NetworkDBPoint> pnts = null;; // TODO networkDB.getNetworkPoints(true);
-		int segments = networkDB.loadNetworkSegments(pnts.valueCollection());
-		System.out.printf("Loaded %,d points, existing shortcuts %,d \n", pnts.size(), segments);
-		Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
+		TLongObjectHashMap<NetworkDBPoint> pntsByGeoId = networkDB.loadNetworkPointsByGeoId();
+		int segments = networkDB.loadNetworkSegments(pntsByGeoId.valueCollection());
+		System.out.printf("Loaded %,d points, existing shortcuts %,d \n", pntsByGeoId.size(), segments);
+		Collection<Entity> objects = proc.buildNetworkShortcuts(pntsByGeoId, networkDB);
 		saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		networkDB.close();
 		
@@ -132,16 +132,16 @@ public class HHRoutingShortcutCreator {
 		private List<NetworkDBPoint> batch;
 		private TLongObjectHashMap<RouteSegment> segments;
 		private HHRoutingShortcutCreator creator;
-		private TLongObjectHashMap<NetworkDBPoint> networkPoints;
+		private TLongObjectHashMap<NetworkDBPoint> networkPointsByGeoId;
 		private int taskId;
 
 		public BuildNetworkShortcutTask(HHRoutingShortcutCreator creator, List<NetworkDBPoint> batch,
-				TLongObjectHashMap<RouteSegment> segments, TLongObjectHashMap<NetworkDBPoint> networkPoints,
+				TLongObjectHashMap<RouteSegment> segments, TLongObjectHashMap<NetworkDBPoint> networkPointsByGeoId,
 				int taskId) {
 			this.creator = creator;
 			this.batch = batch;
 			this.segments = segments;
-			this.networkPoints = networkPoints;
+			this.networkPointsByGeoId = networkPointsByGeoId;
 			this.taskId = taskId;
 		}
 
@@ -165,9 +165,8 @@ public class HHRoutingShortcutCreator {
 					HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
 					for (RouteSegment t : result) {
-						NetworkDBPoint end = networkPoints.get(calcUniDirRoutePointInternalId(t));
-						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true,
-								false);
+						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(), t.getSegmentStart(), t.getSegmentEnd()));
+						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
 						pnt.connected.add(segment);
 						while (t != null) {
 							segment.geometry.add(getPoint(t));
@@ -182,10 +181,9 @@ public class HHRoutingShortcutCreator {
 						}
 					}
 					if (DEBUG_VERBOSE_LEVEL >= 2) {
-						logf("Run dijkstra %s: %.2f ms (calc %.2f ms, load %.2f ms)", s.toString(),
-								(System.nanoTime() - nt2) / 1e6,
-								ctx.calculationProgress.timeToCalculate / 1e6,
-								ctx.calculationProgress.timeToLoad / 1e6);
+						logf("Run dijkstra %d point - %d shortcuts: %.2f ms (calc %.2f ms, load %.2f ms) - %s", pnt.index, result.size(), 
+								(System.nanoTime() - nt2) / 1e6, ctx.calculationProgress.timeToCalculate / 1e6,
+								ctx.calculationProgress.timeToLoad / 1e6, s.toString());
 					}
 					pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
 					res.points.add(pnt);
@@ -206,21 +204,19 @@ public class HHRoutingShortcutCreator {
 
 	}
 
-	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPoints,
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPointsByGeoId,
 			HHRoutingPreparationDB networkDB)
 			throws InterruptedException, IOException, SQLException, ExecutionException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
-		double sz = networkPoints.size() / 100.0;
+		double sz = networkPointsByGeoId.size() / 100.0;
 		int ind = 0, prevPrintInd = 0;
 		// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 }
 		// - 3372.75 vs 2598
 		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
 		TLongObjectHashMap<RouteSegment> segments = new TLongObjectHashMap<>();
-		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
+		for (NetworkDBPoint pnt : networkPointsByGeoId.valueCollection()) {
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end),
 					new RouteSegment(null, pnt.start, pnt.end));
-			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.end, pnt.start),
-					new RouteSegment(null, pnt.end, pnt.start));
 			HHRoutingUtilities.addNode(osmObjects, pnt, null, "highway", "stop");
 		}
 
@@ -230,10 +226,10 @@ public class HHRoutingShortcutCreator {
 		int taskId = 0;
 		int total = 0;
 		int batchSize = BATCH_SIZE;
-		if (networkPoints.size() / THREAD_POOL < batchSize) {
-			batchSize = networkPoints.size() / THREAD_POOL + 1;
+		if (networkPointsByGeoId.size() / THREAD_POOL < batchSize) {
+			batchSize = networkPointsByGeoId.size() / THREAD_POOL + 1;
 		}
-		for (NetworkDBPoint pnt : networkPoints.valueCollection()) {
+		for (NetworkDBPoint pnt : networkPointsByGeoId.valueCollection()) {
 			ind++;
 			if (pnt.connected.size() > 0) {
 				pnt.connected.clear(); // for gc
@@ -249,13 +245,13 @@ public class HHRoutingShortcutCreator {
 			}
 			if (batch.size() == batchSize) {
 				results.add(
-						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
+						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
 				total += batch.size();
 				batch = new ArrayList<>();
 			}
 		}
 		total += batch.size();
-		results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPoints, taskId++)));
+		results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
 		logf("Scheduled %d tasks, %d total points", taskId, total);
 		int maxDirectedPointsGraph = 0;
 		int maxFinalSegmentsFound = 0;
@@ -324,14 +320,9 @@ public class HHRoutingShortcutCreator {
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt1, pnt2);
 
 		List<RouteSegment> res = new ArrayList<>();
-
 		ctx.unloadAllData(); // needed for proper multidijsktra work
 		ctx.calculationProgress = new RouteCalculationProgress();
-		ctx.startX = s.getRoad().getPoint31XTile(s.getSegmentStart(), s.getSegmentEnd());
-		ctx.startY = s.getRoad().getPoint31YTile(s.getSegmentStart(), s.getSegmentEnd());
-		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
-				null, null, segments);
-
+		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s, null, segments);
 		if (frs != null) {
 			TLongSet set = new TLongHashSet();
 			for (RouteSegment o : frs.all) {

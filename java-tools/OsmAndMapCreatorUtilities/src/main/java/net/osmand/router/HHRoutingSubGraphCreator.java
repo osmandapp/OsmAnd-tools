@@ -60,6 +60,7 @@ import net.osmand.util.MapUtils;
 // 1.12 TODO compact chdb even more
 // 1.17 Allow private roads on server calculation 
 // 1.18 Theoretically possible situation with u-turn on same geo point ?
+// 1.19 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 
 // IN PROGRESS
 // 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
