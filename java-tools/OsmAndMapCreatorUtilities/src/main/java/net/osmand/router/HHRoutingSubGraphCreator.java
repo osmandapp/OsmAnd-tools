@@ -931,10 +931,12 @@ public class HHRoutingSubGraphCreator {
 						cluster.visualBorders.put(p.cId, l);
 					}
 				}
-				cluster.borderVertices = null;
-				cluster.allVertices = null;
-				cluster.toVisitVertices = null;
-				cluster.queue = null;
+				if (DEBUG_STORE_ALL_ROADS < 2) {
+					cluster.borderVertices = null;
+					cluster.toVisitVertices = null;
+					cluster.queue = null;
+					cluster.allVertices = null;
+				}
 			}
 		}
 

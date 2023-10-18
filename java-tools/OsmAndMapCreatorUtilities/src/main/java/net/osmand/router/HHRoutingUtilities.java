@@ -138,6 +138,9 @@ public class HHRoutingUtilities {
 		}
 		for (NetworkIsland ni : visualClusters) {
 			TLongSet viewed = new TLongHashSet();
+			if (ni.allVertices == null) {
+				continue;
+			}
 			TLongObjectIterator<RouteSegmentVertex> it = ni.allVertices.iterator();
 			while (it.hasNext()) {
 				it.advance();

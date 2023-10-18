@@ -9,6 +9,7 @@ import java.sql.Statement;
 import java.util.Collection;
 import java.util.List;
 
+import gnu.trove.iterator.TLongIntIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -25,6 +26,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement insGeometry;
 	protected PreparedStatement insPoint;
 	protected PreparedStatement updDualPoint;
+	private PreparedStatement insVisitedPoints;
 	private int maxPointDBID;
 
 	public HHRoutingPreparationDB(Connection conn) throws SQLException {
@@ -36,7 +38,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
 			insPoint = conn.prepareStatement("INSERT INTO points(idPoint, pointGeoUniDir, pointGeoId, clusterId, roadId, start, end, sx31, sy31, ex31, ey31) "
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-			
+			insVisitedPoints = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId, clusterId) VALUES (?, ?, ?)");
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
 		}
 	}
@@ -155,17 +157,20 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 	
 	public void insertVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
-		PreparedStatement ps = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId) VALUES (?, ?)");
 		int ind = 0;
-		for (long k : networkRouteRegion.visitedVertices.keys()) {
-			ps.setLong(1, networkRouteRegion.id);
-			ps.setLong(2, k);
-			ps.addBatch();
+		TLongIntIterator it = networkRouteRegion.visitedVertices.iterator();
+		while (it.hasNext()) {
+			it.advance();
+			insVisitedPoints.setLong(1, networkRouteRegion.id);
+			insVisitedPoints.setLong(2, it.key());
+			insVisitedPoints.setInt(3, it.value());
+			insVisitedPoints.addBatch();
 			if (ind++ > BATCH_SIZE) {
-				ps.executeBatch();
+				insVisitedPoints.executeBatch();
+				ind = 0;
 			}
 		}
-		ps.executeBatch();
+		insVisitedPoints.executeBatch();
 		insPoint.executeBatch();
 		updDualPoint.executeBatch();
 		
