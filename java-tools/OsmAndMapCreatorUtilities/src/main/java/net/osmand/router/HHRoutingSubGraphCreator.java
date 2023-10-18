@@ -48,24 +48,28 @@ import net.osmand.util.MapUtils;
 
 // TODO 
 // BUGS routing
-// 1.2 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
-// 1.3 BinaryRoutePlanner TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
-// 1.4 BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
-// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// 1.6 BinaryRoutePlanner TODO test that routing time is different with on & off!
-// 1.7 BinaryRoutePlanner TODO failing tests
+// 1.1 Fast distance mercator calculatin (PRECISE_DIST_MEASUREMENT=false)
+// 1.2 HHRoutingShortcutCreator TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
+// 1.3 HHRoutingShortcutCreator TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
+// 1.4 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// 1.5 BinaryRoutePlanner TODO test that routing time is different with on & off!
+// 1.6 BinaryRoutePlanner TODO failing tests
 // 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.9 TODO revert 2 queues to fail fast in 1 direction
+// 1.10 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.11 Verify client A* bidirection (route segment calc) equals to server time 
 // 1.12 TODO compact chdb even more
 // 1.17 Allow private roads on server calculation 
 // 1.18 Theoretically possible situation with u-turn on same geo point ?
-// 1.19 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 
 // IN PROGRESS
-// 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
-// 1.10 Routing bug disconnected roads - holes (!)
-// 1.15 Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
+// 1.x Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
+// 1.x Routing bug disconnected roads - holes (!)
+// 1.x Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
+// TESTING
+// 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
+
+
 
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
