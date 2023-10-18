@@ -47,33 +47,30 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
 // TODO 
-// BUGS routing
-// 1.1 Fast distance mercator calculatin (PRECISE_DIST_MEASUREMENT=false)
+// 1.1 Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
 // 1.2 HHRoutingShortcutCreator TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.3 HHRoutingShortcutCreator TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// 1.5 BinaryRoutePlanner TODO test that routing time is different with on & off!
-// 1.6 BinaryRoutePlanner TODO failing tests
+// 1.5 BinaryRoutePlanner TODO test that routing time is different with on & off! should be the same
 // 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.9 TODO revert 2 queues to fail fast in 1 direction
 // 1.10 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.11 Verify client A* bidirection (route segment calc) equals to server time 
 // 1.12 TODO compact chdb even more
-// 1.17 Allow private roads on server calculation 
-// 1.18 Theoretically possible situation with u-turn on same geo point ?
+// 1.13 Allow private roads on server calculation 
+
 
 // IN PROGRESS
 // 1.x Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
 // 1.x Routing bug disconnected roads - holes (!)
 // 1.x Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
+// 2.x BUG: give routes direction shortcuts 
+
 // TESTING
 // 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
-
-
-
+// 1.x BinaryRoutePlanner TODO failing tests
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
-// 2.1 BUG: give routes direction shortcuts (1.14)
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
 // 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
@@ -85,6 +82,7 @@ import net.osmand.util.MapUtils;
 // 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. there should be maximum visited points
 // 2.11 EX10 - example that min depth doesn't give good approximation
 // 2.12 1 - remove 1 shared border point cluster (useless)
+// 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation?
 
 // 3 Later implementation
 // 3.1 Alternative routes (distribute initial points better)
@@ -119,8 +117,7 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon EX6 = new LatLon(42.42385, 19.261171); //
 	protected static LatLon EX7 = new LatLon(42.527111, 19.43255); //
 	
-	// BUGS
-	// Maxflow 6 (actually 7 bug) != 7 mincut - TOTAL_MAX_POINTS = 10000; TOTAL_MIN_POINTS = 100;
+	// Fixed issues: Maxflow 6 (actually 7 bug) != 7 mincut - TOTAL_MAX_POINTS = 10000; TOTAL_MIN_POINTS = 100;
 	protected static LatLon EX8 = new LatLon(42.105892, 19.089802);
 	protected static LatLon EX9 = new LatLon(42.306454, 18.804703);
 	protected static LatLon EX10 = new LatLon(42.10768, 19.103357);
