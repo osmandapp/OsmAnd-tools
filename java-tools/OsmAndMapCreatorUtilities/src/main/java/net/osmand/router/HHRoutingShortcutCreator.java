@@ -210,7 +210,7 @@ public class HHRoutingShortcutCreator {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = networkPointsByGeoId.size() / 100.0;
 		int ind = 0, prevPrintInd = 0;
-		// 1.3 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 }
+		// 1.2 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 }
 		// - 3372.75 vs 2598
 		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
 		TLongObjectHashMap<RouteSegment> segments = new TLongObjectHashMap<>();

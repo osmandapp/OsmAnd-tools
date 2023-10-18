@@ -47,7 +47,6 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
 // TODO 
-// 1.1 Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
 // 1.2 HHRoutingShortcutCreator TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.3 HHRoutingShortcutCreator TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
@@ -69,6 +68,7 @@ import net.osmand.util.MapUtils;
 // TESTING
 // 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
 // 1.x BinaryRoutePlanner TODO failing tests
+// 1.x Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
@@ -241,7 +241,9 @@ public class HHRoutingSubGraphCreator {
 					routeRegion.getSubregions());
 
 			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
-			reader.loadRouteIndexData(regions, new RouteDataObjectProcessor(ctx, estimatedRoads));
+			RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, estimatedRoads);
+			reader.loadRouteIndexData(regions, proc);
+			proc.finish();
 			ctx.finishRegionProcess();
 			ctx.printStatsNetworks();
 		}
@@ -969,6 +971,10 @@ public class HHRoutingSubGraphCreator {
 		public RouteDataObjectProcessor(NetworkCollectPointCtx ctx, float estimatedRoads) {
 			this.estimatedRoads = estimatedRoads;
 			this.ctx = ctx;
+		}
+		
+		public void finish() {
+//			System.out.printf("%d. calc %.2f ms, cache %d\n", s++, ts / 1e6, MapUtils.DIST_CACHE.size());
 		}
 
 		@Override
