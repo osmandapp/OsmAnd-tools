@@ -57,7 +57,7 @@ public class HHRoutingShortcutCreator {
 	private static int THREAD_POOL = 2;
 
 	private static File sourceFile() {
-//		CLEAN = true;
+		CLEAN = true;
 		DEBUG_VERBOSE_LEVEL = 1;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
@@ -78,7 +78,7 @@ public class HHRoutingShortcutCreator {
 	
 	public static void main(String[] args) throws Exception {
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
-		String routingProfile = null; 
+		String routingProfile = "car"; 
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
 				routingProfile = a.substring("--routing_profile=".length());

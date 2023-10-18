@@ -58,14 +58,16 @@ import net.osmand.util.MapUtils;
 // 1.9 TODO revert 2 queues to fail fast in 1 direction
 // 1.11 Verify client A* bidirection (route segment calc) equals to server time 
 // 1.12 TODO compact chdb even more
+// 1.17 Allow private roads on server calculation 
+// 1.18 Theoretically possible situation with u-turn on same geo point ?
 
-// 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn)
-// 1.10 Routing bug disconnected roads - holes
-// 1.15 Exception 3 - shared border points between clusters  (Bug cause only 2 directions) 
-// 1.17 Allow private roads on server calculation
+// IN PROGRESS
+// 1.14 Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
+// 1.10 Routing bug disconnected roads - holes (!)
+// 1.15 Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
+
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
-// 2.0 Run mobile test
 // 2.1 BUG: give routes direction shortcuts (1.14)
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
 // 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
@@ -119,8 +121,6 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon EX10 = new LatLon(42.10768, 19.103357);
 	protected static LatLon EX11 = new LatLon(42.31288, 19.275553);
 	
-	
-
 
 	protected static LatLon[] EX = {
 //			EX11
@@ -132,7 +132,7 @@ public class HHRoutingSubGraphCreator {
 	
 
 	private static File testData() {
-		DEBUG_VERBOSE_LEVEL = 0;
+		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
 		CLEAN = true;
 		
@@ -978,23 +978,23 @@ public class HHRoutingSubGraphCreator {
 			if (indProc < DEBUG_LIMIT_START_OFFSET || isCancelled()) {
 				System.out.println("SKIP PROCESS " + indProc);
 			} else {
-				RouteSegmentPoint pntAround = new RouteSegmentPoint(object, 0, 0);
-				long mainPoint = calcUniDirRoutePointInternalId(pntAround);
-				if (ctx.allVisitedVertices.contains(mainPoint)
-						|| ctx.networkPointToDbInd.containsKey(mainPoint)) {
-					// already existing cluster
-					return false;
+				for (int pos = 0; pos < object.getPointsLength() - 1; pos++) {
+					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
+					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
+					if (ctx.allVisitedVertices.contains(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
+						// already existing cluster
+						continue;
+					}
+					NetworkIsland cluster = buildRoadNetworkIsland(ctx, pntAround);
+					ctx.addCluster(cluster);
+					if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
+						prevPrintInd = indProc;
+						int borderPointsSize = ctx.borderPointsSize();
+						logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters", indProc,
+								indProc * 100.0f / estimatedRoads, ctx.getTotalPoints() + borderPointsSize,
+								borderPointsSize, ctx.clusterSize());
+					}
 				}
-				NetworkIsland cluster = buildRoadNetworkIsland(ctx, pntAround);
-				ctx.addCluster(cluster);
-				if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
-					prevPrintInd = indProc;
-					int borderPointsSize = ctx.borderPointsSize();
-					logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters", indProc,
-							indProc * 100.0f / estimatedRoads, ctx.getTotalPoints() + borderPointsSize,
-							borderPointsSize, ctx.clusterSize());
-				}
-
 			}
 			return false;
 		}
