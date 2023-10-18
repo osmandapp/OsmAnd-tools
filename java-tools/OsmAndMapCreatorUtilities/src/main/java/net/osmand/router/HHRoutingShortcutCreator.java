@@ -2,7 +2,8 @@ package net.osmand.router;
 
 import static net.osmand.router.HHRoutingPrepareContext.logf;
 import static net.osmand.router.HHRoutingUtilities.addWay;
-import static net.osmand.router.HHRoutingUtilities.calculateRoutePointInternalId;
+import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
+import static net.osmand.router.HHRoutePlanner.calculateRoutePointInternalId;
 import static net.osmand.router.HHRoutingUtilities.getPoint;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
 
@@ -96,7 +97,7 @@ public class HHRoutingShortcutCreator {
 		}
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
-		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.getNetworkPoints(true);
+		TLongObjectHashMap<NetworkDBPoint> pnts = null;; // TODO networkDB.getNetworkPoints(true);
 		int segments = networkDB.loadNetworkSegments(pnts.valueCollection());
 		System.out.printf("Loaded %,d points, existing shortcuts %,d \n", pnts.size(), segments);
 		Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
@@ -164,9 +165,7 @@ public class HHRoutingShortcutCreator {
 					HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
 					for (RouteSegment t : result) {
-						NetworkDBPoint end = networkPoints.get(calculateRoutePointInternalId(t.getRoad().getId(),
-								Math.min(t.getSegmentStart(), t.getSegmentEnd()),
-								Math.max(t.getSegmentStart(), t.getSegmentEnd())));
+						NetworkDBPoint end = networkPoints.get(calcUniDirRoutePointInternalId(t));
 						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true,
 								false);
 						pnt.connected.add(segment);
@@ -337,7 +336,7 @@ public class HHRoutingShortcutCreator {
 			TLongSet set = new TLongHashSet();
 			for (RouteSegment o : frs.all) {
 				// duplicates are possible as alternative routes
-				long pntId = calculateRoutePointInternalId(o);
+				long pntId = calcUniDirRoutePointInternalId(o);
 				if (set.add(pntId)) {
 					res.add(o);
 				}

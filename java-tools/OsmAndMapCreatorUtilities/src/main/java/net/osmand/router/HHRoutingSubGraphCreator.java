@@ -1,7 +1,8 @@
 package net.osmand.router;
 
 import static net.osmand.router.HHRoutingPrepareContext.logf;
-import static net.osmand.router.HHRoutingUtilities.calculateRoutePointInternalId;
+import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
+import static net.osmand.router.HHRoutePlanner.calculateRoutePointInternalId;
 import static net.osmand.router.HHRoutingUtilities.distrCumKey;
 import static net.osmand.router.HHRoutingUtilities.distrString;
 import static net.osmand.router.HHRoutingUtilities.distrSum;
@@ -41,6 +42,7 @@ import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
+import net.osmand.router.HHRoutingPreparationDB.NetworkBorderPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
@@ -115,10 +117,13 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon EX8 = new LatLon(42.105892, 19.089802);
 	protected static LatLon EX9 = new LatLon(42.306454, 18.804703);
 	protected static LatLon EX10 = new LatLon(42.10768, 19.103357);
+	protected static LatLon EX11 = new LatLon(42.31288, 19.275553);
+	
 	
 
 
 	protected static LatLon[] EX = {
+//			EX11
 	}; 
 
 	static int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 10000;
@@ -180,7 +185,6 @@ public class HHRoutingSubGraphCreator {
 				RouteSegmentPoint pnt = router.findRouteSegment(l.getLatitude(), l.getLongitude(), ctx.rctx, null);
 				NetworkIsland cluster = buildRoadNetworkIsland(ctx, pnt);
 				ctx.addCluster(cluster);
-				networkDB.insertCluster(cluster.dbIndex, cluster.borderVertices, ctx.networkPointToDbInd);
 			}
 			return ctx;
 		}
@@ -274,7 +278,7 @@ public class HHRoutingSubGraphCreator {
 		while (minDepth < maxDepth - STEP && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
 			minDepth++;
 		}
-		TLongObjectHashMap<RouteSegmentVertexDir> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
+		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
 		c.borderVertices = recalculateClusterPointsUsingMincut(c, pnt, mincuts);
 		for (long key : c.visitedVertices.keys()) {
 			RouteSegmentVertex v = c.allVertices.get(key);
@@ -292,11 +296,11 @@ public class HHRoutingSubGraphCreator {
 		return c;
 	}
 
-	private TLongObjectHashMap<RouteSegmentVertexDir> recalculateClusterPointsUsingMincut(NetworkIsland c, RouteSegmentPoint pnt, 
-			TLongObjectHashMap<RouteSegmentVertexDir> mincuts) {
+	private List<RouteSegmentBorderPoint> recalculateClusterPointsUsingMincut(NetworkIsland c, RouteSegmentPoint pnt, 
+			TLongObjectHashMap<RouteSegmentBorderPoint> mincuts) {
 		c.clearVisitedPoints();
 		c.queue.add(c.getVertex(pnt, false));
-		TLongObjectHashMap<RouteSegmentVertexDir> borderPoints = new TLongObjectHashMap<>();
+		List<RouteSegmentBorderPoint> borderPoints = new ArrayList<>();
 		while (!c.queue.isEmpty()) {
 			RouteSegmentVertex ls = c.queue.poll();
 			if (mincuts.containsKey(ls.getId())) {
@@ -307,7 +311,7 @@ public class HHRoutingSubGraphCreator {
 						&& ls.parentRoute.getEndPointY() == ls.getStartPointY())
 						|| (ls.parentRoute.getStartPointX() == ls.getStartPointX()
 								&& ls.parentRoute.getStartPointY() == ls.getStartPointY());
-				borderPoints.put(ls.getId(), new RouteSegmentVertexDir(ls, pos));
+				borderPoints.add(new RouteSegmentBorderPoint(ls, pos));
 				continue;
 			}
 			proceed(c, ls, c.queue, -1);
@@ -318,7 +322,7 @@ public class HHRoutingSubGraphCreator {
 			System.err.println(msg);
 			throw new IllegalStateException(msg); 
 		}
-		borderPoints.putAll(mincuts);
+		borderPoints.addAll(mincuts.valueCollection());
 		return borderPoints;
 		
 	}
@@ -388,12 +392,11 @@ public class HHRoutingSubGraphCreator {
 					return r;
 				}
 			}
-			System.out.println(this);
 			throw new IllegalArgumentException("No reverse connection: " + this);
 		}
 	}
 
-	private TLongObjectHashMap<RouteSegmentVertexDir> findMincutUsingMaxFlow(NetworkIsland c, int minDepth,
+	private TLongObjectHashMap<RouteSegmentBorderPoint> findMincutUsingMaxFlow(NetworkIsland c, int minDepth,
 			TLongObjectHashMap<RouteSegmentVertex> existingVertices, String errorDebug) {
 		List<MaxFlowVertex> sources = new ArrayList<>();
 		// For maxflow / mincut algorithm RouteSegmentVertex is edge with capacity 1 connected using end boolean flag on both ends
@@ -401,12 +404,12 @@ public class HHRoutingSubGraphCreator {
 
 		MaxFlowVertex source = new MaxFlowVertex(null, false);
 		for (MaxFlowVertex s : sources) {
-			MaxFlowEdge edge = new MaxFlowEdge(s.segment);
+			MaxFlowEdge edge = new MaxFlowEdge(null);
 			edge.s = source;
 			edge.t = s;
 			source.connections.add(edge);
 			
-			edge = new MaxFlowEdge(s.segment);
+			edge = new MaxFlowEdge(null);
 			edge.s = s;
 			edge.t = source;
 			s.connections.add(edge);
@@ -450,7 +453,7 @@ public class HHRoutingSubGraphCreator {
 			}
 			
 		} while (sink != null);
-		TLongObjectHashMap<RouteSegmentVertexDir> mincuts = calculateMincut(vertices, source, sinks, c.visitedVertices);
+		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = calculateMincut(vertices, source, sinks, c.visitedVertices);
 		if (sinks.size() != mincuts.size()) {
 			// debug
 //			mincuts.clear();
@@ -513,7 +516,7 @@ public class HHRoutingSubGraphCreator {
 		return vertices;
 	}
 
-	private TLongObjectHashMap<RouteSegmentVertexDir> calculateMincut(List<MaxFlowVertex> vertices,
+	private TLongObjectHashMap<RouteSegmentBorderPoint> calculateMincut(List<MaxFlowVertex> vertices,
 			MaxFlowVertex source, Collection<MaxFlowVertex> sinks, TLongObjectHashMap<RouteSegment> visitedVertices) {
 		for (MaxFlowVertex rs : vertices) {
 			rs.flowParentTemp = null;
@@ -521,7 +524,7 @@ public class HHRoutingSubGraphCreator {
 		// debug
 //		 visitedVertices.clear();
 
-		TLongObjectHashMap<RouteSegmentVertexDir> mincuts = new TLongObjectHashMap<>();
+		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = new TLongObjectHashMap<>();
 		LinkedList<MaxFlowVertex> queue = new LinkedList<>();
 		Set<MaxFlowVertex> reachableSource = new HashSet<>();
 		queue.add(source);
@@ -543,9 +546,12 @@ public class HHRoutingSubGraphCreator {
 			MaxFlowVertex ps = queue.poll();
 			for (MaxFlowEdge conn : ps.connections) {
 				if (reachableSource.contains(conn.t)) {
-					boolean pos = conn.vertex.getStartPointX() == (conn.s.end ? conn.s.segment.getEndPointX() : conn.s.segment.getStartPointX()) &&
-							conn.vertex.getStartPointY() == (conn.s.end ? conn.s.segment.getEndPointY() : conn.s.segment.getStartPointY());
-					mincuts.put(calculateRoutePointInternalId(conn.vertex), new RouteSegmentVertexDir(conn.vertex, pos));
+					MaxFlowEdge c = conn.vertex == null ? conn.s.flowParentTemp : conn;
+					boolean pos = c.vertex.getStartPointX() == (c.s.end ? c.s.segment.getEndPointX() : c.s.segment.getStartPointX()) &&
+							c.vertex.getStartPointY() == (c.s.end ? c.s.segment.getEndPointY() : c.s.segment.getStartPointY());
+					RouteSegmentBorderPoint dir = new RouteSegmentBorderPoint(c.vertex, pos);
+					mincuts.put(calcUniDirRoutePointInternalId(c.vertex), dir);
+//					System.out.println("? " + dir + " " + c.s + " " + c.t);
 				}
 				// debug
 //				if (conn.vertex != null) {
@@ -581,12 +587,19 @@ public class HHRoutingSubGraphCreator {
 	}
 	
 	
-	class RouteSegmentVertexDir extends  RouteSegmentVertex {
-		public boolean dir = true;
-		public RouteSegmentVertexDir(RouteSegment s, boolean dir) {
-			super(s);
+	class RouteSegmentBorderPoint extends RouteSegment {
+		public final boolean dir;
+		public final long unidirId;
+		public final long uniqueId;
+		// segment [inner point index -> outer point index]
+		public RouteSegmentBorderPoint(RouteSegment s, boolean dir) {
+			super(s.getRoad(), dir ? s.getSegmentStart() : s.getSegmentEnd(),
+					dir ? s.getSegmentEnd() : s.getSegmentStart());
+			unidirId = calcUniDirRoutePointInternalId(s);
+			uniqueId = calculateRoutePointInternalId(getRoad().getId(), getSegmentStart(), getSegmentEnd());
 			this.dir = dir;
 		}
+		
 	}
 
 	class RouteSegmentVertex extends RouteSegment {
@@ -597,7 +610,7 @@ public class HHRoutingSubGraphCreator {
 
 		public RouteSegmentVertex(RouteSegment s) {
 			super(s.getRoad(), s.getSegmentStart(), s.getSegmentEnd());
-			cId = calculateRoutePointInternalId(this);
+			cId = calcUniDirRoutePointInternalId(this);
 		}
 
 		public RouteSegmentVertex() {
@@ -676,7 +689,7 @@ public class HHRoutingSubGraphCreator {
 		TLongObjectHashMap<RouteSegment> visitedVertices = new TLongObjectHashMap<>();
 		TLongObjectHashMap<RouteSegmentVertex> toVisitVertices = new TLongObjectHashMap<>();
 		TLongObjectHashMap<RouteSegmentVertex> allVertices = new TLongObjectHashMap<>();
-		TLongObjectHashMap<RouteSegmentVertexDir> borderVertices = new TLongObjectHashMap<>();
+		List<RouteSegmentBorderPoint> borderVertices;
 		
 		TLongObjectHashMap<List<LatLon>> visualBorders = null;
 
@@ -698,8 +711,7 @@ public class HHRoutingSubGraphCreator {
 			if (s == null) {
 				return null;
 			}
-			long p = calculateRoutePointInternalId(s.getRoad(), Math.min(s.segStart, s.segEnd),
-					Math.max(s.segStart, s.segEnd));
+			long p = calcUniDirRoutePointInternalId(s);
 			RouteSegmentVertex routeSegment = allVertices != null ? allVertices.get(p) : null;
 			if (routeSegment == null && create) {
 				routeSegment = new RouteSegmentVertex(makePositiveDir(s));
@@ -832,7 +844,7 @@ public class HHRoutingSubGraphCreator {
 		
 		int clusterInd = 0;
 		NetworkRouteRegion currentProcessingRegion;
-		TLongObjectHashMap<Integer> networkPointToDbInd = new TLongObjectHashMap<>();
+		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
 		TLongObjectHashMap<RouteSegment> allVisitedVertices = new TLongObjectHashMap<>(); 
 
 		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
@@ -900,7 +912,7 @@ public class HHRoutingSubGraphCreator {
 				visualClusters.add(cluster);
 				if (DEBUG_STORE_ALL_ROADS > 0) {
 					cluster.visualBorders = new TLongObjectHashMap<List<LatLon>>();
-					for (RouteSegmentVertex p : cluster.borderVertices.valueCollection()) {
+					for (RouteSegmentVertex p : cluster.toVisitVertices.valueCollection()) {
 						List<LatLon> l = new ArrayList<LatLon>();
 						RouteSegment par = p;
 						while (par != null) {
@@ -910,7 +922,7 @@ public class HHRoutingSubGraphCreator {
 								break;
 							}
 						}
-						cluster.visualBorders.put(p.getId(), l);
+						cluster.visualBorders.put(p.cId, l);
 					}
 				}
 				cluster.borderVertices = null;
@@ -967,7 +979,7 @@ public class HHRoutingSubGraphCreator {
 				System.out.println("SKIP PROCESS " + indProc);
 			} else {
 				RouteSegmentPoint pntAround = new RouteSegmentPoint(object, 0, 0);
-				long mainPoint = calculateRoutePointInternalId(pntAround);
+				long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 				if (ctx.allVisitedVertices.contains(mainPoint)
 						|| ctx.networkPointToDbInd.containsKey(mainPoint)) {
 					// already existing cluster

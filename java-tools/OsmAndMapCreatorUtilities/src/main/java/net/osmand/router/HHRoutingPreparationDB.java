@@ -9,14 +9,13 @@ import java.sql.Statement;
 import java.util.Collection;
 import java.util.List;
 
-import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
-import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentVertexDir;
+import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -26,18 +25,41 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement insGeometry;
 	protected PreparedStatement insCluster;
 	protected PreparedStatement insPoint;
+	private int maxPointDBID;
 
 	public HHRoutingPreparationDB(Connection conn) throws SQLException {
 		super(conn);
 		if (!compactDB) {
-			insPoint = conn
-					.prepareStatement("INSERT INTO points(idPoint, ind, roadId, start, end, sx31, sy31, ex31, ey31) "
-							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
-			insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, indPoint, clusterInd) VALUES(?, ?, ?)");
+			Statement st = conn.createStatement();
+			st.execute("CREATE TABLE IF NOT EXISTS clusters(idPoint, pointGeoUniDir, clusterInd)");
+			st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
+			st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId)");
+			st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
+			insPoint = conn.prepareStatement("INSERT INTO points(idPoint, pointGeoUniDir, pointGeoId, roadId, start, end, sx31, sy31, ex31, ey31) "
+							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			insCluster = conn.prepareStatement("INSERT INTO clusters(idPoint, pointGeoUniDir, clusterInd) VALUES(?, ?, ?)");
 		}
 	}
+	
+	public void loadNetworkPoints(TLongObjectHashMap<NetworkBorderPoint> networkPointsCluster) throws SQLException {
+		Statement s = conn.createStatement();
+		ResultSet rs = s.executeQuery("SELECT pointGeoUniDir, pointGeoId, idPoint, start, end  FROM points ");
+		while(rs.next()) {
+			long pointGeoUniDir = rs.getLong(1);
+			if (!networkPointsCluster.containsKey(pointGeoUniDir)) {
+				networkPointsCluster.put(pointGeoUniDir, new NetworkBorderPoint(pointGeoUniDir));
+			}
+			int pointId = rs.getInt(3);
+			networkPointsCluster.get(pointGeoUniDir).set(rs.getLong(2), pointId, rs.getLong(4) < rs.getLong(5));
+			maxPointDBID = Math.max(pointId, maxPointDBID);
+		}
+		rs.close();
+		s.close();
+	}
+
 
 	public static void compact(Connection src, Connection tgt) throws SQLException {
+		// TODO not correct column names
 		Statement st = tgt.createStatement();
 		st.execute(
 				"CREATE TABLE IF NOT EXISTS points(pointGeoId, id, chInd, roadId, start, end, sx31, sy31, ex31, ey31,  PRIMARY key (id))"); // ind
@@ -104,6 +126,17 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 	
 	
+	public int getMaxClusterId() throws SQLException {
+		Statement s = conn.createStatement();
+		ResultSet rs = s.executeQuery("select max(clusterInd) from clusters");
+		if (rs.next()) {
+			return rs.getInt(1) + 1;
+		}
+		rs.close();
+		s.close();
+		return 0;
+	}
+
 
 
 	public void updatePointsCHInd(Collection<NetworkDBPoint> pnts) throws SQLException {
@@ -224,35 +257,32 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ins.close();
 	}
 
-	public void insertCluster(int clusterUniqueIndex, TLongObjectHashMap<RouteSegmentVertexDir> borderPoints, TLongObjectHashMap<Integer> pointDbInd) throws SQLException {
-		TLongObjectIterator<? extends RouteSegment> it = borderPoints.iterator();
-		while (it.hasNext()) {
+	public void insertCluster(int clusterUniqueIndex, List<RouteSegmentBorderPoint> borderPoints, 
+			TLongObjectHashMap<NetworkBorderPoint> pointDbInd) throws SQLException {
+		for(RouteSegmentBorderPoint obj : borderPoints) {
 			batchInsPoint++;
-			it.advance();
-			long pntId = it.key();
-			RouteSegment obj = it.value();
-			int pointInd;
-			if (!pointDbInd.contains(pntId)) {
-				pointInd = pointDbInd.size();
-				pointDbInd.put(pntId, pointInd);
-				int p = 1;
-				insPoint.setLong(p++, pntId);
-				insPoint.setInt(p++, pointInd);
-				insPoint.setLong(p++, obj.getRoad().getId());
-				insPoint.setLong(p++, obj.getSegmentStart());
-				insPoint.setLong(p++, obj.getSegmentEnd());
-				insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
-				insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
-				insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
-				insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
-				insPoint.addBatch();
-			} else {
-				pointInd = pointDbInd.get(pntId);
+			if(!pointDbInd.containsKey(obj.unidirId)) {
+				pointDbInd.put(obj.unidirId, new NetworkBorderPoint(obj.unidirId));
 			}
-			
+			NetworkBorderPoint npnt = pointDbInd.get(obj.unidirId);
+			int pointDbId = maxPointDBID++;
+			npnt.set(obj.unidirId, pointDbId, obj.getSegmentStart() < obj.getSegmentEnd());
+			int p = 1;
+			insPoint.setInt(p++, pointDbId);
+			insPoint.setLong(p++, obj.unidirId);
+			insPoint.setLong(p++, obj.uniqueId);
+			insPoint.setLong(p++, obj.getRoad().getId());
+			insPoint.setLong(p++, obj.getSegmentStart());
+			insPoint.setLong(p++, obj.getSegmentEnd());
+			insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
+			insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
+			insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
+			insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
+			insPoint.addBatch();
+
 			int p2 = 1;
-			insCluster.setLong(p2++, pntId);
-			insCluster.setInt(p2++, pointInd);
+			insCluster.setInt(p2++, pointDbId);
+			insCluster.setLong(p2++, obj.unidirId);
 			insCluster.setInt(p2++, clusterUniqueIndex);
 			insCluster.addBatch();
 
@@ -308,6 +338,33 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		rs.close();
 	}
 	
+	static class NetworkBorderPoint {
+		long unidirId;
+		long positiveGeoId;
+		long positiveDbId;
+		long negativeGeoId;
+		long negativeDbId;
+		
+		public NetworkBorderPoint(long unidirId) {
+			this.unidirId = unidirId;
+		}
+		
+		public void set(long geoId, int dbId, boolean pos) {
+			if (pos) {
+				if (positiveGeoId != 0) {
+					throw new IllegalStateException();
+				}
+				positiveGeoId = geoId;
+				positiveDbId = dbId;
+			} else {
+				if (negativeDbId != 0) {
+					throw new IllegalStateException();
+				}
+				negativeGeoId = geoId;
+				negativeDbId = dbId;
+			}
+		}
+	}
 
 	static class NetworkRouteRegion {
 		int id = 0;

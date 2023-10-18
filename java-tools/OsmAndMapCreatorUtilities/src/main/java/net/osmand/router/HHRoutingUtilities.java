@@ -31,6 +31,7 @@ import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
 import net.osmand.util.MapUtils;
+import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
 
 public class HHRoutingUtilities {
 	static long DEBUG_OSM_ID = -1;
@@ -50,18 +51,6 @@ public class HHRoutingUtilities {
 	}
 
 
-	static long calculateRoutePointInternalId(final RouteDataObject road, int pntId, int nextPntId) {
-		return HHRoutePlanner.calculateRoutePointInternalId(road, pntId, nextPntId);
-	}
-	
-	static long calculateRoutePointInternalId(long id, int pntId, int nextPntId) {
-		return HHRoutePlanner.calculateRoutePointInternalId(id, pntId, nextPntId);
-	}
-
-	static long calculateRoutePointInternalId(RouteSegment segm) {
-		return HHRoutePlanner.calculateRoutePointInternalId(segm);
-	}
-	
 
 	static void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment s) {
 		Way w = new Way(DEBUG_OSM_ID--);
@@ -77,7 +66,7 @@ public class HHRoutingUtilities {
 		int ys = s.getRoad().getPoint31YTile(s.getSegmentEnd());
 		w.addNode(new Node(MapUtils.get31LatitudeY(ys), MapUtils.get31LongitudeX(xs), DEBUG_OSM_ID--));
 		w.putTag("oid", (s.getRoad().getId() / 64) + "");
-		osmObjects.put(calculateRoutePointInternalId(s), w);
+		osmObjects.put(calcUniDirRoutePointInternalId(s), w);
 	}
 	
 	public static void addWay(TLongObjectHashMap<Entity> osmObjects, NetworkDBSegment segment, String tag, String value) {
@@ -160,7 +149,7 @@ public class HHRoutingUtilities {
 					if (merge) {
 						while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
 							RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
-							pntKey = calculateRoutePointInternalId(nxt);
+							pntKey = calcUniDirRoutePointInternalId(nxt);
 							if (!visitedSegments.containsKey(pntKey) || viewed.contains(pntKey)) {
 								break;
 							}
