@@ -37,6 +37,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
+import net.osmand.util.MapUtils;
 
 public class HHRoutingShortcutCreator {
 
@@ -58,7 +59,7 @@ public class HHRoutingShortcutCreator {
 
 	private static File sourceFile() {
 		CLEAN = true;
-		DEBUG_VERBOSE_LEVEL = 2;
+		DEBUG_VERBOSE_LEVEL = 1;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
@@ -210,9 +211,6 @@ public class HHRoutingShortcutCreator {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = networkPointsByGeoId.size() / 100.0;
 		int ind = 0, prevPrintInd = 0;
-		// 1.2 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 }
-		// - 3372.75 vs 2598
-		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
 		TLongObjectHashMap<RouteSegment> segments = new TLongObjectHashMap<>();
 		for (NetworkDBPoint pnt : networkPointsByGeoId.valueCollection()) {
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end),
@@ -318,18 +316,34 @@ public class HHRoutingShortcutCreator {
 		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt1, pnt2);
-
+		TLongObjectHashMap<Double> allDistances = new TLongObjectHashMap<Double>();
 		List<RouteSegment> res = new ArrayList<>();
-		ctx.unloadAllData(); // needed for proper multidijsktra work
-		ctx.calculationProgress = new RouteCalculationProgress();
-		MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s, null, segments);
-		if (frs != null) {
-			TLongSet set = new TLongHashSet();
-			for (RouteSegment o : frs.all) {
-				// duplicates are possible as alternative routes
-				long pntId = calcUniDirRoutePointInternalId(o);
-				if (set.add(pntId)) {
-					res.add(o);
+		// 1.2 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
+		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
+		for (int iteration = 0; iteration < 2; iteration++) {
+			res.clear();
+			BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = iteration == 0;
+			ctx.unloadAllData(); // needed for proper multidijsktra work
+			ctx.calculationProgress = new RouteCalculationProgress();
+			// TODO one direction
+			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
+					null, segments);
+			if (frs != null) {
+				TLongSet set = new TLongHashSet();
+				for (RouteSegment o : frs.all) {
+					// duplicates are possible as alternative routes
+					long pntId = calcUniDirRoutePointInternalId(o);
+					if (set.add(pntId)) {
+						res.add(o);
+						if(iteration == 0) {
+							allDistances.put(pntId, (double) o.distanceFromStart);
+						} else {
+							Double d1 = allDistances.get(pntId);
+							if (Math.abs(1 - d1 / o.distanceFromStart)*100 > 0.1) {
+								System.out.printf("%.2f %% err, %.2f != %.2f \n", Math.abs(1 - d1 / o.distanceFromStart)*100, d1, o.distanceFromStart);
+							}
+						}
+					}
 				}
 			}
 		}

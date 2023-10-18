@@ -46,29 +46,30 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkBorderPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
+
+//IN PROGRESS
+//1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
+//1.x Routing bug disconnected roads - holes (!) - Direction shortcuts
+//2.x BUG: give routes direction shortcuts 
+
+//TESTING
+//1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
+//1.x BinaryRoutePlanner TODO failing tests
+//1.x Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
+//1.x Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
+
 // TODO 
 // 1.2 HHRoutingShortcutCreator TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.3 HHRoutingShortcutCreator TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.5 BinaryRoutePlanner TODO test that routing time is different with on & off! should be the same
-// 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.9 TODO revert 2 queues to fail fast in 1 direction
+// 1.12 TODO compact chdb even more (1)use short dist 2) use point ind in cluster) 
+// 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.10 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.11 Verify client A* bidirection (route segment calc) equals to server time 
-// 1.12 TODO compact chdb even more
 // 1.13 Allow private roads on server calculation 
 
-
-// IN PROGRESS
-// 1.x Bug restriction on turns and directions -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
-// 1.x Routing bug disconnected roads - holes (!)
-// 1.x Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
-// 2.x BUG: give routes direction shortcuts 
-
-// TESTING
-// 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
-// 1.x BinaryRoutePlanner TODO failing tests
-// 1.x Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
@@ -79,10 +80,11 @@ import net.osmand.util.MapUtils;
 // 2.7 FILE: Implement border crossing issue on client
 // 2.8 Implement route recalculation in case distance > original 10% ? 
 // 2.9 FILE: different dates for maps!
-// 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. there should be maximum visited points
+// 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
+//       There should be maximum at preproce visited points < 50K-100K
 // 2.11 EX10 - example that min depth doesn't give good approximation
-// 2.12 1 - remove 1 shared border point cluster (useless)
 // 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation?
+// 2.14 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters) 
 
 // 3 Later implementation
 // 3.1 Alternative routes (distribute initial points better)
@@ -134,7 +136,7 @@ public class HHRoutingSubGraphCreator {
 	
 
 	private static File testData() {
-		DEBUG_VERBOSE_LEVEL = 1;
+		DEBUG_VERBOSE_LEVEL = 0;
 		DEBUG_STORE_ALL_ROADS = 1;
 		CLEAN = true;
 		
@@ -170,7 +172,7 @@ public class HHRoutingSubGraphCreator {
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingSubGraphCreator proc = new HHRoutingSubGraphCreator();
 		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(networkDB);
-		List<Entity> objects = visualizeWays(ctx.visualClusters, ctx.allVisitedVertices);
+		List<Entity> objects = visualizeWays(ctx.visualClusters);
 		saveOsmFile(objects, new File(folder, name + ".osm"));
 		networkDB.close();
 	}
@@ -849,7 +851,7 @@ public class HHRoutingSubGraphCreator {
 		int clusterInd = 0;
 		NetworkRouteRegion currentProcessingRegion;
 		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
-		TLongObjectHashMap<RouteSegment> allVisitedVertices = new TLongObjectHashMap<>(); 
+		TLongIntHashMap allVisitedVertices = new TLongIntHashMap(); 
 
 		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
 			this.rctx = rctx;
@@ -887,7 +889,7 @@ public class HHRoutingSubGraphCreator {
 			// force reload cause subregions could change on rerun
 			rctx = prepareContext.gcMemoryLimitToUnloadAll(rctx, subRegions, true);
 
-			this.allVisitedVertices = new TLongObjectHashMap<RouteSegment>();
+			this.allVisitedVertices = new TLongIntHashMap();
 			for (NetworkRouteRegion nr : subRegions) {
 				if (nr != nrouteRegion) {
 					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
@@ -897,9 +899,6 @@ public class HHRoutingSubGraphCreator {
 
 		public void addCluster(NetworkIsland cluster) {
 			cluster.dbIndex = clusterInd++;
-			if (currentProcessingRegion != null) {
-				currentProcessingRegion.visitedVertices.putAll(cluster.visitedVertices);
-			}
 			try {
 				networkDB.insertCluster(cluster.dbIndex, cluster.borderVertices, networkPointToDbInd);
 			} catch (SQLException e) {
@@ -910,7 +909,10 @@ public class HHRoutingSubGraphCreator {
 				if (allVisitedVertices.containsKey(key)) {
 					throw new IllegalStateException("Point was already visited");
 				}
-				allVisitedVertices.put(key, cluster.visitedVertices.get(key)); 
+				allVisitedVertices.put(key, cluster.dbIndex);
+				if (currentProcessingRegion != null) {
+					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
+				}
 			}
 			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
