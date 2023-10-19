@@ -67,7 +67,7 @@ public class HHRoutingShortcutCreator {
 		return new File(System.getProperty("maps.dir"), name);
 	}
 	
-	static void testCompact() throws SQLException {
+	static void testCompact() throws SQLException, IOException {
 		String nameFile = System.getProperty("maps.dir");
 //		nameFile += "Germany";
 		nameFile += "Montenegro_europe_2.road.obf_car";
@@ -77,7 +77,7 @@ public class HHRoutingShortcutCreator {
 	}
 	
 	public static void main(String[] args) throws Exception {
-		testCompact(); if(true) return;
+//		if (args.length == 0) testCompact(); return;
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
 		String routingProfile = "car"; 
 		for (String a : args) {
@@ -109,7 +109,7 @@ public class HHRoutingShortcutCreator {
 				new File(folder, name + HHRoutingDB.CEXT));
 	}
 	
-	public static void compact(File source, File target) throws SQLException {
+	public static void compact(File source, File target) throws SQLException, IOException {
 		System.out.printf("Compacting %s -> %s...\n", source.getName(), target.getName());
 		target.delete();
 		HHRoutingPreparationDB.compact(DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG),

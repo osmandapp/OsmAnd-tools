@@ -48,9 +48,10 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 2.x BUG: give routes direction shortcuts 
-// 1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
-// 1.x Routing bug disconnected roads - holes (!) - Direction shortcuts
+// 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) 
+// 2.x BUG: give routes direction shortcuts DONE 
+// 1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!) - DONE
+// 1.x Routing bug disconnected roads - holes (!) - Direction shortcuts - DONE
 
 // TESTING
 // 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
@@ -65,7 +66,7 @@ import net.osmand.util.MapUtils;
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
-// 1.10 compact chdb even more (1)use short dist 2) use point ind in cluster) 
+
 // 1.11 clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.12 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.13 Allow private roads on server calculation 
@@ -84,13 +85,14 @@ import net.osmand.util.MapUtils;
 // 2.11 EX10 - example that min depth doesn't give good approximation
 // 2.12 Improve / Review A* finish condition
 // 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation?
+// 2.14 Some points have no segments in/out (oneway roads)
 
 // 3 Later implementation
 // 3.1 Alternative routes (HHRoutePlanner distribute initial points better)
 // 3.2 Avoid specific road
 // 3.3 Deprioritize or exclude roads (parameters)
 // 3.4 Live data (think about it)
-// 3.6 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters) 
+// 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters) 
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level

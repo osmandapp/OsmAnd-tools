@@ -1,25 +1,28 @@
 package net.osmand.router;
 
 import java.io.File;
-
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TLongIntIterator;
-import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TByteArrayList;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.util.Algorithms;
@@ -66,7 +69,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 
 
-	public static void compact(Connection src, Connection tgt) throws SQLException {
+	public static void compact(Connection src, Connection tgt) throws SQLException, IOException {
 		Statement st = tgt.createStatement();
 		String columnNames = "pointGeoId, idPoint, clusterId, dualIdPoint, dualClusterId, chInd, roadId, start, end, sx31, sy31, ex31, ey31";
 		int columnSize = columnNames.split(",").length;
@@ -79,12 +82,13 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			}
 			insPnts += "?";
 		}
-		PreparedStatement pIns = tgt
-				.prepareStatement("INSERT INTO points(" + columnNames + ")  " + " VALUES (" + insPnts + ")");
+		HHRoutingDB sourceDB = new HHRoutingDB(src);
+		TLongObjectHashMap<NetworkDBPoint> pointsById = sourceDB.loadNetworkPoints();
+		TIntObjectHashMap<List<NetworkDBPoint>> outPoints = sourceDB.groupByClusters(pointsById, true);
+		TIntObjectHashMap<List<NetworkDBPoint>> inPoints = sourceDB.groupByClusters(pointsById, false);
+		PreparedStatement pIns = tgt.prepareStatement("INSERT INTO points(" + columnNames + ") VALUES (" + insPnts + ")");
 		ResultSet rs = src.createStatement().executeQuery(" select " + columnNames + " from points");
-		TIntArrayList ids = new TIntArrayList();
 		while (rs.next()) {
-			ids.add(rs.getInt(2));
 			for (int i = 0; i < columnSize; i++) {
 				pIns.setObject(i + 1, rs.getObject(i + 1));
 			}
@@ -92,39 +96,54 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 		pIns.executeBatch();
 		PreparedStatement sIns = tgt.prepareStatement("INSERT INTO segments(id, ins, outs)  VALUES (?, ?, ?)");
-		PreparedStatement selOut = src
-				.prepareStatement(" select idConnPoint, dist, shortcut from segments where idPoint = ?");
-		PreparedStatement selIn = src
-				.prepareStatement(" select idPoint, dist, shortcut from segments where idConnPoint = ?");
-		for (int id : ids.toArray()) {
-			selIn.setInt(1, id);
-			selOut.setInt(1, id);
-			sIns.setInt(1, id);
-			sIns.setBytes(2, prepareSegments(selIn));
-			sIns.setBytes(3, prepareSegments(selOut));
+		PreparedStatement selOut = src.prepareStatement(" select idConnPoint, dist, shortcut from segments where idPoint = ?");
+		PreparedStatement selIn = src.prepareStatement(" select idPoint, dist, shortcut from segments where idConnPoint = ?");
+		for(NetworkDBPoint p : pointsById.valueCollection()) {
+			selIn.setInt(1, p.index);
+			selOut.setInt(1, p.index);
+			sIns.setInt(1, p.index);
+//			System.out.println(p.index  + " -> cluster " + p.clusterId + " dual clusterId  " + p.dualPoint.clusterId);
+//			System.out.println("Incoming Cluster: " + inPoints.get(p.clusterId));
+			sIns.setBytes(2, prepareSegments(selIn, pointsById, inPoints.get(p.clusterId)));
+//			System.out.println("Outgoing cluster: " + outPoints.get(p.dualPoint.clusterId));
+			sIns.setBytes(3, prepareSegments(selOut, pointsById, outPoints.get(p.dualPoint.clusterId)));
 			sIns.addBatch();
 		}
+		System.out.println("Zeros " + indZeros + " bytes " + bytes + " conn " + connections);
 		sIns.executeBatch();
 		tgt.close();
 
 	}
-
-	private static byte[] prepareSegments(PreparedStatement selIn) throws SQLException {
-		TIntArrayList bs = new TIntArrayList();
+	// TODO remove stats
+	static int indZeros;
+	static int bytes;
+	static int connections;
+	private static byte[] prepareSegments(PreparedStatement selIn, TLongObjectHashMap<NetworkDBPoint> pointsById, List<NetworkDBPoint> pnts) throws SQLException, IOException {
+		TByteArrayList tbs = new TByteArrayList();
 		ResultSet q = selIn.executeQuery();
+		BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(null, null);
+		for (NetworkDBPoint p : pnts) {
+			p.rtCnt = 0;
+		}
 		while (q.next()) {
 			int conn = q.getInt(1);
-			bs.add(conn);
-			float dist = q.getFloat(2);
-			bs.add(Float.floatToIntBits(dist)); // distance
-			bs.add(q.getInt(3)); // shortcut
+			int distInt = (int) Math.max(1, q.getFloat(2) * 10);
+			NetworkDBPoint connPoint = pointsById.get(conn);
+			int ind = Collections.binarySearch(pnts, connPoint, indexComparator);
+			if (ind < 0) {
+				throw new IllegalStateException();
+			}
+			pnts.get(ind).rtCnt = distInt;
 		}
-
-		byte[] bytes = new byte[bs.size() * 4];
-		for (int i = 0; i < bs.size(); i++) {
-			Algorithms.putIntToBytes(bytes, i * 4, bs.get(i));
+		for (NetworkDBPoint p : pnts) {
+			if (p.rtCnt == 0) {
+				indZeros++;
+			}
+			bmiw.writeRawVarint32(tbs, p.rtCnt);
+			connections++;
 		}
-		return bytes;
+		bytes += tbs.toArray().length;
+		return tbs.toArray();
 	}
 
 	public void recreateSegments() throws SQLException {
