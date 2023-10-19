@@ -98,10 +98,10 @@ public class HHRoutingShortcutCreator {
 		}
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
-		TLongObjectHashMap<NetworkDBPoint> pntsByGeoId = networkDB.loadNetworkPointsByGeoId();
-		int segments = networkDB.loadNetworkSegments(pntsByGeoId.valueCollection());
-		System.out.printf("Loaded %,d points, existing shortcuts %,d \n", pntsByGeoId.size(), segments);
-		Collection<Entity> objects = proc.buildNetworkShortcuts(pntsByGeoId, networkDB);
+		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints();
+		int segments = networkDB.loadNetworkSegments(pnts.valueCollection());
+		System.out.printf("Loaded %,d points, existing shortcuts %,d \n", pnts.size(), segments);
+		Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
 		saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		networkDB.close();
 		
@@ -208,14 +208,14 @@ public class HHRoutingShortcutCreator {
 
 	}
 
-	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> networkPointsByGeoId,
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> pnts,
 			HHRoutingPreparationDB networkDB)
 			throws InterruptedException, IOException, SQLException, ExecutionException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
-		double sz = networkPointsByGeoId.size() / 100.0;
+		double sz = pnts.size() / 100.0;
 		int ind = 0, prevPrintInd = 0;
 		TLongObjectHashMap<RouteSegment> segments = new TLongObjectHashMap<>();
-		for (NetworkDBPoint pnt : networkPointsByGeoId.valueCollection()) {
+		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end),
 					new RouteSegment(null, pnt.start, pnt.end));
 			HHRoutingUtilities.addNode(osmObjects, pnt, null, "highway", "stop");
@@ -227,10 +227,15 @@ public class HHRoutingShortcutCreator {
 		int taskId = 0;
 		int total = 0;
 		int batchSize = BATCH_SIZE;
-		if (networkPointsByGeoId.size() / THREAD_POOL < batchSize) {
-			batchSize = networkPointsByGeoId.size() / THREAD_POOL + 1;
+		if (pnts.size() / THREAD_POOL < batchSize) {
+			batchSize = pnts.size() / THREAD_POOL + 1;
 		}
-		for (NetworkDBPoint pnt : networkPointsByGeoId.valueCollection()) {
+		
+		TLongObjectHashMap<NetworkDBPoint> networkPointsByGeoId = new TLongObjectHashMap<>();
+		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+			networkPointsByGeoId.put(pnt.pntGeoId, pnt);
+		}
+		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			ind++;
 			if (pnt.connected.size() > 0) {
 				pnt.connected.clear(); // for gc
@@ -316,9 +321,9 @@ public class HHRoutingShortcutCreator {
 
 	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegmentPoint s, TLongObjectMap<RouteSegment> segments)
 			throws InterruptedException, IOException {
-		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
-		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
-		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt2);
+//		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
+		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
+		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
 		TLongObjectHashMap<Double> allDistances = new TLongObjectHashMap<Double>();
 		List<RouteSegment> res = new ArrayList<>();
 		// TODO 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
