@@ -925,6 +925,7 @@ public class HHRoutingSubGraphCreator {
 		public void startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
 			currentProcessingRegion = nrouteRegion;
 			currentProcessingRegion.visitedVertices = new TLongIntHashMap();
+			currentProcessingRegion.points = -1;
 			for (NetworkRouteRegion nr : routeRegions) {
 				nr.unload();
 			}

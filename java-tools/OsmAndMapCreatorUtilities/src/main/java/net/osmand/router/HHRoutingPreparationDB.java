@@ -358,21 +358,16 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		return has;
 	}
 	
-	public void loadVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
+	public TLongIntHashMap loadVisitedVertices(int id) throws SQLException {
 		PreparedStatement ps = conn.prepareStatement("SELECT pntId, clusterId FROM routeRegionPoints WHERE id = ? ");
-		ps.setLong(1, networkRouteRegion.id);
+		ps.setInt(1, id);
 		ResultSet rs = ps.executeQuery();
-		if (networkRouteRegion.visitedVertices != null) {
-			throw new IllegalStateException();
-		}
-		networkRouteRegion.visitedVertices = new TLongIntHashMap();
+		TLongIntHashMap pnts = new TLongIntHashMap();
 		while (rs.next()) {
-			networkRouteRegion.visitedVertices.put(rs.getLong(1), rs.getInt(2));
+			pnts.put(rs.getLong(1), rs.getInt(2));
 		}
-		networkRouteRegion.points = -1;		
-		System.out.printf("Loading visited vertices for %s - %d.\n", networkRouteRegion.region.getName(),
-				networkRouteRegion.visitedVertices.size());
 		rs.close();
+		return pnts;
 	}
 	
 	static class NetworkBorderPoint {
@@ -450,7 +445,13 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 
 		public TLongIntHashMap getVisitedVertices(HHRoutingPreparationDB networkDB) throws SQLException {
 			if (points >= 0) {
-				networkDB.loadVisitedVertices(this);
+				if (visitedVertices != null && visitedVertices.size() > 0) {
+					throw new IllegalStateException();
+				}
+				visitedVertices = networkDB.loadVisitedVertices(id);
+				points = -1;
+				HHRoutingPrepareContext.logf("Loading visited vertices for %s - %d...", region.getName(),
+						visitedVertices.size());
 			}
 			return visitedVertices;
 		}
