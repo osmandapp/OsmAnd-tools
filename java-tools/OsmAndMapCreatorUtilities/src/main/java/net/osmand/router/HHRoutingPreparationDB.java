@@ -437,7 +437,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 
 		public void unload() {
-			if (this.visitedVertices != null && this.visitedVertices.size() > 10000) {
+			if (this.visitedVertices != null && this.visitedVertices.size() > 100000) {
 				this.points = this.visitedVertices.size();
 				this.visitedVertices = null;
 			}
