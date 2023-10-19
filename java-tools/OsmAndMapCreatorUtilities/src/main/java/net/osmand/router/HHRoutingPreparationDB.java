@@ -391,7 +391,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		public void set(long geoId, int dbId, int clusterId, boolean positive, RouteSegmentBorderPoint obj) {
 			if (positive) {
 				if (positiveGeoId != 0) {
-					throw new IllegalStateException();
+					String msg = String.format("Geoid %d was already assigned %d (%d) in cluster %d (%d)  %s",
+							positiveGeoId, positiveDbId, dbId, positiveClusterId, clusterId, obj);
+					throw new IllegalStateException(msg);
 				}
 				positiveGeoId = geoId;
 				positiveDbId = dbId;
@@ -399,7 +401,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				positiveClusterId = clusterId;
 			} else {
 				if (negativeDbId != 0) {
-					throw new IllegalStateException();
+					String msg = String.format("Geoid %d was already assigned %d (%d) in cluster %d (%d)  %s",
+							negativeGeoId, negativeDbId, dbId, negativeClusterId, clusterId, obj);
+					throw new IllegalStateException(msg);
 				}
 				negativeObj = obj;
 				negativeGeoId = geoId;
