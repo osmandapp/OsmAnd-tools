@@ -38,7 +38,6 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
-import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
@@ -48,12 +47,12 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) 
+
+// TESTING
+// 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  
 // 2.x BUG: give routes direction shortcuts DONE 
 // 1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!) - DONE
 // 1.x Routing bug disconnected roads - holes (!) - Direction shortcuts - DONE
-
-// TESTING
 // 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
 // 1.x BinaryRoutePlanner TODO failing tests
 // 1.x Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
@@ -62,11 +61,15 @@ import net.osmand.util.MapUtils;
 // TODO 
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 // 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
+// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
-// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
+// 1.7 HHRoutePlanner this is more correct to preserve startDistance
+// 1.9 HHRoutePlanner bug with detailed calculation
 
+// 1.8 HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.11 clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.12 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.13 Allow private roads on server calculation 
@@ -76,19 +79,19 @@ import net.osmand.util.MapUtils;
 // 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
 // 2.5 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
-// 2.6 FILE: Final data structure optimal by size, access time - protobuf (roughly 4 bytes per edge!)
+// 2.6 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 2.7 FILE: Implement border crossing issue on client
 // 2.8 Implement route recalculation in case distance > original 10% ? 
 // 2.9 FILE: different dates for maps!
 // 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
 //       There should be maximum at preproce visited points < 50K-100K
 // 2.11 EX10 - example that min depth doesn't give good approximation
-// 2.12 Improve / Review A* finish condition
-// 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation?
-// 2.14 Some points have no segments in/out (oneway roads)
+// 2.12 HHRoutePlanner Improve / Review A* finish condition
+// 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation - test?
+// 2.14 Some points have no segments in/out (oneway roads) - simplify?
 
 // 3 Later implementation
-// 3.1 Alternative routes (HHRoutePlanner distribute initial points better)
+// 3.1 HHRoutePlanner Alternative routes - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)
 // 3.2 Avoid specific road
 // 3.3 Deprioritize or exclude roads (parameters)
 // 3.4 Live data (think about it)
