@@ -139,7 +139,7 @@ public class HHRoutingSubGraphCreator {
 	
 
 	private static File testData() {
-		DEBUG_VERBOSE_LEVEL = 0;
+		DEBUG_VERBOSE_LEVEL = 1;
 //		DEBUG_STORE_ALL_ROADS = 1;
 //		CLEAN = true;
 		
@@ -162,6 +162,8 @@ public class HHRoutingSubGraphCreator {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
+			} else if (a.equals("--debug")) {
+				DEBUG_VERBOSE_LEVEL = 1;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
