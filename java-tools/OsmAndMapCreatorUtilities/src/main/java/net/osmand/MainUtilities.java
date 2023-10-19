@@ -68,7 +68,16 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
 
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) {
+		try {
+			mainException(args);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
+	public static void mainException(String[] args) throws Exception {
 		if (args.length == 0) {
 			printSynopsys();
 		} else {
