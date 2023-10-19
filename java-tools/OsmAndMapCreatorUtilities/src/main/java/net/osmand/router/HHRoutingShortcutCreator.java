@@ -1,9 +1,8 @@
 package net.osmand.router;
 
+import static net.osmand.router.HHRoutePlanner.calculateRoutePointInternalId;
 import static net.osmand.router.HHRoutingPrepareContext.logf;
 import static net.osmand.router.HHRoutingUtilities.addWay;
-import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
-import static net.osmand.router.HHRoutePlanner.calculateRoutePointInternalId;
 import static net.osmand.router.HHRoutingUtilities.getPoint;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
 
@@ -37,7 +36,6 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
-import net.osmand.util.MapUtils;
 
 public class HHRoutingShortcutCreator {
 
@@ -71,13 +69,15 @@ public class HHRoutingShortcutCreator {
 	
 	static void testCompact() throws SQLException {
 		String nameFile = System.getProperty("maps.dir");
-		nameFile += "Germany";
+//		nameFile += "Germany";
+		nameFile += "Montenegro_europe_2.road.obf_car";
 		File source = new File(nameFile + HHRoutingDB.EXT);
 		File target = new File(nameFile + HHRoutingDB.CEXT);
 		compact(source, target);
 	}
 	
 	public static void main(String[] args) throws Exception {
+		testCompact(); if(true) return;
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
 		String routingProfile = "car"; 
 		for (String a : args) {
@@ -92,7 +92,7 @@ public class HHRoutingShortcutCreator {
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName() + "_" + routingProfile;
 		File dbFile = new File(folder, name + HHRoutingDB.EXT);
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
 		if (CLEAN && dbFile.exists()) {
 			networkDB.recreateSegments();
 		}
@@ -167,6 +167,9 @@ public class HHRoutingShortcutCreator {
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
 					for (RouteSegment t : result) {
 						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(), t.getSegmentStart(), t.getSegmentEnd()));
+						if (pnt.dualPoint.clusterId != end.clusterId) {
+							throw new IllegalStateException("Point can lead only to 1 dual cluster " + pnt + " " + end);
+						}
 						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
 						pnt.connected.add(segment);
 						while (t != null) {
@@ -315,24 +318,28 @@ public class HHRoutingShortcutCreator {
 			throws InterruptedException, IOException {
 		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt2 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
-		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt1, pnt2);
+		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt2);
 		TLongObjectHashMap<Double> allDistances = new TLongObjectHashMap<Double>();
 		List<RouteSegment> res = new ArrayList<>();
-		// 1.2 TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598
-		BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = true;
-		for (int iteration = 0; iteration < 2; iteration++) {
+		// TODO 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
+		// TODO 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
+//		BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = false;
+		
+		for (int iteration = 0; iteration < 1; iteration++) {
 			res.clear();
-			BinaryRoutePlanner.PRECISE_DIST_MEASUREMENT = iteration == 0;
+//			BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
+//			BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
-			// TODO one direction
+			ctx.config.PENALTY_FOR_REVERSE_DIRECTION = -1;
+//			BinaryRoutePlanner.TRACE_ROUTING = true;
 			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
 					null, segments);
 			if (frs != null) {
 				TLongSet set = new TLongHashSet();
 				for (RouteSegment o : frs.all) {
 					// duplicates are possible as alternative routes
-					long pntId = calcUniDirRoutePointInternalId(o);
+					long pntId = calculateRoutePointInternalId(o.getRoad().getId(), o.getSegmentStart(), o.getSegmentEnd());
 					if (set.add(pntId)) {
 						res.add(o);
 						if(iteration == 0) {

@@ -47,29 +47,28 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
 
-//IN PROGRESS
-//1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
-//1.x Routing bug disconnected roads - holes (!) - Direction shortcuts
-//2.x BUG: give routes direction shortcuts 
+// IN PROGRESS
+// 2.x BUG: give routes direction shortcuts 
+// 1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
+// 1.x Routing bug disconnected roads - holes (!) - Direction shortcuts
 
-//TESTING
-//1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
-//1.x BinaryRoutePlanner TODO failing tests
-//1.x Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
-//1.x Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
+// TESTING
+// 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
+// 1.x BinaryRoutePlanner TODO failing tests
+// 1.x Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
+// 1.x Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
 
 // TODO 
-// 1.2 HHRoutingShortcutCreator TODO for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
-// 1.3 HHRoutingShortcutCreator TODO routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
-// 1.4 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// 1.5 BinaryRoutePlanner TODO test that routing time is different with on & off! should be the same
-// 1.9 TODO revert 2 queues to fail fast in 1 direction
-// 1.12 TODO compact chdb even more (1)use short dist 2) use point ind in cluster) 
-// 1.8 TODO clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
-// 1.10 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
-// 1.11 Verify client A* bidirection (route segment calc) equals to server time 
+// 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
+// 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
+// 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
+// 1.4 HHRoutePlanner use cache boundaries to speed up
+// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
+// 1.10 compact chdb even more (1)use short dist 2) use point ind in cluster) 
+// 1.11 clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
+// 1.12 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.13 Allow private roads on server calculation 
-
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
@@ -83,21 +82,20 @@ import net.osmand.util.MapUtils;
 // 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
 //       There should be maximum at preproce visited points < 50K-100K
 // 2.11 EX10 - example that min depth doesn't give good approximation
+// 2.12 Improve / Review A* finish condition
 // 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation?
-// 2.14 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters) 
 
 // 3 Later implementation
-// 3.1 Alternative routes (distribute initial points better)
+// 3.1 Alternative routes (HHRoutePlanner distribute initial points better)
 // 3.2 Avoid specific road
 // 3.3 Deprioritize or exclude roads (parameters)
 // 3.4 Live data (think about it)
-// 3.5 Improve A* finish condition
+// 3.6 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters) 
 
 // *4* Future (if needed) - Introduce 3/4 level 
-// 4.1 Merge islands (<=2) - FAILED merging islands > 3
-// 4.2 Implement midpoint algorithm - HARD to calculate midpoint level
-// 4.3 Implement CH algorithm - HARD to wait to finish CH
-// 4.4 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
+// 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
+// 4.2 Implement CH algorithm - HARD to wait to finish CH
+// 4.3 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
 
 public class HHRoutingSubGraphCreator {
 
@@ -168,7 +166,7 @@ public class HHRoutingSubGraphCreator {
 		if (CLEAN && dbFile.exists()) {
 			dbFile.delete();
 		}
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingSubGraphCreator proc = new HHRoutingSubGraphCreator();
 		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(networkDB);

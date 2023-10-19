@@ -98,8 +98,7 @@ public class HHRoutingTopGraphCreator {
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		
-		HHRoutingPreparationDB networkDB = 
-				new HHRoutingPreparationDB(DBDialect.SQLITE.getDatabaseConnection(new File(folder, name + HHRoutingDB.EXT).getAbsolutePath(), LOG));
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + HHRoutingDB.EXT));
 		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
 		if (PROCESS == PROC_MIDPOINTS) {
