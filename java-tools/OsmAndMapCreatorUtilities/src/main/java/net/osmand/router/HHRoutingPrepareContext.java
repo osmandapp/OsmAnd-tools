@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,13 @@ public class HHRoutingPrepareContext {
 		} else {
 			FILE_SOURCES.add(obfFile);
 		}
+		Collections.sort(FILE_SOURCES, new Comparator<File>() {
+
+			@Override
+			public int compare(File o1, File o2) {
+				return Long.compare(o1.length(), o2.length());
+			}
+		});
 	}
 	
 
