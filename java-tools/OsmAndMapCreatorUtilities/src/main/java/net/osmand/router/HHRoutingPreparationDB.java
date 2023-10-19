@@ -67,11 +67,23 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			maxPointDBID = Math.max(pointId, maxPointDBID);
 			maxClusterID = Math.max(clusterId, maxClusterID);
 		}
+		maxClusterID = Math.max(maxClusterID, getMaxClusterId());
 		rs.close();
 		s.close();
 		return maxClusterID;
 	}
 
+	private int getMaxClusterId() throws SQLException {
+		Statement s = conn.createStatement();
+		ResultSet rs = s.executeQuery("select max(clusterId) from routeRegionPoints");
+		if (rs.next()) {
+			return rs.getInt(1) + 1;
+		}
+		rs.close();
+		s.close();
+		return 0;
+	}
+		  
 
 	public static void compact(Connection src, Connection tgt) throws SQLException, IOException {
 		Statement st = tgt.createStatement();
