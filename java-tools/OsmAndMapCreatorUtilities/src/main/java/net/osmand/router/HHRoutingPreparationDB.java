@@ -196,7 +196,6 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			if (batchInsPoint > BATCH_SIZE) {
 				batchInsPoint = 0;
 				insPoint.executeBatch();
-				updDualPoint.executeBatch();
 			}
 		}
 		insPoint.executeBatch();

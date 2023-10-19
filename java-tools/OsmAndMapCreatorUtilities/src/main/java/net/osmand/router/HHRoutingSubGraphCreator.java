@@ -932,12 +932,27 @@ public class HHRoutingSubGraphCreator {
 
 		public void finishRegionProcess() throws SQLException {
 			logf("Tiles " + rctx.calculationProgress.getInfo(null).get("tiles"));
-			logf("Saving visited %,d points from %s to db...", currentProcessingRegion.getPoints(),
+			int ins = 0, tl = 0;
+			for (NetworkBorderPoint npnt : networkPointToDbInd.valueCollection()) {
+				if (npnt.positiveObj != null) {
+					ins++;
+				}
+				if (npnt.positiveDbId > 0) {
+					tl++;
+				}
+				if (npnt.negativeObj != null) {
+					ins++;
+				}
+				if (npnt.negativeDbId > 0) {
+					tl++;
+				}
+			}
+			logf("Saving visited %,d points (%,d border points) from %s to db...", currentProcessingRegion.getPoints(), ins,
 					currentProcessingRegion.region.getName());
 			networkDB.insertVisitedVerticesBorderPoints(currentProcessingRegion, networkPointToDbInd);
 			currentProcessingRegion.unload();
 			currentProcessingRegion = null;
-			logf("     saved - total %,d points", getTotalPoints());
+			logf("     saved - total %,d points (%,d border points), ", getTotalPoints(), tl);
 
 		}
 		
