@@ -362,14 +362,16 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		PreparedStatement ps = conn.prepareStatement("SELECT pntId, clusterId FROM routeRegionPoints WHERE id = ? ");
 		ps.setLong(1, networkRouteRegion.id);
 		ResultSet rs = ps.executeQuery();
-		if(networkRouteRegion.visitedVertices != null) {
+		if (networkRouteRegion.visitedVertices != null) {
 			throw new IllegalStateException();
 		}
 		networkRouteRegion.visitedVertices = new TLongIntHashMap();
-		while(rs.next()) {
+		while (rs.next()) {
 			networkRouteRegion.visitedVertices.put(rs.getLong(1), rs.getInt(2));
 		}
 		networkRouteRegion.points = -1;		
+		System.out.printf("Loading visited vertices for %s - %d.\n", networkRouteRegion.region.getName(),
+				networkRouteRegion.visitedVertices.size());
 		rs.close();
 	}
 	
@@ -417,8 +419,8 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		int id = 0;
 		RouteRegion region;
 		File file;
-		int points = -1; // -1 loaded points
-		TLongIntHashMap visitedVertices = new TLongIntHashMap();
+		int points = 0; // -1 loaded points, 0 init, > 0 - visitedVertices = null
+		TLongIntHashMap visitedVertices;
 
 		public NetworkRouteRegion(RouteRegion r, File f) {
 			region = r;
@@ -440,14 +442,14 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 
 		public void unload() {
-			if (this.visitedVertices != null && this.visitedVertices.size() > 1000) {
+			if (this.visitedVertices != null && this.visitedVertices.size() > 10000) {
 				this.points = this.visitedVertices.size();
 				this.visitedVertices = null;
 			}
 		}
 
 		public TLongIntHashMap getVisitedVertices(HHRoutingPreparationDB networkDB) throws SQLException {
-			if (points > 0) {
+			if (points >= 0) {
 				networkDB.loadVisitedVertices(this);
 			}
 			return visitedVertices;

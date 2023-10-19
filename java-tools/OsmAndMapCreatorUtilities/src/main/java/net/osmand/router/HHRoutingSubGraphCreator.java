@@ -202,7 +202,8 @@ public class HHRoutingSubGraphCreator {
 		Set<String> routeRegionNames = new TreeSet<>();
 		for (RouteRegion r : rctx.reverseMap.keySet()) {
 			if (routeRegionNames.add(r.getName())) {
-				ctx.routeRegions.add(new NetworkRouteRegion(r, rctx.reverseMap.get(r).getFile()));
+				NetworkRouteRegion reg = new NetworkRouteRegion(r, rctx.reverseMap.get(r).getFile());
+				ctx.routeRegions.add(reg);
 			} else {
 				logf("Ignore route region %s as duplicate", r.getName());
 			}
@@ -923,6 +924,7 @@ public class HHRoutingSubGraphCreator {
 
 		public void startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
 			currentProcessingRegion = nrouteRegion;
+			currentProcessingRegion.visitedVertices = new TLongIntHashMap();
 			for (NetworkRouteRegion nr : routeRegions) {
 				nr.unload();
 			}
