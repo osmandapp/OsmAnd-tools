@@ -428,8 +428,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 
 		public QuadRect getRect() {
-			return new QuadRect(region.getLeftLongitude(), region.getTopLatitude(), region.getRightLongitude(),
-					region.getBottomLatitude());
+			double d = 1;
+			return new QuadRect(Math.max(-180,region.getLeftLongitude()-d), Math.min(85,region.getTopLatitude()+d), 
+					Math.min(180,region.getRightLongitude()+d),Math.max(-85,region.getBottomLatitude()-d));
 		}
 
 		public boolean intersects(NetworkRouteRegion nrouteRegion) {
