@@ -37,6 +37,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement updDualPoint;
 	private PreparedStatement insVisitedPoints;
 	private int maxPointDBID;
+	private int maxClusterID;
 
 	public HHRoutingPreparationDB(File dbFile) throws SQLException {
 		super(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
@@ -52,7 +53,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 	}
 	
-	public void loadNetworkPoints(TLongObjectHashMap<NetworkBorderPoint> networkPointsCluster) throws SQLException {
+	public int loadNetworkPoints(TLongObjectHashMap<NetworkBorderPoint> networkPointsCluster) throws SQLException {
 		Statement s = conn.createStatement();
 		ResultSet rs = s.executeQuery("SELECT pointGeoUniDir, pointGeoId, idPoint, clusterId,  start, end  FROM points ");
 		while (rs.next()) {
@@ -61,11 +62,14 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				networkPointsCluster.put(pointGeoUniDir, new NetworkBorderPoint(pointGeoUniDir));
 			}
 			int pointId = rs.getInt(3);
+			int clusterId = rs.getInt(4);
 			networkPointsCluster.get(pointGeoUniDir).set(rs.getLong(2), pointId, rs.getInt(4), rs.getLong(5) < rs.getLong(6), null);
 			maxPointDBID = Math.max(pointId, maxPointDBID);
+			maxClusterID = Math.max(clusterId, maxClusterID);
 		}
 		rs.close();
 		s.close();
+		return maxClusterID;
 	}
 
 
@@ -147,16 +151,6 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 	
 	
-	public int getMaxClusterId() throws SQLException {
-		Statement s = conn.createStatement();
-		ResultSet rs = s.executeQuery("select max(clusterId) from points");
-		if (rs.next()) {
-			return rs.getInt(1) + 1;
-		}
-		rs.close();
-		s.close();
-		return 0;
-	}
 
 	public void updatePointsCHInd(Collection<NetworkDBPoint> pnts) throws SQLException {
 		PreparedStatement updCHInd = conn.prepareStatement("UPDATE  points SET chInd = ? where idPoint = ?");
@@ -327,8 +321,8 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ins.close();
 	}
 
-	public void prepareBorderPointsToInsert(int clusterIndex, List<RouteSegmentBorderPoint> borderPoints, 
-			TLongObjectHashMap<NetworkBorderPoint> pointDbInd) throws SQLException {
+	public int prepareBorderPointsToInsert(List<RouteSegmentBorderPoint> borderPoints, TLongObjectHashMap<NetworkBorderPoint> pointDbInd) {
+		int clusterIndex = ++maxClusterID;
 		for (RouteSegmentBorderPoint obj : borderPoints) {
 			if (!pointDbInd.containsKey(obj.unidirId)) {
 				pointDbInd.put(obj.unidirId, new NetworkBorderPoint(obj.unidirId));
@@ -337,6 +331,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			int pointDbId = ++maxPointDBID;
 			npnt.set(obj.unidirId, pointDbId, clusterIndex, obj.getSegmentStart() < obj.getSegmentEnd(), obj);
 		}
+		return clusterIndex; 
 	}
 	
 	public boolean hasVisitedPoints(NetworkRouteRegion nrouteRegion) throws SQLException {
@@ -382,7 +377,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			this.unidirId = unidirId;
 		}
 		
-		public void set(long geoId, int dbId, int clusterId,boolean positive, RouteSegmentBorderPoint obj) {
+		public void set(long geoId, int dbId, int clusterId, boolean positive, RouteSegmentBorderPoint obj) {
 			if (positive) {
 				if (positiveGeoId != 0) {
 					throw new IllegalStateException();

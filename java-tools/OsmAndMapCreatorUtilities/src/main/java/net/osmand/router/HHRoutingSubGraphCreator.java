@@ -201,7 +201,6 @@ public class HHRoutingSubGraphCreator {
 			}
 		}
 		networkDB.insertRegions(ctx.routeRegions);
-		ctx.clusterInd = networkDB.getMaxClusterId();
 
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
@@ -846,7 +845,7 @@ public class HHRoutingSubGraphCreator {
 		NetworkCollectStats stats = new NetworkCollectStats();
 		List<NetworkIsland> visualClusters = new ArrayList<>();
 		
-		int clusterInd = 0;
+		int lastClusterInd = 0;
 		NetworkRouteRegion currentProcessingRegion;
 		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
 		TLongIntHashMap allVisitedVertices = new TLongIntHashMap(); 
@@ -862,10 +861,6 @@ public class HHRoutingSubGraphCreator {
 				totalPoints += r.getPoints();
 			}
 			return totalPoints;
-		}
-
-		public int clusterSize() {
-			return clusterInd;
 		}
 
 		public int borderPointsSize() {
@@ -896,8 +891,8 @@ public class HHRoutingSubGraphCreator {
 		}
 
 		public void addCluster(NetworkIsland cluster) {
-			cluster.dbIndex = clusterInd++;
-			
+			cluster.dbIndex = networkDB.prepareBorderPointsToInsert(cluster.borderVertices, networkPointToDbInd);
+			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
 			for (long key : cluster.visitedVertices.keys()) {
 				if (allVisitedVertices.containsKey(key)) {
@@ -908,11 +903,7 @@ public class HHRoutingSubGraphCreator {
 					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
 				}
 			}
-			try {
-				networkDB.prepareBorderPointsToInsert(cluster.dbIndex, cluster.borderVertices, networkPointToDbInd);
-			} catch (SQLException e) {
-				throw new RuntimeException(e);
-			}
+				
 			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
 				if (DEBUG_STORE_ALL_ROADS > 0) {
@@ -959,7 +950,7 @@ public class HHRoutingSubGraphCreator {
 
 		
 		public void printStatsNetworks() {
-			stats.printStatsNetworks(getTotalPoints(), clusterSize());
+			stats.printStatsNetworks(getTotalPoints(), lastClusterInd);
 		}
 
 	}
@@ -1003,7 +994,7 @@ public class HHRoutingSubGraphCreator {
 						int borderPointsSize = ctx.borderPointsSize();
 						logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters", indProc,
 								indProc * 100.0f / estimatedRoads, ctx.getTotalPoints() + borderPointsSize,
-								borderPointsSize, ctx.clusterSize());
+								borderPointsSize, ctx.lastClusterInd);
 					}
 				}
 			}
