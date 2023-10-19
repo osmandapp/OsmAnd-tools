@@ -21,7 +21,7 @@ public class HHRoutingPrepareContext {
 
 	final static int MEMORY_RELOAD_MB = 1000; //
 	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
-	static final int ROUTING_MEMORY_LIMIT = 1024;
+	static final int ROUTING_MEMORY_LIMIT = 2048;
 	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 	static long MEMORY_LAST_USED_MB;
 	static long DEBUG_START_TIME = 0;

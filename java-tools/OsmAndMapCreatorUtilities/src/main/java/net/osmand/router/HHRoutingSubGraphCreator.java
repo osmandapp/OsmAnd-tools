@@ -47,16 +47,10 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
+// 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!) - DONE
 
 // TESTING
 // 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
-// 2.x BUG: give routes direction shortcuts DONE 
-// 1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!) - DONE
-// 1.x Routing bug disconnected roads - holes (!) - Direction shortcuts - DONE
-// 1.x BinaryRoutePlanner TODO double checkfix correct at all?  https://github.com/osmandapp/OsmAnd/issues/14148
-// 1.x BinaryRoutePlanner TODO failing tests
-// 1.x Fast distance mercator calculation (PRECISE_DIST_MEASUREMENT=false)
-// 1.x Exception 3 - shared border points between clusters  (Bug cause only 2 directions)  (!)
 
 // TODO 
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
@@ -67,13 +61,13 @@ import net.osmand.util.MapUtils;
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 1.7 HHRoutePlanner this is more correct to preserve startDistance
-// 1.9 HHRoutePlanner bug with detailed calculation
-// 1.10 HHRoutePlanner calculate start/end alternative routes
 
 // 1.8 HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.11 clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
 // 1.12 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
-// 1.13 Allow private roads on server calculation 
+// 1.13 Allow private roads on server calculation (allow_private)
+// 1.14 Cut start / end to projection as in detailed calculation (MapCreator)
+// 1.15 HHRoutePlanner calculate start/end alternative routes
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
