@@ -336,6 +336,18 @@ public class HHRoutingSubGraphCreator {
 		// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
 		int diff = mincuts.size() + borderPoints.size() - c.toVisitVertices.size();
 		if (diff != 0) {
+			int ind = 0;
+			for (RouteSegmentBorderPoint b : borderPoints) {
+				System.out.println("Border point " + (ind++) + " " + b);
+			}
+			ind = 0;
+			for (RouteSegmentBorderPoint b : mincuts.valueCollection()) {
+				System.out.println("Mincut " + (ind++) + " " + b);
+			}
+			ind = 0;
+			for (RouteSegmentVertex b : c.toVisitVertices.valueCollection()) {
+				System.out.println("To visit " + (ind++) + " " + b);
+			}
 			String msg = String.format("BUG!! mincut %d + %d network pnts != %d graph reached size: %s", mincuts.size(),
 					borderPoints.size(), c.toVisitVertices.size(), c.startToString);
 			System.err.println(msg);
