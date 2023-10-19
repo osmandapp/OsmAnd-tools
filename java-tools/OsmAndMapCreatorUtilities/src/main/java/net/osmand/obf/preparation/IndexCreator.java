@@ -77,6 +77,7 @@ public class IndexCreator {
 	IndexRouteRelationCreator indexRouteRelationCreator;
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
+	PropagateToNodes propagateToNodes;
 
 	private File dbFile;
 	private File mapFile;
@@ -208,6 +209,9 @@ public class IndexCreator {
 				heightData.proccess((Way) e);
 			}
 		}
+		if (propagateToNodes != null) {
+			propagateToNodes.propagateRestrictionNodeTags(e);
+		}
 		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, icc);
 		}
@@ -280,8 +284,8 @@ public class IndexCreator {
 				if (indexAddressCreator != null) {
 					indexAddressCreator.registerCityIfNeeded(entity);
 				}
-				if (indexRouteCreator != null) {
-					indexRouteCreator.registerRestrictionNodes(entity);
+				if (propagateToNodes != null) {
+					propagateToNodes.registerRestrictionNodes(entity);
 				}
 				// accept to allow db creator parse it
 				return true;
@@ -508,11 +512,12 @@ public class IndexCreator {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
 
+		this.propagateToNodes = new PropagateToNodes(renderingTypes);
 		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
-		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
+		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 
 		if (!settings.extraRelations.isEmpty()) {
