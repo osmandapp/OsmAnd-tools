@@ -49,7 +49,7 @@ import net.osmand.util.MapUtils;
 // IN PROGRESS
 
 // TESTING
-// 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  
+// 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
 // 2.x BUG: give routes direction shortcuts DONE 
 // 1.x Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!) - DONE
 // 1.x Routing bug disconnected roads - holes (!) - Direction shortcuts - DONE
@@ -68,6 +68,7 @@ import net.osmand.util.MapUtils;
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 1.7 HHRoutePlanner this is more correct to preserve startDistance
 // 1.9 HHRoutePlanner bug with detailed calculation
+// 1.10 HHRoutePlanner calculate start/end alternative routes
 
 // 1.8 HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.11 clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
@@ -75,6 +76,7 @@ import net.osmand.util.MapUtils;
 // 1.13 Allow private roads on server calculation 
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
+// 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
 // 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
@@ -86,7 +88,6 @@ import net.osmand.util.MapUtils;
 // 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
 //       There should be maximum at preproce visited points < 50K-100K
 // 2.11 EX10 - example that min depth doesn't give good approximation
-// 2.12 HHRoutePlanner Improve / Review A* finish condition
 // 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation - test?
 // 2.14 Some points have no segments in/out (oneway roads) - simplify?
 

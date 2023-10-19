@@ -109,15 +109,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			sIns.setBytes(3, prepareSegments(selOut, pointsById, outPoints.get(p.dualPoint.clusterId)));
 			sIns.addBatch();
 		}
-		System.out.println("Zeros " + indZeros + " bytes " + bytes + " conn " + connections);
 		sIns.executeBatch();
 		tgt.close();
 
 	}
-	// TODO remove stats
-	static int indZeros;
-	static int bytes;
-	static int connections;
 	private static byte[] prepareSegments(PreparedStatement selIn, TLongObjectHashMap<NetworkDBPoint> pointsById, List<NetworkDBPoint> pnts) throws SQLException, IOException {
 		TByteArrayList tbs = new TByteArrayList();
 		ResultSet q = selIn.executeQuery();
@@ -136,13 +131,11 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			pnts.get(ind).rtCnt = distInt;
 		}
 		for (NetworkDBPoint p : pnts) {
-			if (p.rtCnt == 0) {
-				indZeros++;
-			}
+//			if (p.rtCnt == 0) {
+//				indZeros++;
+//			}
 			bmiw.writeRawVarint32(tbs, p.rtCnt);
-			connections++;
 		}
-		bytes += tbs.toArray().length;
 		return tbs.toArray();
 	}
 
