@@ -141,7 +141,7 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 //		DEBUG_STORE_ALL_ROADS = 1;
-//		CLEAN = true;
+		CLEAN = true;
 		
 //		TOTAL_MAX_POINTS = 10000;
 //		TOTAL_MIN_POINTS = 100;
@@ -149,8 +149,8 @@ public class HHRoutingSubGraphCreator {
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
-		name = "Germany";
-		ROUTING_PROFILE = "bicycle";
+//		name = "Germany";
+//		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
 
@@ -318,46 +318,62 @@ public class HHRoutingSubGraphCreator {
 		c.clearVisitedPoints();
 		c.queue.add(c.getVertex(pnt, false));
 		List<RouteSegmentBorderPoint> borderPoints = new ArrayList<>();
+		List<RouteSegmentBorderPoint> exPoints = new ArrayList<>();
 		while (!c.queue.isEmpty()) {
 			RouteSegmentVertex ls = c.queue.poll();
 			if (mincuts.containsKey(ls.getId())) {
+				borderPoints.add(mincuts.get(ls.getId()));
 				continue;
 			}
 			if (c.ctx.testIfNetworkPoint(ls.getId())) {
-				boolean pos = (ls.parentRoute.getEndPointX() == ls.getStartPointX()
-						&& ls.parentRoute.getEndPointY() == ls.getStartPointY())
-						|| (ls.parentRoute.getStartPointX() == ls.getStartPointX()
-								&& ls.parentRoute.getStartPointY() == ls.getStartPointY());
-				borderPoints.add(new RouteSegmentBorderPoint(ls, pos));
+				exPoints.add(RouteSegmentBorderPoint.fromParent(ls));
 				continue;
 			}
 			proceed(c, ls, c.queue, -1);
 		}
-		// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
-		int diff = mincuts.size() + borderPoints.size() - c.toVisitVertices.size();
-		if (diff != 0) {
-			int ind = 0;
-			for (RouteSegmentBorderPoint b : borderPoints) {
-				System.out.println("Border point " + (ind++) + " " + b);
-			}
-			ind = 0;
-			for (RouteSegmentBorderPoint b : mincuts.valueCollection()) {
-				System.out.println("Mincut " + (ind++) + " " + b);
-			}
-			ind = 0;
+		
+		if (borderPoints.size() + exPoints.size() != c.toVisitVertices.size() || 
+				mincuts.size() != borderPoints.size()) {
+			List<RouteSegmentBorderPoint> toVisit = new ArrayList<>();
 			for (RouteSegmentVertex b : c.toVisitVertices.valueCollection()) {
-				System.out.println("To visit " + (ind++) + " " + b);
+				toVisit.add(RouteSegmentBorderPoint.fromParent(b));
 			}
-			String msg = String.format("BUG!! mincut %d + %d network pnts != %d graph reached size: %s", mincuts.size(),
-					borderPoints.size(), c.toVisitVertices.size(), c.startToString);
-			System.err.println(msg);
-			throw new IllegalStateException(msg); 
+			print(sortPoints(exPoints), "Existing");
+			print(sortPoints(borderPoints), "Mincut reached");
+			print(sortPoints(new ArrayList<>(mincuts.valueCollection())), "Mincut");
+			print(sortPoints(toVisit), "To Visit");
+			String msg = String.format("BUG!! mincut %d  ( = %d) + %d network pnts != %d graph reached size: %s", 
+					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
+			if (mincuts.size() != borderPoints.size()) {
+				// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
+				System.err.println(msg);
+			} else {
+				throw new IllegalStateException(msg);
+			}
 		}
-		borderPoints.addAll(mincuts.valueCollection());
+		borderPoints.addAll(exPoints);
 		return borderPoints;
 		
 	}
 
+
+	private void print(List<RouteSegmentBorderPoint> borderPoints, String prefix) {
+		int ind = 0;
+		for (RouteSegmentBorderPoint p : borderPoints) {
+			System.out.println(prefix + " " + (ind++) + " " + p);
+		}
+	}
+
+	private List<RouteSegmentBorderPoint> sortPoints(List<RouteSegmentBorderPoint> borderPoints) {
+		borderPoints.sort(new Comparator<RouteSegmentBorderPoint>() {
+
+			@Override
+			public int compare(RouteSegmentBorderPoint o1, RouteSegmentBorderPoint o2) {
+				return Long.compare(o1.road.getId(), o2.road.getId());
+			}
+		});
+		return borderPoints;
+	}
 
 	private boolean proceed(NetworkIsland c, RouteSegmentVertex vertex, PriorityQueue<RouteSegmentVertex> queue,
 			int maxDepth) {
@@ -618,17 +634,27 @@ public class HHRoutingSubGraphCreator {
 	}
 	
 	
-	class RouteSegmentBorderPoint extends RouteSegment {
+	static class RouteSegmentBorderPoint extends RouteSegment {
 		public final boolean dir;
 		public final long unidirId;
 		public final long uniqueId;
 		// segment [inner point index -> outer point index]
+		
+		
 		public RouteSegmentBorderPoint(RouteSegment s, boolean dir) {
 			super(s.getRoad(), dir ? s.getSegmentStart() : s.getSegmentEnd(),
 					dir ? s.getSegmentEnd() : s.getSegmentStart());
 			unidirId = calcUniDirRoutePointInternalId(s);
 			uniqueId = calculateRoutePointInternalId(getRoad().getId(), getSegmentStart(), getSegmentEnd());
 			this.dir = dir;
+		}
+		
+		public static RouteSegmentBorderPoint fromParent(RouteSegment ls) {
+			boolean pos = (ls.parentRoute.getEndPointX() == ls.getStartPointX()
+					&& ls.parentRoute.getEndPointY() == ls.getStartPointY())
+					|| (ls.parentRoute.getStartPointX() == ls.getStartPointX()
+							&& ls.parentRoute.getStartPointY() == ls.getStartPointY());
+			return new RouteSegmentBorderPoint(ls, pos);
 		}
 		
 	}
