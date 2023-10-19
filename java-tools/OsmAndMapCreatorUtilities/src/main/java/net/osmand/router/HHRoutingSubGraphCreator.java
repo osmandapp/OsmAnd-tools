@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
@@ -133,14 +134,14 @@ public class HHRoutingSubGraphCreator {
 	}; 
 
 	static int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 10000;
-	
 	static boolean CLEAN = false;
+	static String ROUTING_PROFILE = "car";
 	
 
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 0;
-		DEBUG_STORE_ALL_ROADS = 1;
-		CLEAN = true;
+//		DEBUG_STORE_ALL_ROADS = 1;
+//		CLEAN = true;
 		
 //		TOTAL_MAX_POINTS = 10000;
 //		TOTAL_MIN_POINTS = 100;
@@ -148,30 +149,30 @@ public class HHRoutingSubGraphCreator {
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
-//		name = "Germany";
+		name = "Germany";
+		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
 
 	public static void main(String[] args) throws Exception {
 		CLEAN = false;
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
-		String routingProfile = "car";
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
-				routingProfile = a.substring("--routing_profile=".length());
+				ROUTING_PROFILE = a.substring("--routing_profile=".length());
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName() + "_" + routingProfile;
+		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 
 		File dbFile = new File(folder, name + HHRoutingDB.EXT);
 		if (CLEAN && dbFile.exists()) {
 			dbFile.delete();
 		}
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
-		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
+		prepareContext = new HHRoutingPrepareContext(obfFile, ROUTING_PROFILE);
 		HHRoutingSubGraphCreator proc = new HHRoutingSubGraphCreator();
 		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(networkDB);
 		List<Entity> objects = visualizeWays(ctx.visualClusters);
@@ -194,7 +195,7 @@ public class HHRoutingSubGraphCreator {
 			}
 			return ctx;
 		}
-		
+
 		networkDB.loadNetworkPoints(ctx.networkPointToDbInd);
 		Set<String> routeRegionNames = new TreeSet<>();
 		for (RouteRegion r : rctx.reverseMap.keySet()) {
@@ -205,7 +206,13 @@ public class HHRoutingSubGraphCreator {
 			}
 		}
 		networkDB.insertRegions(ctx.routeRegions);
+		Collections.sort(ctx.routeRegions, new Comparator<NetworkRouteRegion>() {
 
+			@Override
+			public int compare(NetworkRouteRegion o1, NetworkRouteRegion o2) {
+				return Integer.compare(o1.id, o2.id);
+			}
+		});
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
 			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, ctx.routeRegions.size(),
@@ -225,8 +232,9 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
-			System.out.println("Region bbox (l,t - r,b): " + nrouteRegion.region.getLeftLongitude() + ", " + nrouteRegion.region.getTopLatitude() + " x " + nrouteRegion.region.getRightLongitude()
-					+ ", " + nrouteRegion.region.getBottomLatitude());
+			System.out.println("Region bbox (l,t - r,b): " + nrouteRegion.region.getLeftLongitude() + ", "
+					+ nrouteRegion.region.getTopLatitude() + " x " + nrouteRegion.region.getRightLongitude() + ", "
+					+ nrouteRegion.region.getBottomLatitude());
 			if (nrouteRegion.region.getLeftLongitude() > nrouteRegion.region.getRightLongitude()) {
 				if (routeRegion.getLength() < 1000) {
 					System.out.printf("Skip region  %s - %d bytes\n", nrouteRegion.region.getName(),
@@ -325,7 +333,7 @@ public class HHRoutingSubGraphCreator {
 		}
 		// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
 		int diff = mincuts.size() + borderPoints.size() - c.toVisitVertices.size();
-		if (diff != 0 && diff != 1) {
+		if (diff != 0) {
 			String msg = String.format("BUG!! mincut %d + %d network pnts != %d graph reached size: %s", mincuts.size(),
 					borderPoints.size(), c.toVisitVertices.size(), c.startToString);
 			System.err.println(msg);

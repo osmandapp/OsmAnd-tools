@@ -305,7 +305,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				.prepareStatement("INSERT INTO routeRegions(id, name, filePointer, size, filename, left, right, top, bottom) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		int ind = 0;
-		for(NetworkRouteRegion nr : regions) {
+		for (NetworkRouteRegion nr : regions) {
 			// name is enough
 			check.setString(1, nr.region.getName());
 //			check.setInt(2, nr.region.getFilePointer());
