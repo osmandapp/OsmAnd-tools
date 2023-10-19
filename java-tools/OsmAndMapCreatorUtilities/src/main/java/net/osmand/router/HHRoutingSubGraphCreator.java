@@ -897,11 +897,7 @@ public class HHRoutingSubGraphCreator {
 
 		public void addCluster(NetworkIsland cluster) {
 			cluster.dbIndex = clusterInd++;
-			try {
-				networkDB.insertCluster(cluster.dbIndex, cluster.borderVertices, networkPointToDbInd);
-			} catch (SQLException e) {
-				throw new RuntimeException(e);
-			}
+			
 			stats.addCluster(cluster);
 			for (long key : cluster.visitedVertices.keys()) {
 				if (allVisitedVertices.containsKey(key)) {
@@ -911,6 +907,11 @@ public class HHRoutingSubGraphCreator {
 				if (currentProcessingRegion != null) {
 					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
 				}
+			}
+			try {
+				networkDB.prepareBorderPointsToInsert(cluster.dbIndex, cluster.borderVertices, networkPointToDbInd);
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
 			}
 			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
@@ -942,7 +943,7 @@ public class HHRoutingSubGraphCreator {
 			logf("Tiles " + rctx.calculationProgress.getInfo(null).get("tiles"));
 			logf("Saving visited %,d points from %s to db...", currentProcessingRegion.getPoints(),
 					currentProcessingRegion.region.getName());
-			networkDB.insertVisitedVertices(currentProcessingRegion);
+			networkDB.insertVisitedVerticesBorderPoints(currentProcessingRegion, networkPointToDbInd);
 			currentProcessingRegion.unload();
 			currentProcessingRegion = null;
 			logf("     saved - total %,d points", getTotalPoints());

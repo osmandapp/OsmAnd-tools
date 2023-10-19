@@ -55,13 +55,13 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	public void loadNetworkPoints(TLongObjectHashMap<NetworkBorderPoint> networkPointsCluster) throws SQLException {
 		Statement s = conn.createStatement();
 		ResultSet rs = s.executeQuery("SELECT pointGeoUniDir, pointGeoId, idPoint, clusterId,  start, end  FROM points ");
-		while(rs.next()) {
+		while (rs.next()) {
 			long pointGeoUniDir = rs.getLong(1);
 			if (!networkPointsCluster.containsKey(pointGeoUniDir)) {
 				networkPointsCluster.put(pointGeoUniDir, new NetworkBorderPoint(pointGeoUniDir));
 			}
 			int pointId = rs.getInt(3);
-			networkPointsCluster.get(pointGeoUniDir).set(rs.getLong(2), pointId, rs.getInt(4), rs.getLong(5) < rs.getLong(6));
+			networkPointsCluster.get(pointGeoUniDir).set(rs.getLong(2), pointId, rs.getInt(4), rs.getLong(5) < rs.getLong(6), null);
 			maxPointDBID = Math.max(pointId, maxPointDBID);
 		}
 		rs.close();
@@ -173,7 +173,40 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		updCHInd.close();
 	}
 	
-	public void insertVisitedVertices(NetworkRouteRegion networkRouteRegion) throws SQLException {
+	public void insertVisitedVerticesBorderPoints(NetworkRouteRegion networkRouteRegion, TLongObjectHashMap<NetworkBorderPoint> borderPoints) throws SQLException {
+		int batchInsPoint = 0;
+		for (NetworkBorderPoint npnt : borderPoints.valueCollection()) {
+			if (npnt.positiveObj == null && npnt.negativeObj == null) {
+				continue;
+			}
+			if (npnt.positiveObj != null) {
+				insPoint(npnt.positiveObj, npnt.positiveClusterId, npnt.positiveDbId);
+				npnt.positiveObj = null; // inserted
+				batchInsPoint++;
+			}
+			if (npnt.negativeObj != null) {
+				insPoint(npnt.negativeObj, npnt.negativeClusterId, npnt.negativeDbId);
+				npnt.negativeObj = null; // inserted
+				batchInsPoint++;
+			}
+			if (npnt.positiveDbId > 0 && npnt.negativeDbId > 0) {
+				updDualPoint.setInt(1, npnt.negativeDbId);
+				updDualPoint.setInt(2, npnt.negativeClusterId);
+				updDualPoint.setInt(3, npnt.positiveDbId);
+				updDualPoint.addBatch();
+				updDualPoint.setInt(1, npnt.positiveDbId);
+				updDualPoint.setInt(2, npnt.positiveClusterId);
+				updDualPoint.setInt(3, npnt.negativeDbId);
+				updDualPoint.addBatch();
+			}
+			if (batchInsPoint > BATCH_SIZE) {
+				batchInsPoint = 0;
+				insPoint.executeBatch();
+				updDualPoint.executeBatch();
+			}
+		}
+		insPoint.executeBatch();
+		updDualPoint.executeBatch();
 		int ind = 0;
 		TLongIntIterator it = networkRouteRegion.visitedVertices.iterator();
 		while (it.hasNext()) {
@@ -188,9 +221,24 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			}
 		}
 		insVisitedPoints.executeBatch();
-		insPoint.executeBatch();
-		updDualPoint.executeBatch();
 		
+	}
+
+	private void insPoint(RouteSegmentBorderPoint obj, int clusterIndex, int pointDbId)
+			throws SQLException {
+		int p = 1;
+		insPoint.setInt(p++, pointDbId);
+		insPoint.setLong(p++, obj.unidirId);
+		insPoint.setLong(p++, obj.uniqueId);
+		insPoint.setInt(p++, clusterIndex);
+		insPoint.setLong(p++, obj.getRoad().getId());
+		insPoint.setLong(p++, obj.getSegmentStart());
+		insPoint.setLong(p++, obj.getSegmentEnd());
+		insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
+		insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
+		insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
+		insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
+		insPoint.addBatch();
 	}
 	
 	public void deleteShortcuts() throws SQLException {
@@ -279,46 +327,16 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ins.close();
 	}
 
-	public void insertCluster(int clusterUniqueIndex, List<RouteSegmentBorderPoint> borderPoints, 
+	public void prepareBorderPointsToInsert(int clusterIndex, List<RouteSegmentBorderPoint> borderPoints, 
 			TLongObjectHashMap<NetworkBorderPoint> pointDbInd) throws SQLException {
 		for (RouteSegmentBorderPoint obj : borderPoints) {
-			batchInsPoint++;
 			if (!pointDbInd.containsKey(obj.unidirId)) {
 				pointDbInd.put(obj.unidirId, new NetworkBorderPoint(obj.unidirId));
 			}
 			NetworkBorderPoint npnt = pointDbInd.get(obj.unidirId);
 			int pointDbId = ++maxPointDBID;
-			npnt.set(obj.unidirId, pointDbId, clusterUniqueIndex, obj.getSegmentStart() < obj.getSegmentEnd());
-			int p = 1;
-			insPoint.setInt(p++, pointDbId);
-			insPoint.setLong(p++, obj.unidirId);
-			insPoint.setLong(p++, obj.uniqueId);
-			insPoint.setInt(p++, clusterUniqueIndex);
-			insPoint.setLong(p++, obj.getRoad().getId());
-			insPoint.setLong(p++, obj.getSegmentStart());
-			insPoint.setLong(p++, obj.getSegmentEnd());
-			insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
-			insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
-			insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
-			insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
-			insPoint.addBatch();
-			if (npnt.positiveDbId > 0 && npnt.negativeDbId > 0) {
-				updDualPoint.setInt(1, npnt.negativeDbId);
-				updDualPoint.setInt(2, npnt.negativeClusterId);
-				updDualPoint.setInt(3, npnt.positiveDbId);
-				updDualPoint.addBatch();
-				updDualPoint.setInt(1, npnt.positiveDbId);
-				updDualPoint.setInt(2, npnt.positiveClusterId);
-				updDualPoint.setInt(3, npnt.negativeDbId);
-				updDualPoint.addBatch();
-			}
+			npnt.set(obj.unidirId, pointDbId, clusterIndex, obj.getSegmentStart() < obj.getSegmentEnd(), obj);
 		}
-		if (batchInsPoint > BATCH_SIZE) {
-			batchInsPoint = 0;
-			insPoint.executeBatch();
-			updDualPoint.executeBatch();
-		}
-
 	}
 	
 	public boolean hasVisitedPoints(NetworkRouteRegion nrouteRegion) throws SQLException {
@@ -354,26 +372,30 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		long positiveGeoId;
 		int positiveDbId;
 		int positiveClusterId;
+		RouteSegmentBorderPoint positiveObj;
 		long negativeGeoId;
 		int negativeDbId;
 		int negativeClusterId;
+		RouteSegmentBorderPoint negativeObj;
 		
 		public NetworkBorderPoint(long unidirId) {
 			this.unidirId = unidirId;
 		}
 		
-		public void set(long geoId, int dbId, int clusterId, boolean pos) {
-			if (pos) {
+		public void set(long geoId, int dbId, int clusterId,boolean positive, RouteSegmentBorderPoint obj) {
+			if (positive) {
 				if (positiveGeoId != 0) {
 					throw new IllegalStateException();
 				}
 				positiveGeoId = geoId;
 				positiveDbId = dbId;
+				positiveObj = obj;
 				positiveClusterId = clusterId;
 			} else {
 				if (negativeDbId != 0) {
 					throw new IllegalStateException();
 				}
+				negativeObj = obj;
 				negativeGeoId = geoId;
 				negativeDbId = dbId;
 				negativeClusterId = clusterId;
