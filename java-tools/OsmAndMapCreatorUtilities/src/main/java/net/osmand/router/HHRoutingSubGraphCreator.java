@@ -402,7 +402,7 @@ public class HHRoutingSubGraphCreator {
 			throw new IllegalStateException(String.format("%d %s was already locally visited", vertex.getId(), vertex.toString()));
 		}
 		if (c.ctx.testGlobalVisited(vertex.getId())) {
-			throw new IllegalStateException(String.format("%d %s was already globally visited: ", 
+			throw new IllegalStateException(String.format("%d %s was already globally visited: %s", 
 					vertex.getId(), vertex.toString(), c.ctx.globalVisitedMessage(vertex.getId())));
 		}
 		c.visitedVertices.put(vertex.getId(), DEBUG_STORE_ALL_ROADS > 2 ? vertex : null);
@@ -943,14 +943,15 @@ public class HHRoutingSubGraphCreator {
 		}
 		
 		public String globalVisitedMessage(long k) {
-			NetworkRouteRegion r = currentProcessingRegion;
+			NetworkRouteRegion r = null;
 			if (currentProcessingRegion != null && currentProcessingRegion.visitedVertices.containsKey(k)) {
 				r = currentProcessingRegion;
-			}
-			for (NetworkRouteRegion n : validateIntersectionRegions) {
-				if (n.visitedVertices.containsKey(k)) {
-					r = n;
-					break;
+			} else {
+				for (NetworkRouteRegion n : validateIntersectionRegions) {
+					if (n.visitedVertices.containsKey(k)) {
+						r = n;
+						break;
+					}
 				}
 			}
 			if (r != null) {
