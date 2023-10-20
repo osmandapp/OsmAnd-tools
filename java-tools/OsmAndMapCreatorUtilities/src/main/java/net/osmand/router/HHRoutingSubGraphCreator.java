@@ -966,6 +966,7 @@ public class HHRoutingSubGraphCreator {
 				if (nr.intersects(nrouteRegion)) {
 					logf("Intersects with %s %s.", nr.region.getName(), nr.rect.toString());
 //					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
+					nr.loadVisitedVertices(networkDB);
 					intersectionRegions.add(nr);
 					subRegions.add(nr);
 				} else {

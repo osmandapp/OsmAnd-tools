@@ -436,7 +436,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		int points = 0; // -1 loaded points, 0 init, > 0 - visitedVertices = null
 		TLongIntHashMap visitedVertices;
 		QuadRect rect;
-		double regionOverlap = 1; //0.2; // we don't need big overlap cause of visited bbox recalculation
+		double regionOverlap = 1;//0.2; // we don't need big overlap cause of visited bbox recalculation
 		QuadRect calcRect;
 
 		public NetworkRouteRegion(RouteRegion r, File f) {
@@ -495,7 +495,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			}
 		}
 
-		public TLongIntHashMap getVisitedVertices(HHRoutingPreparationDB networkDB) throws SQLException {
+		public TLongIntHashMap loadVisitedVertices(HHRoutingPreparationDB networkDB) throws SQLException {
 			if (points >= 0) {
 				if (visitedVertices != null && visitedVertices.size() > 0) {
 					throw new IllegalStateException();
