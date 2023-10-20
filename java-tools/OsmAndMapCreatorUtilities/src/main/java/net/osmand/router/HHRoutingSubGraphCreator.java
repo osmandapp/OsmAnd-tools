@@ -29,6 +29,7 @@ import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -39,6 +40,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
@@ -936,6 +938,7 @@ public class HHRoutingSubGraphCreator {
 		public void startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
 			currentProcessingRegion = nrouteRegion;
 			currentProcessingRegion.visitedVertices = new TLongIntHashMap();
+			currentProcessingRegion.calcRect = null;
 			currentProcessingRegion.points = -1;
 			this.allVisitedVertices = new TLongIntHashMap();
 			List<NetworkRouteRegion> subRegions = new ArrayList<>();
@@ -961,13 +964,18 @@ public class HHRoutingSubGraphCreator {
 			cluster.dbIndex = networkDB.prepareBorderPointsToInsert(cluster.borderVertices, networkPointToDbInd);
 			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
-			for (long key : cluster.visitedVertices.keys()) {
+			TLongObjectIterator<RouteSegment> it = cluster.visitedVertices.iterator();
+			while(it.hasNext()) {
+				it.advance();
+				long key = it.key();
 				if (allVisitedVertices.containsKey(key)) {
 					throw new IllegalStateException("Point was already visited");
 				}
 				allVisitedVertices.put(key, cluster.dbIndex);
 				if (currentProcessingRegion != null) {
 					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
+					RouteSegment v = it.value();
+					currentProcessingRegion.updateBbox(v.getEndPointX(), v.getEndPointY());
 				}
 			}
 				
@@ -1014,12 +1022,24 @@ public class HHRoutingSubGraphCreator {
 					tl++;
 				}
 			}
+			QuadRect c = currentProcessingRegion.getCalcBbox();
+			QuadRect r = currentProcessingRegion.rect;
+			if(c.left < r.left || c.top > r.top || c.bottom < r.bottom || c.right > r.right) {
+				QuadRect n = new QuadRect(Math.min(c.left, r.left), Math.max(c.top, r.top),
+						Math.max(c.right, r.right), Math.min(c.bottom, r.bottom));
+				System.out.printf("Updating bbox (L T R B) for %s from [%.3f, %.3f] x [%.3f, %.3f] add  "
+						+ " [%.3f, %.3f] x [%.3f, %.3f] to [%.3f, %.3f] x [%.3f, %.3f]\n",
+						currentProcessingRegion.region.getName(), r.left, r.top, r.right, r.bottom,
+						c.left, c.top, c.right, c.bottom, n.left, n.top, n.right, n.bottom);
+				currentProcessingRegion.rect = n;
+			}
 			logf("Saving visited %,d points (%,d border points) from %s to db...", currentProcessingRegion.getPoints(), ins,
 					currentProcessingRegion.region.getName());
 			networkDB.insertVisitedVerticesBorderPoints(currentProcessingRegion, networkPointToDbInd);
+			logf("     saved - total %,d points (%,d border points), ", getTotalPoints(), tl);
+			
 			currentProcessingRegion.unload();
 			currentProcessingRegion = null;
-			logf("     saved - total %,d points (%,d border points), ", getTotalPoints(), tl);
 
 		}
 		

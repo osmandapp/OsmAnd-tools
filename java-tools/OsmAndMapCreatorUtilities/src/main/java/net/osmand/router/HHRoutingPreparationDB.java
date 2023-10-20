@@ -35,9 +35,11 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement insGeometry;
 	protected PreparedStatement insPoint;
 	protected PreparedStatement updDualPoint;
-	private PreparedStatement insVisitedPoints;
+	protected PreparedStatement insVisitedPoints;
+	protected PreparedStatement updateRegionBoundaries;
 	private int maxPointDBID;
 	private int maxClusterID;
+
 
 	public HHRoutingPreparationDB(File dbFile) throws SQLException {
 		super(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
@@ -49,6 +51,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insPoint = conn.prepareStatement("INSERT INTO points(idPoint, pointGeoUniDir, pointGeoId, clusterId, roadId, start, end, sx31, sy31, ex31, ey31) "
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			insVisitedPoints = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId, clusterId) VALUES (?, ?, ?)");
+			updateRegionBoundaries = conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? routeRegions where id = ?");
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
 		}
 	}
@@ -227,6 +230,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 		insVisitedPoints.executeBatch();
 		
+		// conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? routeRegions where id = ?");
+		QuadRect r = networkRouteRegion.rect;
+		updateRegionBoundaries.setDouble(1, r.left);
+		updateRegionBoundaries.setDouble(2, r.right);
+		updateRegionBoundaries.setDouble(3, r.top);
+		updateRegionBoundaries.setDouble(4, r.bottom);
+		updateRegionBoundaries.setInt(5, networkRouteRegion.id);
+		updateRegionBoundaries.execute();
+		
 	}
 
 	private void insPoint(RouteSegmentBorderPoint obj, int clusterIndex, int pointDbId)
@@ -300,7 +312,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 	
 	public void insertRegions(List<NetworkRouteRegion> regions) throws SQLException {
-		PreparedStatement check = conn.prepareStatement("SELECT id from routeRegions where name = ? "); // and filePointer = ?
+		PreparedStatement check = conn.prepareStatement("SELECT id, left, top, right, bottom from routeRegions where name = ? "); // and filePointer = ?
 		PreparedStatement ins = conn
 				.prepareStatement("INSERT INTO routeRegions(id, name, filePointer, size, filename, left, right, top, bottom) "
 						+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -312,6 +324,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			ResultSet ls = check.executeQuery();
 			if (ls.next()) {
 				nr.id = ls.getInt(1);
+				nr.rect = new QuadRect(ls.getDouble(2), ls.getDouble(3), ls.getDouble(4), ls.getDouble(5));
 				ind = Math.max(ind, nr.id);
 			} else {
 				nr.id = -1;
@@ -328,10 +341,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			ins.setLong(p++, nr.region.getFilePointer());
 			ins.setLong(p++, nr.region.getLength());
 			ins.setString(p++, nr.file.getName());
-			ins.setDouble(p++, nr.region.getLeftLongitude());
-			ins.setDouble(p++, nr.region.getRightLongitude());
-			ins.setDouble(p++, nr.region.getTopLatitude());
-			ins.setDouble(p++, nr.region.getBottomLatitude());
+			ins.setDouble(p++, nr.rect.left);
+			ins.setDouble(p++, nr.rect.right);
+			ins.setDouble(p++, nr.rect.top);
+			ins.setDouble(p++, nr.rect.bottom);
 			ins.addBatch();
 		}
 		ins.executeBatch();
@@ -422,17 +435,49 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		File file;
 		int points = 0; // -1 loaded points, 0 init, > 0 - visitedVertices = null
 		TLongIntHashMap visitedVertices;
-		QuadRect calculatedRect;
+		QuadRect rect;
+		double regionOverlap = 0.2; // we don't need big overlap cause of visited bbox recalculation
+		QuadRect calcRect;
 
 		public NetworkRouteRegion(RouteRegion r, File f) {
 			region = r;
-			double d = 2; // overlap is needed 
-			// TODO but we need to calculate real rect and store during processing to avoid long ferry hops problem
-			calculatedRect = new QuadRect(Math.max(-180, region.getLeftLongitude() - d),
+			double d = regionOverlap;  
+			rect = new QuadRect(Math.max(-180, region.getLeftLongitude() - d),
 					Math.min(85, region.getTopLatitude() + d), Math.min(180, region.getRightLongitude() + d),
 					Math.max(-85, region.getBottomLatitude() - d));
 			this.file = f;
 
+		}
+		
+		public QuadRect getCalcBbox() {
+			if (calcRect == null) {
+				return rect;
+			}
+			QuadRect qr = new QuadRect();
+			qr.left = MapUtils.get31LongitudeX((int) calcRect.left);
+			qr.right = MapUtils.get31LongitudeX((int) calcRect.right);
+			qr.top = MapUtils.get31LatitudeY((int) calcRect.top);
+			qr.bottom = MapUtils.get31LatitudeY((int) calcRect.bottom);
+			return qr;
+		}
+		
+		public void updateBbox(int x31, int y31) {
+			if (calcRect == null) {
+				calcRect = new QuadRect();
+				calcRect.right = calcRect.left = x31;
+				calcRect.top = calcRect.bottom = y31;
+			} else {
+				if(x31 < calcRect.left ) {
+					calcRect.left = x31;
+				} else if(x31 > calcRect.right ) {
+					calcRect.right = x31;
+				}
+				if (y31 < calcRect.top) {
+					calcRect.top = y31;
+				} else if (y31 > calcRect.bottom) {
+					calcRect.bottom = y31;
+				}
+			}
 		}
 
 		public int getPoints() {
@@ -440,7 +485,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 
 		public boolean intersects(NetworkRouteRegion nrouteRegion) {
-			return QuadRect.intersects(calculatedRect, nrouteRegion.calculatedRect);
+			return QuadRect.intersects(rect, nrouteRegion.rect);
 		}
 
 		public void unload() {
