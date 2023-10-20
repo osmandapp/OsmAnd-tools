@@ -63,6 +63,7 @@ import net.osmand.util.MapUtils;
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 // 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// TODO Bug Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
 
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
