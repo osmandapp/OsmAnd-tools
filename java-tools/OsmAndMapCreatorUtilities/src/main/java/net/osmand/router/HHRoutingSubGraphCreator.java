@@ -228,10 +228,11 @@ public class HHRoutingSubGraphCreator {
 			}
 		});
 		networkDB.insertRegions(ctx.routeRegions);
-		int procInd = 1;
+		int procInd = 0;
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
-			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), procInd++, ctx.routeRegions.size(),
+			procInd++;
+			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
 					new Date().toString());
 			if (networkDB.hasVisitedPoints(nrouteRegion)) {
 				System.out.println("Already processed");
@@ -248,9 +249,8 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
-			System.out.println("Region bbox (l,t - r,b): " + nrouteRegion.region.getLeftLongitude() + ", "
-					+ nrouteRegion.region.getTopLatitude() + " x " + nrouteRegion.region.getRightLongitude() + ", "
-					+ nrouteRegion.region.getBottomLatitude());
+			logf("Region bbox %s (l,t - r,b): %.5f, %.5f x %.5f, %.5f", nrouteRegion.region.getName(),
+					nrouteRegion.rect.left, nrouteRegion.rect.top, nrouteRegion.rect.right, nrouteRegion.rect.bottom);
 			if (nrouteRegion.region.getLeftLongitude() > nrouteRegion.region.getRightLongitude()) {
 				if (routeRegion.getLength() < 1000) {
 					System.out.printf("Skip region  %s - %d bytes\n", nrouteRegion.region.getName(),
@@ -947,7 +947,7 @@ public class HHRoutingSubGraphCreator {
 					continue;
 				}
 				if (nr.intersects(nrouteRegion)) {
-					logf("Intersects with %s - loading points...", nr.region.getName());
+					logf("Intersects with %s %s.", nr.region.getName(), nr.rect.toString());
 					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
 					subRegions.add(nr);
 				} else {
