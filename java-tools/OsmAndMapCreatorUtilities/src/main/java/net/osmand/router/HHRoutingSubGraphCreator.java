@@ -56,11 +56,12 @@ import net.osmand.util.MapUtils;
 // TESTING
 // 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
 
-// TODO 
+// TODO RZR
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 // 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
+// TODO BUGS
 // 1.0 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // TODO Bug Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
@@ -68,12 +69,12 @@ import net.osmand.util.MapUtils;
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 1.7 HHRoutePlanner this is more correct to preserve startDistance
 
-// 1.8 HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
-// 1.11 clean up (HHRoutingPrepareContext + HHRoutingPreparationDB)?
-// 1.12 Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.13 Allow private roads on server calculation (allow_private)
-// 1.14 Cut start / end to projection as in detailed calculation (MapCreator)
-// 1.15 HHRoutePlanner calculate start/end alternative routes
+// 1.8 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
+// 1.11 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
+// 1.12 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
+// 1.14 MapCreator: Cut start / end to projection as in detailed calculation ()
+// 1.15 MapCreator: HHRoutePlanner calculate start/end alternative routes + c.calcDetailed(0) draw segments;
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
