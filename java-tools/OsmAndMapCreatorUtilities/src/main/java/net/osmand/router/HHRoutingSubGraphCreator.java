@@ -396,7 +396,10 @@ public class HHRoutingSubGraphCreator {
 		}
 		c.toVisitVertices.remove(vertex.getId());
 		if (c.testIfVisited(vertex.getId())) {
-			throw new IllegalStateException();
+			throw new IllegalStateException(String.format("%s was already locallyvisited", vertex.toString()));
+		}
+		if (c.ctx.testGlobalVisited(vertex.getId())) {
+			throw new IllegalStateException(String.format("%s was already globally visited", vertex.toString()));
 		}
 		c.visitedVertices.put(vertex.getId(), DEBUG_STORE_ALL_ROADS > 2 ? vertex : null);
 		c.loadVertexConnections(vertex, true);
@@ -831,9 +834,7 @@ public class HHRoutingSubGraphCreator {
 			if (visitedVertices.containsKey(pntId)) {
 				return true;
 			}
-			if (ctx.testGlobalVisited(pntId)) {
-				throw new IllegalStateException();
-			}
+			
 			return false;
 		}
 
@@ -984,13 +985,13 @@ public class HHRoutingSubGraphCreator {
 			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
 			for (long key : cluster.visitedVertices.keys()) {
+				RouteSegmentVertex v = cluster.allVertices.get(key);
 				if (testGlobalVisited(key)) {
-					throw new IllegalStateException("Point was already visited");
+					throw new IllegalStateException(String.format("Point was already visited %s", v));
 				}
 //				allVisitedVertices.put(key, cluster.dbIndex);
 				if (currentProcessingRegion != null) {
 					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
-					RouteSegmentVertex v = cluster.allVertices.get(key);
 					currentProcessingRegion.updateBbox(v.getEndPointX() / 2 + v.getStartPointX() / 2,
 							v.getEndPointY() / 2 + v.getStartPointY() / 2);
 				}
