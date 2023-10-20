@@ -436,7 +436,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		int points = 0; // -1 loaded points, 0 init, > 0 - visitedVertices = null
 		TLongIntHashMap visitedVertices;
 		QuadRect rect;
-		double regionOverlap = 1;//0.2; // we don't need big overlap cause of visited bbox recalculation
+		double regionOverlap = 0.2; // we don't need big overlap cause of visited bbox recalculation
 		QuadRect calcRect;
 
 		public NetworkRouteRegion(RouteRegion r, File f) {

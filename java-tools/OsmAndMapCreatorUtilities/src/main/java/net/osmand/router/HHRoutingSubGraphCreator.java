@@ -249,7 +249,7 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
-			logf("Region bbox %s (l,t - r,b): %.5f, %.5f x %.5f, %.5f", nrouteRegion.region.getName(),
+			logf("Region bbox %s %d of %d (l,t - r,b): %.5f, %.5f x %.5f, %.5f", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
 					nrouteRegion.rect.left, nrouteRegion.rect.top, nrouteRegion.rect.right, nrouteRegion.rect.bottom);
 			if (nrouteRegion.region.getLeftLongitude() > nrouteRegion.region.getRightLongitude()) {
 				if (routeRegion.getLength() < 1000) {
