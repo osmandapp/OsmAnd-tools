@@ -396,10 +396,10 @@ public class HHRoutingSubGraphCreator {
 		}
 		c.toVisitVertices.remove(vertex.getId());
 		if (c.testIfVisited(vertex.getId())) {
-			throw new IllegalStateException(String.format("%s was already locallyvisited", vertex.toString()));
+			throw new IllegalStateException(String.format("%d %s was already locally visited", vertex.getId(), vertex.toString()));
 		}
 		if (c.ctx.testGlobalVisited(vertex.getId())) {
-			throw new IllegalStateException(String.format("%s was already globally visited", vertex.toString()));
+			throw new IllegalStateException(String.format("%d %s was already globally visited", vertex.getId(), vertex.toString()));
 		}
 		c.visitedVertices.put(vertex.getId(), DEBUG_STORE_ALL_ROADS > 2 ? vertex : null);
 		c.loadVertexConnections(vertex, true);
