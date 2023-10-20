@@ -92,6 +92,7 @@ import net.osmand.util.MapUtils;
 // 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation - test?
 // 2.14 Some points have no segments in/out (oneway roads) - simplify?
 // 2.15 HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
+// 2.16 Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
 
 // 3 Later implementation
 // 3.1 HHRoutePlanner Alternative routes - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)
@@ -401,7 +402,8 @@ public class HHRoutingSubGraphCreator {
 			throw new IllegalStateException(String.format("%d %s was already locally visited", vertex.getId(), vertex.toString()));
 		}
 		if (c.ctx.testGlobalVisited(vertex.getId())) {
-			throw new IllegalStateException(String.format("%d %s was already globally visited", vertex.getId(), vertex.toString()));
+			throw new IllegalStateException(String.format("%d %s was already globally visited: ", 
+					vertex.getId(), vertex.toString(), c.ctx.globalVisitedMessage(vertex.getId())));
 		}
 		c.visitedVertices.put(vertex.getId(), DEBUG_STORE_ALL_ROADS > 2 ? vertex : null);
 		c.loadVertexConnections(vertex, true);
@@ -938,6 +940,23 @@ public class HHRoutingSubGraphCreator {
 
 		public int borderPointsSize() {
 			return networkPointToDbInd.size();
+		}
+		
+		public String globalVisitedMessage(long k) {
+			NetworkRouteRegion r = currentProcessingRegion;
+			if (currentProcessingRegion != null && currentProcessingRegion.visitedVertices.containsKey(k)) {
+				r = currentProcessingRegion;
+			}
+			for (NetworkRouteRegion n : validateIntersectionRegions) {
+				if (n.visitedVertices.containsKey(k)) {
+					r = n;
+					break;
+				}
+			}
+			if (r != null) {
+				return String.format("%s region %d cluster", r.region.getName(), r.visitedVertices.get(k));
+			}
+			return "";
 		}
 		
 		public boolean testGlobalVisited(long k) {
