@@ -312,9 +312,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			ResultSet ls = check.executeQuery();
 			if (ls.next()) {
 				nr.id = ls.getInt(1);
+				ind = Math.max(ind, nr.id);
+			} else {
+				nr.id = -1;
+			}
+		}
+		for (NetworkRouteRegion nr : regions) {
+			if (nr.id >= 0) {
 				continue;
 			}
-			
 			int p = 1;
 			nr.id = ind++;
 			ins.setLong(p++, nr.id);
@@ -416,9 +422,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		File file;
 		int points = 0; // -1 loaded points, 0 init, > 0 - visitedVertices = null
 		TLongIntHashMap visitedVertices;
+		QuadRect calculatedRect;
 
 		public NetworkRouteRegion(RouteRegion r, File f) {
 			region = r;
+			double d = 2; // overlap is needed 
+			// TODO but we need to calculate real rect and store during processing to avoid long ferry hops problem
+			calculatedRect = new QuadRect(Math.max(-180, region.getLeftLongitude() - d),
+					Math.min(85, region.getTopLatitude() + d), Math.min(180, region.getRightLongitude() + d),
+					Math.max(-85, region.getBottomLatitude() - d));
 			this.file = f;
 
 		}
@@ -427,14 +439,8 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			return points < 0 ? visitedVertices.size() : points;
 		}
 
-		public QuadRect getRect() {
-			double d = 1;
-			return new QuadRect(Math.max(-180,region.getLeftLongitude()-d), Math.min(85,region.getTopLatitude()+d), 
-					Math.min(180,region.getRightLongitude()+d),Math.max(-85,region.getBottomLatitude()-d));
-		}
-
 		public boolean intersects(NetworkRouteRegion nrouteRegion) {
-			return QuadRect.intersects(getRect(), nrouteRegion.getRect());
+			return QuadRect.intersects(calculatedRect, nrouteRegion.calculatedRect);
 		}
 
 		public void unload() {
@@ -451,7 +457,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				}
 				visitedVertices = networkDB.loadVisitedVertices(id);
 				points = -1;
-				HHRoutingPrepareContext.logf("Loading visited vertices for %s - %d...", region.getName(),
+				HHRoutingPrepareContext.logf("Loaded visited vertices for %s - %d.", region.getName(),
 						visitedVertices.size());
 			}
 			return visitedVertices;

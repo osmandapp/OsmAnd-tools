@@ -208,17 +208,28 @@ public class HHRoutingSubGraphCreator {
 				logf("Ignore route region %s as duplicate", r.getName());
 			}
 		}
-		networkDB.insertRegions(ctx.routeRegions);
 		Collections.sort(ctx.routeRegions, new Comparator<NetworkRouteRegion>() {
-
 			@Override
 			public int compare(NetworkRouteRegion o1, NetworkRouteRegion o2) {
-				return Integer.compare(o1.id, o2.id);
+				int x1 = (int) MapUtils.getTileNumberX(6, o1.region.getLeftLongitude());
+				int y1 = (int) MapUtils.getTileNumberY(6, o1.region.getTopLatitude());
+				int x2 = (int) MapUtils.getTileNumberX(6, o2.region.getLeftLongitude());
+				int y2 = (int) MapUtils.getTileNumberY(6, o2.region.getTopLatitude());
+				// sort from left to right, top to bottom
+				if (Integer.compare(x1, x2) != 0) {
+					return Integer.compare(x1, x2);
+				}
+				if (Integer.compare(y1, y2) != 0) {
+					return Integer.compare(y1, y2);
+				}
+				return Integer.compare(o1.region.getLength() , o2.region.getLength());
 			}
 		});
+		networkDB.insertRegions(ctx.routeRegions);
+		int procInd = 1;
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
-			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), nrouteRegion.id + 1, ctx.routeRegions.size(),
+			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), procInd++, ctx.routeRegions.size(),
 					new Date().toString());
 			if (networkDB.hasVisitedPoints(nrouteRegion)) {
 				System.out.println("Already processed");
@@ -926,25 +937,24 @@ public class HHRoutingSubGraphCreator {
 			currentProcessingRegion = nrouteRegion;
 			currentProcessingRegion.visitedVertices = new TLongIntHashMap();
 			currentProcessingRegion.points = -1;
-			for (NetworkRouteRegion nr : routeRegions) {
-				nr.unload();
-			}
+			this.allVisitedVertices = new TLongIntHashMap();
 			List<NetworkRouteRegion> subRegions = new ArrayList<>();
 			for (NetworkRouteRegion nr : routeRegions) {
-				if (nr != nrouteRegion && nr.intersects(nrouteRegion)) {
+				if (nr == nrouteRegion) {
+					continue;
+				}
+				if (nr.intersects(nrouteRegion)) {
+					logf("Intersects with %s - loading points...", nr.region.getName());
+					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
 					subRegions.add(nr);
+				} else {
+					nr.unload();
 				}
 			}
 			subRegions.add(nrouteRegion);
 			// force reload cause subregions could change on rerun
 			rctx = prepareContext.gcMemoryLimitToUnloadAll(rctx, subRegions, true);
 
-			this.allVisitedVertices = new TLongIntHashMap();
-			for (NetworkRouteRegion nr : subRegions) {
-				if (nr != nrouteRegion) {
-					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
-				}
-			}
 		}
 
 		public void addCluster(NetworkIsland cluster) {
