@@ -21,6 +21,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import javax.xml.stream.XMLStreamException;
+
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
@@ -99,6 +101,7 @@ public class HHRoutingShortcutCreator {
 		prepareContext = new HHRoutingPrepareContext(obfFile, routingProfile);
 		HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
 		TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints();
+		createOSMNetworkPoints(new File(folder, name + "-pnts.osm"), pnts);
 		int segments = networkDB.loadNetworkSegments(pnts.valueCollection());
 		System.out.printf("Loaded %,d points, existing shortcuts %,d \n", pnts.size(), segments);
 		Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
@@ -109,6 +112,14 @@ public class HHRoutingShortcutCreator {
 				new File(folder, name + HHRoutingDB.CEXT));
 	}
 	
+	
+	public static void createOSMNetworkPoints(File osm, TLongObjectHashMap<NetworkDBPoint> pnts) throws XMLStreamException, IOException {
+		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<Entity>();
+		for(NetworkDBPoint p : pnts.valueCollection()) {
+			HHRoutingUtilities.addNode(osmObjects, p, null, "highway", "stop");
+		}
+		HHRoutingUtilities.saveOsmFile(osmObjects.valueCollection(), osm);
+	}
 	public static void compact(File source, File target) throws SQLException, IOException {
 		System.out.printf("Compacting %s -> %s...\n", source.getName(), target.getName());
 		target.delete();

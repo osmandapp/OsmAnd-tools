@@ -123,6 +123,12 @@ public class HHRoutingUtilities {
 		Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
 		n.putTag(tag, val);
 		n.putTag("name", pnt.index + " " + pnt.roadId / 64 + " " + pnt.start + " " + pnt.end);
+		n.putTag("clusterId", pnt.clusterId+"");
+		n.putTag("index", pnt.index+"");
+		if(pnt.dualPoint != null) {
+			n.putTag("dualClusterId", pnt.dualPoint.clusterId+"");
+			n.putTag("dualPoint", pnt.dualPoint.index +"");
+		}
 		osmObjects.put(pnt.pntGeoId, n);
 	}
 
