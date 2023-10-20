@@ -51,7 +51,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insPoint = conn.prepareStatement("INSERT INTO points(idPoint, pointGeoUniDir, pointGeoId, clusterId, roadId, start, end, sx31, sy31, ex31, ey31) "
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			insVisitedPoints = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId, clusterId) VALUES (?, ?, ?)");
-			updateRegionBoundaries = conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? routeRegions where id = ?");
+			updateRegionBoundaries = conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? where id = ?");
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
 		}
 	}
