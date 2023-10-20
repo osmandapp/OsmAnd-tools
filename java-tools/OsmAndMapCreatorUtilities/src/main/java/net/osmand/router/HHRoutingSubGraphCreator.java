@@ -29,7 +29,6 @@ import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TIntIntIterator;
-import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -832,7 +831,7 @@ public class HHRoutingSubGraphCreator {
 			if (visitedVertices.containsKey(pntId)) {
 				return true;
 			}
-			if (ctx.allVisitedVertices.containsKey(pntId)) {
+			if (ctx.testGlobalVisited(pntId)) {
 				throw new IllegalStateException();
 			}
 			return false;
@@ -917,7 +916,9 @@ public class HHRoutingSubGraphCreator {
 		int lastClusterInd = 0;
 		NetworkRouteRegion currentProcessingRegion;
 		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
-		TLongIntHashMap allVisitedVertices = new TLongIntHashMap(); 
+		List<NetworkRouteRegion> intersectionRegions = new ArrayList<>();
+//		TLongIntHashMap allVisitedVertices = new TLongIntHashMap();
+		
 
 		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
 			this.rctx = rctx;
@@ -935,13 +936,28 @@ public class HHRoutingSubGraphCreator {
 		public int borderPointsSize() {
 			return networkPointToDbInd.size();
 		}
+		
+		public boolean testGlobalVisited(long k) {
+			if (currentProcessingRegion != null && currentProcessingRegion.visitedVertices.containsKey(k)) {
+				return true;
+			}
+			for (NetworkRouteRegion n : intersectionRegions) {
+				if (n.visitedVertices.containsKey(k)) {
+					return true;
+				}
+			}
+			return false;
+			// this probably slower but much faster during preparation
+//			return allVisitedVertices.containsKey(k);
+		}
 
 		public void startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
 			currentProcessingRegion = nrouteRegion;
 			currentProcessingRegion.visitedVertices = new TLongIntHashMap();
 			currentProcessingRegion.calcRect = null;
 			currentProcessingRegion.points = -1;
-			this.allVisitedVertices = new TLongIntHashMap();
+			intersectionRegions = new ArrayList<>();
+//			this.allVisitedVertices = new TLongIntHashMap();
 			List<NetworkRouteRegion> subRegions = new ArrayList<>();
 			for (NetworkRouteRegion nr : routeRegions) {
 				if (nr == nrouteRegion) {
@@ -949,7 +965,8 @@ public class HHRoutingSubGraphCreator {
 				}
 				if (nr.intersects(nrouteRegion)) {
 					logf("Intersects with %s %s.", nr.region.getName(), nr.rect.toString());
-					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
+//					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
+					intersectionRegions.add(nr);
 					subRegions.add(nr);
 				} else {
 					nr.unload();
@@ -965,11 +982,11 @@ public class HHRoutingSubGraphCreator {
 			cluster.dbIndex = networkDB.prepareBorderPointsToInsert(cluster.borderVertices, networkPointToDbInd);
 			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
-			for(long key : cluster.visitedVertices.keys()) {
-				if (allVisitedVertices.containsKey(key)) {
+			for (long key : cluster.visitedVertices.keys()) {
+				if (testGlobalVisited(key)) {
 					throw new IllegalStateException("Point was already visited");
 				}
-				allVisitedVertices.put(key, cluster.dbIndex);
+//				allVisitedVertices.put(key, cluster.dbIndex);
 				if (currentProcessingRegion != null) {
 					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
 					RouteSegmentVertex v = cluster.allVertices.get(key);
@@ -1084,7 +1101,7 @@ public class HHRoutingSubGraphCreator {
 				for (int pos = 0; pos < object.getPointsLength() - 1; pos++) {
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
-					if (ctx.allVisitedVertices.contains(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
+					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
 						// already existing cluster
 						continue;
 					}
