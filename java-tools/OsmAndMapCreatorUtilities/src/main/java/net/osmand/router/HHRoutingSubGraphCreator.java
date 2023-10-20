@@ -50,20 +50,17 @@ import net.osmand.util.MapUtils;
 
 // IN PROGRESS
 // 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!) 
-// 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
-
-
 
 // TESTING
 // 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
 
 // TODO 
-// 1.0 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 // 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// TODO Bug Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
 
+// 1.0 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
+// TODO Bug Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
@@ -91,6 +88,7 @@ import net.osmand.util.MapUtils;
 // 2.11 EX10 - example that min depth doesn't give good approximation
 // 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation - test?
 // 2.14 Some points have no segments in/out (oneway roads) - simplify?
+// 2.15 HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
 
 // 3 Later implementation
 // 3.1 HHRoutePlanner Alternative routes - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)
@@ -917,7 +915,7 @@ public class HHRoutingSubGraphCreator {
 		int lastClusterInd = 0;
 		NetworkRouteRegion currentProcessingRegion;
 		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
-		List<NetworkRouteRegion> intersectionRegions = new ArrayList<>();
+		List<NetworkRouteRegion> validateIntersectionRegions = new ArrayList<>();
 //		TLongIntHashMap allVisitedVertices = new TLongIntHashMap();
 		
 
@@ -942,7 +940,7 @@ public class HHRoutingSubGraphCreator {
 			if (currentProcessingRegion != null && currentProcessingRegion.visitedVertices.containsKey(k)) {
 				return true;
 			}
-			for (NetworkRouteRegion n : intersectionRegions) {
+			for (NetworkRouteRegion n : validateIntersectionRegions) {
 				if (n.visitedVertices.containsKey(k)) {
 					return true;
 				}
@@ -953,30 +951,34 @@ public class HHRoutingSubGraphCreator {
 		}
 
 		public void startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
+			// make overlap for routing bigger ideally we should have full connnection...
+			double OVERLAP_FOR_VISITED = 0.2, OVERLAP_FOR_ROUTING = 2;
 			currentProcessingRegion = nrouteRegion;
 			currentProcessingRegion.visitedVertices = new TLongIntHashMap();
 			currentProcessingRegion.calcRect = null;
 			currentProcessingRegion.points = -1;
-			intersectionRegions = new ArrayList<>();
+			validateIntersectionRegions = new ArrayList<>();
 //			this.allVisitedVertices = new TLongIntHashMap();
-			List<NetworkRouteRegion> subRegions = new ArrayList<>();
+			List<NetworkRouteRegion> regionsForRouting = new ArrayList<>();
 			for (NetworkRouteRegion nr : routeRegions) {
 				if (nr == nrouteRegion) {
 					continue;
 				}
-				if (nr.intersects(nrouteRegion)) {
+				if (nr.intersects(nrouteRegion, OVERLAP_FOR_VISITED)) {
 					logf("Intersects with %s %s.", nr.region.getName(), nr.rect.toString());
 //					this.allVisitedVertices.putAll(nr.getVisitedVertices(networkDB));
 					nr.loadVisitedVertices(networkDB);
-					intersectionRegions.add(nr);
-					subRegions.add(nr);
+					validateIntersectionRegions.add(nr);
+					regionsForRouting.add(nr);
+				} else if (nr.intersects(nrouteRegion, OVERLAP_FOR_ROUTING)) {
+					regionsForRouting.add(nr);
 				} else {
 					nr.unload();
 				}
 			}
-			subRegions.add(nrouteRegion);
+			regionsForRouting.add(nrouteRegion);
 			// force reload cause subregions could change on rerun
-			rctx = prepareContext.gcMemoryLimitToUnloadAll(rctx, subRegions, true);
+			rctx = prepareContext.gcMemoryLimitToUnloadAll(rctx, regionsForRouting, true);
 
 		}
 

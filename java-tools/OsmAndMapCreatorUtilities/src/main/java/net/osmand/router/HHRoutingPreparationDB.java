@@ -484,8 +484,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			return points < 0 ? visitedVertices.size() : points;
 		}
 
-		public boolean intersects(NetworkRouteRegion nrouteRegion) {
-			return QuadRect.intersects(rect, nrouteRegion.rect);
+		public boolean intersects(NetworkRouteRegion nrouteRegion, double d) {
+			QuadRect qr = new QuadRect(Math.max(-180, rect.left - d), Math.min(85, rect.top + d),
+					Math.min(180, rect.right + d), Math.max(-85, rect.bottom - d));
+			return QuadRect.intersects(qr, nrouteRegion.rect);
 		}
 
 		public void unload() {
