@@ -168,7 +168,9 @@ public class HHRoutingShortcutCreator {
 					for (RouteSegment t : result) {
 						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(), t.getSegmentStart(), t.getSegmentEnd()));
 						if (pnt.dualPoint.clusterId != end.clusterId) {
-							throw new IllegalStateException("Point can lead only to 1 dual cluster " + pnt + " " + end);
+							String msg = String.format("Point (%s) can lead only to dual cluster %d (%s dual point) - found %s (cluster %d)",
+									pnt, pnt.dualPoint.clusterId, pnt.dualPoint, end, end.clusterId);
+							throw new IllegalStateException(msg);
 						}
 						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
 						pnt.connected.add(segment);

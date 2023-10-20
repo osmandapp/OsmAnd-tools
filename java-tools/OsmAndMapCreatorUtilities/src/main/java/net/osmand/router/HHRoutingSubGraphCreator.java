@@ -49,7 +49,9 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!) 
+// 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
+// 2.5 Speedup shortcuts creation by cluster and specific regions
+// 2.6 FILE file structure
 
 // TESTING
 // 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
@@ -95,7 +97,8 @@ import net.osmand.util.MapUtils;
 // 3.2 Avoid specific road
 // 3.3 Deprioritize or exclude roads (parameters)
 // 3.4 Live data (think about it)
-// 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters) 
+// 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters)
+// 3.6 FILE utilities: Binary inspector...
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
