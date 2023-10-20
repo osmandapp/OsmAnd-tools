@@ -964,18 +964,16 @@ public class HHRoutingSubGraphCreator {
 			cluster.dbIndex = networkDB.prepareBorderPointsToInsert(cluster.borderVertices, networkPointToDbInd);
 			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
-			TLongObjectIterator<RouteSegment> it = cluster.visitedVertices.iterator();
-			while(it.hasNext()) {
-				it.advance();
-				long key = it.key();
+			for(long key : cluster.visitedVertices.keys()) {
 				if (allVisitedVertices.containsKey(key)) {
 					throw new IllegalStateException("Point was already visited");
 				}
 				allVisitedVertices.put(key, cluster.dbIndex);
 				if (currentProcessingRegion != null) {
 					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
-					RouteSegment v = it.value();
-					currentProcessingRegion.updateBbox(v.getEndPointX(), v.getEndPointY());
+					RouteSegmentVertex v = cluster.allVertices.get(key);
+					currentProcessingRegion.updateBbox(v.getEndPointX() / 2 + v.getStartPointX() / 2,
+							v.getEndPointY() / 2 + v.getStartPointY() / 2);
 				}
 			}
 				
