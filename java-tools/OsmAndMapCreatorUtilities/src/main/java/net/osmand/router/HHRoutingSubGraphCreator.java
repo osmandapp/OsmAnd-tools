@@ -52,7 +52,7 @@ import net.osmand.util.MapUtils;
 // 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
 // 2.5 Speedup shortcuts creation by cluster and specific regions
 // 2.6 FILE file structure
-// 1.9 BUG needs to be fixed 
+// 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
 
 // TESTING
 // 1.x Allow private roads on server calculation (allow_private)
@@ -81,7 +81,6 @@ import net.osmand.util.MapUtils;
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
-// 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
 // 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
 // 2.5 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
@@ -90,7 +89,7 @@ import net.osmand.util.MapUtils;
 // 2.8 Implement route recalculation in case distance > original 10% ? 
 // 2.9 FILE: different dates for maps!
 // 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
-//       There should be maximum at preproce visited points < 50K-100K
+//       There should be maximum at preprocessed visited points < 50K-100K
 // 2.11 EX10 - example that min depth doesn't give good approximation
 // 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation - test?
 // 2.14 Some points have no segments in/out (oneway roads) - simplify?

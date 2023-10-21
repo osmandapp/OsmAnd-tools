@@ -17,7 +17,6 @@ import org.apache.commons.logging.Log;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
-import net.osmand.obf.preparation.DBDialect;
 import net.osmand.router.HHRoutePlanner.HHRoutingConfig;
 import net.osmand.router.HHRoutePlanner.HHRoutingContext;
 import net.osmand.router.HHRoutePlanner.RoutingStats;
