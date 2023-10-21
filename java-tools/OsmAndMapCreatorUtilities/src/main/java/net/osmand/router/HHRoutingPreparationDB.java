@@ -139,11 +139,12 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				selIn.setInt(1, p.index);
 				selOut.setInt(1, p.index);
 				sIns.setInt(1, p.index);
+				sIns.setInt(2, profile);
 //			System.out.println(p.index  + " -> cluster " + p.clusterId + " dual clusterId  " + p.dualPoint.clusterId);
 //			System.out.println("Incoming Cluster: " + inPoints.get(p.clusterId));
-				sIns.setBytes(2, prepareSegments(selIn, pointsById, inPoints.get(p.clusterId)));
+				sIns.setBytes(3, prepareSegments(selIn, pointsById, inPoints.get(p.clusterId)));
 //			System.out.println("Outgoing cluster: " + outPoints.get(p.dualPoint.clusterId));
-				sIns.setBytes(3, prepareSegments(selOut, pointsById, outPoints.get(p.dualPoint.clusterId)));
+				sIns.setBytes(4, prepareSegments(selOut, pointsById, outPoints.get(p.dualPoint.clusterId)));
 				sIns.addBatch();
 			}
 			sIns.executeBatch();
