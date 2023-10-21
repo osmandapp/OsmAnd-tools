@@ -983,7 +983,6 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
 
-			long id = -1000000;
 			List<Entity> lst = new ArrayList<Entity>();
 			if (!route.detailed.isEmpty()) {
 				calculateResult(lst, route.detailed);
