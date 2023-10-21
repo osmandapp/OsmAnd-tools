@@ -355,10 +355,6 @@ public class HHRoutingUtilities {
 	}
 
 
-	public static RouteSegmentPoint loadPoint(RoutingContext ctx, NetworkDBPoint pnt) {
-		return HHRoutePlanner.loadPoint(ctx, pnt);
-	}
-
 
 	
 }

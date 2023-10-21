@@ -10,7 +10,6 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -188,12 +187,16 @@ public class HHRoutingShortcutCreator {
 				if (Thread.interrupted()) {
 					return res;
 				}
-				RouteSegmentPoint s = null;
+				ctx.calculationProgress = new RouteCalculationProgress();
+				long nt2 = System.nanoTime();
+				RouteSegmentPoint s = HHRoutePlanner.loadPoint(ctx, pnt);
+				if (s == null) {
+					System.out.printf("Skip segment %d as probably not accessible with current routing params (%s) \n",
+							pnt.roadId / 64, pnt);
+					continue;
+				}
+				HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 				try {
-					ctx.calculationProgress = new RouteCalculationProgress();
-					long nt2 = System.nanoTime();
-					s = HHRoutingUtilities.loadPoint(ctx, pnt);
-					HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
 					boolean errorFound = false;
 					for (RouteSegment t : result) {
