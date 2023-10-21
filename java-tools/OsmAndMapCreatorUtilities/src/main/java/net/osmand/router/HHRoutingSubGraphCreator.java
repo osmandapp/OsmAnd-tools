@@ -324,8 +324,8 @@ public class HHRoutingSubGraphCreator {
 		// debug
 //		c.borderVertices.putAll(mincuts);
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
-			logf("Cluster: borders %d (%,d size ~ %d depth). Flow %d: depth min %d (%,d) <- max %d (%,d). Start %s",
-					c.toVisitVertices.size(), c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()), 
+			logf("Cluster %d: borders %d (%,d size ~ %d depth). Flow %d: depth min %d (%,d) <- max %d (%,d). Start %s",
+					ctx.lastClusterInd + 1,c.toVisitVertices.size(), c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()), 
 					mincuts.size(), minDepth, distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth),  
 					pnt);
 		}
