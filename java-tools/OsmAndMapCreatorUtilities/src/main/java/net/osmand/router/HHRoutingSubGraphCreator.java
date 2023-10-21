@@ -75,6 +75,7 @@ import net.osmand.util.MapUtils;
 // 1.10 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.11 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
 // 1.12 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
+// 1.16 CLEANUP: shortcuts, midpoint, chpoint
 // 1.14 MapCreator: Cut start / end to projection as in detailed calculation ()
 // 1.15 MapCreator: HHRoutePlanner calculate start/end alternative routes + c.calcDetailed(0) draw segments;
 

@@ -16,6 +16,7 @@ import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TLongIntIterator;
 import gnu.trove.list.array.TByteArrayList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -94,8 +95,18 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		Statement st = tgt.createStatement();
 		String columnNames = "pointGeoId, idPoint, clusterId, dualIdPoint, dualClusterId, chInd, roadId, start, end, sx31, sy31, ex31, ey31";
 		int columnSize = columnNames.split(",").length;
-		st.execute("CREATE TABLE IF NOT EXISTS points("+columnNames+",  PRIMARY key (idPoint))"); 
-		st.execute("CREATE TABLE IF NOT EXISTS segments(id, ins, outs, PRIMARY key (id))");
+		st.execute("CREATE TABLE IF NOT EXISTS profiles(id, params)");
+		st.execute("CREATE TABLE IF NOT EXISTS points(" + columnNames + ",  PRIMARY key (idPoint))"); 
+		st.execute("CREATE TABLE IF NOT EXISTS segments(id, profile, ins, outs, PRIMARY key (id, profile))");
+		PreparedStatement pIns = tgt.prepareStatement("INSERT INTO profiles(id, params) VALUES (?, ?)");
+		TIntArrayList profiles = new TIntArrayList();
+		ResultSet profileSet = src.createStatement().executeQuery(" select id, params from profiles from points");
+		while (profileSet.next()) {
+			pIns.setInt(1, profileSet.getInt(1));
+			pIns.setString(2, profileSet.getString(1));
+			pIns.execute();
+			profiles.add(profileSet.getInt(1));
+		}
 		String insPnts = "";
 		for (int k = 0; k < columnSize; k++) {
 			if (k > 0) {
@@ -103,11 +114,12 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			}
 			insPnts += "?";
 		}
+		
 		HHRoutingDB sourceDB = new HHRoutingDB(src);
 		TLongObjectHashMap<NetworkDBPoint> pointsById = sourceDB.loadNetworkPoints();
 		TIntObjectHashMap<List<NetworkDBPoint>> outPoints = sourceDB.groupByClusters(pointsById, true);
 		TIntObjectHashMap<List<NetworkDBPoint>> inPoints = sourceDB.groupByClusters(pointsById, false);
-		PreparedStatement pIns = tgt.prepareStatement("INSERT INTO points(" + columnNames + ") VALUES (" + insPnts + ")");
+		pIns = tgt.prepareStatement("INSERT INTO points(" + columnNames + ") VALUES (" + insPnts + ")");
 		ResultSet rs = src.createStatement().executeQuery(" select " + columnNames + " from points");
 		while (rs.next()) {
 			for (int i = 0; i < columnSize; i++) {
@@ -116,21 +128,26 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			pIns.addBatch();
 		}
 		pIns.executeBatch();
-		PreparedStatement sIns = tgt.prepareStatement("INSERT INTO segments(id, ins, outs)  VALUES (?, ?, ?)");
-		PreparedStatement selOut = src.prepareStatement(" select idConnPoint, dist, shortcut from segments where idPoint = ?");
-		PreparedStatement selIn = src.prepareStatement(" select idPoint, dist, shortcut from segments where idConnPoint = ?");
-		for(NetworkDBPoint p : pointsById.valueCollection()) {
-			selIn.setInt(1, p.index);
-			selOut.setInt(1, p.index);
-			sIns.setInt(1, p.index);
+		
+		for (int profile : profiles.toArray()) {
+			PreparedStatement sIns = tgt.prepareStatement("INSERT INTO segments(id, profile, ins, outs)  VALUES (?, ?, ?, ?)");
+			PreparedStatement selOut = src.prepareStatement(
+					" select idConnPoint, dist, shortcut from segments where idPoint = ? and profile = " + profile);
+			PreparedStatement selIn = src.prepareStatement(
+					" select idPoint, dist, shortcut from segments where idConnPoint = ? and profile = " + profile);
+			for (NetworkDBPoint p : pointsById.valueCollection()) {
+				selIn.setInt(1, p.index);
+				selOut.setInt(1, p.index);
+				sIns.setInt(1, p.index);
 //			System.out.println(p.index  + " -> cluster " + p.clusterId + " dual clusterId  " + p.dualPoint.clusterId);
 //			System.out.println("Incoming Cluster: " + inPoints.get(p.clusterId));
-			sIns.setBytes(2, prepareSegments(selIn, pointsById, inPoints.get(p.clusterId)));
+				sIns.setBytes(2, prepareSegments(selIn, pointsById, inPoints.get(p.clusterId)));
 //			System.out.println("Outgoing cluster: " + outPoints.get(p.dualPoint.clusterId));
-			sIns.setBytes(3, prepareSegments(selOut, pointsById, outPoints.get(p.dualPoint.clusterId)));
-			sIns.addBatch();
+				sIns.setBytes(3, prepareSegments(selOut, pointsById, outPoints.get(p.dualPoint.clusterId)));
+				sIns.addBatch();
+			}
+			sIns.executeBatch();
 		}
-		sIns.executeBatch();
 		tgt.close();
 
 	}
@@ -163,6 +180,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	public void recreateSegments() throws SQLException {
 		Statement st = conn.createStatement();
 		st.execute("DELETE FROM segments");
+		st.execute("DELETE FROM profiles");
 		st.execute("DELETE FROM geometry");
 		st.close();
 	}
@@ -269,10 +287,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	
 	public void insertSegments(List<NetworkDBSegment> segments) throws SQLException {
 		if (insSegment == null) {
-			insSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist, shortcut) VALUES(?, ?, ?, ?)");
+			insSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist, shortcut, profile) VALUES(?, ?, ?, ?, ?)");
 		}
 		if (insGeometry == null) {
-			insGeometry = conn.prepareStatement("INSERT INTO geometry(idPoint, idConnPoint, shortcut, geometry) " + " VALUES(?, ?, ?, ?)");
+			insGeometry = conn.prepareStatement("INSERT INTO geometry(idPoint, idConnPoint, shortcut, geometry, profile) VALUES(?, ?, ?, ?, ?)");
 		}
 		int ind= 0;
 		for (NetworkDBSegment s : segments) {
@@ -280,6 +298,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insSegment.setLong(2, s.end.index);
 			insSegment.setDouble(3, s.dist);
 			insSegment.setInt(4, s.shortcut ? 1 : 0);
+			insSegment.setInt(5, routingProfile);
 			insSegment.addBatch();
 //			byte[] coordinates = new byte[0];
 			if (s.geometry.size() > 0) {
@@ -302,7 +321,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insGeometry.setLong(1, s.start.index);
 			insGeometry.setLong(2, s.end.index);
 			insGeometry.setInt(3, s.shortcut ? 1 : 0);
-			
+			insGeometry.setInt(5, routingProfile);
 			insGeometry.addBatch();
 			if (ind++ % BATCH_SIZE == 0) {
 				insSegment.executeBatch();
