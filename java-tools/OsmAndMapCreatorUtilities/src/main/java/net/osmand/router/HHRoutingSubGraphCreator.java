@@ -1,6 +1,6 @@
 package net.osmand.router;
 
-import static net.osmand.router.HHRoutingPrepareContext.logf;
+import static net.osmand.router.HHRoutingUtilities.logf;
 import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
 import static net.osmand.router.HHRoutePlanner.calculateRoutePointInternalId;
 import static net.osmand.router.HHRoutingUtilities.distrCumKey;
@@ -52,9 +52,10 @@ import net.osmand.util.MapUtils;
 // 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
 // 2.5 Speedup shortcuts creation by cluster and specific regions
 // 2.6 FILE file structure
-// 1.BUG needs to be fixed 
+// 1.9 BUG needs to be fixed 
 
 // TESTING
+// 1.x Allow private roads on server calculation (allow_private)
 // 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
 
 // TODO RZR
@@ -63,16 +64,15 @@ import net.osmand.util.MapUtils;
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
 // TODO BUGS
-// 1. BUG needs to be fixed road separator (Europe / Spain !!https://www.openstreetmap.org/way/377117290 390-389)
-// 1.0 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
+// 1.9 BUG needs to be fixed road separator (Europe / Spain !!https://www.openstreetmap.org/way/377117290 390-389)
+// 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // TODO Bug Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 1.7 HHRoutePlanner this is more correct to preserve startDistance
 
-// 1.13 Allow private roads on server calculation (allow_private)
-// 1.8 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
+// 1.10 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.11 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
 // 1.12 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.14 MapCreator: Cut start / end to projection as in detailed calculation ()
@@ -117,8 +117,6 @@ public class HHRoutingSubGraphCreator {
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
 
-	private static HHRoutingPrepareContext prepareContext;
-
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
 	protected static LatLon EX1 = new LatLon(52.3201813, 4.7644685); // 337 -> 4 (1212 -> 4)
 	protected static LatLon EX2 = new LatLon(52.33265, 4.77738); // 301 -> 12 (2240 -> 8)
@@ -143,6 +141,7 @@ public class HHRoutingSubGraphCreator {
 	static int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 10000;
 	static boolean CLEAN = false;
 	static String ROUTING_PROFILE = "car";
+	static String ROUTING_PARAMS = "allow_private";
 	
 
 	private static File testData() {
@@ -167,6 +166,8 @@ public class HHRoutingSubGraphCreator {
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
+			} else if (a.startsWith("--routing_params=")) {
+				ROUTING_PARAMS = a.substring("--routing_params=".length());
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			} else if (a.equals("--debug")) {
@@ -180,20 +181,18 @@ public class HHRoutingSubGraphCreator {
 		if (CLEAN && dbFile.exists()) {
 			dbFile.delete();
 		}
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
-		prepareContext = new HHRoutingPrepareContext(obfFile, ROUTING_PROFILE);
 		HHRoutingSubGraphCreator proc = new HHRoutingSubGraphCreator();
-		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(networkDB);
+		NetworkCollectPointCtx ctx = proc.collectNetworkPoints(dbFile, obfFile);
 		List<Entity> objects = visualizeWays(ctx.visualClusters);
 		saveOsmFile(objects, new File(folder, name + ".osm"));
-		networkDB.close();
 	}
 
 
 
-	private NetworkCollectPointCtx collectNetworkPoints(HHRoutingPreparationDB networkDB) throws IOException, SQLException {
-		RoutingContext rctx = prepareContext.prepareContext(null, null);
-		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx(rctx, networkDB);
+	private NetworkCollectPointCtx collectNetworkPoints(File dbFile, File obfFile) throws IOException, SQLException {
+		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
+		HHRoutingPrepareContext prepareContext = new HHRoutingPrepareContext(obfFile, ROUTING_PROFILE, ROUTING_PARAMS);
+		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx(prepareContext, networkDB);
 		if (EX != null && EX.length > 0) {
 			DEBUG_STORE_ALL_ROADS = 3;
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -207,9 +206,9 @@ public class HHRoutingSubGraphCreator {
 
 		networkDB.loadNetworkPoints(ctx.networkPointToDbInd);
 		Set<String> routeRegionNames = new TreeSet<>();
-		for (RouteRegion r : rctx.reverseMap.keySet()) {
+		for (RouteRegion r : ctx.rctx.reverseMap.keySet()) {
 			if (routeRegionNames.add(r.getName())) {
-				NetworkRouteRegion reg = new NetworkRouteRegion(r, rctx.reverseMap.get(r).getFile());
+				NetworkRouteRegion reg = new NetworkRouteRegion(r, ctx.rctx.reverseMap.get(r).getFile());
 				ctx.routeRegions.add(reg);
 			} else {
 				logf("Ignore route region %s as duplicate", r.getName());
@@ -279,6 +278,7 @@ public class HHRoutingSubGraphCreator {
 			ctx.finishRegionProcess();
 			ctx.printStatsNetworks();
 		}
+		networkDB.close();
 		return ctx;
 	}
 
@@ -913,22 +913,24 @@ public class HHRoutingSubGraphCreator {
 	}
 	
 	class NetworkCollectPointCtx {
-		RoutingContext rctx;
+		HHRoutingPrepareContext prepareContext;
 		HHRoutingPreparationDB networkDB;
-		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
-		
 		NetworkCollectStats stats = new NetworkCollectStats();
-		List<NetworkIsland> visualClusters = new ArrayList<>();
 		
 		int lastClusterInd = 0;
+		RoutingContext rctx;
+		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
+		List<NetworkIsland> visualClusters = new ArrayList<>();
+		
 		NetworkRouteRegion currentProcessingRegion;
 		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
 		List<NetworkRouteRegion> validateIntersectionRegions = new ArrayList<>();
 //		TLongIntHashMap allVisitedVertices = new TLongIntHashMap();
 		
 
-		public NetworkCollectPointCtx(RoutingContext rctx, HHRoutingPreparationDB networkDB) {
-			this.rctx = rctx;
+		public NetworkCollectPointCtx(HHRoutingPrepareContext prepareContext, HHRoutingPreparationDB networkDB) throws IOException {
+			this.prepareContext = prepareContext;
+			this.rctx = prepareContext.prepareContext(null, null);
 			this.networkDB = networkDB;
 		}
 

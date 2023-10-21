@@ -36,21 +36,26 @@ import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
 
 public class HHRoutingUtilities {
 	static long DEBUG_OSM_ID = -1;
-	
-	
+	static long DEBUG_START_TIME = 0;
+
+	public static void logf(String string, Object... a) {
+		if (DEBUG_START_TIME == 0) {
+			DEBUG_START_TIME = System.currentTimeMillis();
+		}
+		String ms = String.format("%3.1fs ", (System.currentTimeMillis() - DEBUG_START_TIME) / 1000.f);
+		System.out.printf(ms + string + "\n", a);
+	}
 	
 	static LatLon getPoint(RouteSegment r) {
 		double lon = MapUtils.get31LongitudeX(r.getRoad().getPoint31XTile(r.getSegmentStart(), r.getSegmentEnd()));
 		double lat = MapUtils.get31LatitudeY(r.getRoad().getPoint31YTile(r.getSegmentStart(), r.getSegmentEnd()));
 		return new LatLon(lat, lon);
 	}
-
 	
 	static RouteSegment makePositiveDir(RouteSegment next) {
 		return next == null ? null : next.isPositive() ? next : 
 			new RouteSegment(next.getRoad(), next.getSegmentEnd(), next.getSegmentStart());
 	}
-
 
 
 	static void addWay(TLongObjectHashMap<Entity> osmObjects, RouteSegment s) {

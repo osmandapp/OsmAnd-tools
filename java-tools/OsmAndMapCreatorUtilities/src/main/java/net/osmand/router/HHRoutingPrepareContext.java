@@ -1,5 +1,6 @@
 package net.osmand.router;
 
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-
+import static net.osmand.router.HHRoutingUtilities.logf;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -26,12 +27,12 @@ public class HHRoutingPrepareContext {
 	static final int ROUTING_MEMORY_LIMIT = 2048;
 	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 	static long MEMORY_LAST_USED_MB;
-	static long DEBUG_START_TIME = 0;
 
 	private String ROUTING_PROFILE = "car";
+	private Map<String, String> PROFILE_SETTINGS = new TreeMap<>();
 	private List<File> FILE_SOURCES = new ArrayList<File>();
 	
-	public HHRoutingPrepareContext(File obfFile, String routingProfile) {
+	public HHRoutingPrepareContext(File obfFile, String routingProfile, String... profileSettings) {
 		if (routingProfile != null) {
 			ROUTING_PROFILE = routingProfile;
 		}
@@ -45,6 +46,16 @@ public class HHRoutingPrepareContext {
 		} else {
 			FILE_SOURCES.add(obfFile);
 		}
+		if (profileSettings != null) {
+			for (String sp : profileSettings) {
+				String[] s = sp.split("=");
+				String val = "true";
+				if (s.length > 1) {
+					val = s[1];
+				}
+				PROFILE_SETTINGS.put(s[0], val);
+			}
+		}
 		Collections.sort(FILE_SOURCES, new Comparator<File>() {
 
 			@Override
@@ -56,7 +67,7 @@ public class HHRoutingPrepareContext {
 	
 
 	
-	public RoutingContext gcMemoryLimitToUnloadAll(RoutingContext ctx, List<NetworkRouteRegion> subRegions,
+	RoutingContext gcMemoryLimitToUnloadAll(RoutingContext ctx, List<NetworkRouteRegion> subRegions,
 			boolean force) throws IOException {
 		long usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 		if (force || ((usedMemory - MEMORY_LAST_USED_MB) > MEMORY_RELOAD_MB
@@ -85,24 +96,6 @@ public class HHRoutingPrepareContext {
 		return ctx;
 	}
 
-	public static void logf(String string, Object... a) {
-		if (DEBUG_START_TIME == 0) {
-			DEBUG_START_TIME = System.currentTimeMillis();
-		}
-		String ms = String.format("%3.1fs ", (System.currentTimeMillis() - DEBUG_START_TIME) / 1000.f);
-		System.out.printf(ms + string + "\n", a);
-
-	}
-
-	private List<BinaryMapIndexReader> initReaders(Collection<File> hints) throws IOException {
-		List<BinaryMapIndexReader> readers = new ArrayList<BinaryMapIndexReader>();
-		for (File source : (hints != null ? hints : FILE_SOURCES)) {
-			BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source);
-			readers.add(reader);
-		}
-		return readers;
-	}
-
 	RoutingContext prepareContext(Collection<File> fileSources, RoutingContext oldCtx) throws IOException {
 		List<BinaryMapIndexReader> readers = initReaders(fileSources);
 		if (oldCtx != null) {
@@ -113,14 +106,23 @@ public class HHRoutingPrepareContext {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.parseDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(ROUTING_MEMORY_LIMIT, ROUTING_MEMORY_LIMIT);
-		Map<String, String> map = new TreeMap<String, String>();
-		// map.put("avoid_ferries", "true");
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, map);
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, PROFILE_SETTINGS);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
 		return router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[readers.size()]),
 				RouteCalculationMode.NORMAL);
 	}
+
+
+	private List<BinaryMapIndexReader> initReaders(Collection<File> hints) throws IOException {
+		List<BinaryMapIndexReader> readers = new ArrayList<BinaryMapIndexReader>();
+		for (File source : (hints != null ? hints : FILE_SOURCES)) {
+			BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source);
+			readers.add(reader);
+		}
+		return readers;
+	}
+
 
 
 }

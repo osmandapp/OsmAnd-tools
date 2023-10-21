@@ -1,5 +1,6 @@
 package net.osmand.router;
 
+
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -24,6 +25,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.DBDialect;
+import static net.osmand.router.HHRoutingUtilities.logf;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -504,7 +506,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				}
 				visitedVertices = networkDB.loadVisitedVertices(id);
 				points = -1;
-				HHRoutingPrepareContext.logf("Loaded visited vertices for %s - %d.", region.getName(),
+				logf("Loaded visited vertices for %s - %d.", region.getName(),
 						visitedVertices.size());
 			}
 			return visitedVertices;

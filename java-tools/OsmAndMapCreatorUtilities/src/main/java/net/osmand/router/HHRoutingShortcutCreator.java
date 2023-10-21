@@ -1,7 +1,7 @@
 package net.osmand.router;
 
 import static net.osmand.router.HHRoutePlanner.calculateRoutePointInternalId;
-import static net.osmand.router.HHRoutingPrepareContext.logf;
+import static net.osmand.router.HHRoutingUtilities.logf;
 import static net.osmand.router.HHRoutingUtilities.addWay;
 import static net.osmand.router.HHRoutingUtilities.getPoint;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
