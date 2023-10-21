@@ -176,9 +176,14 @@ public class HHRoutingShortcutCreator {
 					s = HHRoutingUtilities.loadPoint(ctx, pnt);
 					HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
+					boolean errorFound = false;
 					for (RouteSegment t : result) {
 						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(), t.getSegmentStart(), t.getSegmentEnd()));
 						if (pnt.dualPoint.clusterId != end.clusterId) {
+							if (errorFound) {
+								continue;
+							}
+							errorFound = true;
 							String msg = String.format("Point (%s) can lead only to dual cluster %d (%s dual point) - found %s (cluster %d)",
 									pnt, pnt.dualPoint.clusterId, pnt.dualPoint, end, end.clusterId);
 							for (RouteSegment test : result) {
