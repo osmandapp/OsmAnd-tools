@@ -191,8 +191,8 @@ public class HHRoutingShortcutCreator {
 				long nt2 = System.nanoTime();
 				RouteSegmentPoint s = HHRoutePlanner.loadPoint(ctx, pnt);
 				if (s == null) {
-					System.out.printf("Skip segment %d as probably not accessible with current routing params (%s) \n",
-							pnt.roadId / 64, pnt);
+					// routing params 
+					System.out.printf("Skip segment %d as not accessible (%s) \n", pnt.roadId / 64, pnt);
 					continue;
 				}
 				HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");

@@ -103,7 +103,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ResultSet profileSet = src.createStatement().executeQuery(" select id, params from profiles");
 		while (profileSet.next()) {
 			pIns.setInt(1, profileSet.getInt(1));
-			pIns.setString(2, profileSet.getString(1));
+			pIns.setString(2, profileSet.getString(2));
 			pIns.execute();
 			profiles.add(profileSet.getInt(1));
 		}
