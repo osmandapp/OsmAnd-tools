@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -89,8 +90,8 @@ public class HHRoutingShortcutCreator {
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
-			} else if (a.startsWith("--routing_profile=")) {
-				ROUTING_PARAMS = a.substring("--routing_params=".length()).split("---");
+			} else if (a.startsWith("--routing_params=")) {
+				ROUTING_PARAMS = a.substring("--routing_params=".length()).trim().split("---");
 			} else if (a.startsWith("--threads=")) {
 				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
 			} else if (a.equals("--clean")) {
