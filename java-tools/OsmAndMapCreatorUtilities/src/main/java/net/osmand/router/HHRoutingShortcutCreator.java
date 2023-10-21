@@ -90,7 +90,7 @@ public class HHRoutingShortcutCreator {
 			if (a.startsWith("--routing_profile=")) {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
 			} else if (a.startsWith("--routing_profile=")) {
-				ROUTING_PARAMS = a.substring("--routing_params=".length()).split(";");
+				ROUTING_PARAMS = a.substring("--routing_params=".length()).split("---");
 			} else if (a.startsWith("--threads=")) {
 				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
 			} else if (a.equals("--clean")) {
