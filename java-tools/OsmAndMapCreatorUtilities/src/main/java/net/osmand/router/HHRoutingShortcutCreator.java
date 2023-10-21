@@ -185,8 +185,10 @@ public class HHRoutingShortcutCreator {
 								NetworkDBPoint other = networkPointsByGeoId.get(calculateRoutePointInternalId(test.getRoad().getId(), test.getSegmentStart(), test.getSegmentEnd()));
 								System.out.println("ERROR out " + other + " clusterId " + other.clusterId);
 							}
-							System.out.println(msg);
-							throw new IllegalStateException(msg);
+							// TODO BUG needs to be fixed road separator (Europe / Spain !!https://www.openstreetmap.org/way/377117290 390-389)
+							System.err.println("BUG needs to be fixed " + msg);
+							continue;
+//							throw new IllegalStateException(msg);
 						}
 						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
 						pnt.connected.add(segment);

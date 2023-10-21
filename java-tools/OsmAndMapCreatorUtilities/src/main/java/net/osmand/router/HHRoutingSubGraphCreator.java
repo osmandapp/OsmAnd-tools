@@ -52,6 +52,7 @@ import net.osmand.util.MapUtils;
 // 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
 // 2.5 Speedup shortcuts creation by cluster and specific regions
 // 2.6 FILE file structure
+// 1.BUG needs to be fixed 
 
 // TESTING
 // 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
@@ -62,6 +63,7 @@ import net.osmand.util.MapUtils;
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
 // TODO BUGS
+// 1. BUG needs to be fixed road separator (Europe / Spain !!https://www.openstreetmap.org/way/377117290 390-389)
 // 1.0 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // TODO Bug Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
@@ -1013,7 +1015,7 @@ public class HHRoutingSubGraphCreator {
 			for (long key : cluster.visitedVertices.keys()) {
 				RouteSegmentVertex v = cluster.allVertices.get(key);
 				if (testGlobalVisited(key)) {
-					throw new IllegalStateException(String.format("Point was already visited %s", v));
+					throw new IllegalStateException(String.format("Point was already visited %s: %s", v, globalVisitedMessage(key)));
 				}
 //				allVisitedVertices.put(key, cluster.dbIndex);
 				if (currentProcessingRegion != null) {
