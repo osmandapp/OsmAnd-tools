@@ -59,8 +59,8 @@ import net.osmand.util.MapUtils;
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
 // + c.calcDetailed(0) draw segments;
 // 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
-// 1.7 HHRoutePlanner alternative this is more correct to preserve startDistance
-// 1.15 MapCreator: 1.7 HHRoutePlanner calculate start/end alternative routes 
+// 1.x HHRoutePlanner alternative this is more correct to preserve startDistance
+// 1.x MapCreator: HHRoutePlanner calculate start/end alternative routes 
 
 // TODO RZR
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
@@ -71,12 +71,13 @@ import net.osmand.util.MapUtils;
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
-// 1.2.8 Recalculate inaccessible: Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
+// 1.7 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938)
+// 1.7.2 HHRoutePlanner Implement route recalculation in case distance > original 10% ?
 
 // 1.10 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.11 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
 // 1.12 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
-// 1.16 CLEANUP: shortcuts, midpoint, chpoint
+// 1.13 CLEANUP: shortcuts, midpoint, chpoint
 // 1.14 MapCreator: Cut start / end to projection as in detailed calculation ()
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
@@ -86,7 +87,6 @@ import net.osmand.util.MapUtils;
 // 2.5 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
 // 2.6 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 2.7 FILE: Implement border crossing issue on client
-// 2.8 Implement route recalculation in case distance > original 10% ? 
 // 2.9 FILE: different dates for maps!
 // 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
 //       There should be maximum at preprocessed visited points < 50K-100K
