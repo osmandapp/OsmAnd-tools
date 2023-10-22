@@ -48,9 +48,10 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// Canada alberta failures (non private)
+// 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
+// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
+// ---------------
 // 2.5 Speedup shortcuts creation by cluster and specific regions
-// 2.6 FILE file structure
 
 // TESTING
 // 1.x Allow private roads on server calculation (allow_private)
@@ -58,6 +59,8 @@ import net.osmand.util.MapUtils;
 // 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
 // + c.calcDetailed(0) draw segments;
 // 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
+// 1.7 HHRoutePlanner alternative this is more correct to preserve startDistance
+// 1.15 MapCreator: 1.7 HHRoutePlanner calculate start/end alternative routes 
 
 // TODO RZR
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
@@ -65,12 +68,9 @@ import net.osmand.util.MapUtils;
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
 // TODO BUGS
-// 1.9 BUG needs to be fixed road separator (Europe / Spain !!https://www.openstreetmap.org/way/377117290 390-389)
-// 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
-// 1.7 HHRoutePlanner this is more correct to preserve startDistance
 // 1.2.8 Recalculate inaccessible: Ukraine_bicycle Error on segment 428240507 (HHRoutePlanner.java:938) - Lat 50.622448 Lon 30.013855 -> Lat 50.466217 Lon 30.34831 
 
 // 1.10 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
@@ -78,7 +78,6 @@ import net.osmand.util.MapUtils;
 // 1.12 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.16 CLEANUP: shortcuts, midpoint, chpoint
 // 1.14 MapCreator: Cut start / end to projection as in detailed calculation ()
-// 1.15 MapCreator: HHRoutePlanner calculate start/end alternative routes 
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
@@ -98,11 +97,11 @@ import net.osmand.util.MapUtils;
 // 2.16 Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
 
 // 3 Later implementation
-// 3.1 HHRoutePlanner Alternative routes - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)
+// 3.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 3.2 Avoid specific road
 // 3.3 Deprioritize or exclude roads (parameters)
 // 3.4 Live data (think about it)
-// 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighboor clusters)
+// 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
 // 3.6 FILE utilities: Binary inspector...
 
 // *4* Future (if needed) - Introduce 3/4 level 
@@ -443,6 +442,7 @@ public class HHRoutingSubGraphCreator {
 		RouteSegmentVertex segment;
 		boolean end;
 		MaxFlowEdge flowParentTemp;
+		
 		public MaxFlowVertex(RouteSegmentVertex e, boolean end) {
 			this.segment = e;
 			this.end = end;

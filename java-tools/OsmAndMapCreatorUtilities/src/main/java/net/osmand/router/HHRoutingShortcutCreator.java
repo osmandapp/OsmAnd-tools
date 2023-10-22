@@ -212,7 +212,7 @@ public class HHRoutingShortcutCreator {
 								NetworkDBPoint other = networkPointsByGeoId.get(calculateRoutePointInternalId(test.getRoad().getId(), test.getSegmentStart(), test.getSegmentEnd()));
 								System.out.println("ERROR out " + other + " clusterId " + other.clusterId);
 							}
-							// TODO BUG needs to be fixed road separator (Europe / Spain !!https://www.openstreetmap.org/way/377117290 390-389)
+							// TODO 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 							System.err.println("BUG needs to be fixed " + msg);
 							continue;
 //							throw new IllegalStateException(msg);
