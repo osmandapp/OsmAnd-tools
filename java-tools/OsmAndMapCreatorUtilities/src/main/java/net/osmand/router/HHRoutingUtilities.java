@@ -1,5 +1,7 @@
 package net.osmand.router;
 
+import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -26,13 +28,12 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
-import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
+import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentVertex;
 import net.osmand.util.MapUtils;
-import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
 
 public class HHRoutingUtilities {
 	static long DEBUG_OSM_ID = -1;
@@ -138,15 +139,88 @@ public class HHRoutingUtilities {
 	}
 
 
-	public static List<Entity> visualizeWays(List<NetworkIsland> visualClusters) {
+	public static List<Entity> visualizeClusters(List<NetworkIsland> visualClusters) {
 		List<Entity> objs = new ArrayList<>();
-		int nodes = 0;
-		int ways1 = 0;
-		int ways2 = 0;
-		boolean merge = false;
+		int clusters = 0;
+		int allCenterRoads = 0, allShortcuts = 0;
 		if (visualClusters == null) {
 			return objs;
 		}
+		int allRoads = visualizeAllNodes(visualClusters, objs);
+
+		TLongObjectHashMap<Node> pnts = new TLongObjectHashMap<>();
+		for (NetworkIsland island : visualClusters) {
+			LatLon l = island.startLatLon;
+			Node startNode = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
+			startNode.putTag("highway", "traffic_signals");
+			startNode.putTag("name", island.startToString);
+			startNode.putTag("clusterId", island.dbIndex+"");
+			objs.add(startNode);
+			startNode.putTag("borderPoints", island.borderVertices.size() + "");
+			
+			clusters++;
+			allShortcuts += island.borderVertices.size() * (island.borderVertices.size() - 1);
+			allCenterRoads += island.borderVertices.size();
+			for (RouteSegmentBorderPoint bp : island.borderVertices) {
+				Node bNode = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
+				bNode.putTag("highway", "stop");
+				bNode.putTag("name", bp.toString());
+				bNode.putTag("clusterId", island.dbIndex+"");
+				pnts.put(bp.uniqueId, bNode);
+				
+				if (island.visualBorders == null) {
+					Way w = new Way(DEBUG_OSM_ID--, Arrays.asList(startNode, bNode));
+					w.putTag("highway", "track");
+					objs.add(w);
+				}
+			}
+			if (island.visualBorders == null) {
+				continue;
+			}
+			TLongObjectIterator<List<LatLon>> it = island.visualBorders.iterator();
+			while (it.hasNext()) {
+				it.advance();
+				long pid = it.key();
+				List<LatLon> lls = it.value();
+				if (lls.size() > 0) {
+					List<Node> nodesList = new ArrayList<Node>();
+					nodesList.add(startNode);
+					for (int i = lls.size() - 2; i >= 0; i--) {
+						LatLon ln = lls.get(i);
+						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
+						objs.add(n2);
+						nodesList.add(n2);
+					}
+					if (!pnts.containsKey(pid)) {
+						LatLon ln = lls.get(0);
+						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
+						objs.add(n2);
+						pnts.put(pid, n2);
+					}
+					if (lls.size() > 1) {
+						nodesList.add(pnts.get(pid));
+						Way w = new Way(DEBUG_OSM_ID--, nodesList);
+						w.putTag("highway", "track");
+						objs.add(w);
+					}
+					nodesList.clear();
+					nodesList.add(startNode);
+					nodesList.add(pnts.get(pid));
+					Way w = new Way(DEBUG_OSM_ID--, nodesList);
+					w.putTag("highway", "motorway");
+					objs.add(w);
+				}
+			}
+		}
+
+		System.out.printf("Total visited roads %d, total clusters %d, total segments %d (from centers) - 2x border points, total segments %d between border points \n", 
+				allRoads,clusters, allCenterRoads, allShortcuts);
+		return objs;
+	}
+
+	private static int visualizeAllNodes(List<NetworkIsland> visualClusters, List<Entity> objs) {
+		boolean merge = false;
+		int ways1 = 0;
 		for (NetworkIsland ni : visualClusters) {
 			TLongSet viewed = new TLongHashSet();
 			if (ni.allVertices == null) {
@@ -184,60 +258,7 @@ public class HHRoutingUtilities {
 				}
 			}
 		}
-
-		TLongObjectHashMap<Node> pnts = new TLongObjectHashMap<>();
-		for (NetworkIsland island : visualClusters) {
-			LatLon l = island.startLatLon;
-			Node n = new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--);
-			n.putTag("highway", "stop");
-			n.putTag("name", island.startToString);
-			objs.add(n);
-			nodes++;
-			if (island.visualBorders == null) {
-				continue;
-			}
-			n.putTag("conn", island.visualBorders.size() + "");
-			TLongObjectIterator<List<LatLon>> it = island.visualBorders.iterator();
-			while (it.hasNext()) {
-				it.advance();
-				long pid = it.key();
-				List<LatLon> lls = it.value();
-				if (lls.size() > 0) {
-					List<Node> nodesList = new ArrayList<Node>();
-					nodesList.add(n);
-					for (int i = lls.size() - 2; i >= 0; i--) {
-						LatLon ln = lls.get(i);
-						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
-						objs.add(n2);
-						nodesList.add(n2);
-					}
-					if (!pnts.containsKey(pid)) {
-						LatLon ln = lls.get(0);
-						Node n2 = new Node(ln.getLatitude(), ln.getLongitude(), DEBUG_OSM_ID--);
-						objs.add(n2);
-						pnts.put(pid, n2);
-					}
-					if (lls.size() > 1) {
-						nodesList.add(pnts.get(pid));
-						Way w = new Way(DEBUG_OSM_ID--, nodesList);
-						w.putTag("highway", "track");
-						objs.add(w);
-						ways2++;
-					}
-					nodesList.clear();
-					nodesList.add(n);
-					nodesList.add(pnts.get(pid));
-					Way w = new Way(DEBUG_OSM_ID--, nodesList);
-					w.putTag("highway", "motorway");
-					objs.add(w);
-					ways2++;
-				}
-			}
-		}
-
-		System.out.printf("Total visited roads %d, total vertices %d, total stop %d connections - %.1f %% \n", ways1,
-				nodes, ways2, (ways2 / 2.0d) / (nodes * (nodes - 1) / 2.0) * 100.0);
-		return objs;
+		return ways1;
 	}
 
 

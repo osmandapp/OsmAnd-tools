@@ -8,7 +8,7 @@ import static net.osmand.router.HHRoutingUtilities.distrString;
 import static net.osmand.router.HHRoutingUtilities.distrSum;
 import static net.osmand.router.HHRoutingUtilities.makePositiveDir;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
-import static net.osmand.router.HHRoutingUtilities.visualizeWays;
+import static net.osmand.router.HHRoutingUtilities.visualizeClusters;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,7 +40,6 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
-import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkBorderPoint;
@@ -176,6 +175,12 @@ public class HHRoutingSubGraphCreator {
 			} else if (a.equals("--debug")) {
 				DEBUG_VERBOSE_LEVEL = 1;
 				DEBUG_STORE_ALL_ROADS = 1;
+			} else if (a.equals("--debug2")) {
+				DEBUG_VERBOSE_LEVEL = 2;
+				DEBUG_STORE_ALL_ROADS = 2;
+			} else if (a.equals("--debug3")) {
+				DEBUG_VERBOSE_LEVEL = 3;
+				DEBUG_STORE_ALL_ROADS = 3;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
@@ -192,7 +197,9 @@ public class HHRoutingSubGraphCreator {
 		try {
 			proc.collectNetworkPoints(ctx);
 		} finally {
-			saveOsmFile(visualizeWays(ctx.visualClusters), new File(folder, name + ".osm"));
+			if (ctx.visualClusters.size() > 0) {
+				saveOsmFile(visualizeClusters(ctx.visualClusters), new File(folder, name + ".osm"));
+			}
 			networkDB.close();
 		}
 			
@@ -775,8 +782,8 @@ public class HHRoutingSubGraphCreator {
 		TLongObjectHashMap<RouteSegment> visitedVertices = new TLongObjectHashMap<>();
 		TLongObjectHashMap<RouteSegmentVertex> toVisitVertices = new TLongObjectHashMap<>();
 		TLongObjectHashMap<RouteSegmentVertex> allVertices = new TLongObjectHashMap<>();
-		List<RouteSegmentBorderPoint> borderVertices;
 		
+		List<RouteSegmentBorderPoint> borderVertices;
 		TLongObjectHashMap<List<LatLon>> visualBorders = null;
 
 		NetworkIsland(NetworkCollectPointCtx ctx, RouteSegment start) {
@@ -1036,6 +1043,7 @@ public class HHRoutingSubGraphCreator {
 			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
 				if (DEBUG_STORE_ALL_ROADS > 0) {
+					// DEBUG_STORE_ALL_ROADS = 2 store full road connections 
 					cluster.visualBorders = new TLongObjectHashMap<List<LatLon>>();
 					for (RouteSegmentVertex p : cluster.toVisitVertices.valueCollection()) {
 						List<LatLon> l = new ArrayList<LatLon>();
@@ -1050,10 +1058,9 @@ public class HHRoutingSubGraphCreator {
 						cluster.visualBorders.put(p.cId, l);
 					}
 				}
+				cluster.toVisitVertices = null;
+				cluster.queue = null;
 				if (DEBUG_STORE_ALL_ROADS < 2) {
-					cluster.borderVertices = null;
-					cluster.toVisitVertices = null;
-					cluster.queue = null;
 					cluster.allVertices = null;
 				}
 			}
