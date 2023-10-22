@@ -304,6 +304,10 @@ public class HHRoutingSubGraphCreator {
 		TIntIntHashMap depthDistr = new TIntIntHashMap();
 		int STEP = 10;
 		int minDepth = 1, maxDepth = STEP + minDepth;
+		if (DEBUG_VERBOSE_LEVEL >= 1) {
+			logf("Cluster %d. %s", ctx.lastClusterInd + 1, pnt );
+					
+		}
 		
 		c.addSegmentToQueue(c.getVertex(pnt, true));
 		while (distrSum(depthDistr, maxDepth) < TOTAL_MAX_POINTS && c.toVisitVertices.size() > 0) {
@@ -337,10 +341,9 @@ public class HHRoutingSubGraphCreator {
 		// debug
 //		c.borderVertices.putAll(mincuts);
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
-			logf("Cluster %d: borders %d (%,d size ~ %d depth). Flow %d: depth min %d (%,d) <- max %d (%,d). Start %s",
-					ctx.lastClusterInd + 1,c.toVisitVertices.size(), c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()), 
-					mincuts.size(), minDepth, distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth),  
-					pnt);
+			logf("   Borders %d (%,d size ~ %d depth). Flow %d: depth min %d (%,d) <- max %d (%,d). Start %s",
+					c.toVisitVertices.size(), c.visitedVertices.size(), distrCumKey(depthDistr, c.visitedVertices.size()), 
+					mincuts.size(), minDepth, distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth));
 		}
 		return c;
 	}
@@ -930,7 +933,7 @@ public class HHRoutingSubGraphCreator {
 		HHRoutingPreparationDB networkDB;
 		NetworkCollectStats stats = new NetworkCollectStats();
 		
-		int lastClusterInd = 0;
+		int lastClusterInd = -1;
 		RoutingContext rctx;
 		List<NetworkRouteRegion> routeRegions = new ArrayList<>();
 		List<NetworkIsland> visualClusters = new ArrayList<>();
@@ -1153,7 +1156,7 @@ public class HHRoutingSubGraphCreator {
 					if (DEBUG_VERBOSE_LEVEL >= 1 || indProc - prevPrintInd > 1000) {
 						prevPrintInd = indProc;
 						int borderPointsSize = ctx.borderPointsSize();
-						logf("%,d %.2f%%: %,d points -> %,d border points, %,d clusters", indProc,
+						logf("Progress %.2f%%: all %,d points -> %,d border points, %,d clusters",
 								indProc * 100.0f / estimatedRoads, ctx.getTotalPoints() + borderPointsSize,
 								borderPointsSize, ctx.lastClusterInd);
 					}
