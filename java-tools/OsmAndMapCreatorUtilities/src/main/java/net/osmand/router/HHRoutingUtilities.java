@@ -165,6 +165,8 @@ public class HHRoutingUtilities {
 				LatLon lt = getPoint(bp);
 				Node bNode = new Node(lt.getLatitude(), lt.getLongitude(), DEBUG_OSM_ID--);
 				bNode.putTag("highway", "stop");
+				bNode.putTag("dir", bp.dir +"");
+				bNode.putTag("unidir", bp.unidirId+"");
 				bNode.putTag("name", bp.toString());
 				bNode.putTag("clusterId", island.dbIndex+"");
 				pnts.put(bp.uniqueId, bNode);
