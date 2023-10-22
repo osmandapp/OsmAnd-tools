@@ -50,17 +50,8 @@ import net.osmand.util.MapUtils;
 // IN PROGRESS
 // 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
-// ---------------
-// 2.5 Speedup shortcuts creation by cluster and specific regions
 
 // TESTING
-// 1.x Allow private roads on server calculation (allow_private)
-// 1.x compact chdb even more (1)use short dist 2) use point ind in cluster) - 2 bytes per edge  - 90 MB -> 30 MB
-// 2.2 FILE: calculate different settings profile (short vs long, use elevation data)
-// + c.calcDetailed(0) draw segments;
-// 1.x Holes Bug restriction on turns and Direction shortcuts -https://www.openstreetmap.org/#map=17/50.54312/30.18480 (uturn) (!)
-// 1.x HHRoutePlanner alternative this is more correct to preserve startDistance
-// 1.x MapCreator: HHRoutePlanner calculate start/end alternative routes 
 
 // TODO RZR
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
@@ -71,8 +62,6 @@ import net.osmand.util.MapUtils;
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
-// 1.7 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938)
-// 1.7.2 HHRoutePlanner Implement route recalculation in case distance > original 10% ?
 
 // 1.10 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.11 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
@@ -82,6 +71,8 @@ import net.osmand.util.MapUtils;
 
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
+// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update)
+// 2.2.2 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
 // 2.5 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
