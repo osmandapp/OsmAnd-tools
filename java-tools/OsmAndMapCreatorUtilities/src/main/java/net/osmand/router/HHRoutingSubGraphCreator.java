@@ -1042,8 +1042,11 @@ public class HHRoutingSubGraphCreator {
 				
 			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
-				if (DEBUG_STORE_ALL_ROADS > 0) {
-					// DEBUG_STORE_ALL_ROADS = 2 store full road connections 
+				// preserve cluster.borderVertices
+				if (DEBUG_STORE_ALL_ROADS < 2) {
+					cluster.allVertices = null;
+				}
+				if (DEBUG_STORE_ALL_ROADS > 1) {
 					cluster.visualBorders = new TLongObjectHashMap<List<LatLon>>();
 					for (RouteSegmentVertex p : cluster.toVisitVertices.valueCollection()) {
 						List<LatLon> l = new ArrayList<LatLon>();
@@ -1051,18 +1054,13 @@ public class HHRoutingSubGraphCreator {
 						while (par != null) {
 							l.add(HHRoutingUtilities.getPoint(par));
 							par = par.parentRoute;
-							if (DEBUG_STORE_ALL_ROADS == 1) {
-								break;
-							}
 						}
 						cluster.visualBorders.put(p.cId, l);
 					}
 				}
 				cluster.toVisitVertices = null;
 				cluster.queue = null;
-				if (DEBUG_STORE_ALL_ROADS < 2) {
-					cluster.allVertices = null;
-				}
+				
 			}
 		}
 
