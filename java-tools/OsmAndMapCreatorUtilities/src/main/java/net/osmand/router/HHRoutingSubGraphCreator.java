@@ -175,6 +175,7 @@ public class HHRoutingSubGraphCreator {
 				CLEAN = true;
 			} else if (a.equals("--debug")) {
 				DEBUG_VERBOSE_LEVEL = 1;
+				DEBUG_STORE_ALL_ROADS = 1;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
