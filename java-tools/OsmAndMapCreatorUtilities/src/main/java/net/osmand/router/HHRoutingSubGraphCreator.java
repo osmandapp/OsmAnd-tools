@@ -138,7 +138,7 @@ public class HHRoutingSubGraphCreator {
 
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
-//		DEBUG_STORE_ALL_ROADS = 1;
+		DEBUG_STORE_ALL_ROADS = 1;
 		CLEAN = true;
 		
 //		TOTAL_MAX_POINTS = 10000;
@@ -507,7 +507,8 @@ public class HHRoutingSubGraphCreator {
 			while (!queue.isEmpty() && sink == null) {
 				MaxFlowVertex vert = queue.poll();
 				for (MaxFlowEdge conn : vert.connections) {
-					if (conn.t.flowParentTemp == null && conn.flow < 1) {
+					int maxFlow = conn.vertex == null ? Integer.MAX_VALUE : 1;
+					if (conn.t.flowParentTemp == null && conn.flow < maxFlow) {
 						conn.t.flowParentTemp = conn;
 						if (conn.vertex != null && conn.vertex.getDepth() <= minDepth && conn.vertex.getDepth() > 0) {
 							sink = conn.t;
@@ -588,6 +589,7 @@ public class HHRoutingSubGraphCreator {
 			t.connections.add(newEdge);
 			if (c.toVisitVertices.contains(r.getId())) {
 				if (!existingVertices.contains(r.getId())) {
+					// target of RouteSegmentVertex segmentEnd
 					sources.add(newEdge.s);
 				}
 			}
@@ -610,15 +612,12 @@ public class HHRoutingSubGraphCreator {
 		if (DEBUG_VERBOSE_LEVEL > 0) {
 			for (MaxFlowEdge t : source.connections) {
 				MaxFlowVertex sourceL = t.t;
-				boolean flow = false;
-				for (MaxFlowEdge tc : source.connections) {
-					if (tc.flow > 0) {
-						flow = true;
-						break;
-					}
+				int flow = 0;
+				for (MaxFlowEdge tc : sourceL.connections) {
+					flow += tc.flow;
 				}
-				if (flow) {
-					System.out.println("-> Source: " + sourceL);
+				if (flow > 0) {
+					System.out.println("-> Source: " + sourceL + " flow " + flow) ;
 				}
 			}
 		}
@@ -626,7 +625,8 @@ public class HHRoutingSubGraphCreator {
 		while (!queue.isEmpty()) {
 			MaxFlowVertex ps = queue.poll();
 			for (MaxFlowEdge conn : ps.connections) {
-				if (conn.t.flowParentTemp == null && conn.flow < 1) {
+				int maxFlow = conn.vertex == null ? Integer.MAX_VALUE : 1;
+				if (conn.t.flowParentTemp == null && conn.flow < maxFlow) {
 					conn.t.flowParentTemp = conn;
 					queue.add(conn.t);
 					reachableSource.add(conn.t);
@@ -640,13 +640,13 @@ public class HHRoutingSubGraphCreator {
 			MaxFlowVertex ps = queue.poll();
 			for (MaxFlowEdge conn : ps.connections) {
 				if (reachableSource.contains(conn.t)) {
-					MaxFlowEdge c = conn.vertex == null ? conn.s.flowParentTemp : conn;
-					boolean pos = c.vertex.getStartPointX() == (c.s.end ? c.s.segment.getEndPointX() : c.s.segment.getStartPointX()) &&
+					MaxFlowEdge c = conn;
+					boolean posDir = c.vertex.getStartPointX() == (c.s.end ? c.s.segment.getEndPointX() : c.s.segment.getStartPointX()) &&
 							c.vertex.getStartPointY() == (c.s.end ? c.s.segment.getEndPointY() : c.s.segment.getStartPointY());
-					RouteSegmentBorderPoint dir = new RouteSegmentBorderPoint(c.vertex, pos);
-					mincuts.put(calcUniDirRoutePointInternalId(c.vertex), dir);
+					RouteSegmentBorderPoint borderPnt = new RouteSegmentBorderPoint(c.vertex, posDir);
+					mincuts.put(calcUniDirRoutePointInternalId(c.vertex), borderPnt);
 					if (DEBUG_VERBOSE_LEVEL > 0) {
-						System.out.println("? Mincut " + c.s + " -> " + dir);
+						System.out.println("? Mincut " + c.s + " -> " + borderPnt);
 					}
 				}
 				// debug
