@@ -137,7 +137,7 @@ public class HHRoutingSubGraphCreator {
 	
 
 	protected static LatLon[] EX = {
-			EX12
+//			EX12
 	}; 
 
 	static int TOTAL_MAX_POINTS = 99000, TOTAL_MIN_POINTS = 10000;
