@@ -607,6 +607,21 @@ public class HHRoutingSubGraphCreator {
 		LinkedList<MaxFlowVertex> queue = new LinkedList<>();
 		Set<MaxFlowVertex> reachableSource = new HashSet<>();
 		queue.add(source);
+		if (DEBUG_VERBOSE_LEVEL > 0) {
+			for (MaxFlowEdge t : source.connections) {
+				MaxFlowVertex sourceL = t.t;
+				boolean flow = false;
+				for (MaxFlowEdge tc : source.connections) {
+					if (tc.flow > 0) {
+						flow = true;
+						break;
+					}
+				}
+				if (flow) {
+					System.out.println("-> Source: " + sourceL);
+				}
+			}
+		}
 		reachableSource.add(source);
 		while (!queue.isEmpty()) {
 			MaxFlowVertex ps = queue.poll();
@@ -630,7 +645,7 @@ public class HHRoutingSubGraphCreator {
 							c.vertex.getStartPointY() == (c.s.end ? c.s.segment.getEndPointY() : c.s.segment.getStartPointY());
 					RouteSegmentBorderPoint dir = new RouteSegmentBorderPoint(c.vertex, pos);
 					mincuts.put(calcUniDirRoutePointInternalId(c.vertex), dir);
-					if (DEBUG_VERBOSE_LEVEL >= 1) {
+					if (DEBUG_VERBOSE_LEVEL > 0) {
 						System.out.println("? Mincut " + c.s + " -> " + dir);
 					}
 				}
