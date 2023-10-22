@@ -373,7 +373,8 @@ public class HHRoutingSubGraphCreator {
 					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if (mincuts.size() != borderPoints.size()) {
 				// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
-				System.err.println(msg);
+//				System.err.println(msg);
+				throw new IllegalStateException(msg);
 			} else {
 				throw new IllegalStateException(msg);
 			}
