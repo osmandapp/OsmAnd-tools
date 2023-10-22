@@ -133,13 +133,14 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon EX9 = new LatLon(42.306454, 18.804703);
 	protected static LatLon EX10 = new LatLon(42.10768, 19.103357);
 	protected static LatLon EX11 = new LatLon(42.31288, 19.275553);
+	protected static LatLon EX12 = new LatLon(32.919117, -96.96761);
 	
 
 	protected static LatLon[] EX = {
-//			EX11
+			EX12
 	}; 
 
-	static int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 10000;
+	static int TOTAL_MAX_POINTS = 99000, TOTAL_MIN_POINTS = 10000;
 	static boolean CLEAN = false;
 	static String ROUTING_PROFILE = "car";
 	static String ROUTING_PARAMS = "allow_private";
@@ -638,7 +639,9 @@ public class HHRoutingSubGraphCreator {
 							c.vertex.getStartPointY() == (c.s.end ? c.s.segment.getEndPointY() : c.s.segment.getStartPointY());
 					RouteSegmentBorderPoint dir = new RouteSegmentBorderPoint(c.vertex, pos);
 					mincuts.put(calcUniDirRoutePointInternalId(c.vertex), dir);
-//					System.out.println("? " + dir + " " + c.s + " " + c.t);
+					if (DEBUG_VERBOSE_LEVEL >= 1) {
+						System.out.println("? Mincut " + c.s + " -> " + dir);
+					}
 				}
 				// debug
 //				if (conn.vertex != null) {
