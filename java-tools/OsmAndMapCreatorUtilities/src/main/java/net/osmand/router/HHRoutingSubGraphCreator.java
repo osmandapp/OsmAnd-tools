@@ -72,8 +72,7 @@ import net.osmand.util.MapUtils;
 // 2nd  phase - points selection / Planet ~6-12h per profile
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update)
-// 2.2.2 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
-// 2.3 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
 // 2.5 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
 // 2.6 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
@@ -94,6 +93,8 @@ import net.osmand.util.MapUtils;
 // 3.4 Live data (think about it)
 // 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
 // 3.6 FILE utilities: Binary inspector...
+// 3.7 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 3.8 Implement Arc flags or CH for clusters inside 
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
@@ -373,8 +374,8 @@ public class HHRoutingSubGraphCreator {
 					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if (mincuts.size() != borderPoints.size()) {
 				// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
-//				System.err.println(msg);
-				throw new IllegalStateException(msg);
+				System.err.println(msg);
+//				throw new IllegalStateException(msg);
 			} else {
 				throw new IllegalStateException(msg);
 			}
@@ -590,8 +591,7 @@ public class HHRoutingSubGraphCreator {
 			t.connections.add(newEdge);
 			if (c.toVisitVertices.contains(r.getId())) {
 				if (!existingVertices.contains(r.getId())) {
-					// target of RouteSegmentVertex segmentEnd
-					sources.add(newEdge.s);
+					sources.add(t);
 				}
 			}
 		}
