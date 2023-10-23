@@ -6,10 +6,7 @@ import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class MapResourcesService {
@@ -18,7 +15,9 @@ public class MapResourcesService {
         Map<String, List<Map<String, String>>> res = new HashMap<>();
         for (String attribute : attributes) {
             List<Map<String, String>> attributeStyles = parseRules(storage, attribute);
-            res.put(attribute, attributeStyles);
+            if (attributeStyles != null) {
+                res.put(attribute, attributeStyles);
+            }
         }
         return res;
     }
@@ -26,24 +25,27 @@ public class MapResourcesService {
     private List<Map<String, String>> parseRules(RenderingRulesStorage storage, String attribute) {
         List<RenderingRule> allRules = new ArrayList<>();
         RenderingRule rule = storage.getRenderingAttributeRule(attribute);
-        allRules = getRules(rule, allRules);
-        List<Map<String, String>> attributeStyles = new ArrayList<>();
-        for (RenderingRule renderingRule : allRules) {
-            RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(storage);
-            searchRequest.loadOutputProperties(renderingRule, true);
-            Map<String, String> res = new HashMap<>();
-            for (RenderingRuleProperty prop : renderingRule.getProperties()) {
-                String name = prop.getAttrName();
-                String value = getProperty(prop, name, searchRequest, renderingRule);
-                if (value != null) {
-                    res.put(name, value);
+        if (rule != null) {
+            allRules = getRules(rule, allRules);
+            List<Map<String, String>> attributeStyles = new ArrayList<>();
+            for (RenderingRule renderingRule : allRules) {
+                RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(storage);
+                searchRequest.loadOutputProperties(renderingRule, true);
+                Map<String, String> res = new HashMap<>();
+                for (RenderingRuleProperty prop : renderingRule.getProperties()) {
+                    String name = prop.getAttrName();
+                    String value = getProperty(prop, name, searchRequest, renderingRule);
+                    if (value != null) {
+                        res.put(name, value);
+                    }
+                }
+                if (!res.isEmpty()) {
+                    attributeStyles.add(res);
                 }
             }
-            if (!res.isEmpty()) {
-                attributeStyles.add(res);
-            }
+            return attributeStyles;
         }
-        return attributeStyles;
+        return null;
     }
     
     private String getProperty(RenderingRuleProperty prop, String name, RenderingRuleSearchRequest searchRequest, RenderingRule renderingRule) {
