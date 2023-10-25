@@ -112,8 +112,7 @@ public class HHRoutingSubGraphCreator {
 	// make overlap for routing bigger ideally we should have full connnection...
 	static final double OVERLAP_FOR_VISITED = 0.2; // degrees to overlap for routing context
 	static final double OVERLAP_FOR_ROUTING = 2; // degrees to overlap for routing context
-	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 1000000000; 
-			// 100000; // distance for ferry segments to put network point
+	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 200 * 1000; //distance for ferry segments to put network point
 	
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
 	protected static LatLon EX1 = new LatLon(52.3201813, 4.7644685); // 337 -> 4 (1212 -> 4)
@@ -305,7 +304,6 @@ public class HHRoutingSubGraphCreator {
 		}
 		if (MapUtils.squareRootDist31(seg.getStartPointX(), seg.getStartPointY(), seg.getEndPointX(),
 				seg.getEndPointY()) > LONG_DISTANCE_SEGMENTS_SPLIT) {
-			System.out.println("------------------------");
 			return true;
 		}
 		return false;
@@ -330,7 +328,8 @@ public class HHRoutingSubGraphCreator {
 			while (!c.queue.isEmpty()) {
 				RouteSegmentVertex seg = c.queue.poll();
 				depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
-				if (existingNetworkPoint(c, seg)) { 
+				if (existingNetworkPoint(c, seg)) {
+					existNetworkPoints.put(seg.getId(), seg);
 					continue;
 				}
 				proceed(c, seg, c.queue, maxDepth);
@@ -368,21 +367,30 @@ public class HHRoutingSubGraphCreator {
 		c.queue.add(c.getVertex(pnt, false));
 		List<RouteSegmentBorderPoint> borderPoints = new ArrayList<>();
 		List<RouteSegmentBorderPoint> exPoints = new ArrayList<>();
+		int longPoints = 0;
 		while (!c.queue.isEmpty()) {
 			RouteSegmentVertex ls = c.queue.poll();
 			if (mincuts.containsKey(ls.getId())) {
 				borderPoints.add(mincuts.get(ls.getId()));
 				continue;
 			}
-			if (existingNetworkPoint(c, ls)) { 
-				exPoints.add(RouteSegmentBorderPoint.fromParent(ls));
+			if (existingNetworkPoint(c, ls)) {
+				if (c.ctx.testIfNetworkPoint(ls.getId())) {
+					exPoints.add(RouteSegmentBorderPoint.fromParent(ls));
+				} else {
+					longPoints++;
+					if (DEBUG_VERBOSE_LEVEL > 0) {
+						System.out.println(" Add long point segment " + ls);
+					}
+					borderPoints.add(RouteSegmentBorderPoint.fromParent(ls));
+				}
 				continue;
 			}
 			proceed(c, ls, c.queue, -1);
 		}
 		
 		if (borderPoints.size() + exPoints.size() != c.toVisitVertices.size() || 
-				mincuts.size() != borderPoints.size()) {
+				(mincuts.size() + longPoints) != borderPoints.size()) {
 			List<RouteSegmentBorderPoint> toVisit = new ArrayList<>();
 			for (RouteSegmentVertex b : c.toVisitVertices.valueCollection()) {
 				toVisit.add(RouteSegmentBorderPoint.fromParent(b));
@@ -393,7 +401,7 @@ public class HHRoutingSubGraphCreator {
 			print(sortPoints(toVisit), "To Visit");
 			String msg = String.format("BUG!! mincut %d  ( = %d) + %d network pnts != %d graph reached size: %s", 
 					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
-			if (mincuts.size() != borderPoints.size()) {
+			if ((mincuts.size() + longPoints) != borderPoints.size()) {
 				// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
 				System.err.println(msg);
 //				throw new IllegalStateException(msg);
@@ -631,7 +639,7 @@ public class HHRoutingSubGraphCreator {
 		LinkedList<MaxFlowVertex> queue = new LinkedList<>();
 		Set<MaxFlowVertex> reachableSource = new HashSet<>();
 		queue.add(source);
-		if (DEBUG_VERBOSE_LEVEL > 0) {
+		if (DEBUG_VERBOSE_LEVEL > 1) {
 			for (MaxFlowEdge t : source.connections) {
 				MaxFlowVertex sourceL = t.t;
 				int flow = 0;
@@ -667,7 +675,7 @@ public class HHRoutingSubGraphCreator {
 							c.vertex.getStartPointY() == (c.s.end ? c.s.segment.getEndPointY() : c.s.segment.getStartPointY());
 					RouteSegmentBorderPoint borderPnt = new RouteSegmentBorderPoint(c.vertex, posDir);
 					mincuts.put(calcUniDirRoutePointInternalId(c.vertex), borderPnt);
-					if (DEBUG_VERBOSE_LEVEL > 0) {
+					if (DEBUG_VERBOSE_LEVEL > 1) {
 						System.out.println("? Mincut " + c.s + " -> " + borderPnt);
 					}
 				}
@@ -1177,29 +1185,19 @@ public class HHRoutingSubGraphCreator {
 				System.out.println("SKIP PROCESS " + indProc);
 			} else {
 				// check long roads max segment
-				double segmentDist = 0;
-				int maxSegment = 0;
+				boolean skipped = false;
 				for (int pos = 0; pos < object.getPointsLength() - 1; pos++) {
-					double dst = MapUtils.getSqrtDistance(object.getPoint31XTile(pos), object.getPoint31YTile(pos),
+					double dst = MapUtils.squareRootDist31(object.getPoint31XTile(pos), object.getPoint31YTile(pos),
 							object.getPoint31XTile(pos + 1), object.getPoint31YTile(pos + 1));
-					if (dst > segmentDist) {
-						long pntId = calculateRoutePointInternalId(object.getId(), pos, pos + 1);
-						if (!ctx.testGlobalVisited(pntId) && !ctx.networkPointToDbInd.containsKey(pntId)) {
-							maxSegment = pos;
-							segmentDist = dst;
+					if (dst > LONG_DISTANCE_SEGMENTS_SPLIT) {
+						if (skipped) {
+							throw new IllegalArgumentException("This is special case with it will be a cut between islands:" + 
+									object + " " + pos) ;
 						}
+						skipped = true;
+						continue;
 					}
-				}
-				if (segmentDist > LONG_DISTANCE_SEGMENTS_SPLIT) {
-					// very long distance could cause unnecessary calculations
-					RouteSegmentPoint pnt = new RouteSegmentPoint(object, maxSegment, 0);
-					ctx.presetNetworkPoints.put(calcUniDirRoutePointInternalId(pnt), null); // not needed to store GC
-					System.out.printf("! %.2f km %s\n", segmentDist / 1000, pnt);
-					System.out.println("------------------------");
-					return true;
-				}
-				
-				for (int pos = 0; pos < object.getPointsLength() - 1; pos++) {
+					skipped = false;
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
