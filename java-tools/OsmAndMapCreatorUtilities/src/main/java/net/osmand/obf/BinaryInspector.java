@@ -80,7 +80,7 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -92,7 +92,7 @@ public class BinaryInspector {
 //					"-latlon=50.73381,7.08721",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_europe_2.road.obf"
+					System.getProperty("maps.dir") + "Iceland_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
