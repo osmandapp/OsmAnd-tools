@@ -276,7 +276,7 @@ public class WebGpxParser {
                     trackPointsMap.put(0, routePoints);
                 }
             } else {
-                int prevTrkPointInd = 0;
+                int prevTrkPointInd = -1;
                 for (GPXUtilities.WptPt p : route.points) {
                     Point routePoint = new Point(p);
                     int currTrkPointInd;
@@ -338,7 +338,7 @@ public class WebGpxParser {
         if (currTrkPointInd != 0) {
             for (Point pt : trackPoints) {
                 int pointInd = trackPoints.indexOf(pt);
-                if (pointInd >= prevTrkPointInd && pointInd <= currTrkPointInd) {
+                if (pointInd > prevTrkPointInd && pointInd <= currTrkPointInd) {
                     if (routePoint.geometry == null) {
                         routePoint.geometry = new ArrayList<>();
                     }
