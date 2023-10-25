@@ -757,13 +757,19 @@ public class WikivoyageLangPreparation {
 						part = partOf.substring(partOf.indexOf("=") + 1, 
 								index == -1 ? partOf.length() : index);
 					} catch (Exception e) {
-						System.out.println("Error parsing the partof: " + partOf);
+						System.out.println("Error parsing the partof: " + partOf  + " in the article: " + title);
 					}
 					return part.trim().replaceAll("_", " ");
 				} else if (lowerCasePartOf.contains("קטגוריה")) {
 					return partOf.substring(partOf.indexOf(":") + 1).trim().replaceAll("[_\\|\\*]", "");
 				} else {
-					return partOf.split("\\|")[1].trim().replaceAll("_", " ");
+					String[] splitPartOf = partOf.split("\\|");
+					if (splitPartOf.length > 1) {
+						return splitPartOf[1].trim().replaceAll("_", " ");
+					} else {
+						System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+						return "";
+					}
 				}
 			}
 			return "";

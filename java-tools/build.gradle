@@ -36,6 +36,7 @@ subprojects {
 			junitXml.enabled = true
 			html.enabled = false
 		}
+		systemProperty 'eyepiece', System.getProperty('eyepiece')
 	}
 
 	task fatJar(type: Jar) {
