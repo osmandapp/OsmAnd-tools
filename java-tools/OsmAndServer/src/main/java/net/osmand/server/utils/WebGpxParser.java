@@ -527,12 +527,16 @@ public class WebGpxParser {
                         int allPoints = 0;
                         for (int i = 0; i < t.points.size(); i++) {
                             Point point = t.points.get(i);
-                            if (point.geometry.isEmpty()) {
+                            Point nextPoint = i < t.points.size() - 1 ? t.points.get(i + 1) : null;
+                            List<WebGpxParser.Point> geo = point.geometry;
+                            if (geo.isEmpty()) {
                                 if (!route.points.isEmpty()) {
                                     gpxFile.routes.add(route);
                                 }
                                 route = new GPXUtilities.Route();
                                 allPoints = 0;
+                            } else {
+                                removeDuplicate(geo, nextPoint);
                             }
                             GPXUtilities.WptPt routePoint = point.ext;
                             if (routePoint == null) {
@@ -549,10 +553,10 @@ public class WebGpxParser {
                             if (!point.profile.equals(LINE_PROFILE_TYPE)) {
                                 routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
-                            allPoints += point.geometry.isEmpty() ? 0 : point.geometry.size();
-                            routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints));
+                            allPoints += geo.isEmpty() ? 0 : geo.size();
+                            routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : allPoints - 1));
                             route.points.add(routePoint);
-                            trkPoints.addAll(point.geometry);
+                            trkPoints.addAll(geo);
                         }
                         gpxFile.routes.add(route);
                         if (!trkPoints.isEmpty()) {
@@ -572,6 +576,16 @@ public class WebGpxParser {
         }
         
         return gpxFile;
+    }
+    
+    private void removeDuplicate(List<WebGpxParser.Point> geo, Point nextPoint) {
+        if (nextPoint != null && !nextPoint.geometry.isEmpty()) {
+            Point lastP = geo.get(geo.size() - 1);
+            Point nextP = nextPoint.geometry.get(0);
+            if (lastP.lat == nextP.lat && lastP.lng == nextP.lng && lastP.segment == null) {
+                geo.remove(geo.size() - 1);
+            }
+        }
     }
     
     public WptPt convertToWptPt(Wpt wpt) {
