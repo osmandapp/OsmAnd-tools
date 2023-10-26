@@ -50,6 +50,7 @@ import net.osmand.util.MapUtils;
 // IN PROGRESS
 // 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // 2.15 HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
+// 1.8.1
 
 // TESTING
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
@@ -1205,8 +1206,11 @@ public class HHRoutingSubGraphCreator {
 							object.getPoint31XTile(pos + 1), object.getPoint31YTile(pos + 1));
 					if (dst > LONG_DISTANCE_SEGMENTS_SPLIT) {
 						if (skipped) {
-							throw new IllegalArgumentException("This is special case with it will be a cut between islands:" + 
-									object + " " + pos) ;
+							String msg = "This is special case with it will be a cut between islands:" + 
+									object + " " + pos;
+							System.err.println(msg);
+							// TODO FIX bug 1.8.1
+//							throw new IllegalArgumentException(msg) ;
 						}
 						skipped = true;
 						continue;
