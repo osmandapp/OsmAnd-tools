@@ -112,7 +112,7 @@ public class HHRoutingSubGraphCreator {
 	// make overlap for routing bigger ideally we should have full connnection...
 	static final double OVERLAP_FOR_VISITED = 0.2; // degrees to overlap for routing context
 	static final double OVERLAP_FOR_ROUTING = 2; // degrees to overlap for routing context
-	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 200 * 1000; //distance for ferry segments to put network point
+	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 1 * 1000; //distance for ferry segments to put network point
 	
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
 	protected static LatLon EX1 = new LatLon(52.3201813, 4.7644685); // 337 -> 4 (1212 -> 4)
@@ -130,6 +130,7 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon EX10 = new LatLon(42.10768, 19.103357);
 	protected static LatLon EX11 = new LatLon(42.31288, 19.275553);
 	protected static LatLon EX12 = new LatLon(32.919117, -96.96761);
+	
 	
 
 	protected static LatLon[] EX = {
@@ -368,10 +369,11 @@ public class HHRoutingSubGraphCreator {
 		List<RouteSegmentBorderPoint> borderPoints = new ArrayList<>();
 		List<RouteSegmentBorderPoint> exPoints = new ArrayList<>();
 		int longPoints = 0;
+		borderPoints.addAll(mincuts.valueCollection());
 		while (!c.queue.isEmpty()) {
 			RouteSegmentVertex ls = c.queue.poll();
 			if (mincuts.containsKey(ls.getId())) {
-				borderPoints.add(mincuts.get(ls.getId()));
+//				borderPoints.add(mincuts.get(ls.getId()));
 				continue;
 			}
 			if (existingNetworkPoint(c, ls)) {
@@ -406,7 +408,9 @@ public class HHRoutingSubGraphCreator {
 				System.err.println(msg);
 //				throw new IllegalStateException(msg);
 			} else {
-				throw new IllegalStateException(msg);
+				System.err.println(msg);
+
+//				throw new IllegalStateException(msg);
 			}
 		}
 		borderPoints.addAll(exPoints);
@@ -435,9 +439,13 @@ public class HHRoutingSubGraphCreator {
 
 	private boolean proceed(NetworkIsland c, RouteSegmentVertex vertex, PriorityQueue<RouteSegmentVertex> queue,
 			int maxDepth) {
+		if (vertex.getId() / 64 == 6021853l) {
+			System.out.println(vertex + " <-! " + vertex.parentRoute);
+		}
 		if (maxDepth > 0 && vertex.getDepth() >= maxDepth) {
 			return false;
 		}
+		
 		c.toVisitVertices.remove(vertex.getId());
 		if (c.testIfVisited(vertex.getId())) {
 			throw new IllegalStateException(String.format("%d %s was already locally visited", vertex.getId(), vertex.toString()));
@@ -553,7 +561,9 @@ public class HHRoutingSubGraphCreator {
 			if (sink != null) {
 				sinks.add(sink);
 				MaxFlowVertex p = sink;
+//				System.out.println("Sink " + sink);
 				while (true) {
+//					System.out.println(p.flowParentTemp);
 					p.flowParentTemp.flow++;
 					if (p.flowParentTemp.s == source) {
 						break;
@@ -588,6 +598,9 @@ public class HHRoutingSubGraphCreator {
 			MaxFlowVertex t = null;
 			for (RouteSegmentEdge e : r.connections) {
 				MaxFlowEdge ex = edges.get(e.t.cId);
+				if (existingVertices.contains(e.t.getId()) || existingVertices.contains(e.s.getId())) {
+					continue;
+				}
 				if (ex != null) {
 					MaxFlowVertex conn = e.tEnd ? ex.t : ex.s;
 					if (e.sEnd) {
@@ -649,6 +662,9 @@ public class HHRoutingSubGraphCreator {
 				if (flow > 0) {
 					System.out.println("-> Source: " + sourceL + " flow " + flow) ;
 				}
+			}
+			for (MaxFlowVertex s : sinks) {
+				System.out.println("<- Sink: " + s);
 			}
 		}
 		reachableSource.add(source);
@@ -792,7 +808,7 @@ public class HHRoutingSubGraphCreator {
 			int prevY = segment.getRoad().getPoint31YTile(segment.getSegmentStart());
 			int x = segment.getRoad().getPoint31XTile(segment.getSegmentEnd());
 			int y = segment.getRoad().getPoint31YTile(segment.getSegmentEnd());
-			return (float) MapUtils.measuredDist31(x, y, prevX, prevY);
+			return (float) MapUtils.squareRootDist31(x, y, prevX, prevY);
 		}
 
 		public RouteSegmentEdge getConnection(RouteSegmentVertex t) {
@@ -1086,7 +1102,7 @@ public class HHRoutingSubGraphCreator {
 			if (DEBUG_STORE_ALL_ROADS > 0) {
 				visualClusters.add(cluster);
 				// preserve cluster.borderVertices
-				if (DEBUG_STORE_ALL_ROADS < 2) {
+				if (DEBUG_STORE_ALL_ROADS <= 2) {
 					cluster.allVertices = null;
 				}
 				if (DEBUG_STORE_ALL_ROADS > 1) {
