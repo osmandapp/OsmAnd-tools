@@ -458,16 +458,13 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		int points = 0; // -1 loaded points, 0 init, > 0 - visitedVertices = null
 		TLongIntHashMap visitedVertices;
 		QuadRect rect;
-		double regionOverlap = 0.2; // we don't need big overlap cause of visited bbox recalculation
 		QuadRect calcRect;
 
 		public NetworkRouteRegion(RouteRegion r, File f, QuadRect qrect) {
 			region = r;
-			double d = regionOverlap;  
 			if (region != null) {
-				rect = new QuadRect(Math.max(-180, region.getLeftLongitude() - d),
-					Math.min(85, region.getTopLatitude() + d), Math.min(180, region.getRightLongitude() + d),
-					Math.max(-85, region.getBottomLatitude() - d));
+				rect = new QuadRect(region.getLeftLongitude(), region.getTopLatitude(), region.getRightLongitude() ,
+						region.getBottomLatitude());
 			} else if (qrect != null) {
 				rect = qrect;
 				id = -1;

@@ -54,6 +54,7 @@ import net.osmand.util.MapUtils;
 // 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
 // 1.8.1
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
+// TODO long roads can't restart...
 
 // TESTING
 
@@ -114,7 +115,7 @@ public class HHRoutingSubGraphCreator {
 	
 	static final double OVERLAP_FOR_VISITED = 0.2; // degrees to overlap to validate visited could be close to 0
 	// make overlap for routing context ideally we should have full worldwide connnection but we compensate LONG_DISTANCE_SEGMENTS_SPLIT
-	static final double OVERLAP_FOR_ROUTING = 0.5; // degrees to overlap for routing context
+	static final double OVERLAP_FOR_ROUTING = 2; // degrees to overlap for routing context
 	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 100 * 1000; //distance for ferry segments to put network point
 	
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
@@ -207,6 +208,20 @@ public class HHRoutingSubGraphCreator {
 			
 	}
 
+	private int compareRect(QuadRect q1, QuadRect q2) {
+		int x1 = (int) MapUtils.getTileNumberX(6, q1.left);
+		int y1 = (int) MapUtils.getTileNumberY(6, q1.top);
+		int x2 = (int) MapUtils.getTileNumberX(6, q2.left);
+		int y2 = (int) MapUtils.getTileNumberY(6, q2.top);
+		// sort from left to right, top to bottom
+		if (Integer.compare(x1, x2) != 0) {
+			return Integer.compare(x1, x2);
+		}
+		if (Integer.compare(y1, y2) != 0) {
+			return Integer.compare(y1, y2);
+		}
+		return 0;
+	}
 
 
 	private NetworkCollectPointCtx collectNetworkPoints(NetworkCollectPointCtx ctx) throws IOException, SQLException {
@@ -233,18 +248,11 @@ public class HHRoutingSubGraphCreator {
 		Collections.sort(ctx.routeRegions, new Comparator<NetworkRouteRegion>() {
 			@Override
 			public int compare(NetworkRouteRegion o1, NetworkRouteRegion o2) {
-				int x1 = (int) MapUtils.getTileNumberX(6, o1.region.getLeftLongitude());
-				int y1 = (int) MapUtils.getTileNumberY(6, o1.region.getTopLatitude());
-				int x2 = (int) MapUtils.getTileNumberX(6, o2.region.getLeftLongitude());
-				int y2 = (int) MapUtils.getTileNumberY(6, o2.region.getTopLatitude());
-				// sort from left to right, top to bottom
-				if (Integer.compare(x1, x2) != 0) {
-					return Integer.compare(x1, x2);
+				int c = compareRect(o1.rect, o2.rect);
+				if (c != 0) {
+					return c;
 				}
-				if (Integer.compare(y1, y2) != 0) {
-					return Integer.compare(y1, y2);
-				}
-				return Integer.compare(o1.region.getLength() , o2.region.getLength());
+				return Integer.compare(o1.region.getLength(), o2.region.getLength());
 			}
 		});
 		ctx.networkDB.insertRegions(ctx.routeRegions);
@@ -336,6 +344,16 @@ public class HHRoutingSubGraphCreator {
 			connectedGroups.add(group);
 		}
 		
+		Collections.sort(connectedGroups, new Comparator<LongRoadGroup>() {
+			@Override
+			public int compare(LongRoadGroup o1, LongRoadGroup o2) {
+				int c = compareRect(o1.r, o2.r);
+				if (c != 0) {
+					return c;
+				}
+				return Integer.compare(o1.set.size(), o2.set.size());
+			}
+		});
 		
 		logf("Process long roads %d and %d connected groups...", size, connectedGroups.size());
 		for (LongRoadGroup group  : connectedGroups) {
