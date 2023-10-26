@@ -756,6 +756,19 @@ public class UserdataService {
         }
     }
     
+    public ResponseEntity<String> confirmCode(MapApiController.UserPasswordPost us) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(us.username);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("User is not registered");
+        }
+        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        if (pu.token.equals(us.token) && !tokenExpired) {
+            return ok();
+        } else {
+            return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+        }
+    }
+    
     
     public ResponseEntity<String> changeEmail(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
