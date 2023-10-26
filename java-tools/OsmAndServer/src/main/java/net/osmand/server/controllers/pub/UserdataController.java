@@ -427,4 +427,13 @@ public class UserdataController {
 		LOG.error("URL:" + url + ", ip:" + ipAddress +  ", code:" + code + ", message:" + msg + m);
 		throw new OsmAndPublicApiException(code, msg);
 	}
+	
+	@PostMapping(path = {"/auth/confirm-code"})
+	@ResponseBody
+	public ResponseEntity<String> confirmCode(@RequestBody MapApiController.UserPasswordPost us) {
+		if (emailSender.isEmail(us.username)) {
+			return userdataService.confirmCode(us);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
 }
