@@ -408,9 +408,7 @@ public class HHRoutingSubGraphCreator {
 				System.err.println(msg);
 //				throw new IllegalStateException(msg);
 			} else {
-				System.err.println(msg);
-
-//				throw new IllegalStateException(msg);
+				throw new IllegalStateException(msg);
 			}
 		}
 		borderPoints.addAll(exPoints);
