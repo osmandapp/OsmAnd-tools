@@ -650,8 +650,11 @@ public class WebGpxParser {
                 GPXUtilities.RouteSegment seg = point.segment.ext;
                 int ind = Integer.parseInt(seg.startTrackPointIndex);
                 if (ind == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
-                    lastStartTrkptIdx = Integer.parseInt(lastPointWithSeg.segment.ext.length) - 1
-                            + Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex);
+                    int currentLength = Integer.parseInt(lastPointWithSeg.segment.ext.length);
+                    //fix approximate results
+                    int segmentLength = currentLength == 1 ? 1 : currentLength - 1;
+                    
+                    lastStartTrkptIdx = segmentLength + Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex);
                     prevTypesSize += lastPointWithSeg.segment.routeTypes.size();
                     segment.routeTypes.addAll(point.segment.routeTypes);
                 }
