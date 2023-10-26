@@ -49,11 +49,11 @@ import net.osmand.util.MapUtils;
 
 // IN PROGRESS
 // 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
-// 2.15 HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
+// 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
 // 1.8.1
+// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 
 // TESTING
-// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 
 // TODO RZR
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
@@ -110,9 +110,9 @@ public class HHRoutingSubGraphCreator {
 	static int DEBUG_LIMIT_PROCESS = -1;
 	static int DEBUG_VERBOSE_LEVEL = 0;
 	
-	// make overlap for routing bigger ideally we should have full connnection...
-	static final double OVERLAP_FOR_VISITED = 0.2; // degrees to overlap for routing context
-	static final double OVERLAP_FOR_ROUTING = 2; // degrees to overlap for routing context
+	static final double OVERLAP_FOR_VISITED = 0.2; // degrees to overlap to validate visited could be close to 0
+	// make overlap for routing context ideally we should have full worldwide connnection but we compensate LONG_DISTANCE_SEGMENTS_SPLIT
+	static final double OVERLAP_FOR_ROUTING = 0.5; // degrees to overlap for routing context
 	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 100 * 1000; //distance for ferry segments to put network point
 	
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
@@ -154,7 +154,7 @@ public class HHRoutingSubGraphCreator {
 //		TOTAL_MIN_POINTS = 100;
 		
 		String name = "Montenegro_europe_2.road.obf";
-//		name = "Us_texas_dallas_northamerica_2.road.obf";
+//		name = "Faroe-islands_europe_2.road.obf";
 //		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
@@ -292,6 +292,24 @@ public class HHRoutingSubGraphCreator {
 			ctx.finishRegionProcess();
 			ctx.printStatsNetworks();
 		}
+		if (ctx.longRoads.size() > 0) {
+			logf("Process long roads %d...", ctx.longRoads.size());
+//			ctx.rctx = ctx.prepareContext.gcMemoryLimitToUnloadAll(ctx.rctx, null, true);
+			ctx.checkLongRoads = false;
+//			ctx.currentProcessingRegion = new NetworkRouteRegion(null, null);
+			ctx.startRegionProcess(new NetworkRouteRegion(null, null));
+//			ctx.currentProcessingRegion.id = -1;
+//			ctx.currentProcessingRegion.visitedVertices = new TLongIntHashMap();
+//			ctx.currentProcessingRegion.points = -1;
+
+			RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, ctx.longRoads.size());
+	
+			for (RouteDataObject o : ctx.longRoads) {
+				proc.publish(o);
+			}
+			proc.finish();
+			ctx.printStatsNetworks();
+		}
 		return ctx;
 	}
 
@@ -301,10 +319,7 @@ public class HHRoutingSubGraphCreator {
 		if (c.ctx.testIfNetworkPoint(unidirId)) {
 			return true;
 		}
-		if (c.ctx.presetNetworkPoints.contains(unidirId)) {
-			return true;
-		}
-		if (MapUtils.squareRootDist31(seg.getStartPointX(), seg.getStartPointY(), seg.getEndPointX(),
+		if (c.ctx.checkLongRoads && MapUtils.squareRootDist31(seg.getStartPointX(), seg.getStartPointY(), seg.getEndPointX(),
 				seg.getEndPointY()) > LONG_DISTANCE_SEGMENTS_SPLIT) {
 			return true;
 		}
@@ -370,11 +385,10 @@ public class HHRoutingSubGraphCreator {
 		List<RouteSegmentBorderPoint> borderPoints = new ArrayList<>();
 		List<RouteSegmentBorderPoint> exPoints = new ArrayList<>();
 		int longPoints = 0;
-		borderPoints.addAll(mincuts.valueCollection());
 		while (!c.queue.isEmpty()) {
 			RouteSegmentVertex ls = c.queue.poll();
 			if (mincuts.containsKey(ls.getId())) {
-//				borderPoints.add(mincuts.get(ls.getId()));
+				borderPoints.add(mincuts.get(ls.getId()));
 				continue;
 			}
 			if (existingNetworkPoint(c, ls)) {
@@ -405,9 +419,8 @@ public class HHRoutingSubGraphCreator {
 			String msg = String.format("BUG!! mincut %d  ( = %d) + %d network pnts != %d graph reached size: %s", 
 					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if ((mincuts.size() + longPoints) != borderPoints.size()) {
-				// TODO BUG 1.0 BUG!! Germany Bicycle mincut 30 + 22 network pnts != 51 graph reached size: 41980845 0 1
-				System.err.println(msg);
-//				throw new IllegalStateException(msg);
+//				System.err.println(msg);
+				throw new IllegalStateException(msg);
 			} else {
 				throw new IllegalStateException(msg);
 			}
@@ -438,9 +451,6 @@ public class HHRoutingSubGraphCreator {
 
 	private boolean proceed(NetworkIsland c, RouteSegmentVertex vertex, PriorityQueue<RouteSegmentVertex> queue,
 			int maxDepth) {
-		if (vertex.getId() / 64 == 6021853l) {
-			System.out.println(vertex + " <-! " + vertex.parentRoute);
-		}
 		if (maxDepth > 0 && vertex.getDepth() >= maxDepth) {
 			return false;
 		}
@@ -994,7 +1004,8 @@ public class HHRoutingSubGraphCreator {
 		List<NetworkIsland> visualClusters = new ArrayList<>();
 		
 		NetworkRouteRegion currentProcessingRegion;
-		TLongObjectHashMap<RouteSegmentPoint> presetNetworkPoints = new TLongObjectHashMap<>();
+		boolean checkLongRoads = true;
+		List<RouteDataObject> longRoads = new ArrayList<RouteDataObject>();
 		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
 		List<NetworkRouteRegion> validateIntersectionRegions = new ArrayList<>();
 		
@@ -1075,7 +1086,9 @@ public class HHRoutingSubGraphCreator {
 					nr.unload();
 				}
 			}
-			regionsForRouting.add(nrouteRegion);
+			if (nrouteRegion.file != null) {
+				regionsForRouting.add(nrouteRegion);
+			}
 			// force reload cause subregions could change on rerun
 			rctx = prepareContext.gcMemoryLimitToUnloadAll(rctx, regionsForRouting, true);
 
@@ -1148,6 +1161,11 @@ public class HHRoutingSubGraphCreator {
 						+ " [%.3f, %.3f] x [%.3f, %.3f] to [%.3f, %.3f] x [%.3f, %.3f]\n",
 						currentProcessingRegion.region.getName(), r.left, r.top, r.right, r.bottom,
 						c.left, c.top, c.right, c.bottom, n.left, n.top, n.right, n.bottom);
+				if (Math.abs(n.left - r.left) > OVERLAP_FOR_ROUTING || Math.abs(n.right - r.right) > OVERLAP_FOR_ROUTING
+						|| Math.abs(n.top - r.top) > OVERLAP_FOR_ROUTING
+						|| Math.abs(n.bottom - r.bottom) > OVERLAP_FOR_ROUTING) {
+					throw new IllegalArgumentException("BBOX is out of range for routing");
+				}
 				currentProcessingRegion.rect = n;
 			}
 			logf("Saving visited %,d points (%,d border points) from %s to db...", currentProcessingRegion.getPoints(), ins,
@@ -1200,23 +1218,17 @@ public class HHRoutingSubGraphCreator {
 				System.out.println("SKIP PROCESS " + indProc);
 			} else {
 				// check long roads max segment
-				boolean skipped = false;
-				for (int pos = 0; pos < object.getPointsLength() - 1; pos++) {
-					double dst = MapUtils.squareRootDist31(object.getPoint31XTile(pos), object.getPoint31YTile(pos),
-							object.getPoint31XTile(pos + 1), object.getPoint31YTile(pos + 1));
+				for (int pos = 0; pos < object.getPointsLength() - 1 && ctx.checkLongRoads; pos++) {
+					double dst = segmentDist(object, pos, pos+1);
 					if (dst > LONG_DISTANCE_SEGMENTS_SPLIT) {
-						if (skipped) {
-							// create shortcut between skipped
-							String msg = "This is special case with it will be a cut between islands:" + 
-									object + " " + pos;
-							System.err.println(msg);
-							// TODO FIX bug 1.8.1
-//							throw new IllegalArgumentException(msg) ;
-						}
-						skipped = true;
-						continue;
+						String msg = String.format("Skip long road to process later %s (length %d) %d <-> %d", 
+								object, object.getPointsLength(), pos, pos + 1);
+						System.out.println(msg);
+						ctx.longRoads.add(object);
+						return false;
 					}
-					skipped = false;
+				}
+				for (int pos = 0; pos < object.getPointsLength() - 1; pos++) {
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
@@ -1235,6 +1247,11 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			return false;
+		}
+
+		private double segmentDist(RouteDataObject object, int pos, int next) {
+			return MapUtils.squareRootDist31(object.getPoint31XTile(pos), object.getPoint31YTile(pos),
+					object.getPoint31XTile(next), object.getPoint31YTile(next));
 		}
 
 		@Override

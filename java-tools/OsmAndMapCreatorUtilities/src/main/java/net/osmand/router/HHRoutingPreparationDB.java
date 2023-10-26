@@ -464,11 +464,14 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		public NetworkRouteRegion(RouteRegion r, File f) {
 			region = r;
 			double d = regionOverlap;  
-			rect = new QuadRect(Math.max(-180, region.getLeftLongitude() - d),
+			if (region != null) {
+				rect = new QuadRect(Math.max(-180, region.getLeftLongitude() - d),
 					Math.min(85, region.getTopLatitude() + d), Math.min(180, region.getRightLongitude() + d),
 					Math.max(-85, region.getBottomLatitude() - d));
+			} else {
+				rect = new QuadRect(-180, 85, 180, -85);
+			}
 			this.file = f;
-
 		}
 		
 		public QuadRect getCalcBbox() {
@@ -489,9 +492,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				calcRect.right = calcRect.left = x31;
 				calcRect.top = calcRect.bottom = y31;
 			} else {
-				if(x31 < calcRect.left ) {
+				if (x31 < calcRect.left) {
 					calcRect.left = x31;
-				} else if(x31 > calcRect.right ) {
+				} else if (x31 > calcRect.right) {
 					calcRect.right = x31;
 				}
 				if (y31 < calcRect.top) {
