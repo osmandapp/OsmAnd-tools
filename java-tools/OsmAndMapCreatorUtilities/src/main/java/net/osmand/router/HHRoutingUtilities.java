@@ -22,6 +22,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -378,6 +379,24 @@ public class HHRoutingUtilities {
 		return b.toString();
 	}
 
+	public static QuadRect expandLatLonRect(QuadRect qr, double left, double top, double right, double bottom) {
+		if (qr == null) {
+			qr = new QuadRect(left, top, right, bottom);
+		}
+		if (left < qr.left) {
+			qr.left = left;
+		}
+		if (right > qr.right) {
+			qr.right = right;
+		}
+		if (top > qr.top) {
+			qr.top = top;
+		}
+		if (bottom < qr.bottom) {
+			qr.bottom = bottom;
+		}
+		return qr;
+	}
 
 
 	

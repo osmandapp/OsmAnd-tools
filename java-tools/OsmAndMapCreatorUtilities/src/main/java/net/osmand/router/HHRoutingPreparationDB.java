@@ -461,15 +461,19 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		double regionOverlap = 0.2; // we don't need big overlap cause of visited bbox recalculation
 		QuadRect calcRect;
 
-		public NetworkRouteRegion(RouteRegion r, File f) {
+		public NetworkRouteRegion(RouteRegion r, File f, QuadRect qrect) {
 			region = r;
 			double d = regionOverlap;  
 			if (region != null) {
 				rect = new QuadRect(Math.max(-180, region.getLeftLongitude() - d),
 					Math.min(85, region.getTopLatitude() + d), Math.min(180, region.getRightLongitude() + d),
 					Math.max(-85, region.getBottomLatitude() - d));
+			} else if (qrect != null) {
+				rect = qrect;
+				id = -1;
 			} else {
 				rect = new QuadRect(-180, 85, 180, -85);
+				id = -1;
 			}
 			this.file = f;
 		}
@@ -533,6 +537,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 						visitedVertices.size());
 			}
 			return visitedVertices;
+		}
+
+		public String getName() {
+			return region == null ? "Worldwide" : region.getName();
 		}
 
 	}
