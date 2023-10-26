@@ -113,7 +113,7 @@ public class HHRoutingSubGraphCreator {
 	// make overlap for routing bigger ideally we should have full connnection...
 	static final double OVERLAP_FOR_VISITED = 0.2; // degrees to overlap for routing context
 	static final double OVERLAP_FOR_ROUTING = 2; // degrees to overlap for routing context
-	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 1 * 1000; //distance for ferry segments to put network point
+	static final int LONG_DISTANCE_SEGMENTS_SPLIT = 100 * 1000; //distance for ferry segments to put network point
 	
 	// Constants / Tests for splitting building network points {7,7,7,7} - 50 -
 	protected static LatLon EX1 = new LatLon(52.3201813, 4.7644685); // 337 -> 4 (1212 -> 4)
@@ -1206,6 +1206,7 @@ public class HHRoutingSubGraphCreator {
 							object.getPoint31XTile(pos + 1), object.getPoint31YTile(pos + 1));
 					if (dst > LONG_DISTANCE_SEGMENTS_SPLIT) {
 						if (skipped) {
+							// create shortcut between skipped
 							String msg = "This is special case with it will be a cut between islands:" + 
 									object + " " + pos;
 							System.err.println(msg);
