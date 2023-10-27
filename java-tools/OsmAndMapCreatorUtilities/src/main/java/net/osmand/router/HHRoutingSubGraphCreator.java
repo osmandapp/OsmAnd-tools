@@ -260,11 +260,19 @@ public class HHRoutingSubGraphCreator {
 		for (NetworkRouteRegion nrouteRegion : ctx.routeRegions) {
 			System.out.println("------------------------");
 			procInd++;
-			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
-					new Date().toString());
+			logf("Region bbox %s %d of %d (l,t - r,b): %.5f, %.5f x %.5f, %.5f", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
+					nrouteRegion.rect.left, nrouteRegion.rect.top, nrouteRegion.rect.right, nrouteRegion.rect.bottom);
 			if (ctx.networkDB.hasVisitedPoints(nrouteRegion)) {
 				System.out.println("Already processed");
 				continue;
+			}
+			if (nrouteRegion.region.getLeftLongitude() > nrouteRegion.region.getRightLongitude()) {
+				if (nrouteRegion.region.getLength() < 1000) {
+					System.out.printf("Skip region  %s - %d bytes\n", nrouteRegion.region.getName(),
+							nrouteRegion.region.getLength());
+					continue;
+				}
+				throw new IllegalStateException();
 			}
 
 			ctx.startRegionProcess(nrouteRegion);
@@ -277,16 +285,9 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
-			logf("Region bbox %s %d of %d (l,t - r,b): %.5f, %.5f x %.5f, %.5f", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
-					nrouteRegion.rect.left, nrouteRegion.rect.top, nrouteRegion.rect.right, nrouteRegion.rect.bottom);
-			if (nrouteRegion.region.getLeftLongitude() > nrouteRegion.region.getRightLongitude()) {
-				if (routeRegion.getLength() < 1000) {
-					System.out.printf("Skip region  %s - %d bytes\n", nrouteRegion.region.getName(),
-							routeRegion.getLength());
-					continue;
-				}
-				throw new IllegalStateException();
-			}
+			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
+					new Date().toString());
+			
 			List<RouteSubregion> regions = reader.searchRouteIndexTree(
 					BinaryMapIndexReader.buildSearchRequest(
 							MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude()),
