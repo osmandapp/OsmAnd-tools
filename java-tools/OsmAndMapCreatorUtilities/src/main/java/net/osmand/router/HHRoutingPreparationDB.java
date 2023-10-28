@@ -250,7 +250,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 		for (NetworkLongRoad r : roads) {
 			if (r.dbId < 0) {
-				r.dbId = max++;
+				r.dbId = ++max;
 				insLongRoads.setInt(1, r.dbId);
 				insLongRoads.setInt(2, networkRouteRegion.id);
 				insLongRoads.setLong(3, r.roadId);
