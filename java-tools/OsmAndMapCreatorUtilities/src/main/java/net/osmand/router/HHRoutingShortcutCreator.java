@@ -220,6 +220,7 @@ public class HHRoutingShortcutCreator {
 							String msg = String.format("%s can lead only to dual cluster %d - found %s (cluster %d): %s",
 									pnt, pnt.dualPoint.clusterId, end, end.clusterId, b.toString());
 							// TODO 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
+							System.err.println(segment.geometry);
 							System.err.println("BUG needs to be fixed " + msg);
 							continue;
 //							throw new IllegalStateException(msg);
