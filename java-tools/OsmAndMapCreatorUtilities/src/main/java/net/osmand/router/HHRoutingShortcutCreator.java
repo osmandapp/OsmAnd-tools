@@ -201,6 +201,12 @@ public class HHRoutingShortcutCreator {
 					boolean errorFound = false;
 					for (RouteSegment t : result) {
 						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(), t.getSegmentStart(), t.getSegmentEnd()));
+						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
+						while (t != null) {
+							segment.geometry.add(getPoint(t));
+							t = t.getParentRoute();
+						}
+						Collections.reverse(segment.geometry);
 						if (pnt.dualPoint.clusterId != end.clusterId) {
 							if (errorFound) {
 								continue;
@@ -211,20 +217,14 @@ public class HHRoutingShortcutCreator {
 								NetworkDBPoint other = networkPointsByGeoId.get(calculateRoutePointInternalId(test.getRoad().getId(), test.getSegmentStart(), test.getSegmentEnd()));
 								b.append(other).append(" (").append(other.clusterId).append("), ");
 							}
-							String msg = String.format("Point (%s) can lead only to dual cluster %d (%s dual point) - found %s (cluster %d): %s",
-									pnt, pnt.dualPoint.clusterId, pnt.dualPoint, end, end.clusterId, b.toString());
+							String msg = String.format("%s can lead only to dual cluster %d - found %s (cluster %d): %s",
+									pnt, pnt.dualPoint.clusterId, end, end.clusterId, b.toString());
 							// TODO 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 							System.err.println("BUG needs to be fixed " + msg);
 							continue;
 //							throw new IllegalStateException(msg);
 						}
-						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
 						pnt.connected.add(segment);
-						while (t != null) {
-							segment.geometry.add(getPoint(t));
-							t = t.getParentRoute();
-						}
-						Collections.reverse(segment.geometry);
 						if (DEBUG_STORE_ALL_ROADS) {
 							addWay(res.osmObjects, segment, "highway", "secondary");
 						}
