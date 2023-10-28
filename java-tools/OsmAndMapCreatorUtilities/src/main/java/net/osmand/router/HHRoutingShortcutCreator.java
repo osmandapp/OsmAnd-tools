@@ -206,12 +206,13 @@ public class HHRoutingShortcutCreator {
 								continue;
 							}
 							errorFound = true;
-							String msg = String.format("Point (%s) can lead only to dual cluster %d (%s dual point) - found %s (cluster %d)",
-									pnt, pnt.dualPoint.clusterId, pnt.dualPoint, end, end.clusterId);
+							StringBuilder b = new StringBuilder();
 							for (RouteSegment test : result) {
 								NetworkDBPoint other = networkPointsByGeoId.get(calculateRoutePointInternalId(test.getRoad().getId(), test.getSegmentStart(), test.getSegmentEnd()));
-								System.out.println("ERROR out " + other + " clusterId " + other.clusterId);
+								b.append(other).append(" (").append(other.clusterId).append("), ");
 							}
+							String msg = String.format("Point (%s) can lead only to dual cluster %d (%s dual point) - found %s (cluster %d): %s",
+									pnt, pnt.dualPoint.clusterId, pnt.dualPoint, end, end.clusterId, b.toString());
 							// TODO 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 							System.err.println("BUG needs to be fixed " + msg);
 							continue;
