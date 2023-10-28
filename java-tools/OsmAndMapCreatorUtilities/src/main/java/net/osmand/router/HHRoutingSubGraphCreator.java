@@ -45,6 +45,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkBorderPoint;
+import net.osmand.router.HHRoutingPreparationDB.NetworkLongRoad;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.MapUtils;
 
@@ -235,6 +236,7 @@ public class HHRoutingSubGraphCreator {
 			return ctx;
 		}
 		ctx.networkDB.loadNetworkPoints(ctx.networkPointToDbInd);
+		ctx.longRoads = ctx.networkDB.loadNetworkLongRoads();
 		Set<String> routeRegionNames = new TreeSet<>();
 		for (RouteRegion r : ctx.rctx.reverseMap.keySet()) {
 			if (routeRegionNames.add(r.getName())) {
@@ -312,7 +314,7 @@ public class HHRoutingSubGraphCreator {
 		int size = ctx.longRoads.size();
 		
 		ctx.checkLongRoads = false;
-		for (LongRoad l : ctx.longRoads) {
+		for (NetworkLongRoad l : ctx.longRoads) {
 			l.addConnected(ctx.longRoads);
 		}
 		List<LongRoadGroup> connectedGroups = new ArrayList<>();
@@ -320,24 +322,24 @@ public class HHRoutingSubGraphCreator {
 		while (!ctx.longRoads.isEmpty()) {
 			LongRoadGroup group = new LongRoadGroup();
 			
-			LongRoad r = ctx.longRoads.get(0);
-			LinkedList<LongRoad> queue = new LinkedList<>();
+			NetworkLongRoad r = ctx.longRoads.get(0);
+			LinkedList<NetworkLongRoad> queue = new LinkedList<>();
 			queue.add(r);
 			while (!queue.isEmpty()) {
-				LongRoad l = queue.poll();
+				NetworkLongRoad l = queue.poll();
 				boolean add = group.set.add(l);
 				if (!add) {
 					continue;
 				}
 				queue.addAll(l.connected);
 			}
-			Iterator<LongRoad> it = ctx.longRoads.iterator();
+			Iterator<NetworkLongRoad> it = ctx.longRoads.iterator();
 			while (it.hasNext()) {
 				if (group.set.contains(it.next())) {
 					it.remove();
 				}
 			}
-			for (LongRoad o : group.set) {
+			for (NetworkLongRoad o : group.set) {
 				QuadRect t = o.getQuadRect();
 				group.r = HHRoutingUtilities.expandLatLonRect(group.r, t.left, t.top, t.right, t.bottom);
 			}
@@ -834,55 +836,10 @@ public class HHRoutingSubGraphCreator {
 		
 	}
 
-	class LongRoad {
-		public final long roadId;
-		public final int startIndex;
-		public final int[] pointsY;
-		public final int[] pointsX;
-		public List<LongRoad> connected =new ArrayList<>();
-		public TLongHashSet points = new TLongHashSet();
-		public LongRoad(long roadId, int startIndex, int[] pointsX, int[] pointsY) {
-			this.roadId = roadId;
-			this.startIndex = startIndex;
-			this.pointsX = pointsX;
-			this.pointsY = pointsY;
-			for (int k = 0; k < pointsX.length; k++) {
-				points.add(MapUtils.interleaveBits(pointsX[k], pointsY[k]));
-			}
-		}
-		
-		public QuadRect getQuadRect() {
-			QuadRect qr = null;
-			for (int k = 0; k < pointsX.length; k++) {
-				double lat = MapUtils.get31LatitudeY(pointsY[k]);
-				double lon = MapUtils.get31LongitudeX(pointsX[k]);
-				qr = HHRoutingUtilities.expandLatLonRect(qr, lon, lat, lon, lat);
-				
-			}
-			return qr;
-		}
-		
-		private void addConnected(List<LongRoad> longRoads) {
-			for (LongRoad r : longRoads) {
-				if (this != r) {
-					boolean intersects = false;
-					for (long pnt : r.points.toArray()) {
-						if (points.contains(pnt)) {
-							intersects = true;
-							break;
-						}
-					}
-					if (intersects) {
-						connected.add(r);
-					}
-				}
-			}
-		}
-	}
 	
 	class LongRoadGroup {
 		QuadRect r;
-		Set<LongRoad> set = new LinkedHashSet<>();
+		Set<NetworkLongRoad> set = new LinkedHashSet<>();
 	}
 	
 	class RouteSegmentVertex extends RouteSegment {
@@ -1128,7 +1085,7 @@ public class HHRoutingSubGraphCreator {
 		NetworkRouteRegion currentProcessingRegion;
 		boolean checkLongRoads = true;
 		
-		List<LongRoad> longRoads = new ArrayList<>();
+		List<NetworkLongRoad> longRoads = new ArrayList<>();
 		TLongObjectHashMap<NetworkBorderPoint> networkPointToDbInd = new TLongObjectHashMap<>();
 		List<NetworkRouteRegion> validateIntersectionRegions = new ArrayList<>();
 		
@@ -1287,7 +1244,7 @@ public class HHRoutingSubGraphCreator {
 			}
 			logf("Saving visited %,d points (%,d border points) from %s to db...", currentProcessingRegion.getPoints(), ins,
 					currentProcessingRegion.getName());
-			networkDB.insertVisitedVerticesBorderPoints(currentProcessingRegion, networkPointToDbInd);
+			networkDB.insertProcessedCluster(currentProcessingRegion, networkPointToDbInd, longRoads);
 			logf("     saved - total %,d points (%,d border points), ", getTotalPoints(), tl);
 			
 			currentProcessingRegion.unload();
@@ -1341,7 +1298,7 @@ public class HHRoutingSubGraphCreator {
 						String msg = String.format("Skip long road to process later %s (length %d) %d <-> %d", 
 								object, object.getPointsLength(), pos, pos + 1);
 						System.out.println(msg);
-						ctx.longRoads.add(new LongRoad(object.getId(), pos, object.pointsX, object.pointsY));
+						ctx.longRoads.add(new NetworkLongRoad(object.getId(), pos, object.pointsX, object.pointsY));
 						return false;
 					}
 				}

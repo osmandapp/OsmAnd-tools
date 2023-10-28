@@ -1,6 +1,7 @@
 package net.osmand.router;
 
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -8,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -20,6 +22,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.data.LatLon;
@@ -27,6 +30,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.DBDialect;
 import static net.osmand.router.HHRoutingUtilities.logf;
+
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -40,23 +44,49 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement updDualPoint;
 	protected PreparedStatement insVisitedPoints;
 	protected PreparedStatement updateRegionBoundaries;
+	protected PreparedStatement insLongRoads;
 	private int maxPointDBID;
 	private int maxClusterID;
+
 
 
 	public HHRoutingPreparationDB(File dbFile) throws SQLException {
 		super(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
 		if (!compactDB) {
 			Statement st = conn.createStatement();
+			st.execute("CREATE TABLE IF NOT EXISTS routeLongRoads(id, regionId, roadId, startIndex, points, PRIMARY key (id))");
 			st.execute("CREATE TABLE IF NOT EXISTS routeRegions(id, name, filePointer, size, filename, left, right, top, bottom, PRIMARY key (id))");
 			st.execute("CREATE TABLE IF NOT EXISTS routeRegionPoints(id, pntId, clusterId)");
 			st.execute("CREATE INDEX IF NOT EXISTS routeRegionPointsIndex on routeRegionPoints(id)");
 			insPoint = conn.prepareStatement("INSERT INTO points(idPoint, pointGeoUniDir, pointGeoId, clusterId, roadId, start, end, sx31, sy31, ex31, ey31) "
 							+ " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			insLongRoads = conn.prepareStatement("INSERT INTO routeLongRoads (id, regionId, roadId, startIndex, points) VALUES (?, ?, ?, ?, ? )");
 			insVisitedPoints = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId, clusterId) VALUES (?, ?, ?)");
 			updateRegionBoundaries = conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? where id = ?");
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
 		}
+	}
+	
+	public List<NetworkLongRoad> loadNetworkLongRoads() throws SQLException {
+		List<NetworkLongRoad> res = new ArrayList<>();
+		Statement s = conn.createStatement();
+		ResultSet rs = s.executeQuery("SELECT id, roadId, startIndex, points from routeLongRoads" );
+		while(rs.next()) {
+			byte[] bytes = rs.getBytes(4);
+			int l = bytes.length / 8;
+			int[] pointsX = new int[l];
+			int[] pointsY = new int[l];
+			for (int k = 0; k < l; k++) {
+				pointsX[k] = Algorithms.parseIntFromBytes(bytes, k * 8);
+				pointsY[k] = Algorithms.parseIntFromBytes(bytes, k * 8 + 4);
+			}
+			NetworkLongRoad r = new NetworkLongRoad(rs.getLong(2), rs.getInt(3), pointsX, pointsY);
+			r.dbId = rs.getInt(1);
+			res.add(r);
+		}
+		rs.close();
+		s.close();
+		return res;
 	}
 	
 	public int loadNetworkPoints(TLongObjectHashMap<NetworkBorderPoint> networkPointsCluster) throws SQLException {
@@ -203,7 +233,68 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		updCHInd.close();
 	}
 	
-	public void insertVisitedVerticesBorderPoints(NetworkRouteRegion networkRouteRegion, TLongObjectHashMap<NetworkBorderPoint> borderPoints) throws SQLException {
+	public void insertProcessedCluster(NetworkRouteRegion networkRouteRegion, 
+			TLongObjectHashMap<NetworkBorderPoint> borderPoints, List<NetworkLongRoad> roads) throws SQLException {
+		insertBorderPoints(borderPoints);
+		insertVisitedPoints(networkRouteRegion);
+		updateRegionBbox(networkRouteRegion);
+		updateLongRoads(networkRouteRegion, roads);
+		
+	}
+
+	private void updateLongRoads(NetworkRouteRegion networkRouteRegion, List<NetworkLongRoad> roads)
+			throws SQLException {
+		int max = -1;
+		for (NetworkLongRoad r : roads) {
+			max = Math.max(r.dbId, max);
+		}
+		for (NetworkLongRoad r : roads) {
+			if (r.dbId < 0) {
+				r.dbId = max++;
+				insLongRoads.setInt(1, r.dbId);
+				insLongRoads.setInt(2, networkRouteRegion.id);
+				insLongRoads.setLong(3, r.roadId);
+				insLongRoads.setInt(4, r.startIndex);
+				byte[] ar = new byte[r.pointsX.length * 8];
+				for (int k = 0; k < r.pointsX.length; k++) {
+					Algorithms.putIntToBytes(ar, k * 8, r.pointsX[k]);
+					Algorithms.putIntToBytes(ar, k * 8 + 4, r.pointsY[k]);
+				}
+				insLongRoads.setBytes(5, ar);
+				insLongRoads.execute();
+			}
+		}
+	}
+
+	private void updateRegionBbox(NetworkRouteRegion networkRouteRegion) throws SQLException {
+		// conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? routeRegions where id = ?");
+		QuadRect r = networkRouteRegion.rect;
+		updateRegionBoundaries.setDouble(1, r.left);
+		updateRegionBoundaries.setDouble(2, r.right);
+		updateRegionBoundaries.setDouble(3, r.top);
+		updateRegionBoundaries.setDouble(4, r.bottom);
+		updateRegionBoundaries.setInt(5, networkRouteRegion.id);
+		updateRegionBoundaries.execute();
+	}
+
+	private void insertVisitedPoints(NetworkRouteRegion networkRouteRegion) throws SQLException {
+		int ind = 0;
+		TLongIntIterator it = networkRouteRegion.visitedVertices.iterator();
+		while (it.hasNext()) {
+			it.advance();
+			insVisitedPoints.setLong(1, networkRouteRegion.id);
+			insVisitedPoints.setLong(2, it.key());
+			insVisitedPoints.setInt(3, it.value());
+			insVisitedPoints.addBatch();
+			if (ind++ > BATCH_SIZE) {
+				insVisitedPoints.executeBatch();
+				ind = 0;
+			}
+		}
+		insVisitedPoints.executeBatch();
+	}
+
+	private void insertBorderPoints(TLongObjectHashMap<NetworkBorderPoint> borderPoints) throws SQLException {
 		int batchInsPoint = 0;
 		for (NetworkBorderPoint npnt : borderPoints.valueCollection()) {
 			if (npnt.positiveObj == null && npnt.negativeObj == null) {
@@ -236,30 +327,6 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 		insPoint.executeBatch();
 		updDualPoint.executeBatch();
-		int ind = 0;
-		TLongIntIterator it = networkRouteRegion.visitedVertices.iterator();
-		while (it.hasNext()) {
-			it.advance();
-			insVisitedPoints.setLong(1, networkRouteRegion.id);
-			insVisitedPoints.setLong(2, it.key());
-			insVisitedPoints.setInt(3, it.value());
-			insVisitedPoints.addBatch();
-			if (ind++ > BATCH_SIZE) {
-				insVisitedPoints.executeBatch();
-				ind = 0;
-			}
-		}
-		insVisitedPoints.executeBatch();
-		
-		// conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? routeRegions where id = ?");
-		QuadRect r = networkRouteRegion.rect;
-		updateRegionBoundaries.setDouble(1, r.left);
-		updateRegionBoundaries.setDouble(2, r.right);
-		updateRegionBoundaries.setDouble(3, r.top);
-		updateRegionBoundaries.setDouble(4, r.bottom);
-		updateRegionBoundaries.setInt(5, networkRouteRegion.id);
-		updateRegionBoundaries.execute();
-		
 	}
 
 	private void insPoint(RouteSegmentBorderPoint obj, int clusterIndex, int pointDbId)
@@ -447,6 +514,54 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				negativeGeoId = geoId;
 				negativeDbId = dbId;
 				negativeClusterId = clusterId;
+			}
+		}
+	}
+	
+	public static class NetworkLongRoad {
+		public int dbId = -1;
+		public final long roadId;
+		public final int startIndex;
+		public final int[] pointsY;
+		public final int[] pointsX;
+		public List<NetworkLongRoad> connected = new ArrayList<>();
+		public TLongHashSet points = new TLongHashSet();
+
+		public NetworkLongRoad(long roadId, int startIndex, int[] pointsX, int[] pointsY) {
+			this.roadId = roadId;
+			this.startIndex = startIndex;
+			this.pointsX = pointsX;
+			this.pointsY = pointsY;
+			for (int k = 0; k < pointsX.length; k++) {
+				points.add(MapUtils.interleaveBits(pointsX[k], pointsY[k]));
+			}
+		}
+		
+		public QuadRect getQuadRect() {
+			QuadRect qr = null;
+			for (int k = 0; k < pointsX.length; k++) {
+				double lat = MapUtils.get31LatitudeY(pointsY[k]);
+				double lon = MapUtils.get31LongitudeX(pointsX[k]);
+				qr = HHRoutingUtilities.expandLatLonRect(qr, lon, lat, lon, lat);
+				
+			}
+			return qr;
+		}
+		
+		public void addConnected(List<NetworkLongRoad> longRoads) {
+			for (NetworkLongRoad r : longRoads) {
+				if (this != r) {
+					boolean intersects = false;
+					for (long pnt : r.points.toArray()) {
+						if (points.contains(pnt)) {
+							intersects = true;
+							break;
+						}
+					}
+					if (intersects) {
+						connected.add(r);
+					}
+				}
 			}
 		}
 	}
