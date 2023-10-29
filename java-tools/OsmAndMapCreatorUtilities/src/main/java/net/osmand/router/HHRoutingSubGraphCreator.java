@@ -33,7 +33,6 @@ import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -150,16 +149,14 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
-		CLEAN = true;
+//		CLEAN = true;
 		
 //		TOTAL_MAX_POINTS = 10000;
 //		TOTAL_MIN_POINTS = 100;
 		
 		String name = "Montenegro_europe_2.road.obf";
 		name = "Faroe-islands_europe_2.road.obf";
-//		name = "Netherlands_europe_2.road.obf";
-//		name = "Ukraine_europe_2.road.obf";
-//		name = "Germany";
+		name = "Gb_england_south";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -311,7 +308,11 @@ public class HHRoutingSubGraphCreator {
 
 	private void processLongRoads(NetworkCollectPointCtx ctx) throws IOException, SQLException {
 		int size = ctx.longRoads.size();
-		
+		NetworkRouteRegion ch = new NetworkRouteRegion(null, null, null);
+		ch.id = -1;
+		if (size == 0 || ctx.networkDB.hasVisitedPoints(ch)) {
+			return;
+		}
 		ctx.checkLongRoads = false;
 		for (NetworkLongRoad l : ctx.longRoads) {
 			l.addConnected(ctx.longRoads);
@@ -357,14 +358,11 @@ public class HHRoutingSubGraphCreator {
 		});
 		
 		logf("Process long roads %d and %d connected groups...", size, connectedGroups.size());
+		int id = -1;
 		for (LongRoadGroup group  : connectedGroups) {
-			ctx.startRegionProcess(new NetworkRouteRegion(null, null, group.r));
-//			ctx.rctx = ctx.prepareContext.gcMemoryLimitToUnloadAll(ctx.rctx, null, true);
-//			ctx.currentProcessingRegion = new NetworkRouteRegion(null, null);
-//			ctx.currentProcessingRegion.id = -1;
-//			ctx.currentProcessingRegion.visitedVertices = new TLongIntHashMap();
-//			ctx.currentProcessingRegion.points = -1;
-
+			NetworkRouteRegion reg = new NetworkRouteRegion(null, null, group.r);
+			reg.id = id --;
+			ctx.startRegionProcess(reg);
 			RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, ctx.longRoads.size());
 			for (NetworkLongRoad o : group.set) {
 				RouteSegment s = ctx.rctx.loadRouteSegment(o.pointsX[o.startIndex], o.pointsY[o.startIndex], 0);
@@ -382,15 +380,13 @@ public class HHRoutingSubGraphCreator {
 				proc.publish(obj);
 			}
 			proc.finish();
+			ctx.finishRegionProcess();
 		}
 		ctx.printStatsNetworks();
 	}
 
-	private boolean existingNetworkPoint(NetworkIsland c, RouteSegmentVertex seg) {
-		long unidirId = seg.getId();
-		if (c.ctx.testIfNetworkPoint(unidirId)) {
-			return true;
-		}
+
+	private boolean checkLongRoads(NetworkIsland c, RouteSegmentVertex seg) {
 		if (c.ctx.checkLongRoads && MapUtils.squareRootDist31(seg.getStartPointX(), seg.getStartPointY(), seg.getEndPointX(),
 				seg.getEndPointY()) > LONG_DISTANCE_SEGMENTS_SPLIT) {
 			return true;
@@ -417,7 +413,7 @@ public class HHRoutingSubGraphCreator {
 			while (!c.queue.isEmpty()) {
 				RouteSegmentVertex seg = c.queue.poll();
 				depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
-				if (existingNetworkPoint(c, seg)) {
+				if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
 					existNetworkPoints.put(seg.getId(), seg);
 					continue;
 				}
@@ -461,21 +457,17 @@ public class HHRoutingSubGraphCreator {
 			RouteSegmentVertex ls = c.queue.poll();
 			if (mincuts.containsKey(ls.getId())) {
 				borderPoints.add(mincuts.get(ls.getId()));
-				continue;
+			} else if (c.ctx.testIfNetworkPoint(ls.getId())) {
+				exPoints.add(RouteSegmentBorderPoint.fromParent(ls));
+			} else if (checkLongRoads(c, ls)) {
+				longPoints++;
+//				if (DEBUG_VERBOSE_LEVEL > 0) {
+					System.out.println(" Add long point segment " + ls);
+//				}
+				borderPoints.add(RouteSegmentBorderPoint.fromParent(ls));
+			} else {
+				proceed(c, ls, c.queue, -1);
 			}
-			if (existingNetworkPoint(c, ls)) {
-				if (c.ctx.testIfNetworkPoint(ls.getId())) {
-					exPoints.add(RouteSegmentBorderPoint.fromParent(ls));
-				} else {
-					longPoints++;
-					if (DEBUG_VERBOSE_LEVEL > 0) {
-						System.out.println(" Add long point segment " + ls);
-					}
-					borderPoints.add(RouteSegmentBorderPoint.fromParent(ls));
-				}
-				continue;
-			}
-			proceed(c, ls, c.queue, -1);
 		}
 		
 		if (borderPoints.size() + exPoints.size() != c.toVisitVertices.size() || 

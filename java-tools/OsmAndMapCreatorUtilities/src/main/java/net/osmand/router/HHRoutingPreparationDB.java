@@ -582,10 +582,8 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 						region.getBottomLatitude());
 			} else if (qrect != null) {
 				rect = qrect;
-				id = -1;
 			} else {
 				rect = new QuadRect(-180, 85, 180, -85);
-				id = -1;
 			}
 			this.file = f;
 		}
