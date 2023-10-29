@@ -50,11 +50,11 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
 
 // TESTING
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 // 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
+// 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
 
 // TODO RZR
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
@@ -78,17 +78,16 @@ import net.osmand.util.MapUtils;
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update)
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
-// 2.4 SERVER: Calculate points in parallel (Planet) - Combine 2 processes 
-// 2.5 SERVER: Optimize shortcut calculation process (local to use less memory) or calculate same time as points
+// 2.4 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
+// 2.5 SERVER: Speedup shortcut calc: local to use less memory, different unload routing context
 // 2.6 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 2.7 FILE: Implement border crossing issue on client
 // 2.9 FILE: different dates for maps!
-// 2.10 Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
+// 2.10 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
 //       There should be maximum at preprocessed visited points < 50K-100K
-// 2.11 EX10 - example that min depth doesn't give good approximation
-// 2.13 Theoretically possible situation with u-turn on same geo point - create bug + explanation - test?
-// 2.14 Some points have no segments in/out (oneway roads) - simplify?
-// 2.16 Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
+// 2.13 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
+// 2.14 CHECK: Some points have no segments in/out (oneway roads) - simplify?
+// 2.16 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
 
 // 3 Later implementation
 // 3.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
@@ -96,6 +95,7 @@ import net.osmand.util.MapUtils;
 // 3.3 Deprioritize or exclude roads (parameters)
 // 3.4 Live data (think about it)
 // 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
+// 3.5.1 EX10 - example that min depth doesn't give good approximation
 // 3.6 FILE utilities: Binary inspector...
 // 3.7 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 3.8 Implement Arc flags or CH for clusters inside 
