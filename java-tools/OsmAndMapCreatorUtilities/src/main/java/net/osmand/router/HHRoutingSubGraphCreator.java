@@ -151,14 +151,14 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
-//		CLEAN = true;
+		CLEAN = true;
 		
 //		TOTAL_MAX_POINTS = 10000;
 //		TOTAL_MIN_POINTS = 100;
 		
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Faroe-islands_europe_2.road.obf";
-		name = "Gb_england_south";
+//		name = "Faroe-islands_europe_2.road.obf";
+//		name = "Gb_england_south";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -274,33 +274,44 @@ public class HHRoutingSubGraphCreator {
 				throw new IllegalStateException();
 			}
 
-			ctx.startRegionProcess(nrouteRegion);
-			RouteRegion routeRegion = null;
-			for (RouteRegion rr : ctx.rctx.reverseMap.keySet()) {
-				if (rr.getFilePointer() == nrouteRegion.region.getFilePointer()
-						&& nrouteRegion.region.getName().equals(rr.getName())) {
-					routeRegion = rr;
-					break;
+			double overlapBbox = OVERLAP_FOR_ROUTING;
+			boolean notProcessed = true;
+			while (notProcessed) {
+				ctx.startRegionProcess(nrouteRegion, overlapBbox);
+				RouteRegion routeRegion = null;
+				for (RouteRegion rr : ctx.rctx.reverseMap.keySet()) {
+					if (rr.getFilePointer() == nrouteRegion.region.getFilePointer()
+							&& nrouteRegion.region.getName().equals(rr.getName())) {
+						routeRegion = rr;
+						break;
+					}
 				}
-			}
-			BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
-			logf("Region %s %d of %d %s", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
-					new Date().toString());
-			
-			List<RouteSubregion> regions = reader.searchRouteIndexTree(
-					BinaryMapIndexReader.buildSearchRequest(
-							MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude()),
-							MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude()),
-							MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude()),
-							MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude()), 16, null),
-					routeRegion.getSubregions());
+				BinaryMapIndexReader reader = ctx.rctx.reverseMap.get(routeRegion);
+				logf("Region %s %d of %d %s", nrouteRegion.region.getName(), procInd, ctx.routeRegions.size(),
+						new Date().toString());
 
-			final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
-			RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, estimatedRoads);
-			reader.loadRouteIndexData(regions, proc);
-			proc.finish();
-			ctx.finishRegionProcess();
-			ctx.printStatsNetworks();
+				List<RouteSubregion> regions = reader.searchRouteIndexTree(
+						BinaryMapIndexReader.buildSearchRequest(
+								MapUtils.get31TileNumberX(nrouteRegion.region.getLeftLongitude()),
+								MapUtils.get31TileNumberX(nrouteRegion.region.getRightLongitude()),
+								MapUtils.get31TileNumberY(nrouteRegion.region.getTopLatitude()),
+								MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude()), 16, null),
+						routeRegion.getSubregions());
+
+				final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
+				RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, estimatedRoads);
+				reader.loadRouteIndexData(regions, proc);
+				boolean ok = ctx.finishRegionProcess(overlapBbox);
+				if (!ok) {
+					overlapBbox *= 2;
+					// clean up for reprocessing
+					ctx.networkDB.cleanupProcessedRegion(nrouteRegion, ctx.networkPointToDbInd, ctx.longRoads);
+					
+				} else {
+					notProcessed = false;
+				}
+				ctx.printStatsNetworks();
+			}
 		}
 		if (ctx.longRoads.size() > 0) {
 			processLongRoads(ctx);
@@ -364,7 +375,7 @@ public class HHRoutingSubGraphCreator {
 		for (LongRoadGroup group  : connectedGroups) {
 			NetworkRouteRegion reg = new NetworkRouteRegion(null, null, group.r);
 			reg.id = id --;
-			ctx.startRegionProcess(reg);
+			ctx.startRegionProcess(reg, OVERLAP_FOR_ROUTING);
 			RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, ctx.longRoads.size());
 			for (NetworkLongRoad o : group.set) {
 				RouteSegment s = ctx.rctx.loadRouteSegment(o.pointsX[o.startIndex], o.pointsY[o.startIndex], 0);
@@ -381,8 +392,7 @@ public class HHRoutingSubGraphCreator {
 				}
 				proc.publish(obj);
 			}
-			proc.finish();
-			ctx.finishRegionProcess();
+			ctx.finishRegionProcess(OVERLAP_FOR_ROUTING);
 		}
 		ctx.printStatsNetworks();
 	}
@@ -1132,7 +1142,7 @@ public class HHRoutingSubGraphCreator {
 			return false;
 		}
 
-		public void startRegionProcess(NetworkRouteRegion nrouteRegion) throws IOException, SQLException {
+		public void startRegionProcess(NetworkRouteRegion nrouteRegion, double overlapBbox) throws IOException, SQLException {
 			currentProcessingRegion = nrouteRegion;
 			currentProcessingRegion.visitedVertices = new TLongIntHashMap();
 			currentProcessingRegion.calcRect = null;
@@ -1148,7 +1158,7 @@ public class HHRoutingSubGraphCreator {
 					nr.loadVisitedVertices(networkDB);
 					validateIntersectionRegions.add(nr);
 					regionsForRouting.add(nr);
-				} else if (nr.intersects(nrouteRegion, OVERLAP_FOR_ROUTING)) {
+				} else if (nr.intersects(nrouteRegion, overlapBbox)) {
 					regionsForRouting.add(nr);
 				} else {
 					nr.unload();
@@ -1202,8 +1212,25 @@ public class HHRoutingSubGraphCreator {
 			}
 		}
 
-		public void finishRegionProcess() throws SQLException {
+		public boolean finishRegionProcess(double overlapBbox) throws SQLException {
 			logf("Tiles " + rctx.calculationProgress.getInfo(null).get("tiles"));
+			QuadRect c = currentProcessingRegion.getCalcBbox();
+			QuadRect r = currentProcessingRegion.rect;
+			if(c.left < r.left || c.top > r.top || c.bottom < r.bottom || c.right > r.right) {
+				QuadRect n = new QuadRect(Math.min(c.left, r.left), Math.max(c.top, r.top),
+						Math.max(c.right, r.right), Math.min(c.bottom, r.bottom));
+				System.out.printf("Updating bbox (L T R B) for %s from [%.3f, %.3f] x [%.3f, %.3f] add  "
+						+ " [%.3f, %.3f] x [%.3f, %.3f] to [%.3f, %.3f] x [%.3f, %.3f]\n",
+						currentProcessingRegion.getName(), r.left, r.top, r.right, r.bottom,
+						c.left, c.top, c.right, c.bottom, n.left, n.top, n.right, n.bottom);
+				if (Math.abs(n.left - r.left) > overlapBbox || Math.abs(n.right - r.right) > overlapBbox
+						|| Math.abs(n.top - r.top) > overlapBbox
+						|| Math.abs(n.bottom - r.bottom) > overlapBbox) {
+					System.err.println("BBOX is out of range for routing");
+					return false;
+				}
+				currentProcessingRegion.rect = n;
+			}
 			int ins = 0, tl = 0;
 			for (NetworkBorderPoint npnt : networkPointToDbInd.valueCollection()) {
 				if (npnt.positiveObj != null) {
@@ -1219,29 +1246,15 @@ public class HHRoutingSubGraphCreator {
 					tl++;
 				}
 			}
-			QuadRect c = currentProcessingRegion.getCalcBbox();
-			QuadRect r = currentProcessingRegion.rect;
-			if(c.left < r.left || c.top > r.top || c.bottom < r.bottom || c.right > r.right) {
-				QuadRect n = new QuadRect(Math.min(c.left, r.left), Math.max(c.top, r.top),
-						Math.max(c.right, r.right), Math.min(c.bottom, r.bottom));
-				System.out.printf("Updating bbox (L T R B) for %s from [%.3f, %.3f] x [%.3f, %.3f] add  "
-						+ " [%.3f, %.3f] x [%.3f, %.3f] to [%.3f, %.3f] x [%.3f, %.3f]\n",
-						currentProcessingRegion.getName(), r.left, r.top, r.right, r.bottom,
-						c.left, c.top, c.right, c.bottom, n.left, n.top, n.right, n.bottom);
-				if (Math.abs(n.left - r.left) > OVERLAP_FOR_ROUTING || Math.abs(n.right - r.right) > OVERLAP_FOR_ROUTING
-						|| Math.abs(n.top - r.top) > OVERLAP_FOR_ROUTING
-						|| Math.abs(n.bottom - r.bottom) > OVERLAP_FOR_ROUTING) {
-					throw new IllegalArgumentException("BBOX is out of range for routing");
-				}
-				currentProcessingRegion.rect = n;
-			}
+			
 			logf("Saving visited %,d points (%,d border points) from %s to db...", currentProcessingRegion.getPoints(), ins,
 					currentProcessingRegion.getName());
-			networkDB.insertProcessedCluster(currentProcessingRegion, networkPointToDbInd, longRoads);
+			networkDB.insertProcessedRegion(currentProcessingRegion, networkPointToDbInd, longRoads);
 			logf("     saved - total %,d points (%,d border points), ", getTotalPoints(), tl);
 			
 			currentProcessingRegion.unload();
 			currentProcessingRegion = null;
+			return true;
 
 		}
 		
@@ -1271,10 +1284,6 @@ public class HHRoutingSubGraphCreator {
 			this.ctx = ctx;
 		}
 		
-		public void finish() {
-//			System.out.printf("%d. calc %.2f ms, cache %d\n", s++, ts / 1e6, MapUtils.DIST_CACHE.size());
-		}
-
 		@Override
 		public boolean publish(RouteDataObject object) {
 			if (!ctx.rctx.getRouter().acceptLine(object)) {

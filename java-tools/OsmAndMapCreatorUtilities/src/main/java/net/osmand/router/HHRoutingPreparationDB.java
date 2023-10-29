@@ -1,7 +1,6 @@
 package net.osmand.router;
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -12,11 +11,13 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TLongIntIterator;
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -233,13 +234,51 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		updCHInd.close();
 	}
 	
-	public void insertProcessedCluster(NetworkRouteRegion networkRouteRegion, 
+	public void insertProcessedRegion(NetworkRouteRegion networkRouteRegion, 
 			TLongObjectHashMap<NetworkBorderPoint> borderPoints, List<NetworkLongRoad> roads) throws SQLException {
 		insertBorderPoints(borderPoints);
 		insertVisitedPoints(networkRouteRegion);
 		updateRegionBbox(networkRouteRegion);
 		updateLongRoads(networkRouteRegion, roads);
 		
+	}
+	
+	public void cleanupProcessedRegion(NetworkRouteRegion networkRouteRegion, 
+			TLongObjectHashMap<NetworkBorderPoint> borderPoints, List<NetworkLongRoad> longRoads) throws SQLException {
+		Iterator<NetworkLongRoad> it = longRoads.iterator();
+		while (it.hasNext()) {
+			NetworkLongRoad r = it.next();
+			if (r.dbId < 0) {
+				it.remove();
+			}
+		}
+		TLongObjectIterator<NetworkBorderPoint> its = borderPoints.iterator();
+		while (its.hasNext()) {
+			its.advance();
+			NetworkBorderPoint npnt = its.value();
+			if (npnt.positiveObj == null && npnt.negativeObj == null) {
+				continue;
+			}
+			int c = 0;
+			if (npnt.positiveObj != null) {
+				npnt.positiveClusterId = 0;
+				npnt.positiveDbId = 0;
+				npnt.positiveGeoId = 0;
+				npnt.positiveObj = null;
+				c++;
+			}
+			if (npnt.negativeObj != null) {
+				npnt.negativeClusterId = 0;
+				npnt.negativeDbId = 0;
+				npnt.negativeGeoId = 0;
+				npnt.negativeObj = null;
+				c++;
+			}
+			if (c == 2) {
+				its.remove();
+			}
+		}
+
 	}
 
 	private void updateLongRoads(NetworkRouteRegion networkRouteRegion, List<NetworkLongRoad> roads)
