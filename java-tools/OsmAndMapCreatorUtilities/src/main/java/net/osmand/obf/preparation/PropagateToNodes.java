@@ -17,7 +17,7 @@ public class PropagateToNodes {
     private MapRenderingTypesEncoder renderingTypes;
     private TLongArrayList nodePropagatedIds = new TLongArrayList();
     private Map<Long, Map<String, String>> nodePropagatedTags = new HashMap<>();
-    private Map<String, PropagateToNodesType> propagateToNodes = new HashMap<>();
+    private Map<String, PropagateRule> propagateToNodes = new HashMap<>();
 
     public PropagateToNodes(MapRenderingTypesEncoder renderingTypes) {
         this.renderingTypes = renderingTypes;
@@ -30,7 +30,8 @@ public class PropagateToNodes {
         for (Map.Entry<String, MapRenderingTypes.MapRulType> entry : ruleTypes.entrySet()) {
             MapRenderingTypes.MapRulType ruleType = entry.getValue();
             if (ruleType.isPropagateToNodes()) {
-                propagateToNodes.put(entry.getKey(), ruleType.getPropagateToNodesType());
+                PropagateRule rule = new PropagateRule(ruleType.getPropagateToNodesType(), ruleType.getPropagateToNodesPrefix());
+                propagateToNodes.put(entry.getKey(), rule);
             }
         }
     }
@@ -42,14 +43,15 @@ public class PropagateToNodes {
             if (allIds.size() == 0) {
                 return;
             }
-            for (Map.Entry<String, PropagateToNodesType> propagate : propagateToNodes.entrySet()) {
+            for (Map.Entry<String, PropagateRule> propagate : propagateToNodes.entrySet()) {
                 String[] tagValue = propagate.getKey().split("/");
                 String propagateTag = tagValue[0];
                 String propagateValue = tagValue[1];
                 String entityTag = entity.getTag(propagateTag);
+                PropagateRule rule = propagate.getValue();
                 if (entityTag != null && entityTag.equals(propagateValue)) {
                     TLongArrayList ids = new TLongArrayList();
-                    switch (propagate.getValue()) {
+                    switch (rule.type) {
                         case ALL:
                             ids.addAll(allIds);
                             break;
@@ -64,6 +66,9 @@ public class PropagateToNodes {
                             break;
                     }
                     nodePropagatedIds.addAll(ids);
+                    if (rule.tagPrefix != null) {
+                        propagateTag = rule.tagPrefix + "_" + propagateTag;
+                    }
                     for (long id : ids.toArray()) {
                         Map<String, String> tags = nodePropagatedTags.get(id);
                         if (tags == null) {
@@ -107,6 +112,15 @@ public class PropagateToNodes {
             propagateWay((Way) e);
         } else if (e instanceof Node) {
             propagateNode((Node) e);
+        }
+    }
+
+    private class PropagateRule {
+        PropagateToNodesType type;
+        String tagPrefix;
+        public PropagateRule(PropagateToNodesType type, String tagPrefix) {
+            this.type = type;
+            this.tagPrefix = tagPrefix;
         }
     }
 }
