@@ -74,7 +74,7 @@ import net.osmand.util.MapUtils;
 // 1.13 CLEANUP: shortcuts, midpoint, chpoint
 // 1.14 MapCreator: Cut start / end to projection as in detailed calculation ()
 
-// 2nd  phase - points selection / Planet ~6-12h per profile
+// 2nd  phase 
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update)
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
@@ -101,6 +101,7 @@ import net.osmand.util.MapUtils;
 // 3.9 FILE utilities: Binary inspector...
 // 3.9 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 3.10 Implement Arc flags or CH for clusters inside 
+// 3.11 C++ implementation HHRoutePlanner
 
 
 // *4* Future (if needed) - Introduce 3/4 level 
