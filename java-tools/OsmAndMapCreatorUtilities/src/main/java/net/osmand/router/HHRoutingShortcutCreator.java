@@ -404,22 +404,24 @@ public class HHRoutingShortcutCreator {
 					long pntId = calculateRoutePointInternalId(o.getRoad().getId(), o.getSegmentStart(), o.getSegmentEnd());
 					if (set.add(pntId)) {
 						res.add(o);
-						if (testBug != null && iteration == 0) {
-							testBug.put(pntId, o);
-						} else if(testBug != null) {
-							RouteSegment prev = testBug.get(pntId);
-							if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
-								double d1 = testGetDist(prev, false);
-								double d2 = testGetDist(prev, true);
-								System.out.printf("%.2f (%.2f) %% err, %.2f (%.2f) != %.2f (%.2f) \n",
-										Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
-										Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart, testGetDist(prev, false),
-										o.distanceFromStart, testGetDist(prev, true));
-								
-//								System.out.println(getGeometry(prev, true));
-//								System.out.println(getGeometry(o, false));
-								
-							}
+					} else {
+						continue;
+					}
+
+					// checks
+					if (testBug != null && iteration == 0) {
+						testBug.put(pntId, o);
+					} else if (testBug != null) {
+						RouteSegment prev = testBug.get(pntId);
+						if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
+							double d1 = testGetDist(prev, false);
+							double d2 = testGetDist(prev, true);
+							System.out.printf("%.2f (%.2f) %% err, %.2f (%.2f) != %.2f (%.2f) \n",
+									Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
+									Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart, testGetDist(prev, false),
+									o.distanceFromStart, testGetDist(o, true));
+							System.out.println(testGetGeometry(prev, true));
+							System.out.println(testGetGeometry(o, false));
 						}
 					}
 				}
@@ -437,12 +439,12 @@ public class HHRoutingShortcutCreator {
 			int sy = t.getRoad().getPoint31YTile(t.getSegmentStart(), t.getSegmentEnd());
 			t = t.getParentRoute();
 			if (px != 0) {
-				if(precise) {
-					d+=MapUtils.measuredDist31(px, py, sx, sy);
+				if (precise) {
+					d += MapUtils.measuredDist31(px, py, sx, sy);
 				} else {
-					d+=MapUtils.squareRootDist31(px, py, sx, sy);
+					d += MapUtils.squareRootDist31(px, py, sx, sy);
 				}
-			} 
+			}
 			px = sx;
 			py = sy;
 		}
@@ -450,23 +452,12 @@ public class HHRoutingShortcutCreator {
 	}
 
 	private String testGetGeometry(RouteSegment t, boolean f) {
-		int px = 0, py = 0;
 		StringBuilder b = new StringBuilder();
+		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>"
+				+ "<gpx version=\"1.1\" ><trk><trkseg>"); 
 		while (t != null) {
 			LatLon p = getPoint(t);
-			int sx = t.getRoad().getPoint31XTile(t.getSegmentStart(), t.getSegmentEnd());
-			int sy = t.getRoad().getPoint31YTile(t.getSegmentStart(), t.getSegmentEnd());
-			t = t.getParentRoute();
-			if (px != 0) {
-				if(f) {
-					b.append(String.format("- %.2f -", MapUtils.measuredDist31(px, py, sx, sy)));
-				} else {
-					b.append(String.format("- %.2f -", MapUtils.squareRootDist31(px, py, sx, sy)));
-				}
-			} 
-			b.append(p);
-			px = sx;
-			py = sy;
+			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/> ", p.getLatitude(), p.getLongitude()));
 		}
 		return b.toString();
 	}
