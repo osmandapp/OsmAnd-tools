@@ -458,6 +458,7 @@ public class HHRoutingShortcutCreator {
 		while (t != null) {
 			LatLon p = getPoint(t);
 			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/> ", p.getLatitude(), p.getLongitude()));
+			t = t.getParentRoute();
 		}
 		return b.toString();
 	}
