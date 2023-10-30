@@ -31,6 +31,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
+import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
@@ -38,6 +39,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
+import net.osmand.util.MapUtils;
 
 public class HHRoutingShortcutCreator {
 
@@ -200,7 +202,8 @@ public class HHRoutingShortcutCreator {
 					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
 					boolean errorFound = false;
 					for (RouteSegment t : result) {
-						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(), t.getSegmentStart(), t.getSegmentEnd()));
+						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(),
+								t.getSegmentStart(), t.getSegmentEnd()));
 						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
 						while (t != null) {
 							segment.geometry.add(getPoint(t));
@@ -214,7 +217,8 @@ public class HHRoutingShortcutCreator {
 							errorFound = true;
 							StringBuilder b = new StringBuilder();
 							for (RouteSegment test : result) {
-								NetworkDBPoint other = networkPointsByGeoId.get(calculateRoutePointInternalId(test.getRoad().getId(), test.getSegmentStart(), test.getSegmentEnd()));
+								NetworkDBPoint other = networkPointsByGeoId.get(calculateRoutePointInternalId(
+										test.getRoad().getId(), test.getSegmentStart(), test.getSegmentEnd()));
 								b.append(other).append(" (").append(other.clusterId).append("), ");
 							}
 							String msg = String.format("%s can lead only to dual cluster %d - found %s (cluster %d): %s",
@@ -224,13 +228,14 @@ public class HHRoutingShortcutCreator {
 //							continue;
 							throw new IllegalStateException(msg);
 						}
+						if (segment.dist < 0) {
+							throw new IllegalStateException(segment + " dist < " + segment.dist);
+						}
 						pnt.connected.add(segment);
 						if (DEBUG_STORE_ALL_ROADS) {
 							addWay(res.osmObjects, segment, "highway", "secondary");
 						}
-						if (segment.dist < 0) {
-							throw new IllegalStateException(segment + " dist < " + segment.dist);
-						}
+						
 					}
 					if (DEBUG_VERBOSE_LEVEL >= 2) {
 						logf("Run dijkstra %d point - %d shortcuts: %.2f ms (calc %.2f ms, load %.2f ms) - %s", pnt.index, result.size(), 
@@ -369,23 +374,27 @@ public class HHRoutingShortcutCreator {
 
 	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegmentPoint s, TLongObjectMap<RouteSegment> segments)
 			throws InterruptedException, IOException {
-//		long pnt1 = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentStart(), s.getSegmentEnd());
 		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
-		TLongObjectHashMap<Double> allDistances = new TLongObjectHashMap<Double>();
 		List<RouteSegment> res = new ArrayList<>();
+//			BinaryRoutePlanner.TRACE_ROUTING = true;
 		// TODO 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 		// TODO 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
-//		BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = false;
+		boolean testBUG_B = false;
+		boolean testBUG_P = false;
+		TLongObjectHashMap<RouteSegment> testBug = testBUG_B || testBUG_P  ? new TLongObjectHashMap<RouteSegment>() : null;
 		
-		for (int iteration = 0; iteration < 1; iteration++) {
+		for (int iteration = 0; iteration < (testBUG_B || testBUG_P ? 2 : 1); iteration++) {
 			res.clear();
-//			BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
-//			BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
+			if (testBUG_B) {
+				BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
+			}
+			if (testBUG_P) {
+				BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
+			}
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
 			ctx.config.PENALTY_FOR_REVERSE_DIRECTION = -1;
-//			BinaryRoutePlanner.TRACE_ROUTING = true;
 			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
 					null, segments);
 			if (frs != null) {
@@ -395,12 +404,21 @@ public class HHRoutingShortcutCreator {
 					long pntId = calculateRoutePointInternalId(o.getRoad().getId(), o.getSegmentStart(), o.getSegmentEnd());
 					if (set.add(pntId)) {
 						res.add(o);
-						if(iteration == 0) {
-							allDistances.put(pntId, (double) o.distanceFromStart);
-						} else {
-							Double d1 = allDistances.get(pntId);
-							if (Math.abs(1 - d1 / o.distanceFromStart)*100 > 0.1) {
-								System.out.printf("%.2f %% err, %.2f != %.2f \n", Math.abs(1 - d1 / o.distanceFromStart)*100, d1, o.distanceFromStart);
+						if (testBug != null && iteration == 0) {
+							testBug.put(pntId, o);
+						} else if(testBug != null) {
+							RouteSegment prev = testBug.get(pntId);
+							if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
+								double d1 = testGetDist(prev, false);
+								double d2 = testGetDist(prev, true);
+								System.out.printf("%.2f (%.2f) %% err, %.2f (%.2f) != %.2f (%.2f) \n",
+										Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
+										Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart, testGetDist(prev, false),
+										o.distanceFromStart, testGetDist(prev, true));
+								
+//								System.out.println(getGeometry(prev, true));
+//								System.out.println(getGeometry(o, false));
+								
 							}
 						}
 					}
@@ -409,6 +427,48 @@ public class HHRoutingShortcutCreator {
 		}
 
 		return res;
+	}
+	
+	private double testGetDist(RouteSegment t, boolean precise) {
+		int px = 0, py = 0;
+		double d = 0;
+		while (t != null) {
+			int sx = t.getRoad().getPoint31XTile(t.getSegmentStart(), t.getSegmentEnd());
+			int sy = t.getRoad().getPoint31YTile(t.getSegmentStart(), t.getSegmentEnd());
+			t = t.getParentRoute();
+			if (px != 0) {
+				if(precise) {
+					d+=MapUtils.measuredDist31(px, py, sx, sy);
+				} else {
+					d+=MapUtils.squareRootDist31(px, py, sx, sy);
+				}
+			} 
+			px = sx;
+			py = sy;
+		}
+		return d;
+	}
+
+	private String testGetGeometry(RouteSegment t, boolean f) {
+		int px = 0, py = 0;
+		StringBuilder b = new StringBuilder();
+		while (t != null) {
+			LatLon p = getPoint(t);
+			int sx = t.getRoad().getPoint31XTile(t.getSegmentStart(), t.getSegmentEnd());
+			int sy = t.getRoad().getPoint31YTile(t.getSegmentStart(), t.getSegmentEnd());
+			t = t.getParentRoute();
+			if (px != 0) {
+				if(f) {
+					b.append(String.format("- %.2f -", MapUtils.measuredDist31(px, py, sx, sy)));
+				} else {
+					b.append(String.format("- %.2f -", MapUtils.squareRootDist31(px, py, sx, sy)));
+				}
+			} 
+			b.append(p);
+			px = sx;
+			py = sy;
+		}
+		return b.toString();
 	}
 
 }

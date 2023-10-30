@@ -78,27 +78,30 @@ import net.osmand.util.MapUtils;
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update)
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
-// 2.4 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
-// 2.5 SERVER: Speedup shortcut calc: local to use less memory, different unload routing context
+
 // 2.6 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 2.7 FILE: Implement border crossing issue on client
 // 2.9 FILE: different dates for maps!
 // 2.10 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
 //       There should be maximum at preprocessed visited points < 50K-100K
+// 2.11 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
 // 2.13 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 2.14 CHECK: Some points have no segments in/out (oneway roads) - simplify?
 // 2.16 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
 
 // 3 Later implementation
 // 3.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 3.2 Avoid specific road
-// 3.3 Deprioritize or exclude roads (parameters)
-// 3.4 Live data (think about it)
-// 3.5 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
-// 3.5.1 EX10 - example that min depth doesn't give good approximation
-// 3.6 FILE utilities: Binary inspector...
-// 3.7 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 3.8 Implement Arc flags or CH for clusters inside 
+// 3.2 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
+// 3.3 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
+// 3.4 SERVER: Speedup shortcut calc: local to use less memory, different unload routing context
+// 3.5 Avoid specific road
+// 3.6 Deprioritize or exclude roads (parameters)
+// 3.7 Live data (think about it)
+// 3.8.1 EX10 - example that min depth doesn't give good approximation
+// 3.9 FILE utilities: Binary inspector...
+// 3.9 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 3.10 Implement Arc flags or CH for clusters inside 
+
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
