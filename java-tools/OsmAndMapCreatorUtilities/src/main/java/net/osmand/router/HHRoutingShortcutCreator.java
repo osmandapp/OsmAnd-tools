@@ -415,13 +415,26 @@ public class HHRoutingShortcutCreator {
 						RouteSegment prev = testBug.get(pntId);
 						if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
 							double d1 = testGetDist(prev, false);
-							double d2 = testGetDist(prev, true);
+							double d2 = testGetDist(o, testBUG_P);
 							System.out.printf("%.2f (%.2f) %% err, %.2f (%.2f) != %.2f (%.2f) \n",
 									Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
 									Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart, testGetDist(prev, false),
-									o.distanceFromStart, testGetDist(o, true));
-							System.out.println(testGetGeometry(prev, true));
-							System.out.println(testGetGeometry(o, false));
+									o.distanceFromStart, testGetDist(o, testBUG_P));
+							List<LatLon> lp = testGeometry(prev);
+							List<LatLon> ls = testGeometry(o);
+							boolean diff = false;
+							if (lp.size() != ls.size()) {
+								diff = true;
+							}
+							for (int k = 0; !diff && k < lp.size(); k++) {
+								if (MapUtils.getDistance(lp.get(k), ls.get(k)) > 5) {
+									diff = true;
+								}
+							}
+							if (diff) {
+								System.out.println(testGetGeometry(prev));
+								System.out.println(testGetGeometry(o));
+							}
 						}
 					}
 				}
@@ -450,16 +463,27 @@ public class HHRoutingShortcutCreator {
 		}
 		return d;
 	}
+	
+	private List<LatLon> testGeometry(RouteSegment t) {
+		List<LatLon> l = new ArrayList<LatLon>();
+		while (t != null) {
+			LatLon p = getPoint(t);
+			l.add(p);
+			t = t.getParentRoute();
+		}
+		return l;
+	}
 
-	private String testGetGeometry(RouteSegment t, boolean f) {
+	private String testGetGeometry(RouteSegment t) {
 		StringBuilder b = new StringBuilder();
-		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>"
-				+ "<gpx version=\"1.1\" ><trk><trkseg>"); 
+		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>");
+		b.append("<gpx version=\"1.1\" ><trk><trkseg>"); 
 		while (t != null) {
 			LatLon p = getPoint(t);
 			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/> ", p.getLatitude(), p.getLongitude()));
 			t = t.getParentRoute();
 		}
+		b.append("</trkseg></trk></gpx>");
 		return b.toString();
 	}
 
