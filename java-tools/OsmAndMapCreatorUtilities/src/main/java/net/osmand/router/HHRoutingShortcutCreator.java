@@ -6,8 +6,7 @@ import static net.osmand.router.HHRoutingUtilities.addWay;
 import static net.osmand.router.HHRoutingUtilities.getPoint;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -382,15 +381,19 @@ public class HHRoutingShortcutCreator {
 		// TODO 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 		boolean testBUG_B = false;
 		boolean testBUG_P = false;
-		TLongObjectHashMap<RouteSegment> testBug = testBUG_B || testBUG_P  ? new TLongObjectHashMap<RouteSegment>() : null;
+		boolean testBUG_R = false;
+		TLongObjectHashMap<RouteSegment> testBug = testBUG_B || testBUG_P || testBUG_R ? new TLongObjectHashMap<RouteSegment>() : null;
 		
-		for (int iteration = 0; iteration < (testBUG_B || testBUG_P ? 2 : 1); iteration++) {
+		for (int iteration = 0; iteration < (testBUG_B || testBUG_P || testBUG_R ? 2 : 1); iteration++) {
 			res.clear();
 			if (testBUG_B) {
 				BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
 			}
 			if (testBUG_P) {
 				BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
+			}
+			if (testBUG_R) {
+				BinaryRoutePlanner.DEBUG_ALWAYS_AVOID_VISITED = iteration != 0; // or true
 			}
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
@@ -414,12 +417,10 @@ public class HHRoutingShortcutCreator {
 					} else if (testBug != null) {
 						RouteSegment prev = testBug.get(pntId);
 						if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
-							double d1 = testGetDist(prev, false);
-							double d2 = testGetDist(o, testBUG_P);
-							System.out.printf("%.2f (%.2f) %% err, %.2f (%.2f) != %.2f (%.2f) \n",
-									Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
-									Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart, testGetDist(prev, false),
-									o.distanceFromStart, testGetDist(o, testBUG_P));
+							// compare geo distance by the same method (precise)
+							float d1 = testGetDist(prev, true, pntId);
+							float d2 = testGetDist(o, true, pntId);
+
 							List<LatLon> lp = testGeometry(prev);
 							List<LatLon> ls = testGeometry(o);
 							boolean diff = false;
@@ -432,8 +433,21 @@ public class HHRoutingShortcutCreator {
 								}
 							}
 							if (diff) {
-								System.out.println(testGetGeometry(prev));
-								System.out.println(testGetGeometry(o));
+								writeTestGeometry(prev, pntId, "Blue", d1); // iteration 0
+								writeTestGeometry(o, pntId, "Red", d2); // iteration 1
+							}
+
+							if (true || !diff) {
+								System.out.printf("err %.2f%% (%.2f%%) time %.2f (%.2f) dist %.2f (%.2f) [ %d ] %s\n",
+										(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
+										(1 - d1 / d2) * 100,
+										prev.distanceFromStart,
+										o.distanceFromStart,
+										d1,
+										d2,
+										pntId,
+										diff ? "GPX" : ""
+								);
 							}
 						}
 					}
@@ -443,27 +457,37 @@ public class HHRoutingShortcutCreator {
 
 		return res;
 	}
-	
-	private double testGetDist(RouteSegment t, boolean precise) {
-		int px = 0, py = 0;
-		double d = 0;
-		while (t != null) {
-			int sx = t.getRoad().getPoint31XTile(t.getSegmentStart(), t.getSegmentEnd());
-			int sy = t.getRoad().getPoint31YTile(t.getSegmentStart(), t.getSegmentEnd());
-			t = t.getParentRoute();
-			if (px != 0) {
+
+	private float testGetDist(RouteSegment t, boolean precise, long pntId) {
+		float dist = 0;
+		List<RouteSegment> path = new ArrayList<RouteSegment>();
+
+		// traverse path
+		do {
+			path.add(t);
+		} while ((t = t.getParentRoute()) != null);
+
+		Collections.reverse(path);
+
+		for(int i = 0; i < path.size(); i++) {
+			RouteSegment current = path.get(i);
+			if (!(current instanceof BinaryRoutePlanner.FinalRouteSegment)) {
+				int x1 = current.getRoad().getPoint31XTile(current.getSegmentStart());
+				int y1 = current.getRoad().getPoint31YTile(current.getSegmentStart());
+				int x2 = current.getRoad().getPoint31XTile(current.getSegmentEnd());
+				int y2 = current.getRoad().getPoint31YTile(current.getSegmentEnd());
+				float d = 0;
 				if (precise) {
-					d += MapUtils.measuredDist31(px, py, sx, sy);
+					d = (float) MapUtils.measuredDist31(x1, y1, x2, y2);
 				} else {
-					d += MapUtils.squareRootDist31(px, py, sx, sy);
+					d = (float) MapUtils.squareRootDist31(x1, y1, x2, y2);
 				}
+				dist += d; // d might be used to debug each edge weight
 			}
-			px = sx;
-			py = sy;
 		}
-		return d;
+		return dist;
 	}
-	
+
 	private List<LatLon> testGeometry(RouteSegment t) {
 		List<LatLon> l = new ArrayList<LatLon>();
 		while (t != null) {
@@ -474,17 +498,24 @@ public class HHRoutingShortcutCreator {
 		return l;
 	}
 
-	private String testGetGeometry(RouteSegment t) {
+	private void writeTestGeometry(RouteSegment t, long pntId, String color, double distance)
+			throws FileNotFoundException, UnsupportedEncodingException {
+
+		PrintWriter gpx = new PrintWriter(
+				String.format("point-%d-%s-%d.gpx", pntId, color, (int) distance), "UTF-8");
+
 		StringBuilder b = new StringBuilder();
-		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>");
-		b.append("<gpx version=\"1.1\" ><trk><trkseg>"); 
+		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n");
+		b.append("<gpx version=\"1.0\" creator=\"test\" xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\" xmlns=\"http://www.topografix.com/GPX/1/0\">\n");
+		b.append("<trk><extensions><gpxx:TrackExtension><gpxx:DisplayColor>" + color + "</gpxx:DisplayColor></gpxx:TrackExtension></extensions><trkseg>\n");
 		while (t != null) {
 			LatLon p = getPoint(t);
-			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/> ", p.getLatitude(), p.getLongitude()));
+			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/>\n", p.getLatitude(), p.getLongitude()));
 			t = t.getParentRoute();
 		}
-		b.append("</trkseg></trk></gpx>");
-		return b.toString();
+		b.append("</trkseg></trk></gpx>\n");
+		gpx.println(b.toString());
+		gpx.close();
 	}
 
 }
