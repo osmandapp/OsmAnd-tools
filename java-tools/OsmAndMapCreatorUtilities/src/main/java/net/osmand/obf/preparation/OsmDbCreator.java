@@ -2,11 +2,7 @@ package net.osmand.obf.preparation;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
@@ -53,6 +49,10 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int currentWaysCount = 0;
 	private PreparedStatement prepWays;
 	int allWays = 0;
+
+	int propagateCount = 0;
+	private PreparedStatement prepPropagateNode;
+
 	
 	// not used for now
 	private PreparedStatement delNode;
@@ -77,6 +77,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private final boolean addGeoHash;
 	
 	private long generatedId = -100;
+
+	private PropagateToNodes propagateToNodes;
 
 
 	public OsmDbCreator(int additionId, int shiftId) {
@@ -230,7 +232,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		Statement stat = dbConn.createStatement();
 		if (create) {
 			dialect.deleteTableIfExists("node", stat);
-			stat.executeUpdate("create table node (id bigint primary key, latitude double, longitude double, tags blob)"); //$NON-NLS-1$
+			stat.executeUpdate("create table node (id bigint primary key, latitude double, longitude double, tags blob, propagate boolean)"); //$NON-NLS-1$
 			stat.executeUpdate("create index IdIndex ON node (id)"); //$NON-NLS-1$
 			dialect.deleteTableIfExists("ways", stat);
 			stat.executeUpdate("create table ways (id bigint, node bigint, ord smallint, tags blob, boundary smallint, primary key (id, ord))"); //$NON-NLS-1$
@@ -251,9 +253,10 @@ public class OsmDbCreator implements IOsmStorageFilter {
 //				initRelationIds("relations", relationIds);
 			}
 		}
-		prepNode = dbConn.prepareStatement("replace into node(id, latitude, longitude, tags) values (?, ?, ?, ?)"); //$NON-NLS-1$
+		prepNode = dbConn.prepareStatement("replace into node(id, latitude, longitude, tags, propagate) values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		prepWays = dbConn.prepareStatement("replace into ways(id, node, ord, tags, boundary) values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		prepRelations = dbConn.prepareStatement("replace into relations(id, member, type, role, ord, tags) values (?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
+		prepPropagateNode = dbConn.prepareStatement("update node set propagate=1 where id=?");
 		dbConn.setAutoCommit(false);
 	}
 
@@ -282,10 +285,14 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			if (currentRelationsCount > 0) {
 				prepRelations.executeBatch();
 			}
+			if (propagateCount > 0) {
+				prepPropagateNode.executeBatch();
+			}
 		} catch (SQLException ex) {
 			log.error("TODO FIX: Could not save in db ", ex); //$NON-NLS-1$
 		}
 		prepRelations.close();
+		prepPropagateNode.close();
 		if (delNode != null) {
 			delNode.close();
 		}
@@ -319,9 +326,11 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		prepNode.executeBatch();
 		prepWays.executeBatch();
 		prepRelations.executeBatch();
+		prepPropagateNode.executeBatch();
 		currentWaysCount = 0;
 		currentCountNode = 0;
 		currentRelationsCount = 0;
+		propagateCount = 0;
 		if (e instanceof Node) {
 			delNode.setLong(1, id);
 			delNode.execute();
@@ -359,6 +368,22 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				throw new RuntimeException(es);
 			}
 			long id = convertId(e);
+			if (propagateToNodes != null) {
+				TLongArrayList propagatedNodeIds = propagateToNodes.registerRestrictionNodes(e);
+				if (propagatedNodeIds.size() > 0) {
+					for (int i = 0; i < propagatedNodeIds.size(); i++) {
+						long nodeId = propagatedNodeIds.get(i);
+						prepPropagateNode.setLong(1, nodeId);
+						prepPropagateNode.addBatch();
+						propagateCount++;
+					}
+					if (propagateCount >= BATCH_SIZE_OSM) {
+						prepPropagateNode.executeBatch();
+						dbConn.commit(); // clear memory
+						propagateCount = 0;
+					}
+				}
+			}
 			if (e instanceof Node) {
 				currentCountNode++;
 				if (!e.getTags().isEmpty()) {
@@ -368,6 +393,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				prepNode.setDouble(2, ((Node) e).getLatitude());
 				prepNode.setDouble(3, ((Node) e).getLongitude());
 				prepNode.setBytes(4, tags.toByteArray());
+				prepNode.setBoolean(5, false);
 				prepNode.addBatch();
 				if (currentCountNode >= BATCH_SIZE_OSM) {
 					prepNode.executeBatch();
@@ -441,6 +467,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		return allWays;
 	}
 
+	public void setPropagateToNodes(PropagateToNodes propagateToNodes) {
+		this.propagateToNodes = propagateToNodes;
+	}
 	
 
 }

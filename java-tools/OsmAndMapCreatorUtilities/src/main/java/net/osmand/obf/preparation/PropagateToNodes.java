@@ -36,12 +36,13 @@ public class PropagateToNodes {
         }
     }
 
-    public void registerRestrictionNodes(Entity entity) {
+    public TLongArrayList registerRestrictionNodes(Entity entity) {
+        TLongArrayList resultIds = new TLongArrayList();
         if (entity instanceof Way) {
             Way w = (Way) entity;
             TLongArrayList allIds = w.getNodeIds();
             if (allIds.size() == 0) {
-                return;
+                return resultIds;
             }
             for (Map.Entry<String, PropagateRule> propagate : propagateToNodes.entrySet()) {
                 String[] tagValue = propagate.getKey().split("/");
@@ -50,6 +51,9 @@ public class PropagateToNodes {
                 String entityTag = entity.getTag(propagateTag);
                 PropagateRule rule = propagate.getValue();
                 if (entityTag != null && entityTag.equals(propagateValue)) {
+                    if (rule.tagPrefix != null) {
+                        propagateTag = rule.tagPrefix + propagateTag;
+                    }
                     TLongArrayList ids = new TLongArrayList();
                     switch (rule.type) {
                         case ALL:
@@ -64,22 +68,23 @@ public class PropagateToNodes {
                         case CENTER:
                             ids.add(allIds.get(allIds.size() / 2));
                             break;
+                        case BORDER:
+                            long start = allIds.get(0);
+                            long end = allIds.get(allIds.size() - 1);
+                            ids.add(start);
+                            if (start != end) {
+                                ids.add(end);
+                            }
+                            break;
                     }
-                    nodePropagatedIds.addAll(ids);
-                    if (rule.tagPrefix != null) {
-                        propagateTag = rule.tagPrefix + "_" + propagateTag;
-                    }
+                    resultIds.addAll(ids);
                     for (long id : ids.toArray()) {
-                        Map<String, String> tags = nodePropagatedTags.get(id);
-                        if (tags == null) {
-                            tags = new HashMap<>();
-                        }
-                        tags.put(propagateTag, propagateValue);
-                        nodePropagatedTags.put(id, tags);
+                        setPropagation(id, propagateTag, propagateValue, rule.type);
                     }
                 }
             }
         }
+        return resultIds;
     }
 
     private void propagateWay(Way w) {
@@ -96,7 +101,7 @@ public class PropagateToNodes {
         if (nodePropagatedIds.size() == 0) {
             return;
         }
-        long nodeId = n.getId() >> OsmDbCreator.SHIFT_ID;
+        long nodeId = n.getId();
         if (nodePropagatedIds.contains(nodeId)) {
             Map<String, String> tags = nodePropagatedTags.get(nodeId);
             for (Map.Entry<String, String> entry : tags.entrySet()) {
@@ -115,6 +120,10 @@ public class PropagateToNodes {
         }
     }
 
+    public TLongArrayList getNodePropagatedIds() {
+        return nodePropagatedIds;
+    }
+
     private class PropagateRule {
         PropagateToNodesType type;
         String tagPrefix;
@@ -122,5 +131,19 @@ public class PropagateToNodes {
             this.type = type;
             this.tagPrefix = tagPrefix;
         }
+    }
+
+    private void setPropagation(long id, String propagateTag, String propagateValue, PropagateToNodesType type) {
+        Map<String, String> tags = nodePropagatedTags.get(id);
+        if (tags == null) {
+            tags = new HashMap<>();
+        } else if (type == PropagateToNodesType.BORDER) {
+            nodePropagatedTags.remove(id);
+            nodePropagatedIds.remove(id);
+            return;
+        }
+        tags.put(propagateTag, propagateValue);
+        nodePropagatedTags.put(id, tags);
+        nodePropagatedIds.add(id);
     }
 }
