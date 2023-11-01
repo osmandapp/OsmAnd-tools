@@ -50,10 +50,10 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
-// REVERT TO min depth as it produced less shorcuts and smaller border cuts
+// REVERT TO min depth as it produced less shorcuts and smaller border cuts ? slower ?
 
 // TESTING
+// BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 // 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
@@ -146,14 +146,13 @@ public class HHRoutingSubGraphCreator {
 	protected static LatLon[] EX = {
 //			EX1
 	}; 
-
 	
-	static int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 1000;
+	static int TOTAL_MAX_POINTS = 100000; // Max points in cluster - used as source for max flow
+	static int TOTAL_MIN_POINTS = 1000; // Min points in cluster - used as sink for max flow
 	static boolean CLEAN = false;
 	static String ROUTING_PROFILE = "car";
 	static String ROUTING_PARAMS = "allow_private";
 	
-
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
@@ -511,7 +510,7 @@ public class HHRoutingSubGraphCreator {
 					borderPoints.size(), mincuts.size(), longPoints, exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if ((mincuts.size() + longPoints) != borderPoints.size()) {
 				System.err.println(msg);
-//				throw new IllegalStateException(msg);
+				throw new IllegalStateException(msg);
 			} else {
 				throw new IllegalStateException(msg);
 			}
@@ -1319,10 +1318,10 @@ public class HHRoutingSubGraphCreator {
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
 						if (!ctx.checkLongRoads && pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
-							logf("MERGE long route road " + pntAround + " with previous segment");
 							NetworkBorderPoint negDir = ctx.networkPointToDbInd.get(mainPoint);
 							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(calculateRoutePointInternalId(object.getId(), pos - 1, pos));
 							if (posDir != null && posDir.negativeDbId == 0) {
+								logf("MERGE long route road %s [%d - %d] with previous segment", pnt, pos - 1, pos + 1);
 								if (posDir.positiveDbId == 0 || negDir.negativeDbId == 0 || negDir.positiveDbId != 0) {
 									throw new IllegalStateException(pntAround + "");
 								}
