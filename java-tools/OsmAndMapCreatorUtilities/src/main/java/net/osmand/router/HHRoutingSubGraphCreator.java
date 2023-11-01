@@ -499,8 +499,8 @@ public class HHRoutingSubGraphCreator {
 			String msg = String.format("BUG!! mincut %d  ( = %d) + %d network pnts != %d graph reached size: %s", 
 					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if ((mincuts.size() + longPoints) != borderPoints.size()) {
-//				System.err.println(msg);
-				throw new IllegalStateException(msg);
+				System.err.println(msg);
+//				throw new IllegalStateException(msg);
 			} else {
 				throw new IllegalStateException(msg);
 			}
@@ -977,12 +977,6 @@ public class HHRoutingSubGraphCreator {
 			loadVertexConnections(segment, false, createVertices);
 		}
 		
-		public void initQueueFromPointsToVisit() {
-			queue.clear();
-			for (RouteSegment r : toVisitVertices.valueCollection()) {
-				queue.add((RouteSegmentVertex) r);
-			}			
-		}
 		
 		void loadVertexConnections(RouteSegmentVertex segment, boolean end, boolean createVertices) {
 			int segmentInd = end ? segment.getSegmentEnd() : segment.getSegmentStart();
@@ -1017,6 +1011,7 @@ public class HHRoutingSubGraphCreator {
 			}
 			visitedVertices.clear();
 			toVisitVertices.clear();
+			queue.clear();
 		}
 
 	}
@@ -1311,7 +1306,7 @@ public class HHRoutingSubGraphCreator {
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
-						if (ctx.checkLongRoads && pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
+						if (!ctx.checkLongRoads && pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
 							logf("MERGE long route road " + pntAround + " with previous segment");
 							NetworkBorderPoint negDir = ctx.networkPointToDbInd.get(mainPoint);
 							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(calculateRoutePointInternalId(object.getId(), pos - 1, pos));

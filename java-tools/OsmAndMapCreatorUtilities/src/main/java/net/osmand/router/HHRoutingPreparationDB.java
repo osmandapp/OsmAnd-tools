@@ -488,9 +488,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			posMain.negativeDbId = negMerge.negativeDbId;
 			posMain.negativeClusterId = negMerge.negativeClusterId;
 
-			updMergePoint = conn.prepareStatement(
-					"UPDATE points SET pointGeoUniDir, pointGeoId, start, end, sx31, sy31, ex31, ey31 WHERE idPoint = ?");
-			int p = 0;
+			int p = 1;
 			updMergePoint.setLong(p++, posMain.unidirId);
 			updMergePoint.setLong(p++, HHRoutePlanner.calculateRoutePointInternalId(negMain.road.getId(),
 					negMain.getSegmentStart(), negMain.getSegmentEnd()));
@@ -501,7 +499,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			updMergePoint.setLong(p++, negMain.getEndPointX());
 			updMergePoint.setLong(p++, negMain.getEndPointY());
 			updMergePoint.setInt(p++, posMain.negativeDbId);
-
+			updMergePoint.execute();
 			updDualPoint.setInt(1, posMain.negativeDbId);
 			updDualPoint.setInt(2, posMain.negativeClusterId);
 			updDualPoint.setInt(3, posMain.positiveDbId);
