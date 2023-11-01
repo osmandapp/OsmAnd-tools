@@ -415,7 +415,7 @@ public class HHRoutingSubGraphCreator {
 
 		TLongObjectHashMap<RouteSegmentVertex> existNetworkPoints = new TLongObjectHashMap<>();
 		TIntIntHashMap depthDistr = new TIntIntHashMap();
-		int minDepth = 1, DIFF_DEPTH = 10, maxDepth = DIFF_DEPTH + 2;
+		int minDepth = 0, DIFF_DEPTH = 10, maxDepth = DIFF_DEPTH + 2;
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
 			logf("Cluster %d. %s", ctx.lastClusterInd + 1, pnt );
 					
@@ -425,9 +425,15 @@ public class HHRoutingSubGraphCreator {
 			RouteSegmentVertex seg = c.queue.poll();
 			if (seg.getDepth() > maxDepth) {
 				maxDepth = seg.getDepth();
-				if (distrSum(depthDistr, maxDepth) >= TOTAL_MAX_POINTS) {
-					break;
+				if (distrSum(depthDistr, maxDepth) >= TOTAL_MAX_POINTS && minDepth == 0) {
+					// calculate mindepth to finish properly
+					while (minDepth < maxDepth - DIFF_DEPTH && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
+						minDepth++;
+					}
 				}
+			}
+			if (minDepth > 0 && seg.getDepth() > minDepth) {
+				continue;
 			}
 			depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
 			if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
@@ -440,10 +446,7 @@ public class HHRoutingSubGraphCreator {
 		for (RouteSegmentVertex r : c.toVisitVertices.valueCollection()) {
 			c.loadVertexConnections(r, false);
 		}
-		// depthDistr.get(minDepth) < TOTAL_MIN_DEPTH_POINTS
-		while (minDepth < maxDepth - DIFF_DEPTH && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
-			minDepth++;
-		}
+	
 		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
 		c.borderVertices = recalculateClusterPointsUsingMincut(c, pnt, mincuts);
 		for (long key : c.visitedVertices.keys()) {
@@ -496,11 +499,11 @@ public class HHRoutingSubGraphCreator {
 			print(sortPoints(borderPoints), "Mincut reached");
 			print(sortPoints(new ArrayList<>(mincuts.valueCollection())), "Mincut");
 			print(sortPoints(toVisit), "To Visit");
-			String msg = String.format("BUG!! mincut %d  ( = %d) + %d network pnts != %d graph reached size: %s", 
+			String msg = String.format("BUG !! mincut %d  ( = %d) + %d network pnts != %d graph reached size: %s", 
 					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if ((mincuts.size() + longPoints) != borderPoints.size()) {
 				System.err.println(msg);
-//				throw new IllegalStateException(msg);
+				throw new IllegalStateException(msg);
 			} else {
 				throw new IllegalStateException(msg);
 			}
@@ -716,7 +719,7 @@ public class HHRoutingSubGraphCreator {
 			newEdge.t = s;
 			t.connections.add(newEdge);
 			if (c.toVisitVertices.contains(r.getId())) {
-				if (!existingVertices.contains(r.getId())) {
+				if (!existingVertices.contains(r.getId())) { 
 					sources.add(t);
 				}
 			}
@@ -744,11 +747,11 @@ public class HHRoutingSubGraphCreator {
 					flow += tc.flow;
 				}
 				if (flow > 0) {
-					System.out.println("-> Source: " + sourceL + " flow " + flow) ;
+					System.out.printf("-> Source: %s depth %d, flow %d\n", sourceL, sourceL.segment.getDepth(), flow) ;
 				}
 			}
 			for (MaxFlowVertex s : sinks) {
-				System.out.println("<- Sink: " + s);
+				System.out.printf("-> Source: %s depth %d\n", s, s.segment.getDepth()) ;
 			}
 		}
 		reachableSource.add(source);
