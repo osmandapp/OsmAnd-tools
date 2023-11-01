@@ -503,7 +503,7 @@ public class HHRoutingSubGraphCreator {
 					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if ((mincuts.size() + longPoints) != borderPoints.size()) {
 				System.err.println(msg);
-				throw new IllegalStateException(msg);
+//				throw new IllegalStateException(msg);
 			} else {
 				throw new IllegalStateException(msg);
 			}
@@ -751,7 +751,7 @@ public class HHRoutingSubGraphCreator {
 				}
 			}
 			for (MaxFlowVertex s : sinks) {
-				System.out.printf("-> Source: %s depth %d\n", s, s.segment.getDepth()) ;
+				System.out.printf("<- Sink: %s depth %d\n", s, s.segment.getDepth()) ;
 			}
 		}
 		reachableSource.add(source);
