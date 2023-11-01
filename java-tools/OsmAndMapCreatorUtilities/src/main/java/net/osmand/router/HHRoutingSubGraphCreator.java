@@ -50,6 +50,7 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
+// BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
 
 // TESTING
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)

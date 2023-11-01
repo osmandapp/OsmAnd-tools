@@ -500,14 +500,17 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			updMergePoint.setLong(p++, negMain.getEndPointY());
 			updMergePoint.setInt(p++, posMain.negativeDbId);
 			updMergePoint.execute();
+			
 			updDualPoint.setInt(1, posMain.negativeDbId);
 			updDualPoint.setInt(2, posMain.negativeClusterId);
 			updDualPoint.setInt(3, posMain.positiveDbId);
-			updDualPoint.execute();
+			updDualPoint.addBatch();
+			
 			updDualPoint.setInt(1, posMain.positiveDbId);
 			updDualPoint.setInt(2, posMain.positiveClusterId);
 			updDualPoint.setInt(3, posMain.negativeDbId);
-			updDualPoint.execute();
+			updDualPoint.addBatch();
+			updDualPoint.executeBatch();
 		} catch (SQLException e) {
 			throw new IllegalStateException(e);
 		}
