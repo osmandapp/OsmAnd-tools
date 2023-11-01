@@ -1321,7 +1321,7 @@ public class HHRoutingSubGraphCreator {
 							NetworkBorderPoint negDir = ctx.networkPointToDbInd.get(mainPoint);
 							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(calculateRoutePointInternalId(object.getId(), pos - 1, pos));
 							if (posDir != null && posDir.negativeDbId == 0) {
-								logf("MERGE long route road %s [%d - %d] with previous segment", pnt, pos - 1, pos + 1);
+								logf("MERGE long route road %s [%d - %d] with previous segment", pntAround, pos - 1, pos + 1);
 								if (posDir.positiveDbId == 0 || negDir.negativeDbId == 0 || negDir.positiveDbId != 0) {
 									throw new IllegalStateException(pntAround + "");
 								}
