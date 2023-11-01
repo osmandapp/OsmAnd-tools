@@ -227,10 +227,10 @@ public class HHRoutingUtilities {
 		int ways1 = 0;
 		for (NetworkIsland ni : visualClusters) {
 			TLongSet viewed = new TLongHashSet();
-			if (ni.allVertices == null) {
+			if (ni.visitedVertices == null) {
 				continue;
 			}
-			TLongObjectIterator<RouteSegmentVertex> it = ni.allVertices.iterator();
+			TLongObjectIterator<RouteSegment> it = ni.visitedVertices.iterator();
 			while (it.hasNext()) {
 				it.advance();
 				long pntKey = it.key();
@@ -246,7 +246,7 @@ public class HHRoutingUtilities {
 						while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
 							RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
 							pntKey = calcUniDirRoutePointInternalId(nxt);
-							if (!ni.allVertices.containsKey(pntKey) || viewed.contains(pntKey)) {
+							if (!ni.visitedVertices.containsKey(pntKey) || viewed.contains(pntKey)) {
 								break;
 							}
 							viewed.add(pntKey);

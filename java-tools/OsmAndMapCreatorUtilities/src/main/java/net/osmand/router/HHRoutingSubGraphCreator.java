@@ -50,7 +50,7 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// REVERT TO min depth as it produced less shorcuts and smaller border cuts ? slower ?
+// REVERT TO min depth / max depth: 1) compare shortcuts 2) slower
 
 // TESTING
 // BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
@@ -163,7 +163,7 @@ public class HHRoutingSubGraphCreator {
 		
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Italy_test";
-//		name = "Netherlands_europe_2.road.obf";
+		name = "Netherlands_europe_2.road.obf";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -229,7 +229,7 @@ public class HHRoutingSubGraphCreator {
 
 	private NetworkCollectPointCtx collectNetworkPoints(NetworkCollectPointCtx ctx) throws IOException, SQLException {
 		if (EX != null && EX.length > 0) {
-			DEBUG_STORE_ALL_ROADS = 2;
+			DEBUG_STORE_ALL_ROADS = 3;
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			for (LatLon l : EX) {
 				RouteSegmentPoint pnt = router.findRouteSegment(l.getLatitude(), l.getLongitude(), ctx.rctx, null);
@@ -430,18 +430,6 @@ public class HHRoutingSubGraphCreator {
 			}
 			RouteSegmentVertex seg = c.queue.poll();
 			seg.order = order++;
-//			if (seg.getDepth() > maxDepth) {
-//				maxDepth = seg.getDepth();
-//				if (distrSum(depthDistr, maxDepth) >= TOTAL_MAX_POINTS && minDepth == 0) {
-//					// calculate mindepth to finish properly
-//					while (minDepth < maxDepth - DIFF_DEPTH && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
-//						minDepth++;
-//					}
-//				}
-//			}
-//			if (minDepth > 0 && seg.getDepth() > minDepth) {
-//				continue;
-//			}
 			depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
 			if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
 				c.toVisitVertices.remove(seg.getId());
