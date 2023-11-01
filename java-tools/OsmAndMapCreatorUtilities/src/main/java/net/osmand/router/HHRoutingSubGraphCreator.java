@@ -51,6 +51,7 @@ import net.osmand.util.MapUtils;
 
 // IN PROGRESS
 // BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
+// REVERT TO min depth as it produced less shorcuts and smaller border cuts
 
 // TESTING
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
@@ -143,11 +144,11 @@ public class HHRoutingSubGraphCreator {
 	
 
 	protected static LatLon[] EX = {
-//			EX12
+//			EX1
 	}; 
 
 	
-	static int TOTAL_MAX_POINTS = 99000, TOTAL_MIN_POINTS = 10000;
+	static int TOTAL_MAX_POINTS = 100000, TOTAL_MIN_POINTS = 1000;
 	static boolean CLEAN = false;
 	static String ROUTING_PROFILE = "car";
 	static String ROUTING_PARAMS = "allow_private";
@@ -156,13 +157,14 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
-//		CLEAN = true;
+		CLEAN = true;
 		
-//		TOTAL_MAX_POINTS = 10000;
-//		TOTAL_MIN_POINTS = 100;
+//		TOTAL_MAX_POINTS = 100000;
+//		TOTAL_MIN_POINTS = 1000;
 		
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Italy_test";
+//		name = "Italy_test";
+//		name = "Netherlands_europe_2.road.obf";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -228,7 +230,7 @@ public class HHRoutingSubGraphCreator {
 
 	private NetworkCollectPointCtx collectNetworkPoints(NetworkCollectPointCtx ctx) throws IOException, SQLException {
 		if (EX != null && EX.length > 0) {
-			DEBUG_STORE_ALL_ROADS = 3;
+			DEBUG_STORE_ALL_ROADS = 2;
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			for (LatLon l : EX) {
 				RouteSegmentPoint pnt = router.findRouteSegment(l.getLatitude(), l.getLongitude(), ctx.rctx, null);
@@ -422,20 +424,25 @@ public class HHRoutingSubGraphCreator {
 					
 		}
 		c.addSegmentToQueue(c.getVertex(pnt, true));
+		int order = 0;
 		while (!c.queue.isEmpty()) {
+			if (order > TOTAL_MAX_POINTS) {
+				break;
+			}
 			RouteSegmentVertex seg = c.queue.poll();
-			if (seg.getDepth() > maxDepth) {
-				maxDepth = seg.getDepth();
-				if (distrSum(depthDistr, maxDepth) >= TOTAL_MAX_POINTS && minDepth == 0) {
-					// calculate mindepth to finish properly
-					while (minDepth < maxDepth - DIFF_DEPTH && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
-						minDepth++;
-					}
-				}
-			}
-			if (minDepth > 0 && seg.getDepth() > minDepth) {
-				continue;
-			}
+			seg.order = order++;
+//			if (seg.getDepth() > maxDepth) {
+//				maxDepth = seg.getDepth();
+//				if (distrSum(depthDistr, maxDepth) >= TOTAL_MAX_POINTS && minDepth == 0) {
+//					// calculate mindepth to finish properly
+//					while (minDepth < maxDepth - DIFF_DEPTH && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
+//						minDepth++;
+//					}
+//				}
+//			}
+//			if (minDepth > 0 && seg.getDepth() > minDepth) {
+//				continue;
+//			}
 			depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
 			if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
 				c.toVisitVertices.remove(seg.getId());
@@ -637,7 +644,7 @@ public class HHRoutingSubGraphCreator {
 					int maxFlow = conn.vertex == null ? Integer.MAX_VALUE : 1;
 					if (conn.t.flowParentTemp == null && conn.flow < maxFlow) {
 						conn.t.flowParentTemp = conn;
-						if (conn.vertex != null && conn.vertex.getDepth() <= minDepth && conn.vertex.getDepth() > 0) {
+						if (conn.vertex != null && conn.vertex.order <= TOTAL_MIN_POINTS && conn.vertex.order > 0) {
 							sink = conn.t;
 							break;
 						} else {
@@ -858,6 +865,7 @@ public class HHRoutingSubGraphCreator {
 		public List<RouteSegmentEdge> connections = new ArrayList<>();
 		public int cDepth;
 		public final long cId;
+		public int order = 0;
 
 		public RouteSegmentVertex(RouteSegment s) {
 			super(s.getRoad(), s.getSegmentStart(), s.getSegmentEnd());
