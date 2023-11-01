@@ -483,6 +483,23 @@ public class HHRoutingShortcutCreator {
 					d = (float) MapUtils.squareRootDist31(x1, y1, x2, y2);
 				}
 				dist += d; // d might be used to debug each edge weight
+//				if (current.weight != d || current.distanceFromStart != d) {
+//					System.err.printf("[%d/%d] %f!=%f || %f %f (%f) [%d] %b\n",
+//							i,
+//							path.size(),
+//							current.weight,
+//							d,
+//							current.distanceFromStart, dist,
+//							current.distanceFromStart - dist,
+//							pntId,
+//							current.reAdded
+//					);
+//					throw new IllegalStateException("weight");
+//				} else {
+//					if (current.reAdded) {
+//						System.out.printf("[%d] %f==%f && %f\n", i, current.weight, d, dist);
+//					}
+//				}
 			}
 		}
 		return dist;
