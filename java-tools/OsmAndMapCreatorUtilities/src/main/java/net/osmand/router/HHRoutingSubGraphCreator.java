@@ -155,14 +155,13 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
-		CLEAN = true;
+//		CLEAN = true;
 		
 //		TOTAL_MAX_POINTS = 10000;
 //		TOTAL_MIN_POINTS = 100;
 		
 		String name = "Montenegro_europe_2.road.obf";
-//		name = "Faroe-islands_europe_2.road.obf";
-//		name = "Gb_england_south";
+		name = "Italy_test";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -379,6 +378,7 @@ public class HHRoutingSubGraphCreator {
 		for (LongRoadGroup group  : connectedGroups) {
 			NetworkRouteRegion reg = new NetworkRouteRegion(null, null, group.r);
 			reg.id = id --;
+			logf("Group %d [%s] - %s ", reg.id, group.r, group);
 			ctx.startRegionProcess(reg, OVERLAP_FOR_ROUTING);
 			RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, ctx.longRoads.size());
 			for (NetworkLongRoad o : group.set) {
@@ -412,36 +412,36 @@ public class HHRoutingSubGraphCreator {
 	
 	private NetworkIsland buildRoadNetworkIsland(NetworkCollectPointCtx ctx, RouteSegmentPoint pnt) {
 		NetworkIsland c = new NetworkIsland(ctx, pnt);
-		
+
 		TLongObjectHashMap<RouteSegmentVertex> existNetworkPoints = new TLongObjectHashMap<>();
 		TIntIntHashMap depthDistr = new TIntIntHashMap();
-		int STEP = 10;
-		int minDepth = 1, maxDepth = STEP + minDepth;
+		int minDepth = 1, DIFF_DEPTH = 10, maxDepth = DIFF_DEPTH + 2;
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
 			logf("Cluster %d. %s", ctx.lastClusterInd + 1, pnt );
 					
 		}
-		
 		c.addSegmentToQueue(c.getVertex(pnt, true));
-		while (distrSum(depthDistr, maxDepth) < TOTAL_MAX_POINTS && c.toVisitVertices.size() > 0) {
-			maxDepth ++;
-			c.initQueueFromPointsToVisit();
-			while (!c.queue.isEmpty()) {
-				RouteSegmentVertex seg = c.queue.poll();
-				depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
-				if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
-					existNetworkPoints.put(seg.getId(), seg);
-					continue;
+		while (!c.queue.isEmpty()) {
+			RouteSegmentVertex seg = c.queue.poll();
+			if (seg.getDepth() > maxDepth) {
+				maxDepth = seg.getDepth();
+				if (distrSum(depthDistr, maxDepth) >= TOTAL_MAX_POINTS) {
+					break;
 				}
-				proceed(c, seg, c.queue, maxDepth);
-				
 			}
+			depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
+			if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
+				c.toVisitVertices.remove(seg.getId());
+				existNetworkPoints.put(seg.getId(), seg);
+				continue;
+			}
+			proceed(c, seg, c.queue);
 		}
 		for (RouteSegmentVertex r : c.toVisitVertices.valueCollection()) {
 			c.loadVertexConnections(r, false);
 		}
 		// depthDistr.get(minDepth) < TOTAL_MIN_DEPTH_POINTS
-		while (minDepth < maxDepth - STEP && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
+		while (minDepth < maxDepth - DIFF_DEPTH && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
 			minDepth++;
 		}
 		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
@@ -482,7 +482,7 @@ public class HHRoutingSubGraphCreator {
 //				}
 				borderPoints.add(RouteSegmentBorderPoint.fromParent(ls));
 			} else {
-				proceed(c, ls, c.queue, -1);
+				proceed(c, ls, c.queue);
 			}
 		}
 		
@@ -529,12 +529,7 @@ public class HHRoutingSubGraphCreator {
 		return borderPoints;
 	}
 
-	private boolean proceed(NetworkIsland c, RouteSegmentVertex vertex, PriorityQueue<RouteSegmentVertex> queue,
-			int maxDepth) {
-		if (maxDepth > 0 && vertex.getDepth() >= maxDepth) {
-			return false;
-		}
-		
+	private boolean proceed(NetworkIsland c, RouteSegmentVertex vertex, PriorityQueue<RouteSegmentVertex> queue) {
 		c.toVisitVertices.remove(vertex.getId());
 		if (c.testIfVisited(vertex.getId())) {
 			throw new IllegalStateException(String.format("%d %s was already locally visited", vertex.getId(), vertex.toString()));
@@ -847,6 +842,11 @@ public class HHRoutingSubGraphCreator {
 	class LongRoadGroup {
 		QuadRect r;
 		Set<NetworkLongRoad> set = new LinkedHashSet<>();
+		
+		@Override
+		public String toString() {
+			return set.toString();
+		}
 	}
 	
 	class RouteSegmentVertex extends RouteSegment {
@@ -1076,7 +1076,6 @@ public class HHRoutingSubGraphCreator {
 			this.totalBorderPoints += borderPoints;
 						
 		}
-
 	}
 	
 	private static class NetworkCollectPointCtx {
@@ -1312,6 +1311,18 @@ public class HHRoutingSubGraphCreator {
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
+						if (ctx.checkLongRoads && pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
+							logf("MERGE long route road " + pntAround + " with previous segment");
+							NetworkBorderPoint negDir = ctx.networkPointToDbInd.get(mainPoint);
+							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(calculateRoutePointInternalId(object.getId(), pos - 1, pos));
+							if (posDir != null && posDir.negativeDbId == 0) {
+								if (posDir.positiveDbId == 0 || negDir.negativeDbId == 0 || negDir.positiveDbId != 0) {
+									throw new IllegalStateException(pntAround + "");
+								}
+								ctx.networkDB.mergePoints(posDir, negDir, new RouteSegmentPoint(object, pos, pos - 1, 0));
+								ctx.networkPointToDbInd.remove(mainPoint);
+							}
+						}
 						// already existing cluster
 						continue;
 					}
@@ -1339,4 +1350,6 @@ public class HHRoutingSubGraphCreator {
 			return DEBUG_LIMIT_PROCESS != -1 && indProc >= DEBUG_LIMIT_PROCESS;
 		}
 	}
+
+	
 }

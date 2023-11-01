@@ -67,6 +67,7 @@ public class HHRoutingShortcutCreator {
 		DEBUG_VERBOSE_LEVEL = 1;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
+		name = "Italy_test";
 //		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
