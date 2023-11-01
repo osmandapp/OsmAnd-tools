@@ -421,6 +421,7 @@ public class WebGpxParser {
             res.put("minSpeed", analysis.minSpeed);
             res.put("avgSpeed", analysis.avgSpeed);
             res.put("maxSpeed", analysis.maxSpeed);
+            res.put("points", analysis.points);
             
             if (srtmAnalysis != null) {
                 res.put("srtmAnalysis", true);
