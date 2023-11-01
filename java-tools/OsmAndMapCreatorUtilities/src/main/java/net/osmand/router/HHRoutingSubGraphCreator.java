@@ -499,8 +499,8 @@ public class HHRoutingSubGraphCreator {
 			print(sortPoints(borderPoints), "Mincut reached");
 			print(sortPoints(new ArrayList<>(mincuts.valueCollection())), "Mincut");
 			print(sortPoints(toVisit), "To Visit");
-			String msg = String.format("BUG !! mincut %d  ( = %d) + %d network pnts != %d graph reached size: %s", 
-					borderPoints.size(), mincuts.size(), exPoints.size(), c.toVisitVertices.size(), c.startToString);
+			String msg = String.format("BUG !! mincut border %d  ( = %d mincut + %d long ) + %d existing pnts != %d graph reached size: %s", 
+					borderPoints.size(), mincuts.size(), longPoints, exPoints.size(), c.toVisitVertices.size(), c.startToString);
 			if ((mincuts.size() + longPoints) != borderPoints.size()) {
 				System.err.println(msg);
 //				throw new IllegalStateException(msg);
