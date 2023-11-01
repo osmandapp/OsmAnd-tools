@@ -482,12 +482,18 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ins.close();
 	}
 	
-	public void mergePoints(NetworkBorderPoint posMain, NetworkBorderPoint negMerge, RouteSegmentPoint negMain) {
+	public void mergePoints(NetworkRouteRegion ni, NetworkBorderPoint posMain, NetworkBorderPoint negMerge, RouteSegmentPoint negMain) {
 		// merge to posDir
 		try {
 			posMain.negativeDbId = negMerge.negativeDbId;
 			posMain.negativeClusterId = negMerge.negativeClusterId;
-
+			ni.visitedVertices.put(negMerge.unidirId, negMerge.negativeClusterId);
+			insVisitedPoints.setLong(1, ni.id);
+			insVisitedPoints.setLong(2, negMerge.unidirId);
+			insVisitedPoints.setInt(3, negMerge.negativeClusterId);
+			insVisitedPoints.addBatch();
+			insVisitedPoints.execute();
+			
 			int p = 1;
 			updMergePoint.setLong(p++, posMain.unidirId);
 			updMergePoint.setLong(p++, HHRoutePlanner.calculateRoutePointInternalId(negMain.road.getId(),

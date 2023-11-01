@@ -50,7 +50,6 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// REVERT TO min depth / max depth: 1) compare shortcuts 2) slower
 
 // TESTING
 // BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
@@ -66,6 +65,7 @@ import net.osmand.util.MapUtils;
 // TODO BUGS
 // NEW sqrtDistance too slow for A* heuristic as it uses measureDist
 // NEW no private roads for shortcuts creates empty points in graph? 
+// REVERT TO min depth / max depth: 1) compare shortcuts 2) slower (4adde378 Improve logging <-> 8a6dd8497b9 )
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
@@ -1313,7 +1313,7 @@ public class HHRoutingSubGraphCreator {
 								if (posDir.positiveDbId == 0 || negDir.negativeDbId == 0 || negDir.positiveDbId != 0) {
 									throw new IllegalStateException(pntAround + "");
 								}
-								ctx.networkDB.mergePoints(posDir, negDir, new RouteSegmentPoint(object, pos, pos - 1, 0));
+								ctx.networkDB.mergePoints(ctx.currentProcessingRegion, posDir, negDir, new RouteSegmentPoint(object, pos, pos - 1, 0));
 								ctx.networkPointToDbInd.remove(mainPoint);
 							}
 						}
