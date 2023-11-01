@@ -7,9 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Iterator;
 import java.util.zip.GZIPInputStream;
 
@@ -284,9 +282,6 @@ public class IndexCreator {
 				if (indexAddressCreator != null) {
 					indexAddressCreator.registerCityIfNeeded(entity);
 				}
-				if (propagateToNodes != null) {
-					propagateToNodes.registerRestrictionNodes(entity);
-				}
 				// accept to allow db creator parse it
 				return true;
 			}
@@ -294,6 +289,7 @@ public class IndexCreator {
 
 		// 1. Loading osm file
 		OsmDbCreator dbCreator = generateNewIds ? new OsmDbCreator(idSourceMapInd, idShift) : new OsmDbCreator();
+		dbCreator.setPropagateToNodes(propagateToNodes);
 		
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
