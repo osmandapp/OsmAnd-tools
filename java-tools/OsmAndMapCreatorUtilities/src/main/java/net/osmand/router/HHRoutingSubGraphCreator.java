@@ -104,7 +104,8 @@ import net.osmand.util.MapUtils;
 // 3.9 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 3.10 Implement Arc flags or CH for clusters inside 
 // 3.11 C++ implementation HHRoutePlanner
-// 3.12 Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - still slower than 4adde378 diff e12209d1e
+// 3.12 Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
+///    static int TOTAL_MAX_POINTS = 99000 (50000), TOTAL_MIN_POINTS = 1000; still slower than git diff fd4fcd54 8a6dd8497b
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
@@ -144,10 +145,10 @@ public class HHRoutingSubGraphCreator {
 	
 
 	protected static LatLon[] EX = {
-//			EX1
+			EX1
 	}; 
 	
-	static int TOTAL_MAX_POINTS = 100000; // Max points in cluster - used as source for max flow
+	static int TOTAL_MAX_POINTS = 50000; // Max points in cluster - used as source for max flow
 	static int TOTAL_MIN_POINTS = 1000; // Min points in cluster - used as sink for max flow
 	static boolean ALG_BY_DEPTH_REACH_POINTS = true;
 	static int ALG_BY_DEPTH_MINMAX_DIFF = 10;
@@ -160,14 +161,13 @@ public class HHRoutingSubGraphCreator {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
 		CLEAN = true;
-		ALG_BY_DEPTH_REACH_POINTS = false;
 		
 //		TOTAL_MAX_POINTS = 100000;
 //		TOTAL_MIN_POINTS = 1000;
 		
 		String name = "Montenegro_europe_2.road.obf";
 		name = "Italy_test";
-//		name = "Netherlands_europe_2.road.obf";
+		name = "Netherlands_europe_2.road.obf";
 //		name = "__europe";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
