@@ -492,7 +492,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insVisitedPoints.setLong(2, negMerge.unidirId);
 			insVisitedPoints.setInt(3, negMerge.negativeClusterId);
 			insVisitedPoints.addBatch();
-			insVisitedPoints.execute();
+			insVisitedPoints.executeBatch();
 			
 			int p = 1;
 			updMergePoint.setLong(p++, posMain.unidirId);
