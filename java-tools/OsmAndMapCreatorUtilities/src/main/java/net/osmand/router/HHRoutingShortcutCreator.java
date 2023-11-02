@@ -224,9 +224,11 @@ public class HHRoutingShortcutCreator {
 							}
 							String msg = String.format("%s can lead only to dual cluster %d - found %s (cluster %d): %s",
 									pnt, pnt.dualPoint.clusterId, end, end.clusterId, b.toString());
-							System.err.println(segment.geometry);
+							System.err.println(HHRoutingUtilities.testGetGeometry(segment.geometry));
 							System.err.println("BUG needs to be fixed " + msg);
-							throw new IllegalStateException(msg);
+							// TODO 1.9
+							System.err.println(msg);
+//							throw new IllegalStateException(msg);
 						}
 						if (segment.dist < 0) {
 							throw new IllegalStateException(segment + " dist < " + segment.dist);
@@ -414,14 +416,15 @@ public class HHRoutingShortcutCreator {
 					} else if (testBug != null) {
 						RouteSegment prev = testBug.get(pntId);
 						if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
-							double d1 = testGetDist(prev, false);
-							double d2 = testGetDist(o, testBUG_P);
+							double d1 = HHRoutingUtilities.testGetDist(prev, false);
+							double d2 = HHRoutingUtilities.testGetDist(o, testBUG_P);
 							System.out.printf("%.2f (%.2f) %% err, %.2f (%.2f) != %.2f (%.2f) \n",
 									Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
-									Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart, testGetDist(prev, false),
-									o.distanceFromStart, testGetDist(o, testBUG_P));
-							List<LatLon> lp = testGeometry(prev);
-							List<LatLon> ls = testGeometry(o);
+									Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart,
+									HHRoutingUtilities.testGetDist(prev, false), o.distanceFromStart,
+									HHRoutingUtilities.testGetDist(o, testBUG_P));
+							List<LatLon> lp = HHRoutingUtilities.testGeometry(prev);
+							List<LatLon> ls = HHRoutingUtilities.testGeometry(o);
 							boolean diff = false;
 							if (lp.size() != ls.size()) {
 								diff = true;
@@ -432,8 +435,8 @@ public class HHRoutingShortcutCreator {
 								}
 							}
 							if (diff) {
-								System.out.println(testGetGeometry(prev));
-								System.out.println(testGetGeometry(o));
+								System.out.println(HHRoutingUtilities.testGetGeometry(lp));
+								System.out.println(HHRoutingUtilities.testGetGeometry(ls));
 							}
 						}
 					}
@@ -444,47 +447,4 @@ public class HHRoutingShortcutCreator {
 		return res;
 	}
 	
-	private double testGetDist(RouteSegment t, boolean precise) {
-		int px = 0, py = 0;
-		double d = 0;
-		while (t != null) {
-			int sx = t.getRoad().getPoint31XTile(t.getSegmentStart(), t.getSegmentEnd());
-			int sy = t.getRoad().getPoint31YTile(t.getSegmentStart(), t.getSegmentEnd());
-			t = t.getParentRoute();
-			if (px != 0) {
-				if (precise) {
-					d += MapUtils.measuredDist31(px, py, sx, sy);
-				} else {
-					d += MapUtils.squareRootDist31(px, py, sx, sy);
-				}
-			}
-			px = sx;
-			py = sy;
-		}
-		return d;
-	}
-	
-	private List<LatLon> testGeometry(RouteSegment t) {
-		List<LatLon> l = new ArrayList<LatLon>();
-		while (t != null) {
-			LatLon p = getPoint(t);
-			l.add(p);
-			t = t.getParentRoute();
-		}
-		return l;
-	}
-
-	private String testGetGeometry(RouteSegment t) {
-		StringBuilder b = new StringBuilder();
-		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>");
-		b.append("<gpx version=\"1.1\" ><trk><trkseg>"); 
-		while (t != null) {
-			LatLon p = getPoint(t);
-			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/> ", p.getLatitude(), p.getLongitude()));
-			t = t.getParentRoute();
-		}
-		b.append("</trkseg></trk></gpx>");
-		return b.toString();
-	}
-
 }

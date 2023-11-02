@@ -399,5 +399,47 @@ public class HHRoutingUtilities {
 	}
 
 
+
+	static double testGetDist(RouteSegment t, boolean precise) {
+		int px = 0, py = 0;
+		double d = 0;
+		while (t != null) {
+			int sx = t.getRoad().getPoint31XTile(t.getSegmentStart(), t.getSegmentEnd());
+			int sy = t.getRoad().getPoint31YTile(t.getSegmentStart(), t.getSegmentEnd());
+			t = t.getParentRoute();
+			if (px != 0) {
+				if (precise) {
+					d += MapUtils.measuredDist31(px, py, sx, sy);
+				} else {
+					d += MapUtils.squareRootDist31(px, py, sx, sy);
+				}
+			}
+			px = sx;
+			py = sy;
+		}
+		return d;
+	}
+	
+	static List<LatLon> testGeometry(RouteSegment t) {
+		List<LatLon> l = new ArrayList<LatLon>();
+		while (t != null) {
+			LatLon p = getPoint(t);
+			l.add(p);
+			t = t.getParentRoute();
+		}
+		return l;
+	}
+
+	static String testGetGeometry(List<LatLon> ls) {
+		StringBuilder b = new StringBuilder();
+		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>");
+		b.append("<gpx version=\"1.1\" ><trk><trkseg>");
+		for (LatLon p : ls) {
+			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/> ", p.getLatitude(), p.getLongitude()));
+		}
+		b.append("</trkseg></trk></gpx>");
+		return b.toString();
+	}
+
 	
 }

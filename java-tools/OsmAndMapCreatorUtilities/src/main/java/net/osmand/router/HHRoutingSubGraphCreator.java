@@ -51,9 +51,10 @@ import net.osmand.util.MapUtils;
 
 // IN PROGRESS
 // TODO if(e.t.parentRoute == null) {
+// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
+
 // TESTING
 // BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
-// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 // 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
 
