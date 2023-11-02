@@ -1370,14 +1370,18 @@ public class HHRoutingSubGraphCreator {
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
 						if (pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
+							long prevPoint = calculateRoutePointInternalId(object.getId(), pos - 1, pos);
 							NetworkBorderPoint negDir = ctx.networkPointToDbInd.get(mainPoint);
-							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(calculateRoutePointInternalId(object.getId(), pos - 1, pos));
+							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(prevPoint);
 							if (posDir != null && posDir.negativeDbId == 0) {
 								logf("MERGE route road %s [%d - %d] with previous segment", pntAround, pos - 1, pos + 1);
 								if (posDir.positiveDbId == 0 || negDir.negativeDbId == 0 || negDir.positiveDbId != 0) {
 									throw new IllegalStateException(pntAround + "");
 								}
 								ctx.networkDB.mergePoints(ctx.currentProcessingRegion, posDir, negDir, new RouteSegmentPoint(object, pos, pos - 1, 0));
+								if (negDir.negativeObj != null) {
+									posDir.negativeObj = new RouteSegmentBorderPoint(new RouteSegmentPoint(object, pos - 1, 0), false);
+								}
 								ctx.networkPointToDbInd.remove(mainPoint);
 							}
 						}

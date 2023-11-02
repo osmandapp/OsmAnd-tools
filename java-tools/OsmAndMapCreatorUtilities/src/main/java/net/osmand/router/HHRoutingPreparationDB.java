@@ -492,6 +492,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		try {
 			posMain.negativeDbId = negMerge.negativeDbId;
 			posMain.negativeClusterId = negMerge.negativeClusterId;
+			if (negMerge.negativeObj != null) {
+				posMain.negativeObj = new RouteSegmentBorderPoint(negMain, true);
+			}
 			ni.visitedVertices.put(negMerge.unidirId, negMerge.negativeClusterId);
 			insVisitedPoints.setLong(1, ni.id);
 			insVisitedPoints.setLong(2, negMerge.unidirId);
