@@ -104,7 +104,7 @@ import net.osmand.util.MapUtils;
 // 3.9 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 3.10 Implement Arc flags or CH for clusters inside 
 // 3.11 C++ implementation HHRoutePlanner
-// 3.12 Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network)
+// 3.12 Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - still slower than 4adde378 diff e12209d1e
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
