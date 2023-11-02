@@ -156,14 +156,15 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
-		CLEAN = true;
+//		CLEAN = true;
 		
 //		TOTAL_MAX_POINTS = 100000;
 //		TOTAL_MIN_POINTS = 1000;
 		
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Italy_test";
-		name = "Netherlands_europe_2.road.obf";
+//		name = "Netherlands_europe_2.road.obf";
+		name = "__europe";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -425,9 +426,6 @@ public class HHRoutingSubGraphCreator {
 		c.addSegmentToQueue(c.getVertex(pnt, true));
 		int order = 0;
 		while (!c.queue.isEmpty()) {
-			if (order > TOTAL_MAX_POINTS) {
-				break;
-			}
 			RouteSegmentVertex seg = c.queue.poll();
 			seg.order = order++;
 			depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
@@ -436,10 +434,13 @@ public class HHRoutingSubGraphCreator {
 				existNetworkPoints.put(seg.getId(), seg);
 				continue;
 			}
+			if (order > TOTAL_MAX_POINTS) {
+				continue;
+			}
 			proceed(c, seg, c.queue);
 		}
-		for (RouteSegmentVertex r : c.toVisitVertices.valueCollection()) {
-			c.loadVertexConnections(r, false);
+		for (RouteSegmentVertex seg : c.toVisitVertices.valueCollection()) {
+			c.loadVertexConnections(seg, false);
 		}
 	
 		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
@@ -714,9 +715,8 @@ public class HHRoutingSubGraphCreator {
 			newEdge.t = s;
 			t.connections.add(newEdge);
 			if (c.toVisitVertices.contains(r.getId())) {
-				if (!existingVertices.contains(r.getId())) { 
-					sources.add(t);
-				}
+				assert !existingVertices.contains(r.getId()); 
+				sources.add(t);
 			}
 		}
 		return vertices;
