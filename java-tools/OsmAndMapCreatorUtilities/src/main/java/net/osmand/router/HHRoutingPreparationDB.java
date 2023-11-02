@@ -48,9 +48,11 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement updMergePoint;
 	protected PreparedStatement insVisitedPoints;
 	protected PreparedStatement updateRegionBoundaries;
+	protected PreparedStatement insertRegionBoundaries;
 	protected PreparedStatement insLongRoads;
 	private int maxPointDBID;
 	private int maxClusterID;
+
 
 
 
@@ -68,6 +70,8 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insLongRoads = conn.prepareStatement("INSERT INTO routeLongRoads (id, regionId, roadId, startIndex, points) VALUES (?, ?, ?, ?, ? )");
 			insVisitedPoints = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId, clusterId) VALUES (?, ?, ?)");
 			updateRegionBoundaries = conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? where id = ?");
+			insertRegionBoundaries = conn.prepareStatement("INSERT INTO routeRegions(left, right, top, bottom, id) VALUES (?, ?, ?, ?, ?)");
+
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
 			updMergePoint = conn.prepareStatement("UPDATE points SET pointGeoUniDir = ?, pointGeoId = ?, start = ?, end = ?, sx31 = ?, sy31 = ?, ex31 = ?, ey31 = ? WHERE idPoint = ?");
 		}
@@ -309,14 +313,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 
 	private void updateRegionBbox(NetworkRouteRegion networkRouteRegion) throws SQLException {
-		// conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? routeRegions where id = ?");
+		@SuppressWarnings("resource")
+		PreparedStatement p = networkRouteRegion.id < 0 ? insertRegionBoundaries : updateRegionBoundaries;
 		QuadRect r = networkRouteRegion.rect;
-		updateRegionBoundaries.setDouble(1, r.left);
-		updateRegionBoundaries.setDouble(2, r.right);
-		updateRegionBoundaries.setDouble(3, r.top);
-		updateRegionBoundaries.setDouble(4, r.bottom);
-		updateRegionBoundaries.setInt(5, networkRouteRegion.id);
-		updateRegionBoundaries.execute();
+		p.setDouble(1, r.left);
+		p.setDouble(2, r.right);
+		p.setDouble(3, r.top);
+		p.setDouble(4, r.bottom);
+		p.setInt(5, networkRouteRegion.id);
+		p.execute();
 	}
 
 	private void insertVisitedPoints(NetworkRouteRegion networkRouteRegion) throws SQLException {

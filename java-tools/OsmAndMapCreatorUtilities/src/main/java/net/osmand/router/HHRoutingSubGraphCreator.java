@@ -336,9 +336,7 @@ public class HHRoutingSubGraphCreator {
 
 	private void processLongRoads(NetworkCollectPointCtx ctx) throws IOException, SQLException {
 		int size = ctx.longRoads.size();
-		NetworkRouteRegion ch = new NetworkRouteRegion(null, null, null);
-		ch.id = -1;
-		if (size == 0 || ctx.networkDB.hasVisitedPoints(ch)) {
+		if (size == 0) {
 			return;
 		}
 		ctx.checkLongRoads = false;
@@ -389,7 +387,10 @@ public class HHRoutingSubGraphCreator {
 		int id = -1;
 		for (LongRoadGroup group  : connectedGroups) {
 			NetworkRouteRegion reg = new NetworkRouteRegion(null, null, group.r);
-			reg.id = id --;
+			reg.id = id--;
+			if (ctx.networkDB.hasVisitedPoints(reg)) {
+				continue;
+			}
 			logf("Group %d [%s] - %s ", reg.id, group.r, group);
 			ctx.startRegionProcess(reg, OVERLAP_FOR_ROUTING);
 			RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, ctx.longRoads.size());
