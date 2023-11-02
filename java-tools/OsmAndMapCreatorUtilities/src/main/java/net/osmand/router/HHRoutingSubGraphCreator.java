@@ -145,7 +145,7 @@ public class HHRoutingSubGraphCreator {
 	
 
 	protected static LatLon[] EX = {
-			EX1
+//			EX1
 	}; 
 	
 	static int TOTAL_MAX_POINTS = 50000; // Max points in cluster - used as source for max flow
