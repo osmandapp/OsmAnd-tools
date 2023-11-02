@@ -104,7 +104,7 @@ import net.osmand.util.MapUtils;
 // 3.9 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 3.10 Implement Arc flags or CH for clusters inside 
 // 3.11 C++ implementation HHRoutePlanner
-
+// 3.12 Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network)
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
@@ -149,6 +149,9 @@ public class HHRoutingSubGraphCreator {
 	
 	static int TOTAL_MAX_POINTS = 100000; // Max points in cluster - used as source for max flow
 	static int TOTAL_MIN_POINTS = 1000; // Min points in cluster - used as sink for max flow
+	static boolean ALG_BY_DEPTH_REACH_POINTS = true;
+	static int ALG_BY_DEPTH_MINMAX_DIFF = 10;
+	
 	static boolean CLEAN = false;
 	static String ROUTING_PROFILE = "car";
 	static String ROUTING_PARAMS = "allow_private";
@@ -156,15 +159,16 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
-//		CLEAN = true;
+		CLEAN = true;
+		ALG_BY_DEPTH_REACH_POINTS = false;
 		
 //		TOTAL_MAX_POINTS = 100000;
 //		TOTAL_MIN_POINTS = 1000;
 		
 		String name = "Montenegro_europe_2.road.obf";
-//		name = "Italy_test";
+		name = "Italy_test";
 //		name = "Netherlands_europe_2.road.obf";
-		name = "__europe";
+//		name = "__europe";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -177,6 +181,10 @@ public class HHRoutingSubGraphCreator {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
 			} else if (a.startsWith("--routing_params=")) {
 				ROUTING_PARAMS = a.substring("--routing_params=".length());
+			} else if (a.equals("--network_by_depth")) {
+				ALG_BY_DEPTH_REACH_POINTS = true;
+			} else if (a.equals("--network_by_limits")) {
+				ALG_BY_DEPTH_REACH_POINTS = false;
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			} else if (a.equals("--debug")) {
@@ -418,27 +426,29 @@ public class HHRoutingSubGraphCreator {
 
 		TLongObjectHashMap<RouteSegmentVertex> existNetworkPoints = new TLongObjectHashMap<>();
 		TIntIntHashMap depthDistr = new TIntIntHashMap();
-		int minDepth = 0, DIFF_DEPTH = 10, maxDepth = DIFF_DEPTH + 2;
+		int minDepth = 0, maxDepth = ALG_BY_DEPTH_MINMAX_DIFF + 2;
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
 			logf("Cluster %d. %s", ctx.lastClusterInd + 1, pnt );
 					
 		}
 		c.addSegmentToQueue(c.getVertex(pnt, true));
-		int order = 0;
-		while (!c.queue.isEmpty()) {
-			RouteSegmentVertex seg = c.queue.poll();
-			seg.order = order++;
-			depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
-			if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
-				c.toVisitVertices.remove(seg.getId());
-				existNetworkPoints.put(seg.getId(), seg);
-				continue;
+		int maxPoints = 0;
+		if (ALG_BY_DEPTH_REACH_POINTS) {
+			while (distrSum(depthDistr, maxDepth) < TOTAL_MAX_POINTS && c.toVisitVertices.size() > 0) {
+				maxDepth++;
+				c.queue.clear();
+				for (RouteSegment r : c.toVisitVertices.valueCollection()) {
+					c.queue.add((RouteSegmentVertex) r);
+				}
+				maxPoints = reachAllPoints(c, existNetworkPoints, depthDistr, maxDepth, maxPoints);
 			}
-			if (order > TOTAL_MAX_POINTS) {
-				continue;
+			while (minDepth < maxDepth - ALG_BY_DEPTH_MINMAX_DIFF && distrSum(depthDistr, minDepth) < TOTAL_MIN_POINTS) {
+				minDepth++;
 			}
-			proceed(c, seg, c.queue);
+		} else {
+			maxPoints = reachAllPoints(c, existNetworkPoints, depthDistr, maxDepth, maxPoints);
 		}
+		
 		for (RouteSegmentVertex seg : c.toVisitVertices.valueCollection()) {
 			c.loadVertexConnections(seg, false);
 		}
@@ -459,6 +469,32 @@ public class HHRoutingSubGraphCreator {
 					distrSum(depthDistr, minDepth), maxDepth, distrSum(depthDistr, maxDepth));
 		}
 		return c;
+	}
+
+	private int reachAllPoints(NetworkIsland c, TLongObjectHashMap<RouteSegmentVertex> existNetworkPoints,
+			TIntIntHashMap depthDistr, int maxDepth, int order) {
+		while (!c.queue.isEmpty()) {
+			RouteSegmentVertex seg = c.queue.poll();
+			seg.order = order++;
+			depthDistr.adjustOrPutValue(seg.getDepth(), 1, 1);
+			if (c.ctx.testIfNetworkPoint(seg.getId()) || checkLongRoads(c, seg)) {
+				c.toVisitVertices.remove(seg.getId());
+				existNetworkPoints.put(seg.getId(), seg);
+				continue;
+			}
+			if (ALG_BY_DEPTH_REACH_POINTS) {
+				if (seg.getDepth() > maxDepth) {
+					continue;
+				}
+			} else {
+				if (order > TOTAL_MAX_POINTS) {
+					continue;
+				}
+			}
+			
+			proceed(c, seg, c.queue);
+		}
+		return order;
 	}
 
 	private List<RouteSegmentBorderPoint> recalculateClusterPointsUsingMincut(NetworkIsland c, RouteSegmentPoint pnt, 
@@ -632,7 +668,13 @@ public class HHRoutingSubGraphCreator {
 					int maxFlow = conn.vertex == null ? Integer.MAX_VALUE : 1;
 					if (conn.t.flowParentTemp == null && conn.flow < maxFlow) {
 						conn.t.flowParentTemp = conn;
-						if (conn.vertex != null && conn.vertex.order <= TOTAL_MIN_POINTS && conn.vertex.order > 0) {
+						boolean isSink;
+						if (ALG_BY_DEPTH_REACH_POINTS) {
+							isSink = conn.vertex != null && conn.vertex.getDepth() < minDepth;
+						} else {
+							isSink = conn.vertex != null && conn.vertex.order <= TOTAL_MIN_POINTS && conn.vertex.order > 0;
+						}
+						if (isSink) {
 							sink = conn.t;
 							break;
 						} else {
