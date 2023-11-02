@@ -451,14 +451,21 @@ public class HHRoutingSubGraphCreator {
 		
 		for (RouteSegmentVertex seg : c.toVisitVertices.valueCollection()) {
 			c.loadVertexConnections(seg, false);
+//			c.loadVertexConnections(seg, true);
 		}
-	
-		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = findMincutUsingMaxFlow(c, minDepth, existNetworkPoints, pnt.toString());
+		List<MaxFlowVertex> sources = new ArrayList<>();
+		List<MaxFlowVertex> vertices = constructMaxFlowGraph(c, existNetworkPoints, sources);
+		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = findMincutUsingMaxFlow(c, minDepth, sources, vertices,
+				pnt.toString());
+		
 		c.borderVertices = recalculateClusterPointsUsingMincut(c, pnt, mincuts);
 		for (long key : c.visitedVertices.keys()) {
 			RouteSegmentVertex v = c.allVertices.get(key);
 			c.edgeDistr.adjustOrPutValue(v.connections.size(), 1, 1);
 			c.edges += v.connections.size();
+		}
+		for (RouteSegmentVertex v : c.allVertices.valueCollection()) {
+			v.clearPoint();
 		}
 		// debug
 //		c.borderVertices.putAll(mincuts);
@@ -634,11 +641,8 @@ public class HHRoutingSubGraphCreator {
 	}
 
 	private TLongObjectHashMap<RouteSegmentBorderPoint> findMincutUsingMaxFlow(NetworkIsland c, int minDepth,
-			TLongObjectHashMap<RouteSegmentVertex> existingVertices, String errorDebug) {
-		List<MaxFlowVertex> sources = new ArrayList<>();
+			 List<MaxFlowVertex> sources, List<MaxFlowVertex> vertices, String errorDebug) {
 		// For maxflow / mincut algorithm RouteSegmentVertex is edge with capacity 1 connected using end boolean flag on both ends
-		List<MaxFlowVertex> vertices = constructMaxFlowGraph(c, existingVertices, sources);
-
 		MaxFlowVertex source = new MaxFlowVertex(null, false);
 		for (MaxFlowVertex s : sources) {
 			MaxFlowEdge edge = new MaxFlowEdge(null);
@@ -1125,6 +1129,7 @@ public class HHRoutingSubGraphCreator {
 		List<NetworkIsland> visualClusters = new ArrayList<>();
 		
 		NetworkRouteRegion currentProcessingRegion;
+		TLongObjectHashMap<RouteSegmentVertex> allVerticesCache = new TLongObjectHashMap<>();
 		boolean checkLongRoads = true;
 		
 		List<NetworkLongRoad> longRoads = new ArrayList<>();
