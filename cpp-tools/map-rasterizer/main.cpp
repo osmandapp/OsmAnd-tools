@@ -88,6 +88,7 @@ void printUsage(const std::string& warning /*= std::string()*/)
     tcout << xT("\t-outputImageFilename=path/with/filename and/or -outputJSONFilename=path/with/filename (without extension)") << std::endl;
     tcout << xT("\t[-outputImageFormat=png|jpeg]") << std::endl;
     tcout << xT("\t[-latLon=46.95:7.45 or -target31=x:y]") << std::endl;
+    tcout << xT("\t[-targetOnRelief]") << std::endl;
     tcout << xT("\t[-zoom=15]") << std::endl;
     tcout << xT("\t[-azimuth=0]") << std::endl;
     tcout << xT("\t[-elevationAngle=90]") << std::endl;
