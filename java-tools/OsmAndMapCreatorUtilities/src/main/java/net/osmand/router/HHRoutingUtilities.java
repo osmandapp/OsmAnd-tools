@@ -230,7 +230,7 @@ public class HHRoutingUtilities {
 			if (ni.visitedVertices == null) {
 				continue;
 			}
-			TLongObjectIterator<RouteSegment> it = ni.visitedVertices.iterator();
+			TLongObjectIterator<RouteSegmentVertex> it = ni.visitedVertices.iterator();
 			while (it.hasNext()) {
 				it.advance();
 				long pntKey = it.key();

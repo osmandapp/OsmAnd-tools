@@ -30,6 +30,7 @@ import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -450,21 +451,25 @@ public class HHRoutingSubGraphCreator {
 		}
 		
 		for (RouteSegmentVertex seg : c.toVisitVertices.valueCollection()) {
+			if (existNetworkPoints.contains(seg.getId())) {
+				throw new IllegalStateException();
+			}
 			c.loadVertexConnections(seg, false);
 //			c.loadVertexConnections(seg, true);
 		}
-		List<MaxFlowVertex> sources = new ArrayList<>();
-		List<MaxFlowVertex> vertices = constructMaxFlowGraph(c, existNetworkPoints, sources);
+		TLongObjectHashMap<MaxFlowEdge> edges = new TLongObjectHashMap<>();
+		List<MaxFlowVertex> vertices = constructMaxFlowGraph(c.visitedVertices, existNetworkPoints, edges);
+		List<MaxFlowVertex> sources = constructMaxFlowGraph(c.toVisitVertices, existNetworkPoints, edges);
 		TLongObjectHashMap<RouteSegmentBorderPoint> mincuts = findMincutUsingMaxFlow(c, minDepth, sources, vertices,
 				pnt.toString());
 		
 		c.borderVertices = recalculateClusterPointsUsingMincut(c, pnt, mincuts);
-		for (long key : c.visitedVertices.keys()) {
-			RouteSegmentVertex v = c.allVertices.get(key);
+		for (RouteSegmentVertex v : c.visitedVertices.valueCollection()) {
 			c.edgeDistr.adjustOrPutValue(v.connections.size(), 1, 1);
 			c.edges += v.connections.size();
 		}
-		for (RouteSegmentVertex v : c.allVertices.valueCollection()) {
+		// TODO
+		for (RouteSegmentVertex v : ctx.allVerticesCache.valueCollection()) {
 			v.clearPoint();
 		}
 		// debug
@@ -580,11 +585,15 @@ public class HHRoutingSubGraphCreator {
 			throw new IllegalStateException(String.format("%d %s was already globally visited: %s", 
 					vertex.getId(), vertex.toString(), c.ctx.globalVisitedMessage(vertex.getId())));
 		}
-		c.visitedVertices.put(vertex.getId(), DEBUG_STORE_ALL_ROADS > 2 ? vertex : null);
+		c.visitedVertices.put(vertex.getId(), vertex);
 		c.loadVertexConnections(vertex, true);
 		float distFromStart = vertex.distanceFromStart + vertex.distSegment() / 2;
 		for (RouteSegmentEdge e : vertex.connections) {
 			if (!c.testIfVisited(e.t.getId()) && !c.toVisitVertices.containsKey(e.t.getId())) {
+				// TODO
+//				if(e.t.parentRoute == null) {
+//					throw new IllegalArgumentException();
+//				}
 				e.t.parentRoute = vertex;
 				e.t.distanceFromStart = distFromStart + e.t.distSegment() / 2;
 				c.addSegmentToQueue(e.t);
@@ -654,6 +663,7 @@ public class HHRoutingSubGraphCreator {
 			edge.s = s;
 			edge.t = source;
 			s.connections.add(edge);
+			vertices.add(s);
 		}
 		vertices.add(source);
 		
@@ -718,11 +728,10 @@ public class HHRoutingSubGraphCreator {
 		return mincuts;
 	}
 
-	private List<MaxFlowVertex> constructMaxFlowGraph(NetworkIsland c,
-			TLongObjectHashMap<RouteSegmentVertex> existingVertices, List<MaxFlowVertex> sources) {
-		TLongObjectHashMap<MaxFlowEdge> edges = new TLongObjectHashMap<>();
+	private List<MaxFlowVertex> constructMaxFlowGraph(TLongObjectHashMap<RouteSegmentVertex> values,
+			TLongObjectHashMap<RouteSegmentVertex> existingVertices, TLongObjectHashMap<MaxFlowEdge> edges) {
 		List<MaxFlowVertex> vertices = new ArrayList<>();
-		for (RouteSegmentVertex r : c.allVertices.valueCollection()) {
+		for (RouteSegmentVertex r : values.valueCollection()) {
 			MaxFlowVertex s = null;
 			MaxFlowVertex t = null;
 			for (RouteSegmentEdge e : r.connections) {
@@ -760,16 +769,13 @@ public class HHRoutingSubGraphCreator {
 			newEdge.s = t;
 			newEdge.t = s;
 			t.connections.add(newEdge);
-			if (c.toVisitVertices.contains(r.getId())) {
-				assert !existingVertices.contains(r.getId()); 
-				sources.add(t);
-			}
+			
 		}
 		return vertices;
 	}
 
 	private TLongObjectHashMap<RouteSegmentBorderPoint> calculateMincut(List<MaxFlowVertex> vertices,
-			MaxFlowVertex source, Collection<MaxFlowVertex> sinks, TLongObjectHashMap<RouteSegment> visitedVertices) {
+			MaxFlowVertex source, Collection<MaxFlowVertex> sinks, TLongObjectHashMap<RouteSegmentVertex> visitedVertices) {
 		for (MaxFlowVertex rs : vertices) {
 			rs.flowParentTemp = null;
 		}
@@ -978,9 +984,8 @@ public class HHRoutingSubGraphCreator {
 		TIntIntHashMap edgeDistr = new TIntIntHashMap();
 		
 		PriorityQueue<RouteSegmentVertex> queue;
-		TLongObjectHashMap<RouteSegment> visitedVertices = new TLongObjectHashMap<>();
+		TLongObjectHashMap<RouteSegmentVertex> visitedVertices = new TLongObjectHashMap<>();
 		TLongObjectHashMap<RouteSegmentVertex> toVisitVertices = new TLongObjectHashMap<>();
-		TLongObjectHashMap<RouteSegmentVertex> allVertices = new TLongObjectHashMap<>();
 		
 		List<RouteSegmentBorderPoint> borderVertices;
 		TLongObjectHashMap<List<LatLon>> visualBorders = null;
@@ -1004,11 +1009,11 @@ public class HHRoutingSubGraphCreator {
 				return null;
 			}
 			long p = calcUniDirRoutePointInternalId(s);
-			RouteSegmentVertex routeSegment = allVertices != null ? allVertices.get(p) : null;
+			RouteSegmentVertex routeSegment = ctx.allVerticesCache != null ? ctx.allVerticesCache.get(p) : null;
 			if (routeSegment == null && create) {
 				routeSegment = new RouteSegmentVertex(makePositiveDir(s));
-				if (allVertices != null) {
-					allVertices.put(p, routeSegment);
+				if (ctx.allVerticesCache != null) {
+					ctx.allVerticesCache.put(p, routeSegment);
 				}
 			}
 			return routeSegment;
@@ -1051,7 +1056,7 @@ public class HHRoutingSubGraphCreator {
 		}
 
 		public void clearVisitedPoints() {
-			for (RouteSegmentVertex v : allVertices.valueCollection()) {
+			for (RouteSegmentVertex v : ctx.allVerticesCache.valueCollection()) {
 				v.clearPoint();
 			}
 			visitedVertices.clear();
@@ -1220,13 +1225,12 @@ public class HHRoutingSubGraphCreator {
 			cluster.dbIndex = networkDB.prepareBorderPointsToInsert(cluster.borderVertices, networkPointToDbInd);
 			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
-			for (long key : cluster.visitedVertices.keys()) {
-				RouteSegmentVertex v = cluster.allVertices.get(key);
-				if (testGlobalVisited(key)) {
-					throw new IllegalStateException(String.format("Point was already visited %s: %s", v, globalVisitedMessage(key)));
+			for (RouteSegmentVertex v : cluster.visitedVertices.valueCollection()) {
+				if (testGlobalVisited(v.getId())) {
+					throw new IllegalStateException(String.format("Point was already visited %s: %s", v, globalVisitedMessage(v.getId())));
 				}
 				if (currentProcessingRegion != null) {
-					currentProcessingRegion.visitedVertices.put(key, cluster.dbIndex);
+					currentProcessingRegion.visitedVertices.put(v.getId(), cluster.dbIndex);
 					currentProcessingRegion.updateBbox(v.getEndPointX() / 2 + v.getStartPointX() / 2,
 							v.getEndPointY() / 2 + v.getStartPointY() / 2);
 				}
@@ -1236,7 +1240,10 @@ public class HHRoutingSubGraphCreator {
 				visualClusters.add(cluster);
 				// preserve cluster.borderVertices
 				if (DEBUG_STORE_ALL_ROADS <= 2) {
-					cluster.allVertices = null;
+					long[] keys = cluster.visitedVertices.keys();
+					for(long k : keys) {
+						cluster.visitedVertices.put(k, null);
+					}
 				}
 				if (DEBUG_STORE_ALL_ROADS > 1) {
 					cluster.visualBorders = new TLongObjectHashMap<List<LatLon>>();
