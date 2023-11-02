@@ -169,7 +169,7 @@ public class HHRoutingSubGraphCreator {
 		String name = "Montenegro_europe_2.road.obf";
 		name = "Italy_test";
 		name = "Netherlands_europe_2.road.obf";
-//		name = "__europe";
+		name = "Spain_castilla-la-mancha_europe_2.road.obf";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -1369,11 +1369,11 @@ public class HHRoutingSubGraphCreator {
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
-						if (!ctx.checkLongRoads && pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
+						if (pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
 							NetworkBorderPoint negDir = ctx.networkPointToDbInd.get(mainPoint);
 							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(calculateRoutePointInternalId(object.getId(), pos - 1, pos));
 							if (posDir != null && posDir.negativeDbId == 0) {
-								logf("MERGE long route road %s [%d - %d] with previous segment", pntAround, pos - 1, pos + 1);
+								logf("MERGE route road %s [%d - %d] with previous segment", pntAround, pos - 1, pos + 1);
 								if (posDir.positiveDbId == 0 || negDir.negativeDbId == 0 || negDir.positiveDbId != 0) {
 									throw new IllegalStateException(pntAround + "");
 								}
