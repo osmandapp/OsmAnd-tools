@@ -1467,6 +1467,7 @@ public class HHRoutingSubGraphCreator {
 					pos.ex, pos.ey, pos.sx, pos.sy);
 			newNeg.clusterDbId = neg.clusterDbId;
 			newNeg.pointDbId = neg.pointDbId;
+			newNeg.inserted = neg.inserted;
 			ctx.networkDB.mergePoints(ctx.currentProcessingRegion, pos, neg, newNeg);
 			ctx.networkPointToDbInd.get(pos.unidirId).negativeObj = newNeg;
 			ctx.networkPointToDbInd.remove(neg.unidirId);
