@@ -18,6 +18,7 @@ public class PropagateToNodes {
     private TLongArrayList nodePropagatedIds = new TLongArrayList();
     private Map<Long, Map<String, String>> nodePropagatedTags = new HashMap<>();
     private Map<String, PropagateRule> propagateToNodes = new HashMap<>();
+    private TLongArrayList removedIds = new TLongArrayList();
 
     public PropagateToNodes(MapRenderingTypesEncoder renderingTypes) {
         this.renderingTypes = renderingTypes;
@@ -30,7 +31,10 @@ public class PropagateToNodes {
         for (Map.Entry<String, MapRenderingTypes.MapRulType> entry : ruleTypes.entrySet()) {
             MapRenderingTypes.MapRulType ruleType = entry.getValue();
             if (ruleType.isPropagateToNodes()) {
-                PropagateRule rule = new PropagateRule(ruleType.getPropagateToNodesType(), ruleType.getPropagateToNodesPrefix());
+                PropagateToNodesType type = ruleType.getPropagateToNodesType();
+                String prefix = ruleType.getPropagateToNodesPrefix();
+                Map<String, String> propIf = ruleType.getPropagateIf();
+                PropagateRule rule = new PropagateRule(type, prefix, propIf);
                 propagateToNodes.put(entry.getKey(), rule);
             }
         }
@@ -51,6 +55,22 @@ public class PropagateToNodes {
                 String entityTag = entity.getTag(propagateTag);
                 PropagateRule rule = propagate.getValue();
                 if (entityTag != null && entityTag.equals(propagateValue)) {
+                    boolean propIf = true;
+                    if (rule.propIf != null) {
+                        propIf = false;
+                        for (Map.Entry<String, String> entry : rule.propIf.entrySet()) {
+                            String ifTag = entity.getTag(entry.getKey());
+                            if (ifTag != null) {
+                                if (entry.getValue() == null || ifTag.equals(entry.getValue())) {
+                                    propIf = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!propIf) {
+                        continue;
+                    }
                     if (rule.tagPrefix != null) {
                         propagateTag = rule.tagPrefix + propagateTag;
                     }
@@ -127,9 +147,11 @@ public class PropagateToNodes {
     private class PropagateRule {
         PropagateToNodesType type;
         String tagPrefix;
-        public PropagateRule(PropagateToNodesType type, String tagPrefix) {
+        Map<String, String> propIf;
+        public PropagateRule(PropagateToNodesType type, String tagPrefix, Map<String, String> propIf) {
             this.type = type;
             this.tagPrefix = tagPrefix;
+            this.propIf = propIf;
         }
     }
 
@@ -137,9 +159,10 @@ public class PropagateToNodes {
         Map<String, String> tags = nodePropagatedTags.get(id);
         if (tags == null) {
             tags = new HashMap<>();
-        } else if (type == PropagateToNodesType.BORDER) {
+        } else if (type == PropagateToNodesType.BORDER || removedIds.contains(id)) {
             nodePropagatedTags.remove(id);
             nodePropagatedIds.remove(id);
+            removedIds.add(id);
             return;
         }
         tags.put(propagateTag, propagateValue);
