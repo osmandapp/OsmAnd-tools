@@ -417,25 +417,28 @@ public class HHRoutingShortcutCreator {
 						if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
 							double d1 = HHRoutingUtilities.testGetDist(prev, false);
 							double d2 = HHRoutingUtilities.testGetDist(o, testBUG_P);
-							System.out.printf("%.2f (%.2f) %% err, %.2f (%.2f) != %.2f (%.2f) \n",
+							System.out.printf("1 = false (2 = true): %.1f%% (%.1f%%). %.2f s (%.2f m) != %.2f  s (%.2fm) - %.5f, %.5f -> %.5f, %.5f \n",
 									Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
 									Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart,
 									HHRoutingUtilities.testGetDist(prev, false), o.distanceFromStart,
-									HHRoutingUtilities.testGetDist(o, testBUG_P));
-							List<LatLon> lp = HHRoutingUtilities.testGeometry(prev);
-							List<LatLon> ls = HHRoutingUtilities.testGeometry(o);
+									HHRoutingUtilities.testGetDist(o, testBUG_P),
+									MapUtils.get31LatitudeY(s.getStartPointY()), MapUtils.get31LongitudeX(s.getStartPointX()),
+									MapUtils.get31LatitudeY(o.getStartPointY()), MapUtils.get31LongitudeX(o.getStartPointX())
+									);
+							List<LatLon> lprev = HHRoutingUtilities.testGeometry(prev);
+							List<LatLon> lcur = HHRoutingUtilities.testGeometry(o);
 							boolean diff = false;
-							if (lp.size() != ls.size()) {
+							if (lprev.size() != lcur.size()) {
 								diff = true;
 							}
-							for (int k = 0; !diff && k < lp.size(); k++) {
-								if (MapUtils.getDistance(lp.get(k), ls.get(k)) > 5) {
+							for (int k = 0; !diff && k < lprev.size(); k++) {
+								if (MapUtils.getDistance(lprev.get(k), lcur.get(k)) > 5) {
 									diff = true;
 								}
 							}
 							if (diff) {
-								System.out.println(HHRoutingUtilities.testGetGeometry(lp));
-								System.out.println(HHRoutingUtilities.testGetGeometry(ls));
+								System.out.println(HHRoutingUtilities.testGetGeometry(lprev));
+								System.out.println(HHRoutingUtilities.testGetGeometry(lcur));
 							}
 						}
 					}

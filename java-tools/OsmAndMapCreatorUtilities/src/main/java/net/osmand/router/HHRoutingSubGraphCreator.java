@@ -875,6 +875,7 @@ public class HHRoutingSubGraphCreator {
 		// segment [inner point index -> outer point index]
 		public int pointDbId;
 		public int clusterDbId;
+		public int fileDbId;
 		public boolean inserted;
 		
 		
@@ -1275,7 +1276,8 @@ public class HHRoutingSubGraphCreator {
 		}
 
 		public void addCluster(NetworkIsland cluster) {
-			cluster.dbIndex = networkDB.prepareBorderPointsToInsert(cluster.borderVertices, networkPointToDbInd);
+			cluster.dbIndex = networkDB.prepareBorderPointsToInsert(currentProcessingRegion == null ? 0 : currentProcessingRegion.id, 
+					cluster.borderVertices, networkPointToDbInd);
 			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
 			for (RouteSegmentVertex v : cluster.visitedVertices.valueCollection()) {
@@ -1473,7 +1475,11 @@ public class HHRoutingSubGraphCreator {
 			newNeg.clusterDbId = neg.clusterDbId;
 			newNeg.pointDbId = neg.pointDbId;
 			newNeg.inserted = neg.inserted;
-			ctx.networkDB.mergePoints(ctx.currentProcessingRegion, pos, neg, newNeg);
+			newNeg.fileDbId = neg.fileDbId;
+			ctx.networkDB.mergePoints(pos, neg, newNeg);
+			if (ctx.currentProcessingRegion != null) {
+				ctx.currentProcessingRegion.visitedVertices.put(neg.unidirId, neg.clusterDbId);
+			}
 			ctx.networkPointToDbInd.get(pos.unidirId).negativeObj = newNeg;
 			ctx.networkPointToDbInd.remove(neg.unidirId);
 		}
