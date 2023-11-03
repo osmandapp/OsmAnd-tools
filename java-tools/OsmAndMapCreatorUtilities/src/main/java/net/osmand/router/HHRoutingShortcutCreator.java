@@ -66,6 +66,7 @@ public class HHRoutingShortcutCreator {
 		DEBUG_VERBOSE_LEVEL = 1;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
+//		name = "Italy_test";
 //		name = "Netherlands_europe_2.road.obf";
 //		name = "Ukraine_europe_2.road.obf";
 //		name = "Germany";
@@ -222,10 +223,11 @@ public class HHRoutingShortcutCreator {
 							}
 							String msg = String.format("%s can lead only to dual cluster %d - found %s (cluster %d): %s",
 									pnt, pnt.dualPoint.clusterId, end, end.clusterId, b.toString());
-							System.err.println(segment.geometry);
+							System.err.println(HHRoutingUtilities.testGetGeometry(segment.geometry));
 							System.err.println("BUG needs to be fixed " + msg);
-//							continue;
-							throw new IllegalStateException(msg);
+							// TODO 1.9
+							System.err.println(msg);
+//							throw new IllegalStateException(msg);
 						}
 						if (segment.dist < 0) {
 							throw new IllegalStateException(segment + " dist < " + segment.dist);
@@ -380,8 +382,8 @@ public class HHRoutingShortcutCreator {
 		// TODO 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 		// TODO 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 		boolean testBUG_B = false;
-		boolean testBUG_P = false;
-		boolean testBUG_R = false;
+		boolean testBUG_P = true;
+		boolean testBUG_R = true;
 		TLongObjectHashMap<RouteSegment> testBug = testBUG_B || testBUG_P || testBUG_R ? new TLongObjectHashMap<RouteSegment>() : null;
 		
 		for (int iteration = 0; iteration < (testBUG_B || testBUG_P || testBUG_R ? 2 : 1); iteration++) {
@@ -393,7 +395,7 @@ public class HHRoutingShortcutCreator {
 				BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
 			}
 			if (testBUG_R) {
-				BinaryRoutePlanner.DEBUG_ALWAYS_AVOID_VISITED = iteration != 0; // or true
+				BinaryRoutePlanner.DEBUG_ALWAYS_AVOID_VISITED = true; // iteration != 0; // or true for both iterations
 			}
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
@@ -418,11 +420,12 @@ public class HHRoutingShortcutCreator {
 						RouteSegment prev = testBug.get(pntId);
 						if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
 							// compare geo distance by the same method (precise)
-							float d1 = testGetDist(prev, true, pntId);
-							float d2 = testGetDist(o, true, pntId);
+							double d1 = HHRoutingUtilities.testGetDist(prev, false, pntId);
+							double d2 = HHRoutingUtilities.testGetDist(o, testBUG_P, pntId);
 
-							List<LatLon> lp = testGeometry(prev);
-							List<LatLon> ls = testGeometry(o);
+							List<LatLon> lp = HHRoutingUtilities.testGeometry(prev);
+							List<LatLon> ls = HHRoutingUtilities.testGeometry(o);
+
 							boolean diff = false;
 							if (lp.size() != ls.size()) {
 								diff = true;
@@ -433,8 +436,8 @@ public class HHRoutingShortcutCreator {
 								}
 							}
 							if (diff) {
-								writeTestGeometry(prev, pntId, "Blue", d1); // iteration 0
-								writeTestGeometry(o, pntId, "Red", d2); // iteration 1
+								HHRoutingUtilities.writeTestGeometry(prev, pntId, "Blue", d1); // iteration 0
+								HHRoutingUtilities.writeTestGeometry(o, pntId, "Red", d2); // iteration 1
 							}
 
 							if (true || !diff) {
@@ -457,82 +460,4 @@ public class HHRoutingShortcutCreator {
 
 		return res;
 	}
-
-	private float testGetDist(RouteSegment t, boolean precise, long pntId) {
-		float dist = 0;
-		List<RouteSegment> path = new ArrayList<RouteSegment>();
-
-		// traverse path
-		do {
-			path.add(t);
-		} while ((t = t.getParentRoute()) != null);
-
-		Collections.reverse(path);
-
-		for(int i = 0; i < path.size(); i++) {
-			RouteSegment current = path.get(i);
-			if (!(current instanceof BinaryRoutePlanner.FinalRouteSegment)) {
-				int x1 = current.getRoad().getPoint31XTile(current.getSegmentStart());
-				int y1 = current.getRoad().getPoint31YTile(current.getSegmentStart());
-				int x2 = current.getRoad().getPoint31XTile(current.getSegmentEnd());
-				int y2 = current.getRoad().getPoint31YTile(current.getSegmentEnd());
-				float d = 0;
-				if (precise) {
-					d = (float) MapUtils.measuredDist31(x1, y1, x2, y2);
-				} else {
-					d = (float) MapUtils.squareRootDist31(x1, y1, x2, y2);
-				}
-				dist += d; // d might be used to debug each edge weight
-//				if (current.weight != d || current.distanceFromStart != d) {
-//					System.err.printf("[%d/%d] %f!=%f || %f %f (%f) [%d] %b\n",
-//							i,
-//							path.size(),
-//							current.weight,
-//							d,
-//							current.distanceFromStart, dist,
-//							current.distanceFromStart - dist,
-//							pntId,
-//							current.reAdded
-//					);
-//					throw new IllegalStateException("weight");
-//				} else {
-//					if (current.reAdded) {
-//						System.out.printf("[%d] %f==%f && %f\n", i, current.weight, d, dist);
-//					}
-//				}
-			}
-		}
-		return dist;
-	}
-
-	private List<LatLon> testGeometry(RouteSegment t) {
-		List<LatLon> l = new ArrayList<LatLon>();
-		while (t != null) {
-			LatLon p = getPoint(t);
-			l.add(p);
-			t = t.getParentRoute();
-		}
-		return l;
-	}
-
-	private void writeTestGeometry(RouteSegment t, long pntId, String color, double distance)
-			throws FileNotFoundException, UnsupportedEncodingException {
-
-		PrintWriter gpx = new PrintWriter(
-				String.format("point-%d-%s-%d.gpx", pntId, color, (int) distance), "UTF-8");
-
-		StringBuilder b = new StringBuilder();
-		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n");
-		b.append("<gpx version=\"1.0\" creator=\"test\" xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\" xmlns=\"http://www.topografix.com/GPX/1/0\">\n");
-		b.append("<trk><extensions><gpxx:TrackExtension><gpxx:DisplayColor>" + color + "</gpxx:DisplayColor></gpxx:TrackExtension></extensions><trkseg>\n");
-		while (t != null) {
-			LatLon p = getPoint(t);
-			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/>\n", p.getLatitude(), p.getLongitude()));
-			t = t.getParentRoute();
-		}
-		b.append("</trkseg></trk></gpx>\n");
-		gpx.println(b.toString());
-		gpx.close();
-	}
-
 }

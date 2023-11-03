@@ -2,14 +2,8 @@ package net.osmand.router;
 
 import static net.osmand.router.HHRoutePlanner.calcUniDirRoutePointInternalId;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.io.*;
+import java.util.*;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -163,10 +157,11 @@ public class HHRoutingUtilities {
 			allShortcuts += island.borderVertices.size() * (island.borderVertices.size() - 1);
 			allCenterRoads += island.borderVertices.size();
 			for (RouteSegmentBorderPoint bp : island.borderVertices) {
-				LatLon lt = getPoint(bp);
-				Node bNode = new Node(lt.getLatitude(), lt.getLongitude(), DEBUG_OSM_ID--);
+				double lon = MapUtils.get31LongitudeX(bp.sx / 2 + bp.ex / 2);
+				double lat = MapUtils.get31LatitudeY(bp.sy / 2 + bp.ey / 2);
+				Node bNode = new Node(lat, lon, DEBUG_OSM_ID--);
 				bNode.putTag("highway", "stop");
-				bNode.putTag("dir", bp.dir +"");
+				bNode.putTag("dir", bp.isPositive() +"");
 				bNode.putTag("unidir", bp.unidirId+"");
 				bNode.putTag("name", bp.toString());
 				bNode.putTag("clusterId", island.dbIndex+"");
@@ -227,10 +222,10 @@ public class HHRoutingUtilities {
 		int ways1 = 0;
 		for (NetworkIsland ni : visualClusters) {
 			TLongSet viewed = new TLongHashSet();
-			if (ni.allVertices == null) {
+			if (ni.visitedVertices == null) {
 				continue;
 			}
-			TLongObjectIterator<RouteSegmentVertex> it = ni.allVertices.iterator();
+			TLongObjectIterator<RouteSegmentVertex> it = ni.visitedVertices.iterator();
 			while (it.hasNext()) {
 				it.advance();
 				long pntKey = it.key();
@@ -246,7 +241,7 @@ public class HHRoutingUtilities {
 						while ((segmentEnd + d) >= 0 && (segmentEnd + d) < s.getRoad().getPointsLength()) {
 							RouteSegment nxt = new RouteSegment(s.getRoad(), segmentEnd, segmentEnd + d);
 							pntKey = calcUniDirRoutePointInternalId(nxt);
-							if (!ni.allVertices.containsKey(pntKey) || viewed.contains(pntKey)) {
+							if (!ni.visitedVertices.containsKey(pntKey) || viewed.contains(pntKey)) {
 								break;
 							}
 							viewed.add(pntKey);
@@ -398,6 +393,90 @@ public class HHRoutingUtilities {
 		return qr;
 	}
 
+	static float testGetDist(RouteSegment t, boolean precise, long pntId) {
+		float dist = 0;
+		List<RouteSegment> path = new ArrayList<RouteSegment>();
 
-	
+		// traverse path
+		do {
+			path.add(t);
+		} while ((t = t.getParentRoute()) != null);
+
+		Collections.reverse(path);
+
+		for(int i = 0; i < path.size(); i++) {
+			RouteSegment current = path.get(i);
+			if (!(current instanceof BinaryRoutePlanner.FinalRouteSegment)) {
+				int x1 = current.getRoad().getPoint31XTile(current.getSegmentStart());
+				int y1 = current.getRoad().getPoint31YTile(current.getSegmentStart());
+				int x2 = current.getRoad().getPoint31XTile(current.getSegmentEnd());
+				int y2 = current.getRoad().getPoint31YTile(current.getSegmentEnd());
+				float d = 0;
+				if (precise) {
+					d = (float) MapUtils.measuredDist31(x1, y1, x2, y2);
+				} else {
+					d = (float) MapUtils.squareRootDist31(x1, y1, x2, y2);
+				}
+				dist += d; // d might be used to debug each edge weight
+//				if (current.weight != d || current.distanceFromStart != d) {
+//					System.err.printf("[%d/%d] %f!=%f || %f %f (%f) [%d] %b\n",
+//							i,
+//							path.size(),
+//							current.weight,
+//							d,
+//							current.distanceFromStart, dist,
+//							current.distanceFromStart - dist,
+//							pntId,
+//							current.reAdded
+//					);
+//					throw new IllegalStateException("weight");
+//				} else {
+//					if (current.reAdded) {
+//						System.out.printf("[%d] %f==%f && %f\n", i, current.weight, d, dist);
+//					}
+//				}
+			}
+		}
+		return dist;
+	}
+
+	static List<LatLon> testGeometry(RouteSegment t) {
+		List<LatLon> l = new ArrayList<LatLon>();
+		while (t != null) {
+			LatLon p = getPoint(t);
+			l.add(p);
+			t = t.getParentRoute();
+		}
+		return l;
+	}
+
+	static String testGetGeometry(List<LatLon> ls) {
+		StringBuilder b = new StringBuilder();
+		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>");
+		b.append("<gpx version=\"1.1\" ><trk><trkseg>");
+		for (LatLon p : ls) {
+			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/> ", p.getLatitude(), p.getLongitude()));
+		}
+		b.append("</trkseg></trk></gpx>");
+		return b.toString();
+	}
+
+	static void writeTestGeometry(RouteSegment t, long pntId, String color, double distance)
+			throws FileNotFoundException, UnsupportedEncodingException {
+		PrintWriter gpx = new PrintWriter(
+				String.format("point-%d-%s-%d.gpx", pntId, color, (int) distance), "UTF-8");
+
+		StringBuilder b = new StringBuilder();
+		b.append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n");
+		b.append("<gpx version=\"1.0\" creator=\"test\" xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\" xmlns=\"http://www.topografix.com/GPX/1/0\">\n");
+		b.append("<trk><extensions><gpxx:TrackExtension><gpxx:DisplayColor>" + color + "</gpxx:DisplayColor></gpxx:TrackExtension></extensions><trkseg>\n");
+		while (t != null) {
+			LatLon p = getPoint(t);
+			b.append(String.format("<trkpt lat=\"%.6f\" lon=\"%.6f\"/>\n", p.getLatitude(), p.getLongitude()));
+			t = t.getParentRoute();
+		}
+		b.append("</trkseg></trk></gpx>\n");
+		gpx.println(b.toString());
+		gpx.close();
+	}
 }

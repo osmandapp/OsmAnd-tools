@@ -43,11 +43,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement insGeometry;
 	protected PreparedStatement insPoint;
 	protected PreparedStatement updDualPoint;
+	protected PreparedStatement updMergePoint;
 	protected PreparedStatement insVisitedPoints;
 	protected PreparedStatement updateRegionBoundaries;
+	protected PreparedStatement insertRegionBoundaries;
 	protected PreparedStatement insLongRoads;
 	private int maxPointDBID;
 	private int maxClusterID;
+
+
 
 
 
@@ -64,7 +68,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insLongRoads = conn.prepareStatement("INSERT INTO routeLongRoads (id, regionId, roadId, startIndex, points) VALUES (?, ?, ?, ?, ? )");
 			insVisitedPoints = conn.prepareStatement("INSERT INTO routeRegionPoints (id, pntId, clusterId) VALUES (?, ?, ?)");
 			updateRegionBoundaries = conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? where id = ?");
+			insertRegionBoundaries = conn.prepareStatement("INSERT INTO routeRegions(left, right, top, bottom, id) VALUES (?, ?, ?, ?, ?)");
+
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
+			updMergePoint = conn.prepareStatement("UPDATE points SET pointGeoUniDir = ?, pointGeoId = ?, start = ?, end = ?, sx31 = ?, sy31 = ?, ex31 = ?, ey31 = ? WHERE idPoint = ?");
 		}
 	}
 	
@@ -92,17 +99,23 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	
 	public int loadNetworkPoints(TLongObjectHashMap<NetworkBorderPoint> networkPointsCluster) throws SQLException {
 		Statement s = conn.createStatement();
-		ResultSet rs = s.executeQuery("SELECT pointGeoUniDir, pointGeoId, idPoint, clusterId,  start, end  FROM points ");
+		ResultSet rs = s.executeQuery("SELECT pointGeoUniDir, pointGeoId, idPoint, clusterId, roadId, start, end, sx31, sy31, ex31, ey31 FROM points ");
 		while (rs.next()) {
 			long pointGeoUniDir = rs.getLong(1);
 			if (!networkPointsCluster.containsKey(pointGeoUniDir)) {
 				networkPointsCluster.put(pointGeoUniDir, new NetworkBorderPoint(pointGeoUniDir));
 			}
-			int pointId = rs.getInt(3);
-			int clusterId = rs.getInt(4);
-			networkPointsCluster.get(pointGeoUniDir).set(rs.getLong(2), pointId, rs.getInt(4), rs.getLong(5) < rs.getLong(6), null);
-			maxPointDBID = Math.max(pointId, maxPointDBID);
-			maxClusterID = Math.max(clusterId, maxClusterID);
+//			
+			long roadId = rs.getLong(5);
+			int st = rs.getInt(6);
+			int end = rs.getInt(7);
+			int sx = rs.getInt(8), sy = rs.getInt(9), ex = rs.getInt(10), ey = rs.getInt(11);
+			RouteSegmentBorderPoint bp = new RouteSegmentBorderPoint(roadId, st, end, sx, sy, ex, ey);
+			bp.pointDbId = rs.getInt(3);
+			bp.clusterDbId = rs.getInt(4);
+			networkPointsCluster.get(pointGeoUniDir).set(rs.getLong(2), bp);
+			maxPointDBID = Math.max(bp.pointDbId, maxPointDBID);
+			maxClusterID = Math.max(bp.clusterDbId, maxClusterID);
 		}
 		maxClusterID = Math.max(maxClusterID, getMaxClusterId());
 		rs.close();
@@ -256,25 +269,13 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		while (its.hasNext()) {
 			its.advance();
 			NetworkBorderPoint npnt = its.value();
-			if (npnt.positiveObj == null && npnt.negativeObj == null) {
-				continue;
-			}
-			int c = 0;
-			if (npnt.positiveObj != null) {
-				npnt.positiveClusterId = 0;
-				npnt.positiveDbId = 0;
-				npnt.positiveGeoId = 0;
+			if (npnt.positiveObj != null && !npnt.positiveObj.inserted) {
 				npnt.positiveObj = null;
-				c++;
 			}
-			if (npnt.negativeObj != null) {
-				npnt.negativeClusterId = 0;
-				npnt.negativeDbId = 0;
-				npnt.negativeGeoId = 0;
+			if (npnt.negativeObj != null && !npnt.negativeObj.inserted) {
 				npnt.negativeObj = null;
-				c++;
 			}
-			if (c == 2) {
+			if (npnt.positiveObj == null && npnt.negativeObj == null) {
 				its.remove();
 			}
 		}
@@ -306,14 +307,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 
 	private void updateRegionBbox(NetworkRouteRegion networkRouteRegion) throws SQLException {
-		// conn.prepareStatement("UPDATE routeRegions SET left = ?, right = ?, top = ? , bottom = ? routeRegions where id = ?");
+		@SuppressWarnings("resource")
+		PreparedStatement p = networkRouteRegion.id < 0 ? insertRegionBoundaries : updateRegionBoundaries;
 		QuadRect r = networkRouteRegion.rect;
-		updateRegionBoundaries.setDouble(1, r.left);
-		updateRegionBoundaries.setDouble(2, r.right);
-		updateRegionBoundaries.setDouble(3, r.top);
-		updateRegionBoundaries.setDouble(4, r.bottom);
-		updateRegionBoundaries.setInt(5, networkRouteRegion.id);
-		updateRegionBoundaries.execute();
+		p.setDouble(1, r.left);
+		p.setDouble(2, r.right);
+		p.setDouble(3, r.top);
+		p.setDouble(4, r.bottom);
+		p.setInt(5, networkRouteRegion.id);
+		p.execute();
 	}
 
 	private void insertVisitedPoints(NetworkRouteRegion networkRouteRegion) throws SQLException {
@@ -336,27 +338,24 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	private void insertBorderPoints(TLongObjectHashMap<NetworkBorderPoint> borderPoints) throws SQLException {
 		int batchInsPoint = 0;
 		for (NetworkBorderPoint npnt : borderPoints.valueCollection()) {
-			if (npnt.positiveObj == null && npnt.negativeObj == null) {
-				continue;
-			}
-			if (npnt.positiveObj != null) {
-				insPoint(npnt.positiveObj, npnt.positiveClusterId, npnt.positiveDbId);
-				npnt.positiveObj = null; // inserted
+			if (npnt.positiveObj != null && !npnt.positiveObj.inserted) {
+				insPoint(npnt.positiveObj);
+				npnt.positiveObj.inserted = true;
 				batchInsPoint++;
 			}
-			if (npnt.negativeObj != null) {
-				insPoint(npnt.negativeObj, npnt.negativeClusterId, npnt.negativeDbId);
-				npnt.negativeObj = null; // inserted
+			if (npnt.negativeObj != null && !npnt.negativeObj.inserted) {
+				insPoint(npnt.negativeObj);
+				npnt.negativeObj.inserted = true;
 				batchInsPoint++;
 			}
-			if (npnt.positiveDbId > 0 && npnt.negativeDbId > 0) {
-				updDualPoint.setInt(1, npnt.negativeDbId);
-				updDualPoint.setInt(2, npnt.negativeClusterId);
-				updDualPoint.setInt(3, npnt.positiveDbId);
+			if (npnt.positiveObj != null && npnt.negativeObj != null) {
+				updDualPoint.setInt(1, npnt.negativeObj.pointDbId);
+				updDualPoint.setInt(2, npnt.negativeObj.clusterDbId);
+				updDualPoint.setInt(3, npnt.positiveObj.pointDbId);
 				updDualPoint.addBatch();
-				updDualPoint.setInt(1, npnt.positiveDbId);
-				updDualPoint.setInt(2, npnt.positiveClusterId);
-				updDualPoint.setInt(3, npnt.negativeDbId);
+				updDualPoint.setInt(1, npnt.positiveObj.pointDbId);
+				updDualPoint.setInt(2, npnt.positiveObj.clusterDbId);
+				updDualPoint.setInt(3, npnt.negativeObj.pointDbId);
 				updDualPoint.addBatch();
 			}
 			if (batchInsPoint > BATCH_SIZE) {
@@ -368,20 +367,20 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		updDualPoint.executeBatch();
 	}
 
-	private void insPoint(RouteSegmentBorderPoint obj, int clusterIndex, int pointDbId)
+	private void insPoint(RouteSegmentBorderPoint obj)
 			throws SQLException {
 		int p = 1;
-		insPoint.setInt(p++, pointDbId);
+		insPoint.setInt(p++, obj.pointDbId);
 		insPoint.setLong(p++, obj.unidirId);
 		insPoint.setLong(p++, obj.uniqueId);
-		insPoint.setInt(p++, clusterIndex);
-		insPoint.setLong(p++, obj.getRoad().getId());
-		insPoint.setLong(p++, obj.getSegmentStart());
-		insPoint.setLong(p++, obj.getSegmentEnd());
-		insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentStart()));
-		insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentStart()));
-		insPoint.setInt(p++, obj.getRoad().getPoint31XTile(obj.getSegmentEnd()));
-		insPoint.setInt(p++, obj.getRoad().getPoint31YTile(obj.getSegmentEnd()));
+		insPoint.setInt(p++, obj.clusterDbId);
+		insPoint.setLong(p++, obj.roadId);
+		insPoint.setInt(p++, obj.segmentStart);
+		insPoint.setInt(p++, obj.segmentEnd);
+		insPoint.setInt(p++, obj.sx);
+		insPoint.setInt(p++, obj.sy);
+		insPoint.setInt(p++, obj.ex);
+		insPoint.setInt(p++, obj.ey);
 		insPoint.addBatch();
 	}
 	
@@ -478,6 +477,43 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ins.executeBatch();
 		ins.close();
 	}
+	
+	public void mergePoints(NetworkRouteRegion ni, RouteSegmentBorderPoint posMain, RouteSegmentBorderPoint negMerge, RouteSegmentBorderPoint newNeg) {
+		// merge to posDir
+		try {
+			ni.visitedVertices.put(negMerge.unidirId, negMerge.clusterDbId);
+			insVisitedPoints.setLong(1, ni.id);
+			insVisitedPoints.setLong(2, negMerge.unidirId);
+			insVisitedPoints.setInt(3, negMerge.clusterDbId);
+			insVisitedPoints.addBatch();
+			insVisitedPoints.executeBatch();
+			
+			int p = 1;
+			updMergePoint.setLong(p++, newNeg.unidirId);
+			updMergePoint.setLong(p++, newNeg.uniqueId);
+			updMergePoint.setLong(p++, newNeg.segmentStart);
+			updMergePoint.setLong(p++, newNeg.segmentEnd);
+			updMergePoint.setLong(p++, newNeg.sx);
+			updMergePoint.setLong(p++, newNeg.sy);
+			updMergePoint.setLong(p++, newNeg.ex);
+			updMergePoint.setLong(p++, newNeg.ey);
+			updMergePoint.setInt(p++, newNeg.pointDbId);
+			updMergePoint.execute();
+			
+			updDualPoint.setInt(1, newNeg.pointDbId);
+			updDualPoint.setInt(2, newNeg.clusterDbId);
+			updDualPoint.setInt(3, posMain.pointDbId);
+			updDualPoint.addBatch();
+			
+			updDualPoint.setInt(1, posMain.pointDbId);
+			updDualPoint.setInt(2, posMain.clusterDbId);
+			updDualPoint.setInt(3, newNeg.pointDbId);
+			updDualPoint.addBatch();
+			updDualPoint.executeBatch();
+		} catch (SQLException e) {
+			throw new IllegalStateException(e);
+		}
+	}
 
 	public int prepareBorderPointsToInsert(List<RouteSegmentBorderPoint> borderPoints, TLongObjectHashMap<NetworkBorderPoint> pointDbInd) {
 		int clusterIndex = ++maxClusterID;
@@ -486,8 +522,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				pointDbInd.put(obj.unidirId, new NetworkBorderPoint(obj.unidirId));
 			}
 			NetworkBorderPoint npnt = pointDbInd.get(obj.unidirId);
-			int pointDbId = ++maxPointDBID;
-			npnt.set(obj.unidirId, pointDbId, clusterIndex, obj.getSegmentStart() < obj.getSegmentEnd(), obj);
+			obj.pointDbId = ++maxPointDBID;
+			obj.clusterDbId = clusterIndex;
+			
+			npnt.set(obj.unidirId, obj);
 		}
 		return clusterIndex; 
 	}
@@ -519,40 +557,28 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	
 	static class NetworkBorderPoint {
 		long unidirId;
-		long positiveGeoId;
-		int positiveDbId;
-		int positiveClusterId;
 		RouteSegmentBorderPoint positiveObj;
-		long negativeGeoId;
-		int negativeDbId;
-		int negativeClusterId;
 		RouteSegmentBorderPoint negativeObj;
 		
 		public NetworkBorderPoint(long unidirId) {
 			this.unidirId = unidirId;
 		}
 		
-		public void set(long geoId, int dbId, int clusterId, boolean positive, RouteSegmentBorderPoint obj) {
-			if (positive) {
-				if (positiveGeoId != 0) {
+		public void set(long geoId, RouteSegmentBorderPoint obj) {
+			if (obj.isPositive()) {
+				if (positiveObj != null) {
 					String msg = String.format("Geoid %d was already assigned %d (%d) in cluster %d (%d)  %s",
-							positiveGeoId, positiveDbId, dbId, positiveClusterId, clusterId, obj);
+							geoId, obj.pointDbId, positiveObj.pointDbId, obj.clusterDbId, positiveObj.clusterDbId, obj);
 					throw new IllegalStateException(msg);
 				}
-				positiveGeoId = geoId;
-				positiveDbId = dbId;
 				positiveObj = obj;
-				positiveClusterId = clusterId;
 			} else {
-				if (negativeDbId != 0) {
+				if (negativeObj != null) {
 					String msg = String.format("Geoid %d was already assigned %d (%d) in cluster %d (%d)  %s",
-							negativeGeoId, negativeDbId, dbId, negativeClusterId, clusterId, obj);
+							geoId, obj.pointDbId, negativeObj.pointDbId, obj.clusterDbId, negativeObj.clusterDbId, obj);
 					throw new IllegalStateException(msg);
 				}
 				negativeObj = obj;
-				negativeGeoId = geoId;
-				negativeDbId = dbId;
-				negativeClusterId = clusterId;
 			}
 		}
 	}
@@ -602,6 +628,11 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 					}
 				}
 			}
+		}
+		
+		@Override
+		public String toString() {
+			return String.format("Long road %d index %d", roadId / 64, startIndex);
 		}
 	}
 
@@ -693,5 +724,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 
 	}
+
+	
 
 }
