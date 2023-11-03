@@ -163,10 +163,11 @@ public class HHRoutingUtilities {
 			allShortcuts += island.borderVertices.size() * (island.borderVertices.size() - 1);
 			allCenterRoads += island.borderVertices.size();
 			for (RouteSegmentBorderPoint bp : island.borderVertices) {
-				LatLon lt = getPoint(bp);
-				Node bNode = new Node(lt.getLatitude(), lt.getLongitude(), DEBUG_OSM_ID--);
+				double lon = MapUtils.get31LongitudeX(bp.sx / 2 + bp.ex / 2);
+				double lat = MapUtils.get31LatitudeY(bp.sy / 2 + bp.ey / 2);
+				Node bNode = new Node(lat, lon, DEBUG_OSM_ID--);
 				bNode.putTag("highway", "stop");
-				bNode.putTag("dir", bp.dir +"");
+				bNode.putTag("dir", bp.isPositive() +"");
 				bNode.putTag("unidir", bp.unidirId+"");
 				bNode.putTag("name", bp.toString());
 				bNode.putTag("clusterId", island.dbIndex+"");

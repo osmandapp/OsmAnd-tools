@@ -46,6 +46,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkBorderPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkLongRoad;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 
@@ -569,7 +570,7 @@ public class HHRoutingSubGraphCreator {
 
 			@Override
 			public int compare(RouteSegmentBorderPoint o1, RouteSegmentBorderPoint o2) {
-				return Long.compare(o1.road.getId(), o2.road.getId());
+				return Long.compare(o1.roadId, o2.roadId);
 			}
 		});
 		return borderPoints;
@@ -862,19 +863,50 @@ public class HHRoutingSubGraphCreator {
 	}
 	
 	
-	static class RouteSegmentBorderPoint extends RouteSegment {
-		public final boolean dir;
+	static class RouteSegmentBorderPoint {
 		public final long unidirId;
 		public final long uniqueId;
+		public final int segmentStart;
+		public final int segmentEnd;
+		public final long roadId;
+		public final int sx, sy, ex, ey;
 		// segment [inner point index -> outer point index]
+		public int pointDbId;
+		public int clusterDbId;
+		public boolean inserted;
 		
 		
 		public RouteSegmentBorderPoint(RouteSegment s, boolean dir) {
-			super(s.getRoad(), dir ? s.getSegmentStart() : s.getSegmentEnd(),
-					dir ? s.getSegmentEnd() : s.getSegmentStart());
-			unidirId = calcUniDirRoutePointInternalId(s);
-			uniqueId = calculateRoutePointInternalId(getRoad().getId(), getSegmentStart(), getSegmentEnd());
-			this.dir = dir;
+			segmentStart = dir ? s.getSegmentStart() : s.getSegmentEnd();
+			segmentEnd = dir ? s.getSegmentEnd() : s.getSegmentStart();
+			roadId = s.getRoad().getId();
+			sx = dir ? s.getStartPointX() : s.getEndPointX();
+			sy = dir ? s.getStartPointX() : s.getEndPointX();
+			ex = !dir ? s.getStartPointX() : s.getEndPointX();
+			ey = !dir ? s.getStartPointX() : s.getEndPointX();
+			unidirId = uniId();
+			uniqueId = uniqueId();
+		}
+		
+		public RouteSegmentBorderPoint(long roadId, int st, int end, int sx, int sy, int ex, int ey) {
+			this.roadId = roadId;
+			this.segmentStart = st;
+			this.segmentEnd = end;
+			this.sx = sx; 
+			this.sy = sy;
+			this.ex = ex;
+			this.ey = ey;
+			unidirId = uniId();
+			uniqueId = uniqueId();
+			inserted = true;
+		}
+
+		private long uniqueId() {
+			return calculateRoutePointInternalId(roadId, segmentStart, segmentEnd);
+		}
+
+		private long uniId() {
+			return calculateRoutePointInternalId(roadId, Math.min(segmentStart, segmentEnd),Math.max(segmentStart, segmentEnd));
 		}
 		
 		public static RouteSegmentBorderPoint fromParent(RouteSegment ls) {
@@ -884,7 +916,15 @@ public class HHRoutingSubGraphCreator {
 							&& ls.parentRoute.getStartPointY() == ls.getStartPointY());
 			return new RouteSegmentBorderPoint(ls, pos);
 		}
+
+		public boolean isPositive() {
+			return segmentStart < segmentEnd;
+		}
 		
+		@Override
+		public String toString() {
+			return String.format("Border point db %d (cluster %d), road %d [%d - %d]", pointDbId, clusterDbId, roadId, segmentStart, segmentEnd);
+		}
 	}
 
 	
@@ -1274,6 +1314,7 @@ public class HHRoutingSubGraphCreator {
 		}
 
 		public boolean finishRegionProcess(double overlapBbox) throws SQLException {
+			mergeConnectedPoints(this);
 			logf("Tiles " + rctx.calculationProgress.getInfo(null).get("tiles"));
 			QuadRect c = currentProcessingRegion.getCalcBbox();
 			QuadRect r = currentProcessingRegion.rect;
@@ -1295,15 +1336,15 @@ public class HHRoutingSubGraphCreator {
 			int ins = 0, tl = 0;
 			for (NetworkBorderPoint npnt : networkPointToDbInd.valueCollection()) {
 				if (npnt.positiveObj != null) {
-					ins++;
-				}
-				if (npnt.positiveDbId > 0) {
+					if (!npnt.positiveObj.inserted) {
+						ins++;
+					}
 					tl++;
 				}
 				if (npnt.negativeObj != null) {
-					ins++;
-				}
-				if (npnt.negativeDbId > 0) {
+					if (!npnt.negativeObj.inserted) {
+						ins++;
+					}
 					tl++;
 				}
 			}
@@ -1369,22 +1410,6 @@ public class HHRoutingSubGraphCreator {
 					RouteSegmentPoint pntAround = new RouteSegmentPoint(object, pos, 0);
 					long mainPoint = calcUniDirRoutePointInternalId(pntAround);
 					if (ctx.testGlobalVisited(mainPoint) || ctx.networkPointToDbInd.containsKey(mainPoint)) {
-						if (pos > 0 && ctx.networkPointToDbInd.containsKey(mainPoint)) {
-							long prevPoint = calculateRoutePointInternalId(object.getId(), pos - 1, pos);
-							NetworkBorderPoint negDir = ctx.networkPointToDbInd.get(mainPoint);
-							NetworkBorderPoint posDir = ctx.networkPointToDbInd.get(prevPoint);
-							if (posDir != null && posDir.negativeDbId == 0) {
-								logf("MERGE route road %s [%d - %d] with previous segment", pntAround, pos - 1, pos + 1);
-								if (posDir.positiveDbId == 0 || negDir.negativeDbId == 0 || negDir.positiveDbId != 0) {
-									throw new IllegalStateException(pntAround + "");
-								}
-								ctx.networkDB.mergePoints(ctx.currentProcessingRegion, posDir, negDir, new RouteSegmentPoint(object, pos, pos - 1, 0));
-								if (negDir.negativeObj != null) {
-									posDir.negativeObj = new RouteSegmentBorderPoint(new RouteSegmentPoint(object, pos - 1, 0), false);
-								}
-								ctx.networkPointToDbInd.remove(mainPoint);
-							}
-						}
 						// already existing cluster
 						continue;
 					}
@@ -1410,6 +1435,40 @@ public class HHRoutingSubGraphCreator {
 		@Override
 		public boolean isCancelled() {
 			return DEBUG_LIMIT_PROCESS != -1 && indProc >= DEBUG_LIMIT_PROCESS;
+		}
+	}
+
+	public static void mergeConnectedPoints(NetworkCollectPointCtx ctx) {
+		TLongObjectHashMap<RouteSegmentBorderPoint> mp = new TLongObjectHashMap<>();
+		for (NetworkBorderPoint p : ctx.networkPointToDbInd.valueCollection()) {
+			if (p.positiveObj != null && p.negativeObj == null) {
+				mergePoint(ctx, mp, p.positiveObj);
+			}
+			if (p.negativeObj != null && p.positiveObj == null) {
+				mergePoint(ctx, mp, p.negativeObj);
+			}
+		}
+	}
+
+	private static void mergePoint(NetworkCollectPointCtx ctx, TLongObjectHashMap<RouteSegmentBorderPoint> mp, RouteSegmentBorderPoint po) {
+		long epnt = Algorithms.combine2Points(po.ex, po.ey);
+		RouteSegmentBorderPoint co = mp.get(epnt);
+		if (co == null) {
+			mp.put(epnt, po);
+		} else {
+			RouteSegmentBorderPoint pos = po.isPositive() ? po : co;
+			RouteSegmentBorderPoint neg = !po.isPositive() ? po : co;
+			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentStart) {
+				throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
+			}
+			logf("MERGE route road %s with %s", pos, neg);
+			RouteSegmentBorderPoint newNeg = new RouteSegmentBorderPoint(pos.roadId, pos.segmentEnd, pos.segmentStart, 
+					pos.ex, pos.ey, pos.sx, pos.sy);
+			newNeg.clusterDbId = neg.clusterDbId;
+			newNeg.pointDbId = neg.pointDbId;
+			ctx.networkDB.mergePoints(ctx.currentProcessingRegion, pos, neg, newNeg);
+			ctx.networkPointToDbInd.get(pos.unidirId).negativeObj = newNeg;
+			ctx.networkPointToDbInd.remove(neg.unidirId);
 		}
 	}
 
