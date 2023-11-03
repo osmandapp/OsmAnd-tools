@@ -481,12 +481,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	public void mergePoints(NetworkRouteRegion ni, RouteSegmentBorderPoint posMain, RouteSegmentBorderPoint negMerge, RouteSegmentBorderPoint newNeg) {
 		// merge to posDir
 		try {
-			ni.visitedVertices.put(negMerge.unidirId, negMerge.clusterDbId);
-			insVisitedPoints.setLong(1, ni.id);
-			insVisitedPoints.setLong(2, negMerge.unidirId);
-			insVisitedPoints.setInt(3, negMerge.clusterDbId);
-			insVisitedPoints.addBatch();
-			insVisitedPoints.executeBatch();
+			if (ni != null) {
+				ni.visitedVertices.put(negMerge.unidirId, negMerge.clusterDbId);
+				// small issue on rebuilding possible
+				insVisitedPoints.setLong(1, ni.id);
+				insVisitedPoints.setLong(2, negMerge.unidirId);
+				insVisitedPoints.setInt(3, negMerge.clusterDbId);
+				insVisitedPoints.addBatch();
+				insVisitedPoints.executeBatch();
+			}
 			
 			int p = 1;
 			updMergePoint.setLong(p++, newNeg.unidirId);

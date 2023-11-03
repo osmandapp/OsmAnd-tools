@@ -53,6 +53,8 @@ import net.osmand.util.MapUtils;
 // IN PROGRESS
 // TODO if(e.t.parentRoute == null) {
 // 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
+// TODO BUG routing from 52.26657 / 4.961864 to south... 
+
 
 // TESTING
 // BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
@@ -316,7 +318,7 @@ public class HHRoutingSubGraphCreator {
 				final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
 				RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, estimatedRoads);
 				reader.loadRouteIndexData(regions, proc);
-				mergeConnectedPoints(ctx, false);
+//				mergeConnectedPoints(ctx, false);
 				boolean ok = ctx.finishRegionProcess(overlapBbox);
 				if (!ok) {
 					overlapBbox *= 2;
@@ -332,6 +334,7 @@ public class HHRoutingSubGraphCreator {
 		if (ctx.longRoads.size() > 0) {
 			processLongRoads(ctx);
 		}
+		mergeConnectedPoints(ctx, true);
 		return ctx;
 	}
 
@@ -385,7 +388,7 @@ public class HHRoutingSubGraphCreator {
 		});
 		
 		logf("Process long roads %d and %d connected groups...", size, connectedGroups.size());
-		int id = -1;
+		int id = -2;
 		for (LongRoadGroup group  : connectedGroups) {
 			NetworkRouteRegion reg = new NetworkRouteRegion(null, null, group.r);
 			reg.id = id--;
@@ -410,7 +413,6 @@ public class HHRoutingSubGraphCreator {
 				}
 				proc.publish(obj);
 			}
-			mergeConnectedPoints(ctx, true);
 			ctx.finishRegionProcess(OVERLAP_FOR_ROUTING);
 		}
 		ctx.printStatsNetworks();
