@@ -333,7 +333,7 @@ public class HHRoutingSubGraphCreator {
 		if (ctx.longRoads.size() > 0) {
 			processLongRoads(ctx);
 		}
-		mergeConnectedPoints(ctx, true);
+		mergeConnectedPoints(ctx);
 		return ctx;
 	}
 
@@ -1440,21 +1440,20 @@ public class HHRoutingSubGraphCreator {
 		}
 	}
 
-	public void mergeConnectedPoints(NetworkCollectPointCtx ctx, boolean postProcessing) {
+	public void mergeConnectedPoints(NetworkCollectPointCtx ctx) {
 		TLongObjectHashMap<RouteSegmentBorderPoint> mp = new TLongObjectHashMap<>();
 		List<NetworkBorderPoint> lst = new ArrayList<>(ctx.networkPointToDbInd.valueCollection());
 		for (NetworkBorderPoint p : lst) {
 			if (p.positiveObj != null && p.negativeObj == null) {
-				mergePoint(ctx, mp, p.positiveObj, postProcessing);
+				mergePoint(ctx, mp, p.positiveObj);
 			}
 			if (p.negativeObj != null && p.positiveObj == null) {
-				mergePoint(ctx, mp, p.negativeObj, postProcessing);
+				mergePoint(ctx, mp, p.negativeObj);
 			}
 		}
 	}
 
-	private void mergePoint(NetworkCollectPointCtx ctx, TLongObjectHashMap<RouteSegmentBorderPoint> mp, RouteSegmentBorderPoint po,
-			boolean postProcessing) {
+	private void mergePoint(NetworkCollectPointCtx ctx, TLongObjectHashMap<RouteSegmentBorderPoint> mp, RouteSegmentBorderPoint po) {
 		long epnt = Algorithms.combine2Points(po.ex, po.ey);
 		RouteSegmentBorderPoint co = mp.get(epnt);
 		if (co == null) {
@@ -1462,9 +1461,9 @@ public class HHRoutingSubGraphCreator {
 		} else {
 			RouteSegmentBorderPoint pos = po.isPositive() ? po : co;
 			RouteSegmentBorderPoint neg = !po.isPositive() ? po : co;
-			if (!postProcessing && po.roadId != co.roadId) {
-				return;
-			}
+//			if (!postProcessing && po.roadId != co.roadId) {
+//				return;
+//			}
 			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentEnd) {
 				throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
 			}
