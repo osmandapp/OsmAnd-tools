@@ -1458,7 +1458,7 @@ public class HHRoutingSubGraphCreator {
 		} else {
 			RouteSegmentBorderPoint pos = po.isPositive() ? po : co;
 			RouteSegmentBorderPoint neg = !po.isPositive() ? po : co;
-			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentStart) {
+			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentEnd) {
 				throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
 			}
 			logf("MERGE route road %s with %s", pos, neg);
