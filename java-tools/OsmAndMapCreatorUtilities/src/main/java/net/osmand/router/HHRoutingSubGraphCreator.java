@@ -168,9 +168,8 @@ public class HHRoutingSubGraphCreator {
 //		TOTAL_MIN_POINTS = 1000;
 		
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Italy_test";
-		name = "Netherlands_europe_2.road.obf";
-		name = "Spain_castilla-la-mancha_europe_2.road.obf";
+//		name = "Italy_test";
+//		name = "Netherlands_europe_2.road.obf";
 //		ROUTING_PROFILE = "bicycle";
 		return new File(System.getProperty("maps.dir"), name);
 	}
@@ -883,9 +882,9 @@ public class HHRoutingSubGraphCreator {
 			segmentEnd = dir ? s.getSegmentEnd() : s.getSegmentStart();
 			roadId = s.getRoad().getId();
 			sx = dir ? s.getStartPointX() : s.getEndPointX();
-			sy = dir ? s.getStartPointX() : s.getEndPointX();
+			sy = dir ? s.getStartPointY() : s.getEndPointY();
 			ex = !dir ? s.getStartPointX() : s.getEndPointX();
-			ey = !dir ? s.getStartPointX() : s.getEndPointX();
+			ey = !dir ? s.getStartPointY() : s.getEndPointY();
 			unidirId = uniId();
 			uniqueId = uniqueId();
 		}
