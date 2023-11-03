@@ -226,9 +226,8 @@ public class HHRoutingShortcutCreator {
 									pnt, pnt.dualPoint.clusterId, end, end.clusterId, b.toString());
 							System.err.println(HHRoutingUtilities.testGetGeometry(segment.geometry));
 							System.err.println("BUG needs to be fixed " + msg);
-							// TODO 1.9
 							System.err.println(msg);
-//							throw new IllegalStateException(msg);
+							throw new IllegalStateException(msg);
 						}
 						if (segment.dist < 0) {
 							throw new IllegalStateException(segment + " dist < " + segment.dist);

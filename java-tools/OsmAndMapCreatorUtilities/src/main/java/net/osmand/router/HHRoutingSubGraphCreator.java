@@ -51,17 +51,17 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// TODO if(e.t.parentRoute == null) {
-// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
-// TODO BUG routing from 52.26657 / 4.961864 to south... 
 
 
 // TESTING
+// TODO if(e.t.parentRoute == null) {
+// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
 // BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
 // 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
 // 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
 
 // TODO RZR
+// TODO BUG routing from 52.26657 / 4.961864 to south... 
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 // 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
@@ -69,7 +69,6 @@ import net.osmand.util.MapUtils;
 // TODO BUGS
 // NEW sqrtDistance too slow for A* heuristic as it uses measureDist
 // NEW no private roads for shortcuts creates empty points in graph? 
-// REVERT TO min depth / max depth: 1) compare shortcuts 2) slower (4adde378 Improve logging <-> 8a6dd8497b9 )
 // 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
 // 1.4 HHRoutePlanner use cache boundaries to speed up
 // 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
@@ -89,7 +88,7 @@ import net.osmand.util.MapUtils;
 // 2.7 FILE: Implement border crossing issue on client
 // 2.9 FILE: different dates for maps!
 // 2.10 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
-//       There should be maximum at preprocessed visited points < 50K-100K
+//       There should be maximum at preprocessed visited points < 150K (assert at preparation)
 // 2.11 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
 // 2.13 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 2.14 CHECK: Some points have no segments in/out (oneway roads) - simplify?
@@ -103,13 +102,13 @@ import net.osmand.util.MapUtils;
 // 3.5 Avoid specific road
 // 3.6 Deprioritize or exclude roads (parameters)
 // 3.7 Live data (think about it)
-// 3.8.1 EX10 - example that min depth doesn't give good approximation
-// 3.9 FILE utilities: Binary inspector...
+// 3.8 FILE utilities: Binary inspector...
 // 3.9 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
 // 3.10 Implement Arc flags or CH for clusters inside 
 // 3.11 C++ implementation HHRoutePlanner
 // 3.12 Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
-///    static int TOTAL_MAX_POINTS = 99000 (50000), TOTAL_MIN_POINTS = 1000; still slower than git diff fd4fcd54 8a6dd8497b
+///    static int TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
+// 3.12.1 EX10 - example that min depth doesn't give good approximation
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
@@ -506,8 +505,7 @@ public class HHRoutingSubGraphCreator {
 					continue;
 				}
 			}
-			
-			proceed(c, seg, c.queue);
+			proceed(c, seg, existNetworkPoints, c.queue);
 		}
 		return order;
 	}
@@ -532,7 +530,7 @@ public class HHRoutingSubGraphCreator {
 //				}
 				borderPoints.add(RouteSegmentBorderPoint.fromParent(ls));
 			} else {
-				proceed(c, ls, c.queue);
+				proceed(c, ls, null, c.queue);
 			}
 		}
 		
@@ -579,7 +577,7 @@ public class HHRoutingSubGraphCreator {
 		return borderPoints;
 	}
 
-	private boolean proceed(NetworkIsland c, RouteSegmentVertex vertex, PriorityQueue<RouteSegmentVertex> queue) {
+	private boolean proceed(NetworkIsland c, RouteSegmentVertex vertex, TLongObjectHashMap<RouteSegmentVertex> existNetworkPoints, PriorityQueue<RouteSegmentVertex> queue) {
 		c.toVisitVertices.remove(vertex.getId());
 		if (c.testIfVisited(vertex.getId())) {
 			throw new IllegalStateException(String.format("%d %s was already locally visited", vertex.getId(), vertex.toString()));
@@ -592,11 +590,12 @@ public class HHRoutingSubGraphCreator {
 		c.loadVertexConnections(vertex);
 		float distFromStart = vertex.distanceFromStart + vertex.distSegment() / 2;
 		for (RouteSegmentEdge e : vertex.connections) {
-			if (!c.testIfVisited(e.t.getId()) && !c.toVisitVertices.containsKey(e.t.getId())) {
-				// TODO
-//				if(e.t.parentRoute == null) {
-//					throw new IllegalArgumentException();
-//				}
+			long id = e.t.getId();
+			if (!c.testIfVisited(id) && !c.toVisitVertices.containsKey(id)) {
+				if (existNetworkPoints != null && !existNetworkPoints.contains(id) && e.t.parentRoute != null) {
+					// assert node is visited once
+					throw new IllegalArgumentException(e.t + " parent " + e.t.parentRoute);
+				}
 				e.t.parentRoute = vertex;
 				e.t.distanceFromStart = distFromStart + e.t.distSegment() / 2;
 				c.addSegmentToQueue(e.t);
