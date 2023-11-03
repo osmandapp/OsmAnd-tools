@@ -1440,7 +1440,8 @@ public class HHRoutingSubGraphCreator {
 
 	public static void mergeConnectedPoints(NetworkCollectPointCtx ctx) {
 		TLongObjectHashMap<RouteSegmentBorderPoint> mp = new TLongObjectHashMap<>();
-		for (NetworkBorderPoint p : ctx.networkPointToDbInd.valueCollection()) {
+		List<NetworkBorderPoint> lst = new ArrayList<>(ctx.networkPointToDbInd.valueCollection());
+		for (NetworkBorderPoint p : lst) {
 			if (p.positiveObj != null && p.negativeObj == null) {
 				mergePoint(ctx, mp, p.positiveObj);
 			}
