@@ -317,6 +317,7 @@ public class HHRoutingSubGraphCreator {
 				final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
 				RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, estimatedRoads);
 				reader.loadRouteIndexData(regions, proc);
+				mergeConnectedPoints(ctx, false);
 				boolean ok = ctx.finishRegionProcess(overlapBbox);
 				if (!ok) {
 					overlapBbox *= 2;
@@ -410,6 +411,7 @@ public class HHRoutingSubGraphCreator {
 				}
 				proc.publish(obj);
 			}
+			mergeConnectedPoints(ctx, true);
 			ctx.finishRegionProcess(OVERLAP_FOR_ROUTING);
 		}
 		ctx.printStatsNetworks();
@@ -923,7 +925,8 @@ public class HHRoutingSubGraphCreator {
 		
 		@Override
 		public String toString() {
-			return String.format("Border point db %d (cluster %d), road %d [%d - %d]", pointDbId, clusterDbId, roadId, segmentStart, segmentEnd);
+			return String.format("Border point db %d (cluster %d), road %d [%d - %d]", pointDbId, clusterDbId, 
+					roadId / 64, segmentStart, segmentEnd);
 		}
 	}
 
@@ -1314,7 +1317,6 @@ public class HHRoutingSubGraphCreator {
 		}
 
 		public boolean finishRegionProcess(double overlapBbox) throws SQLException {
-			mergeConnectedPoints(this);
 			logf("Tiles " + rctx.calculationProgress.getInfo(null).get("tiles"));
 			QuadRect c = currentProcessingRegion.getCalcBbox();
 			QuadRect r = currentProcessingRegion.rect;
@@ -1438,20 +1440,21 @@ public class HHRoutingSubGraphCreator {
 		}
 	}
 
-	public static void mergeConnectedPoints(NetworkCollectPointCtx ctx) {
+	public void mergeConnectedPoints(NetworkCollectPointCtx ctx, boolean postProcessing) {
 		TLongObjectHashMap<RouteSegmentBorderPoint> mp = new TLongObjectHashMap<>();
 		List<NetworkBorderPoint> lst = new ArrayList<>(ctx.networkPointToDbInd.valueCollection());
 		for (NetworkBorderPoint p : lst) {
 			if (p.positiveObj != null && p.negativeObj == null) {
-				mergePoint(ctx, mp, p.positiveObj);
+				mergePoint(ctx, mp, p.positiveObj, postProcessing);
 			}
 			if (p.negativeObj != null && p.positiveObj == null) {
-				mergePoint(ctx, mp, p.negativeObj);
+				mergePoint(ctx, mp, p.negativeObj, postProcessing);
 			}
 		}
 	}
 
-	private static void mergePoint(NetworkCollectPointCtx ctx, TLongObjectHashMap<RouteSegmentBorderPoint> mp, RouteSegmentBorderPoint po) {
+	private void mergePoint(NetworkCollectPointCtx ctx, TLongObjectHashMap<RouteSegmentBorderPoint> mp, RouteSegmentBorderPoint po,
+			boolean postProcessing) {
 		long epnt = Algorithms.combine2Points(po.ex, po.ey);
 		RouteSegmentBorderPoint co = mp.get(epnt);
 		if (co == null) {
@@ -1459,6 +1462,9 @@ public class HHRoutingSubGraphCreator {
 		} else {
 			RouteSegmentBorderPoint pos = po.isPositive() ? po : co;
 			RouteSegmentBorderPoint neg = !po.isPositive() ? po : co;
+			if (!postProcessing && po.roadId != co.roadId) {
+				return;
+			}
 			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentEnd) {
 				throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
 			}
