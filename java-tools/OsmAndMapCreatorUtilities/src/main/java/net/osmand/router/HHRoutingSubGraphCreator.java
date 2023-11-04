@@ -177,6 +177,7 @@ public class HHRoutingSubGraphCreator {
 
 	public static void main(String[] args) throws Exception {
 		CLEAN = false;
+		boolean merge = false;
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
@@ -189,6 +190,8 @@ public class HHRoutingSubGraphCreator {
 				ALG_BY_DEPTH_REACH_POINTS = false;
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
+			} else if (a.equals("--merge")) {
+				merge = true;
 			} else if (a.equals("--debug")) {
 				DEBUG_VERBOSE_LEVEL = 1;
 				DEBUG_STORE_ALL_ROADS = 1;
@@ -212,7 +215,13 @@ public class HHRoutingSubGraphCreator {
 		HHRoutingPrepareContext prepareContext = new HHRoutingPrepareContext(obfFile, ROUTING_PROFILE, ROUTING_PARAMS);
 		NetworkCollectPointCtx ctx = new NetworkCollectPointCtx(prepareContext, networkDB);
 		try {
-			proc.collectNetworkPoints(ctx);
+			ctx.networkDB.loadNetworkPoints(ctx.networkPointToDbInd);
+			ctx.longRoads = ctx.networkDB.loadNetworkLongRoads();
+			if (merge) {
+				proc.mergeConnectedPoints(ctx);
+			} else { 
+				proc.collectNetworkPoints(ctx);
+			}
 		} finally {
 			if (ctx.visualClusters.size() > 0) {
 				saveOsmFile(visualizeClusters(ctx.visualClusters), new File(folder, name + ".osm"));
@@ -249,8 +258,7 @@ public class HHRoutingSubGraphCreator {
 			}
 			return ctx;
 		}
-		ctx.networkDB.loadNetworkPoints(ctx.networkPointToDbInd);
-		ctx.longRoads = ctx.networkDB.loadNetworkLongRoads();
+		
 		Set<String> routeRegionNames = new TreeSet<>();
 		for (RouteRegion r : ctx.rctx.reverseMap.keySet()) {
 			if (routeRegionNames.add(r.getName())) {
@@ -317,7 +325,6 @@ public class HHRoutingSubGraphCreator {
 				final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
 				RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, estimatedRoads);
 				reader.loadRouteIndexData(regions, proc);
-//				mergeConnectedPoints(ctx, false);
 				boolean ok = ctx.finishRegionProcess(overlapBbox);
 				if (!ok) {
 					overlapBbox *= 2;
