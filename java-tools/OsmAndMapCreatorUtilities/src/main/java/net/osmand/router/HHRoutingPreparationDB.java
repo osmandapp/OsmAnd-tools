@@ -251,8 +251,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	public void insertProcessedRegion(NetworkRouteRegion networkRouteRegion, 
 			TLongObjectHashMap<NetworkBorderPoint> borderPoints, List<NetworkLongRoad> roads) throws SQLException {
 		insertBorderPoints(borderPoints);
-		insertVisitedPoints(networkRouteRegion);
-		updateRegionBbox(networkRouteRegion);
+		int ins = insertVisitedPoints(networkRouteRegion);
+		if (ins > 0) {
+			updateRegionBbox(networkRouteRegion);
+		}
 		updateLongRoads(networkRouteRegion, roads);
 		
 	}
@@ -319,10 +321,10 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		p.execute();
 	}
 
-	private void insertVisitedPoints(NetworkRouteRegion networkRouteRegion) throws SQLException {
+	private int insertVisitedPoints(NetworkRouteRegion networkRouteRegion) throws SQLException {
 		int ind = 0;
 		if (networkRouteRegion.visitedVertices.size() == 0) {
-			return;
+			return ind;
 		}
 		TLongIntIterator it = networkRouteRegion.visitedVertices.iterator();
 		while (it.hasNext()) {
@@ -331,12 +333,12 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insVisitedPoints.setLong(2, it.key());
 			insVisitedPoints.setInt(3, it.value());
 			insVisitedPoints.addBatch();
-			if (ind++ > BATCH_SIZE) {
+			if (ind++ % BATCH_SIZE == 0) {
 				insVisitedPoints.executeBatch();
-				ind = 0;
 			}
 		}
 		insVisitedPoints.executeBatch();
+		return ind;
 	}
 
 	private void insertBorderPoints(TLongObjectHashMap<NetworkBorderPoint> borderPoints) throws SQLException {
