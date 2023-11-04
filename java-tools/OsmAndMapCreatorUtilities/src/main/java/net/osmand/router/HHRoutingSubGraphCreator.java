@@ -85,7 +85,7 @@ import net.osmand.util.MapUtils;
 
 
 // HHRoutePlanner - Routing implementations
-// 2.0.1 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
+// 2.0.1 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263) - Montenegro
 // 2.0.2 HHRoutePlanner use cache boundaries to speed up search
 // 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 

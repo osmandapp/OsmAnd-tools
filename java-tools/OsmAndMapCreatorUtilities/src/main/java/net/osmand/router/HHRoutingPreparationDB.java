@@ -321,6 +321,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 
 	private void insertVisitedPoints(NetworkRouteRegion networkRouteRegion) throws SQLException {
 		int ind = 0;
+		if (networkRouteRegion.visitedVertices.size() == 0) {
+			return;
+		}
 		TLongIntIterator it = networkRouteRegion.visitedVertices.iterator();
 		while (it.hasNext()) {
 			it.advance();
@@ -339,17 +342,20 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	private void insertBorderPoints(TLongObjectHashMap<NetworkBorderPoint> borderPoints) throws SQLException {
 		int batchInsPoint = 0;
 		for (NetworkBorderPoint npnt : borderPoints.valueCollection()) {
+			boolean ins = false;
 			if (npnt.positiveObj != null && !npnt.positiveObj.inserted) {
 				insPoint(npnt.positiveObj);
 				npnt.positiveObj.inserted = true;
+				ins = true;
 				batchInsPoint++;
 			}
 			if (npnt.negativeObj != null && !npnt.negativeObj.inserted) {
 				insPoint(npnt.negativeObj);
 				npnt.negativeObj.inserted = true;
+				ins = true;
 				batchInsPoint++;
 			}
-			if (npnt.positiveObj != null && npnt.negativeObj != null) {
+			if (ins && npnt.positiveObj != null && npnt.negativeObj != null) {
 				updDualPoint.setInt(1, npnt.negativeObj.pointDbId);
 				updDualPoint.setInt(2, npnt.negativeObj.clusterDbId);
 				updDualPoint.setInt(3, npnt.positiveObj.pointDbId);
@@ -358,14 +364,18 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 				updDualPoint.setInt(2, npnt.positiveObj.clusterDbId);
 				updDualPoint.setInt(3, npnt.negativeObj.pointDbId);
 				updDualPoint.addBatch();
+				batchInsPoint++;
 			}
 			if (batchInsPoint > BATCH_SIZE) {
 				batchInsPoint = 0;
 				insPoint.executeBatch();
+				updDualPoint.executeBatch();
 			}
 		}
-		insPoint.executeBatch();
-		updDualPoint.executeBatch();
+		if (batchInsPoint > 0) {
+			insPoint.executeBatch();
+			updDualPoint.executeBatch();
+		}
 	}
 
 	private void insPoint(RouteSegmentBorderPoint obj)
