@@ -51,65 +51,69 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
-// 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
+// 1.4.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
+// 1.4.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 
 
 // TESTING
 // TODO BUG A* routing from 52.26657 / 4.961864 to south... 
 
 // TODO RZR
-// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// ???
 
 // TODO BUGS
 // NEW sqrtDistance too slow for A* heuristic as it uses measureDist
 // NEW no private roads for shortcuts creates empty points in graph? 
-// 1.3 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
-// 1.4 HHRoutePlanner use cache boundaries to speed up
-// 1.6 HHRoutePlanner revert 2 queues to fail fast in 1 direction
+// 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
+// 1.1.2 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
+// 1.1.3 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
+// 1.1.4 CLEANUP: shortcuts, midpoint, chpoint
+// 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
+// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
-// 1.10 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
-// 1.11 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
-// 1.12 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
-// 1.13 CLEANUP: shortcuts, midpoint, chpoint
-// 1.14 MapCreator: Cut start / end to projection as in detailed calculation ()
+// 1.0 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
+// 1.7 FILE: Implement border crossing issue on client
+// 1.8 FILE: different dates for maps!
 
-// 2nd  phase 
+// 1.3.1 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
+//    There should be maximum at preprocessed visited points < 150K (assert at preparation)
+// 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
+// 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
+// 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
+// 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
+
+
+
+// HHRoutePlanner - Routing implementations
+// 2.0.1 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263)
+// 2.0.2 HHRoutePlanner use cache boundaries to speed up search
+// 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
+
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
-
-// 2.6 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
-// 2.7 FILE: Implement border crossing issue on client
-// 2.9 FILE: different dates for maps!
-
-// 2.10 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
-//       There should be maximum at preprocessed visited points < 150K (assert at preparation)
-// 2.11 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
-// 2.13 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
-// 2.14 CHECK: Some points have no segments in/out (oneway roads) - simplify?
-// 2.16 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
+// 2.4 Once point is unreachable (isolated cluster) A* - Point 1437488 (176391972 34-33) visited - cost 118035.15 > prev cost 118254.05
+// 2.5 C++ implementation HHRoutePlanner
+// 2.6 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+// 2.8 Avoid specific road
+// 2.9 Deprioritize or exclude roads (parameters)
+// 2.10 Live data (think about it)
 
 // 3 Later implementation
-// 3.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 3.2 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
-// 3.3 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
-// 3.4 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
-// 3.5 Avoid specific road
-// 3.6 Deprioritize or exclude roads (parameters)
-// 3.7 Live data (think about it)
-// 3.8 FILE utilities: Binary inspector...
-// 3.9 TESTS: 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 3.10 Implement Arc flags or CH for clusters inside 
-// 3.11 C++ implementation HHRoutePlanner
-// 3.12 Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
-///    static int TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
-// 3.12.1 EX10 - example that min depth doesn't give good approximation
+// 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
+// 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
+// 3.3 FILE utilities: Binary inspector...
+// 3.4 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
+// 3.5 DATA: Tests 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 3.6 DATA: Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
+//    static int TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
+// 3.7 DATA: EX10 - example that min depth doesn't give good approximation
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
 // 4.2 Implement CH algorithm - HARD to wait to finish CH
 // 4.3 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
+// 4.4 Implement Arc flags or CH for clusters inside 
 
 public class HHRoutingSubGraphCreator {
 
@@ -1459,11 +1463,13 @@ public class HHRoutingSubGraphCreator {
 		} else {
 			RouteSegmentBorderPoint pos = po.isPositive() ? po : co;
 			RouteSegmentBorderPoint neg = !po.isPositive() ? po : co;
-//			if (!postProcessing && po.roadId != co.roadId) {
-//				return;
-//			}
 			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentEnd) {
-				throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
+				String msg = String.format("Can't merge %s with %s", po, co);
+				if (po.clusterDbId == co.clusterDbId) {
+					System.err.println("Ignore (same cluster): " + msg);
+				} else {
+					throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
+				}
 			}
 			logf("MERGE route road %s with %s", pos, neg);
 			RouteSegmentBorderPoint newNeg = new RouteSegmentBorderPoint(pos.roadId, pos.segmentEnd, pos.segmentStart, 
