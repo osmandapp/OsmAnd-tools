@@ -1113,14 +1113,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		}
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(2000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
-		RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
-				addImpassableRoad(1481307619l).
-				addImpassableRoad(1488689829l).
-				addImpassableRoad(40775598739l).
-				addImpassableRoad(18569170929l).
-				
-				
-				setDirectionPoints(directionPointsFile)
+		// addImpassableRoad(18569170929l).
+		RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().setDirectionPoints(directionPointsFile)
 				.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 
 		// config.planRoadDirection = 1;

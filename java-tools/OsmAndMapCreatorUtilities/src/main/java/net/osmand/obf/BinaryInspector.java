@@ -89,10 +89,10 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-					"-latlon=49.9014,23.7566",
+					"-latlon=50.449257,30.433495",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Ukraine_lviv_europe_2.obf"
+					System.getProperty("maps.dir") + "Ukraine_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
