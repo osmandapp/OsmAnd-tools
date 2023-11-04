@@ -287,7 +287,7 @@ public class HHRoutingTopGraphCreator {
 //		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
 		time = System.nanoTime();
 		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), routingStats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegments(list, true);
+		int cntEdges = networkDB.loadNetworkSegmentsInternal(list, true);
 		routingStats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
 		System.out.printf(" %,d - %.2fms\nContracting nodes..\n", cntEdges, routingStats.loadEdgesTime);
 		

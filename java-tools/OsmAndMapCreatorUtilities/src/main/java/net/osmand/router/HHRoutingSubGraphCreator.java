@@ -54,16 +54,11 @@ import net.osmand.util.MapUtils;
 
 
 // TESTING
-// TODO if(e.t.parentRoute == null) {
-// 1.9 !!!TRICKY BUG needs to be fixed road separator (Europe / Spain / Alberta / Texas !!https://www.openstreetmap.org/way/377117290 390-389)
-// BUG !! mincut 182  ( = 209) + 12 network pnts != 194 graph reached size: 489655051 0 1
-// 1.8 BUG!! __europe car BUG!! mincut 5 + 9 network pnts != 13 graph reached size: 976618135 0 1 (Germany Bicycle mincut 30 +  22)
-// 2.15 PUT CHECK HHRoutingSubGraphCreator OVERLAP_FOR_ROUTING shouldn't exist as it could lead to bugs with ferry hops
+// 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
+// 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 
 // TODO RZR
 // TODO BUG routing from 52.26657 / 4.961864 to south... 
-// 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
-// 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
 // TODO BUGS
@@ -81,12 +76,13 @@ import net.osmand.util.MapUtils;
 
 // 2nd  phase 
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
-// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update)
+// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 
 // 2.6 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 2.7 FILE: Implement border crossing issue on client
 // 2.9 FILE: different dates for maps!
+
 // 2.10 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
 //       There should be maximum at preprocessed visited points < 150K (assert at preparation)
 // 2.11 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
@@ -98,7 +94,7 @@ import net.osmand.util.MapUtils;
 // 3.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 3.2 Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
 // 3.3 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
-// 3.4 SERVER: Speedup shortcut calc: local to use less memory, different unload routing context
+// 3.4 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.5 Avoid specific road
 // 3.6 Deprioritize or exclude roads (parameters)
 // 3.7 Live data (think about it)

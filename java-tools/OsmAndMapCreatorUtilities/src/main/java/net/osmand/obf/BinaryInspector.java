@@ -89,10 +89,10 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-//					"-latlon=50.73381,7.08721",
+					"-latlon=49.9014,23.7566",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-//					System.getProperty("maps.dir") + "Faroe-islands_europe_2.road.obf"
+					System.getProperty("maps.dir") + "Ukraine_lviv_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
