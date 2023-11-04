@@ -51,14 +51,14 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-
-
-// TESTING
 // 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 // 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 
+
+// TESTING
+// TODO BUG A* routing from 52.26657 / 4.961864 to south... 
+
 // TODO RZR
-// TODO BUG routing from 52.26657 / 4.961864 to south... 
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
 // TODO BUGS
