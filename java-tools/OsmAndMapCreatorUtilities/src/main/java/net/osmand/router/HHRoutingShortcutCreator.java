@@ -27,6 +27,7 @@ import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
+import gnu.trove.map.hash.TLongDoubleHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
@@ -377,76 +378,72 @@ public class HHRoutingShortcutCreator {
 			throws InterruptedException, IOException {
 		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
-		List<RouteSegment> res = new ArrayList<>();
-//			BinaryRoutePlanner.TRACE_ROUTING = true;
+		
+		//// TEST BLOCK ///// 
+//		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = true;
 		// TODO 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 		// TODO 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
-		boolean testBUG_B = false;
-		boolean testBUG_P = false;
-		TLongObjectHashMap<RouteSegment> testBug = testBUG_B || testBUG_P  ? new TLongObjectHashMap<RouteSegment>() : null;
-		
-		for (int iteration = 0; iteration < (testBUG_B || testBUG_P ? 2 : 1); iteration++) {
-			res.clear();
-			if (testBUG_B) {
-				BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
-			}
-			if (testBUG_P) {
+		boolean testBUG = false;
+//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 232921868;
+		TLongObjectHashMap<RouteSegment> testIteration = null, resUnique = new TLongObjectHashMap<>();
+		for (int iteration = 0; iteration < (testBUG ? 2 : 1); iteration++) {
+			testIteration = resUnique; 
+			if (testBUG) {
+//				BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
 				BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
 			}
+			///// TEST BLOCK ////
+			
+			resUnique = new TLongObjectHashMap<>();
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
 			ctx.config.PENALTY_FOR_REVERSE_DIRECTION = -1;
 			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
 					null, segments);
 			if (frs != null) {
-				TLongSet set = new TLongHashSet();
 				for (RouteSegment o : frs.all) {
 					// duplicates are possible as alternative routes
 					long pntId = calculateRoutePointInternalId(o.getRoad().getId(), o.getSegmentStart(), o.getSegmentEnd());
-					if (set.add(pntId)) {
-						res.add(o);
-					} else {
+					if (resUnique.containsKey(pntId) && resUnique.get(pntId).getDistanceFromStart() < o.getDistanceFromStart()) {
 						continue;
-					}
-
-					// checks
-					if (testBug != null && iteration == 0) {
-						testBug.put(pntId, o);
-					} else if (testBug != null) {
-						RouteSegment prev = testBug.get(pntId);
-						if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
-							double d1 = HHRoutingUtilities.testGetDist(prev, false);
-							double d2 = HHRoutingUtilities.testGetDist(o, testBUG_P);
-							System.out.printf("1 = false (2 = true): %.1f%% (%.1f%%). %.2f s (%.2f m) != %.2f  s (%.2fm) - %.5f, %.5f -> %.5f, %.5f \n",
-									Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100,
-									Math.abs(1 - d1 / d2) * 100, prev.distanceFromStart,
-									HHRoutingUtilities.testGetDist(prev, false), o.distanceFromStart,
-									HHRoutingUtilities.testGetDist(o, testBUG_P),
-									MapUtils.get31LatitudeY(s.getStartPointY()), MapUtils.get31LongitudeX(s.getStartPointX()),
-									MapUtils.get31LatitudeY(o.getStartPointY()), MapUtils.get31LongitudeX(o.getStartPointX())
-									);
-							List<LatLon> lprev = HHRoutingUtilities.testGeometry(prev);
-							List<LatLon> lcur = HHRoutingUtilities.testGeometry(o);
-							boolean diff = false;
-							if (lprev.size() != lcur.size()) {
-								diff = true;
-							}
-							for (int k = 0; !diff && k < lprev.size(); k++) {
-								if (MapUtils.getDistance(lprev.get(k), lcur.get(k)) > 5) {
-									diff = true;
-								}
-							}
-							if (diff) {
-								System.out.println(HHRoutingUtilities.testGetGeometry(lprev));
-								System.out.println(HHRoutingUtilities.testGetGeometry(lcur));
-							}
-						}
-					}
+					} 
+					resUnique.put(pntId, o);
 				}
 			}
 		}
+		//// TEST BLOCK
+		long[] testKeys = testIteration == null ? new long[0] : testIteration.keys();
+		for (long pntId : testKeys) {
+			RouteSegment prev = testIteration.get(pntId);
+			RouteSegment o = resUnique.get(pntId);
+			if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
+				double d1 = HHRoutingUtilities.testGetDist(prev, false);
+				double d2 = HHRoutingUtilities.testGetDist(o, true);
+				System.out.printf("1 = false (2 = true): %.1f%% (%.1f%%). %.2f s (%.2f m) != %.2f  s (%.2fm) - %s %s - %.5f, %.5f -> %.5f, %.5f \n",
+						Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100, Math.abs(1 - d1 / d2) * 100,
+						prev.distanceFromStart, HHRoutingUtilities.testGetDist(prev, false), o.distanceFromStart,
+						HHRoutingUtilities.testGetDist(o, true), s, o,
+						MapUtils.get31LatitudeY(s.getStartPointY()), MapUtils.get31LongitudeX(s.getStartPointX()), 
+						MapUtils.get31LatitudeY(o.getStartPointY()), MapUtils.get31LongitudeX(o.getStartPointX()));
+				List<LatLon> lprev = HHRoutingUtilities.testGeometry(prev);
+				List<LatLon> lcur = HHRoutingUtilities.testGeometry(o);
+				boolean diff = false;
+				if (lprev.size() != lcur.size()) {
+					diff = true;
+				}
+				for (int k = 0; !diff && k < lprev.size(); k++) {
+					if (MapUtils.getDistance(lprev.get(k), lcur.get(k)) > 5) {
+						diff = true;
+					}
+				}
+				if (diff) {
+					System.out.println(HHRoutingUtilities.testGetGeometry(lprev));
+					System.out.println(HHRoutingUtilities.testGetGeometry(lcur));
+				}
+			}
 
-		return res;
+		}
+		return new ArrayList<>(resUnique.valueCollection());
 	}
 	
 }
