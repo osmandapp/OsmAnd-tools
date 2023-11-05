@@ -1474,6 +1474,8 @@ public class HHRoutingSubGraphCreator {
 				String msg = String.format("Can't merge %s with %s", po, co);
 				if (po.clusterDbId == co.clusterDbId) {
 					System.err.println("Ignore (same cluster): " + msg);
+					// it's possible to merge it if it's unique and check other cases
+					return;
 				} else {
 					throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
 				}

@@ -71,7 +71,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insertRegionBoundaries = conn.prepareStatement("INSERT INTO routeRegions(left, right, top, bottom, id) VALUES (?, ?, ?, ?, ?)");
 
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
-			updMergePoint = conn.prepareStatement("UPDATE points SET pointGeoUniDir = ?, pointGeoId = ?, start = ?, end = ?, sx31 = ?, sy31 = ?, ex31 = ?, ey31 = ? WHERE idPoint = ?");
+			updMergePoint = conn.prepareStatement("UPDATE points SET pointGeoUniDir = ?, pointGeoId = ?, roadId = ?, start = ?, end = ?, sx31 = ?, sy31 = ?, ex31 = ?, ey31 = ? WHERE idPoint = ?");
 		}
 	}
 	
@@ -504,6 +504,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			int p = 1;
 			updMergePoint.setLong(p++, newNeg.unidirId);
 			updMergePoint.setLong(p++, newNeg.uniqueId);
+			updMergePoint.setLong(p++, newNeg.roadId);
 			updMergePoint.setLong(p++, newNeg.segmentStart);
 			updMergePoint.setLong(p++, newNeg.segmentEnd);
 			updMergePoint.setLong(p++, newNeg.sx);
