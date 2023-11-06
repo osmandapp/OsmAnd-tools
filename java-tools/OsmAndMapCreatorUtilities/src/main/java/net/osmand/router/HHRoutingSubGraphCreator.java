@@ -55,6 +55,7 @@ import net.osmand.util.MapUtils;
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
 // TESTING
+// HANGS Europe calculation
 // 1.4.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
 // NEW sqrtDistance too slow for A* heuristic as it uses measureDist
 // 1.4.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
@@ -70,7 +71,6 @@ import net.osmand.util.MapUtils;
 // 1.1.3 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.1.4 CLEANUP: shortcuts, midpoint, chpoint
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
-// NEW no private roads for shortcuts creates empty points in graph? 
 
 // 1.0 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 1.7 FILE: Implement border crossing issue on client
@@ -83,8 +83,8 @@ import net.osmand.util.MapUtils;
 // 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
 // 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
 
-
 // HHRoutePlanner - Routing implementations
+// 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation 
 // 2.0.2 HHRoutePlanner use cache boundaries to speed up search
 // 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 2.0.4 should be speed up by just clearing visited
@@ -97,6 +97,7 @@ import net.osmand.util.MapUtils;
 // 2.8 Avoid specific road
 // 2.9 Deprioritize or exclude roads (parameters)
 // 2.10 Live data (think about it)
+// 2.11 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 
 // 3 Later implementation
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
