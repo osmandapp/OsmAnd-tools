@@ -235,6 +235,7 @@ public class OsmAndTestStyleRenderer {
 
 				if (textTileExt != null) {
 					txtFile = new File(pms.outputDir, formatTile(zoom, x, y, suffix, textTileExt));
+					System.out.println("  Save text to tile " + txtFile.getName());
 				} else {
 					txtFile = null;
 				}
