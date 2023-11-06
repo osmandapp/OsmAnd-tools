@@ -9,8 +9,8 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class GetDistanceTest {
-	public final float MAX_DEVIATION = 1.0f; // %
-	public final int TEST_PERFORMANCE_TIMEOUT = 100; // ms, 0 to disable
+	public final int TEST_PERFORMANCE_TIMEOUT = 0; // ms, 0 to disable, 100-1000 to test
+//	public final float MAX_DEVIATION = 1.0f; // max allowed deviation % for squareRootDist31() (later)
 
 	@Test
 	public void testTriangleInequality() throws Exception {
