@@ -59,6 +59,7 @@ import net.osmand.util.MapUtils;
 // NEW sqrtDistance too slow for A* heuristic as it uses measureDist
 // 1.4.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // TODO BUG A* routing from 52.26657 / 4.961864 to south... 
+// 2.0.1 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263) - Montenegro
 
 // TODO RZR
 // ???
@@ -84,10 +85,9 @@ import net.osmand.util.MapUtils;
 
 
 // HHRoutePlanner - Routing implementations
-// 2.0.1 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263) - Montenegro
 // 2.0.2 HHRoutePlanner use cache boundaries to speed up search
 // 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
-
+// 2.0.4 should be speed up by just clearing visited
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)

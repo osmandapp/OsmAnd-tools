@@ -95,7 +95,7 @@ public class HHRoutingShortcutCreator {
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			} else if (a.equals("--onlycompact")) {
-				onlyCompact= true;
+				onlyCompact = true;
 			}
 		}
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
