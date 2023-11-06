@@ -51,25 +51,25 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.4.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
-// 1.4.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
-
+// TODO 1.6 make exception to test non base
+// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 
 // TESTING
+// 1.4.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
+// NEW sqrtDistance too slow for A* heuristic as it uses measureDist
+// 1.4.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
 // TODO BUG A* routing from 52.26657 / 4.961864 to south... 
 
 // TODO RZR
 // ???
 
 // TODO BUGS
-// NEW sqrtDistance too slow for A* heuristic as it uses measureDist
-// NEW no private roads for shortcuts creates empty points in graph? 
 // 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.1.2 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
 // 1.1.3 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.1.4 CLEANUP: shortcuts, midpoint, chpoint
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
-// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// NEW no private roads for shortcuts creates empty points in graph? 
 
 // 1.0 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 1.7 FILE: Implement border crossing issue on client
@@ -81,7 +81,6 @@ import net.osmand.util.MapUtils;
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
 // 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
-
 
 
 // HHRoutePlanner - Routing implementations

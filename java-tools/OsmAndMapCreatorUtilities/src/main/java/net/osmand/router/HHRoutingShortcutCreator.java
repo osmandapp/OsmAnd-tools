@@ -1,9 +1,9 @@
 package net.osmand.router;
 
 import static net.osmand.router.HHRoutePlanner.calculateRoutePointInternalId;
-import static net.osmand.router.HHRoutingUtilities.logf;
 import static net.osmand.router.HHRoutingUtilities.addWay;
 import static net.osmand.router.HHRoutingUtilities.getPoint;
+import static net.osmand.router.HHRoutingUtilities.logf;
 import static net.osmand.router.HHRoutingUtilities.saveOsmFile;
 
 import java.io.File;
@@ -27,12 +27,8 @@ import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
-import gnu.trove.map.hash.TLongDoubleHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.TLongSet;
-import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
-import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
@@ -40,7 +36,6 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
-import net.osmand.util.MapUtils;
 
 public class HHRoutingShortcutCreator {
 
@@ -378,20 +373,17 @@ public class HHRoutingShortcutCreator {
 			throws InterruptedException, IOException {
 		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
-		
-		//// TEST BLOCK ///// 
-//		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = true;
-		// TODO 1.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
-		// TODO 1.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
-		boolean testBUG = false;
-//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 232921868;
-		TLongObjectHashMap<RouteSegment> testIteration = null, resUnique = new TLongObjectHashMap<>();
-		for (int iteration = 0; iteration < (testBUG ? 2 : 1); iteration++) {
-			testIteration = resUnique; 
-			if (testBUG) {
+		TLongObjectHashMap<RouteSegment> resUnique = new TLongObjectHashMap<>();
+		//// REMOVE TEST BLOCK ONCE NOT USED///// 
+//		boolean testBUG = true;
+////		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 91333429;
+//		TLongObjectHashMap<RouteSegment> testIteration = null;
+//		for (int iteration = 0; iteration < (testBUG ? 2 : 1); iteration++) {
+//			testIteration = resUnique; 
+//			if (testBUG) {
 //				BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
-				BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
-			}
+//				BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
+//			}
 			///// TEST BLOCK ////
 			
 			resUnique = new TLongObjectHashMap<>();
@@ -410,39 +402,39 @@ public class HHRoutingShortcutCreator {
 					resUnique.put(pntId, o);
 				}
 			}
-		}
-		//// TEST BLOCK
-		long[] testKeys = testIteration == null ? new long[0] : testIteration.keys();
-		for (long pntId : testKeys) {
-			RouteSegment prev = testIteration.get(pntId);
-			RouteSegment o = resUnique.get(pntId);
-			if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
-				double d1 = HHRoutingUtilities.testGetDist(prev, false);
-				double d2 = HHRoutingUtilities.testGetDist(o, true);
-				System.out.printf("1 = false (2 = true): %.1f%% (%.1f%%). %.2f s (%.2f m) != %.2f  s (%.2fm) - %s %s - %.5f, %.5f -> %.5f, %.5f \n",
-						Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100, Math.abs(1 - d1 / d2) * 100,
-						prev.distanceFromStart, HHRoutingUtilities.testGetDist(prev, false), o.distanceFromStart,
-						HHRoutingUtilities.testGetDist(o, true), s, o,
-						MapUtils.get31LatitudeY(s.getStartPointY()), MapUtils.get31LongitudeX(s.getStartPointX()), 
-						MapUtils.get31LatitudeY(o.getStartPointY()), MapUtils.get31LongitudeX(o.getStartPointX()));
-				List<LatLon> lprev = HHRoutingUtilities.testGeometry(prev);
-				List<LatLon> lcur = HHRoutingUtilities.testGeometry(o);
-				boolean diff = false;
-				if (lprev.size() != lcur.size()) {
-					diff = true;
-				}
-				for (int k = 0; !diff && k < lprev.size(); k++) {
-					if (MapUtils.getDistance(lprev.get(k), lcur.get(k)) > 5) {
-						diff = true;
-					}
-				}
-				if (diff) {
-					System.out.println(HHRoutingUtilities.testGetGeometry(lprev));
-					System.out.println(HHRoutingUtilities.testGetGeometry(lcur));
-				}
-			}
-
-		}
+			//// TEST BLOCK
+//		}
+//		long[] testKeys = testIteration == null ? new long[0] : testIteration.keys();
+//		for (long pntId : testKeys) {
+//			RouteSegment prev = testIteration.get(pntId);
+//			RouteSegment o = resUnique.get(pntId);
+//			if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 1) {
+//				double d1 = HHRoutingUtilities.testGetDist(prev, false);
+//				double d2 = HHRoutingUtilities.testGetDist(o, true);
+//				System.out.printf("1 = false (2 = true): %.1f%% (%.1f%%). %.2f s (%.2f m) != %.2f  s (%.2fm) - %s %s - %.5f, %.5f -> %.5f, %.5f \n",
+//						Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100, Math.abs(1 - d1 / d2) * 100,
+//						prev.distanceFromStart, HHRoutingUtilities.testGetDist(prev, false), o.distanceFromStart,
+//						HHRoutingUtilities.testGetDist(o, true), s, o,
+//						MapUtils.get31LatitudeY(s.getStartPointY()), MapUtils.get31LongitudeX(s.getStartPointX()), 
+//						MapUtils.get31LatitudeY(o.getStartPointY()), MapUtils.get31LongitudeX(o.getStartPointX()));
+//				List<LatLon> lprev = HHRoutingUtilities.testGeometry(prev);
+//				List<LatLon> lcur = HHRoutingUtilities.testGeometry(o);
+//				boolean diff = false;
+//				if (lprev.size() != lcur.size()) {
+//					diff = true;
+//				}
+//				for (int k = 0; !diff && k < lprev.size(); k++) {
+//					if (MapUtils.getDistance(lprev.get(k), lcur.get(k)) > 5) {
+//						diff = true;
+//					}
+//				}
+//				if (diff) {
+//					System.out.println(HHRoutingUtilities.testGetGeometry(lprev));
+//					System.out.println(HHRoutingUtilities.testGetGeometry(lcur));
+//				}
+//			}
+//
+//		}
 		return new ArrayList<>(resUnique.valueCollection());
 	}
 	
