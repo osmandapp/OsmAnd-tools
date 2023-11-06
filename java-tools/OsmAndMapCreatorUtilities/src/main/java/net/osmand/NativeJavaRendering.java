@@ -220,6 +220,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		public final int height;
 		public long searchTime;
 		public long renderingTime;
+		public boolean saveTxt = false;
 		public RenderingContext context;
 
 		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
@@ -334,6 +335,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 		rctx.zoom = ctx.zoom;
 		rctx.tileDivisor = tileDivisor;
+		rctx.saveTextTile = ctx.saveTxt;
 		long search = time + System.currentTimeMillis();
 		final RenderingGenerationResult rres = NativeJavaRendering.generateRenderingIndirect(rctx, res.nativeHandler,
 				false, request, true);
