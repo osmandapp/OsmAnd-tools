@@ -581,16 +581,6 @@ public class WebGpxParser {
         return gpxFile;
     }
     
-    private void removeDuplicate(List<WebGpxParser.Point> geo, Point nextPoint) {
-        if (nextPoint != null && !nextPoint.geometry.isEmpty()) {
-            Point lastP = geo.get(geo.size() - 1);
-            Point nextP = nextPoint.geometry.get(0);
-            if (lastP.lat == nextP.lat && lastP.lng == nextP.lng && lastP.segment == null) {
-                geo.remove(geo.size() - 1);
-            }
-        }
-    }
-    
     public WptPt convertToWptPt(Wpt wpt) {
         WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
         point.name = wpt.name;
