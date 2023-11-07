@@ -278,12 +278,17 @@ public class WebGpxParser {
             } else {
                 int prevTrkPointInd = -1;
                 for (GPXUtilities.WptPt p : route.points) {
+                    boolean isLastPoint = route.points.indexOf(p) == route.points.size() - 1;
                     Point routePoint = new Point(p);
                     int currTrkPointInd;
                     if (routePoint.geometrySize == -1) {
                         currTrkPointInd = findNearestPoint(trackPoints, routePoint);
                     } else {
-                        currTrkPointInd = routePoint.geometrySize;
+                        currTrkPointInd = routePoint.geometrySize - 1;
+                    }
+                    //add last trkpt to last rtept geo
+                    if (isLastPoint) {
+                        currTrkPointInd += 1;
                     }
                     prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
                 }
@@ -348,12 +353,9 @@ public class WebGpxParser {
                     routePoint.geometry.add(pt);
                 }
             }
-            prevTrkPointInd = currTrkPointInd;
-            routePoints.add(routePoint);
-        } else {
-            routePoints.add(routePoint);
         }
-        return prevTrkPointInd;
+        routePoints.add(routePoint);
+        return currTrkPointInd;
     }
     
     public void addSrtmEle(List<Track> tracks, GPXTrackAnalysis srtmAnalysis) {
@@ -528,7 +530,6 @@ public class WebGpxParser {
                         int allPoints = 0;
                         for (int i = 0; i < t.points.size(); i++) {
                             Point point = t.points.get(i);
-                            Point nextPoint = i < t.points.size() - 1 ? t.points.get(i + 1) : null;
                             List<WebGpxParser.Point> geo = point.geometry;
                             if (geo.isEmpty()) {
                                 if (!route.points.isEmpty()) {
@@ -536,8 +537,6 @@ public class WebGpxParser {
                                 }
                                 route = new GPXUtilities.Route();
                                 allPoints = 0;
-                            } else {
-                                removeDuplicate(geo, nextPoint);
                             }
                             GPXUtilities.WptPt routePoint = point.ext;
                             if (routePoint == null) {
@@ -555,7 +554,10 @@ public class WebGpxParser {
                                 routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
                             allPoints += geo.isEmpty() ? 0 : geo.size();
-                            routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : allPoints - 1));
+                            boolean isLast = i == t.points.size() - 1;
+                            //for last rtept trkpt_idx = last index of trkpt points
+                            int ind = isLast ? allPoints - 1 : allPoints;
+                            routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));
                             route.points.add(routePoint);
                             trkPoints.addAll(geo);
                         }
