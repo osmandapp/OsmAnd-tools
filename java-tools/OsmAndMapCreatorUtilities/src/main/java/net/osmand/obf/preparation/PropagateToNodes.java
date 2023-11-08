@@ -91,9 +91,20 @@ public class PropagateToNodes {
                         case BORDER:
                             long start = allIds.get(0);
                             long end = allIds.get(allIds.size() - 1);
-                            ids.add(start);
                             if (start != end) {
+                                ids.add(start);
                                 ids.add(end);
+                            }
+                            if (allIds.size() > 2) {
+                                for (int i = 1; i < allIds.size() - 1; i++) {
+                                    long n = (allIds.get(i));
+                                    removedIds.add(n);
+                                    Map<String, String> tags = nodePropagatedTags.get(n);
+                                    if (tags != null && tags.containsKey(propagateTag)) {
+                                        nodePropagatedTags.remove(n);
+                                        nodePropagatedIds.remove(n);
+                                    }
+                                }
                             }
                             break;
                     }
@@ -159,10 +170,17 @@ public class PropagateToNodes {
         Map<String, String> tags = nodePropagatedTags.get(id);
         if (tags == null) {
             tags = new HashMap<>();
-        } else if (type == PropagateToNodesType.BORDER || removedIds.contains(id)) {
+        } else if (type == PropagateToNodesType.BORDER && tags.containsKey(propagateTag)) {
             nodePropagatedTags.remove(id);
             nodePropagatedIds.remove(id);
             removedIds.add(id);
+            return;
+        }
+        if (removedIds.contains(id)) {
+            if (tags.containsKey(propagateTag)) {
+                nodePropagatedTags.remove(id);
+                nodePropagatedIds.remove(id);
+            }
             return;
         }
         tags.put(propagateTag, propagateValue);
