@@ -374,9 +374,9 @@ public class HHRoutingShortcutCreator {
 		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
 		TLongObjectHashMap<RouteSegment> resUnique = new TLongObjectHashMap<>();
-		//// REMOVE TEST BLOCK ONCE NOT USED///// 
+		//// REMOVE TEST BLOCK ONCE NOT USED ///// 
+//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 923172937; //233801367l;
 //		boolean testBUG = true;
-////		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 91333429;
 //		TLongObjectHashMap<RouteSegment> testIteration = null;
 //		for (int iteration = 0; iteration < (testBUG ? 2 : 1); iteration++) {
 //			testIteration = resUnique; 
@@ -396,8 +396,13 @@ public class HHRoutingShortcutCreator {
 				for (RouteSegment o : frs.all) {
 					// duplicates are possible as alternative routes
 					long pntId = calculateRoutePointInternalId(o.getRoad().getId(), o.getSegmentStart(), o.getSegmentEnd());
-					if (resUnique.containsKey(pntId) && resUnique.get(pntId).getDistanceFromStart() < o.getDistanceFromStart()) {
-						continue;
+					if (resUnique.containsKey(pntId)) {
+						if (resUnique.get(pntId).getDistanceFromStart() > o.getDistanceFromStart()) {
+							// TODO 1.5 fix unique
+						 //	throw new IllegalStateException(resUnique.get(pntId) + " > " + o  + " - " + s) ;
+						} else {
+							continue;
+						}
 					} 
 					resUnique.put(pntId, o);
 				}

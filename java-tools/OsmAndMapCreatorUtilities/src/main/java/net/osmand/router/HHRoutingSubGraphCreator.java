@@ -51,37 +51,30 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// TODO 1.6 make exception to test non base
+// visited - cost 1131.20 > prev cost 1652.90 2.4 ?? A*
+// TODO BinaryRoutePlanner 1.6 make exception to test non base (4 TODOs)
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// TODO BinaryRoutePlanner 1.5 fix resUnique not sorted correctly 
 
 // TESTING
-// HANGS Europe calculation
-// 1.4.1 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT TODO test that routing time is different with on & off! should be the same
-// NEW sqrtDistance too slow for A* heuristic as it uses measureDist
-// 1.4.2 HHRoutingShortcutCreator BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT for long distance causes bugs if (pnt.index != 2005) { 2005-> 1861 } - 3372.75 vs 2598 -
-// TODO BUG A* routing from 52.26657 / 4.961864 to south... 
-// 2.0.1 HHRoutePlanner routing 1/-1/0 FIX routing time 7288 / 7088 / 7188 (43.15274, 19.55169 -> 42.955495, 19.0972263) - Montenegro
-
-// TODO RZR
-// ???
 
 // TODO BUGS
 // 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.1.2 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
 // 1.1.3 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.1.4 CLEANUP: shortcuts, midpoint, chpoint
+
+// 1.3.1 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
+// There should be maximum at preprocessed visited points < 150K (assert at preparation)
+// 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
+// 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
+// 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
+// 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
 
 // 1.0 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // 1.7 FILE: Implement border crossing issue on client
 // 1.8 FILE: different dates for maps!
-
-// 1.3.1 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
-//    There should be maximum at preprocessed visited points < 150K (assert at preparation)
-// 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
-// 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
-// 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
-// 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
 
 // HHRoutePlanner - Routing implementations
 // 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation 
@@ -91,7 +84,6 @@ import net.osmand.util.MapUtils;
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
-// 2.4 Once point is unreachable (isolated cluster) A* - Point 1437488 (176391972 34-33) visited - cost 118035.15 > prev cost 118254.05
 // 2.5 C++ implementation HHRoutePlanner
 // 2.6 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.8 Avoid specific road
