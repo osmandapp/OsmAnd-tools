@@ -167,6 +167,8 @@ public class PropagateToNodes {
         }
         tags.put(propagateTag, propagateValue);
         nodePropagatedTags.put(id, tags);
-        nodePropagatedIds.add(id);
+        if (!nodePropagatedIds.contains(id)) {
+            nodePropagatedIds.add(id);
+        }
     }
 }
