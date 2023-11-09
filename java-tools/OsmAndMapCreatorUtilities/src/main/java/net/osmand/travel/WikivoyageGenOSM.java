@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -147,6 +149,9 @@ public class WikivoyageGenOSM {
 	}
 
 	public static void genWikivoyageOsm(File wikivoyageFile, File outputFile, int LIMIT) throws SQLException, IOException {
+		OsmandRegions regions;
+		regions = new OsmandRegions();
+		regions.prepareFile();
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection connection = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getCanonicalPath(), log );
 		Statement statement = connection.createStatement();
@@ -197,6 +202,9 @@ public class WikivoyageGenOSM {
 			String isParentOf = rs.getString(rind++);
 			String isAggrPartOf = rs.getString(rind++);
 			String contentJson = rs.getString(rind);
+			if (lat == 0 && lon == 0 && gpxFile.isPointsEmpty() && !isParentOf.isEmpty()) {
+				spreadArticleToEverySubregions(regions, gpxFile);
+			}
 			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle, bannerTitle, isPartOf,
 					isParentOf, isAggrPartOf, contentJson);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
@@ -237,7 +245,17 @@ public class WikivoyageGenOSM {
 		System.out.println(String.format("Total saved articles: %d", totalArticles));
 		System.out.println(String.format("Empty article: %d no points in article + %d no location page articles (total %d) ", emptyContent, emptyLocation, total));
 	}
-	
+
+	private static void spreadArticleToEverySubregions(OsmandRegions regions, GPXFile gpxFile) {
+		for (WorldRegion region : regions.getWorldRegion().getSubregions()) {
+			WptPt wptPt = new WptPt();
+			LatLon regionCenter = region.getSubregions().get(0).getRegionCenter();
+			wptPt.lat = regionCenter.getLatitude();
+			wptPt.lon = regionCenter.getLongitude();
+			gpxFile.addPoint(wptPt);
+		}
+	}
+
 	private static void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
 		if (Algorithms.isEmpty(value)) {
 			return;
