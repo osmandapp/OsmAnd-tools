@@ -89,9 +89,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private MapRoutingTypes routeTypes;
 	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 
-	private TLongArrayList nodePropagatedIds = new TLongArrayList();
-	private Map<Long, Map<String, String>> nodePropagatedTags = new HashMap<>();
-
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
 	
 	// flipped quad tree cause bottom > top
@@ -137,7 +134,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private PreparedStatement basemapRouteInsertStat;
 	private MapRenderingTypesEncoder renderingTypes;
 	private IndexCreatorSettings settings;
-	private Set<String> propagateToNodes = new HashSet<>();
+	PropagateToNodes propagateToNodes;
 
 
 	private class RouteMissingPoints {
@@ -155,12 +152,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	}
 
-	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, IndexCreatorSettings settings) {
+	public IndexRouteCreator(MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, IndexCreatorSettings settings, PropagateToNodes propagateToNodes) {
 		this.renderingTypes = renderingTypes;
 		this.logMapDataWarn = logMapDataWarn;
 		this.settings = settings;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
-		initPropagateToNodes();
+		this.propagateToNodes = propagateToNodes;
 	}
 	
 	public void indexExtraRelations(OsmBaseStorage reader) {
@@ -273,7 +270,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			if (encoded) {
 				// Load point with tags!
 				ctx.loadEntityWay(e);
-				propagateRestrictionNodeTags(e.getNodes());
+				if (propagateToNodes != null) {
+					propagateToNodes.propagateRestrictionNodeTags(e);
+				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
@@ -1228,57 +1227,6 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			ay.addAll(by);
 			gw.px = ax;
 			gw.py = ay;
-		}
-	}
-
-	public void registerRestrictionNodes(Entity entity) {
-		if (entity instanceof Way) {
-			for (String propagate : propagateToNodes) {
-				String[] tagValue = propagate.split("/");
-				String propagateTag = tagValue[0];
-				String propagateValue = tagValue[1];
-				String entityTag = entity.getTag(propagateTag);
-				if (entityTag != null && entityTag.equals(propagateValue)) {
-					Way w = (Way) entity;
-					TLongArrayList ids = w.getNodeIds();
-					nodePropagatedIds.addAll(ids);
-					for (long id : ids.toArray()) {
-						Map<String, String> tags = nodePropagatedTags.get(id);
-						if (tags == null) {
-							tags = new HashMap<>();
-						}
-						tags.put(propagateTag, propagateValue);
-						nodePropagatedTags.put(id, tags);
-					}
-				}
-			}
-		}
-	}
-
-	private void initPropagateToNodes() {
-		Map<String, MapRenderingTypes.MapRulType> ruleTypes = renderingTypes.getEncodingRuleTypes();
-		for (Map.Entry<String, MapRenderingTypes.MapRulType> entry : ruleTypes.entrySet()) {
-			MapRenderingTypes.MapRulType ruleType = entry.getValue();
-			if (ruleType.isPropagateToNodes()) {
-				propagateToNodes.add(entry.getKey());
-			}
-		}
-	}
-
-	private void propagateRestrictionNodeTags (List<Node> nodes) {
-		if (nodePropagatedIds.size() == 0) {
-			return;
-		}
-		for (Node n : nodes) {
-			long nodeId = n.getId() >> OsmDbCreator.SHIFT_ID;
-			if (nodePropagatedIds.contains(nodeId)) {
-				Map<String, String> tags = nodePropagatedTags.get(nodeId);
-				for (Map.Entry<String, String> entry : tags.entrySet()) {
-					if (n.getTag(entry.getKey()) == null) {
-						n.putTag(entry.getKey(), entry.getValue());
-					}
-				}
-			}
 		}
 	}
 

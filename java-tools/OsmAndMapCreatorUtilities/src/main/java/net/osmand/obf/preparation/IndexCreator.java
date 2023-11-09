@@ -7,9 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Iterator;
 import java.util.zip.GZIPInputStream;
 
@@ -77,6 +75,7 @@ public class IndexCreator {
 	IndexRouteRelationCreator indexRouteRelationCreator;
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
+	PropagateToNodes propagateToNodes;
 
 	private File dbFile;
 	private File mapFile;
@@ -208,6 +207,9 @@ public class IndexCreator {
 				heightData.proccess((Way) e);
 			}
 		}
+		if (propagateToNodes != null) {
+			propagateToNodes.propagateRestrictionNodeTags(e);
+		}
 		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, icc);
 		}
@@ -280,9 +282,6 @@ public class IndexCreator {
 				if (indexAddressCreator != null) {
 					indexAddressCreator.registerCityIfNeeded(entity);
 				}
-				if (indexRouteCreator != null) {
-					indexRouteCreator.registerRestrictionNodes(entity);
-				}
 				// accept to allow db creator parse it
 				return true;
 			}
@@ -290,6 +289,7 @@ public class IndexCreator {
 
 		// 1. Loading osm file
 		OsmDbCreator dbCreator = generateNewIds ? new OsmDbCreator(idSourceMapInd, idShift) : new OsmDbCreator();
+		dbCreator.setPropagateToNodes(propagateToNodes);
 		
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
@@ -508,11 +508,12 @@ public class IndexCreator {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
 
+		this.propagateToNodes = new PropagateToNodes(renderingTypes);
 		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
-		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
+		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 
 		if (!settings.extraRelations.isEmpty()) {

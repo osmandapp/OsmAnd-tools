@@ -3,6 +3,7 @@ package net.osmand.render;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.MessageFormat;
@@ -50,6 +51,7 @@ public class OsmAndTestStyleRenderer {
 		String vectorStyle ="";
 		int vectorSize = 256;
 		String suffix;
+		String textTile;
 		
 		public static TileSourceGenTemplate raster(String rasterTemplate) {
 			TileSourceGenTemplate t = new TileSourceGenTemplate();
@@ -74,6 +76,7 @@ public class OsmAndTestStyleRenderer {
 			t.vector = true;
 			t.vectorStyle = params.get("style");
 			t.suffix = params.get("suffix");
+			t.textTile = params.get("text");
 			if (params.containsKey("size")) {
 				t.vectorSize = Integer.parseInt(params.get("size"));
 			}
@@ -217,15 +220,24 @@ public class OsmAndTestStyleRenderer {
 	private static void downloadTiles(int x, int y, int zoom, OsmAndTestStyleRendererParams pms) throws Exception {
 		int ind = 0;
 		File outFile = null;
+		File txtFile = null;
 		try {
 			for (TileSourceGenTemplate t : pms.tilesource) {
 				ind++;
 				String suffix = t.suffix == null ? ind + "" : t.suffix;
+				String textTileExt = t.textTile == null ? null : t.textTile;
 				String ext = t.getExt();
 				outFile = new File(pms.outputDir, formatTile(zoom, x, y, suffix, ext));
 				outFile.getParentFile().mkdirs();
 				if (outFile.exists() && !pms.overwrite) {
 					continue;
+				}
+
+				if (textTileExt != null) {
+					txtFile = new File(pms.outputDir, formatTile(zoom, x, y, suffix, textTileExt));
+					System.out.println("  Save text to tile " + txtFile.getName());
+				} else {
+					txtFile = null;
 				}
 				if (t.vector) {
 //				RenderingImageContext ctx = new RenderingImageContext(x << (31 - zoom), (x + 1) << (31 - zoom),
@@ -241,8 +253,16 @@ public class OsmAndTestStyleRenderer {
 					} else {
 						pms.nsr.setRenderingProps(props);
 					}
+					if (txtFile != null) {
+						ctx.saveTxt = true;
+					}
 					BufferedImage img = pms.nsr.renderImage(ctx);
 					ImageIO.write(img, ext, outFile);
+					if (txtFile != null && !Algorithms.isEmpty(ctx.context.textTile)) {
+						FileWriter fr = new FileWriter(txtFile);
+						fr.write(ctx.context.textTile);
+						fr.close();
+					}
 				} else {
 					String template = TileSourceTemplate.normalizeUrl(t.url);
 					int bingQuadKeyParamIndex = template.indexOf(TileSourceManager.PARAM_BING_QUAD_KEY);

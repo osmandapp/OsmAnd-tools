@@ -4,6 +4,9 @@ import org.xml.sax.Attributes;
 import org.xml.sax.Locator;
 import org.xml.sax.helpers.DefaultHandler;
 
+import java.time.Instant;
+import java.util.Date;
+
 public class ExtractorHandler extends DefaultHandler {
 	private long startTime;
 	private Locator locator;
@@ -30,7 +33,7 @@ public class ExtractorHandler extends DefaultHandler {
 
 	@Override
 	public void startDocument() {
-		System.out.println("Start Document");
+		System.out.println("Start Document parsing " + Date.from(Instant.now()));
 		startTime = System.currentTimeMillis();
 	}
 
@@ -58,7 +61,7 @@ public class ExtractorHandler extends DefaultHandler {
 		if (qName.equalsIgnoreCase("title")) {
 			if (currentValue.toString().equals(title)) {
 				firstArticleLine = locator.getLineNumber() - 1;
-				System.out.println(locator.getLineNumber() + " " + currentValue);
+				System.out.printf("Found title %s on the line %d\n", currentValue, locator.getLineNumber());
 				article = true;
 			}
 		}

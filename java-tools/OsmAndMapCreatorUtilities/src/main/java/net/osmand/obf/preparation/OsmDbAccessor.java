@@ -60,7 +60,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 				"from relations r where r.id = ? order by r.ord"); //$NON-NLS-1$
 
 		iterateNodes = dbConn
-				.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0"); //$NON-NLS-1$
+				.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0 or n.propagate = 1"); //$NON-NLS-1$
 		iterateWays = dbConn.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 				"from ways w left join node n on w.node = n.id order by w.id, w.ord"); //$NON-NLS-1$
 		iterateWayBoundaries = dbConn

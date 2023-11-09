@@ -248,8 +248,6 @@ public class WikivoyageGenOSM {
 		serializer.endTag(null, "tag");
 	}
 
-	
-
 	private static boolean combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
 		article.updateCategoryCounts();		
 		long idStart = NODE_ID ;
@@ -275,23 +273,25 @@ public class WikivoyageGenOSM {
 				}
 			}
 		}
-		if (mainArticlePoint == null) {
+		if (mainArticlePoint == null && Algorithms.isEmpty(article.partsOf)) {
 			// System.out.println(String.format("Skip article as it has no points: %s", article.titles));
 			return false;
 		}
 
-		points = sortPoints(mainArticlePoint, points);
-		serializer.startTag(null, "node");
-		long mainArticleid = NODE_ID--;
-		serializer.attribute(null, "id", mainArticleid + "");
-		serializer.attribute(null, "action", "modify");
-		serializer.attribute(null, "version", "1");
-		serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
-		serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
-		tagValue(serializer, "route", "point");
-		tagValue(serializer, "route_type", "article");
-		addArticleTags(article, serializer, true);
-		serializer.endTag(null, "node");
+		if (mainArticlePoint != null) {
+			points = sortPoints(mainArticlePoint, points);
+			serializer.startTag(null, "node");
+			long mainArticleid = NODE_ID--;
+			serializer.attribute(null, "id", mainArticleid + "");
+			serializer.attribute(null, "action", "modify");
+			serializer.attribute(null, "version", "1");
+			serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
+			serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
+			tagValue(serializer, "route", "point");
+			tagValue(serializer, "route_type", "article");
+			addArticleTags(article, serializer, true);
+			serializer.endTag(null, "node");
+		}
 		
 		for (WptPt p : points) {
 			String category = simplifyWptCategory(p.category, CAT_OTHER);
