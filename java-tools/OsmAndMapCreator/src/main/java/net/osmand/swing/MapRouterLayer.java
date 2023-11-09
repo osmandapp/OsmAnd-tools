@@ -1,6 +1,7 @@
 package net.osmand.swing;
 
 
+
 import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
 import java.awt.Color;
@@ -86,8 +87,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.HHRoutePlanner;
-import net.osmand.router.HHRoutePlanner.HHNetworkRouteRes;
-import net.osmand.router.HHRoutePlanner.HHNetworkSegmentRes;
+import net.osmand.router.HHRouteDataStructure.*;
 import net.osmand.router.HHRoutingDB;
 import net.osmand.router.HHRoutingUtilities;
 import net.osmand.router.PrecalculatedRouteDirection;

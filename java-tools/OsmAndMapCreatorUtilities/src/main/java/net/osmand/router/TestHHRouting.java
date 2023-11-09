@@ -1,5 +1,6 @@
 package net.osmand.router;
 
+
 import java.io.File;
 
 import org.apache.commons.logging.Log;
@@ -9,9 +10,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
-import net.osmand.router.HHRoutePlanner.HHRoutingConfig;
-import net.osmand.router.HHRoutePlanner.HHNetworkRouteRes;
-import net.osmand.router.HHRoutePlanner.HHNetworkSegmentRes;
+import net.osmand.router.HHRouteDataStructure.*;
 
 public class TestHHRouting {
 	

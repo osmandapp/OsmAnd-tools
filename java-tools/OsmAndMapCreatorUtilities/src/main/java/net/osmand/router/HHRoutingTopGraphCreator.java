@@ -1,6 +1,7 @@
 package net.osmand.router;
 
 import java.io.File;
+
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,9 +18,7 @@ import org.apache.commons.logging.Log;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
-import net.osmand.router.HHRoutePlanner.HHRoutingConfig;
-import net.osmand.router.HHRoutePlanner.HHRoutingContext;
-import net.osmand.router.HHRoutePlanner.RoutingStats;
+import net.osmand.router.HHRouteDataStructure.*;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 
@@ -42,14 +41,12 @@ public class HHRoutingTopGraphCreator {
 	
 	private HHRoutingPreparationDB networkDB;
 	private HHRoutePlanner routePlanner;
-	private RoutingStats routingStats;
-	private HHRoutingContext hctx;
+//	private RoutingStats routingStats;
+//	private HHRoutingContext hctx;
 	
 	public HHRoutingTopGraphCreator(HHRoutePlanner routePlanner, HHRoutingPreparationDB networkDB) throws SQLException {
 		this.routePlanner = routePlanner;
 		this.networkDB = networkDB;
-		routingStats = new RoutingStats();
-		hctx = routePlanner.initHCtx(HHRoutingConfig.dijkstra(0), routingStats);
 	}
 	
 	
@@ -100,6 +97,7 @@ public class HHRoutingTopGraphCreator {
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + HHRoutingDB.EXT));
 		HHRoutePlanner routePlanner = new HHRoutePlanner(HHRoutePlanner.prepareContext(ROUTING_PROFILE), networkDB);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
+		
 		if (PROCESS == PROC_MIDPOINTS) {
 			planner.calculateMidPoints(MAX_DEPTH, MAX_ITERATIONS);
 		} else if (PROCESS == PROC_CH) { 
@@ -169,22 +167,16 @@ public class HHRoutingTopGraphCreator {
 	}
 	
 	private void calculateMidPoints(int MAX_DEPTH, int MAX_ITERATIONS) throws SQLException {
-		RoutingStats stats = new RoutingStats();
+		HHRoutingConfig config = HHRoutingConfig.dijkstra(0).preloadSegments();
+		HHRoutingContext hctx = routePlanner.initHCtx(config);
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		TLongObjectHashMap<NetworkDBPoint> pnts = hctx.pointsById;
 		List<NetworkDBPoint> pointsList = new ArrayList<>(pnts.valueCollection());
 		networkDB.loadMidPointsIndex(pnts, pointsList, false);
-		stats.loadPointsTime = (System.nanoTime() - time) / 1e6;
+		hctx.stats.loadPointsTime += (System.nanoTime() - time) / 1e6;
 		
-//		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
-		
-		time = System.nanoTime();
-		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), stats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegments(pointsList);
-		stats.loadEdgesTime = (System.nanoTime() - time) / 1e6;
-
 		// Routing
-		System.out.printf(" %,d - %.2fms\nRouting...\n", cntEdges, stats.loadEdgesTime);
+		System.out.printf(" %,d - %.2fms\nRouting...\n", hctx.stats.loadEdgesCnt, hctx.stats.loadEdgesTime);
 		
 		int iteration = Math.min(MAX_ITERATIONS, pnts.size() / 2);
 		Random random = new Random();
@@ -201,8 +193,8 @@ public class HHRoutingTopGraphCreator {
 			iteration--;
 			startPnt.rtIndex = 1;
 			
-			stats = new RoutingStats();
-			routePlanner.runDijkstraNetworkRouting(startPnt, null, c, hctx, stats);
+			hctx.stats = new RoutingStats();
+			routePlanner.runRoutingPointToPoint(hctx, startPnt, null);
 			for (NetworkDBPoint pnt : pointsList) {
 				pnt.rtLevel = 0;
 				if (pnt.rtRouteToPoint != null) {
@@ -235,7 +227,8 @@ public class HHRoutingTopGraphCreator {
 				pnt.clearRouting();
 			}
 			System.out.printf("increased %d points - max diff %d, max top %d (%,d (%,d unique) visited / %,d added vertices, %.2f queue ms) \n", 
-					countInc, maxInc, maxTop, stats.visitedVertices, stats.uniqueVisitedVertices, stats.addedVertices, stats.addQueueTime);
+					countInc, maxInc, maxTop, hctx.stats.visitedVertices, hctx.stats.uniqueVisitedVertices, 
+					hctx.stats.addedVertices, hctx.stats.addQueueTime);
 			if (iteration % SAVE_ITERATIONS == 0) {
 				saveAndPrintPoints(pointsList, pnts, LOG_STAT_MAX_DEPTH);
 			}
@@ -245,10 +238,10 @@ public class HHRoutingTopGraphCreator {
 		
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
-				(time - startTime) /1e6, stats.loadEdgesTime + stats.loadPointsTime, stats.routingTime,
-				stats.addQueueTime, stats.prepTime);
+				(time - startTime) /1e6, hctx.stats.loadEdgesTime + hctx.stats.loadPointsTime, hctx.stats.routingTime,
+				hctx.stats.addQueueTime, hctx.stats.prepTime);
 		System.out.println(String.format("Found final route - cost %.2f, %d depth ( %,d (%,d unique) visited / %,d added vertices )", 
-				0.0, 0, stats.visitedVertices, stats.uniqueVisitedVertices, stats.visitedVertices));
+				0.0, 0, hctx.stats.visitedVertices, hctx.stats.uniqueVisitedVertices, hctx.stats.visitedVertices));
 	}
 
 
@@ -281,20 +274,20 @@ public class HHRoutingTopGraphCreator {
 
 
 	private void runContractionHierarchy(int maxPoints, double percent) throws SQLException {
+		HHRoutingConfig config = HHRoutingConfig.dijkstra(1).maxSettlePoints(maxPoints).preloadSegments();
+		HHRoutingContext hctx = routePlanner.initHCtx(config);
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		TLongObjectHashMap<NetworkDBPoint> pnts = hctx.pointsById;
 		List<NetworkDBPoint> list = new ArrayList<>(pnts.valueCollection());
 //		Map<Integer, NetworkHHCluster> clusters = restoreClusters(pnts);
 		time = System.nanoTime();
-		System.out.printf(" %,d - %.2fms\nLoading segments...", pnts.size(), routingStats.loadPointsTime);
-		int cntEdges = networkDB.loadNetworkSegmentsInternal(list, true);
-		routingStats.loadEdgesTime = (System.nanoTime() - time) / 1e6;		
-		System.out.printf(" %,d - %.2fms\nContracting nodes..\n", cntEdges, routingStats.loadEdgesTime);
+				
+		System.out.printf(" %,d - %.2fms\nContracting nodes..\n", hctx.stats.loadEdgesCnt, hctx.stats.loadEdgesTime);
 		
 		calculateAndPrintVertexDegree(list);
 		
 		time = System.nanoTime();
-		HHRoutingConfig c = HHRoutingConfig.dijkstra(1).maxSettlePoints(maxPoints);
+
 		TIntIntHashMap edgeDiffMap = new TIntIntHashMap();
 		PriorityQueue<NetworkDBPoint> pq = new PriorityQueue<>(new Comparator<NetworkDBPoint>() {
 
@@ -308,7 +301,7 @@ public class HHRoutingTopGraphCreator {
 			if (++prog % 1000 == 0) {
 				logf("Preparing %d...", prog);
 			}
-			calculateCHEdgeDiff(hctx, p, c, null);
+			calculateCHEdgeDiff(hctx, p, null);
 			pq.add(p);
 			if (!edgeDiffMap.containsKey(p.rtIndex)) {
 				edgeDiffMap.put(p.rtIndex, 0);
@@ -328,18 +321,18 @@ public class HHRoutingTopGraphCreator {
 			}
 			if (++prog % 1000 == 0) {
 				logf("Contracting %d %.1f%% (reindexing %d, shortcuts %d)...", contracted, contracted / toContract * 100.0, reindex, allShortcuts.size());
-				printStat("Contraction stat ", routingStats, timeC, 1000);
+				printStat("Contraction stat ", hctx.stats, timeC, 1000);
 				if (prog % 10000 == 0) {
 					calculateAndPrintVertexDegree(list);
 				}
-				routingStats = new RoutingStats();
+				hctx.stats = new RoutingStats();
 				timeC = System.nanoTime();
 			}
 			
 			NetworkDBPoint pnt = pq.poll();
 			int oldIndex = pnt.rtIndex;
 			shortcuts.clear();
-			calculateCHEdgeDiff(hctx, pnt, c, shortcuts);
+			calculateCHEdgeDiff(hctx, pnt, shortcuts);
 			if (oldIndex < pnt.rtIndex) {
 				pq.add(pnt);
 				reindex++;
@@ -376,11 +369,11 @@ public class HHRoutingTopGraphCreator {
 		
 		System.out.printf("Added %d shortcuts, reindexed %d \n", allShortcuts.size(), reindex);
 		
-		printStat("Contraction ", routingStats, time, list.size());
+		printStat("Contraction ", hctx.stats, time, list.size());
 		time = System.nanoTime();
 		System.out.printf("Routing finished %.2f ms: load data %.2f ms, routing %.2f ms (%.2f queue ms), prep result %.2f ms\n",
-				(time - startTime) / 1e6, routingStats.loadEdgesTime + routingStats.loadPointsTime, routingStats.routingTime,
-				routingStats.addQueueTime, routingStats.prepTime);
+				(time - startTime) / 1e6, hctx.stats.loadEdgesTime + hctx.stats.loadPointsTime, hctx.stats.routingTime,
+				hctx.stats.addQueueTime, hctx.stats.prepTime);
 	}
 
 
@@ -432,10 +425,10 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void calculateCHEdgeDiff(HHRoutingContext hctx, NetworkDBPoint p, HHRoutingConfig c, List<NetworkDBSegment> shortcuts) throws SQLException {
-		c.MAX_COST = 0;
+	private void calculateCHEdgeDiff(HHRoutingContext hctx, NetworkDBPoint p, List<NetworkDBSegment> shortcuts) throws SQLException {
+		hctx.config.MAX_COST = 0;
 		for (NetworkDBSegment out : p.connected) {
-			c.MAX_COST = Math.max(out.dist, c.MAX_COST);
+			hctx.config.MAX_COST = Math.max(out.dist, hctx.config.MAX_COST);
 		}
 		// shortcuts
 		p.rtCnt = 0;
@@ -444,7 +437,7 @@ public class HHRoutingTopGraphCreator {
 			if (in.start.rtExclude) {
 				continue;
 			}
-			routePlanner.runDijkstraNetworkRouting(in.start, null, c, hctx, routingStats);
+			routePlanner.runRoutingPointToPoint(hctx, in.start, null);
 			for (NetworkDBSegment out : p.connected) {
 				if (out.end.rtExclude) {
 					continue;

@@ -53,21 +53,21 @@ import net.osmand.util.MapUtils;
 // IN PROGRESS
 // TODO BinaryRoutePlanner 1.6 make exception to test non base (4 TODOs)
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// TODO BinaryRoutePlanner 1.5 fix resUnique not sorted correctly 
+// TODO BinaryRoutePlanner 1.5 fix resUnique not sorted correctly
+
+// 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
+// 1.1.2 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
+// 1.1.3 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
+// 1.1.4 CLEANUP: shortcuts, midpoint, chpoint
 
 // TESTING
 // - visited - cost 1131.20 > prev cost 1652.90 2.4 ?? est_A*(1408244, 1408520) = 9.5 vs segment = 3 -- europe bicycle
 //"113337857443852"	"1408244"	"561100"	"1408157"	"561097"	"NULL"	"55340750705"	"6"	"5"	"1114768016"	"712117744"	"1114757712"	"712121584"
 //"3375182874626"   	"1408520"	"561165"	"1408226"	"561100"	"NULL"	"1648038513"	"1"	"0"	"1114772464"	"712118464"	"1114768016"	"712117744"
 // - assert max cluster size points 75K
+// 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
 
 // TODO BUGS
-// 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
-// 1.1.2 CLEANUP: HHRoutingPrepareContext + HHRoutingPreparationDB?
-// 1.1.3 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
-// 1.1.4 CLEANUP: shortcuts, midpoint, chpoint
-
-// 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
 // 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
