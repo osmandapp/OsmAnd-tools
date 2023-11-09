@@ -36,6 +36,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
+import net.osmand.util.MapUtils;
 
 public class HHRoutingShortcutCreator {
 
@@ -196,12 +197,20 @@ public class HHRoutingShortcutCreator {
 				}
 				HHRoutingUtilities.addNode(res.osmObjects, pnt, getPoint(s), "highway", "stop"); // "place","city");
 				try {
-					List<RouteSegment> result = creator.runDijsktra(ctx, s, segments);
+					BinaryRoutePlanner routePlanner = new BinaryRoutePlanner();
+					List<RouteSegment> result = creator.runDijsktra(ctx, routePlanner, s, segments);
 					boolean errorFound = false;
 					for (RouteSegment t : result) {
 						NetworkDBPoint end = networkPointsByGeoId.get(calculateRoutePointInternalId(t.getRoad().getId(),
 								t.getSegmentStart(), t.getSegmentEnd()));
-						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, t.getDistanceFromStart(), true, false);
+						double h = MapUtils.squareRootDist31(pnt.midX(), pnt.midY(), end.midX(), end.midY())
+								/ ctx.getRouter().getMaxSpeed();
+						float routeTime = t.getDistanceFromStart() + routePlanner.calcRoutingSegmentTimeOnlyDist(ctx.getRouter(), t) / 2 ;
+						if (h > routeTime) {
+							throw new IllegalStateException(
+									String.format("%s %s - %.2f > %.2f", pnt, end, h, t.getDistanceFromStart()));
+						}
+						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, routeTime, true, false);
 						while (t != null) {
 							segment.geometry.add(getPoint(t));
 							t = t.getParentRoute();
@@ -266,8 +275,8 @@ public class HHRoutingShortcutCreator {
 		int ind = 0, prevPrintInd = 0;
 		TLongObjectHashMap<RouteSegment> segments = new TLongObjectHashMap<>();
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
-			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end),
-					new RouteSegment(null, pnt.start, pnt.end));
+			RouteSegment s = new RouteSegment(null, pnt.start, pnt.end);
+			segments.put(calculateRoutePointInternalId(pnt.roadId, pnt.start, pnt.end), s);
 			HHRoutingUtilities.addNode(osmObjects, pnt, null, "highway", "stop");
 		}
 
@@ -369,13 +378,13 @@ public class HHRoutingShortcutCreator {
 		return osmObjects.valueCollection();
 	}
 
-	private List<RouteSegment> runDijsktra(RoutingContext ctx, RouteSegmentPoint s, TLongObjectMap<RouteSegment> segments)
+	private List<RouteSegment> runDijsktra(RoutingContext ctx, BinaryRoutePlanner routePlanner, RouteSegmentPoint s, TLongObjectMap<RouteSegment> segments)
 			throws InterruptedException, IOException {
 		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
 		TLongObjectHashMap<RouteSegment> resUnique = new TLongObjectHashMap<>();
 		//// REMOVE TEST BLOCK ONCE NOT USED ///// 
-//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 923172937; //233801367l;
+//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 170670960; //233801367l;
 //		boolean testBUG = true;
 //		TLongObjectHashMap<RouteSegment> testIteration = null;
 //		for (int iteration = 0; iteration < (testBUG ? 2 : 1); iteration++) {
@@ -390,7 +399,7 @@ public class HHRoutingShortcutCreator {
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
 			ctx.config.PENALTY_FOR_REVERSE_DIRECTION = -1;
-			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) new BinaryRoutePlanner().searchRouteInternal(ctx, s,
+			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) routePlanner.searchRouteInternal(ctx, s,
 					null, segments);
 			if (frs != null) {
 				for (RouteSegment o : frs.all) {

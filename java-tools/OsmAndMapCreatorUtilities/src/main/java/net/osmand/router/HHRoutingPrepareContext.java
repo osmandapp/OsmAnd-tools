@@ -104,13 +104,20 @@ public class HHRoutingPrepareContext {
 			}
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		RoutingConfiguration config = getRoutingConfig();
+		return router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[readers.size()]),
+				RouteCalculationMode.NORMAL);
+	}
+
+
+
+	public RoutingConfiguration getRoutingConfig() {
 		Builder builder = RoutingConfiguration.parseDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(ROUTING_MEMORY_LIMIT, ROUTING_MEMORY_LIMIT);
 		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, PROFILE_SETTINGS);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
-		return router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[readers.size()]),
-				RouteCalculationMode.NORMAL);
+		return config;
 	}
 
 
