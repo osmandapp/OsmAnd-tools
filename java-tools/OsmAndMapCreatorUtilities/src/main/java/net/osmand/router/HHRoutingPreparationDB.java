@@ -51,10 +51,6 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	private int maxPointDBID;
 	private int maxClusterID;
 
-
-
-
-
 	public HHRoutingPreparationDB(File dbFile) throws SQLException {
 		super(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
 		if (!compactDB) {
