@@ -612,7 +612,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιΤμήμαΤου") || str.startsWith("commonscat") || str.startsWith("jest w")
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
-				|| str.startsWith("بخشی")) {
+				|| str.startsWith("بخشی") || str.startsWith("partofitinerary")) {
 			return WikivoyageTemplates.PART_OF.getType();
 		} else if (str.startsWith("do") || str.startsWith("see")
 				|| str.startsWith("eat") || str.startsWith("drink") 
