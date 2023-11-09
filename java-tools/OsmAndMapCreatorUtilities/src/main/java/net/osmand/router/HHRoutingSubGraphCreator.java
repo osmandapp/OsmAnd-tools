@@ -51,16 +51,15 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// visited - cost 1131.20 > prev cost 1652.90 2.4 ?? est_A*(1408244, 1408520) = 9.5 vs segment = 3
-// "113337857443852"	"1408244"	"561100"	"1408157"	"561097"	"NULL"	"55340750705"	"6"	"5"	"1114768016"	"712117744"	"1114757712"	"712121584"
-// "3375182874626"   	"1408520"	"561165"	"1408226"	"561100"	"NULL"	"1648038513"	"1"	"0"	"1114772464"	"712118464"	"1114768016"	"712117744"
-
-
 // TODO BinaryRoutePlanner 1.6 make exception to test non base (4 TODOs)
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // TODO BinaryRoutePlanner 1.5 fix resUnique not sorted correctly 
 
 // TESTING
+// - visited - cost 1131.20 > prev cost 1652.90 2.4 ?? est_A*(1408244, 1408520) = 9.5 vs segment = 3 -- europe bicycle
+//"113337857443852"	"1408244"	"561100"	"1408157"	"561097"	"NULL"	"55340750705"	"6"	"5"	"1114768016"	"712117744"	"1114757712"	"712121584"
+//"3375182874626"   	"1408520"	"561165"	"1408226"	"561100"	"NULL"	"1648038513"	"1"	"0"	"1114772464"	"712118464"	"1114768016"	"712117744"
+// - assert max cluster size points 75K
 
 // TODO BUGS
 // 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
@@ -68,8 +67,6 @@ import net.osmand.util.MapUtils;
 // 1.1.3 CLEANUP: Make separate / lightweight for Runtime memory NetworkDBPoint / NetworkDBSegment
 // 1.1.4 CLEANUP: shortcuts, midpoint, chpoint
 
-// 1.3.1 CHECK: Implement check that routing doesn't allow more roads (custom routing.xml) i.e. 
-// There should be maximum at preprocessed visited points < 150K (assert at preparation)
 // 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
@@ -90,6 +87,7 @@ import net.osmand.util.MapUtils;
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.5 C++ implementation HHRoutePlanner
 // 2.6 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+// 2.7 CHECK: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 // 2.8 Avoid specific road
 // 2.9 Deprioritize or exclude roads (parameters)
 // 2.10 Live data (think about it)
@@ -1283,6 +1281,10 @@ public class HHRoutingSubGraphCreator {
 					cluster.borderVertices, networkPointToDbInd);
 			lastClusterInd = cluster.dbIndex;
 			stats.addCluster(cluster);
+			if (cluster.visitedVertices.size() > TOTAL_MAX_POINTS * 1.5) {
+				throw new IllegalStateException(
+						"Cluster " + cluster.dbIndex + " has too many points: " + cluster.visitedVertices.size());
+			}
 			for (RouteSegmentVertex v : cluster.visitedVertices.valueCollection()) {
 				if (testGlobalVisited(v.getId())) {
 					throw new IllegalStateException(String.format("Point was already visited %s: %s", v, globalVisitedMessage(v.getId())));
