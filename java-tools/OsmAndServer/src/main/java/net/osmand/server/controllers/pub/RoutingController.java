@@ -338,4 +338,11 @@ public class RoutingController {
 		List<WebGpxParser.Point> res = routingService.getRoute(points);
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
 	}
+	
+	@PostMapping(path = {"/approximate"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> approximateRoute(@RequestBody List<WebGpxParser.Point> points, @RequestParam String routeMode) throws IOException, InterruptedException {
+		List<WebGpxParser.Point> res = routingService.approximateRoute(points, routeMode);
+		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
+	}
 }

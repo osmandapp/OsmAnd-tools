@@ -638,7 +638,7 @@ public class WebGpxParser {
                 if (ind == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
                     lastStartTrkptIdx = Integer.parseInt(lastPointWithSeg.segment.ext.length) - 1
                             + Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex);
-                    prevTypesSize = lastPointWithSeg.segment.routeTypes.size();
+                    prevTypesSize += lastPointWithSeg.segment.routeTypes.size();
                     segment.routeTypes.addAll(point.segment.routeTypes);
                 }
                 seg.startTrackPointIndex = Integer.toString(ind + lastStartTrkptIdx);
