@@ -133,11 +133,7 @@ public class OsmAndTestStyleRenderer {
 				pms.leftLon = Double.parseDouble(bbox[0]);
 				pms.bottomLat = Double.parseDouble(bbox[1]);
 				pms.rightLon = Double.parseDouble(bbox[2]);
-<<<<<<< HEAD
-				pms.topLat  = Double.parseDouble(bbox[3]);
-=======
 				pms.topLat = Double.parseDouble(bbox[3]);
->>>>>>> origin/master
 			} else if (a.startsWith("-zoom=")) {
 				String s = a.substring("-zoom=".length());
 				pms.zooms = MapZooms.parseZooms(s);
