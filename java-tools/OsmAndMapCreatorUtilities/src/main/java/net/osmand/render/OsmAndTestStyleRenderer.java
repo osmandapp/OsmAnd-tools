@@ -204,8 +204,10 @@ public class OsmAndTestStyleRenderer {
 
 			for (int x = leftx; x <= rightx; x++) {
 				for (int y = topY; y <= bottomY; y++) {
-					if (pms.total > 1 && (x + y + z) % pms.total != pms.partTotal) {
-						continue;
+					if (!pms.overwrite) {
+						if (pms.total > 1 && (x + y + z) % pms.total != pms.partTotal) {
+							continue;
+						}
 					}
 					ind++;
 					System.out.printf("Generating  %.2f%% (%d / %d tiles) %d/%d/%d...\n", ind * 100.0 / cnt, ind, cnt,
