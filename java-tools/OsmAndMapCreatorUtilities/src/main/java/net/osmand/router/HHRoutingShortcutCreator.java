@@ -110,7 +110,7 @@ public class HHRoutingShortcutCreator {
 		if (CLEAN && dbFile.exists()) {
 			networkDB.recreateSegments();
 		}
-		TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints();
+		TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints(NetworkDBPoint.class);
 		createOSMNetworkPoints(new File(folder, name + "-pnts.osm"), totalPnts);
 		System.out.printf("Loaded %,d points\n", totalPnts.size());
 		
@@ -120,7 +120,7 @@ public class HHRoutingShortcutCreator {
 			HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
 			networkDB.selectRoutingProfile(routingProfile);
 			// reload points to avoid cache
-			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints();
+			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints(NetworkDBPoint.class);
 			int segments = networkDB.loadNetworkSegments(pnts.valueCollection());
 			System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam, segments);	
 			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
@@ -248,7 +248,8 @@ public class HHRoutingShortcutCreator {
 								(System.nanoTime() - nt2) / 1e6, ctx.calculationProgress.timeToCalculate / 1e6,
 								ctx.calculationProgress.timeToLoad / 1e6, s.toString());
 					}
-					pnt.rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
+					// use to store time
+					pnt.rt().rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
 					res.points.add(pnt);
 					res.progress.add(ctx.calculationProgress);
 					res.shortcuts.add(result.size());
@@ -339,7 +340,7 @@ public class HHRoutingShortcutCreator {
 							if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 200) {
 								prevPrintInd = ind;
 								logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, rpnt.roadId / 64,
-										res.shortcuts.get(k), rpnt.rtDistanceFromStart);
+										res.shortcuts.get(k), rpnt.rt().rtDistanceFromStart);
 							}
 							networkDB.insertSegments(rpnt.connected);
 							if (DEBUG_VERBOSE_LEVEL >= 2) {

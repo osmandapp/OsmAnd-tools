@@ -157,9 +157,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 		
 		HHRoutingDB sourceDB = new HHRoutingDB(src);
-		TLongObjectHashMap<NetworkDBPoint> pointsById = sourceDB.loadNetworkPoints();
-		TIntObjectHashMap<List<NetworkDBPoint>> outPoints = sourceDB.groupByClusters(pointsById, true);
-		TIntObjectHashMap<List<NetworkDBPoint>> inPoints = sourceDB.groupByClusters(pointsById, false);
+		TLongObjectHashMap<NetworkDBPointPrep> pointsById = sourceDB.loadNetworkPoints(NetworkDBPointPrep.class);
+		TIntObjectHashMap<List<NetworkDBPointPrep>> outPoints = sourceDB.groupByClusters(pointsById, true);
+		TIntObjectHashMap<List<NetworkDBPointPrep>> inPoints = sourceDB.groupByClusters(pointsById, false);
 		pIns = tgt.prepareStatement("INSERT INTO points(" + columnNames + ") VALUES (" + insPnts + ")");
 		ResultSet rs = src.createStatement().executeQuery(" select " + columnNames + " from points");
 		while (rs.next()) {
@@ -176,7 +176,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 					" select idConnPoint, dist, shortcut from segments where idPoint = ? and profile = " + profile);
 			PreparedStatement selIn = src.prepareStatement(
 					" select idPoint, dist, shortcut from segments where idConnPoint = ? and profile = " + profile);
-			for (NetworkDBPoint p : pointsById.valueCollection()) {
+			for (NetworkDBPointPrep p : pointsById.valueCollection()) {
 				selIn.setInt(1, p.index);
 				selOut.setInt(1, p.index);
 				sIns.setInt(1, p.index);
@@ -191,14 +191,26 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			sIns.executeBatch();
 		}
 		tgt.close();
-
 	}
-	private static byte[] prepareSegments(PreparedStatement selIn, TLongObjectHashMap<NetworkDBPoint> pointsById, List<NetworkDBPoint> pnts) throws SQLException, IOException {
+	
+	static class NetworkDBPointPrep extends NetworkDBPoint {
+		int distSegment;
+		int chIndexEdgeDiff;
+		int chFinalInd;
+		int chIndexCnt;
+		boolean midSaved;
+		int midMaxDepth;
+		int midProc;
+		int midDepth;
+		int midPrevMaxDepth;
+	}
+	
+	private static byte[] prepareSegments(PreparedStatement selIn, TLongObjectHashMap<NetworkDBPointPrep> pointsById, List<NetworkDBPointPrep> pnts) throws SQLException, IOException {
 		TByteArrayList tbs = new TByteArrayList();
 		ResultSet q = selIn.executeQuery();
 		BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(null, null);
-		for (NetworkDBPoint p : pnts) {
-			p.rtCnt = 0;
+		for (NetworkDBPointPrep p : pnts) {
+			p.distSegment = 0;
 		}
 		while (q.next()) {
 			int conn = q.getInt(1);
@@ -208,13 +220,13 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			if (ind < 0) {
 				throw new IllegalStateException();
 			}
-			pnts.get(ind).rtCnt = distInt;
+			pnts.get(ind).distSegment = distInt;
 		}
-		for (NetworkDBPoint p : pnts) {
-//			if (p.rtCnt == 0) {
+		for (NetworkDBPointPrep p : pnts) {
+//			if (p.tmpIndex == 0) {
 //				indZeros++;
 //			}
-			bmiw.writeRawVarint32(tbs, p.rtCnt);
+			bmiw.writeRawVarint32(tbs, p.distSegment);
 		}
 		return tbs.toArray();
 	}
@@ -229,11 +241,11 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	
 	
 
-	public void updatePointsCHInd(Collection<NetworkDBPoint> pnts) throws SQLException {
+	public void updatePointsCHInd(Collection<NetworkDBPointPrep> pnts) throws SQLException {
 		PreparedStatement updCHInd = conn.prepareStatement("UPDATE  points SET chInd = ? where idPoint = ?");
 		int ind = 0;
-		for (NetworkDBPoint p : pnts) {
-			updCHInd.setLong(1, p.chInd);
+		for (NetworkDBPointPrep p : pnts) {
+			updCHInd.setLong(1, p.chFinalInd);
 			updCHInd.setLong(2, p.pntGeoId);
 			updCHInd.addBatch();
 			if (ind++ % BATCH_SIZE == 0) {
@@ -523,6 +535,60 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		} catch (SQLException e) {
 			throw new IllegalStateException(e);
 		}
+	}
+	
+	public void loadMidPointsIndex(TLongObjectHashMap<NetworkDBPointPrep> pntsMap, Collection<NetworkDBPointPrep> pointsList, boolean update) throws SQLException {
+		Statement s = conn.createStatement();
+		// rtCnt -> midMaxDepth
+		// rtIndex -> midProc
+		for (NetworkDBPointPrep p : pointsList) {
+			p.midSaved = false;
+		}
+		PreparedStatement ps = conn.prepareStatement("UPDATE midpoints SET maxMidDepth = ?, proc = ? where ind = ?");
+		int batch = 0;
+		ResultSet rs = s.executeQuery("SELECT ind, maxMidDepth, proc  FROM midpoints ");
+		while (rs.next()) {
+			int ind = rs.getInt(1);
+			NetworkDBPointPrep pnt = pntsMap.get(ind);
+			boolean upd = false;
+			if (pnt.midMaxDepth > rs.getInt(2)) {
+				upd = true;
+			} else {
+				pnt.midMaxDepth = rs.getInt(2);
+			}
+			if (pnt.midProc == 1 && rs.getInt(3) == 0) {
+				upd = true;
+			} else {
+				pnt.midProc = rs.getInt(3);
+			}
+			if (upd) {
+				ps.setLong(1, pnt.midMaxDepth);
+				ps.setLong(2, pnt.midProc);
+				ps.setLong(3, pnt.index);
+				ps.addBatch();
+				if (batch++ > 1000) {
+					batch = 0;
+					ps.executeBatch();
+				}
+			}
+			pnt.midSaved = true;
+		}
+		ps.executeBatch();
+		ps = conn.prepareStatement("INSERT INTO midpoints(ind, maxMidDepth, proc) VALUES(?, ?, ?)");
+		batch = 0;
+		for (NetworkDBPointPrep p : pointsList) {
+			if (!p.midSaved && (p.midMaxDepth > 0 || p.midProc > 0)) {
+				ps.setLong(1, p.index);
+				ps.setLong(2, p.midMaxDepth);
+				ps.setLong(3, p.midProc);
+				ps.addBatch();
+				if (batch++ > 1000) {
+					batch = 0;
+					ps.executeBatch();
+				}
+			}
+		}
+		ps.executeBatch();
 	}
 
 	public int prepareBorderPointsToInsert(int fileId, List<RouteSegmentBorderPoint> borderPoints, TLongObjectHashMap<NetworkBorderPoint> pointDbInd) {

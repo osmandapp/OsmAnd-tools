@@ -96,7 +96,7 @@ public class TestHHRouting {
 		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
 		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		File dbFile = new File(folder, name + HHRoutingDB.EXT);
-		HHRoutePlanner planner = new HHRoutePlanner(HHRoutePlanner.prepareContext(ROUTING_PROFILE),
+		HHRoutePlanner<?> planner = HHRoutePlanner.create(HHRoutePlanner.prepareContext(ROUTING_PROFILE),
 				new HHRoutingDB(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG)));
 		HHNetworkRouteRes route = planner.runRouting(PROCESS_START, PROCESS_END, c);
 		TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();

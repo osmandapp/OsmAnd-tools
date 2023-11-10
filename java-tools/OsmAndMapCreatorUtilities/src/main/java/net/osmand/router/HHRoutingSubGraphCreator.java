@@ -51,30 +51,34 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
-// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
+
 
 // TESTING
 // - visited - cost 1131.20 > prev cost 1652.90 2.4 ?? est_A*(1408244, 1408520) = 9.5 vs segment = 3 -- europe bicycle
-//     "113337857443852"	"1408244"	"561100"	"1408157"	"561097"	"NULL"	"55340750705"	"6"	"5"	"1114768016"	"712117744"	"1114757712"	"712121584"
-//     "3375182874626"   	"1408520"	"561165"	"1408226"	"561100"	"NULL"	"1648038513"	"1"	"0"	"1114772464"	"712118464"	"1114768016"	"712117744"
+//  "113337857443852"	"1408244"	"561100"	"1408157"	"561097"	"NULL"	"55340750705"	"6"	"5"	"1114768016"	"712117744"	"1114757712"	"712121584"
+//  "3375182874626"   	"1408520"	"561165"	"1408226"	"561100"	"NULL"	"1648038513"	"1"	"0"	"1114772464"	"712118464"	"1114768016"	"712117744"
 // - assert max cluster size points 75K
 // 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
 // 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
 // 1.1.4 CLEANUP: HHRoutePlanner - shortcuts, midpoint, chpoint
 
-// TODO BUGS
+// VICTOR
+// 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
+// 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
+// 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
+// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
 // 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
-// 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
-// 1.0 FILE: Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
-// 1.7 FILE: Implement border crossing issue on client
-// 1.8 FILE: different dates for maps!
+// 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation 
+
+// FILE IMPLEMENTATION
+// F.1 FILE: Write Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
+// F.2 FILE: Read data by HHRoutePlanner (same map for start / end) 
+// F.3 FILE: Merge maps cluster and check dates in HHRoutePlanner
+// F.4 FILE utilities: Binary inspector...
 
 // HHRoutePlanner - Routing implementations
-// 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation 
 // 2.0.2 HHRoutePlanner use cache boundaries to speed up search
 // 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 2.0.4 should be speed up by just clearing visited
@@ -89,15 +93,14 @@ import net.osmand.util.MapUtils;
 // 2.10 Live data (think about it)
 // 2.11 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 
-// 3 Later implementation
+// 3 Server speedups and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
-// 3.3 FILE utilities: Binary inspector...
-// 3.4 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
-// 3.5 DATA: Tests 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 3.6 DATA: Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
+// 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
+// 3.4 DATA: Tests 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
+// 3.5 DATA: Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
 //    static int TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
-// 3.7 DATA: EX10 - example that min depth doesn't give good approximation
+// 3.6 DATA: EX10 - example that min depth doesn't give good approximation
 
 // *4* Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
