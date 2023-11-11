@@ -205,10 +205,12 @@ public class HHRoutingShortcutCreator {
 								t.getSegmentStart(), t.getSegmentEnd()));
 						double h = MapUtils.squareRootDist31(pnt.midX(), pnt.midY(), end.midX(), end.midY())
 								/ ctx.getRouter().getMaxSpeed();
-						float routeTime = t.getDistanceFromStart() + routePlanner.calcRoutingSegmentTimeOnlyDist(ctx.getRouter(), t) / 2 ;
+						float routeTime = t.getDistanceFromStart() + routePlanner.calcRoutingSegmentTimeOnlyDist(ctx.getRouter(), t) / 2;
 						if (h > routeTime) {
-							throw new IllegalStateException(
-									String.format("%s %s - %.2f > %.2f", pnt, end, h, t.getDistanceFromStart()));
+							routeTime += 1; // happens in extra rare cases straight line / maxspeed and float roundings
+							if (h > routeTime) {
+								throw new IllegalStateException(String.format("%s %s - %.2f > %.2f", pnt, end, h, routeTime));
+							}
 						}
 						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, routeTime, true, false);
 						while (t != null) {
