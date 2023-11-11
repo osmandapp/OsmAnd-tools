@@ -51,6 +51,7 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
+// 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
 
 
 // TESTING
@@ -64,7 +65,6 @@ import net.osmand.util.MapUtils;
 
 // VICTOR
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
-// 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
 // 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?

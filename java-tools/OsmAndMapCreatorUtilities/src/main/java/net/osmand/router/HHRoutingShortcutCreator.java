@@ -249,7 +249,7 @@ public class HHRoutingShortcutCreator {
 								ctx.calculationProgress.timeToLoad / 1e6, s.toString());
 					}
 					// use to store time
-					pnt.rt().rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
+					pnt.rt(false).rtDistanceFromStart = (System.nanoTime() - nt2) / 1e6;
 					res.points.add(pnt);
 					res.progress.add(ctx.calculationProgress);
 					res.shortcuts.add(result.size());
@@ -340,7 +340,7 @@ public class HHRoutingShortcutCreator {
 							if (DEBUG_VERBOSE_LEVEL >= 1 || ind - prevPrintInd > 200) {
 								prevPrintInd = ind;
 								logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, rpnt.roadId / 64,
-										res.shortcuts.get(k), rpnt.rt().rtDistanceFromStart);
+										res.shortcuts.get(k), rpnt.rt(false).rtDistanceFromStart);
 							}
 							networkDB.insertSegments(rpnt.connected);
 							if (DEBUG_VERBOSE_LEVEL >= 2) {

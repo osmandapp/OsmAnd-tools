@@ -201,19 +201,19 @@ public class HHRoutingTopGraphCreator {
 			routePlanner.runRoutingPointToPoint(hctx, startPnt, null);
 			for (NetworkDBPointPrep pnt : pointsList) {
 				pnt.midDepth = 0;
-				if (pnt.rt().rtRouteToPoint != null) {
+				if (pnt.rt(false).rtRouteToPoint != null) {
 					pnt.midDepth++;
 					NetworkDBPoint p = pnt;
-					while ((p = p.rt().rtRouteToPoint) != startPnt) {
+					while ((p = p.rt(false).rtRouteToPoint) != startPnt) {
 						pnt.midDepth++;
 					}
 				}
 			}
 			for (NetworkDBPointPrep pnt : pointsList) {
-				if (pnt.rt().rtRouteToPoint != null) {
+				if (pnt.rt(false).rtRouteToPoint != null) {
 					int k = 0;
 					NetworkDBPointPrep p = pnt;
-					while ((p = (NetworkDBPointPrep) p.rt().rtRouteToPoint) != startPnt) {
+					while ((p = (NetworkDBPointPrep) p.rt(false).rtRouteToPoint) != startPnt) {
 						k++;
 						p.midMaxDepth = Math.max(p.midMaxDepth, Math.min(k, p.midDepth));
 					}
@@ -446,7 +446,7 @@ public class HHRoutingTopGraphCreator {
 				if (out.end.rtExclude) {
 					continue;
 				}
-				if (out.end.rt().rtDistanceFromStart == 0 || out.end.rt().rtDistanceFromStart > out.dist) {
+				if (out.end.rt(false).rtDistanceFromStart == 0 || out.end.rt(false).rtDistanceFromStart > out.dist) {
 					p.chIndexCnt++;
 					if (shortcuts != null) {
 						if (DEBUG_VERBOSE_LEVEL >= 1) {
