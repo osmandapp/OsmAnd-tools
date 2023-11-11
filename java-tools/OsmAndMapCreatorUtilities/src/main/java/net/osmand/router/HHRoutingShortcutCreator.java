@@ -29,6 +29,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
+import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
@@ -212,12 +213,13 @@ public class HHRoutingShortcutCreator {
 								throw new IllegalStateException(String.format("%s %s - %.2f > %.2f", pnt, end, h, routeTime));
 							}
 						}
-						NetworkDBSegment segment = new NetworkDBSegment(pnt, end, routeTime, true, false);
+						final NetworkDBSegment segment = new NetworkDBSegment(pnt, end, routeTime, true, false);
+						final List<LatLon> geometry = segment.getGeometry();
 						while (t != null) {
-							segment.geometry.add(getPoint(t));
+							geometry.add(getPoint(t));
 							t = t.getParentRoute();
 						}
-						Collections.reverse(segment.geometry);
+						Collections.reverse(geometry);
 						if (pnt.dualPoint.clusterId != end.clusterId) {
 							if (errorFound) {
 								continue;
@@ -231,7 +233,7 @@ public class HHRoutingShortcutCreator {
 							}
 							String msg = String.format("%s can lead only to dual cluster %d - found %s (cluster %d): %s",
 									pnt, pnt.dualPoint.clusterId, end, end.clusterId, b.toString());
-							System.err.println(HHRoutingUtilities.testGetGeometry(segment.geometry));
+							System.err.println(HHRoutingUtilities.testGetGeometry(geometry));
 							System.err.println("BUG needs to be fixed " + msg);
 							System.err.println(msg);
 							throw new IllegalStateException(msg);

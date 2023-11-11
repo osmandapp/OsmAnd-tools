@@ -1,7 +1,6 @@
 package net.osmand.router;
 
 import java.io.File;
-
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,10 +17,13 @@ import org.apache.commons.logging.Log;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
-import net.osmand.router.HHRouteDataStructure.*;
+import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
+import net.osmand.router.HHRouteDataStructure.RoutingStats;
 import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
+import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegmentPrep;
 
 public class HHRoutingTopGraphCreator {
 	static int DEBUG_VERBOSE_LEVEL = 0;
@@ -361,7 +363,7 @@ public class HHRoutingTopGraphCreator {
 				allShortcuts.add(sh);
 				sh.start.connected.add(sh);
 				NetworkDBSegment rev = new NetworkDBSegment(sh.start, sh.end, sh.dist, !sh.direction, sh.shortcut);
-				rev.geometry.addAll(sh.geometry);
+				rev.getGeometry().addAll(sh.getGeometry());
 				sh.end.connectedReverse.add(rev);
 			}
 			pnt.chFinalInd = contracted++;
@@ -453,16 +455,16 @@ public class HHRoutingTopGraphCreator {
 							System.out.printf("Shortcut %d -> %d via %d %.2f cost \n ", in.start.index, out.end.index,
 									in.end.index, in.dist + out.dist);
 						}
-						NetworkDBSegment sh = new NetworkDBSegment(in.start, out.end,
+						NetworkDBSegmentPrep sh = new NetworkDBSegmentPrep(in.start, out.end,
 								in.dist + out.dist, true, true);
 						if (in.shortcut) {
-							sh.segmentsStartEnd.addAll(in.segmentsStartEnd);
+							sh.segmentsStartEnd.addAll(((NetworkDBSegmentPrep)in).segmentsStartEnd);
 						} else {
 							sh.segmentsStartEnd.add(in.start.index);
 							sh.segmentsStartEnd.add(in.end.index);
 						}
 						if (out.shortcut) {
-							sh.segmentsStartEnd.addAll(out.segmentsStartEnd);
+							sh.segmentsStartEnd.addAll(((NetworkDBSegmentPrep)out).segmentsStartEnd);
 						} else {
 							sh.segmentsStartEnd.add(out.start.index);
 							sh.segmentsStartEnd.add(out.end.index);

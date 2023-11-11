@@ -32,6 +32,8 @@ import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.DBDialect;
 import static net.osmand.router.HHRoutingUtilities.logf;
 
+import net.osmand.router.HHRoutingDB.NetworkDBPoint;
+import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -429,20 +431,22 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insSegment.setInt(5, routingProfile);
 			insSegment.addBatch();
 //			byte[] coordinates = new byte[0];
-			if (s.geometry.size() > 0) {
-				byte[] coordinates = new byte[8 * s.geometry.size()];
-				for (int t = 0; t < s.geometry.size(); t++) {
-					LatLon l = s.geometry.get(t);
+			if (s.getGeometry().size() > 0) {
+				List<LatLon> geometry = s.getGeometry();
+				byte[] coordinates = new byte[8 * geometry.size()];
+				for (int t = 0; t < geometry.size(); t++) {
+					LatLon l = geometry.get(t);
 					Algorithms.putIntToBytes(coordinates, 8 * t, MapUtils.get31TileNumberX(l.getLongitude()));
 					Algorithms.putIntToBytes(coordinates, 8 * t + 4, MapUtils.get31TileNumberY(l.getLatitude()));
 				}
 				insGeometry.setBytes(4, coordinates);
-			} else if (s.segmentsStartEnd.size() > 0) {
-				byte[] coordinates = new byte[4 * s.segmentsStartEnd.size() + 8];
+			} else if (s instanceof NetworkDBSegmentPrep && ((NetworkDBSegmentPrep) s).segmentsStartEnd.size() > 0) {
+				NetworkDBSegmentPrep ps = ((NetworkDBSegmentPrep) s);
+				byte[] coordinates = new byte[4 * ps.segmentsStartEnd.size() + 8];
 				Algorithms.putIntToBytes(coordinates, 0, XY_SHORTCUT_GEOM);
 				Algorithms.putIntToBytes(coordinates, 4, XY_SHORTCUT_GEOM);
-				for (int t = 0; t < s.segmentsStartEnd.size(); t++) {
-					Algorithms.putIntToBytes(coordinates, 4 * t + 8, s.segmentsStartEnd.getQuick(t));
+				for (int t = 0; t < ps.segmentsStartEnd.size(); t++) {
+					Algorithms.putIntToBytes(coordinates, 4 * t + 8, ps.segmentsStartEnd.getQuick(t));
 				}
 				insGeometry.setBytes(4, coordinates);
 			}
@@ -802,6 +806,15 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 
 	}
 
+	static class NetworkDBSegmentPrep extends NetworkDBSegment {
+
+		TIntArrayList segmentsStartEnd = new TIntArrayList();
+
+		public NetworkDBSegmentPrep(NetworkDBPoint start, NetworkDBPoint end, double dist, boolean direction,
+				boolean shortcut) {
+			super(start, end, dist, direction, shortcut);
+		}
+	}
 	
 
 }

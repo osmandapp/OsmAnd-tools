@@ -51,20 +51,13 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
+// 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
 
 
 // TESTING
-// - visited - cost 1131.20 > prev cost 1652.90 2.4 ?? est_A*(1408244, 1408520) = 9.5 vs segment = 3 -- europe bicycle
-//  "113337857443852"	"1408244"	"561100"	"1408157"	"561097"	"NULL"	"55340750705"	"6"	"5"	"1114768016"	"712117744"	"1114757712"	"712121584"
-//  "3375182874626"   	"1408520"	"561165"	"1408226"	"561100"	"NULL"	"1648038513"	"1"	"0"	"1114772464"	"712118464"	"1114768016"	"712117744"
-// - assert max cluster size points 75K
-// 1.3.2 CHECK: long roads ferries is correctly calculated (manual tests) - ways 201337669, 587547089
-// 1.1.1 CLEANUP: HHRoutePlanner encapsulate HHRoutingPreparationDB, RoutingContext -> HHRoutingContext
-// 1.1.4 CLEANUP: HHRoutePlanner - shortcuts, midpoint, chpoint
+// 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
 
 // VICTOR
-// 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
 // 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?

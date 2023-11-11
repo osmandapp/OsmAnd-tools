@@ -78,12 +78,13 @@ public class HHRoutingUtilities {
 	}
 	
 	public static void addWay(TLongObjectHashMap<Entity> osmObjects, NetworkDBSegment segment, String tag, String value) {
-		if (segment.geometry.isEmpty()) {
+		if (segment.geom == null || segment.geom.isEmpty()) {
 			return;
 		}
+		List<LatLon> geometry = segment.getGeometry();
 		Way w = new Way(DEBUG_OSM_ID--);
 		w.putTag("name", String.format("%d -> %d %.1f", segment.start.index, segment.end.index, segment.dist));
-		for (LatLon l : segment.geometry) {
+		for (LatLon l : geometry) {
 			w.addNode(new Node(l.getLatitude(), l.getLongitude(), DEBUG_OSM_ID--));
 		}
 		osmObjects.put(w.getId(), w);
