@@ -51,19 +51,19 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
+// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
+// 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation 
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
 
-
 // TESTING
+// 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
 
-// VICTOR
-// 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
-// 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
+// CHECKS
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
 // 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
-// 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation 
 
 // FILE IMPLEMENTATION
 // F.1 FILE: Write Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
@@ -73,7 +73,6 @@ import net.osmand.util.MapUtils;
 
 // HHRoutePlanner - Routing implementations
 // 2.0.2 HHRoutePlanner use cache boundaries to speed up search
-// 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 2.0.4 should be speed up by just clearing visited
 // 2.1 HHRoutePlanner Improve / Review A* finish condition
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
