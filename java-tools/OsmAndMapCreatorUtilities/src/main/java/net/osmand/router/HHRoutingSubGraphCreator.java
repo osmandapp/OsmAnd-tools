@@ -53,10 +53,10 @@ import net.osmand.util.MapUtils;
 // IN PROGRESS
 // 1.5 BinaryRoutePlanner TODO ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
 // 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
-// 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation 
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
 
 // TESTING
+// 2.0.1 Make / check precise routing time between detailed segment calculation and server calculation - https://github.com/osmandapp/OsmAnd/issues/18566 
 // 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 // 1.1.3 CLEANUP: separate / lightweight  NetworkDBPoint - 32 -> 10 ? fields,  NetworkDBSegment - 7 -> 4?
 
