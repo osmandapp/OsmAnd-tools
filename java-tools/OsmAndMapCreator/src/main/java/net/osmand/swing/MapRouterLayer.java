@@ -1125,6 +1125,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		// config.initialDirection = 0 / 180d * Math.PI; // NORTH
 		// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
 		// config.ZOOM_TO_LOAD_TILES = 14;
+//		config.initialDirection = 30 / 180.0 * Math.PI;
 		try {
 			config.minPointApproximation = RoutingConfiguration.parseSilentFloat(
 					paramsR.get("minPointApproximation"), config.minPointApproximation);

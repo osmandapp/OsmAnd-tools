@@ -51,11 +51,13 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
+// 1.3.3 BUG: (Fix time) init direction + u-turn via same geo point - (Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+// 1.3.4 BUG: gap when route goes via 1 network point
+// 1.3.5 BUG: route without network points (implement)
+
+// 1.1 HHRoutePlanner use cache boundaries to speed up search
+// 1.2 HHRoutePlanner should be speed up by just clearing visited
 // 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
-// 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
-// 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
-// 2.0.2 HHRoutePlanner use cache boundaries to speed up search
-// 2.0.4 should be speed up by just clearing visited
 
 // TESTING
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
@@ -67,6 +69,7 @@ import net.osmand.util.MapUtils;
 // F.2 FILE: Read data by HHRoutePlanner (same map for start / end) 
 // F.3 FILE: Merge maps cluster and check dates in HHRoutePlanner
 // F.4 FILE utilities: Binary inspector...
+// F.5 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%) 
 
 // HHRoutePlanner - Routing implementations
 // 2.0 Test precise routing time each segment (https://github.com/osmandapp/OsmAnd/issues/18566 )
