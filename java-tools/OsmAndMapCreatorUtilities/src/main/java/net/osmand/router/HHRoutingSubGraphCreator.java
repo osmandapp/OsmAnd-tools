@@ -51,12 +51,12 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.3.5 BUG: route without network points (implement)
 // 1.1 HHRoutePlanner use cache boundaries to speed up search
 // 1.2 HHRoutePlanner should be speed up by just clearing visited
 // 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
 
 // TESTING
+// 1.3.5 BUG: route without network points (implement)
 // 1.3.3 BUG: (Fix time) init direction + u-turn via same geo point - (Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
 // 1.3.4 BUG: gap when route goes via 1 network point
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
@@ -73,6 +73,7 @@ import net.osmand.util.MapUtils;
 // HHRoutePlanner - Routing implementations
 // 2.0 Test precise routing time each segment (https://github.com/osmandapp/OsmAnd/issues/18566 )
 // 2.0.1 (Fix time) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+// 2.0.2 Routes don't match with default A* (very short for example) 
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
