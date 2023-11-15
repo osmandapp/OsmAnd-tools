@@ -52,13 +52,10 @@ import net.osmand.util.MapUtils;
 
 // IN PROGRESS
 // 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
-
-// VICTOR 
-// 2.0.2 HHRoutePlanner use cache boundaries to speed up search
-// 2.0.4 should be speed up by just clearing visited
 // 1.3.3 CHECK: Theoretically possible situation with u-turn on same geo point - explanation - test (should work fine)?
 // 1.3.4 CHECK: Some points have no segments in/out (oneway roads) - simplify?
-// 1.3.5 CHECK: Some routes strangely don't have dual point - https://www.openstreetmap.org/way/22568749 (investigate)
+// 2.0.2 HHRoutePlanner use cache boundaries to speed up search
+// 2.0.4 should be speed up by just clearing visited
 
 // TESTING
 // 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
@@ -85,6 +82,7 @@ import net.osmand.util.MapUtils;
 // 2.11 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 
 // 3 Server speedups and Data research
+// 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
