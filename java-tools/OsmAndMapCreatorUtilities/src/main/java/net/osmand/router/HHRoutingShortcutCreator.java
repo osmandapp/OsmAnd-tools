@@ -388,7 +388,6 @@ public class HHRoutingShortcutCreator {
 		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
 		TLongObjectHashMap<RouteSegment> resUnique = new TLongObjectHashMap<>();
-//		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = true;
 		// REMOVE TEST BLOCK ONCE NOT USED ///// 
 //		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 185255216; //233801367l;
 //		boolean testBUG = true;
@@ -427,8 +426,7 @@ public class HHRoutingShortcutCreator {
 //		for (long pntId : testKeys) {
 //			RouteSegment prev = testIteration.get(pntId);
 //			RouteSegment o = resUnique.get(pntId);
-//			System.out.println(o);
-//			if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 1) {
+//			if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.4) {
 //				double d1 = HHRoutingUtilities.testGetDist(prev, false);
 //				double d2 = HHRoutingUtilities.testGetDist(o, true);
 //				System.out.printf("1 = false (2 = true): %.1f%% (%.1f%%). %.2f s (%.2f m) != %.2f  s (%.2fm) - %s %s - %.5f, %.5f -> %.5f, %.5f \n",

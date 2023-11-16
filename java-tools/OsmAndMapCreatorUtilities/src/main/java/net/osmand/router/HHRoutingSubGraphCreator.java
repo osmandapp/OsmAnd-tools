@@ -51,9 +51,11 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
+// 1 = false (2 = true): 4.8% (0.0%). 728.57 s (5124.05 m) != 695.43  s (5124.05m) - 10 (Lat 42.336205 Lon 19.246946): Road (451406223) Road (308015459) [175-176] dstStart=695.43 - 42.33620, 19.24690 -> 42.34428, 19.29960
+// Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
 
 // TESTING
+// 1.6 BinaryRoutePlanner make exception to test non base (TODO)
 // 1.1 HHRoutePlanner use cache boundaries to speed up search
 // 1.3.5 BUG: route without network points (implement)
 // 1.3.3 BUG: (Fix time) init direction + u-turn via same geo point - (Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
