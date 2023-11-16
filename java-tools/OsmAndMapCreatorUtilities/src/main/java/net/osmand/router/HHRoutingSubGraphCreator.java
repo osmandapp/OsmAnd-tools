@@ -51,11 +51,10 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1.1 HHRoutePlanner use cache boundaries to speed up search
-// 1.2 HHRoutePlanner should be speed up by just clearing visited
 // 1.6 BinaryRoutePlanner make exception to test non base (4 TODOs)
 
 // TESTING
+// 1.1 HHRoutePlanner use cache boundaries to speed up search
 // 1.3.5 BUG: route without network points (implement)
 // 1.3.3 BUG: (Fix time) init direction + u-turn via same geo point - (Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
 // 1.3.4 BUG: gap when route goes via 1 network point
@@ -77,6 +76,7 @@ import net.osmand.util.MapUtils;
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
+// 2.4 Progress bar for HHRoutePlanner
 // 2.5 C++ implementation HHRoutePlanner
 // 2.6 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.7 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
@@ -84,6 +84,7 @@ import net.osmand.util.MapUtils;
 // 2.9 Deprioritize or exclude roads (parameters)
 // 2.10 Live data (think about it)
 // 2.11 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
+// 2.12 HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData)
 
 // 3 Server speedups and Data research
 // 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)

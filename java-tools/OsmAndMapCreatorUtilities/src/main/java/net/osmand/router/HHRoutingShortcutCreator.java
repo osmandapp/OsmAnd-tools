@@ -388,8 +388,9 @@ public class HHRoutingShortcutCreator {
 		long pnt = calculateRoutePointInternalId(s.getRoad().getId(), s.getSegmentEnd(), s.getSegmentStart());
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
 		TLongObjectHashMap<RouteSegment> resUnique = new TLongObjectHashMap<>();
+//		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = true;
 		// REMOVE TEST BLOCK ONCE NOT USED ///// 
-//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 170670960; //233801367l;
+//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 185255216; //233801367l;
 //		boolean testBUG = true;
 //		TLongObjectHashMap<RouteSegment> testIteration = null;
 //		for (int iteration = 0; iteration < (testBUG ? 2 : 1); iteration++) {
