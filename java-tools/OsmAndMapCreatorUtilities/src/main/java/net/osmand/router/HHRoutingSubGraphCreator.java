@@ -51,8 +51,9 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// 1 = false (2 = true): 4.8% (0.0%). 728.57 s (5124.05 m) != 695.43  s (5124.05m) - 10 (Lat 42.336205 Lon 19.246946): Road (451406223) Road (308015459) [175-176] dstStart=695.43 - 42.33620, 19.24690 -> 42.34428, 19.29960
-// Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
+// Victor: 1 = false (2 = true): 4.8% (0.0%). 728.57 s (5124.05 m) != 695.43  s (5124.05m) - 10 (Lat 42.336205 Lon 19.246946): Road (451406223) Road (308015459) [175-176] dstStart=695.43 - 42.33620, 19.24690 -> 42.34428, 19.29960
+// Victor: DEBUG_BREAK_EACH_SEGMENT = true / false, DEBUG_PRECISE_DIST_MEASUREMENT = true / false
+// YURII: Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
 
 // TESTING
 // 1.6 BinaryRoutePlanner make exception to test non base (TODO)
@@ -72,7 +73,7 @@ import net.osmand.util.MapUtils;
 // F.5 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%) 
 
 // HHRoutePlanner - Routing implementations
-// 2.0 Test precise routing time each segment (https://github.com/osmandapp/OsmAnd/issues/18566 )
+// 2.0 Test precise routing time each segment vs  (https://github.com/osmandapp/OsmAnd/issues/18566 )
 // 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
 // 2.0.2 HH Routing time doesn't match with default A* (very short for example) 
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
