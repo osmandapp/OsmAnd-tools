@@ -73,8 +73,8 @@ import net.osmand.util.MapUtils;
 
 // HHRoutePlanner - Routing implementations
 // 2.0 Test precise routing time each segment (https://github.com/osmandapp/OsmAnd/issues/18566 )
-// 2.0.1 (Fix time) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// 2.0.2 Routes don't match with default A* (very short for example) 
+// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+// 2.0.2 HH Routing time doesn't match with default A* (very short for example) 
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
