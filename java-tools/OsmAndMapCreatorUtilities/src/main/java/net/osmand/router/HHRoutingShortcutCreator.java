@@ -62,7 +62,7 @@ public class HHRoutingShortcutCreator {
 
 	private static File sourceFile() {
 		CLEAN = true;
-		DEBUG_VERBOSE_LEVEL = 1;
+		DEBUG_VERBOSE_LEVEL = 0;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Italy_test";
@@ -413,8 +413,7 @@ public class HHRoutingShortcutCreator {
 					long pntId = calculateRoutePointInternalId(o.getRoad().getId(), o.getSegmentStart(), o.getSegmentEnd());
 					if (resUnique.containsKey(pntId)) {
 						if (resUnique.get(pntId).getDistanceFromStart() > o.getDistanceFromStart()) {
-							// TODO 1.6 fix unique
-						   // throw new IllegalStateException(resUnique.get(pntId) + " > " + o  + " - " + s) ;
+							throw new IllegalStateException(resUnique.get(pntId) + " > " + o + " - " + s);
 						} else {
 							continue;
 						}
