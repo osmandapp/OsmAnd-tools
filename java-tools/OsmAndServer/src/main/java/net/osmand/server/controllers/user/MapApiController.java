@@ -300,7 +300,7 @@ public class MapApiController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, true);
+		UserFilesResults res = userdataService.generateFilesFromOneType(dev.userid, name, type, allVersions, true);
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
