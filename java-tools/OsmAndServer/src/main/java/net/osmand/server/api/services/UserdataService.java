@@ -613,6 +613,7 @@ public class UserdataService {
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
+        final String EMPTY_FILE_NAME = "empty.ignore";
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
 		Set<String> fileIds = new TreeSet<>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
@@ -626,7 +627,7 @@ public class UserdataService {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-				if (filterTypes != null && !isSelectedType(filterTypes, sf)) {
+				if ((filterTypes != null && !isSelectedType(filterTypes, sf)) || sf.name.endsWith(EMPTY_FILE_NAME)) {
 					continue;
 				}
 				if (fileIds.add(fileId)) {
