@@ -63,6 +63,8 @@ public class HHRoutingShortcutCreator {
 	private static File sourceFile() {
 		CLEAN = true;
 		DEBUG_VERBOSE_LEVEL = 0;
+//		DEBUG_LIMIT_START_OFFSET = 1150;
+//		DEBUG_LIMIT_PROCESS = 1200;
 		THREAD_POOL = 1;
 		String name = "Montenegro_europe_2.road.obf";
 //		name = "Italy_test";
@@ -305,7 +307,6 @@ public class HHRoutingShortcutCreator {
 				pnt.connected.clear(); // for gc
 				continue;
 			}
-//			if (pnt.index > 2000 || pnt.index < 1800)  continue;
 			if (ind < DEBUG_LIMIT_START_OFFSET) {
 				continue;
 			}
@@ -389,7 +390,7 @@ public class HHRoutingShortcutCreator {
 		segments = new ExcludeTLongObjectMap<RouteSegment>(segments, pnt);
 		TLongObjectHashMap<RouteSegment> resUnique = new TLongObjectHashMap<>();
 		// REMOVE TEST BLOCK ONCE NOT USED ///// 
-//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 185255216; //233801367l;
+//		BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 451406223; //233801367l;
 //		boolean testBUG = true;
 //		TLongObjectHashMap<RouteSegment> testIteration = null;
 //		for (int iteration = 0; iteration < (testBUG ? 2 : 1); iteration++) {
@@ -426,7 +427,7 @@ public class HHRoutingShortcutCreator {
 //		for (long pntId : testKeys) {
 //			RouteSegment prev = testIteration.get(pntId);
 //			RouteSegment o = resUnique.get(pntId);
-//			if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.4) {
+//			if (Math.abs(1 - prev.distanceFromStart / o.distanceFromStart) * 100 > 0.1) {
 //				double d1 = HHRoutingUtilities.testGetDist(prev, false);
 //				double d2 = HHRoutingUtilities.testGetDist(o, true);
 //				System.out.printf("1 = false (2 = true): %.1f%% (%.1f%%). %.2f s (%.2f m) != %.2f  s (%.2fm) - %s %s - %.5f, %.5f -> %.5f, %.5f \n",

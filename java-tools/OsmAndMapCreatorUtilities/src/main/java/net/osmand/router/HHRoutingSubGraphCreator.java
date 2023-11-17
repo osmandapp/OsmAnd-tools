@@ -51,11 +51,10 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// Victor: 1 = false (2 = true): 4.8% (0.0%). 728.57 s (5124.05 m) != 695.43  s (5124.05m) - 10 (Lat 42.336205 Lon 19.246946): Road (451406223) Road (308015459) [175-176] dstStart=695.43 - 42.33620, 19.24690 -> 42.34428, 19.29960
-// Victor: DEBUG_BREAK_EACH_SEGMENT = true / false, DEBUG_PRECISE_DIST_MEASUREMENT = true / false
 // YURII: Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
 
 // TESTING
+// Victor: DEBUG_BREAK_EACH_SEGMENT = true / false, DEBUG_PRECISE_DIST_MEASUREMENT = true / false
 // 1.6 BinaryRoutePlanner make exception to test non base (TODO)
 // 1.1 HHRoutePlanner use cache boundaries to speed up search
 // 1.3.5 BUG: route without network points (implement)
