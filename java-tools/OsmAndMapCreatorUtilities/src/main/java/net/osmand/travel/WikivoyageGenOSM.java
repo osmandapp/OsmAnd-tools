@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import net.osmand.map.OsmandRegions;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -148,9 +147,6 @@ public class WikivoyageGenOSM {
 	}
 
 	public static void genWikivoyageOsm(File wikivoyageFile, File outputFile, int LIMIT) throws SQLException, IOException {
-		OsmandRegions regions;
-		regions = new OsmandRegions();
-		regions.prepareFile();
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection connection = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getCanonicalPath(), log );
 		Statement statement = connection.createStatement();
