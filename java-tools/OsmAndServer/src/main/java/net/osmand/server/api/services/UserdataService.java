@@ -138,7 +138,7 @@ public class UserdataService {
             }
 		}
         
-        UserdataController.UserFilesResults res = generateFiles(user.id, null, null, false, false);
+        UserdataController.UserFilesResults res = generateFiles(user.id, null, false, false);
         if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
             throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
                     "Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
@@ -152,18 +152,31 @@ public class UserdataService {
 								+ " MB. Please contact support in order to investigate possible solutions.");
 			}
 		}
-		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
-			if (res.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
+        if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
+            UserdataController.UserFilesResults files = generateFiles(user.id, null, false, false, FREE_TYPES.toArray(new String[0]));
+            if (files.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
                 throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
             }
-		}
+        }
     }
     
-    public UserdataController.UserFilesResults generateFiles(int userId, String name, String type, boolean allVersions, boolean details) {
+    public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
+        List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
+        if (types != null) {
+            for (String t : types) {
+                if (t != null) {
+                    List<UserFileNoData> fl =
+                            details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
+                                    filesRepository.listFilesByUserid(userId, name, t);
+                    allFiles.addAll(fl);
+                }
+            }
+        }
+        return getUserFilesResults(allFiles, userId, allVersions);
+    }
+    
+    private UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
         PremiumUser user = usersRepository.findById(userId);
-        List<PremiumUserFilesRepository.UserFileNoData> fl =
-                details ? filesRepository.listFilesByUseridWithDetails(userId, name, type) :
-                        filesRepository.listFilesByUserid(userId, name, type);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
         res.uniqueFiles = new ArrayList<>();
@@ -172,7 +185,7 @@ public class UserdataService {
         }
         res.userid = userId;
         Set<String> fileIds = new TreeSet<String>();
-        for (PremiumUserFilesRepository.UserFileNoData sf : fl) {
+        for (PremiumUserFilesRepository.UserFileNoData sf : files) {
             String fileId = sf.type + "____" + sf.name;
             if (sf.filesize >= 0) {
                 res.totalFileVersions++;

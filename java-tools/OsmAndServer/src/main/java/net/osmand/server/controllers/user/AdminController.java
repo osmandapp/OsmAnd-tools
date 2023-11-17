@@ -205,7 +205,7 @@ public class AdminController {
 					deviceSub = ls.get(0);
 				}
 				if (deviceSub != null) {
-					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, null, true, false);
+					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
 					ufs.allFiles.clear();
 					ufs.uniqueFiles.clear();
 					deviceSub.payload = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") + " at "
