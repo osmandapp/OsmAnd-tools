@@ -24,7 +24,6 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import net.osmand.map.OsmandRegions;
-import net.osmand.map.WorldRegion;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -54,9 +53,9 @@ public class WikivoyageGenOSM {
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
-	
-	
-	static long NODE_ID = -1000;
+	public static final int COMMON_ARTICLE_LAT_LON = -85; // Antarctica LatLon(-85,-85)
+
+	static long NODE_ID = -1000000;
 	static Map<String, Integer> categories = new HashMap<>();
 	static Map<String, String> categoriesExample = new HashMap<>();
 	private static Map<String, String> wptCategories;
@@ -202,9 +201,6 @@ public class WikivoyageGenOSM {
 			String isParentOf = rs.getString(rind++);
 			String isAggrPartOf = rs.getString(rind++);
 			String contentJson = rs.getString(rind);
-			if (lat == 0 && lon == 0 && gpxFile.isPointsEmpty() && !isParentOf.isEmpty()) {
-				spreadArticleToEverySubregions(regions, gpxFile);
-			}
 			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle, bannerTitle, isPartOf,
 					isParentOf, isAggrPartOf, contentJson);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
@@ -246,16 +242,6 @@ public class WikivoyageGenOSM {
 		System.out.println(String.format("Empty article: %d no points in article + %d no location page articles (total %d) ", emptyContent, emptyLocation, total));
 	}
 
-	private static void spreadArticleToEverySubregions(OsmandRegions regions, GPXFile gpxFile) {
-		for (WorldRegion region : regions.getWorldRegion().getSubregions()) {
-			WptPt wptPt = new WptPt();
-			LatLon regionCenter = region.getSubregions().get(0).getRegionCenter();
-			wptPt.lat = regionCenter.getLatitude();
-			wptPt.lon = regionCenter.getLongitude();
-			gpxFile.addPoint(wptPt);
-		}
-	}
-
 	private static void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
 		if (Algorithms.isEmpty(value)) {
 			return;
@@ -267,7 +253,8 @@ public class WikivoyageGenOSM {
 	}
 
 	private static boolean combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
-		article.updateCategoryCounts();		
+		article.updateCategoryCounts();
+		boolean commonArticle = false;
 		long idStart = NODE_ID ;
 		LatLon mainArticlePoint = article.latlons.get(0);
 		List<WptPt> points = new ArrayList<GPXUtilities.WptPt>();
@@ -291,15 +278,19 @@ public class WikivoyageGenOSM {
 				}
 			}
 		}
-		if (mainArticlePoint == null && Algorithms.isEmpty(article.partsOf)) {
+		if (mainArticlePoint == null)
+			if (Algorithms.isEmpty(article.partsOf) && Algorithms.isEmpty(article.parentOf)) {
 			// System.out.println(String.format("Skip article as it has no points: %s", article.titles));
 			return false;
+			} else if (!Algorithms.isEmpty(article.parentOf)) {
+				mainArticlePoint = new LatLon(COMMON_ARTICLE_LAT_LON, COMMON_ARTICLE_LAT_LON);
+				commonArticle = true;
 		}
 
 		if (mainArticlePoint != null) {
 			points = sortPoints(mainArticlePoint, points);
 			serializer.startTag(null, "node");
-			long mainArticleid = NODE_ID--;
+			long mainArticleid = NODE_ID++;
 			serializer.attribute(null, "id", mainArticleid + "");
 			serializer.attribute(null, "action", "modify");
 			serializer.attribute(null, "version", "1");
@@ -307,14 +298,16 @@ public class WikivoyageGenOSM {
 			serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
 			tagValue(serializer, "route", "point");
 			tagValue(serializer, "route_type", "article");
+			if (commonArticle) {
+				tagValue(serializer, "common_article", "true");
+			}
 			addArticleTags(article, serializer, true);
 			serializer.endTag(null, "node");
 		}
-		
 		for (WptPt p : points) {
 			String category = simplifyWptCategory(p.category, CAT_OTHER);
 			serializer.startTag(null, "node");
-			long id = NODE_ID--;
+			long id = NODE_ID++;
 			serializer.attribute(null, "id", id + "");
 			serializer.attribute(null, "action", "modify");
 			serializer.attribute(null, "version", "1");
@@ -337,7 +330,7 @@ public class WikivoyageGenOSM {
 		
 		long idEnd = NODE_ID;
 		serializer.startTag(null, "way");
-		long wayId = NODE_ID--;
+		long wayId = NODE_ID++;
 		serializer.attribute(null, "id", wayId + "");
 		serializer.attribute(null, "action", "modify");
 		serializer.attribute(null, "version", "1");
@@ -345,8 +338,8 @@ public class WikivoyageGenOSM {
 		tagValue(serializer, "route", "points_collection");
 		tagValue(serializer, "route_type", "article_points");
 		addArticleTags(article, serializer, false);
-		
-		for(long nid  = idStart ; nid > idEnd; nid--  ) {
+
+		for (long nid = idStart; nid < idEnd; nid++) {
 			serializer.startTag(null, "nd");
 			serializer.attribute(null, "ref", nid +"");
 			serializer.endTag(null, "nd");
