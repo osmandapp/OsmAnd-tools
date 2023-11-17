@@ -138,7 +138,7 @@ public class UserdataService {
             }
 		}
         
-        UserdataController.UserFilesResults res = generateFiles(user.id, null, false, false, (String) null);
+        UserdataController.UserFilesResults res = generateFiles(user.id, null, false, false);
         if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
             throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
                     "Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
@@ -162,12 +162,14 @@ public class UserdataService {
     
     public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
         List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
-        for (String t : types) {
-            if (t != null) {
-                List<UserFileNoData> fl =
-                        details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
-                                filesRepository.listFilesByUserid(userId, name, t);
-                allFiles.addAll(fl);
+        if (types != null) {
+            for (String t : types) {
+                if (t != null) {
+                    List<UserFileNoData> fl =
+                            details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
+                                    filesRepository.listFilesByUserid(userId, name, t);
+                    allFiles.addAll(fl);
+                }
             }
         }
         return getUserFilesResults(allFiles, userId, allVersions);

@@ -97,7 +97,7 @@ public class UserdataController {
 	}
 	
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
-		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, (String) null);
+		UserFilesResults res = userdataService.generateFiles(userId, null, false, false);
 		Iterator<UserFileNoData> it = res.uniqueFiles.iterator();
 		StringBuilder sb = new StringBuilder();
 		while (it.hasNext()) {
