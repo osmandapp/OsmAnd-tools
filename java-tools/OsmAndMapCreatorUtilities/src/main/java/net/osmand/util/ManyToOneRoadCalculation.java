@@ -285,9 +285,9 @@ public class ManyToOneRoadCalculation {
 			ManyToManySegment seg, boolean direction, TLongObjectHashMap<ManyToManySegment> allSegments, TLongHashSet visitedSegments) {
 		int p = seg.segmentIndex;
 		double dist = 0;
-		double speed = router.defineRoutingSpeed(seg.road);
+		double speed = router.defineRoutingSpeed(seg.road, direction);
 		boolean continueMovement = true;
-		while(continueMovement) {
+		while (continueMovement) {
 			int pp = p;
 			visitedSegments.add(calcSegmentId(seg));
 			p = direction ? p + 1 : p - 1;

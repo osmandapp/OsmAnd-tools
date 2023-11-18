@@ -51,9 +51,13 @@ import net.osmand.util.MapUtils;
 
 
 // IN PROGRESS
-// YURII: Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
+// 2.0 https://github.com/osmandapp/OsmAnd/issues/18566 (TODOs)
+// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+// 2.0.3 A* vs HH: Routing time doesn't match: 15.3 vs 4.75 
 
 // TESTING
+// YURII: Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
+// 2.0.2 A* vs HH: Routing time doesn't match (TESTING except short) 
 // Victor: DEBUG_BREAK_EACH_SEGMENT = true / false, DEBUG_PRECISE_DIST_MEASUREMENT = true / false
 // 1.6 BinaryRoutePlanner make exception to test non base (TODO)
 // 1.1 HHRoutePlanner use cache boundaries to speed up search
@@ -72,9 +76,6 @@ import net.osmand.util.MapUtils;
 // F.5 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%) 
 
 // HHRoutePlanner - Routing implementations
-// 2.0 Test precise routing time each segment vs  (https://github.com/osmandapp/OsmAnd/issues/18566 )
-// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// 2.0.2 HH Routing time doesn't match with default A* (very short for example) 
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
