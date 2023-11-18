@@ -49,13 +49,11 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
-
 // IN PROGRESS
-// 2.0 https://github.com/osmandapp/OsmAnd/issues/18566 (TODOs)
-// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// 2.0.3 A* vs HH: Routing time doesn't match: 15.3 vs 4.75 
 
 // TESTING
+// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+// 2.0.3 A* vs HH: Routing time doesn't match: 15.3 vs 4.75 
 // YURII: Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
 // 2.0.2 A* vs HH: Routing time doesn't match (TESTING except short) 
 // Victor: DEBUG_BREAK_EACH_SEGMENT = true / false, DEBUG_PRECISE_DIST_MEASUREMENT = true / false
@@ -88,6 +86,7 @@ import net.osmand.util.MapUtils;
 // 2.10 Live data (think about it)
 // 2.11 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 // 2.12 HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData)
+// 2.13 2-dir routing speed https://github.com/osmandapp/OsmAnd/issues/18566 
 
 // 3 Server speedups and Data research
 // 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
