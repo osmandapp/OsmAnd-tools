@@ -162,7 +162,6 @@ public class IndexController {
 		model.addAttribute("slope", doc.getSlope());
 		model.addAttribute("heightmap", doc.getHeightmap());
 		model.addAttribute("weather", doc.getWeather());
-        model.addAttribute("travel", doc.getTravelGuides());
         return "admin/indexes";
     }
 
