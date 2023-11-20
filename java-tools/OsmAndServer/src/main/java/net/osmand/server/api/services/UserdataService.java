@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.server.controllers.user.FavoriteController.ERROR_READING_GPX_MSG;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
@@ -18,6 +19,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
@@ -31,6 +34,7 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -550,6 +554,36 @@ public class UserdataService {
         storageService.deleteFile(userFile.storage, userFolder(userFile), storageFileName(userFile));
         filesRepository.delete(userFile);
         return ok();
+    }
+    
+    public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+        PremiumUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
+        InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
+        if (in != null) {
+            //create zip file
+            GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+            File tmpGpx = File.createTempFile(newName, ".gpx");
+            Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+            if (exception != null) {
+                return ResponseEntity.badRequest().body("Error writing gpx!");
+            }
+            InternalZipFile zipFile = InternalZipFile.buildFromFile(tmpGpx);
+            
+            try {
+                validateUserForUpload(dev, type, zipFile.getSize());
+            } catch (OsmAndPublicApiException e) {
+                return ResponseEntity.badRequest().body(e.getMessage());
+            }
+            
+            //create file with new name
+            ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+            if (res.getStatusCode().is2xxSuccessful()) {
+                //delete file with old name
+                deleteFile(oldName, type, null, null, dev);
+                return ok();
+            }
+        }
+        return ResponseEntity.badRequest().body("Error rename file!");
     }
     
     public PremiumUsersRepository.PremiumUser getUserById(int id) {
