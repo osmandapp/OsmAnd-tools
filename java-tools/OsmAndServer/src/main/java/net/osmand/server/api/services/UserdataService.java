@@ -556,34 +556,38 @@ public class UserdataService {
         return ok();
     }
     
-    public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+    public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
         PremiumUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
-        InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
-        if (in != null) {
-            //create zip file
-            GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-            File tmpGpx = File.createTempFile(newName, ".gpx");
-            Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
-            if (exception != null) {
-                return ResponseEntity.badRequest().body("Error writing gpx!");
-            }
-            InternalZipFile zipFile = InternalZipFile.buildFromFile(tmpGpx);
-            
-            try {
-                validateUserForUpload(dev, type, zipFile.getSize());
-            } catch (OsmAndPublicApiException e) {
-                return ResponseEntity.badRequest().body(e.getMessage());
-            }
-            
-            //create file with new name
-            ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
-            if (res.getStatusCode().is2xxSuccessful()) {
-                //delete file with old name
-                deleteFile(oldName, type, null, null, dev);
-                return ok();
+        if (file != null) {
+            InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
+            if (in != null) {
+                //create zip file
+                GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+                File tmpGpx = File.createTempFile(newName, ".gpx");
+                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+                if (exception != null) {
+                    return ResponseEntity.badRequest().body("Error writing gpx!");
+                }
+                InternalZipFile zipFile = InternalZipFile.buildFromFile(tmpGpx);
+                
+                try {
+                    validateUserForUpload(dev, type, zipFile.getSize());
+                } catch (OsmAndPublicApiException e) {
+                    return ResponseEntity.badRequest().body(e.getMessage());
+                }
+                
+                //create file with new name
+                ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+                if (res.getStatusCode().is2xxSuccessful()) {
+                    if (!saveCopy) {
+                        //delete file with old name
+                        deleteFile(oldName, type, null, null, dev);
+                    }
+                    return ok();
+                }
             }
         }
-        return ResponseEntity.badRequest().body("Error rename file!");
+        return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
     }
     
     public PremiumUsersRepository.PremiumUser getUserById(int id) {

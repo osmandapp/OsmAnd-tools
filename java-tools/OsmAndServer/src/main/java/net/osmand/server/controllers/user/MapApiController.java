@@ -292,13 +292,16 @@ public class MapApiController {
 	
 	@GetMapping(value = "/rename-file")
 	@ResponseBody
-	public ResponseEntity<String> renameFile(@RequestParam String oldName, @RequestParam String newName, @RequestParam String type) throws IOException {
+	public ResponseEntity<String> renameFile(@RequestParam String oldName,
+	                                         @RequestParam String newName,
+	                                         @RequestParam String type,
+	                                         @RequestParam boolean saveCopy) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
 		if (!oldName.equals(newName)) {
-			return userdataService.renameFile(oldName, newName, type, dev);
+			return userdataService.renameFile(oldName, newName, type, dev, saveCopy);
 		}
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
