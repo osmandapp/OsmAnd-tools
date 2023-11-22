@@ -612,6 +612,17 @@ public class UserdataService {
         return ok();
     }
     
+    @Transactional
+    public ResponseEntity<String> deleteFolder(String folderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+        for (UserFile file : files) {
+            if (file.filesize != -1) {
+                deleteFile(file.name, type, null, null, dev);
+            }
+        }
+        return ok();
+    }
+    
     public PremiumUsersRepository.PremiumUser getUserById(int id) {
         return usersRepository.findById(id);
     }

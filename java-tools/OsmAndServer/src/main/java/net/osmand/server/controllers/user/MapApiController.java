@@ -318,6 +318,17 @@ public class MapApiController {
 		return userdataService.renameFolder(folderName, newFolderName, type, dev);
 	}
 	
+	@GetMapping(value = "/delete-folder")
+	@ResponseBody
+	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
+	                                           @RequestParam String type) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		return userdataService.deleteFolder(folderName, type, dev);
+	}
+	
 	@GetMapping(value = "/list-files")
 	@ResponseBody
 	public ResponseEntity<String> listFiles(
