@@ -12,6 +12,7 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+import java.nio.file.Files;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -779,6 +780,46 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
+    
+    @Transactional
+    public void getBackupFolder(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                String folderName, String format, String type) throws IOException {
+        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
+        String fileName = "Export_" + formatter.format(new Date());
+        File tmpFile = File.createTempFile(fileName, ".zip");
+        try (ZipOutputStream zs = new ZipOutputStream(new FileOutputStream(tmpFile))) {
+            JSONArray itemsJson = new JSONArray();
+            for (UserFile file : files) {
+                if (file.filesize != -1 && !file.name.endsWith(EMPTY_FILE_NAME)) {
+                    itemsJson.put(new JSONObject(toJson(type, file.name)));
+                    InputStream is = new GZIPInputStream(getInputStream(dev, file));
+                    ZipEntry zipEntry = new ZipEntry(file.name);
+                    zs.putNextEntry(zipEntry);
+                    Algorithms.streamCopy(is, zs);
+                    zs.closeEntry();
+                }
+            }
+            JSONObject json = createItemsJson(itemsJson);
+            ZipEntry zipEntry = new ZipEntry("items.json");
+            zs.putNextEntry(zipEntry);
+            InputStream is = new ByteArrayInputStream(json.toString().getBytes());
+            Algorithms.streamCopy(is, zs);
+            zs.closeEntry();
+            zs.flush();
+            zs.finish();
+            response.setHeader("Content-Disposition", "attachment; filename=" + fileName + format);
+            response.setHeader("Content-Type", "application/zip");
+            response.setHeader("Content-Length", tmpFile.length() + "");
+            try (FileInputStream fis = new FileInputStream(tmpFile)) {
+                OutputStream ous = response.getOutputStream();
+                Algorithms.streamCopy(fis, ous);
+                ous.close();
+            }
+        } finally {
+            Files.delete(tmpFile.toPath());
+        }
+    }
     
     
     @Transactional

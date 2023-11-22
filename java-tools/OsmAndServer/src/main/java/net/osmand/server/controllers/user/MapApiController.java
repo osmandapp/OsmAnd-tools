@@ -538,6 +538,24 @@ public class MapApiController {
 		userdataService.getBackup(response, dev, Set.copyOf(data), includeDeleted, format);
 	}
 	
+	@PostMapping(value = "/download-backup-folder")
+	@ResponseBody
+	public void createBackupFolder(@RequestParam String format,
+	                               @RequestParam String folderName,
+	                               @RequestParam String type,
+	                               HttpServletResponse response) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			ResponseEntity<String> error = tokenNotValid();
+			response.setStatus(error.getStatusCodeValue());
+			if (error.getBody() != null) {
+				response.getWriter().write(error.getBody());
+			}
+			return;
+		}
+		userdataService.getBackupFolder(response, dev, folderName, format, type);
+	}
+	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
