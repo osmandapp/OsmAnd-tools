@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import static net.osmand.server.controllers.user.FavoriteController.ERROR_READING_GPX_MSG;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
@@ -34,7 +33,6 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -123,6 +121,7 @@ public class UserdataService {
     public static final String FILE_TYPE_OSM_EDITS = "OSM_EDITS";
     public static final String FILE_TYPE_OSM_NOTES = "OSM_NOTES";
     public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
+    public static final String EMPTY_FILE_NAME = "empty.ignore";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
@@ -556,26 +555,17 @@ public class UserdataService {
         return ok();
     }
     
+    @Transactional
     public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
         PremiumUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
         if (file != null) {
-            InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
-            if (in != null) {
-                //create zip file
-                GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-                File tmpGpx = File.createTempFile(newName, ".gpx");
-                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
-                if (exception != null) {
-                    return ResponseEntity.badRequest().body("Error writing gpx!");
-                }
-                InternalZipFile zipFile = InternalZipFile.buildFromFile(tmpGpx);
-                
+            InternalZipFile zipFile = getZipFile(file, newName);
+            if (zipFile != null) {
                 try {
                     validateUserForUpload(dev, type, zipFile.getSize());
                 } catch (OsmAndPublicApiException e) {
                     return ResponseEntity.badRequest().body(e.getMessage());
                 }
-                
                 //create file with new name
                 ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
                 if (res.getStatusCode().is2xxSuccessful()) {
@@ -588,6 +578,38 @@ public class UserdataService {
             }
         }
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
+    }
+    
+    private InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+        InternalZipFile zipFile = null;
+        File tmpGpx = File.createTempFile(newName, ".gpx");
+        if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
+            zipFile = InternalZipFile.buildFromFile(tmpGpx);
+        } else {
+            InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
+            if (in != null) {
+                GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+                if (exception != null) {
+                    return null;
+                }
+                zipFile = InternalZipFile.buildFromFile(tmpGpx);
+            }
+        }
+        return zipFile;
+    }
+    
+    @Transactional
+    public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+        for (UserFile file : files) {
+            String newName = file.name.replaceFirst(folderName, newFolderName);
+            ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false);
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                return response;
+            }
+        }
+        return ok();
     }
     
     public PremiumUsersRepository.PremiumUser getUserById(int id) {
@@ -669,7 +691,6 @@ public class UserdataService {
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
-        final String EMPTY_FILE_NAME = "empty.ignore";
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
 		Set<String> fileIds = new TreeSet<>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");

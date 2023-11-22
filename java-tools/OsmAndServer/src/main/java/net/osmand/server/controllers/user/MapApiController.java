@@ -306,6 +306,18 @@ public class MapApiController {
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
 	
+	@GetMapping(value = "/rename-folder")
+	@ResponseBody
+	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
+	                                           @RequestParam String type,
+	                                           @RequestParam String newFolderName) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		return userdataService.renameFolder(folderName, newFolderName, type, dev);
+	}
+	
 	@GetMapping(value = "/list-files")
 	@ResponseBody
 	public ResponseEntity<String> listFiles(
