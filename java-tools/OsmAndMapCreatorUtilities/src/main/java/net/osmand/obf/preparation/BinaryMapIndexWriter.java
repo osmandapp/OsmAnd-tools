@@ -154,6 +154,9 @@ public class BinaryMapIndexWriter {
 
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
+	
+	
+	private final static int HH_INDEX_INIT = 17;
 
 
 	public BinaryMapIndexWriter(final RandomAccessFile raf, long timestamp) throws IOException {
@@ -235,6 +238,22 @@ public class BinaryMapIndexWriter {
 		int len = writeInt32Size();
 		log.info("MAP INDEX SIZE : " + len);
 	}
+	
+	
+	public void startHHRoutingIndex(long edition, String profile) throws IOException {
+		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
+		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+		preserveInt32Size();
+		codedOutStream.writeInt64(OsmandOdb.OsmAndHHRoutingIndex.EDITION_FIELD_NUMBER, edition);
+		codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILE_FIELD_NUMBER, profile);
+	}
+
+	public void endHHRoutingIndex() throws IOException {
+		popState(HH_INDEX_INIT);
+		int len = writeInt32Size();
+		log.info("HHROUTING INDEX SIZE : " + len);
+	}
+
 
 	public void startWriteRouteIndex(String name) throws IOException {
 		pushState(ROUTE_INDEX_INIT, OSMAND_STRUCTURE_INIT);

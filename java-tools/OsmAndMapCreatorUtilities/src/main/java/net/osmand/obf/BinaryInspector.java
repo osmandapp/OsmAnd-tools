@@ -92,7 +92,7 @@ public class BinaryInspector {
 					"-latlon=42.7405,18.6357",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "Netherlands_europe_car.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -138,6 +138,7 @@ public class BinaryInspector {
 		boolean vpoi;
 		boolean vmap;
 		boolean vrouting;
+		boolean vhhrouting;
 		boolean vmapObjects;
 		boolean vmapCoordinates;
 		boolean vstats;
@@ -200,6 +201,8 @@ public class BinaryInspector {
 					vstats = true;
 				} else if (params[i].equals("-vrouting")) {
 					vrouting = true;
+				} else if (params[i].equals("-vhhrouting")) {
+					vhhrouting = true;
 				} else if (params[i].equals("-vmapobjects")) {
 					vmapObjects = true;
 				} else if (params[i].equals("-vmapcoordinates")) {
@@ -507,18 +510,7 @@ public class BinaryInspector {
 			int i = 1;
 			println("Binary index " + filename + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()) + owner);
 			for (BinaryIndexPart p : index.getIndexes()) {
-				String partname = "";
-				if (p instanceof MapIndex) {
-					partname = "Map";
-				} else if (p instanceof TransportIndex) {
-					partname = "Transport";
-				} else if (p instanceof RouteRegion) {
-					partname = "Routing";
-				} else if (p instanceof PoiRegion) {
-					partname = "Poi";
-				} else if (p instanceof AddressRegion) {
-					partname = "Address";
-				}
+				String partname = p.getPartName();
 				String name = p.getName() == null ? "" : p.getName();
 				println(MessageFormat.format("{0} {1} data {3} - {2,number,#,###} bytes",
 						new Object[]{i, partname, p.getLength(), name}));

@@ -75,16 +75,18 @@ import net.osmand.util.MapUtils;
 
 // HHRoutePlanner - Routing implementations
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
-// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
-// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.4 Progress bar for HHRoutePlanner
 // 2.5 C++ implementation HHRoutePlanner
 // 2.6 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+///////////////////////////////////////////////////////////
+// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
+// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.7 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 // 2.8 Avoid specific road
 // 2.9 Deprioritize or exclude roads (parameters)
 // 2.10 Live data (think about it)
 // 2.11 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
+//////////////////////////////////////////////////////////
 // 2.12 HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData)
 // 2.13 2-dir routing speed https://github.com/osmandapp/OsmAnd/issues/18566 
 
