@@ -39,7 +39,6 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 
-import static net.osmand.wiki.CommonsWikimediaPreparation.COMMONSWIKI_SQLITE;
 import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
 
 public class OsmCoordinatesByTag {
@@ -55,15 +54,14 @@ public class OsmCoordinatesByTag {
 	private PreparedStatement selectCoordsByID;
 	private Connection commonsWikiConn;
 
-	public OsmCoordinatesByTag(File wikiFolder, String[] filterExactTags, String[] filterStartsWithTags) throws SQLException {
+	public OsmCoordinatesByTag(File wikidataSqlite, String[] filterExactTags, String[] filterStartsWithTags) throws SQLException {
 
 		this.filterExactTags = new TreeSet<>(Arrays.asList(filterExactTags));
 		this.filterStartsWithTags = filterStartsWithTags;
-		File commonsWikiSqlite = new File(wikiFolder, COMMONSWIKI_SQLITE);
-		if (!commonsWikiSqlite.exists()) {
-			initCoordinates(wikiFolder);
+		if (!wikidataSqlite.exists()) {
+			initCoordinates(wikidataSqlite.getParentFile());
 		} else {
-			commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(commonsWikiSqlite.getAbsolutePath(), log);
+			commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 			selectCoordsByID = commonsWikiConn.prepareStatement("SELECT * FROM wiki_coords where originalId = ?");
 		}
 	}

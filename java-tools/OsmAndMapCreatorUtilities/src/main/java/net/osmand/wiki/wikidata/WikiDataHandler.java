@@ -62,15 +62,16 @@ public class WikiDataHandler extends DefaultHandler {
 	OsmCoordinatesByTag osmWikiCoordinates;
 
 
-	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile, OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions)
+	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
+	                       OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions)
 			throws SQLException {
 		this.saxParser = saxParser;
 		this.osmWikiCoordinates = osmWikiCoordinates;
 		this.regions = regions;
 		this.progress = progress;
 		DBDialect dialect = DBDialect.SQLITE;
-		dialect.removeDatabase(sqliteFile);
-		conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+		dialect.removeDatabase(wikidataSqlite);
+		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE wiki_coords(id long, originalId text, lat double, lon double)");
 		conn.createStatement().execute("CREATE TABLE wiki_mapping(id long, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");

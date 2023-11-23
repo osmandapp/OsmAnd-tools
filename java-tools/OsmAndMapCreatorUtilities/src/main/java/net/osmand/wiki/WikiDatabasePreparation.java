@@ -74,7 +74,7 @@ public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
 
 	private static final Set<String> unitsOfDistance = new HashSet<>(Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi", "m2"));
-	public static final String WIKI_SQLITE = "wiki.sqlite";
+	public static final String WIKIPEDIA_SQLITE = "wikipedia.sqlite";
 	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
@@ -717,39 +717,44 @@ public class WikiDatabasePreparation {
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
 		String lang = "";
-		String folder = "";
+		String wikipediaFolder = "";
 		String mode = "";
 		long testArticleID = 0;
-		String database = "";
+		String wikidataSqliteName = "";
 
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
 			if (arg.startsWith("--lang=")) {
 				lang = val;
-			} else if (arg.startsWith("--dir=")) {
-				folder = val;
+			} else if (arg.startsWith("--wikipediaDir=")) {
+				wikipediaFolder = val;
 			} else if (arg.startsWith("--mode=")) {
 				mode = val;
 			} else if (arg.startsWith("--testID=")) {
 				testArticleID = Long.parseLong(val);
 			} else if (arg.startsWith("--result_db=")) {
-				database = val;
+				wikidataSqliteName = val;
 			}
 		}
-		if (mode.isEmpty() || folder.isEmpty()
+
+		if (mode.isEmpty() || wikipediaFolder.isEmpty()
 				|| ((mode.equals("process-wikipedia") || mode.equals("test-wikipedia")) && lang.isEmpty())) {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-		final String sqliteFileName = database.isEmpty() ? folder + WIKI_SQLITE : database;
-		final String pathToWikiData = folder + WIKIDATA_ARTICLES_GZ;
+		final String wikipediaSqliteName = wikipediaFolder + WIKIPEDIA_SQLITE;
+		if (mode.equals("test-wikipedia")) {
+			wikidataSqliteName = wikipediaSqliteName;
+		}
+		String wikidataFolder = new File(wikidataSqliteName).getParent();
+		final String pathToWikiData = wikidataFolder + WIKIDATA_ARTICLES_GZ;
 
 		switch (mode) {
 			case "process-wikidata-regions":
-				processWikidataRegions(sqliteFileName);
+				processWikidataRegions(wikidataSqliteName);
 				break;
 			case "process-wikidata":
-				File wikiDB = new File(sqliteFileName);
+				File wikiDB = new File(wikidataSqliteName);
 				if (!new File(pathToWikiData).exists()) {
 					throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
 				}
@@ -757,13 +762,14 @@ public class WikiDatabasePreparation {
 					wikiDB.delete();
 				}
 				log.info("Processing wikidata...");
-				processDump(folder, sqliteFileName, null);
+				processDump(wikipediaSqliteName, wikidataSqliteName, null);
 				break;
 			case "process-wikipedia":
-				processDump(folder, sqliteFileName, lang);
+				log.info("Processing wikipedia...");
+				processDump(wikipediaSqliteName, wikidataSqliteName, lang);
 				break;
 			case "test-wikipedia":
-				processDump(folder, sqliteFileName, lang, testArticleID);
+				processDump(wikipediaSqliteName, wikidataSqliteName, lang, testArticleID);
 				break;
 		}
 	}
@@ -814,7 +820,7 @@ public class WikiDatabasePreparation {
 	}
 
 	protected static void testContent(String lang, String folder) throws SQLException, IOException {
-		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + WIKI_SQLITE, log);
+		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + WIKIPEDIA_SQLITE, log);
 		ResultSet rs = conn.createStatement().executeQuery("SELECT * from wiki");
 		while(rs.next()) {
 			double lat = rs.getDouble("lat");
@@ -831,40 +837,39 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void processDump(final String dataDir, final String sqliteFileName, String lang)
+	private static void processDump(final String wikipediaSqlite, final String commonsWikiSqlite, String lang)
 			throws SQLException, ParserConfigurationException, IOException, SAXException, XmlPullParserException, InterruptedException {
-		processDump(dataDir, sqliteFileName, lang,0);
+		processDump(wikipediaSqlite, commonsWikiSqlite, lang, 0);
 	}
 
 
-	public static void processDump(final String wikiFolderName, final String sqliteFileName, String lang, long testArticleId)
-			throws ParserConfigurationException, SAXException, IOException, SQLException, XmlPullParserException, InterruptedException {
+	public static void processDump(final String wikipediaSqliteFileName, final String wikidataSqliteFileName,
+	                               String lang, long testArticleId)
+			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		boolean processWikidata = lang == null;
-
-		final String wikiFile;
-		if (processWikidata) {
-			wikiFile = wikiFolderName + WIKIDATA_ARTICLES_GZ;
-		} else {
-			wikiFile = wikiFolderName + lang + WIKI_ARTICLES_GZ;
-		}
+		File wikipediaSqlite = new File(wikipediaSqliteFileName);
+		String wikipediaFolderName = wikipediaSqlite.getParent();
+		File wikidataSqlite = new File(wikidataSqliteFileName);
+		String wikidataFolderName = wikidataSqlite.getParent();
+		String wikiFile = processWikidata
+				? wikidataFolderName + WIKIDATA_ARTICLES_GZ
+				: wikipediaFolderName + lang + WIKI_ARTICLES_GZ;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
-		File sqliteFile = new File(sqliteFileName);
 		if (processWikidata) {
 			OsmandRegions regions = new OsmandRegions();
 			regions.prepareFile();
 			regions.cacheAllCountries();
-			File wikiFolder = new File(wikiFolderName);
-			OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikiFolder, new String[]{"wikipedia", "wikidata"},
+			OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikidataSqlite, new String[]{"wikipedia", "wikidata"},
 					new String[] { "wikipedia:" });
-			final WikiDataHandler handler = new WikiDataHandler(sx, progress, sqliteFile, osmCoordinates, regions);
+			final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions);
 			sx.parse(is, handler);
 			handler.finish();
 			osmCoordinates.closeConnection();
 		} else {
-			final WikiOsmHandler handler = new WikiOsmHandler(sx, progress, lang, sqliteFile, testArticleId);
+			final WikipediaHandler handler = new WikipediaHandler(sx, progress, lang, wikipediaSqlite, testArticleId);
 			sx.parse(is, handler);
 			handler.finish();
 		}
@@ -878,7 +883,7 @@ public class WikiDatabasePreparation {
 		return is;
 	}
 
-	public static class WikiOsmHandler extends DefaultHandler {
+	public static class WikipediaHandler extends DefaultHandler {
 		long counter = 1;
 		private final SAXParser saxParser;
 		private boolean page = false;
@@ -923,13 +928,13 @@ public class WikiDatabasePreparation {
 		private FileProgressImplementation progIS;
 		private long cid;
 
-		WikiOsmHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, File sqliteFile,
-		               long testArticleId) throws IOException, SQLException {
+		WikipediaHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, File wikipediaSqlite,
+		                 long testArticleId) throws SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
 			this.testArticleId = testArticleId;
-			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			conn = dialect.getDatabaseConnection(wikipediaSqlite.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipContent blob)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
@@ -939,7 +944,7 @@ public class WikiDatabasePreparation {
 			if (this.testArticleId == 0) {
 				selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
 			}
-			imageUrlStorage = new WikiImageUrlStorage(conn, sqliteFile.getParent(), lang);
+			imageUrlStorage = new WikiImageUrlStorage(conn, wikipediaSqlite.getParent(), lang);
 			log.info("Tables are prepared");
 		}
 
