@@ -495,7 +495,7 @@ public class WikiDatabasePreparation {
 		String lon = null;
 		String areaCode = "";
 		String wikiLink = "";
-		String wikiData = "";
+		String wikiDataQId = "";
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -530,7 +530,7 @@ public class WikiDatabasePreparation {
 							|| field.equalsIgnoreCase("دورنگار")) {
 						bld.append("fax: ").append(value).append(", ");
 					} else if (field.equalsIgnoreCase("wdid") || field.equalsIgnoreCase("wikidata")) {
-						wikiData = value;
+						wikiDataQId = value;
 					} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel")
 							|| field.equalsIgnoreCase("téléphone") || field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
 						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/")
@@ -560,9 +560,9 @@ public class WikiDatabasePreparation {
 				} catch (Exception e) {}
 			}
 		}
-		if (wikiLink.isEmpty() && !wikiData.isEmpty() && wikiDataconn != null) {
-			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData);
-			LatLon latLon = osmCoordinates.getCoordinates("wikidata", wikiData);
+		if (wikiLink.isEmpty() && !wikiDataQId.isEmpty() && wikiDataconn != null) {
+			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiDataQId);
+			LatLon latLon = osmCoordinates.getCoordinatesFromCommonsWikiDB(wikiDataQId);
 			if (latLon != null) {
 				String newLat = String.valueOf(latLon.getLatitude());
 				String newLon = String.valueOf(latLon.getLongitude());
@@ -614,7 +614,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی")) {
 			return WikivoyageTemplates.PART_OF.getType();
-		} else if (str.startsWith("do") || str.startsWith("see")
+		} else if (str.startsWith("do") || str.startsWith("see") || str.startsWith("go")
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
 				|| str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("se loger") 
@@ -835,45 +835,36 @@ public class WikiDatabasePreparation {
 			throws SQLException, ParserConfigurationException, IOException, SAXException, XmlPullParserException, InterruptedException {
 		processDump(dataDir, sqliteFileName, lang,0);
 	}
-	
 
 
-	public static void processDump(final String wikiFolder, final String sqliteFileName, String lang, long testArticleId)
+	public static void processDump(final String wikiFolderName, final String sqliteFileName, String lang, long testArticleId)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, XmlPullParserException, InterruptedException {
 		boolean processWikidata = lang == null;
 
 		final String wikiFile;
 		if (processWikidata) {
-			wikiFile = wikiFolder + WIKIDATA_ARTICLES_GZ;
+			wikiFile = wikiFolderName + WIKIDATA_ARTICLES_GZ;
 		} else {
-			wikiFile = wikiFolder + lang + WIKI_ARTICLES_GZ;
+			wikiFile = wikiFolderName + lang + WIKI_ARTICLES_GZ;
 		}
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
+		File sqliteFile = new File(sqliteFileName);
 		if (processWikidata) {
 			OsmandRegions regions = new OsmandRegions();
 			regions.prepareFile();
 			regions.cacheAllCountries();
-			OsmCoordinatesByTag osmWikiCoordinates = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
+			File wikiFolder = new File(wikiFolderName);
+			OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikiFolder, new String[]{"wikipedia", "wikidata"},
 					new String[] { "wikipedia:" });
-			File[] listFiles = new File(wikiFolder).listFiles();
-			if (listFiles != null) {
-				for (File f : listFiles) {
-					if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX)) {
-						boolean parseRelations = f.getName().contains("multi");
-						osmWikiCoordinates.parseOSMCoordinates(f, null, parseRelations);
-					}
-				}
-			} else {
-				log.error("osm_wiki_*.gz files is absent");
-			}
-			final WikiDataHandler handler = new WikiDataHandler(sx, progress, new File(sqliteFileName), osmWikiCoordinates, regions);
+			final WikiDataHandler handler = new WikiDataHandler(sx, progress, sqliteFile, osmCoordinates, regions);
 			sx.parse(is, handler);
 			handler.finish();
+			osmCoordinates.closeConnection();
 		} else {
-			final WikiOsmHandler handler = new WikiOsmHandler(sx, progress, lang, new File(sqliteFileName), testArticleId);
+			final WikiOsmHandler handler = new WikiOsmHandler(sx, progress, lang, sqliteFile, testArticleId);
 			sx.parse(is, handler);
 			handler.finish();
 		}

@@ -48,8 +48,6 @@ import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 import org.xmlpull.v1.XmlPullParserException;
 
-import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
-
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
 	private static boolean uncompressed;
@@ -170,9 +168,9 @@ public class WikivoyageLangPreparation {
 		public String wikidataId;
 	}
 
-	protected static void processWikivoyage(final File wikiPg, final File wikiProps, String lang, File wikivoyageSqlite,
-	                                        File osmWikiFolder)
-			throws ParserConfigurationException, SAXException, IOException, SQLException, XmlPullParserException, InterruptedException {
+	protected static void processWikivoyage(final File wikiArticles, final File wikiProps, String lang,
+	                                        File wikivoyageSqlite, File wikiFolder)
+			throws ParserConfigurationException, SAXException, IOException, SQLException {
 
 		Map<Long, PageInfo> pageInfos = new LinkedHashMap<Long, WikivoyageLangPreparation.PageInfo>();
 		SqlInsertValuesReader.readInsertValuesFile(wikiProps.getAbsolutePath(), new InsertValueProcessor() {
@@ -201,27 +199,17 @@ public class WikivoyageLangPreparation {
 		});
 		
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
-		InputStream streamFile = new BufferedInputStream(new FileInputStream(wikiPg), 8192 * 4);
-		BZip2CompressorInputStream zis = new BZip2CompressorInputStream(streamFile);
+		InputStream articlesStream = new BufferedInputStream(new FileInputStream(wikiArticles), 8192 * 4);
+		BZip2CompressorInputStream zis = new BZip2CompressorInputStream(articlesStream);
 		Reader reader = new InputStreamReader(zis, "UTF-8");
-		InputSource is = new InputSource(reader);
-		is.setEncoding("UTF-8");
-		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
+		InputSource articlesSource = new InputSource(reader);
+		articlesSource.setEncoding("UTF-8");
+		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikiFolder, new String[]{"wikipedia", "wikidata"},
 				new String[]{"wikidata"});
-		File[] listFiles = osmWikiFolder.listFiles();
-		if (listFiles != null) {
-			for (File f : listFiles) {
-				if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX)) {
-					boolean parseRelations = f.getName().contains("multi");
-					osmCoordinates.parseOSMCoordinates(f, null, parseRelations);
-				}
-			}
-		} else {
-			log.error("osm_wiki_*.gz files is absent");
-		}
-		final WikiOsmHandler handler = new WikiOsmHandler(sx, streamFile, lang, wikivoyageSqlite, pageInfos, osmCoordinates);
-		sx.parse(is, handler);
+		final WikiOsmHandler handler = new WikiOsmHandler(sx, articlesStream, lang, wikivoyageSqlite, pageInfos, osmCoordinates);
+		sx.parse(articlesSource, handler);
 		handler.finish();
+		osmCoordinates.closeConnection();
 	}
 
 	public static void createInitialDbStructure(Connection conn, boolean uncompressed) throws SQLException {
@@ -387,7 +375,7 @@ public class WikivoyageLangPreparation {
 			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, wikidataconn, osmCoordinates);
 			try {
 				if (!macroBlocks.isEmpty()) {
-					LatLon ll = osmCoordinates.getCoordinates("wikidata",
+					LatLon ll = osmCoordinates.getCoordinatesFromCommonsWikiDB(
 							pageInfos.get(Long.parseLong(pageId.toString())).wikidataId);
 					if (ll == null) {
 						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
