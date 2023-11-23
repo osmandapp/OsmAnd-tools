@@ -290,6 +290,45 @@ public class MapApiController {
 		}
 	}
 	
+	@GetMapping(value = "/rename-file")
+	@ResponseBody
+	public ResponseEntity<String> renameFile(@RequestParam String oldName,
+	                                         @RequestParam String newName,
+	                                         @RequestParam String type,
+	                                         @RequestParam boolean saveCopy) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		if (!oldName.equals(newName)) {
+			return userdataService.renameFile(oldName, newName, type, dev, saveCopy);
+		}
+		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
+	}
+	
+	@GetMapping(value = "/rename-folder")
+	@ResponseBody
+	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
+	                                           @RequestParam String type,
+	                                           @RequestParam String newFolderName) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		return userdataService.renameFolder(folderName, newFolderName, type, dev);
+	}
+	
+	@GetMapping(value = "/delete-folder")
+	@ResponseBody
+	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
+	                                           @RequestParam String type) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		}
+		return userdataService.deleteFolder(folderName, type, dev);
+	}
+	
 	@GetMapping(value = "/list-files")
 	@ResponseBody
 	public ResponseEntity<String> listFiles(
@@ -497,6 +536,24 @@ public class MapApiController {
 			return;
 		}
 		userdataService.getBackup(response, dev, Set.copyOf(data), includeDeleted, format);
+	}
+	
+	@PostMapping(value = "/download-backup-folder")
+	@ResponseBody
+	public void createBackupFolder(@RequestParam String format,
+	                               @RequestParam String folderName,
+	                               @RequestParam String type,
+	                               HttpServletResponse response) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			ResponseEntity<String> error = tokenNotValid();
+			response.setStatus(error.getStatusCodeValue());
+			if (error.getBody() != null) {
+				response.getWriter().write(error.getBody());
+			}
+			return;
+		}
+		userdataService.getBackupFolder(response, dev, folderName, format, type);
 	}
 	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")

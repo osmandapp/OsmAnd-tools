@@ -12,12 +12,15 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+import java.nio.file.Files;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
@@ -119,6 +122,7 @@ public class UserdataService {
     public static final String FILE_TYPE_OSM_EDITS = "OSM_EDITS";
     public static final String FILE_TYPE_OSM_NOTES = "OSM_NOTES";
     public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
+    public static final String EMPTY_FILE_NAME = "empty.ignore";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
@@ -552,6 +556,74 @@ public class UserdataService {
         return ok();
     }
     
+    @Transactional
+    public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
+        PremiumUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
+        if (file != null) {
+            InternalZipFile zipFile = getZipFile(file, newName);
+            if (zipFile != null) {
+                try {
+                    validateUserForUpload(dev, type, zipFile.getSize());
+                } catch (OsmAndPublicApiException e) {
+                    return ResponseEntity.badRequest().body(e.getMessage());
+                }
+                //create file with new name
+                ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+                if (res.getStatusCode().is2xxSuccessful()) {
+                    if (!saveCopy) {
+                        //delete file with old name
+                        deleteFile(oldName, type, null, null, dev);
+                    }
+                    return ok();
+                }
+            }
+        }
+        return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
+    }
+    
+    private InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+        InternalZipFile zipFile = null;
+        File tmpGpx = File.createTempFile(newName, ".gpx");
+        if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
+            zipFile = InternalZipFile.buildFromFile(tmpGpx);
+        } else {
+            InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
+            if (in != null) {
+                GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+                if (exception != null) {
+                    return null;
+                }
+                zipFile = InternalZipFile.buildFromFile(tmpGpx);
+            }
+        }
+        return zipFile;
+    }
+    
+    @Transactional
+    public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+        for (UserFile file : files) {
+            String newName = file.name.replaceFirst(folderName, newFolderName);
+            ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false);
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                return response;
+            }
+        }
+        return ok();
+    }
+    
+    @Transactional
+    public ResponseEntity<String> deleteFolder(String folderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+        for (UserFile file : files) {
+            if (file.filesize != -1) {
+                deleteFile(file.name, type, null, null, dev);
+            }
+        }
+        return ok();
+    }
+    
     public PremiumUsersRepository.PremiumUser getUserById(int id) {
         return usersRepository.findById(id);
     }
@@ -631,7 +703,6 @@ public class UserdataService {
     
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
-        final String EMPTY_FILE_NAME = "empty.ignore";
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
 		Set<String> fileIds = new TreeSet<>();
 		SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
@@ -709,6 +780,46 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
+    
+    @Transactional
+    public void getBackupFolder(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
+                                String folderName, String format, String type) throws IOException {
+        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
+        String fileName = "Export_" + formatter.format(new Date());
+        File tmpFile = File.createTempFile(fileName, ".zip");
+        try (ZipOutputStream zs = new ZipOutputStream(new FileOutputStream(tmpFile))) {
+            JSONArray itemsJson = new JSONArray();
+            for (UserFile file : files) {
+                if (file.filesize != -1 && !file.name.endsWith(EMPTY_FILE_NAME)) {
+                    itemsJson.put(new JSONObject(toJson(type, file.name)));
+                    InputStream is = new GZIPInputStream(getInputStream(dev, file));
+                    ZipEntry zipEntry = new ZipEntry(file.name);
+                    zs.putNextEntry(zipEntry);
+                    Algorithms.streamCopy(is, zs);
+                    zs.closeEntry();
+                }
+            }
+            JSONObject json = createItemsJson(itemsJson);
+            ZipEntry zipEntry = new ZipEntry("items.json");
+            zs.putNextEntry(zipEntry);
+            InputStream is = new ByteArrayInputStream(json.toString().getBytes());
+            Algorithms.streamCopy(is, zs);
+            zs.closeEntry();
+            zs.flush();
+            zs.finish();
+            response.setHeader("Content-Disposition", "attachment; filename=" + fileName + format);
+            response.setHeader("Content-Type", "application/zip");
+            response.setHeader("Content-Length", tmpFile.length() + "");
+            try (FileInputStream fis = new FileInputStream(tmpFile)) {
+                OutputStream ous = response.getOutputStream();
+                Algorithms.streamCopy(fis, ous);
+                ous.close();
+            }
+        } finally {
+            Files.delete(tmpFile.toPath());
+        }
+    }
     
     
     @Transactional

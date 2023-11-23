@@ -32,6 +32,11 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
 	Iterable<UserFile> findAllByUserid(int userid);
 	
+	@Query("SELECT uf FROM UserFile uf " +
+			"WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type " +
+			"AND uf.updatetime = (SELECT MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid AND uft.name = uf.name)")
+	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
+	
 	
 //	@Modifying
 //	@Query("update UserFile uf set uf.details = ?1 where uf.id = ?2")
