@@ -576,6 +576,9 @@ public class UserdataService {
                     }
                     return ok();
                 }
+            } else {
+                // skip deleted files
+                return ok();
             }
         }
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
