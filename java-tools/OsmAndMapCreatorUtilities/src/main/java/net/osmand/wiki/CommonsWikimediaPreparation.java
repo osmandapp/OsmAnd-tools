@@ -134,6 +134,8 @@ public class CommonsWikimediaPreparation {
             log.info("========= CREATE TABLES common_depict, common_content =========");
             conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_depict(id long, depict_qid long, depict_type text)");
             conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_content(id long, name text, ns int)");
+            conn.createStatement().execute("DELETE FROM common_depict");
+            conn.createStatement().execute("DELETE FROM common_content");
             prepDepict = conn.prepareStatement("INSERT INTO common_depict(id, depict_qid, depict_type) VALUES (?, ?, ?)");
             prepContent = conn.prepareStatement("INSERT INTO common_content(id, name, ns) VALUES (?, ?, ?)");
         }
