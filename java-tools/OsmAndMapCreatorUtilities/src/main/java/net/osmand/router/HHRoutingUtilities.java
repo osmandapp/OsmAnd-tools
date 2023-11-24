@@ -137,7 +137,7 @@ public class HHRoutingUtilities {
 			n.putTag("dualClusterId", pnt.dualPoint.clusterId+"");
 			n.putTag("dualPoint", pnt.dualPoint.index +"");
 		}
-		osmObjects.put(pnt.pntGeoId, n);
+		osmObjects.put(pnt.getGeoPntId(), n);
 	}
 
 

@@ -36,7 +36,7 @@ public class HHRoutingOBFWriter {
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
-			mapName = "__europe_car.chdb";
+//			mapName = "__europe_car.chdb";
 //			mapName = "_road_bicycle.chdb";
 			f = new File(System.getProperty("maps.dir"), mapName);
 		} else {
@@ -130,7 +130,7 @@ public class HHRoutingOBFWriter {
 		writer.endHHRouteBlockSegments();
 	}
 
-	public List<NetworkDBPointPrep> writeBinaryRouteTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer,
+	private List<NetworkDBPointPrep> writeBinaryRouteTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer,
 			TLongObjectHashMap<NetworkDBPointPrep> points, int[] pntId)
 			throws IOException, RTreeException {
 		Element[] es = parent.getAllElements();

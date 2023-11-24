@@ -526,10 +526,10 @@ public class BinaryMapIndexWriter {
 		} else {
 			bounds = stackBounds.peek();
 		}
-		codedOutStream.writeSInt32(RouteDataBox.LEFT_FIELD_NUMBER, leftX - bounds.leftX);
-		codedOutStream.writeSInt32(RouteDataBox.RIGHT_FIELD_NUMBER, rightX - bounds.rightX);
-		codedOutStream.writeSInt32(RouteDataBox.TOP_FIELD_NUMBER, topY - bounds.topY);
-		codedOutStream.writeSInt32(RouteDataBox.BOTTOM_FIELD_NUMBER, bottomY - bounds.bottomY);
+		codedOutStream.writeSInt32(HHRoutePointsBox.LEFT_FIELD_NUMBER, leftX - bounds.leftX);
+		codedOutStream.writeSInt32(HHRoutePointsBox.RIGHT_FIELD_NUMBER, rightX - bounds.rightX);
+		codedOutStream.writeSInt32(HHRoutePointsBox.TOP_FIELD_NUMBER, topY - bounds.topY);
+		codedOutStream.writeSInt32(HHRoutePointsBox.BOTTOM_FIELD_NUMBER, bottomY - bounds.bottomY);
 		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
 	}
 	

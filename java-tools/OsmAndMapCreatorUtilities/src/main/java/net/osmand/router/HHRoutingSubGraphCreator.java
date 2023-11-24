@@ -69,9 +69,10 @@ import net.osmand.util.MapUtils;
 // FILE IMPLEMENTATION
 // F.1 FILE: Write Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // F.2 FILE: Read data by HHRoutePlanner (same map for start / end) 
-// F.3 FILE: Merge maps cluster and check dates in HHRoutePlanner
-// F.4 FILE utilities: Binary inspector...
-// F.5 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%) 
+// F.3 FILE: index utilities (add hh info)
+// F.4 FILE: Merge maps cluster and check dates in HHRoutePlanner
+// F.5 FILE utilities: Binary inspector...
+// F.6 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%)
 
 // HHRoutePlanner - Routing implementations
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)

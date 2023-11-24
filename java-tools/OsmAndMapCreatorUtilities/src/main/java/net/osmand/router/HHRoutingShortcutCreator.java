@@ -299,7 +299,7 @@ public class HHRoutingShortcutCreator {
 		
 		TLongObjectHashMap<NetworkDBPoint> networkPointsByGeoId = new TLongObjectHashMap<>();
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
-			networkPointsByGeoId.put(pnt.pntGeoId, pnt);
+			networkPointsByGeoId.put(pnt.getGeoPntId() , pnt);
 		}
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			ind++;

@@ -1,6 +1,8 @@
 package net.osmand.router;
 
 
+import static net.osmand.router.HHRoutingUtilities.logf;
+
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -30,10 +32,6 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.DBDialect;
-import static net.osmand.router.HHRoutingUtilities.logf;
-
-import net.osmand.router.HHRoutingDB.NetworkDBPoint;
-import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -248,7 +246,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		int ind = 0;
 		for (NetworkDBPointPrep p : pnts) {
 			updCHInd.setLong(1, p.chFinalInd);
-			updCHInd.setLong(2, p.pntGeoId);
+			updCHInd.setLong(2, p.index);
 			updCHInd.addBatch();
 			if (ind++ % BATCH_SIZE == 0) {
 				updCHInd.executeBatch();
