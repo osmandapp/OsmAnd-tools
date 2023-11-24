@@ -28,7 +28,7 @@ public class CommonsWikimediaPreparation {
 
     public static final String COMMONSWIKI_ARTICLES_GZ = "commonswiki-latest-pages-articles.xml.gz";
     public static final String COMMONSWIKI_CATEGORYLINKS_GZ = "commonswiki-latest-categorylinks.sql.gz";
-    public static final String COMMONSWIKI_SQLITE = "commonswiki.sqlite";
+    public static final String COMMONSWIKI_SQLITE = "wikidata_commons_osm.sqlitedb";
     public static final String CATEGORY_NAMESPACE = "14";
     public static final String FILE_NAMESPACE = "6";
     public static final String DEPICT_KEY = "[[d:Special:EntityPage/";
