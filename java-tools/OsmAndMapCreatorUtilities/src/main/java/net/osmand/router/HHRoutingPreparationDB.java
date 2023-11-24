@@ -158,8 +158,8 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		
 		HHRoutingDB sourceDB = new HHRoutingDB(src);
 		TLongObjectHashMap<NetworkDBPointPrep> pointsById = sourceDB.loadNetworkPoints(NetworkDBPointPrep.class);
-		TIntObjectHashMap<List<NetworkDBPointPrep>> outPoints = sourceDB.groupByClusters(pointsById, true);
-		TIntObjectHashMap<List<NetworkDBPointPrep>> inPoints = sourceDB.groupByClusters(pointsById, false);
+		TIntObjectHashMap<List<NetworkDBPointPrep>> outPoints = HHRoutePlanner.groupByClusters(pointsById, true);
+		TIntObjectHashMap<List<NetworkDBPointPrep>> inPoints = HHRoutePlanner.groupByClusters(pointsById, false);
 		pIns = tgt.prepareStatement("INSERT INTO points(" + columnNames + ") VALUES (" + insPnts + ")");
 		ResultSet rs = src.createStatement().executeQuery(" select " + columnNames + " from points");
 		while (rs.next()) {
@@ -413,7 +413,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		st.close();
 	}
 	
-	public void insertSegments(List<NetworkDBSegment> segments) throws SQLException {
+	public void insertSegments(List<NetworkDBSegment> segments, int routingProfile) throws SQLException {
 		if (insSegment == null) {
 			insSegment = conn.prepareStatement("INSERT INTO segments(idPoint, idConnPoint, dist, shortcut, profile) VALUES(?, ?, ?, ?, ?)");
 		}

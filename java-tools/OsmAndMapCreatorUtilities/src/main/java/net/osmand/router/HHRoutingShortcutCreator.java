@@ -121,12 +121,11 @@ public class HHRoutingShortcutCreator {
 			prepareContext = new HHRoutingPrepareContext(obfFile, ROUTING_PROFILE, routingParam.split(","));
 			int routingProfile = networkDB.insertRoutingProfile(routingParam);
 			HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
-			networkDB.selectRoutingProfile(routingProfile);
 			// reload points to avoid cache
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints(NetworkDBPoint.class);
-			int segments = networkDB.loadNetworkSegments(pnts.valueCollection());
+			int segments = networkDB.loadNetworkSegments(pnts.valueCollection(), routingProfile);
 			System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam, segments);	
-			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB);
+			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB, routingProfile);
 			saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		}
 		networkDB.close();
@@ -274,8 +273,7 @@ public class HHRoutingShortcutCreator {
 
 	}
 
-	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> pnts,
-			HHRoutingPreparationDB networkDB)
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> pnts,HHRoutingPreparationDB networkDB, int routingProfile)
 			throws InterruptedException, IOException, SQLException, ExecutionException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = pnts.size() / 100.0;
@@ -347,7 +345,7 @@ public class HHRoutingShortcutCreator {
 								logf("%.2f%% Process %d (%d shortcuts) - %.1f ms", ind / sz, rpnt.roadId / 64,
 										res.shortcuts.get(k), rpnt.rt(false).rtDistanceFromStart);
 							}
-							networkDB.insertSegments(rpnt.connected);
+							networkDB.insertSegments(rpnt.connected, routingProfile);
 							if (DEBUG_VERBOSE_LEVEL >= 2) {
 								System.out.println(calculationProgress.getInfo(null));
 							}

@@ -1,6 +1,7 @@
 package net.osmand.router;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -105,7 +106,7 @@ public class HHRoutingTopGraphCreator {
 		if (PROCESS == PROC_MIDPOINTS) {
 			planner.calculateMidPoints(MAX_DEPTH, MAX_ITERATIONS);
 		} else if (PROCESS == PROC_CH) { 
-			planner.runContractionHierarchy(MAX_DEPTH, PERCENT_CH / 100.0);
+			planner.runContractionHierarchy(MAX_DEPTH, PERCENT_CH / 100.0, 0);
 		}
 		planner.networkDB.close();
 	}
@@ -170,7 +171,7 @@ public class HHRoutingTopGraphCreator {
 		}
 	}
 	
-	private void calculateMidPoints(int MAX_DEPTH, int MAX_ITERATIONS) throws SQLException {
+	private void calculateMidPoints(int MAX_DEPTH, int MAX_ITERATIONS) throws SQLException, IOException {
 		// rtCnt -> midMaxDepth
 		// rtIndex -> midProc
 		HHRoutingConfig config = HHRoutingConfig.dijkstra(0).preloadSegments();
@@ -279,9 +280,10 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void runContractionHierarchy(int maxPoints, double percent) throws SQLException {
+	private void runContractionHierarchy(int maxPoints, double percent, int routingProfile) throws SQLException, IOException {
 		HHRoutingConfig config = HHRoutingConfig.dijkstra(1).maxSettlePoints(maxPoints).preloadSegments();
 		HHRoutingContext<NetworkDBPointPrep> hctx = routePlanner.initHCtx(config);
+		routePlanner.setRoutingProfile(routingProfile);
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		TLongObjectHashMap<NetworkDBPointPrep> pnts = hctx.pointsById;
 		List<NetworkDBPointPrep> list = new ArrayList<>(pnts.valueCollection());
@@ -371,7 +373,7 @@ public class HHRoutingTopGraphCreator {
 		}
 		networkDB.updatePointsCHInd(list);
 		networkDB.deleteShortcuts();
-		networkDB.insertSegments(allShortcuts);
+		networkDB.insertSegments(allShortcuts, routingProfile);
 		
 		System.out.printf("Added %d shortcuts, reindexed %d \n", allShortcuts.size(), reindex);
 		
