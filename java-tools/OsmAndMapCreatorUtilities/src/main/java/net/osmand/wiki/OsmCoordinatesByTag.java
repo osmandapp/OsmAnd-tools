@@ -54,11 +54,11 @@ public class OsmCoordinatesByTag {
 	private PreparedStatement selectCoordsByID;
 	private Connection commonsWikiConn;
 
-	public OsmCoordinatesByTag(File wikidataSqlite, String[] filterExactTags, String[] filterStartsWithTags) throws SQLException {
+	public OsmCoordinatesByTag(File wikidataSqlite, String[] filterExactTags, String[] filterStartsWithTags, boolean initFromOsm) throws SQLException {
 
 		this.filterExactTags = new TreeSet<>(Arrays.asList(filterExactTags));
 		this.filterStartsWithTags = filterStartsWithTags;
-		if (!wikidataSqlite.exists()) {
+		if (!wikidataSqlite.exists() || initFromOsm) {
 			initCoordinates(wikidataSqlite.getParentFile());
 		} else {
 			commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
@@ -88,7 +88,7 @@ public class OsmCoordinatesByTag {
 		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_waynodes.osm.gz");
 //		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_buildings_multipolygon.osm.gz");
 		OsmCoordinatesByTag o = new OsmCoordinatesByTag(osmGz.getParentFile(), new String[]{"wikipedia", "wikidata"},
-				new String[] { "wikipedia:" });
+				new String[] { "wikipedia:" }, false);
 	}
 	
 	private static String combineTagValue(String tag, String value) {

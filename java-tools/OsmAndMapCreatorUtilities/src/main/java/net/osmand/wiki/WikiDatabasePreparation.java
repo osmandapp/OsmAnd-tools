@@ -15,7 +15,9 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -29,6 +31,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -36,6 +40,9 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.data.LatLon;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -753,7 +760,7 @@ public class WikiDatabasePreparation {
 			case "process-wikidata-regions":
 				processWikidataRegions(wikidataSqliteName);
 				break;
-			case "process-wikidata":
+			case "create-wikidata":
 				File wikiDB = new File(wikidataSqliteName);
 				if (!new File(pathToWikiData).exists()) {
 					throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
@@ -761,15 +768,32 @@ public class WikiDatabasePreparation {
 				if (wikiDB.exists()) {
 					wikiDB.delete();
 				}
-				log.info("Processing wikidata...");
-				processDump(wikipediaSqliteName, wikidataSqliteName, null);
+				log.info("Create wikidata...");
+				String wikidataFolderName = wikiDB.getParent();
+				String wikidataFile = wikidataFolderName + WIKIDATA_ARTICLES_GZ;
+				processWikidata(wikidataSqliteName, wikidataFile, 0);
+				break;
+			case "update-wikidata":
+				File wikidataDB = new File(wikidataSqliteName);
+				if (!new File(pathToWikiData).exists()) {
+					throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
+				}
+				log.info("Updating wikidata...");
+				WikiDatabaseUpdater wdu = new WikiDatabaseUpdater(wikidataDB);
+				List<String> downloadedPages = wdu.getDownloadedPages();
+				long maxQId = wdu.getMaxQId();
+				for (String f : downloadedPages) {
+					log.info("Updating " + f);
+					processWikidata(wikidataSqliteName, f, maxQId);
+				}
+				wdu.removeDownloadedPages();
 				break;
 			case "process-wikipedia":
 				log.info("Processing wikipedia...");
-				processDump(wikipediaSqliteName, wikidataSqliteName, lang);
+				processWikipedia(wikipediaSqliteName, lang, 0);
 				break;
 			case "test-wikipedia":
-				processDump(wikipediaSqliteName, wikidataSqliteName, lang, testArticleID);
+				processWikipedia(wikipediaSqliteName, lang, testArticleID);
 				break;
 		}
 	}
@@ -837,42 +861,36 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void processDump(final String wikipediaSqlite, final String commonsWikiSqlite, String lang)
-			throws SQLException, ParserConfigurationException, IOException, SAXException, XmlPullParserException, InterruptedException {
-		processDump(wikipediaSqlite, commonsWikiSqlite, lang, 0);
-	}
-
-
-	public static void processDump(final String wikipediaSqliteFileName, final String wikidataSqliteFileName,
-	                               String lang, long testArticleId)
+	public static void processWikipedia(final String wikipediaSqliteFileName, String lang, long testArticleId)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
-		boolean processWikidata = lang == null;
 		File wikipediaSqlite = new File(wikipediaSqliteFileName);
 		String wikipediaFolderName = wikipediaSqlite.getParent();
-		File wikidataSqlite = new File(wikidataSqliteFileName);
-		String wikidataFolderName = wikidataSqlite.getParent();
-		String wikiFile = processWikidata
-				? wikidataFolderName + WIKIDATA_ARTICLES_GZ
-				: wikipediaFolderName + lang + WIKI_ARTICLES_GZ;
+		String wikiFile = wikipediaFolderName + lang + WIKI_ARTICLES_GZ;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
-		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikiFile));
+		FileProgressImplementation progress = new FileProgressImplementation("Read wikipedia file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
-		if (processWikidata) {
-			OsmandRegions regions = new OsmandRegions();
-			regions.prepareFile();
-			regions.cacheAllCountries();
-			OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikidataSqlite, new String[]{"wikipedia", "wikidata"},
-					new String[] { "wikipedia:" });
-			final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions);
-			sx.parse(is, handler);
-			handler.finish();
-			osmCoordinates.closeConnection();
-		} else {
-			final WikipediaHandler handler = new WikipediaHandler(sx, progress, lang, wikipediaSqlite, testArticleId);
-			sx.parse(is, handler);
-			handler.finish();
-		}
+		final WikipediaHandler handler = new WikipediaHandler(sx, progress, lang, wikipediaSqlite, testArticleId);
+		sx.parse(is, handler);
+		handler.finish();
+	}
+
+	public static void processWikidata(final String wikidataSqliteFileName, final String wikidataFile, long lastProcessedId)
+			throws ParserConfigurationException, SAXException, IOException, SQLException {
+		File wikidataSqlite = new File(wikidataSqliteFileName);
+		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
+		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikidataFile));
+		InputStream streamFile = progress.openFileInputStream();
+		InputSource is = getInputSource(streamFile);
+		OsmandRegions regions = new OsmandRegions();
+		regions.prepareFile();
+		regions.cacheAllCountries();
+		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikidataSqlite, new String[]{"wikipedia", "wikidata"},
+				new String[] { "wikipedia:" }, lastProcessedId != 0);
+		final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions, lastProcessedId);
+		sx.parse(is, handler);
+		handler.finish();
+		osmCoordinates.closeConnection();
 	}
 
 	private static InputSource getInputSource(InputStream streamFile) throws IOException {

@@ -204,7 +204,7 @@ public class WikivoyageLangPreparation {
 		InputSource articlesSource = new InputSource(reader);
 		articlesSource.setEncoding("UTF-8");
 		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikidataSqlite, new String[]{"wikipedia", "wikidata"},
-				new String[]{"wikidata"});
+				new String[]{"wikidata"}, false);
 		WikivoyageHandler handler = new WikivoyageHandler(sx, articlesStream, lang, wikivoyageSqlite, pageInfos,
 				osmCoordinates);
 		sx.parse(articlesSource, handler);

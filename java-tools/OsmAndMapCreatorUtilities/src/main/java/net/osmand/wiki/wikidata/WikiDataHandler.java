@@ -60,15 +60,17 @@ public class WikiDataHandler extends DefaultHandler {
 	private List<String> keyNames = new ArrayList<>();
 
 	OsmCoordinatesByTag osmWikiCoordinates;
+	private long lastProcessedId;
 
 
 	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
-	                       OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions)
+	                       OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId)
 			throws SQLException {
 		this.saxParser = saxParser;
 		this.osmWikiCoordinates = osmWikiCoordinates;
 		this.regions = regions;
 		this.progress = progress;
+		this.lastProcessedId = lastProcessedId;
 		DBDialect dialect = DBDialect.SQLITE;
 		dialect.removeDatabase(wikidataSqlite);
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
@@ -114,6 +116,10 @@ public class WikiDataHandler extends DefaultHandler {
         coordsPrep.close();
         conn.close();
     }
+
+    public void setLastProcessedId(Long lastProcessedId) {
+		this.lastProcessedId = lastProcessedId;
+	}
 
     @Override
     public void startElement(String uri, String localName, String qName, Attributes attributes) {
@@ -161,6 +167,10 @@ public class WikiDataHandler extends DefaultHandler {
 						return;
 					}
 					try {
+						long id = Long.parseLong(title.substring(1));
+						if (id < lastProcessedId) {
+							return;
+						}
 						ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
 						for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 							String articleTitle = siteLink.title;
@@ -192,7 +202,6 @@ public class WikiDataHandler extends DefaultHandler {
 							if (++count % ARTICLE_BATCH_SIZE == 0) {
 								log.info(String.format("Article accepted %s (%d)", title, count));
 							}
-							long id = Long.parseLong(title.substring(1));
 							coordsPrep.setLong(1, id);
 							coordsPrep.setString(2, title.toString());
 							coordsPrep.setDouble(3, article.getLat());
@@ -213,7 +222,6 @@ public class WikiDataHandler extends DefaultHandler {
 						}
 						if (article.getImage() != null) {
 							String image = StringEscapeUtils.unescapeJava(article.getImage());
-							long id = Long.parseLong(title.substring(1));
 							wikidataPropPrep.setLong(1, id);
 							wikidataPropPrep.setString(2, ArticleMapper.PROP_IMAGE);
 							wikidataPropPrep.setString(3, image);
@@ -221,7 +229,6 @@ public class WikiDataHandler extends DefaultHandler {
 						}
 						if (article.getCommonCat() != null) {
 							String commonCat = StringEscapeUtils.unescapeJava(article.getCommonCat());
-							long id = Long.parseLong(title.substring(1));
 							wikidataPropPrep.setLong(1, id);
 							wikidataPropPrep.setString(2, ArticleMapper.PROP_COMMON_CAT);
 							wikidataPropPrep.setString(3, commonCat);
