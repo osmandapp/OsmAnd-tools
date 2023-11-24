@@ -103,7 +103,7 @@ public class WikiDataHandler extends DefaultHandler {
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_lang_title_idx ON wiki_mapping(lang, title)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_mapping_index on wiki_mapping(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_idx on wiki_coords(id)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_originalId on wiki_coords(originalId)");
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_originalId on wiki_coords(originalId)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_region_idx on wiki_region(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS reg_region_idx on wiki_region(regionName)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS wikidata_properties_idx on wikidata_properties(id)");
