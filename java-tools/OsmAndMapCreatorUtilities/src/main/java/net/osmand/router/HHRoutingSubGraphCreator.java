@@ -50,37 +50,23 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 // IN PROGRESS
+// 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
+// F.4 FILE: Merge maps cluster and check dates in HHRoutePlanner
+// F.6 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%)
+
+// TESTING
+// F.7 TODO here we could take into account hhregion.profileParams
 // F.1 FILE: Write Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
 // F.2 FILE: Read data by HHRoutePlanner (same map for start / end) 
 // F.5 FILE utilities: Binary inspector...
 // F.3 FILE: index utilities (add hh info)
-
-// TESTING
 // 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// 2.0.3 A* vs HH: Routing time doesn't match: 15.3 vs 4.75 
-// YURII: Test: OsmAnd commit (abfe9890f5acaa): rescuetrack approximation - 48.52232, 9.12010 -> 48.52528, 9.11304
-// 2.0.2 A* vs HH: Routing time doesn't match (TESTING except short) 
-// Victor: DEBUG_BREAK_EACH_SEGMENT = true / false, DEBUG_PRECISE_DIST_MEASUREMENT = true / false
-// 1.6 BinaryRoutePlanner make exception to test non base (TODO)
-// 1.1 HHRoutePlanner use cache boundaries to speed up search
-// 1.3.5 BUG: route without network points (implement)
 // 1.3.3 BUG: (Fix time) init direction + u-turn via same geo point - (Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// 1.3.4 BUG: gap when route goes via 1 network point
-// 1.2 MapCreator: Cut start / end to projection as in detailed calculation ()
-// 1.5 BinaryRoutePlanner ?? we don't stop here in order to allow improve found *potential* final segment - test case on short route
-// 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
-
-// FILE IMPLEMENTATION
-// F.4 FILE: Merge maps cluster and check dates in HHRoutePlanner
-// F.6 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%)
-// F.7 TODO here we could take into account hhregion.profileParams
 
 // HHRoutePlanner - Routing implementations
-// 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.4 Progress bar for HHRoutePlanner
-// 2.5 C++ implementation HHRoutePlanner / Files
+// 2.5 C++ implementation HHRoutePlanner / Fixes
 // 2.6 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-///////////////////////////////////////////////////////////
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.7 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)

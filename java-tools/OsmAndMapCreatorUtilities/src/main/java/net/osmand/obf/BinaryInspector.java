@@ -86,7 +86,7 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vhhrouting",
+					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
@@ -96,7 +96,7 @@ public class BinaryInspector {
 					"-latlon=42.7405,18.6357",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Netherlands_europe_car.obf"
+					System.getProperty("maps.dir") + "Germany_car.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -533,8 +533,8 @@ public class BinaryInspector {
 				} else if (p instanceof HHRouteRegion) {
 					HHRouteRegion ri = ((HHRouteRegion) p);
 					QuadRect rt = ri.getLatLonBbox();
-					println(String.format("\tBounds %s profile '%s' edition = %s", formatLatBounds(rt.left, rt.right,
-							rt.top, rt.bottom), ri.profile, new Date(ri.edition)));
+					println(String.format("\tBounds %s profile '%s' %s edition = %s", formatLatBounds(rt.left, rt.right,
+							rt.top, rt.bottom), ri.profile, ri.profileParams, new Date(ri.edition)));
 					if ((vInfo != null && vInfo.isVHHrouting())) {
 						TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(ri, NetworkDBPoint.class);
 						for (NetworkDBPoint pnt : pnts.valueCollection()) {
