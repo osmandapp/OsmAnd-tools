@@ -852,7 +852,7 @@ void mouseMotion(int x, int y)
         newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
         newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
 
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
     }
 }
 
@@ -919,7 +919,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'S':
@@ -927,7 +927,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.y += wasdStep / (key == 's' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'A':
@@ -935,7 +935,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'D':
@@ -943,7 +943,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'R':
@@ -1117,7 +1117,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         auto text = inputDialog(QStringLiteral("Input coordinate"), QStringLiteral("Coordinate: "), latLon.toQString());
         latLon = OsmAnd::CoordinateSearch::search(text);
         auto target31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
-        renderer->setTarget(target31);
+        renderer->setMapTargetLocation(target31);
         return;
     }
     case 'c':
