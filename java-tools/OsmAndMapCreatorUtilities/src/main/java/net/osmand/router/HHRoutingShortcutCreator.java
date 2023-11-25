@@ -129,7 +129,9 @@ public class HHRoutingShortcutCreator {
 			saveOsmFile(objects, new File(folder, name + "-hh.osm"));
 		}
 		networkDB.close();
-		compact(dbFile, new File(folder, name + HHRoutingDB.CEXT));
+		File compactFile = new File(folder, name + HHRoutingDB.CEXT);
+		compact(dbFile, compactFile);
+		new HHRoutingOBFWriter().writeFile(ROUTING_PROFILE, compactFile);
 	}
 	
 	
