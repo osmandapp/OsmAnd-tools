@@ -433,7 +433,7 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void calculateCHEdgeDiff(HHRoutingContext<NetworkDBPointPrep> hctx, NetworkDBPointPrep p, List<NetworkDBSegment> shortcuts) throws SQLException {
+	private void calculateCHEdgeDiff(HHRoutingContext<NetworkDBPointPrep> hctx, NetworkDBPointPrep p, List<NetworkDBSegment> shortcuts) throws SQLException, IOException {
 		hctx.config.MAX_COST = 0;
 		for (NetworkDBSegment out : p.connected) {
 			hctx.config.MAX_COST = Math.max(out.dist, hctx.config.MAX_COST);

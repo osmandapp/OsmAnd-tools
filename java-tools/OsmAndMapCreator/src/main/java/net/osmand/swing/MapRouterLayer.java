@@ -114,8 +114,8 @@ public class MapRouterLayer implements MapPanelLayer {
 	private static boolean TEST_INTERMEDIATE_POINTS = false;
 
 	private MapPanel map;
-	private LatLon startRoute ;
-	private LatLon endRoute ;
+	private LatLon startRoute;
+	private LatLon endRoute;
 	private List<LatLon> intermediates = new ArrayList<LatLon>();
 	private boolean nextAvailable = true;
 	private boolean pause = true;
@@ -147,7 +147,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 
 	private File getHHFile(String profile) {
-		return new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "Maps_"+profile+".hhdb");
+		return new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "Maps_" + profile + ".hhdb");
 	}
 
 
@@ -171,8 +171,8 @@ public class MapRouterLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		startRoute =  DataExtractionSettings.getSettings().getStartLocation();
-		endRoute =  DataExtractionSettings.getSettings().getEndLocation();
+		startRoute = DataExtractionSettings.getSettings().getStartLocation();
+		endRoute = DataExtractionSettings.getSettings().getEndLocation();
 
 		nextTurn = new JButton(">>"); //$NON-NLS-1$
 		nextTurn.addActionListener(new ActionListener(){
@@ -325,9 +325,21 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(selfBaseRoute);
-		String[] hhProfiles = { "car", "bicycle", "pedestrian" };
-		for (String hhProfile : hhProfiles) {
-			if (getHHFile(hhProfile).exists()) {
+		
+		try {
+			BinaryMapIndexReader[] readers = DataExtractionSettings.getSettings().getObfReaders();
+			String[] hhProfiles = { "car", "bicycle", "pedestrian" };
+			for (String hhProfile : hhProfiles) {
+				boolean rt = false;
+				for (BinaryMapIndexReader r : readers) {
+					if (r.hasHHProfile(hhProfile) != null) {
+						rt = true;
+						break;
+					}
+				}
+				if (!rt && !getHHFile(hhProfile).exists()) {
+					continue;
+				}
 				Action hhRoute = new AbstractAction("Build HH " + hhProfile + " route") {
 					private static final long serialVersionUID = 8049712829806139142L;
 
@@ -339,6 +351,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				};
 				directions.add(hhRoute);
 			}
+		} catch (IOException e2) {
+			throw new RuntimeException(e2);
 		}
 		
 		if (selectedGPXFile != null) {
@@ -805,8 +819,8 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void run() {
 				map.setPoints(new DataTileManager<Entity>(11));
-				Collection<Entity> res = hh != null ?  hhRoute(startRoute, endRoute, hh) : 
-						selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+				Collection<Entity> res = hh != null ? hhRoute(startRoute, endRoute, hh)
+						: selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
 				if (res != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Entity w : res) {
@@ -972,12 +986,21 @@ public class MapRouterLayer implements MapPanelLayer {
 			HHRoutePlanner<?> hhRoutePlanner = hhPlanners.get(profile);
 			if (hhRoutePlanner == null) {
 				File hhFile = getHHFile(profile);
+				BinaryMapIndexReader[] readers = DataExtractionSettings.getSettings().getObfReaders();
 				final RoutingContext ctx = prepareRoutingContext(null, profile, RouteCalculationMode.NORMAL,
-						DataExtractionSettings.getSettings().getObfReaders(), //new BinaryMapIndexReader[0], 
+						readers, //new BinaryMapIndexReader[0], 
 						new RoutePlannerFrontEnd());
-				
-				Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
-				hhRoutePlanner = HHRoutePlanner.create(ctx,  new HHRoutingDB(conn));
+				if (hhFile.exists()) {
+					Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
+					hhRoutePlanner = HHRoutePlanner.create(ctx, new HHRoutingDB(conn));
+				} else {
+					for (BinaryMapIndexReader r : readers) {
+						if (r.hasHHProfile(profile) != null) {
+							hhRoutePlanner = HHRoutePlanner.create(ctx, r, r.hasHHProfile(profile), profile);
+							break;
+						}
+					}
+				}
 				hhPlanners.put(profile, hhRoutePlanner);
 			}
 

@@ -60,8 +60,8 @@ public class HHRoutingOBFWriter {
 			int pInd = 0;
 			String[] profileParams = new String[routingProfiles.size()];
 			int[] profileParamsKeys = new int[routingProfiles.size()];
-			for(int p : routingProfiles.keys()) {
-				profileParamsKeys[pInd]= p;
+			for (int p : routingProfiles.keys()) {
+				profileParamsKeys[pInd] = p;
 				profileParams[pInd] = routingProfiles.get(p);
 				pInd++;
 			}
