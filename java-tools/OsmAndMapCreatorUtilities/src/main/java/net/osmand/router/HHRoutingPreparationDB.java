@@ -52,7 +52,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	private int maxClusterID;
 
 	public HHRoutingPreparationDB(File dbFile) throws SQLException {
-		super(DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
+		super(dbFile, DBDialect.SQLITE.getDatabaseConnection(dbFile.getAbsolutePath(), LOG));
 		if (!compactDB) {
 			Statement st = conn.createStatement();
 			st.execute("CREATE TABLE IF NOT EXISTS routeLongRoads(id, regionId, roadId, startIndex, points, PRIMARY key (id))");
@@ -132,7 +132,11 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	}
 		  
 
-	public static void compact(Connection src, Connection tgt) throws SQLException, IOException {
+	public static void compact(File source, File target) throws SQLException, IOException {
+		System.out.printf("Compacting %s -> %s...\n", source.getName(), target.getName());
+		target.delete();
+		Connection src = DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG);
+		Connection tgt = DBDialect.SQLITE.getDatabaseConnection(target.getAbsolutePath(), LOG);
 		Statement st = tgt.createStatement();
 		String columnNames = "pointGeoId, idPoint, clusterId, dualIdPoint, dualClusterId, chInd, roadId, start, end, sx31, sy31, ex31, ey31";
 		int columnSize = columnNames.split(",").length;
@@ -156,7 +160,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insPnts += "?";
 		}
 		
-		HHRoutingDB sourceDB = new HHRoutingDB(src);
+		HHRoutingDB sourceDB = new HHRoutingDB(source, src);
 		TLongObjectHashMap<NetworkDBPointPrep> pointsById = sourceDB.loadNetworkPoints(NetworkDBPointPrep.class);
 		TIntObjectHashMap<List<NetworkDBPointPrep>> outPoints = HHRoutePlanner.groupByClusters(pointsById, true);
 		TIntObjectHashMap<List<NetworkDBPointPrep>> inPoints = HHRoutePlanner.groupByClusters(pointsById, false);

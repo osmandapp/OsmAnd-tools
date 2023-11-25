@@ -81,7 +81,7 @@ public class HHRoutingShortcutCreator {
 		nameFile += "Montenegro_europe_2.road.obf_car";
 		File source = new File(nameFile + HHRoutingDB.EXT);
 		File target = new File(nameFile + HHRoutingDB.CEXT);
-		compact(source, target);
+		HHRoutingPreparationDB.compact(source, target);
 	}
 	
 	public static void main(String[] args) throws Exception {
@@ -106,7 +106,7 @@ public class HHRoutingShortcutCreator {
 		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		File dbFile = new File(folder, name + HHRoutingDB.EXT);
 		if (onlyCompact) {
-			compact(dbFile, new File(folder, name + HHRoutingDB.CEXT));
+			HHRoutingPreparationDB.compact(dbFile, new File(folder, name + HHRoutingDB.CEXT));
 			return;
 		}
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
@@ -130,7 +130,7 @@ public class HHRoutingShortcutCreator {
 		}
 		networkDB.close();
 		File compactFile = new File(folder, name + HHRoutingDB.CEXT);
-		compact(dbFile, compactFile);
+		HHRoutingPreparationDB.compact(dbFile, compactFile);
 		new HHRoutingOBFWriter().writeFile(ROUTING_PROFILE, compactFile);
 	}
 	
@@ -141,12 +141,6 @@ public class HHRoutingShortcutCreator {
 			HHRoutingUtilities.addNode(osmObjects, p, null, "highway", "stop");
 		}
 		HHRoutingUtilities.saveOsmFile(osmObjects.valueCollection(), osm);
-	}
-	public static void compact(File source, File target) throws SQLException, IOException {
-		System.out.printf("Compacting %s -> %s...\n", source.getName(), target.getName());
-		target.delete();
-		HHRoutingPreparationDB.compact(DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG),
-				DBDialect.SQLITE.getDatabaseConnection(target.getAbsolutePath(), LOG));
 	}
 
 	

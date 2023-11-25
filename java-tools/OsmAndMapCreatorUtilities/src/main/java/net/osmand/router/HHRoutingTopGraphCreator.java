@@ -175,7 +175,7 @@ public class HHRoutingTopGraphCreator {
 		// rtCnt -> midMaxDepth
 		// rtIndex -> midProc
 		HHRoutingConfig config = HHRoutingConfig.dijkstra(0).preloadSegments();
-		HHRoutingContext<NetworkDBPointPrep> hctx = routePlanner.initHCtx(config);
+		HHRoutingContext<NetworkDBPointPrep> hctx = routePlanner.initHCtx(config, null, null);
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		TLongObjectHashMap<NetworkDBPointPrep> pnts = hctx.pointsById;
 		List<NetworkDBPointPrep> pointsList = new ArrayList<>(pnts.valueCollection());
@@ -282,7 +282,7 @@ public class HHRoutingTopGraphCreator {
 
 	private void runContractionHierarchy(int maxPoints, double percent, int routingProfile) throws SQLException, IOException {
 		HHRoutingConfig config = HHRoutingConfig.dijkstra(1).maxSettlePoints(maxPoints).preloadSegments();
-		HHRoutingContext<NetworkDBPointPrep> hctx = routePlanner.initHCtx(config);
+		HHRoutingContext<NetworkDBPointPrep> hctx = routePlanner.initHCtx(config, null, null);
 		routePlanner.setRoutingProfile(routingProfile);
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		TLongObjectHashMap<NetworkDBPointPrep> pnts = hctx.pointsById;

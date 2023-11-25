@@ -988,19 +988,13 @@ public class MapRouterLayer implements MapPanelLayer {
 				File hhFile = getHHFile(profile);
 				BinaryMapIndexReader[] readers = DataExtractionSettings.getSettings().getObfReaders();
 				final RoutingContext ctx = prepareRoutingContext(null, profile, RouteCalculationMode.NORMAL,
-						readers, //new BinaryMapIndexReader[0], 
-						new RoutePlannerFrontEnd());
+						readers,  new RoutePlannerFrontEnd());
+				HHRoutingDB db = null;
 				if (hhFile.exists()) {
 					Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
-					hhRoutePlanner = HHRoutePlanner.create(ctx, new HHRoutingDB(conn));
-				} else {
-					for (BinaryMapIndexReader r : readers) {
-						if (r.hasHHProfile(profile) != null) {
-							hhRoutePlanner = HHRoutePlanner.create(ctx, r, r.hasHHProfile(profile), profile);
-							break;
-						}
-					}
-				}
+					db = new HHRoutingDB(hhFile, conn);
+				} 
+				hhRoutePlanner = HHRoutePlanner.create(ctx, db);
 				hhPlanners.put(profile, hhRoutePlanner);
 			}
 

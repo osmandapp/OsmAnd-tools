@@ -50,6 +50,10 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 // IN PROGRESS
+// F.1 FILE: Write Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
+// F.2 FILE: Read data by HHRoutePlanner (same map for start / end) 
+// F.5 FILE utilities: Binary inspector...
+// F.3 FILE: index utilities (add hh info)
 
 // TESTING
 // 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
@@ -67,17 +71,14 @@ import net.osmand.util.MapUtils;
 // 2.0.3 HHRoutePlanner revert 2 queues to fail fast in 1 direction
 
 // FILE IMPLEMENTATION
-// F.1 FILE: Write Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
-// F.2 FILE: Read data by HHRoutePlanner (same map for start / end) 
-// F.3 FILE: index utilities (add hh info)
 // F.4 FILE: Merge maps cluster and check dates in HHRoutePlanner
-// F.5 FILE utilities: Binary inspector...
 // F.6 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%)
+// F.7 TODO here we could take into account hhregion.profileParams
 
 // HHRoutePlanner - Routing implementations
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.4 Progress bar for HHRoutePlanner
-// 2.5 C++ implementation HHRoutePlanner
+// 2.5 C++ implementation HHRoutePlanner / Files
 // 2.6 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 ///////////////////////////////////////////////////////////
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
