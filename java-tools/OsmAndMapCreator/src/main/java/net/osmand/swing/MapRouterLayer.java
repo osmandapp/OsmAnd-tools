@@ -985,8 +985,12 @@ public class MapRouterLayer implements MapPanelLayer {
 //			}
 
 			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
-
 			List<Entity> lst = new ArrayList<Entity>();
+			if (route.error != null) {
+				JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), route.error, "Routing error",
+						JOptionPane.ERROR_MESSAGE);
+				System.err.println(route.error);
+			}
 			if (!route.detailed.isEmpty()) {
 				calculateResult(lst, route.detailed);
 			} else {
@@ -1051,6 +1055,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					return null;
 				}
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+				RoutePlannerFrontEnd.USE_HH_ROUTING = false;
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 				// LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
