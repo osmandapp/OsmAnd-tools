@@ -131,7 +131,7 @@ public class HHRoutingShortcutCreator {
 		networkDB.close();
 		File compactFile = new File(folder, name + HHRoutingDB.CEXT);
 		HHRoutingPreparationDB.compact(dbFile, compactFile);
-		new HHRoutingOBFWriter().writeFile(ROUTING_PROFILE, compactFile);
+		new HHRoutingOBFWriter().writeFile(compactFile);
 	}
 	
 	

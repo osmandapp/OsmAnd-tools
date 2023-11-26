@@ -32,7 +32,6 @@ public class HHRoutingOBFWriter {
 	
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
 		File f;
-		String profile = "car";
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
@@ -41,14 +40,11 @@ public class HHRoutingOBFWriter {
 			f = new File(System.getProperty("maps.dir"), mapName);
 		} else {
 			f = new File(args[0]);
-			if (args.length > 1) {
-				profile = args[1];
-			}
 		}
-		new HHRoutingOBFWriter().writeFile(profile, f);
+		new HHRoutingOBFWriter().writeFile(f);
 	}
 	
-	public void writeFile(String profile, File dbFile) throws IOException, SQLException, IllegalValueException {
+	public void writeFile(File dbFile) throws IOException, SQLException, IllegalValueException {
 		File outFile = new File(dbFile.getParentFile(),
 				dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
@@ -56,6 +52,7 @@ public class HHRoutingOBFWriter {
 		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		try {
 			HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
+			String profile = db.getRoutingProfile();
 			TIntObjectHashMap<String> routingProfiles = db.getRoutingProfiles();
 			int pInd = 0;
 			String[] profileParams = new String[routingProfiles.size()];
