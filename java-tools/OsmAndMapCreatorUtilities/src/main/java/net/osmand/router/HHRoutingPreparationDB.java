@@ -140,17 +140,18 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		Statement st = tgt.createStatement();
 		String columnNames = "pointGeoId, idPoint, clusterId, dualIdPoint, dualClusterId, chInd, roadId, start, end, sx31, sy31, ex31, ey31";
 		int columnSize = columnNames.split(",").length;
-		st.execute("CREATE TABLE IF NOT EXISTS profiles(id, params)");
+		st.execute("CREATE TABLE IF NOT EXISTS profiles(profile, id, params)");
 		st.execute("CREATE TABLE IF NOT EXISTS points(" + columnNames + ",  PRIMARY key (idPoint))"); 
 		st.execute("CREATE TABLE IF NOT EXISTS segments(id, profile, ins, outs, PRIMARY key (id, profile))");
-		PreparedStatement pIns = tgt.prepareStatement("INSERT INTO profiles(id, params) VALUES (?, ?)");
+		PreparedStatement pIns = tgt.prepareStatement("INSERT INTO profiles(profile, id, params) VALUES (?, ?, ?)");
 		TIntArrayList profiles = new TIntArrayList();
-		ResultSet profileSet = src.createStatement().executeQuery(" select id, params from profiles");
+		ResultSet profileSet = src.createStatement().executeQuery("select profile, id, params from profiles");
 		while (profileSet.next()) {
-			pIns.setInt(1, profileSet.getInt(1));
-			pIns.setString(2, profileSet.getString(2));
+			pIns.setString(1, profileSet.getString(1));
+			pIns.setInt(2, profileSet.getInt(2));
+			pIns.setString(3, profileSet.getString(3));
 			pIns.execute();
-			profiles.add(profileSet.getInt(1));
+			profiles.add(profileSet.getInt(2));
 		}
 		String insPnts = "";
 		for (int k = 0; k < columnSize; k++) {

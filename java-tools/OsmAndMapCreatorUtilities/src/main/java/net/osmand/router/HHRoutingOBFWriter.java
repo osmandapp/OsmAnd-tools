@@ -36,8 +36,8 @@ public class HHRoutingOBFWriter {
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
-//			mapName = "__europe_car.chdb";
-//			mapName = "_road_bicycle.chdb";
+			mapName = "__europe_car.chdb";
+//			mapName = "_road_car.chdb";
 			f = new File(System.getProperty("maps.dir"), mapName);
 		} else {
 			f = new File(args[0]);
@@ -53,9 +53,9 @@ public class HHRoutingOBFWriter {
 				dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
+		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		try {
 			HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
-			long timestamp = System.currentTimeMillis();
 			TIntObjectHashMap<String> routingProfiles = db.getRoutingProfiles();
 			int pInd = 0;
 			String[] profileParams = new String[routingProfiles.size()];
@@ -65,8 +65,8 @@ public class HHRoutingOBFWriter {
 				profileParams[pInd] = routingProfiles.get(p);
 				pInd++;
 			}
-			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(outFile, "rw"), timestamp);
-			bmiw.startHHRoutingIndex(timestamp, profile, profileParams);
+			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(outFile, "rw"), edition);
+			bmiw.startHHRoutingIndex(edition, profile, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
 			
 

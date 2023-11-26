@@ -50,7 +50,6 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 // IN PROGRESS
-// F.3 Progress bar for HHRoutePlanner
 // F.4 FILE: Utility to cut cluster by countries
 // F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
 
@@ -60,19 +59,15 @@ import net.osmand.util.MapUtils;
 // C.3 C++ File readers and file structure 
 // C.4 C++ implementation HHRoutePlanner / Progress Bar
 
-// TESTING
+////// TESTING ///////
 // !!! RoutePlannerFrontEnd integration with Android !!!
 // 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
-// F.6 FILE: Don't write empty segment blobs - points have no in/out (oneway roads) - Europe 96215 (5%)
-// F.7 TODO here we could take into account hhregion.profileParams
-// F.1 FILE: Write Final data structure optimal by size, access time - protobuf (2 bytes per edge!)
-// F.2 FILE: Read data by HHRoutePlanner (same map for start / end) 
-// F.5 FILE utilities: Binary inspector...
-// F.3 FILE: index utilities (add hh info)
 // 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// 1.3.3 BUG: (Fix time) init direction + u-turn via same geo point - (Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+//////////////////////
 
-// HHRoutePlanner - fixes related to live data
+// 2. SHORT-TERM HHRoutePlanner - fixes related to live data
+// Error HH A* Kyiv - France err ~0.2 (wrong file?)	
+// 2.0 Progress bar for HHRoutePlanner
 // 2.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
@@ -82,7 +77,7 @@ import net.osmand.util.MapUtils;
 // 2.7 Live data (think about it)
 // 2.8 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 
-// 3 Speedups, small bugs and Data research
+// 3. MID-TERM Speedups, small bugs and Data research
 // 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
@@ -94,12 +89,11 @@ import net.osmand.util.MapUtils;
 // 3.7 BUG: 2-dir routing speed https://github.com/osmandapp/OsmAnd/issues/18566 
 // 3.8 SPEEDUP: HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData())
 
-// *4* Future (if needed) - Introduce 3/4 level 
+// *4* LATE Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
 // 4.2 Implement CH algorithm - HARD to wait to finish CH
 // 4.3 Try different recursive algorithm for road separation - DIDN'T IMPLEMENT
 // 4.4 Implement Arc flags or CH for clusters inside 
-
 
 public class HHRoutingSubGraphCreator {
 

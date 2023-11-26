@@ -119,7 +119,7 @@ public class HHRoutingShortcutCreator {
 		
 		for (String routingParam : ROUTING_PARAMS) {
 			prepareContext = new HHRoutingPrepareContext(obfFile, ROUTING_PROFILE, routingParam.split(","));
-			int routingProfile = networkDB.insertRoutingProfile(routingParam);
+			int routingProfile = networkDB.insertRoutingProfile(ROUTING_PROFILE, routingParam);
 			HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
 			// reload points to avoid cache
 			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints(NetworkDBPoint.class);
