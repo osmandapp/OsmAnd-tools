@@ -65,7 +65,7 @@ public class WikipediaByCountryDivider {
 			throw new RuntimeException("Set --dir=/path/to/wikipedia/source");
 		}
 
-		final String sqliteFileName = database.isEmpty() ? folder + WikiDatabasePreparation.WIKI_SQLITE : database;
+		final String sqliteFileName = database.isEmpty() ? folder + WikiDatabasePreparation.WIKIPEDIA_SQLITE : database;
 
 		switch (mode) {
 			case "inspect":
