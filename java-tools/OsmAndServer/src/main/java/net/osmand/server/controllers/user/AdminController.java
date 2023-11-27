@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.transaction.Transactional;
 
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
@@ -138,6 +139,8 @@ public class AdminController {
 	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
 	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
 	
+	public static final String PROMO_WEBSITE = "promo_website";
+	
 	
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
 	public String publish(Model model, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
@@ -184,7 +187,7 @@ public class AdminController {
 	
 	@PostMapping(path = {"/register-promo"})
 	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) {
-		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, "promo_website", null);
+		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, PROMO_WEBSITE, null);
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(resp.deviceSub));
 		return "redirect:info#audience";
 	}
@@ -220,6 +223,41 @@ public class AdminController {
 		}
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
         return "redirect:info#audience";
+	}
+	
+	@Transactional
+	@PostMapping(path = {"/downgrade-subscription"})
+	public String downgradeSubscription(@RequestParam String orderId, @RequestParam String subscriptionType) {
+		PremiumUser pu = usersRepository.findByOrderid(orderId);
+		if (pu != null) {
+			SupporterDeviceSubscription subscription = new SupporterDeviceSubscription();
+			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(pu.orderid);
+			if (subscriptions != null && !subscriptions.isEmpty()) {
+				subscription = subscriptions.get(0);
+			}
+			// downgrade only promo_website
+			if (subscription != null && subscription.sku.equals(subscriptionType)) {
+				// update expiretime
+				Calendar c = Calendar.getInstance();
+				c.setTimeInMillis(System.currentTimeMillis());
+				subscription.expiretime = c.getTime();
+				subscriptionsRepository.save(subscription);
+				// remove user orderid
+				pu.orderid = null;
+				usersRepository.saveAndFlush(pu);
+			}
+		}
+		return "redirect:info#audience";
+	}
+	
+	@PostMapping("/get-email-by-orderId")
+	@ResponseBody
+	public ResponseEntity<String> getEmailByOrderId(@RequestParam String orderId) {
+		PremiumUser pu = usersRepository.findByOrderid(orderId);
+		if (pu != null) {
+			return ResponseEntity.ok().body(pu.email);
+		}
+		return ResponseEntity.badRequest().body("User is not found.");
 	}
 
 	
@@ -433,6 +471,9 @@ public class AdminController {
 		model.addAttribute("emailsReport", emailService.getEmailsDBReport());
 		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
+		
+		model.addAttribute("promoSku", PROMO_WEBSITE);
+		
 		return "admin/info";
 	}
 	
