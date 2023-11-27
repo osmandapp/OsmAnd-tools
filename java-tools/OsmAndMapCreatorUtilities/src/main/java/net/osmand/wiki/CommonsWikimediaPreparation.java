@@ -28,7 +28,7 @@ public class CommonsWikimediaPreparation {
 
     public static final String COMMONSWIKI_ARTICLES_GZ = "commonswiki-latest-pages-articles.xml.gz";
     public static final String COMMONSWIKI_CATEGORYLINKS_GZ = "commonswiki-latest-categorylinks.sql.gz";
-    public static final String COMMONSWIKI_SQLITE = "commons_wiki.sqlite";
+    public static final String COMMONSWIKI_SQLITE = "wikidata_commons_osm.sqlitedb";
     public static final String CATEGORY_NAMESPACE = "14";
     public static final String FILE_NAMESPACE = "6";
     public static final String DEPICT_KEY = "[[d:Special:EntityPage/";
@@ -134,6 +134,8 @@ public class CommonsWikimediaPreparation {
             log.info("========= CREATE TABLES common_depict, common_content =========");
             conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_depict(id long, depict_qid long, depict_type text)");
             conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_content(id long, name text, ns int)");
+            conn.createStatement().execute("DELETE FROM common_depict");
+            conn.createStatement().execute("DELETE FROM common_content");
             prepDepict = conn.prepareStatement("INSERT INTO common_depict(id, depict_qid, depict_type) VALUES (?, ?, ?)");
             prepContent = conn.prepareStatement("INSERT INTO common_content(id, name, ns) VALUES (?, ?, ?)");
         }

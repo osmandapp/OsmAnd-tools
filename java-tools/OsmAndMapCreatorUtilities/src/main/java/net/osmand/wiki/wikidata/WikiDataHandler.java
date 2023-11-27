@@ -60,17 +60,20 @@ public class WikiDataHandler extends DefaultHandler {
 	private List<String> keyNames = new ArrayList<>();
 
 	OsmCoordinatesByTag osmWikiCoordinates;
+	private long lastProcessedId;
 
 
-	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile, OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions)
+	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
+	                       OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId)
 			throws SQLException {
 		this.saxParser = saxParser;
 		this.osmWikiCoordinates = osmWikiCoordinates;
 		this.regions = regions;
 		this.progress = progress;
+		this.lastProcessedId = lastProcessedId;
 		DBDialect dialect = DBDialect.SQLITE;
-		dialect.removeDatabase(sqliteFile);
-		conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+		dialect.removeDatabase(wikidataSqlite);
+		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE wiki_coords(id long, originalId text, lat double, lon double)");
 		conn.createStatement().execute("CREATE TABLE wiki_mapping(id long, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
@@ -100,6 +103,7 @@ public class WikiDataHandler extends DefaultHandler {
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_lang_title_idx ON wiki_mapping(lang, title)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_mapping_index on wiki_mapping(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_idx on wiki_coords(id)");
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_originalId on wiki_coords(originalId)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_region_idx on wiki_region(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS reg_region_idx on wiki_region(regionName)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS wikidata_properties_idx on wikidata_properties(id)");
@@ -113,6 +117,10 @@ public class WikiDataHandler extends DefaultHandler {
         coordsPrep.close();
         conn.close();
     }
+
+    public void setLastProcessedId(Long lastProcessedId) {
+		this.lastProcessedId = lastProcessedId;
+	}
 
     @Override
     public void startElement(String uri, String localName, String qName, Attributes attributes) {
@@ -160,6 +168,10 @@ public class WikiDataHandler extends DefaultHandler {
 						return;
 					}
 					try {
+						long id = Long.parseLong(title.substring(1));
+						if (id < lastProcessedId) {
+							return;
+						}
 						ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
 						for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 							String articleTitle = siteLink.title;
@@ -191,7 +203,6 @@ public class WikiDataHandler extends DefaultHandler {
 							if (++count % ARTICLE_BATCH_SIZE == 0) {
 								log.info(String.format("Article accepted %s (%d)", title, count));
 							}
-							long id = Long.parseLong(title.substring(1));
 							coordsPrep.setLong(1, id);
 							coordsPrep.setString(2, title.toString());
 							coordsPrep.setDouble(3, article.getLat());
@@ -212,7 +223,6 @@ public class WikiDataHandler extends DefaultHandler {
 						}
 						if (article.getImage() != null) {
 							String image = StringEscapeUtils.unescapeJava(article.getImage());
-							long id = Long.parseLong(title.substring(1));
 							wikidataPropPrep.setLong(1, id);
 							wikidataPropPrep.setString(2, ArticleMapper.PROP_IMAGE);
 							wikidataPropPrep.setString(3, image);
@@ -220,7 +230,6 @@ public class WikiDataHandler extends DefaultHandler {
 						}
 						if (article.getCommonCat() != null) {
 							String commonCat = StringEscapeUtils.unescapeJava(article.getCommonCat());
-							long id = Long.parseLong(title.substring(1));
 							wikidataPropPrep.setLong(1, id);
 							wikidataPropPrep.setString(2, ArticleMapper.PROP_COMMON_CAT);
 							wikidataPropPrep.setString(3, commonCat);

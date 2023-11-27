@@ -123,7 +123,7 @@ public class ArticleExtractor {
 			if (!processWikidata && !Algorithms.isEmpty(articleID)) {
 				String[] arguments = {
 						"--lang=" + lang,
-						"--dir=" + outputDir.getAbsolutePath() + File.separator,
+						"--wikipediaDir=" + outputDir.getAbsolutePath() + File.separator,
 						"--mode=test-wikipedia",
 						"--testID=" + articleID};
 				WikiDatabasePreparation.main(arguments);
