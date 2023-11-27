@@ -744,9 +744,21 @@ public class WikiDatabasePreparation {
 			}
 		}
 
-		if (mode.isEmpty() || wikipediaFolder.isEmpty()
-				|| ((mode.equals("process-wikipedia") || mode.equals("test-wikipedia")) && lang.isEmpty())) {
-			throw new RuntimeException("Correct arguments weren't supplied");
+		if (mode.isEmpty()) {
+			throw new RuntimeException("Correct arguments weren't supplied. --mode= is not set");
+		}
+		if (mode.equals("process-wikipedia") || mode.equals("test-wikipedia")) {
+			if (wikipediaFolder.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --wikipediaDir= is not set");
+			}
+			if (lang.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --lang= is not set");
+			}
+		}
+		if (mode.equals("create-wikidata") || mode.equals("update-wikidata")) {
+			if (wikidataSqliteName.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
+			}
 		}
 
 		final String wikipediaSqliteName = wikipediaFolder + WIKIPEDIA_SQLITE;
