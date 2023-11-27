@@ -72,12 +72,11 @@ public class WikiDataHandler extends DefaultHandler {
 		this.progress = progress;
 		this.lastProcessedId = lastProcessedId;
 		DBDialect dialect = DBDialect.SQLITE;
-		dialect.removeDatabase(wikidataSqlite);
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE wiki_coords(id long, originalId text, lat double, lon double)");
-		conn.createStatement().execute("CREATE TABLE wiki_mapping(id long, lang text, title text)");
-		conn.createStatement().execute("CREATE TABLE wiki_region(id long, regionName text)");
-		conn.createStatement().execute("CREATE TABLE wikidata_properties(id long, type text, value text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id long, originalId text, lat double, lon double)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id long, lang text, title text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id long, regionName text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id long, type text, value text)");
 		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon) VALUES (?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
@@ -168,6 +167,10 @@ public class WikiDataHandler extends DefaultHandler {
 						return;
 					}
 					try {
+						String t = title.toString();
+						if (t.startsWith("Lexeme:")) {
+							return;
+						}
 						long id = Long.parseLong(title.substring(1));
 						if (id < lastProcessedId) {
 							return;

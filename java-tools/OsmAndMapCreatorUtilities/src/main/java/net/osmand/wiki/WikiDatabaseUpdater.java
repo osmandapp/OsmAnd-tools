@@ -10,12 +10,15 @@ import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class WikiDatabaseUpdater {
 
@@ -23,6 +26,7 @@ public class WikiDatabaseUpdater {
     private final String WIKIDATA_URL = "https://dumps.wikimedia.org/wikidatawiki/latest/";
     private List<String> downloadedPages = new ArrayList<>();
     private long maxQId = 0;
+    private final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
     public WikiDatabaseUpdater(File db) {
         try {
@@ -91,12 +95,26 @@ public class WikiDatabaseUpdater {
             gzFile = folder + "/" + gzFile;
             File gz = new File(gzFile);
             if (gz.exists()) {
+                System.out.println(gzFile + " already downloaded");
+                downloadedPages.add(gzFile);
                 continue;
             }
-            String cmd = "curl " + WIKIDATA_URL + p.url + " | bzcat | gzip -1 > " + gzFile;
+            String cmd = "curl -A \"" + USER_AGENT + "\" "
+                    + WIKIDATA_URL + p.url + " | bzcat | gzip -1 ";
+            System.out.println("Download " + WIKIDATA_URL + p.url);
             System.out.println(cmd);
-            Runtime.getRuntime().exec(new String[] { "bash", "-c", cmd });
-            System.out.println(gzFile + " downloaded");
+            Process process = Runtime.getRuntime().exec(new String[] { "bash", "-c", cmd });
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new GZIPInputStream(process.getInputStream())));
+
+            GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(gzFile));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line + System.lineSeparator();
+                gzout.write(line.getBytes(StandardCharsets.UTF_8));
+            }
+            gzout.close();
+            System.out.println(gzFile + " downloading is finished");
             downloadedPages.add(gzFile);
         }
     }
@@ -113,8 +131,7 @@ public class WikiDatabaseUpdater {
     private List<Page> readUrl(Pattern pattern) throws IOException {
         URLConnection connection = new URL(WIKIDATA_URL).openConnection();
         connection
-                .setRequestProperty("User-Agent",
-                        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11");
+                .setRequestProperty("User-Agent", USER_AGENT);
         connection.connect();
 
         BufferedReader r = new BufferedReader(new InputStreamReader(connection.getInputStream(),
@@ -143,7 +160,6 @@ public class WikiDatabaseUpdater {
 
     private long getMaxQIdFromDb(File wikidataSqlite) throws SQLException {
         DBDialect dialect = DBDialect.SQLITE;
-        dialect.removeDatabase(wikidataSqlite);
         Connection conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
         ResultSet rs = conn.createStatement().executeQuery("SELECT max(id) FROM wiki_coords");
         long maxQId = 0;

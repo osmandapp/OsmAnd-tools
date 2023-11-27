@@ -767,6 +767,8 @@ public class WikiDatabasePreparation {
 		}
 		String wikidataFolder = new File(wikidataSqliteName).getParent();
 		final String pathToWikiData = wikidataFolder + File.separator + WIKIDATA_ARTICLES_GZ;
+		OsmCoordinatesByTag osmCoordinates;
+		File wikidataDB;
 
 		switch (mode) {
 			case "process-wikidata-regions":
@@ -780,23 +782,27 @@ public class WikiDatabasePreparation {
 				if (wikiDB.exists()) {
 					wikiDB.delete();
 				}
-				log.info("Create wikidata...");
 				String wikidataFolderName = wikiDB.getParent();
-				String wikidataFile = wikidataFolderName + WIKIDATA_ARTICLES_GZ;
-				processWikidata(wikidataSqliteName, wikidataFile, 0);
+				String wikidataFile = wikidataFolderName + File.separator + WIKIDATA_ARTICLES_GZ;
+				wikidataDB = new File(wikidataSqliteName);
+				log.info("Process OSM coordinates...");
+				osmCoordinates = new OsmCoordinatesByTag(wikidataDB, new String[]{"wikipedia", "wikidata"},
+						new String[] { "wikipedia:" }, true);
+				log.info("Create wikidata...");
+				processWikidata(wikidataDB, wikidataFile, osmCoordinates,0);
 				break;
 			case "update-wikidata":
-				File wikidataDB = new File(wikidataSqliteName);
-				if (!new File(pathToWikiData).exists()) {
-					throw new RuntimeException("Wikidata dump doesn't exist:" + pathToWikiData);
-				}
-				log.info("Updating wikidata...");
+				wikidataDB = new File(wikidataSqliteName);
+				log.info("Process OSM coordinates...");
+				osmCoordinates = new OsmCoordinatesByTag(wikidataDB, new String[]{"wikipedia", "wikidata"},
+						new String[] { "wikipedia:" }, true);
 				WikiDatabaseUpdater wdu = new WikiDatabaseUpdater(wikidataDB);
 				List<String> downloadedPages = wdu.getDownloadedPages();
 				long maxQId = wdu.getMaxQId();
+				log.info("Updating wikidata...");
 				for (String f : downloadedPages) {
 					log.info("Updating " + f);
-					processWikidata(wikidataSqliteName, f, maxQId);
+					processWikidata(wikidataDB, f, osmCoordinates, maxQId);
 				}
 				wdu.removeDownloadedPages();
 				break;
@@ -887,9 +893,8 @@ public class WikiDatabasePreparation {
 		handler.finish();
 	}
 
-	public static void processWikidata(final String wikidataSqliteFileName, final String wikidataFile, long lastProcessedId)
+	public static void processWikidata(File wikidataSqlite, final String wikidataFile, OsmCoordinatesByTag osmCoordinates, long lastProcessedId)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
-		File wikidataSqlite = new File(wikidataSqliteFileName);
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikidataFile));
 		InputStream streamFile = progress.openFileInputStream();
@@ -897,8 +902,6 @@ public class WikiDatabasePreparation {
 		OsmandRegions regions = new OsmandRegions();
 		regions.prepareFile();
 		regions.cacheAllCountries();
-		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(wikidataSqlite, new String[]{"wikipedia", "wikidata"},
-				new String[] { "wikipedia:" }, lastProcessedId != 0);
 		final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions, lastProcessedId);
 		sx.parse(is, handler);
 		handler.finish();
