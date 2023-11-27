@@ -775,7 +775,7 @@ public class WikiDatabasePreparation {
 			case "create-wikidata":
 				File wikiDB = new File(wikidataSqliteName);
 				if (!new File(pathToWikiData).exists()) {
-					throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
+					throw new RuntimeException("Wikidata dump doesn't exist:" + pathToWikiData);
 				}
 				if (wikiDB.exists()) {
 					wikiDB.delete();
@@ -788,7 +788,7 @@ public class WikiDatabasePreparation {
 			case "update-wikidata":
 				File wikidataDB = new File(wikidataSqliteName);
 				if (!new File(pathToWikiData).exists()) {
-					throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
+					throw new RuntimeException("Wikidata dump doesn't exist:" + pathToWikiData);
 				}
 				log.info("Updating wikidata...");
 				WikiDatabaseUpdater wdu = new WikiDatabaseUpdater(wikidataDB);
