@@ -766,7 +766,7 @@ public class WikiDatabasePreparation {
 			wikidataSqliteName = wikipediaSqliteName;
 		}
 		String wikidataFolder = new File(wikidataSqliteName).getParent();
-		final String pathToWikiData = wikidataFolder + WIKIDATA_ARTICLES_GZ;
+		final String pathToWikiData = wikidataFolder + File.separator + WIKIDATA_ARTICLES_GZ;
 
 		switch (mode) {
 			case "process-wikidata-regions":
