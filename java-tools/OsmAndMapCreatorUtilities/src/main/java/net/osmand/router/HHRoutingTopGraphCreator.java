@@ -18,11 +18,12 @@ import org.apache.commons.logging.Log;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
+import net.osmand.router.HHRouteDataStructure.HHRouteRegionPointsCtx;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.HHRouteDataStructure.NetworkDBSegment;
 import net.osmand.router.HHRouteDataStructure.RoutingStats;
-import net.osmand.router.HHRoutingDB.NetworkDBPoint;
-import net.osmand.router.HHRoutingDB.NetworkDBSegment;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBSegmentPrep;
 
@@ -99,14 +100,17 @@ public class HHRoutingTopGraphCreator {
 		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + HHRoutingDB.EXT));
+		HHRouteRegionPointsCtx<NetworkDBPointPrep> ctx = new HHRouteRegionPointsCtx<NetworkDBPointPrep>((short) 0,
+				networkDB);
+		ctx.routingProfile = 0;
 		HHRoutePlanner<NetworkDBPointPrep> routePlanner = new HHRoutePlanner<NetworkDBPointPrep>(HHRoutePlanner.prepareContext(ROUTING_PROFILE), 
-				networkDB, NetworkDBPointPrep.class);
+				ctx, NetworkDBPointPrep.class);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
 		
 		if (PROCESS == PROC_MIDPOINTS) {
 			planner.calculateMidPoints(MAX_DEPTH, MAX_ITERATIONS);
 		} else if (PROCESS == PROC_CH) { 
-			planner.runContractionHierarchy(MAX_DEPTH, PERCENT_CH / 100.0, 0);
+			planner.runContractionHierarchy(MAX_DEPTH, PERCENT_CH / 100.0);
 		}
 		planner.networkDB.close();
 	}
@@ -280,10 +284,9 @@ public class HHRoutingTopGraphCreator {
 	}
 
 
-	private void runContractionHierarchy(int maxPoints, double percent, int routingProfile) throws SQLException, IOException {
+	private void runContractionHierarchy(int maxPoints, double percent) throws SQLException, IOException {
 		HHRoutingConfig config = HHRoutingConfig.dijkstra(1).maxSettlePoints(maxPoints).preloadSegments();
 		HHRoutingContext<NetworkDBPointPrep> hctx = routePlanner.initHCtx(config, null, null);
-		routePlanner.setRoutingProfile(routingProfile);
 		long time = System.nanoTime(), startTime = System.nanoTime();
 		TLongObjectHashMap<NetworkDBPointPrep> pnts = hctx.pointsById;
 		List<NetworkDBPointPrep> list = new ArrayList<>(pnts.valueCollection());
@@ -373,7 +376,7 @@ public class HHRoutingTopGraphCreator {
 		}
 		networkDB.updatePointsCHInd(list);
 		networkDB.deleteShortcuts();
-		networkDB.insertSegments(allShortcuts, routingProfile);
+		networkDB.insertSegments(allShortcuts, hctx.regions.get(0).routingProfile);
 		
 		System.out.printf("Added %d shortcuts, reindexed %d \n", allShortcuts.size(), reindex);
 		

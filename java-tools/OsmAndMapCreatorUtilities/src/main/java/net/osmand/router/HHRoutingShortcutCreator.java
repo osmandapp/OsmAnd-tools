@@ -30,13 +30,12 @@ import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
-import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
-import net.osmand.router.HHRoutingDB.NetworkDBPoint;
-import net.osmand.router.HHRoutingDB.NetworkDBSegment;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.HHRouteDataStructure.NetworkDBSegment;
 import net.osmand.util.MapUtils;
 
 public class HHRoutingShortcutCreator {
@@ -113,7 +112,7 @@ public class HHRoutingShortcutCreator {
 		if (CLEAN && dbFile.exists()) {
 			networkDB.recreateSegments();
 		}
-		TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints(NetworkDBPoint.class);
+		TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short)0, NetworkDBPoint.class);
 		createOSMNetworkPoints(new File(folder, name + "-pnts.osm"), totalPnts);
 		System.out.printf("Loaded %,d points\n", totalPnts.size());
 		
@@ -122,7 +121,7 @@ public class HHRoutingShortcutCreator {
 			int routingProfile = networkDB.insertRoutingProfile(ROUTING_PROFILE, routingParam);
 			HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
 			// reload points to avoid cache
-			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints(NetworkDBPoint.class);
+			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints((short)0, NetworkDBPoint.class);
 			int segments = networkDB.loadNetworkSegments(pnts.valueCollection(), routingProfile);
 			System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam, segments);	
 			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB, routingProfile);

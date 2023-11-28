@@ -67,7 +67,7 @@ public class HHRoutingOBFWriter {
 			RTree routeTree = new RTree(rTreeFile);
 			
 
-			TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints(NetworkDBPointPrep.class);
+			TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
 			for (NetworkDBPointPrep pnt : points.valueCollection()) {
 				routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
 			}

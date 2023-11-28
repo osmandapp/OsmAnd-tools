@@ -64,8 +64,8 @@ import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
-import net.osmand.router.HHRoutingDB.NetworkDBPoint;
 import net.osmand.util.MapUtils;
 
 public class BinaryInspector {
@@ -96,7 +96,7 @@ public class BinaryInspector {
 					"-latlon=42.7405,18.6357",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Germany_car.obf"
+					System.getProperty("maps.dir") + "Montenegro_car.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -536,7 +536,7 @@ public class BinaryInspector {
 					println(String.format("\tBounds %s profile '%s' %s edition = %s", formatLatBounds(rt.left, rt.right,
 							rt.top, rt.bottom), ri.profile, ri.profileParams, new Date(ri.edition)));
 					if ((vInfo != null && vInfo.isVHHrouting())) {
-						TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(ri, NetworkDBPoint.class);
+						TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(ri, (short) 0, NetworkDBPoint.class);
 						for (NetworkDBPoint pnt : pnts.valueCollection()) {
 							System.out.println(String.format("\t\t %s - cluster %d (duap point %d, %d) - %d,%d -> %d,%d", pnt,
 									pnt.clusterId, pnt.dualPoint == null ? 0 : pnt.dualPoint.index,

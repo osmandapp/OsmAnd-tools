@@ -32,6 +32,8 @@ import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.HHRouteDataStructure.NetworkDBSegment;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -162,7 +164,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 		
 		HHRoutingDB sourceDB = new HHRoutingDB(source, src);
-		TLongObjectHashMap<NetworkDBPointPrep> pointsById = sourceDB.loadNetworkPoints(NetworkDBPointPrep.class);
+		TLongObjectHashMap<NetworkDBPointPrep> pointsById = sourceDB.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
 		TIntObjectHashMap<List<NetworkDBPointPrep>> outPoints = HHRoutePlanner.groupByClusters(pointsById, true);
 		TIntObjectHashMap<List<NetworkDBPointPrep>> inPoints = HHRoutePlanner.groupByClusters(pointsById, false);
 		pIns = tgt.prepareStatement("INSERT INTO points(" + columnNames + ") VALUES (" + insPnts + ")");

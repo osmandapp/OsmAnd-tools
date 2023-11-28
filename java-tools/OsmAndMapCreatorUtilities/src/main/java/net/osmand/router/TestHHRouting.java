@@ -10,7 +10,9 @@ import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
-import net.osmand.router.HHRouteDataStructure.*;
+import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
+import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
+import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 
 public class TestHHRouting {
 	
