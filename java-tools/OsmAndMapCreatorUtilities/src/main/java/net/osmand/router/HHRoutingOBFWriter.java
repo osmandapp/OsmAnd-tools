@@ -95,9 +95,6 @@ public class HHRoutingOBFWriter {
 				outFile.getParentFile().mkdirs();
 				QuadRect bbox31 = new QuadRect();
 				LinkedList<BinaryMapDataObject> bboxReg = null;
-
-				outFile = new File(obfPolyFile.getParentFile(),
-						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
 				String countryName = obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('_'))
 						.toLowerCase();
 				if (cacheAllCountries.containsKey(countryName)) {
