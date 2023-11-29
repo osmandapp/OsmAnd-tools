@@ -2,9 +2,9 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
-import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
