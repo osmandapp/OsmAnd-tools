@@ -2,14 +2,11 @@ package net.osmand.router;
 
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +21,6 @@ import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.AbstractIndexPartCreator;
@@ -48,6 +43,7 @@ public class HHRoutingOBFWriter {
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
 		File dbFile;
 		File obfPolyFile = null;
+		String subFolder = "";
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
@@ -61,12 +57,15 @@ public class HHRoutingOBFWriter {
 			if (args.length > 0) {
 				obfPolyFile = new File(args[1]);
 			}
+			if (args.length > 1) {
+				subFolder = "/" + args[2];
+			}
 			dbFile = new File(args[0]);
 		}
-		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile);
+		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, subFolder);
 	}
 	
-	public void writeFile(File dbFile, File obfPolyFileIn) throws IOException, SQLException, IllegalValueException {
+	public void writeFile(File dbFile, File obfPolyFileIn, String subFolder) throws IOException, SQLException, IllegalValueException {
 		
 		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
@@ -91,8 +90,9 @@ public class HHRoutingOBFWriter {
 				obfPolyFiles.add(obfPolyFileIn);
 			}
 			for (File obfPolyFile : obfPolyFiles) {
-				File outFile = new File(obfPolyFile.getParentFile(),
+				File outFile = new File(obfPolyFile.getParentFile() + subFolder,
 						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
+				outFile.getParentFile().mkdirs();
 				QuadRect bbox31 = new QuadRect();
 				LinkedList<BinaryMapDataObject> bboxReg = null;
 
@@ -128,17 +128,14 @@ public class HHRoutingOBFWriter {
 				writeFileBbox(db, points, outFile, edition, bbox31, bboxReg);
 			}
 		}
-		
 	}
 
-	private void writeFileBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile, long edition, QuadRect bbox31,
-			LinkedList<BinaryMapDataObject> bboxReg )
+	private void writeFileBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
+			long edition, QuadRect bbox31, LinkedList<BinaryMapDataObject> bboxReg)
 			throws SQLException, IOException, IllegalValueException {
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
 		try {
-			
-			
 			String profile = db.getRoutingProfile();
 			TIntObjectHashMap<String> routingProfiles = db.getRoutingProfiles();
 			int pInd = 0;
@@ -152,7 +149,7 @@ public class HHRoutingOBFWriter {
 			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(outFile, "rw"), edition);
 			bmiw.startHHRoutingIndex(edition, profile, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
-			for(NetworkDBPointPrep p : points.valueCollection()) {
+			for (NetworkDBPointPrep p : points.valueCollection()) {
 				p.mapId = 0;
 				p.fileId = 0;
 			}

@@ -41,6 +41,7 @@ import net.osmand.render.OsmAndTestStyleRenderer;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
+import net.osmand.router.HHRoutingOBFWriter;
 import net.osmand.router.HHRoutingShortcutCreator;
 import net.osmand.router.HHRoutingSubGraphCreator;
 import net.osmand.router.HHRoutingTopGraphCreator;
@@ -137,6 +138,8 @@ public class MainUtilities {
 				HHRoutingSubGraphCreator.main(subArgsArray);
 			} else if (utl.equals("hh-routing-shortcuts")) {
 				HHRoutingShortcutCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-obf-write")) {
+				HHRoutingOBFWriter.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
 				TestHHRouting.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
