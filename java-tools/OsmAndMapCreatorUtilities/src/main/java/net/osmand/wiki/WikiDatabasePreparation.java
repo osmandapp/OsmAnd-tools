@@ -736,8 +736,9 @@ public class WikiDatabasePreparation {
 			String val = arg.substring(arg.indexOf("=") + 1);
 			if (arg.startsWith("--lang=")) {
 				lang = val;
-			} else if (arg.startsWith("--wikipediaDir=")) {
+			} else if (arg.startsWith("--dir=")) {
 				wikipediaFolder = val;
+				wikidataFolder = val;
 			} else if (arg.startsWith("--mode=")) {
 				mode = val;
 			} else if (arg.startsWith("--testID=")) {
@@ -752,7 +753,7 @@ public class WikiDatabasePreparation {
 		}
 		if (mode.equals("process-wikipedia") || mode.equals("test-wikipedia")) {
 			if (wikipediaFolder.isEmpty()) {
-				throw new RuntimeException("Correct arguments weren't supplied. --wikipediaDir= is not set");
+				throw new RuntimeException("Correct arguments weren't supplied. --dir= is not set");
 			}
 			if (lang.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --lang= is not set");
@@ -763,11 +764,13 @@ public class WikiDatabasePreparation {
 			if (resultDB.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
 			}
+			if (wikidataFolder.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --dir= is not set");
+			}
 			wikidataSqliteName = resultDB;
-			wikidataFolder = new File(wikidataSqliteName).getParent();
 		}
 
-		final String pathToWikiData = wikidataFolder + File.separator + WIKIDATA_ARTICLES_GZ;
+		final String pathToWikiData = wikidataFolder + WIKIDATA_ARTICLES_GZ;
 		OsmCoordinatesByTag osmCoordinates;
 		File wikidataDB;
 
@@ -783,8 +786,7 @@ public class WikiDatabasePreparation {
 				if (wikiDB.exists()) {
 					wikiDB.delete();
 				}
-				String wikidataFolderName = wikiDB.getParent();
-				String wikidataFile = wikidataFolderName + File.separator + WIKIDATA_ARTICLES_GZ;
+				String wikidataFile = wikidataFolder + WIKIDATA_ARTICLES_GZ;
 				wikidataDB = new File(wikidataSqliteName);
 				log.info("Process OSM coordinates...");
 				osmCoordinates = new OsmCoordinatesByTag(wikidataDB, new String[]{"wikipedia", "wikidata"},
