@@ -725,8 +725,11 @@ public class WikiDatabasePreparation {
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
 		String lang = "";
 		String wikipediaFolder = "";
+		String wikidataFolder = "";
 		String mode = "";
 		long testArticleID = 0;
+		String resultDB = "";
+		String wikipediaSqliteName = "";
 		String wikidataSqliteName = "";
 
 		for (String arg : args) {
@@ -740,7 +743,7 @@ public class WikiDatabasePreparation {
 			} else if (arg.startsWith("--testID=")) {
 				testArticleID = Long.parseLong(val);
 			} else if (arg.startsWith("--result_db=")) {
-				wikidataSqliteName = val;
+				resultDB = val;
 			}
 		}
 
@@ -754,18 +757,16 @@ public class WikiDatabasePreparation {
 			if (lang.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --lang= is not set");
 			}
+			wikipediaSqliteName = resultDB.isEmpty() ? wikipediaFolder + WIKIPEDIA_SQLITE : resultDB;
 		}
 		if (mode.equals("create-wikidata") || mode.equals("update-wikidata")) {
-			if (wikidataSqliteName.isEmpty()) {
+			if (resultDB.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
 			}
+			wikidataSqliteName = resultDB;
+			wikidataFolder = new File(wikidataSqliteName).getParent();
 		}
 
-		final String wikipediaSqliteName = wikipediaFolder + WIKIPEDIA_SQLITE;
-		if (mode.equals("test-wikipedia")) {
-			wikidataSqliteName = wikipediaSqliteName;
-		}
-		String wikidataFolder = new File(wikidataSqliteName).getParent();
 		final String pathToWikiData = wikidataFolder + File.separator + WIKIDATA_ARTICLES_GZ;
 		OsmCoordinatesByTag osmCoordinates;
 		File wikidataDB;
@@ -808,10 +809,10 @@ public class WikiDatabasePreparation {
 				break;
 			case "process-wikipedia":
 				log.info("Processing wikipedia...");
-				processWikipedia(wikipediaSqliteName, lang, 0);
+				processWikipedia(wikipediaFolder, wikipediaSqliteName, lang, 0);
 				break;
 			case "test-wikipedia":
-				processWikipedia(wikipediaSqliteName, lang, testArticleID);
+				processWikipedia(wikipediaFolder, wikipediaSqliteName, lang, testArticleID);
 				break;
 		}
 	}
@@ -879,11 +880,10 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	public static void processWikipedia(final String wikipediaSqliteFileName, String lang, long testArticleId)
+	public static void processWikipedia(final String wikipediaFolder, final String wikipediaSqliteFileName, String lang, long testArticleId)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		File wikipediaSqlite = new File(wikipediaSqliteFileName);
-		String wikipediaFolderName = wikipediaSqlite.getParent();
-		String wikiFile = wikipediaFolderName + lang + WIKI_ARTICLES_GZ;
+		String wikiFile = wikipediaFolder + lang + WIKI_ARTICLES_GZ;
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikipedia file", new File(wikiFile));
 		InputStream streamFile = progress.openFileInputStream();
