@@ -2,22 +2,37 @@ package net.osmand.router;
 
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.data.QuadRect;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.AbstractIndexPartCreator;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.IndexVectorMapCreator;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
+import net.osmand.util.MapUtils;
 import rtree.Element;
 import rtree.IllegalValueException;
 import rtree.LeafElement;
@@ -31,27 +46,99 @@ public class HHRoutingOBFWriter {
 	private static final int BLOCK_SEGMENTS_SIZE = 24;
 	
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
-		File f;
+		File dbFile;
+		File obfPolyFile = null;
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
 			mapName = "__europe_car.chdb";
 //			mapName = "_road_car.chdb";
-			f = new File(System.getProperty("maps.dir"), mapName);
+			String polyFile = "Netherlands_europe_2.road.obf";
+			polyFile = "_split";
+			dbFile = new File(System.getProperty("maps.dir"), mapName);
+			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
 		} else {
-			f = new File(args[0]);
+			if (args.length > 0) {
+				obfPolyFile = new File(args[1]);
+			}
+			dbFile = new File(args[0]);
 		}
-		new HHRoutingOBFWriter().writeFile(f);
+		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile);
 	}
 	
-	public void writeFile(File dbFile) throws IOException, SQLException, IllegalValueException {
-		File outFile = new File(dbFile.getParentFile(),
-				dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
+	public void writeFile(File dbFile, File obfPolyFileIn) throws IOException, SQLException, IllegalValueException {
+		
+		long edition = dbFile.lastModified(); // System.currentTimeMillis();
+		HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
+		TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
+		if (obfPolyFileIn == null) {
+			File outFile = new File(dbFile.getParentFile(),
+					dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
+			writeFileBbox(db, points, outFile, edition, null, null);
+		} else {
+			OsmandRegions or = new OsmandRegions();
+			or.prepareFile();
+			Map<String, LinkedList<BinaryMapDataObject>> cacheAllCountries = or.cacheAllCountries(true);
+			
+			List<File> obfPolyFiles = new ArrayList<>();
+			if (obfPolyFileIn.isDirectory()) {
+				for (File o : obfPolyFileIn.listFiles()) {
+					if (o.getName().endsWith(".road.obf") || o.getName().endsWith("_2.obf")) {
+						obfPolyFiles.add(o);
+					}
+				}
+			} else {
+				obfPolyFiles.add(obfPolyFileIn);
+			}
+			for (File obfPolyFile : obfPolyFiles) {
+				File outFile = new File(obfPolyFile.getParentFile(),
+						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
+				QuadRect bbox31 = new QuadRect();
+				LinkedList<BinaryMapDataObject> bboxReg = null;
+
+				outFile = new File(obfPolyFile.getParentFile(),
+						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
+				String countryName = obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('_'))
+						.toLowerCase();
+				if (cacheAllCountries.containsKey(countryName)) {
+					bboxReg = cacheAllCountries.get(countryName);
+					System.out.printf("Use native boundary %s - %d\n", countryName, bboxReg.size());
+				} else {
+					BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(obfPolyFile, "r"),
+							obfPolyFile);
+					// use map index as it more reasonable size
+					// for (RouteRegion r : reader.getRoutingIndexes()) {
+					// for (RouteSubregion subregion : r.getSubregions()) {
+					// bbox31.expand(subregion.left, subregion.top, subregion.right,
+					// subregion.bottom);
+					// }
+					// }
+					for (MapIndex mi : reader.getMapIndexes()) {
+						for (MapRoot rt : mi.getRoots()) {
+							// use first
+							bbox31.expand(rt.getLeft(), rt.getTop(), rt.getRight(), rt.getBottom());
+							break;
+						}
+					}
+					reader.close();
+					System.out.printf("Using polygon for %s %.5f %.5f - %.5f %.5f\n", outFile.getName(),
+							MapUtils.get31LongitudeX((int) bbox31.left), MapUtils.get31LatitudeY((int) bbox31.top),
+							MapUtils.get31LongitudeX((int) bbox31.right), MapUtils.get31LatitudeY((int) bbox31.bottom));
+				}
+				writeFileBbox(db, points, outFile, edition, bbox31, bboxReg);
+			}
+		}
+		
+	}
+
+	private void writeFileBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile, long edition, QuadRect bbox31,
+			LinkedList<BinaryMapDataObject> bboxReg )
+			throws SQLException, IOException, IllegalValueException {
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
-		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		try {
-			HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
+			
+			
 			String profile = db.getRoutingProfile();
 			TIntObjectHashMap<String> routingProfiles = db.getRoutingProfiles();
 			int pInd = 0;
@@ -65,11 +152,52 @@ public class HHRoutingOBFWriter {
 			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(outFile, "rw"), edition);
 			bmiw.startHHRoutingIndex(edition, profile, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
-			
-
-			TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
+			for(NetworkDBPointPrep p : points.valueCollection()) {
+				p.mapId = 0;
+				p.fileId = 0;
+			}
+			boolean useBbox = !bbox31.hasInitialState() || bboxReg != null;
 			for (NetworkDBPointPrep pnt : points.valueCollection()) {
-				routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+				boolean contains = !useBbox;
+				if (!contains && !bbox31.hasInitialState()) {
+					contains = bbox31.contains(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY());
+				}
+				if (!contains && bboxReg != null) {
+					for (BinaryMapDataObject bo : bboxReg) {
+						contains |= OsmandRegions.contain(bo, pnt.midX(), pnt.midY());
+					}
+				}
+				if (contains) {
+					pnt.mapId = 1;
+					routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+				}
+			}
+			if (useBbox) {
+				TLongHashSet clusters = new TLongHashSet();
+//				TLongHashSet clustersOut = new TLongHashSet();
+				for (NetworkDBPointPrep pnt : points.valueCollection()) {
+					if (pnt.mapId > 0) {
+						clusters.add(pnt.clusterId);
+//						clustersOut.add(pnt.dualPoint.clusterId);
+					}
+				}
+
+				int pointsInc = 0, partial = 0, completeInc = 0;
+				for (NetworkDBPointPrep pnt : points.valueCollection()) {
+					pointsInc++;
+					if (pnt.mapId == 0) {
+						if (clusters.contains(pnt.clusterId) || clusters.contains(pnt.dualPoint.clusterId)) {
+							pnt.mapId = 2;
+							partial++;
+							routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+						}
+					} else {
+						completeInc++;
+					}
+				}
+				System.out.printf("Total points %d: included %d (complete clusters), %d (partial clusters) \n",
+						pointsInc, completeInc, partial);
+
 			}
 			routeTree = AbstractIndexPartCreator.packRtreeFile(routeTree, rTreeFile, rpTreeFile);
 			

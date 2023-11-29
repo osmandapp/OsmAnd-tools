@@ -545,7 +545,12 @@ public class BinaryMapIndexWriter {
 			builder.setRoadStartEndIndex((p.start << 1) + (p.end > p.start ? 1 : 0));
 			builder.setDx(p.startX - bounds.leftX);
 			builder.setDy(p.startY - bounds.topY);
-			if(p.dualPoint != null) {
+			if (p.mapId > 1) {
+				builder.setPartialInd(p.mapId - 1);
+			} else if (p.mapId == 0) {
+				throw new IllegalStateException();
+			}
+			if (p.dualPoint != null) {
 				builder.setDualClusterId(p.dualPoint.clusterId);
 				builder.setDualPointId(p.dualPoint.index);
 			}
