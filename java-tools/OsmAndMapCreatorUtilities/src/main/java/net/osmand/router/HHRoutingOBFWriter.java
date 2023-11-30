@@ -20,6 +20,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -191,6 +192,17 @@ public class HHRoutingOBFWriter {
 			File writeFile = outFile; 
 			if (outFile.exists()) {
 				reader = new BinaryMapIndexReader(new RandomAccessFile(outFile, "rw"), outFile);
+				boolean profileAlreadyExist = false;
+				for (HHRouteRegion h : reader.getHHRoutingIndexes()) {
+					if (h.profile.equals(profile)) {
+						profileAlreadyExist = true;
+						break;
+					}
+				}
+				if(profileAlreadyExist) {
+					System.out.println("Skip file as hh routing profile already exist");
+					return;
+				}
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
 			}
 			long timestamp = reader != null ? reader.getDateCreated() : edition;
@@ -281,7 +293,7 @@ public class HHRoutingOBFWriter {
 			if (reader != null) {
 				reader.close();
 				writeFile.renameTo(outFile);
-				outFile.setLastModified(timestamp);
+//				outFile.setLastModified(timestamp); // not needed for upload but problem for web files
 			}
 		} catch (RTreeException | RTreeInsertException e) {
 			throw new IOException(e);
