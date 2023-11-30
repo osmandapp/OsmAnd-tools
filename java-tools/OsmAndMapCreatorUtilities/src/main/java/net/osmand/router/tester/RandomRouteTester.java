@@ -30,10 +30,10 @@ class RandomRouteTester {
 		};
 
 		// random tests settings
-		final int ITERATIONS = 10; // number of random routes
+		final int ITERATIONS = 1; // number of random routes
 		final int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2) TODO
-		final int MIN_DISTANCE_KM = 0; // min distance between start and finish (50) TODO
-		final int MAX_DISTANCE_KM = 5; // max distance between start and finish (100) TODO
+		final int MIN_DISTANCE_KM = 10; // min distance between start and finish (50) TODO
+		final int MAX_DISTANCE_KM = 20; // max distance between start and finish (100) TODO
 		final int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		final String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 //				"car",
@@ -50,7 +50,7 @@ class RandomRouteTester {
 
 		RandomRouteTester test = new RandomRouteTester(obfDirectory);
 
-		test.initHHsqliteConnections();
+//		test.initHHsqliteConnections();
 		test.loadNativeLibrary();
 		test.initObfReaders();
 		test.generateRoutes();
@@ -61,6 +61,7 @@ class RandomRouteTester {
 	private File obfDirectory;
 	NativeLibrary nativeLibrary = null;
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
+	private HashMap<String, File> hhFiles = new HashMap<>(); // [Profile]
 	private HashMap<String, Connection> hhConnections = new HashMap<>(); // [Profile]
 
 	private RandomRouteGenerator generator;
@@ -121,6 +122,7 @@ class RandomRouteTester {
 				String profile = parts[parts.length - 2];
 				System.out.printf("Use HH (%s) %s...\n", profile, source.getName());
 				hhConnections.put(profile, DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG));
+				hhFiles.put(profile, source);
 			}
 		}
 
@@ -143,6 +145,8 @@ class RandomRouteTester {
 				throw new RuntimeException(e);
 			} catch (InterruptedException e) {
 				throw new RuntimeException(e);
+//			} catch (SQLException e) {
+//				throw new RuntimeException(e);
 			}
 		});
 	}
@@ -192,10 +196,49 @@ class RandomRouteTester {
 		entry.results.add(result);
 	}
 
-	private void runHHRoutePlannerJava(RandomRouteEntry entry) {
-		long started = System.currentTimeMillis();
-
-		RoutePlannerFrontEnd.USE_HH_ROUTING = true; // TODO ?
+	private void runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+//		long started = System.currentTimeMillis();
+////		RoutingContext hhContext = prepareContext.gcMemoryLimitToUnloadAll(hhContext, null, hhContext == null);
+//
+////		// ready to use HHRoutePlanner class
+////		hhPlanner = HHRoutePlanner.create(hhContext, new HHRoutingDB(conn));
+////
+////		HHRouteDataStructure.HHRoutingConfig hhConfig = new HHRouteDataStructure.HHRoutingConfig().astar(0);
+//////		HHRouteDataStructure.HHRoutingConfig hhConfig = new HHRouteDataStructure.HHRoutingConfig().dijkstra(0);
+////		// run test HH-routing
+////		HHRouteDataStructure.HHNetworkRouteRes hh = hhPlanner.runRouting(START, FINISH, hhConfig);
+//
+////		RoutePlannerFrontEnd.USE_HH_ROUTING = true; // really doesn't matter for direct hhPlanner.runRouting call
+//		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+//
+//		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
+//
+//		RoutingConfiguration.RoutingMemoryLimits memoryLimits = new RoutingConfiguration.RoutingMemoryLimits(
+//				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 10,
+//				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+//
+//		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
+//
+//		RoutingContext ctx = fe.buildRoutingContext(
+//				config,
+//				null,
+//				obfReaders.toArray(new BinaryMapIndexReader[0]),
+//				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
+//		);
+//
+//		HHRouteDataStructure.HHRoutingConfig hhConfig =
+//				new HHRouteDataStructure.HHRoutingConfig()
+//						.astar(0)
+//						.calcDetailed(2);
+//
+//		HHRoutingDB db = new HHRoutingDB(hhFiles.get(entry.profile), hhConnections.get(entry.profile));
+//		HHRoutePlanner<HHRouteDataStructure.NetworkDBPoint> hhPlanner = HHRoutePlanner.create(ctx, db);
+//
+////		ctx.config.heuristicCoefficient = 1; // h() *= 1 for A*, 0 for Dijkstra
+////		ctx.config.planRoadDirection = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
+//
+//		HHRouteDataStructure.HHNetworkRouteRes res = hhPlanner.runRouting(entry.start, entry.finish, hhConfig);
+//		// TODO check HH for params (height_obstacles)
 	}
 
 	private void loadNativeLibrary() {
@@ -251,47 +294,6 @@ class RandomRouteTester {
 // TODO RR-2 Equalise Binary Native lib call (interpoints==0 vs interpoints>0)
 // TODO RR-3 MapCreator - parse start/finish from url, share route url, route hotkeys (Ctrl + 1/2/3/4/5)
 // TODO RR-4 fix start segment calc: https://osmand.net/map/?start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&type=osmand&profile=car#14/50.4505/30.5511
+// TODO RR-5 turn back and test recently added "ignored" route test, then remove ignore=true there
 
 // BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 451406223; // 233801367L;
-//	private static RoutingContext hhContext;
-//	private static HHRoutePlanner hhPlanner;
-//	private static BinaryRoutePlanner brPlanner;
-
-//		// use HHRoutingPrepareContext to list *.obf and parse profile/params
-//		TestPrepareContext prepareContext = new TestPrepareContext(obfDirectory, ROUTING_PROFILE, ROUTING_PARAMS[0].split(","));
-//
-//		// run garbage collector, return ctx TODO does it need to use force = true every cycle?
-//		hhContext = prepareContext.gcMemoryLimitToUnloadAll(hhContext, null, hhContext == null);
-//
-//		// hhFile as SQLITE database now, but will be changed to obf-data later
-//		Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), LOG);
-//		// ready to use HHRoutePlanner class
-//		hhPlanner = HHRoutePlanner.create(hhContext, new HHRoutingDB(conn));
-//
-//		HHRouteDataStructure.HHRoutingConfig hhConfig = new HHRouteDataStructure.HHRoutingConfig().astar(0);
-////		HHRouteDataStructure.HHRoutingConfig hhConfig = new HHRouteDataStructure.HHRoutingConfig().dijkstra(0);
-//		// run test HH-routing
-//		HHRouteDataStructure.HHNetworkRouteRes hh = hhPlanner.runRouting(START, FINISH, hhConfig);
-
-////////////// TODO need fresh RoutingContext for next use! How to reset it??? //////////////////
-//		hhContext = hhPrepareContext.gcMemoryLimitToUnloadAll(hhContext, null, true);
-//		hhContext.routingTime = 0;
-//
-//		// use BinaryRoutePlanner as default route frontend
-//		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-//		// run test BinaryRoutePlanner TODO is it correct to use hhContext here?
-//		List<RouteSegmentResult> routeSegments = router.searchRoute(hhContext, START, FINISH, null);
-
-//	private static class TestPrepareContext extends HHRoutingPrepareContext {
-//		public TestPrepareContext(File obfFile, String routingProfile, String... profileSettings) {
-//			super(obfFile, routingProfile, profileSettings);
-//		}
-//
-//		@Override
-//		public RoutingConfiguration getRoutingConfig() {
-//			RoutingConfiguration config = super.getRoutingConfig();
-//			config.heuristicCoefficient = 1; // Binary A*
-////			config.planRoadDirection = 1;
-//			return config;
-//		}
-//	}
