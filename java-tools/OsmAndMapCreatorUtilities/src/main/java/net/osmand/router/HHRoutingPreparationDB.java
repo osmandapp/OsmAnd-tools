@@ -135,6 +135,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		  
 
 	public static void compact(File source, File target) throws SQLException, IOException {
+		target.delete();
 		System.out.printf("Compacting %s -> %s...\n", source.getName(), target.getName());
 		target.delete();
 		Connection src = DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG);

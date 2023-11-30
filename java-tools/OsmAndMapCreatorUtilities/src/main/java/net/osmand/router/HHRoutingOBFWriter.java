@@ -54,7 +54,7 @@ public class HHRoutingOBFWriter {
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
-			mapName = "__europe_car.chdb";
+//			mapName = "__europe_car.chdb";
 //			mapName = "_road_car.chdb";
 			String polyFile = "Netherlands_europe_2.road.obf";
 			polyFile = "_split";
