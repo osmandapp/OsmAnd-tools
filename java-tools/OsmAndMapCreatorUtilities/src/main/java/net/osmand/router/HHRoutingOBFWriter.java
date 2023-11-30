@@ -7,7 +7,7 @@ import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -77,8 +77,6 @@ public class HHRoutingOBFWriter {
 		} else {
 			OsmandRegions or = new OsmandRegions();
 			or.prepareFile();
-			Map<String, LinkedList<BinaryMapDataObject>> cacheAllCountries = or.cacheAllCountries(true);
-			
 			List<File> obfPolyFiles = new ArrayList<>();
 			if (obfPolyFileIn.isDirectory()) {
 				for (File o : obfPolyFileIn.listFiles()) {
@@ -89,17 +87,35 @@ public class HHRoutingOBFWriter {
 			} else {
 				obfPolyFiles.add(obfPolyFileIn);
 			}
+			Map<String, List<NetworkDBPointPrep>> pointsByDownloadName = new LinkedHashMap<String, List<NetworkDBPointPrep>>();
+			for (NetworkDBPointPrep p : points.valueCollection()) {
+				List<BinaryMapDataObject> l = or.query(p.midX(), p.midY());
+				for (BinaryMapDataObject b : l) {
+					if (OsmandRegions.contain(b, p.midX(), p.midY())) {
+						String dw = or.getDownloadName(b);
+						if (!pointsByDownloadName.containsKey(dw)) {
+							pointsByDownloadName.put(dw, new ArrayList<NetworkDBPointPrep>());
+						}
+						pointsByDownloadName.get(dw).add(p);
+					}
+				}
+			}
 			for (File obfPolyFile : obfPolyFiles) {
 				File outFile = new File(obfPolyFile.getParentFile() + subFolder,
 						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
 				outFile.getParentFile().mkdirs();
 				QuadRect bbox31 = new QuadRect();
-				LinkedList<BinaryMapDataObject> bboxReg = null;
+				List<NetworkDBPointPrep> filteredPoints = null;
 				String countryName = obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('_'))
 						.toLowerCase();
-				if (cacheAllCountries.containsKey(countryName)) {
-					bboxReg = cacheAllCountries.get(countryName);
-					System.out.printf("Use native boundary %s - %d\n", countryName, bboxReg.size());
+				
+				if (or.getRegionDataByDownloadName(countryName) != null) {
+					filteredPoints = pointsByDownloadName.get(countryName);
+					if(filteredPoints == null) {
+						System.out.printf("Skip %s as it has no points\n", countryName);
+						continue;
+					}
+					System.out.printf("Use native boundary %s - %d\n", countryName, filteredPoints.size());
 				} else {
 					BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(obfPolyFile, "r"),
 							obfPolyFile);
@@ -122,13 +138,13 @@ public class HHRoutingOBFWriter {
 							MapUtils.get31LongitudeX((int) bbox31.left), MapUtils.get31LatitudeY((int) bbox31.top),
 							MapUtils.get31LongitudeX((int) bbox31.right), MapUtils.get31LatitudeY((int) bbox31.bottom));
 				}
-				writeFileBbox(db, points, outFile, edition, bbox31, bboxReg);
+				writeFileBbox(db, points, outFile, edition, bbox31, filteredPoints);
 			}
 		}
 	}
 
 	private void writeFileBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
-			long edition, QuadRect bbox31, LinkedList<BinaryMapDataObject> bboxReg)
+			long edition, QuadRect bbox31, List<NetworkDBPointPrep> filteredPoints)
 			throws SQLException, IOException, IllegalValueException {
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
@@ -146,24 +162,27 @@ public class HHRoutingOBFWriter {
 			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(outFile, "rw"), edition);
 			bmiw.startHHRoutingIndex(edition, profile, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
+			
 			for (NetworkDBPointPrep p : points.valueCollection()) {
 				p.mapId = 0;
 				p.fileId = 0;
 			}
-			boolean useBbox = !bbox31.hasInitialState() || bboxReg != null;
-			for (NetworkDBPointPrep pnt : points.valueCollection()) {
-				boolean contains = !useBbox;
-				if (!contains && !bbox31.hasInitialState()) {
-					contains = bbox31.contains(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY());
-				}
-				if (!contains && bboxReg != null) {
-					for (BinaryMapDataObject bo : bboxReg) {
-						contains |= OsmandRegions.contain(bo, pnt.midX(), pnt.midY());
-					}
-				}
-				if (contains) {
+			boolean useBbox = !bbox31.hasInitialState() || filteredPoints != null;
+			if (filteredPoints != null) {
+				for (NetworkDBPointPrep pnt : filteredPoints) {
 					pnt.mapId = 1;
 					routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+				}
+			} else {
+				for (NetworkDBPointPrep pnt : points.valueCollection()) {
+					boolean contains = !useBbox;
+					if (!contains && !bbox31.hasInitialState()) {
+						contains = bbox31.contains(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY());
+					}
+					if (contains) {
+						pnt.mapId = 1;
+						routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+					}
 				}
 			}
 			if (useBbox) {
