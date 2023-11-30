@@ -16,7 +16,7 @@ class RandomRouteGenerator {
 	private List<RandomRouteEntry> testList = new ArrayList<>();
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 
-	public RandomRouteGenerator(RandomRouteTester.GeneratorConfig config) {
+	RandomRouteGenerator(RandomRouteTester.GeneratorConfig config) {
 		this.config = config;
 	}
 

@@ -1,6 +1,7 @@
 package net.osmand.router.tester;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.FileSystems;
@@ -30,18 +31,22 @@ class RandomRouteTester {
 		};
 
 		// random tests settings
-		final int ITERATIONS = 1; // number of random routes
-		final int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2) TODO
-		final int MIN_DISTANCE_KM = 10; // min distance between start and finish (50) TODO
-		final int MAX_DISTANCE_KM = 20; // max distance between start and finish (100) TODO
+		final int ITERATIONS = 100; // number of random routes
+		final int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2) TODO
+		final int MIN_DISTANCE_KM = 45; // min distance between start and finish (50) TODO
+		final int MAX_DISTANCE_KM = 90; // max distance between start and finish (100) TODO
 		final int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		final String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
-//				"car",
-//				"bicycle",
+				"car",
+				"bicycle",
 				"bicycle,height_obstacles",
 //				"bicycle,driving_style_prefer_unpaved,driving_style_balance:false,height_obstacles",
 //				"bicycle,driving_style_prefer_unpaved,driving_style_balance=false,height_obstacles",
 		};
+
+		// cost/distance deviation limits
+		final double DEVIATION_RED = 1.0F; // > 1% - mark as failed
+		final double DEVIATION_YELLOW = 0.1F; // > 0.1% - mark as acceptable
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -50,15 +55,19 @@ class RandomRouteTester {
 
 		RandomRouteTester test = new RandomRouteTester(obfDirectory);
 
+		test.reportHtmlWriter = new FileWriter("report.html"); // TODO args optional
+
 //		test.initHHsqliteConnections();
 		test.loadNativeLibrary();
 		test.initObfReaders();
 		test.generateRoutes();
 		test.collectRoutes();
-//		test.reportResult();
+		test.reportResult();
 	}
 
+	private long started;
 	private File obfDirectory;
+	FileWriter reportHtmlWriter;
 	NativeLibrary nativeLibrary = null;
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 	private HashMap<String, File> hhFiles = new HashMap<>(); // [Profile]
@@ -71,8 +80,32 @@ class RandomRouteTester {
 	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
 
 	private RandomRouteTester(File obfDirectory) {
+		this.started = System.currentTimeMillis();
 		this.generator = new RandomRouteGenerator(config);
 		this.obfDirectory = obfDirectory;
+	}
+
+	private void reportResult() throws IOException {
+		RandomRouteReport report = new RandomRouteReport(
+				started, obfReaders.size(), testList.size(),
+				config.DEVIATION_RED, config.DEVIATION_YELLOW);
+
+		for (int i = 0; i < testList.size(); i++) {
+			report.entryOpen(i + 1);
+			RandomRouteEntry entry = testList.get(i);
+			for (int j = 0; j < entry.results.size(); j++) {
+				RandomRouteResult ideal = entry.results.get(0);
+				RandomRouteResult result = entry.results.get(j);
+				if (j == 0) {
+					report.resultIdeal(i + 1, ideal);
+				} else {
+					report.resultCompare(i + 1, result, ideal);
+				}
+			}
+			report.entryClose();
+		}
+
+		report.flush(reportHtmlWriter);
 	}
 
 	private void initObfReaders() throws IOException {
@@ -136,7 +169,13 @@ class RandomRouteTester {
 	}
 
 	private void collectRoutes() {
+		class Counter {
+			private int value;
+		}
+		Counter counter = new Counter(); // TODO remove
+
 		testList.forEach(entry -> {
+			System.err.printf("\n\n%d / %d ...\n\n", ++counter.value, testList.size());
 			try {
 				runBinaryRoutePlannerJava(entry);
 				runBinaryRoutePlannerCpp(entry);
@@ -168,8 +207,8 @@ class RandomRouteTester {
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
 		RoutingConfiguration.RoutingMemoryLimits memoryLimits = new RoutingConfiguration.RoutingMemoryLimits(
-				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 10,
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 33, // ~1GB
+				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 4); // ~1GB
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
 
@@ -191,7 +230,7 @@ class RandomRouteTester {
 		long runTime = System.currentTimeMillis() - started;
 
 		RandomRouteResult result = new RandomRouteResult(
-				useNative ? "osmand-native" : "osmand-java", entry, runTime, ctx, routeSegments);
+				useNative ? "native" : "java", entry, runTime, ctx, routeSegments);
 
 		entry.results.add(result);
 	}
