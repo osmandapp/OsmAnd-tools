@@ -447,7 +447,7 @@ public class ImproveRoadConnectivity {
 			visited.add(calcPointIdUnique(segment.getRoad(), ind));
 			int x = road.getPoint31XTile(ind);
 			int y = road.getPoint31YTile(ind);
-			float spd = ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
+			float spd = ctx.getRouter().defineRoutingSpeed(road, direction) * ctx.getRouter().defineSpeedPriority(road, direction);
 			if (spd > ctx.getRouter().getMaxSpeed()) {
 				spd = ctx.getRouter().getMaxSpeed();
 			}

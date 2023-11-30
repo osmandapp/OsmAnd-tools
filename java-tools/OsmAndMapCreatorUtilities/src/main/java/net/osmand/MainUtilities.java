@@ -12,14 +12,22 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import net.osmand.obf.*;
-import net.osmand.obf.diff.*;
 import net.osmand.wiki.CommonsWikimediaPreparation;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.BinaryComparator;
+import net.osmand.obf.BinaryInspector;
+import net.osmand.obf.BinaryMerger;
+import net.osmand.obf.GenerateRegionTags;
+import net.osmand.obf.IconVisibility;
+import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.obf.diff.ObfDiffGenerator;
+import net.osmand.obf.diff.ObfDiffMerger;
+import net.osmand.obf.diff.ObfRegionSplitter;
+import net.osmand.obf.diff.RelationDiffGenerator;
 import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
@@ -33,6 +41,11 @@ import net.osmand.render.OsmAndTestStyleRenderer;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
+import net.osmand.router.HHRoutingOBFWriter;
+import net.osmand.router.HHRoutingShortcutCreator;
+import net.osmand.router.HHRoutingSubGraphCreator;
+import net.osmand.router.HHRoutingTopGraphCreator;
+import net.osmand.router.TestHHRouting;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -57,7 +70,16 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
 
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) {
+		try {
+			mainException(args);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
+	public static void mainException(String[] args) throws Exception {
 		if (args.length == 0) {
 			printSynopsys();
 		} else {
@@ -110,6 +132,16 @@ public class MainUtilities {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? subArgsArray[1] : null);
 			} else if (utl.equals("create-sqlitedb")) {
 				SQLiteBigPlanetIndex.main(subArgsArray);
+			} else if (utl.equals("hh-routing-2nd-level")) {
+				HHRoutingTopGraphCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-prepare")) {
+				HHRoutingSubGraphCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-shortcuts")) {
+				HHRoutingShortcutCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-obf-write")) {
+				HHRoutingOBFWriter.main(subArgsArray);
+			} else if (utl.equals("hh-routing-run")) {
+				TestHHRouting.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("test-icons")) {

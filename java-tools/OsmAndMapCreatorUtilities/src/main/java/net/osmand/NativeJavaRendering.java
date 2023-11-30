@@ -492,7 +492,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		File cacheFile = new File(dir, INDEXES_CACHE);
 		CachedOsmandIndexes cache = new CachedOsmandIndexes();
 		if (cacheFile.exists()) {
-			cache.readFromFile(cacheFile, CachedOsmandIndexes.VERSION);
+			cache.readFromFile(cacheFile);
 		}
 		if (dir.exists() && dir.listFiles() != null) {
 			MapsCollection mapsCollection = new MapsCollection(filterDuplicates);
