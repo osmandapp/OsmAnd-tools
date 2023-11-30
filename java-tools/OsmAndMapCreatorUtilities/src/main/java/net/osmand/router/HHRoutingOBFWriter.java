@@ -98,7 +98,7 @@ public class HHRoutingOBFWriter {
 			List<File> obfPolyFiles = new ArrayList<>();
 			if (obfPolyFileIn.isDirectory()) {
 				for (File o : obfPolyFileIn.listFiles()) {
-					if (o.getName().toLowerCase().equals("world")) {
+					if (o.getName().toLowerCase().contains("world")) {
 						continue;
 					}
 					if (o.getName().endsWith(".road.obf") || o.getName().endsWith("_2.obf")) {
