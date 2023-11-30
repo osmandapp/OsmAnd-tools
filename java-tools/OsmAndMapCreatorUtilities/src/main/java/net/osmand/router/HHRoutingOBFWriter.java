@@ -190,15 +190,15 @@ public class HHRoutingOBFWriter {
 				reader = new BinaryMapIndexReader(new RandomAccessFile(outFile, "rw"), outFile);
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
 			}
-			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(writeFile, "rw"), 
-					reader != null ? reader.getDateCreated() : edition);
+			long timestamp = reader != null ? reader.getDateCreated() : edition;
+			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(writeFile, "rw"), timestamp);
 			if (reader != null) {
 				byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 				for (int i = 0; i < reader.getIndexes().size(); i++) {
 					BinaryIndexPart part = reader.getIndexes().get(i);
 					bmiw.getCodedOutStream().writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					BinaryInspector.writeInt(bmiw.getCodedOutStream(), part.getLength());
-					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, bmiw.getRaf(), part.getFilePointer(), part.getLength());
+					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, reader.getRaf(), part.getFilePointer(), part.getLength());
 				}
 			}
 			bmiw.startHHRoutingIndex(edition, profile, profileParams);
@@ -275,6 +275,11 @@ public class HHRoutingOBFWriter {
 
 			RandomAccessFile file = routeTree.getFileHdr().getFile();
 			file.close();
+			if (reader != null) {
+				reader.close();
+				writeFile.renameTo(outFile);
+				outFile.setLastModified(timestamp);
+			}
 		} catch (RTreeException | RTreeInsertException e) {
 			throw new IOException(e);
 		} finally {
