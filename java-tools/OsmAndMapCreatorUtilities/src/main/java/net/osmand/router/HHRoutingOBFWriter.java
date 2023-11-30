@@ -77,6 +77,7 @@ public class HHRoutingOBFWriter {
 		} else {
 			OsmandRegions or = new OsmandRegions();
 			or.prepareFile();
+			or.cacheAllCountries();
 			List<File> obfPolyFiles = new ArrayList<>();
 			if (obfPolyFileIn.isDirectory()) {
 				for (File o : obfPolyFileIn.listFiles()) {

@@ -53,6 +53,8 @@ import net.osmand.util.MapUtils;
 // alter table profiles add column profile default 'car';
 // F.4 FILE: Utility to cut cluster by countries
 // F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
+// TODO C++ protos/osmand_index.pb.h
+// TODO C++ protos/OBF.pb.cc
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
