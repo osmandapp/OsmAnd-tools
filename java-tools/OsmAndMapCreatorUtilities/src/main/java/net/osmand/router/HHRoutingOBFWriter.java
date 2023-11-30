@@ -7,6 +7,7 @@ import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,8 +90,13 @@ public class HHRoutingOBFWriter {
 				obfPolyFiles.add(obfPolyFileIn);
 			}
 			Map<String, List<NetworkDBPointPrep>> pointsByDownloadName = new LinkedHashMap<String, List<NetworkDBPointPrep>>();
+			int index = 0;
+			System.out.println("Indexing points...");
 			for (NetworkDBPointPrep p : points.valueCollection()) {
 				List<BinaryMapDataObject> l = or.query(p.midX(), p.midY());
+				if (index % 5000 == 0) {
+					System.out.printf("Indexed %d of %d - %s \n", index, points.valueCollection().size(), new Date());
+				}
 				for (BinaryMapDataObject b : l) {
 					if (OsmandRegions.contain(b, p.midX(), p.midY())) {
 						String dw = or.getDownloadName(b);
