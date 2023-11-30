@@ -94,7 +94,7 @@ public class HHRoutingOBFWriter {
 			System.out.println("Indexing points...");
 			for (NetworkDBPointPrep p : points.valueCollection()) {
 				List<BinaryMapDataObject> l = or.query(p.midX(), p.midY());
-				if (index % 5000 == 0) {
+				if (index++ % 5000 == 0) {
 					System.out.printf("Indexed %d of %d - %s \n", index, points.valueCollection().size(), new Date());
 				}
 				for (BinaryMapDataObject b : l) {
