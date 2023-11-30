@@ -89,7 +89,7 @@ public class HHRoutingOBFWriter {
 			if (outFile.exists()) {
 				outFile.delete();
 			}
-			writeFileBbox(db, points, outFile, edition, null, null);
+			writeFileBbox(db, points, outFile, edition, new QuadRect(), null);
 		} else {
 			OsmandRegions or = new OsmandRegions();
 			or.prepareFile();
