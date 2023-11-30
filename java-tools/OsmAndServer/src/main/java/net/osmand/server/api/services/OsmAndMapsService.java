@@ -427,7 +427,7 @@ public class OsmAndMapsService {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(config.obfLocation, fn);
 					File targetTemp = new File(config.obfLocation, fn + ".new");
-					if (!target.exists() || target.lastModified() != zipFile.lastModified()
+					if (!target.exists() || target.lastModified() < zipFile.lastModified()
 							|| zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
 						ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
