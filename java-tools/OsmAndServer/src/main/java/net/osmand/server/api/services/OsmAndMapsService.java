@@ -1068,7 +1068,7 @@ public class OsmAndMapsService {
 		if (mapsFolder.exists()) {
 			File cacheFile = new File(mapsFolder, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME);
 			if (cacheFile.exists()) {
-				cacheFiles.readFromFile(cacheFile, 2);
+				cacheFiles.readFromFile(cacheFile);
 			}
 			for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
 				if (obf.getName().endsWith(".obf")) {
