@@ -105,7 +105,9 @@ public class HHRoutingShortcutCreator {
 		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		File dbFile = new File(folder, name + HHRoutingDB.EXT);
 		if (onlyCompact) {
-			HHRoutingPreparationDB.compact(dbFile, new File(folder, name + HHRoutingDB.CEXT));
+			File compactFile = new File(folder, name + HHRoutingDB.CEXT);
+			HHRoutingPreparationDB.compact(dbFile, compactFile);
+			new HHRoutingOBFWriter().writeFile(compactFile, null, ROUTING_PROFILE, false);
 			return;
 		}
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
@@ -130,7 +132,7 @@ public class HHRoutingShortcutCreator {
 		networkDB.close();
 		File compactFile = new File(folder, name + HHRoutingDB.CEXT);
 		HHRoutingPreparationDB.compact(dbFile, compactFile);
-		new HHRoutingOBFWriter().writeFile(compactFile, null, ROUTING_PROFILE);
+		new HHRoutingOBFWriter().writeFile(compactFile, null, ROUTING_PROFILE, false);
 	}
 	
 	
