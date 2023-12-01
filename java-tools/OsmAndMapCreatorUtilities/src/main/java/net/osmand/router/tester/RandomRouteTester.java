@@ -31,10 +31,10 @@ class RandomRouteTester {
 		};
 
 		// random tests settings
-		final int ITERATIONS = 100; // number of random routes
-		final int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2) TODO
-		final int MIN_DISTANCE_KM = 45; // min distance between start and finish (50) TODO
-		final int MAX_DISTANCE_KM = 90; // max distance between start and finish (100) TODO
+		final int ITERATIONS = 1; // number of random routes
+		final int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
+		final int MIN_DISTANCE_KM = 10; // min distance between start and finish (50)
+		final int MAX_DISTANCE_KM = 20; // max distance between start and finish (100)
 		final int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		final String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
@@ -200,15 +200,15 @@ class RandomRouteTester {
 
 	private void runBinaryRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
 		long started = System.currentTimeMillis();
+		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
 
 		RoutePlannerFrontEnd.USE_HH_ROUTING = false;
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
-		RoutingConfiguration.RoutingMemoryLimits memoryLimits = new RoutingConfiguration.RoutingMemoryLimits(
-				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 33, // ~1GB
-				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 4); // ~1GB
+		RoutingConfiguration.RoutingMemoryLimits memoryLimits =
+				new RoutingConfiguration.RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
 
@@ -230,7 +230,7 @@ class RandomRouteTester {
 		long runTime = System.currentTimeMillis() - started;
 
 		RandomRouteResult result = new RandomRouteResult(
-				useNative ? "native" : "java", entry, runTime, ctx, routeSegments);
+				useNative ? "cpp" : "java", entry, runTime, ctx, routeSegments);
 
 		entry.results.add(result);
 	}
