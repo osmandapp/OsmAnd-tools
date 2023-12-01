@@ -32,7 +32,7 @@ class RandomRouteTester {
 		};
 
 		// random tests settings
-		final int ITERATIONS = 1; // number of random routes
+		final int ITERATIONS = 100; // number of random routes
 		final int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
 		final int MIN_DISTANCE_KM = 10; // min distance between start and finish (50)
 		final int MAX_DISTANCE_KM = 20; // max distance between start and finish (100)
@@ -119,7 +119,8 @@ class RandomRouteTester {
 		if (Files.exists(path) && Files.isWritable(path)) {
 			return true;
 		}
-		if (Files.exists(path.getParent()) && Files.isWritable(path.getParent())) {
+		Path parent = path.normalize().toAbsolutePath().getParent();
+		if (Files.exists(parent) && Files.isWritable(parent)) {
 			return true;
 		}
 		return false;
