@@ -420,7 +420,7 @@ public class DownloadIndexesService  {
 	    WIKIMAP("wiki", "wiki") ,
 	    TRAVEL("travel", "wikivoyage", "travel") ,
 	    ROAD_MAP("road-indexes", "road"),
-	    HILLSHADE("hillshade"),
+	    HILLSHADE("hillshade", "hillshade"),
 	    HEIGHTMAP("heightmap", "heightmap"), // Deprecated
 	    GEOTIFF("heightmap", "heightmap"),
 	    SLOPE("slope", "slope") ,

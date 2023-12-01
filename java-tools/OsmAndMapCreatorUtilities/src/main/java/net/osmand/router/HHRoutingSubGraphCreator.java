@@ -49,13 +49,21 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+//////     TESTING     ///////
+//F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
+//F.4 FILE: Utility to cut cluster by countries
+//!!! RoutePlannerFrontEnd integration with Android !!!
+//2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
+//2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+
+/////////////////////////////////
 // IN PROGRESS
-// F.4 FILE: Utility to cut cluster by countries
-// F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
-// TODO C++ protos/osmand_index.pb.h
-// TODO C++ protos/OBF.pb.cc
-// Switch TestMapCreator -> MapCreator
-// Check coverage and return null, so revert to old routing 
+// - WEB Testing + Fixes - Yurii  
+// 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
+// 1.2 Check coverage HH is not enough & don't calculate 
+// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
+// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
+// 2.4 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
@@ -63,19 +71,10 @@ import net.osmand.util.MapUtils;
 // C.3 C++ File readers and file structure 
 // C.4 C++ implementation HHRoutePlanner / Progress Bar
 
-////// TESTING ///////
-// !!! RoutePlannerFrontEnd integration with Android !!!
-// 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
-// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-//////////////////////
-
 // 2. SHORT-TERM HHRoutePlanner - fixes related to live data
-// Error HH A* Kyiv - France err ~0.2 (wrong file?)	
 // 2.0 Progress bar for HHRoutePlanner
 // 2.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
-// 2.4 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 // 2.5 Avoid specific road
 // 2.6 Deprioritize or exclude roads (parameters)
 // 2.7 Live data (think about it)
