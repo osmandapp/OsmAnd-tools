@@ -59,10 +59,9 @@ import net.osmand.util.MapUtils;
 /////////////////////////////////
 // IN PROGRESS
 // - WEB Testing + Fixes - Yurii  
-// 1.3 Prepare new Files Automation (Car + Bicycle) - 
-// 1.3.1 Country road files ?
 // 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
 // 1.2 Check coverage HH is not enough & don't calculate 
+// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.4 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 
