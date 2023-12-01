@@ -20,9 +20,9 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.PlatformUtil;
 
-class RandomRouteTester {
+public class RandomRouteTester {
 	class GeneratorConfig {
-		final String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
+		String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
 //				"https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles#14/48.1852/24.4208",
 //				"https://osmand.net/map/?start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&type=osmand&profile=car#14/50.4505/30.5511",
 //				"start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles",
@@ -32,22 +32,22 @@ class RandomRouteTester {
 		};
 
 		// random tests settings
-		final int ITERATIONS = 100; // number of random routes
-		final int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
-		final int MIN_DISTANCE_KM = 10; // min distance between start and finish (50)
-		final int MAX_DISTANCE_KM = 20; // max distance between start and finish (100)
-		final int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
-		final String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
+		int ITERATIONS = 10; // number of random routes
+		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
+		int MIN_DISTANCE_KM = 10; // min distance between start and finish (50)
+		int MAX_DISTANCE_KM = 20; // max distance between start and finish (100)
+		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
+		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
 				"bicycle",
-				"bicycle,height_obstacles",
+//				"bicycle,height_obstacles",
 //				"bicycle,driving_style_prefer_unpaved,driving_style_balance:false,height_obstacles",
 //				"bicycle,driving_style_prefer_unpaved,driving_style_balance=false,height_obstacles",
 		};
 
 		// cost/distance deviation limits
-		final double DEVIATION_RED = 1.0F; // > 1% - mark as failed
-		final double DEVIATION_YELLOW = 0.1F; // > 0.1% - mark as acceptable
+		double DEVIATION_RED = 1.0F; // > 1% - mark as failed
+		double DEVIATION_YELLOW = 0.1F; // > 0.1% - mark as acceptable
 	}
 
 	class CommandLineOpts {
@@ -127,7 +127,7 @@ class RandomRouteTester {
 	}
 
 	private void applyCommandLineOpts() {
-		// apply
+		// apply system options
 		optMapsDir = Objects.requireNonNullElse(opts.getOpt("--maps-dir"), "./");
 		optObfPrefix = Objects.requireNonNullElse(opts.getOpt("--obf-prefix"), "");
 		optHtmlReport = Objects.requireNonNullElse(opts.getOpt("--html-report"), "rr-report.html");
@@ -139,28 +139,57 @@ class RandomRouteTester {
 			throw new IllegalStateException(optHtmlReport + " (html-report) file is not writable");
 		}
 
+		// apply generator options
+		config.ITERATIONS = Integer.parseInt(Objects.requireNonNullElse(
+				opts.getOpt("--iterations"), String.valueOf(config.ITERATIONS)));
+		config.MIN_DISTANCE_KM = Integer.parseInt(Objects.requireNonNullElse(
+				opts.getOpt("--min-dist"), String.valueOf(config.MIN_DISTANCE_KM)));
+		config.MAX_DISTANCE_KM = Integer.parseInt(Objects.requireNonNullElse(
+				opts.getOpt("--max-dist"), String.valueOf(config.MAX_DISTANCE_KM)));
+		config.MAX_INTER_POINTS = Integer.parseInt(Objects.requireNonNullElse(
+				opts.getOpt("--max-inter"), String.valueOf(config.MAX_INTER_POINTS)));
+		config.MAX_SHIFT_ALL_POINTS_M = Integer.parseInt(Objects.requireNonNullElse(
+				opts.getOpt("--max-shift"), String.valueOf(config.MAX_SHIFT_ALL_POINTS_M)));
+		config.DEVIATION_RED = Double.parseDouble(Objects.requireNonNullElse(
+				opts.getOpt("--red"), String.valueOf(config.DEVIATION_RED)));
+		config.DEVIATION_YELLOW = Double.parseDouble(Objects.requireNonNullElse(
+				opts.getOpt("--yellow"), String.valueOf(config.DEVIATION_YELLOW)));
+		if (opts.getOpt("--profile") != null) {
+			config.RANDOM_PROFILES = new String[] {
+					opts.getOpt("--profile")
+			};
+		}
+
+		// apply predefined tests from command line
+		if (opts.getStrings().size() > 0) {
+			config.PREDEFINED_TESTS = opts.getStrings().toArray(new String[0]);
+		}
+
 		/**
-		 *  Usage: random-route-tester [--options] [TEST_ROUTE]
+		 *  Usage: random-route-tester [--options] [TEST_ROUTE(s)]
 		 *
-		 *  --maps-dir= /path/to/directory/with/*.obf (default ./)
-		 *  --obf-prefix= prefix to filter obf files (default all)
-		 *  --html-report = /path/to/report.html (rr-report.html)
-		 *  --libs-dir = /path/to/native/libs/dir (default auto)
+		 *  --maps-dir=/path/to/directory/with/*.obf (default ./)
+		 *  --obf-prefix=prefix to filter obf files (default all)
+		 *  --html-report=/path/to/report.html (rr-report.html)
+		 *  --libs-dir=/path/to/native/libs/dir (default auto)
 		 *
-		 *  --iterations= N
-		 *  --min-dist= N km
-		 *  --max-dist= N km
-		 *  --max-inter= N number
-		 *  --max-shift= N meters
+		 *  --iterations=N
+		 *  --min-dist=N km
+		 *  --max-dist=N km
+		 *  --max-shift=N meters
+		 *  --max-inter=N number
+		 *  --profile=profile,settings,key:value force one profile
 		 *
 		 *  --ideal= TYPE (java, cpp, hh)
 		 *  --run-java
 		 *  --run-cpp
 		 *  --run-hh
 		 *
-		 *  [TEST_ROUTE] run specific test (url or querystring format)
+		 *  --red= % red-limit
+		 *  --yellow= % yellow-limit
+		 *
+		 *  [TEST_ROUTE] run specific test (url or query_string format)
 		 */
-
 	}
 
 	private void reportResult() throws IOException {
