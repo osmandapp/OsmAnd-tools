@@ -14,16 +14,21 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 
+import com.google.protobuf.WireFormat;
+
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
+import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
+import net.osmand.obf.BinaryInspector;
 import net.osmand.obf.preparation.AbstractIndexPartCreator;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.IndexVectorMapCreator;
@@ -40,33 +45,41 @@ import rtree.Rect;
 public class HHRoutingOBFWriter {
 	final static Log LOG = PlatformUtil.getLog(HHRoutingOBFWriter.class);
 	private static final int BLOCK_SEGMENTS_SIZE = 24;
+	public static final int BUFFER_SIZE = 1 << 20;
 	
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
-		File dbFile;
+		File dbFile = null;
 		File obfPolyFile = null;
 		String subFolder = "";
+		boolean updateExistingFiles = false;
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
-			mapName = "__europe_car.chdb";
+//			mapName = "__europe_car.chdb";
 //			mapName = "_road_car.chdb";
 			String polyFile = "Netherlands_europe_2.road.obf";
 			polyFile = "_split";
+			polyFile = "_split/Netherlands_europe_2.road.obf";
+			updateExistingFiles = true;
 			dbFile = new File(System.getProperty("maps.dir"), mapName);
 			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
 		} else {
-			if (args.length > 0) {
-				obfPolyFile = new File(args[1]);
+			for (String arg : args) {
+				if (arg.startsWith("--db=")) {
+					dbFile = new File(arg.substring("--db=".length()));
+				} else if (arg.startsWith("--subfolder=")) {
+					subFolder = "/" + arg.substring("--subfolder=".length());
+				} else if (arg.startsWith("--update-existing-files")) {
+					updateExistingFiles = true;
+				} else if (arg.startsWith("--obf=")) {
+					obfPolyFile = new File(arg.substring("--obf=".length()));
+				}
 			}
-			if (args.length > 1) {
-				subFolder = "/" + args[2];
-			}
-			dbFile = new File(args[0]);
 		}
-		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, subFolder);
+		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, subFolder, updateExistingFiles);
 	}
 	
-	public void writeFile(File dbFile, File obfPolyFileIn, String subFolder) throws IOException, SQLException, IllegalValueException {
+	public void writeFile(File dbFile, File obfPolyFileIn, String subFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
 		
 		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
@@ -74,7 +87,10 @@ public class HHRoutingOBFWriter {
 		if (obfPolyFileIn == null) {
 			File outFile = new File(dbFile.getParentFile(),
 					dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
-			writeFileBbox(db, points, outFile, edition, null, null);
+			if (outFile.exists()) {
+				outFile.delete();
+			}
+			writeFileBbox(db, points, outFile, edition, new QuadRect(), null);
 		} else {
 			OsmandRegions or = new OsmandRegions();
 			or.prepareFile();
@@ -82,6 +98,9 @@ public class HHRoutingOBFWriter {
 			List<File> obfPolyFiles = new ArrayList<>();
 			if (obfPolyFileIn.isDirectory()) {
 				for (File o : obfPolyFileIn.listFiles()) {
+					if (o.getName().toLowerCase().contains("world")) {
+						continue;
+					}
 					if (o.getName().endsWith(".road.obf") || o.getName().endsWith("_2.obf")) {
 						obfPolyFiles.add(o);
 					}
@@ -91,11 +110,11 @@ public class HHRoutingOBFWriter {
 			}
 			Map<String, List<NetworkDBPointPrep>> pointsByDownloadName = new LinkedHashMap<String, List<NetworkDBPointPrep>>();
 			int index = 0;
-			System.out.println("Indexing points...");
+			System.out.printf("Indexing points %d...\n", points.size());
 			for (NetworkDBPointPrep p : points.valueCollection()) {
 				List<BinaryMapDataObject> l = or.query(p.midX(), p.midY());
 				if (++index % 100000 == 0) {
-					System.out.printf("Indexed %d of %d - %s \n", index, points.valueCollection().size(), new Date());
+					System.out.printf("Indexed %d of %d - %s \n", index, points.size(), new Date());
 				}
 				for (BinaryMapDataObject b : l) {
 					if (OsmandRegions.contain(b, p.midX(), p.midY())) {
@@ -110,6 +129,9 @@ public class HHRoutingOBFWriter {
 			for (File obfPolyFile : obfPolyFiles) {
 				File outFile = new File(obfPolyFile.getParentFile() + subFolder,
 						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
+				if (updateExistingFiles) {
+					outFile = obfPolyFile;
+				}
 				outFile.getParentFile().mkdirs();
 				QuadRect bbox31 = new QuadRect();
 				List<NetworkDBPointPrep> filteredPoints = null;
@@ -166,7 +188,34 @@ public class HHRoutingOBFWriter {
 				profileParams[pInd] = routingProfiles.get(p);
 				pInd++;
 			}
-			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(outFile, "rw"), edition);
+			BinaryMapIndexReader reader = null;
+			File writeFile = outFile; 
+			if (outFile.exists()) {
+				reader = new BinaryMapIndexReader(new RandomAccessFile(outFile, "rw"), outFile);
+				boolean profileAlreadyExist = false;
+				for (HHRouteRegion h : reader.getHHRoutingIndexes()) {
+					if (h.profile.equals(profile)) {
+						profileAlreadyExist = true;
+						break;
+					}
+				}
+				if(profileAlreadyExist) {
+					System.out.println("Skip file as hh routing profile already exist");
+					return;
+				}
+				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
+			}
+			long timestamp = reader != null ? reader.getDateCreated() : edition;
+			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(writeFile, "rw"), timestamp);
+			if (reader != null) {
+				byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
+				for (int i = 0; i < reader.getIndexes().size(); i++) {
+					BinaryIndexPart part = reader.getIndexes().get(i);
+					bmiw.getCodedOutStream().writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+					BinaryInspector.writeInt(bmiw.getCodedOutStream(), part.getLength());
+					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, reader.getRaf(), part.getFilePointer(), part.getLength());
+				}
+			}
 			bmiw.startHHRoutingIndex(edition, profile, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
 			
@@ -241,6 +290,11 @@ public class HHRoutingOBFWriter {
 
 			RandomAccessFile file = routeTree.getFileHdr().getFile();
 			file.close();
+			if (reader != null) {
+				reader.close();
+				writeFile.renameTo(outFile);
+//				outFile.setLastModified(timestamp); // not needed for upload but problem for web files
+			}
 		} catch (RTreeException | RTreeInsertException e) {
 			throw new IOException(e);
 		} finally {

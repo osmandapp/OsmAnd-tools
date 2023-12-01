@@ -50,11 +50,12 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 // IN PROGRESS
-// alter table profiles add column profile default 'car';
 // F.4 FILE: Utility to cut cluster by countries
 // F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
 // TODO C++ protos/osmand_index.pb.h
 // TODO C++ protos/OBF.pb.cc
+// Switch TestMapCreator -> MapCreator
+// Check coverage and return null, so revert to old routing 
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
