@@ -224,7 +224,8 @@ class RandomRouteReport {
 		return "green";
 	}
 
-	void flush(FileWriter writer) throws IOException {
+	void flush(String htmlFileName) throws IOException {
+		FileWriter writer = new FileWriter(htmlFileName);
 		this.html += "</table><br>\n" +
 				"cost - cost of all segments (seconds)<br>\n" +
 				"dist - distance of geometry (meters)<br>\n" +

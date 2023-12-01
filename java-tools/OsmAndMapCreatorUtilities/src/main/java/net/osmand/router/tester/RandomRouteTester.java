@@ -7,6 +7,7 @@ import java.io.RandomAccessFile;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
@@ -49,15 +50,38 @@ class RandomRouteTester {
 		final double DEVIATION_YELLOW = 0.1F; // > 0.1% - mark as acceptable
 	}
 
+	class CommandLineOpts {
+		public String getOpt(String key) {
+			return opts.get(key);
+		}
+
+		public List<String> getStrings() {
+			return strings;
+		}
+
+		public CommandLineOpts(String[] args) {
+			for (String a : args) {
+				if (a.startsWith("--")) {
+					if (a.contains("=")) {
+						String[] keyval = a.split("=");
+						opts.put(keyval[0], keyval[1]); // --opt=value
+					} else {
+						opts.put(a, "true"); // --opt
+					}
+				} else {
+					strings.add(a);
+				}
+			}
+		}
+
+		private HashMap<String, String> opts = new HashMap<>(); // --opt=value --opt[=true]
+		private List<String> strings = new ArrayList<>(); // other args not parsed as opts
+	}
+
 	public static void main(String[] args) throws Exception {
-		// TODO parse args --obf-storage --obf-prefix --iterations --min-dist --max-dist --output-html --native-lib etc
-		File obfDirectory = new File(args.length == 0 ? "." : args[0]); // args[0] is a path to *.obf and hh-files
+		RandomRouteTester test = new RandomRouteTester(args);
 
-		RandomRouteTester test = new RandomRouteTester(obfDirectory);
-
-		test.reportHtmlWriter = new FileWriter("report.html"); // TODO args optional
-
-//		test.initHHsqliteConnections();
+		test.applyCommandLineOpts();
 		test.loadNativeLibrary();
 		test.initObfReaders();
 		test.generateRoutes();
@@ -65,13 +89,18 @@ class RandomRouteTester {
 		test.reportResult();
 	}
 
+	CommandLineOpts opts;
+	private String optMapsDir;
+	private String optLibsDir;
+	private String optObfPrefix;
+	private String optHtmlReport;
+
 	private long started;
 	private File obfDirectory;
-	FileWriter reportHtmlWriter;
 	NativeLibrary nativeLibrary = null;
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 	private HashMap<String, File> hhFiles = new HashMap<>(); // [Profile]
-	private HashMap<String, Connection> hhConnections = new HashMap<>(); // [Profile]
+//	private HashMap<String, Connection> hhConnections = new HashMap<>(); // [Profile]
 
 	private RandomRouteGenerator generator;
 	private GeneratorConfig config = new GeneratorConfig();
@@ -79,10 +108,58 @@ class RandomRouteTester {
 
 	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
 
-	private RandomRouteTester(File obfDirectory) {
+	private RandomRouteTester(String[] args) {
+		this.opts = new CommandLineOpts(args);
 		this.started = System.currentTimeMillis();
 		this.generator = new RandomRouteGenerator(config);
-		this.obfDirectory = obfDirectory;
+	}
+
+	private Boolean isFileWriteable(String name) {
+		Path path = Paths.get(name);
+		if (Files.exists(path) && Files.isWritable(path)) {
+			return true;
+		}
+		if (Files.exists(path.getParent()) && Files.isWritable(path.getParent())) {
+			return true;
+		}
+		return false;
+	}
+
+	private void applyCommandLineOpts() {
+		// apply
+		optMapsDir = Objects.requireNonNullElse(opts.getOpt("--maps-dir"), "./");
+		optObfPrefix = Objects.requireNonNullElse(opts.getOpt("--obf-prefix"), "");
+		optHtmlReport = Objects.requireNonNullElse(opts.getOpt("--html-report"), "rr-report.html");
+		optLibsDir = Objects.requireNonNullElse(
+				opts.getOpt("--libs-dir"), optMapsDir + "/../core-legacy/binaries");
+
+		// validate
+		if (false == isFileWriteable(optHtmlReport)) {
+			throw new IllegalStateException(optHtmlReport + " (html-report) file is not writable");
+		}
+
+		/**
+		 *  Usage: random-route-tester [--options] [TEST_ROUTE]
+		 *
+		 *  --maps-dir= /path/to/directory/with/*.obf (default ./)
+		 *  --obf-prefix= prefix to filter obf files (default all)
+		 *  --html-report = /path/to/report.html (rr-report.html)
+		 *  --libs-dir = /path/to/native/libs/dir (default auto)
+		 *
+		 *  --iterations= N
+		 *  --min-dist= N km
+		 *  --max-dist= N km
+		 *  --max-inter= N number
+		 *  --max-shift= N meters
+		 *
+		 *  --ideal= TYPE (java, cpp, hh)
+		 *  --run-java
+		 *  --run-cpp
+		 *  --run-hh
+		 *
+		 *  [TEST_ROUTE] run specific test (url or querystring format)
+		 */
+
 	}
 
 	private void reportResult() throws IOException {
@@ -105,15 +182,17 @@ class RandomRouteTester {
 			report.entryClose();
 		}
 
-		report.flush(reportHtmlWriter);
+		report.flush(optHtmlReport);
 	}
 
 	private void initObfReaders() throws IOException {
 		List<File> obfFiles = new ArrayList<>();
 
+		obfDirectory = new File(optMapsDir);
+
 		if (obfDirectory.isDirectory()) {
 			for (File f : obfDirectory.listFiles()) {
-				if (f.isFile() && f.getName().endsWith(".obf")) {
+				if (f.isFile() && f.getName().endsWith(".obf") && f.getName().startsWith(optObfPrefix)) {
 					obfFiles.add(f);
 				}
 			}
@@ -135,34 +214,34 @@ class RandomRouteTester {
 		}
 	}
 
-	private void initHHsqliteConnections() throws SQLException {
-		List<File> sqliteFiles = new ArrayList<>();
-
-		if (obfDirectory.isDirectory()) {
-			for (File f : obfDirectory.listFiles()) {
-				if (f.isFile() && f.getName().endsWith(HHRoutingDB.EXT)) {
-					sqliteFiles.add(f);
-				}
-			}
-		}
-
-		// sort files by name to improve pseudo-random reproducibility
-		sqliteFiles.sort((f1, f2) -> f1.getName().compareTo(f2.getName()));
-
-		for (File source : sqliteFiles) {
-			String[] parts = source.getName().split("[_.]"); // Maps_PROFILE.hhdb
-			if (parts.length > 2) {
-				String profile = parts[parts.length - 2];
-				System.out.printf("Use HH (%s) %s...\n", profile, source.getName());
-				hhConnections.put(profile, DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG));
-				hhFiles.put(profile, source);
-			}
-		}
-
-		if (hhConnections.size() == 0) {
-			throw new IllegalStateException("empty hhConnections");
-		}
-	}
+//	private void initHHsqliteConnections() throws SQLException {
+//		List<File> sqliteFiles = new ArrayList<>();
+//
+//		if (obfDirectory.isDirectory()) {
+//			for (File f : obfDirectory.listFiles()) {
+//				if (f.isFile() && f.getName().endsWith(HHRoutingDB.EXT)) {
+//					sqliteFiles.add(f);
+//				}
+//			}
+//		}
+//
+//		// sort files by name to improve pseudo-random reproducibility
+//		sqliteFiles.sort((f1, f2) -> f1.getName().compareTo(f2.getName()));
+//
+//		for (File source : sqliteFiles) {
+//			String[] parts = source.getName().split("[_.]"); // Maps_PROFILE.hhdb
+//			if (parts.length > 2) {
+//				String profile = parts[parts.length - 2];
+//				System.out.printf("Use HH (%s) %s...\n", profile, source.getName());
+//				hhConnections.put(profile, DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG));
+//				hhFiles.put(profile, source);
+//			}
+//		}
+//
+//		if (hhConnections.size() == 0) {
+//			throw new IllegalStateException("empty hhConnections");
+//		}
+//	}
 
 	private void generateRoutes() {
 		testList = generator.generateTestList(obfReaders);
@@ -292,9 +371,10 @@ class RandomRouteTester {
 	}
 
 	private String getNativeLibPath() { // taken from RouterUtilTest and modified
-		Path path = FileSystems.getDefault().getPath("../../core-legacy/binaries");
+		Path path = FileSystems.getDefault().getPath(optLibsDir);
 		if (!Files.exists(path)) {
-			path = FileSystems.getDefault().getPath("../core-legacy/binaries");
+			// for default path, try ../core-legacy/binaries together with ../../core-legacy/binaries
+			path = FileSystems.getDefault().getPath(optLibsDir.replaceFirst("../", "../../"));
 		}
 		if (Files.exists(path)) {
 			File nativeLibPath = path.normalize().toAbsolutePath().toFile();
@@ -307,6 +387,9 @@ class RandomRouteTester {
 						}
 					}
 				}
+			}
+			if (Files.isDirectory(path)) {
+				return nativeLibPath.getAbsolutePath(); // fallback when final libs directory was specified
 			}
 		}
 		return null;
