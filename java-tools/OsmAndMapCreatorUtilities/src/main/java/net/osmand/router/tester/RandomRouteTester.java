@@ -34,8 +34,8 @@ public class RandomRouteTester {
 		// random tests settings
 		int ITERATIONS = 10; // number of random routes
 		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
-		int MIN_DISTANCE_KM = 10; // min distance between start and finish (50)
-		int MAX_DISTANCE_KM = 20; // max distance between start and finish (100)
+		int MIN_DISTANCE_KM = 5; // min distance between start and finish (50)
+		int MAX_DISTANCE_KM = 10; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
@@ -55,6 +55,10 @@ public class RandomRouteTester {
 			return opts.get(key);
 		}
 
+		public void setOpt(String key, String val) {
+			opts.put(key, val);
+		}
+
 		public List<String> getStrings() {
 			return strings;
 		}
@@ -64,9 +68,9 @@ public class RandomRouteTester {
 				if (a.startsWith("--")) {
 					if (a.contains("=")) {
 						String[] keyval = a.split("=");
-						opts.put(keyval[0], keyval[1]); // --opt=value
+						setOpt(keyval[0], keyval[1]); // --opt=value
 					} else {
-						opts.put(a, "true"); // --opt
+						setOpt(a, "true"); // --opt
 					}
 				} else {
 					strings.add(a);
@@ -155,7 +159,7 @@ public class RandomRouteTester {
 		config.DEVIATION_YELLOW = Double.parseDouble(Objects.requireNonNullElse(
 				opts.getOpt("--yellow"), String.valueOf(config.DEVIATION_YELLOW)));
 		if (opts.getOpt("--profile") != null) {
-			config.RANDOM_PROFILES = new String[] {
+			config.RANDOM_PROFILES = new String[]{
 					opts.getOpt("--profile")
 			};
 		}
@@ -165,31 +169,41 @@ public class RandomRouteTester {
 			config.PREDEFINED_TESTS = opts.getStrings().toArray(new String[0]);
 		}
 
-		/**
-		 *  Usage: random-route-tester [--options] [TEST_ROUTE(s)]
-		 *
-		 *  --maps-dir=/path/to/directory/with/*.obf (default ./)
-		 *  --obf-prefix=prefix to filter obf files (default all)
-		 *  --html-report=/path/to/report.html (rr-report.html)
-		 *  --libs-dir=/path/to/native/libs/dir (default auto)
-		 *
-		 *  --iterations=N
-		 *  --min-dist=N km
-		 *  --max-dist=N km
-		 *  --max-shift=N meters
-		 *  --max-inter=N number
-		 *  --profile=profile,settings,key:value force one profile
-		 *
-		 *  --ideal= TYPE (java, cpp, hh)
-		 *  --run-java
-		 *  --run-cpp
-		 *  --run-hh
-		 *
-		 *  --red= % red-limit
-		 *  --yellow= % yellow-limit
-		 *
-		 *  [TEST_ROUTE] run specific test (url or query_string format)
-		 */
+		// --ideal --avoid-java --avoid-cpp --avoid-hh will be processed by collectRoutes()
+
+		if (opts.getOpt("--help") != null) {
+			System.err.printf("%s\n", String.join("\n",
+					"",
+					"Usage: random-route-tester [--options] [TEST_ROUTE(s)]",
+					"",
+					"[TEST_ROUTE] run specific test (url or query_string format)",
+					"",
+					"--maps-dir=/path/to/directory/with/*.obf (default ./)",
+					"--obf-prefix=prefix to filter obf files (default all)",
+					"--html-report=/path/to/report.html (rr-report.html)",
+					"--libs-dir=/path/to/native/libs/dir (default auto)",
+					"",
+					"--iterations=N",
+					"--min-dist=N km",
+					"--max-dist=N km",
+					"--max-shift=N meters",
+					"--max-inter=N number",
+					"--profile=profile,settings,key:value force one profile",
+					"",
+					"--ideal=(java|cpp|hh) compare others against this",
+					"--avoid-java avoid BinaryRoutePlanner (java)",
+					"--avoid-cpp avoid BinaryRoutePlanner (cpp)",
+					"--avoid-hh avoid HHRoutePlanner (java)",
+					"",
+					"--red= % red-color limit",
+					"--yellow= % yellow-color limit",
+					"",
+					"--help show help",
+					""
+			));
+			System.exit(0);
+		}
+
 	}
 
 	private void reportResult() throws IOException {
@@ -286,9 +300,33 @@ public class RandomRouteTester {
 		testList.forEach(entry -> {
 			System.err.printf("\n\n%d / %d ...\n\n", ++counter.value, testList.size());
 			try {
-				runBinaryRoutePlannerJava(entry);
-				runBinaryRoutePlannerCpp(entry);
-//				runHHRoutePlannerJava(entry);
+				// ideal is always 1st route call of the entry
+				// other route calls will be compared to the ideal
+
+				// process --ideal and set --avoid-xxx
+				if (opts.getOpt("--ideal") != null) {
+					if ("java".equals(opts.getOpt("--ideal"))) {
+						opts.setOpt("--avoid-java", "true");
+						runBinaryRoutePlannerJava(entry);
+					} else if ("cpp".equals(opts.getOpt("--ideal"))) {
+						opts.setOpt("--avoid-cpp", "true");
+						runBinaryRoutePlannerCpp(entry);
+					} else if ("hh".equals(opts.getOpt("--ideal"))) {
+						opts.setOpt("--avoid-hh", "true");
+//  			    	runHHRoutePlannerJava(entry);
+					}
+				}
+
+				// process --avoid-xxx options
+				if (opts.getOpt("--avoid-java") == null) {
+					runBinaryRoutePlannerJava(entry);
+				}
+				if (opts.getOpt("--avoid-cpp") == null) {
+					runBinaryRoutePlannerCpp(entry);
+				}
+				if (opts.getOpt("--avoid-hh") == null) {
+//  				runHHRoutePlannerJava(entry);
+				}
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			} catch (InterruptedException e) {
