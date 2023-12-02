@@ -32,14 +32,14 @@ public class RandomRouteTester {
 		};
 
 		// random tests settings
-		int ITERATIONS = 10; // number of random routes
-		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
+		int ITERATIONS = 1; // number of random routes
+		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
 		int MIN_DISTANCE_KM = 5; // min distance between start and finish (50)
 		int MAX_DISTANCE_KM = 10; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
-				"bicycle",
+//				"bicycle",
 //				"bicycle,height_obstacles",
 //				"bicycle,driving_style_prefer_unpaved,driving_style_balance:false,height_obstacles",
 //				"bicycle,driving_style_prefer_unpaved,driving_style_balance=false,height_obstacles",
@@ -313,7 +313,7 @@ public class RandomRouteTester {
 						runBinaryRoutePlannerCpp(entry);
 					} else if ("hh".equals(opts.getOpt("--ideal"))) {
 						opts.setOpt("--avoid-hh", "true");
-//  			    	runHHRoutePlannerJava(entry);
+						runHHRoutePlannerJava(entry);
 					}
 				}
 
@@ -325,14 +325,14 @@ public class RandomRouteTester {
 					runBinaryRoutePlannerCpp(entry);
 				}
 				if (opts.getOpt("--avoid-hh") == null) {
-//  				runHHRoutePlannerJava(entry);
+					runHHRoutePlannerJava(entry);
 				}
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			} catch (InterruptedException e) {
 				throw new RuntimeException(e);
-//			} catch (SQLException e) {
-//				throw new RuntimeException(e);
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
 			}
 		});
 	}
@@ -383,6 +383,42 @@ public class RandomRouteTester {
 	}
 
 	private void runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+		long started = System.currentTimeMillis();
+		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
+
+		RoutePlannerFrontEnd.USE_HH_ROUTING = true;
+//		RoutePlannerFrontEnd.USE_HH_ROUTING_ONLY = true; // TODO
+		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+
+		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
+
+		RoutingConfiguration.RoutingMemoryLimits memoryLimits =
+				new RoutingConfiguration.RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
+
+		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
+
+		RoutingContext ctx = fe.buildRoutingContext(
+				config,
+				null,
+				obfReaders.toArray(new BinaryMapIndexReader[0]),
+				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
+		);
+
+		// TODO refresh and verify settings for HH
+//		ctx.dijkstraMode = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
+//		ctx.config.heuristicCoefficient = 1; // h() *= 1 for A*, 0 for Dijkstra
+//		BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = false; // debug
+//		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = false; // debug
+//		BinaryRoutePlanner.TRACE_ROUTING = false; // make it public
+
+		List<RouteSegmentResult> routeSegments = fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null);
+
+		long runTime = System.currentTimeMillis() - started;
+
+		RandomRouteResult result = new RandomRouteResult("hh", entry, runTime, ctx, routeSegments);
+
+		entry.results.add(result);
+
 //		long started = System.currentTimeMillis();
 ////		RoutingContext hhContext = prepareContext.gcMemoryLimitToUnloadAll(hhContext, null, hhContext == null);
 //
