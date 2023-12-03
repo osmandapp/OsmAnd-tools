@@ -45,7 +45,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 	protected PreparedStatement insGeometry;
 	protected PreparedStatement insPoint;
 	protected PreparedStatement updDualPoint;
-	protected PreparedStatement updMergePoint;
+	protected PreparedStatement deletePoint;
 	protected PreparedStatement insVisitedPoints;
 	protected PreparedStatement updateRegionBoundaries;
 	protected PreparedStatement insertRegionBoundaries;
@@ -69,7 +69,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insertRegionBoundaries = conn.prepareStatement("INSERT INTO routeRegions(left, right, top, bottom, id) VALUES (?, ?, ?, ?, ?)");
 
 			updDualPoint = conn.prepareStatement("UPDATE points SET dualIdPoint = ?, dualClusterId = ? WHERE idPoint = ?");
-			updMergePoint = conn.prepareStatement("UPDATE points SET pointGeoUniDir = ?, pointGeoId = ?, roadId = ?, start = ?, end = ?, sx31 = ?, sy31 = ?, ex31 = ?, ey31 = ? WHERE idPoint = ?");
+			deletePoint = conn.prepareStatement("DELETE FROM points WHERE idPoint = ?");
 		}
 	}
 	
@@ -274,7 +274,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		
 	}
 	
-	public void cleanupProcessedRegion(NetworkRouteRegion networkRouteRegion, 
+	public void cleanupRegionForReprocessing(NetworkRouteRegion networkRouteRegion, 
 			TLongObjectHashMap<NetworkBorderPoint> borderPoints, List<NetworkLongRoad> longRoads) throws SQLException {
 		Iterator<NetworkLongRoad> it = longRoads.iterator();
 		while (it.hasNext()) {
@@ -509,8 +509,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		ins.close();
 	}
 	
-	public void mergePoints(RouteSegmentBorderPoint posMain, RouteSegmentBorderPoint negMerge, RouteSegmentBorderPoint newNeg) {
-		// merge to posDir
+	public void deleteMergePoints(RouteSegmentBorderPoint negMerge) {
 		try {
 			insVisitedPoints.setLong(1, negMerge.fileDbId);
 			insVisitedPoints.setLong(2, negMerge.unidirId);
@@ -518,27 +517,27 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			insVisitedPoints.addBatch();
 			insVisitedPoints.executeBatch();
 			
-			int p = 1;
-			updMergePoint.setLong(p++, newNeg.unidirId);
-			updMergePoint.setLong(p++, newNeg.uniqueId);
-			updMergePoint.setLong(p++, newNeg.roadId);
-			updMergePoint.setLong(p++, newNeg.segmentStart);
-			updMergePoint.setLong(p++, newNeg.segmentEnd);
-			updMergePoint.setLong(p++, newNeg.sx);
-			updMergePoint.setLong(p++, newNeg.sy);
-			updMergePoint.setLong(p++, newNeg.ex);
-			updMergePoint.setLong(p++, newNeg.ey);
-			updMergePoint.setInt(p++, newNeg.pointDbId);
-			updMergePoint.execute();
-			
-			updDualPoint.setInt(1, newNeg.pointDbId);
-			updDualPoint.setInt(2, newNeg.clusterDbId);
-			updDualPoint.setInt(3, posMain.pointDbId);
+			deletePoint.setInt(1, negMerge.pointDbId);
+			deletePoint.addBatch();
+			deletePoint.executeBatch();
+		} catch (SQLException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+	public void mergePoints(RouteSegmentBorderPoint main, RouteSegmentBorderPoint newMainOpp) {
+		try {
+			newMainOpp.pointDbId = ++maxPointDBID;
+			insPoint(newMainOpp);
+			insPoint.executeBatch();
+
+			updDualPoint.setInt(1, newMainOpp.pointDbId);
+			updDualPoint.setInt(2, newMainOpp.clusterDbId);
+			updDualPoint.setInt(3, main.pointDbId);
 			updDualPoint.addBatch();
 			
-			updDualPoint.setInt(1, posMain.pointDbId);
-			updDualPoint.setInt(2, posMain.clusterDbId);
-			updDualPoint.setInt(3, newNeg.pointDbId);
+			updDualPoint.setInt(1, main.pointDbId);
+			updDualPoint.setInt(2, main.clusterDbId);
+			updDualPoint.setInt(3, newMainOpp.pointDbId);
 			updDualPoint.addBatch();
 			updDualPoint.executeBatch();
 		} catch (SQLException e) {

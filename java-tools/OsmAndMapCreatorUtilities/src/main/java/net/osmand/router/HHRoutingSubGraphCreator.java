@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,7 +34,6 @@ import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TIntHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -313,7 +313,7 @@ public class HHRoutingSubGraphCreator {
 				if (!ok) {
 					overlapBbox *= 2;
 					// clean up for reprocessing
-					ctx.networkDB.cleanupProcessedRegion(nrouteRegion, ctx.networkPointToDbInd, ctx.longRoads);
+					ctx.networkDB.cleanupRegionForReprocessing(nrouteRegion, ctx.networkPointToDbInd, ctx.longRoads);
 					
 				} else {
 					notProcessed = false;
@@ -1460,16 +1460,33 @@ public class HHRoutingSubGraphCreator {
 				RouteSegmentBorderPoint f = lstMerge.get(0);
 				RouteSegmentBorderPoint s = lstMerge.get(1);
 				if (f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd) {
-					simpleMerge(ctx, f.isPositive() ? f : s, f.isPositive() ? s : f);
+					// simple merge scenario
+					simpleMerge(ctx, f, s.clusterDbId, s);
 					continue;
 				}
-				TIntHashSet clusters = new TIntHashSet();
+				TIntIntHashMap clusters = new TIntIntHashMap();
 				for (RouteSegmentBorderPoint p : lstMerge) {
-					clusters.add(p.clusterDbId);
+					clusters.adjustOrPutValue(p.clusterDbId, 1, 1);
 				}
 				if (clusters.size() == 1) {
 					// ignoring points that belong to same cluster is ok cause it doesn't change connectivity between clusters
 					System.err.println("Ignore (same cluster points to merge): " + lstMerge);
+					continue;
+				}
+				RouteSegmentBorderPoint singlePointCluster = null;
+				for (RouteSegmentBorderPoint p : lstMerge) {
+					if (clusters.get(p.clusterDbId) == 1) {
+						singlePointCluster = p;
+						break;
+					}
+				}
+				if (clusters.size() == 2 && singlePointCluster != null) {
+					System.out.printf(
+							"Complex scenario with 2 clusters (%s) and main point %s merging with points (%s) \n",
+							clusters, singlePointCluster, lstMerge);
+					lstMerge.remove(singlePointCluster);
+					simpleMerge(ctx, singlePointCluster, lstMerge.get(0).clusterDbId,
+							lstMerge.toArray(new RouteSegmentBorderPoint[lstMerge.size()]));
 					continue;
 				}
 				String msg = String.format("Can't merge points ", lstMerge);
@@ -1486,20 +1503,28 @@ public class HHRoutingSubGraphCreator {
 		mp.get(epnt).add(po);
 	}
 
-	private void simpleMerge(NetworkCollectPointCtx ctx, RouteSegmentBorderPoint pos, RouteSegmentBorderPoint neg) {
-		logf("MERGE route road %s with %s", pos, neg);
-		RouteSegmentBorderPoint newNeg = new RouteSegmentBorderPoint(pos.roadId, pos.segmentEnd, pos.segmentStart,
-				pos.ex, pos.ey, pos.sx, pos.sy);
-		newNeg.clusterDbId = neg.clusterDbId;
-		newNeg.pointDbId = neg.pointDbId;
-		newNeg.inserted = neg.inserted;
-		newNeg.fileDbId = neg.fileDbId;
-		ctx.networkDB.mergePoints(pos, neg, newNeg);
-		if (ctx.currentProcessingRegion != null) {
-			ctx.currentProcessingRegion.visitedVertices.put(neg.unidirId, neg.clusterDbId);
+	private void simpleMerge(NetworkCollectPointCtx ctx, RouteSegmentBorderPoint main, int clusterOppId, RouteSegmentBorderPoint... toMerges) {
+		logf("MERGE route road %s with %s", main, Arrays.toString(toMerges));
+		RouteSegmentBorderPoint newOpp = new RouteSegmentBorderPoint(main.roadId, main.segmentEnd, main.segmentStart,
+				main.ex, main.ey, main.sx, main.sy);
+		if (main.isPositive()) {
+			ctx.networkPointToDbInd.get(main.unidirId).negativeObj = newOpp;
+		} else {
+			ctx.networkPointToDbInd.get(main.unidirId).positiveObj = newOpp;
+ 	 	}
+		newOpp.clusterDbId = clusterOppId;
+		newOpp.inserted = main.inserted;
+		newOpp.fileDbId = main.fileDbId;
+		ctx.networkDB.mergePoints(main, newOpp);
+		
+		for (RouteSegmentBorderPoint toMerge : toMerges) {
+			ctx.networkDB.deleteMergePoints(toMerge);
+			if (ctx.currentProcessingRegion != null) {
+				ctx.currentProcessingRegion.visitedVertices.put(toMerge.unidirId, toMerge.clusterDbId);
+			}
+			ctx.networkPointToDbInd.remove(toMerge.unidirId);
 		}
-		ctx.networkPointToDbInd.get(pos.unidirId).negativeObj = newNeg;
-		ctx.networkPointToDbInd.remove(neg.unidirId);
+		
 	}
 
 	
