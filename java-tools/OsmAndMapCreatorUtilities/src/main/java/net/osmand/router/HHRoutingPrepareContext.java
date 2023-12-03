@@ -22,9 +22,9 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 
 public class HHRoutingPrepareContext {
 
-	final static int MEMORY_RELOAD_MB = 1000; //
-	final static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
 	static final int ROUTING_MEMORY_LIMIT = 2048;
+	static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
+	static int MEMORY_RELOAD_MB = 1000; //
 	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
 	static long MEMORY_LAST_USED_MB;
 
@@ -90,8 +90,13 @@ public class HHRoutingPrepareContext {
 			System.gc();
 			MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 			MEMEORY_LAST_RELOAD = System.currentTimeMillis();
+			double reloadTimeSeconds = (System.nanoTime() - nt) / 1e9;
 			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f s) *****\n", usedMemory,
-					ntusedMemory, MEMORY_LAST_USED_MB, (System.nanoTime() - nt) / 1e9);
+					ntusedMemory, MEMORY_LAST_USED_MB, reloadTimeSeconds);
+			if (reloadTimeSeconds * 16 > MEMORY_RELOAD_TIMEOUT_SECONDS) {
+				MEMORY_RELOAD_TIMEOUT_SECONDS = (int) (reloadTimeSeconds * 16);
+				logf("New reload memory time %d seconds", MEMORY_RELOAD_TIMEOUT_SECONDS);
+			}
 		}
 		return ctx;
 	}
