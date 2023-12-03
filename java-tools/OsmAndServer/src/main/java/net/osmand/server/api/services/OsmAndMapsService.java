@@ -791,6 +791,7 @@ public class OsmAndMapsService {
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
 			usedMapList = getReaders(list);
+			
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
 			if (rsc[0] != null) {
 				StringBuilder url = new StringBuilder(rsc[0].url);
@@ -807,7 +808,6 @@ public class OsmAndMapsService {
 					}
 				});
 				String gpx = restTemplate.getForObject(url.toString(), String.class);
-				
 				GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
 				TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
 				List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
@@ -817,6 +817,7 @@ public class OsmAndMapsService {
 				routeRes = approximate(ctx, router, props, polyline);
 			} else {
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
+				RoutePlannerFrontEnd.USE_HH_ROUTING = true;
 				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
 				putResultProps(ctx, routeRes, props);
 			}

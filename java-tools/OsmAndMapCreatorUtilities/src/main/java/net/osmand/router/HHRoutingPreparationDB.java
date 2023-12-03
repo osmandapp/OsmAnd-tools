@@ -524,6 +524,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			throw new IllegalStateException(e);
 		}
 	}
+	
 	public void mergePoints(RouteSegmentBorderPoint main, RouteSegmentBorderPoint newMainOpp) {
 		try {
 			newMainOpp.pointDbId = ++maxPointDBID;
