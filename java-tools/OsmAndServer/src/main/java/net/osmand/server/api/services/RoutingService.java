@@ -184,13 +184,13 @@ public class RoutingService {
         for (RouteSegmentResult r : res) {
             int i;
             int dir = r.isForwardDirection() ? 1 : -1;
-            if (r.getDescription() != null && r.getDescription().length() > 0) {
+            String description = r.getDescription(true);
+            if (!Algorithms.isEmpty(description)) {
                 RoutingController.Feature f = new RoutingController.Feature(RoutingController.Geometry.point(r.getStartPoint()));
-                f.prop("description", r.getDescription()).prop("routingTime", r.getRoutingTime())
+                f.prop("description", description).prop("routingTime", r.getRoutingTime())
                         .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
                         .prop("roadId", r.getObject().getId());
                 features.add(f);
-                
             }
             for (i = r.getStartPointIndex(); ; i += dir) {
                 if(i != r.getEndPointIndex()) {

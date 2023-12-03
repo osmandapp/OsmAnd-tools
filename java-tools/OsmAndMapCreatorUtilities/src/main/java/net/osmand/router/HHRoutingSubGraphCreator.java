@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -58,12 +59,13 @@ import net.osmand.util.MapUtils;
 
 /////////////////////////////////
 // IN PROGRESS
-// - WEB Testing + Fixes - Yurii  
-// 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
-// 1.2 Check coverage HH is not enough & don't calculate 
 // 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
+// HH routing + C++ routing wrong turns
+// TEST: Java / C++ approximation, Java / C++ routing 
+// 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
+// 1.2 Check coverage HH is not enough & don't calculate (Monaco)
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
-// 2.4 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
+// 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
@@ -72,7 +74,8 @@ import net.osmand.util.MapUtils;
 // C.4 C++ implementation HHRoutePlanner / Progress Bar
 
 // 2. SHORT-TERM HHRoutePlanner - fixes related to live data
-// 2.0 Progress bar for HHRoutePlanner
+// 2.0.1 Progress bar for HHRoutePlanner
+// 2.0.2 Intermediate points
 // 2.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.5 Avoid specific road
@@ -81,7 +84,8 @@ import net.osmand.util.MapUtils;
 // 2.8 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 
 // 3. MID-TERM Speedups, small bugs and Data research
-// 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 3.0.1 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 3.0.2 Monaco doesn't have any cluster point will it support hh routing?
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
@@ -312,7 +316,7 @@ public class HHRoutingSubGraphCreator {
 				if (!ok) {
 					overlapBbox *= 2;
 					// clean up for reprocessing
-					ctx.networkDB.cleanupProcessedRegion(nrouteRegion, ctx.networkPointToDbInd, ctx.longRoads);
+					ctx.networkDB.cleanupRegionForReprocessing(nrouteRegion, ctx.networkPointToDbInd, ctx.longRoads);
 					
 				} else {
 					notProcessed = false;
@@ -1437,50 +1441,94 @@ public class HHRoutingSubGraphCreator {
 	}
 
 	public void mergeConnectedPoints(NetworkCollectPointCtx ctx) {
-		TLongObjectHashMap<RouteSegmentBorderPoint> mp = new TLongObjectHashMap<>();
+		// Connected points needs to be merged to create continuous network
+		// As single point will be ignored as end of the roads that might be a problem
+		// for continuity
+		// Points to merge happen in both cases: processing long roads and having a
+		// limit TOTAL_MAX_POINTS
+		TLongObjectHashMap<List<RouteSegmentBorderPoint>> mp = new TLongObjectHashMap<>();
 		List<NetworkBorderPoint> lst = new ArrayList<>(ctx.networkPointToDbInd.valueCollection());
 		for (NetworkBorderPoint p : lst) {
 			if (p.positiveObj != null && p.negativeObj == null) {
-				mergePoint(ctx, mp, p.positiveObj);
+				add(p.positiveObj, mp);
 			}
 			if (p.negativeObj != null && p.positiveObj == null) {
-				mergePoint(ctx, mp, p.negativeObj);
+				add(p.negativeObj, mp);
+			}
+		}
+		System.out.printf("Check to merge %d points... ", mp.size());
+		for (List<RouteSegmentBorderPoint> lstMerge : mp.valueCollection()) {
+			if (lstMerge.size() == 1) {
+				// nothing to merge
+			} else if (lstMerge.size() == 2) {
+				RouteSegmentBorderPoint f = lstMerge.get(0);
+				RouteSegmentBorderPoint s = lstMerge.get(1);
+				if (f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd) {
+					// simple merge scenario
+					simpleMerge(ctx, f, s.clusterDbId, s);
+					continue;
+				}
+				TIntIntHashMap clusters = new TIntIntHashMap();
+				for (RouteSegmentBorderPoint p : lstMerge) {
+					clusters.adjustOrPutValue(p.clusterDbId, 1, 1);
+				}
+				if (clusters.size() == 1) {
+					// ignoring points that belong to same cluster is ok cause it doesn't change connectivity between clusters
+					System.err.println("Ignore (same cluster points to merge): " + lstMerge);
+					continue;
+				}
+				RouteSegmentBorderPoint singlePointCluster = null;
+				for (RouteSegmentBorderPoint p : lstMerge) {
+					if (clusters.get(p.clusterDbId) == 1) {
+						singlePointCluster = p;
+						break;
+					}
+				}
+				if (clusters.size() == 2 && singlePointCluster != null) {
+					System.out.printf(
+							"Complex scenario with 2 clusters (%s) and main point %s merging with points (%s) \n",
+							clusters, singlePointCluster, lstMerge);
+					lstMerge.remove(singlePointCluster);
+					simpleMerge(ctx, singlePointCluster, lstMerge.get(0).clusterDbId,
+							lstMerge.toArray(new RouteSegmentBorderPoint[lstMerge.size()]));
+					continue;
+				}
+				String msg = String.format("Can't merge points ", lstMerge);
+				throw new IllegalArgumentException(msg);
 			}
 		}
 	}
 
-	private void mergePoint(NetworkCollectPointCtx ctx, TLongObjectHashMap<RouteSegmentBorderPoint> mp, RouteSegmentBorderPoint po) {
+	private void add(RouteSegmentBorderPoint po, TLongObjectHashMap<List<RouteSegmentBorderPoint>> mp) {
 		long epnt = Algorithms.combine2Points(po.ex, po.ey);
-		RouteSegmentBorderPoint co = mp.get(epnt);
-		if (co == null) {
-			mp.put(epnt, po);
-		} else {
-			RouteSegmentBorderPoint pos = po.isPositive() ? po : co;
-			RouteSegmentBorderPoint neg = !po.isPositive() ? po : co;
-			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentEnd) {
-				String msg = String.format("Can't merge %s with %s", po, co);
-				if (po.clusterDbId == co.clusterDbId) {
-					System.err.println("Ignore (same cluster): " + msg);
-					// it's possible to merge it if it's unique and check other cases
-					return;
-				} else {
-					throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
-				}
-			}
-			logf("MERGE route road %s with %s", pos, neg);
-			RouteSegmentBorderPoint newNeg = new RouteSegmentBorderPoint(pos.roadId, pos.segmentEnd, pos.segmentStart, 
-					pos.ex, pos.ey, pos.sx, pos.sy);
-			newNeg.clusterDbId = neg.clusterDbId;
-			newNeg.pointDbId = neg.pointDbId;
-			newNeg.inserted = neg.inserted;
-			newNeg.fileDbId = neg.fileDbId;
-			ctx.networkDB.mergePoints(pos, neg, newNeg);
-			if (ctx.currentProcessingRegion != null) {
-				ctx.currentProcessingRegion.visitedVertices.put(neg.unidirId, neg.clusterDbId);
-			}
-			ctx.networkPointToDbInd.get(pos.unidirId).negativeObj = newNeg;
-			ctx.networkPointToDbInd.remove(neg.unidirId);
+		if (!mp.containsKey(epnt)) {
+			mp.put(epnt, new ArrayList<>());
 		}
+		mp.get(epnt).add(po);
+	}
+
+	private void simpleMerge(NetworkCollectPointCtx ctx, RouteSegmentBorderPoint main, int clusterOppId, RouteSegmentBorderPoint... toMerges) {
+		logf("MERGE route road %s with %s", main, Arrays.toString(toMerges));
+		RouteSegmentBorderPoint newOpp = new RouteSegmentBorderPoint(main.roadId, main.segmentEnd, main.segmentStart,
+				main.ex, main.ey, main.sx, main.sy);
+		if (main.isPositive()) {
+			ctx.networkPointToDbInd.get(main.unidirId).negativeObj = newOpp;
+		} else {
+			ctx.networkPointToDbInd.get(main.unidirId).positiveObj = newOpp;
+ 	 	}
+		newOpp.clusterDbId = clusterOppId;
+		newOpp.inserted = main.inserted;
+		newOpp.fileDbId = main.fileDbId;
+		ctx.networkDB.mergePoints(main, newOpp);
+		
+		for (RouteSegmentBorderPoint toMerge : toMerges) {
+			ctx.networkDB.deleteMergePoints(toMerge);
+			if (ctx.currentProcessingRegion != null) {
+				ctx.currentProcessingRegion.visitedVertices.put(toMerge.unidirId, toMerge.clusterDbId);
+			}
+			ctx.networkPointToDbInd.remove(toMerge.unidirId);
+		}
+		
 	}
 
 	
