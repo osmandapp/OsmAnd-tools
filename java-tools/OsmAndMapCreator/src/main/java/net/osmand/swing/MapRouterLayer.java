@@ -1224,7 +1224,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
 			Way way = new Way(-1);
 //					String name = String.format("time %.2f ", s.getSegmentTime());
-			String name = segm.getDescription();
+			String name = segm.getDescription(false);
 			if(segm.getTurnType() != null) {
 				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
 			}
