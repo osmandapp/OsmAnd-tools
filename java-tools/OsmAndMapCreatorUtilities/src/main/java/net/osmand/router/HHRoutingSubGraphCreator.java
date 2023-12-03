@@ -59,12 +59,13 @@ import net.osmand.util.MapUtils;
 
 /////////////////////////////////
 // IN PROGRESS
-// - WEB Testing + Fixes - Yurii  
-// 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
-// 1.2 Check coverage HH is not enough & don't calculate 
 // 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
+// HH routing + C++ routing wrong turns
+// TEST: Java / C++ approximation, Java / C++ routing 
+// 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
+// 1.2 Check coverage HH is not enough & don't calculate (Monaco)
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
-// 2.4 LIMIT: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
+// 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
@@ -73,7 +74,8 @@ import net.osmand.util.MapUtils;
 // C.4 C++ implementation HHRoutePlanner / Progress Bar
 
 // 2. SHORT-TERM HHRoutePlanner - fixes related to live data
-// 2.0 Progress bar for HHRoutePlanner
+// 2.0.1 Progress bar for HHRoutePlanner
+// 2.0.2 Intermediate points
 // 2.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.5 Avoid specific road
@@ -82,7 +84,8 @@ import net.osmand.util.MapUtils;
 // 2.8 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 
 // 3. MID-TERM Speedups, small bugs and Data research
-// 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 3.0.1 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 3.0.2 Monaco doesn't have any cluster point will it support hh routing?
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
@@ -1453,10 +1456,11 @@ public class HHRoutingSubGraphCreator {
 				add(p.negativeObj, mp);
 			}
 		}
+		System.out.printf("Check to merge %d points... ", mp.size());
 		for (List<RouteSegmentBorderPoint> lstMerge : mp.valueCollection()) {
 			if (lstMerge.size() == 1) {
 				// nothing to merge
-			} else if (lst.size() == 2) {
+			} else if (lstMerge.size() == 2) {
 				RouteSegmentBorderPoint f = lstMerge.get(0);
 				RouteSegmentBorderPoint s = lstMerge.get(1);
 				if (f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd) {
