@@ -1458,12 +1458,12 @@ public class HHRoutingSubGraphCreator {
 		}
 		System.out.printf("Check to merge %d points... ", mp.size());
 		for (List<RouteSegmentBorderPoint> lstMerge : mp.valueCollection()) {
-			if (lstMerge.size() == 1) {
+			if (lstMerge.size() <= 1) {
 				// nothing to merge
-			} else if (lstMerge.size() == 2) {
+			} else {
 				RouteSegmentBorderPoint f = lstMerge.get(0);
 				RouteSegmentBorderPoint s = lstMerge.get(1);
-				if (f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd) {
+				if (lstMerge.size() == 2 && f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd) {
 					// simple merge scenario
 					simpleMerge(ctx, f, s.clusterDbId, s);
 					continue;
