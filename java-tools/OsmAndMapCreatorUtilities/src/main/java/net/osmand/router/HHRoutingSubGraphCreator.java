@@ -33,6 +33,7 @@ import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TIntHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -1437,50 +1438,68 @@ public class HHRoutingSubGraphCreator {
 	}
 
 	public void mergeConnectedPoints(NetworkCollectPointCtx ctx) {
-		TLongObjectHashMap<RouteSegmentBorderPoint> mp = new TLongObjectHashMap<>();
+		// Connected points needs to be merged to create continuous network
+		// As single point will be ignored as end of the roads that might be a problem
+		// for continuity
+		// Points to merge happen in both cases: processing long roads and having a
+		// limit TOTAL_MAX_POINTS
+		TLongObjectHashMap<List<RouteSegmentBorderPoint>> mp = new TLongObjectHashMap<>();
 		List<NetworkBorderPoint> lst = new ArrayList<>(ctx.networkPointToDbInd.valueCollection());
 		for (NetworkBorderPoint p : lst) {
 			if (p.positiveObj != null && p.negativeObj == null) {
-				mergePoint(ctx, mp, p.positiveObj);
+				add(p.positiveObj, mp);
 			}
 			if (p.negativeObj != null && p.positiveObj == null) {
-				mergePoint(ctx, mp, p.negativeObj);
+				add(p.negativeObj, mp);
+			}
+		}
+		for (List<RouteSegmentBorderPoint> lstMerge : mp.valueCollection()) {
+			if (lstMerge.size() == 1) {
+				// nothing to merge
+			} else if (lst.size() == 2) {
+				RouteSegmentBorderPoint f = lstMerge.get(0);
+				RouteSegmentBorderPoint s = lstMerge.get(1);
+				if (f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd) {
+					simpleMerge(ctx, f.isPositive() ? f : s, f.isPositive() ? s : f);
+					continue;
+				}
+				TIntHashSet clusters = new TIntHashSet();
+				for (RouteSegmentBorderPoint p : lstMerge) {
+					clusters.add(p.clusterDbId);
+				}
+				if (clusters.size() == 1) {
+					// ignoring points that belong to same cluster is ok cause it doesn't change connectivity between clusters
+					System.err.println("Ignore (same cluster points to merge): " + lstMerge);
+					continue;
+				}
+				String msg = String.format("Can't merge points ", lstMerge);
+				throw new IllegalArgumentException(msg);
 			}
 		}
 	}
 
-	private void mergePoint(NetworkCollectPointCtx ctx, TLongObjectHashMap<RouteSegmentBorderPoint> mp, RouteSegmentBorderPoint po) {
+	private void add(RouteSegmentBorderPoint po, TLongObjectHashMap<List<RouteSegmentBorderPoint>> mp) {
 		long epnt = Algorithms.combine2Points(po.ex, po.ey);
-		RouteSegmentBorderPoint co = mp.get(epnt);
-		if (co == null) {
-			mp.put(epnt, po);
-		} else {
-			RouteSegmentBorderPoint pos = po.isPositive() ? po : co;
-			RouteSegmentBorderPoint neg = !po.isPositive() ? po : co;
-			if (po.roadId != co.roadId || po.isPositive() == co.isPositive() || pos.segmentEnd != neg.segmentEnd) {
-				String msg = String.format("Can't merge %s with %s", po, co);
-				if (po.clusterDbId == co.clusterDbId) {
-					System.err.println("Ignore (same cluster): " + msg);
-					// it's possible to merge it if it's unique and check other cases
-					return;
-				} else {
-					throw new IllegalArgumentException(String.format("Can't merge %s with %s", po, co));
-				}
-			}
-			logf("MERGE route road %s with %s", pos, neg);
-			RouteSegmentBorderPoint newNeg = new RouteSegmentBorderPoint(pos.roadId, pos.segmentEnd, pos.segmentStart, 
-					pos.ex, pos.ey, pos.sx, pos.sy);
-			newNeg.clusterDbId = neg.clusterDbId;
-			newNeg.pointDbId = neg.pointDbId;
-			newNeg.inserted = neg.inserted;
-			newNeg.fileDbId = neg.fileDbId;
-			ctx.networkDB.mergePoints(pos, neg, newNeg);
-			if (ctx.currentProcessingRegion != null) {
-				ctx.currentProcessingRegion.visitedVertices.put(neg.unidirId, neg.clusterDbId);
-			}
-			ctx.networkPointToDbInd.get(pos.unidirId).negativeObj = newNeg;
-			ctx.networkPointToDbInd.remove(neg.unidirId);
+		if (!mp.containsKey(epnt)) {
+			mp.put(epnt, new ArrayList<>());
 		}
+		mp.get(epnt).add(po);
+	}
+
+	private void simpleMerge(NetworkCollectPointCtx ctx, RouteSegmentBorderPoint pos, RouteSegmentBorderPoint neg) {
+		logf("MERGE route road %s with %s", pos, neg);
+		RouteSegmentBorderPoint newNeg = new RouteSegmentBorderPoint(pos.roadId, pos.segmentEnd, pos.segmentStart,
+				pos.ex, pos.ey, pos.sx, pos.sy);
+		newNeg.clusterDbId = neg.clusterDbId;
+		newNeg.pointDbId = neg.pointDbId;
+		newNeg.inserted = neg.inserted;
+		newNeg.fileDbId = neg.fileDbId;
+		ctx.networkDB.mergePoints(pos, neg, newNeg);
+		if (ctx.currentProcessingRegion != null) {
+			ctx.currentProcessingRegion.visitedVertices.put(neg.unidirId, neg.clusterDbId);
+		}
+		ctx.networkPointToDbInd.get(pos.unidirId).negativeObj = newNeg;
+		ctx.networkPointToDbInd.remove(neg.unidirId);
 	}
 
 	
