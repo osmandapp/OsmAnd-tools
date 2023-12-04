@@ -1,14 +1,12 @@
 package net.osmand.router.tester;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 
@@ -17,7 +15,6 @@ import net.osmand.NativeLibrary;
 import org.apache.commons.logging.Log;
 
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.obf.preparation.DBDialect;
 import net.osmand.PlatformUtil;
 
 public class RandomRouteTester {
@@ -32,10 +29,10 @@ public class RandomRouteTester {
 		};
 
 		// random tests settings
-		int ITERATIONS = 1; // number of random routes
+		int ITERATIONS = 10; // number of random routes
 		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
-		int MIN_DISTANCE_KM = 5; // min distance between start and finish (50)
-		int MAX_DISTANCE_KM = 10; // max distance between start and finish (100)
+		int MIN_DISTANCE_KM = 200; // min distance between start and finish (50)
+		int MAX_DISTANCE_KM = 250; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
@@ -104,7 +101,6 @@ public class RandomRouteTester {
 	NativeLibrary nativeLibrary = null;
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 	private HashMap<String, File> hhFiles = new HashMap<>(); // [Profile]
-//	private HashMap<String, Connection> hhConnections = new HashMap<>(); // [Profile]
 
 	private RandomRouteGenerator generator;
 	private GeneratorConfig config = new GeneratorConfig();
@@ -257,35 +253,6 @@ public class RandomRouteTester {
 			throw new IllegalStateException("empty obfReaders");
 		}
 	}
-
-//	private void initHHsqliteConnections() throws SQLException {
-//		List<File> sqliteFiles = new ArrayList<>();
-//
-//		if (obfDirectory.isDirectory()) {
-//			for (File f : obfDirectory.listFiles()) {
-//				if (f.isFile() && f.getName().endsWith(HHRoutingDB.EXT)) {
-//					sqliteFiles.add(f);
-//				}
-//			}
-//		}
-//
-//		// sort files by name to improve pseudo-random reproducibility
-//		sqliteFiles.sort((f1, f2) -> f1.getName().compareTo(f2.getName()));
-//
-//		for (File source : sqliteFiles) {
-//			String[] parts = source.getName().split("[_.]"); // Maps_PROFILE.hhdb
-//			if (parts.length > 2) {
-//				String profile = parts[parts.length - 2];
-//				System.out.printf("Use HH (%s) %s...\n", profile, source.getName());
-//				hhConnections.put(profile, DBDialect.SQLITE.getDatabaseConnection(source.getAbsolutePath(), LOG));
-//				hhFiles.put(profile, source);
-//			}
-//		}
-//
-//		if (hhConnections.size() == 0) {
-//			throw new IllegalStateException("empty hhConnections");
-//		}
-//	}
 
 	private void generateRoutes() {
 		testList = generator.generateTestList(obfReaders);
@@ -460,7 +427,6 @@ public class RandomRouteTester {
 ////		ctx.config.planRoadDirection = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
 //
 //		HHRouteDataStructure.HHNetworkRouteRes res = hhPlanner.runRouting(entry.start, entry.finish, hhConfig);
-//		// TODO check HH for params (height_obstacles)
 	}
 
 	private void loadNativeLibrary() {
