@@ -26,13 +26,14 @@ public class RandomRouteTester {
 //				"start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&profile=car",
 //				"start=50.450128,30.535611&finish=50.460479,30.589365&via=1,2;3,4;5,6&profile=car",
 //				"start=L,L&finish=L,L&via=L,L;L,L&profile=pedestrian&params=height_obstacles" // example
+				"https://test.osmand.net/map/?start=48.913403,11.872949&finish=49.079640,11.752095&type=osmand&profile=car#10/48.996521/11.812522"
 		};
 
 		// random tests settings
-		int ITERATIONS = 10; // number of random routes
+		int ITERATIONS = 1; // number of random routes
 		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
-		int MIN_DISTANCE_KM = 200; // min distance between start and finish (50)
-		int MAX_DISTANCE_KM = 250; // max distance between start and finish (100)
+		int MIN_DISTANCE_KM = 20; // min distance between start and finish (50)
+		int MAX_DISTANCE_KM = 30; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
@@ -371,12 +372,7 @@ public class RandomRouteTester {
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
 		);
 
-		// TODO refresh and verify settings for HH
-//		ctx.dijkstraMode = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
-//		ctx.config.heuristicCoefficient = 1; // h() *= 1 for A*, 0 for Dijkstra
-//		BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = false; // debug
-//		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = false; // debug
-//		BinaryRoutePlanner.TRACE_ROUTING = false; // make it public
+		// TODO think how to set HH settings before test
 
 		List<RouteSegmentResult> routeSegments = fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null);
 
@@ -385,48 +381,6 @@ public class RandomRouteTester {
 		RandomRouteResult result = new RandomRouteResult("hh", entry, runTime, ctx, routeSegments);
 
 		entry.results.add(result);
-
-//		long started = System.currentTimeMillis();
-////		RoutingContext hhContext = prepareContext.gcMemoryLimitToUnloadAll(hhContext, null, hhContext == null);
-//
-////		// ready to use HHRoutePlanner class
-////		hhPlanner = HHRoutePlanner.create(hhContext, new HHRoutingDB(conn));
-////
-////		HHRouteDataStructure.HHRoutingConfig hhConfig = new HHRouteDataStructure.HHRoutingConfig().astar(0);
-//////		HHRouteDataStructure.HHRoutingConfig hhConfig = new HHRouteDataStructure.HHRoutingConfig().dijkstra(0);
-////		// run test HH-routing
-////		HHRouteDataStructure.HHNetworkRouteRes hh = hhPlanner.runRouting(START, FINISH, hhConfig);
-//
-////		RoutePlannerFrontEnd.USE_HH_ROUTING = true; // really doesn't matter for direct hhPlanner.runRouting call
-//		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
-//
-//		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
-//
-//		RoutingConfiguration.RoutingMemoryLimits memoryLimits = new RoutingConfiguration.RoutingMemoryLimits(
-//				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 10,
-//				RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
-//
-//		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
-//
-//		RoutingContext ctx = fe.buildRoutingContext(
-//				config,
-//				null,
-//				obfReaders.toArray(new BinaryMapIndexReader[0]),
-//				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
-//		);
-//
-//		HHRouteDataStructure.HHRoutingConfig hhConfig =
-//				new HHRouteDataStructure.HHRoutingConfig()
-//						.astar(0)
-//						.calcDetailed(2);
-//
-//		HHRoutingDB db = new HHRoutingDB(hhFiles.get(entry.profile), hhConnections.get(entry.profile));
-//		HHRoutePlanner<HHRouteDataStructure.NetworkDBPoint> hhPlanner = HHRoutePlanner.create(ctx, db);
-//
-////		ctx.config.heuristicCoefficient = 1; // h() *= 1 for A*, 0 for Dijkstra
-////		ctx.config.planRoadDirection = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
-//
-//		HHRouteDataStructure.HHNetworkRouteRes res = hhPlanner.runRouting(entry.start, entry.finish, hhConfig);
 	}
 
 	private void loadNativeLibrary() {

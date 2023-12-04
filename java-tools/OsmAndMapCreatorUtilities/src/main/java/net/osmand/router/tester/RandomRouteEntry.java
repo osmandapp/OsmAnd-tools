@@ -126,10 +126,16 @@ class RandomRouteReport {
 		String finish = String.format("%f,%f", ideal.entry.finish.getLatitude(), ideal.entry.finish.getLongitude());
 		String url = ideal.toString();
 
+		String sCost = ideal.cost > 0 ? String.format("%.2f", ideal.cost) : "zero";
+		String colorCost = costDistHtmlColor(ideal.cost);
+
+		String sDistance = ideal.distance > 0 ? String.format("%.2f", ideal.distance) : "zero";
+		String colorDistance = costDistHtmlColor(ideal.distance);
+
 		this.html += "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, ideal.type) + // 1
-				String.format("<td>%.2f</td>", ideal.cost) +                                     // 2
-				String.format("<td>%.2f</td>", ideal.distance) +                                 // 3
+				String.format("<td><font color=%s>%s</font></td>", colorCost, sCost) +           // 2
+				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +   // 3
 				String.format("<td>%d</td>", ideal.visitedSegments) +                            // 4
 				String.format("<td>%.1f</td>", ideal.runTime / 1000F) +                          // 5
 				String.format("<td>%s</td>", start) +                                            // 6
@@ -155,12 +161,12 @@ class RandomRouteReport {
 
 		double dCost = ideal.cost > 0 ? (result.cost / ideal.cost - 1) * 100 : 0;
 		String sCost = Math.abs(dCost) < deviationYellow ? "ok"
-				: String.format("%s%.2f%%", dCost > 0 ? "+" : "", dCost);
+				: (result.cost > 0 ? String.format("%s%.2f%%", dCost > 0 ? "+" : "", dCost) : "zero");
 		String colorCost = deviationHtmlColor(dCost);
 
 		double dDistance = ideal.distance > 0 ? (result.distance / ideal.distance - 1) * 100 : 0;
 		String sDistance = Math.abs(dDistance) < deviationYellow ? "ok"
-				: String.format("%s%.2f%%", dDistance > 0 ? "+" : "", dDistance);
+				: (result.distance > 0 ? String.format("%s%.2f%%", dDistance > 0 ? "+" : "", dDistance) : "zero");
 		String colorDistance = deviationHtmlColor(dDistance);
 
 		this.html += "<tr align=center>" +
@@ -199,6 +205,10 @@ class RandomRouteReport {
 	void entryClose() {
 		this.text += "\n";
 		this.html += "<tr><td colspan=10>&nbsp;</td></tr>\n";
+	}
+
+	private String costDistHtmlColor(double n) {
+		return n > 0 ? "green" : "red";
 	}
 
 	private String deviationHtmlColor(double percent) {
