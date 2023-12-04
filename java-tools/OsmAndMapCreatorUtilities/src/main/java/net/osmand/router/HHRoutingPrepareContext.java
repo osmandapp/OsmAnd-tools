@@ -93,7 +93,7 @@ public class HHRoutingPrepareContext {
 			double reloadTimeSeconds = (System.nanoTime() - nt) / 1e9;
 			logf("***** Reload memory used before %d MB -> GC %d MB -> reload ctx %d MB (%.1f s) *****\n", usedMemory,
 					ntusedMemory, MEMORY_LAST_USED_MB, reloadTimeSeconds);
-			if (reloadTimeSeconds * 16 > MEMORY_RELOAD_TIMEOUT_SECONDS) {
+			if (reloadTimeSeconds * 8 > MEMORY_RELOAD_TIMEOUT_SECONDS) {
 				MEMORY_RELOAD_TIMEOUT_SECONDS = (int) (reloadTimeSeconds * 16);
 				logf("New reload memory time %d seconds", MEMORY_RELOAD_TIMEOUT_SECONDS);
 			}

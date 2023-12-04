@@ -63,7 +63,8 @@ import net.osmand.util.MapUtils;
 // HH routing + C++ routing wrong turns
 // TEST: Java / C++ approximation, Java / C++ routing 
 // 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
-// 1.2 Check coverage HH is not enough & don't calculate (Monaco)
+// 1.2 Check coverage HH is not enough & don't calculate 
+// 1.2.1 Empty HH file (Monaco)
 // 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 
@@ -84,8 +85,7 @@ import net.osmand.util.MapUtils;
 // 2.8 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 
 // 3. MID-TERM Speedups, small bugs and Data research
-// 3.0.1 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
-// 3.0.2 Monaco doesn't have any cluster point will it support hh routing?
+// 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
@@ -1442,10 +1442,8 @@ public class HHRoutingSubGraphCreator {
 
 	public void mergeConnectedPoints(NetworkCollectPointCtx ctx) {
 		// Connected points needs to be merged to create continuous network
-		// As single point will be ignored as end of the roads that might be a problem
-		// for continuity
-		// Points to merge happen in both cases: processing long roads and having a
-		// limit TOTAL_MAX_POINTS
+		// As single point will be ignored as end of the roads that might be a problem for continuity
+		// Points to merge happen in both cases: processing long roads and having a limit TOTAL_MAX_POINTS
 		TLongObjectHashMap<List<RouteSegmentBorderPoint>> mp = new TLongObjectHashMap<>();
 		List<NetworkBorderPoint> lst = new ArrayList<>(ctx.networkPointToDbInd.valueCollection());
 		for (NetworkBorderPoint p : lst) {
