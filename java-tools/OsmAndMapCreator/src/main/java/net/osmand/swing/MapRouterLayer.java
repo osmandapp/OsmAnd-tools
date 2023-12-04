@@ -98,6 +98,7 @@ import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
@@ -292,7 +293,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		menu.add(points);
 		final JMenu directions = new JMenu("Directions"); //$NON-NLS-1$
 		menu.add(directions);
-		Action complexRoute = new AbstractAction("Build route (OsmAnd standard|COMPLEX)") {
+		Action complexRoute = new AbstractAction("Build route (OsmAnd 2-phase|COMPLEX)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
@@ -304,7 +305,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		directions.add(complexRoute);
 
 
-		Action selfRoute = new AbstractAction("Build route (OsmAnd short|NORMAL)") {
+		Action selfRoute = new AbstractAction("Build route (OsmAnd slow+precise|NORMAL)") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
@@ -315,7 +316,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		};
 		directions.add(selfRoute);
 
-		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd long|BASE)") {
+		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd fast+long|BASE)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
@@ -326,16 +327,17 @@ public class MapRouterLayer implements MapPanelLayer {
 		};
 		directions.add(selfBaseRoute);
 		
-		Action hhRoute = new AbstractAction("Build HH route") {
-			private static final long serialVersionUID = 8049712829806139142L;
+		Action selfHHRoute = new AbstractAction("Build HH route (only)") {
+			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(null, true);
+				calcRoute(RouteCalculationMode.NORMAL, true);
 			}
 		};
-		directions.add(hhRoute);
+		directions.add(selfHHRoute);
+		
 		
 		if (selectedGPXFile != null) {
 			Action recalculate = new AbstractAction("Calculate GPX route (OsmAnd)") {
@@ -801,8 +803,16 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void run() {
 				map.setPoints(new DataTileManager<Entity>(11));
-				Collection<Entity> res = hh ? hhRoute(startRoute, endRoute)
-						: selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+				Collection<Entity> res;
+				if(hh) {
+//					res = hhRoute(startRoute, endRoute); // to test DB
+					RoutePlannerFrontEnd.USE_HH_ROUTING = true;
+					RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = true;
+					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+				} else {
+					RoutePlannerFrontEnd.USE_HH_ROUTING = false;
+					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+				}
 				if (res != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Entity w : res) {
@@ -963,7 +973,8 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	
-	private Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute) {
+	protected Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute) {
+		// specialize testing
 		try {
 			String profile = DataExtractionSettings.getSettings().getRouteMode();
 			if(profile.indexOf(',') != -1) {
@@ -987,13 +998,13 @@ public class MapRouterLayer implements MapPanelLayer {
 
 			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
 			List<Entity> lst = new ArrayList<Entity>();
-			if (route.error != null) {
-				JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), route.error, "Routing error",
+			if (route.getError() != null) {
+				JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), route.getError(), "Routing error",
 						JOptionPane.ERROR_MESSAGE);
-				System.err.println(route.error);
+				System.err.println(route.getError());
 			}
-			if (!route.detailed.isEmpty()) {
-				calculateResult(lst, route.detailed);
+			if (!route.getList().isEmpty()) {
+				calculateResult(lst, route.getList());
 			} else {
 				TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
 				for (HHNetworkSegmentRes r : route.segments) {
@@ -1056,7 +1067,6 @@ public class MapRouterLayer implements MapPanelLayer {
 					return null;
 				}
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-				RoutePlannerFrontEnd.USE_HH_ROUTING = false;
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 				// LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
@@ -1076,9 +1086,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				try {
 					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
-					List<RouteSegmentResult> searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
+					RouteCalcResult searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
 							: router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-					throwExceptionIfRouteNotFound(ctx, searchRoute);
+					throwExceptionIfRouteNotFound(ctx, searchRoute.getList());
 					System.out.println("Routing time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
 						playPauseButton.setVisible(false);
@@ -1086,8 +1096,8 @@ public class MapRouterLayer implements MapPanelLayer {
 						waitNextPress();
 						nextTurn.setText(">>");
 					}
-					this.previousRoute = searchRoute;
-					calculateResult(res, searchRoute);
+					this.previousRoute = searchRoute.getList();
+					calculateResult(res, searchRoute.getList());
 				} finally {
 					if (ctx.calculationProgress != null) {
 						ctx.calculationProgress.isCancelled = true;
@@ -1160,17 +1170,18 @@ public class MapRouterLayer implements MapPanelLayer {
 		return ctx;
 	}
 
-	private List<RouteSegmentResult> getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
+	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
 			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
 		if (TEST_INTERMEDIATE_POINTS) {
-			return r.result;
+			return new RouteCalcResult(r.result);
 		}
 		List<RouteSegmentResult> rsr = new ArrayList<RouteSegmentResult>();
 		for (GpxPoint pnt : r.finalPoints) {
 			rsr.addAll(pnt.routeToTarget);
 		}
-		return rsr;
+		
+		return new RouteCalcResult(rsr);
 	}
 
 	private void throwExceptionIfRouteNotFound(final RoutingContext ctx, List<RouteSegmentResult> searchRoute) {

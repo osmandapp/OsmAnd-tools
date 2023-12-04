@@ -817,8 +817,9 @@ public class OsmAndMapsService {
 				routeRes = approximate(ctx, router, props, polyline);
 			} else {
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
-				RoutePlannerFrontEnd.USE_HH_ROUTING = true;
-				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
+				RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = true;
+//				RoutePlannerFrontEnd.USE_HH_ROUTING = true;
+				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection).getList();
 				putResultProps(ctx, routeRes, props);
 			}
 		} finally {

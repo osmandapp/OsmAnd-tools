@@ -62,6 +62,7 @@ import net.osmand.util.MapUtils;
 // 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
 // HH routing + C++ routing wrong turns
 // TEST: Java / C++ approximation, Java / C++ routing 
+// Long routes crashes
 // 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
 // 1.2 Check coverage HH is not enough & don't calculate 
 // 1.2.1 Empty HH file (Monaco)
