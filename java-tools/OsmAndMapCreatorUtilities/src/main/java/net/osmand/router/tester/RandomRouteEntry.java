@@ -125,19 +125,17 @@ class RandomRouteReport {
 		String start = String.format("%f,%f", ideal.entry.start.getLatitude(), ideal.entry.start.getLongitude());
 		String finish = String.format("%f,%f", ideal.entry.finish.getLatitude(), ideal.entry.finish.getLongitude());
 		String url = ideal.toString();
-		String geoOk = "ok";
 
 		this.html += "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, ideal.type) + // 1
 				String.format("<td>%.2f</td>", ideal.cost) +                                     // 2
 				String.format("<td>%.2f</td>", ideal.distance) +                                 // 3
-				String.format("<td>%s</td>", geoOk) +                                            // 4
-				String.format("<td>%d</td>", ideal.visitedSegments) +                            // 5
-				String.format("<td>%.1f</td>", ideal.runTime / 1000F) +                          // 6
-				String.format("<td>%s</td>", start) +                                            // 7
-				String.format("<td>%s</td>", finish) +                                           // 8
-				String.format("<td>%d</td>", ideal.entry.via.size()) +                           // 9
-				String.format("<td>%s</td>", mapCreatorProfileParams) +                          // 10
+				String.format("<td>%d</td>", ideal.visitedSegments) +                            // 4
+				String.format("<td>%.1f</td>", ideal.runTime / 1000F) +                          // 5
+				String.format("<td>%s</td>", start) +                                            // 6
+				String.format("<td>%s</td>", finish) +                                           // 7
+				String.format("<td>%d</td>", ideal.entry.via.size()) +                           // 8
+				String.format("<td>%s</td>", mapCreatorProfileParams) +                          // 9
 				"</tr>\n";
 
 		this.text += String.format("%d:%s cost=%.2f dist=%.2f segments=%d seconds=%.1f via=%d profile=%s\n",
@@ -153,14 +151,7 @@ class RandomRouteReport {
 	}
 
 	void resultCompare(int n, RandomRouteResult result, RandomRouteResult ideal) {
-		String mapCreatorProfileParams = (result.entry.profile + "," + result.entry.params.toString())
-				.replaceAll("[\\[ \\]]", "") // remove array specific chars
-				.replaceAll(":", "=") // replace key:value to key=value
-				.replaceAll(",$", ""); // drop tailing comma
-		String start = String.format("%f,%f", result.entry.start.getLatitude(), result.entry.start.getLongitude());
-		String finish = String.format("%f,%f", result.entry.finish.getLatitude(), result.entry.finish.getLongitude());
 		String url = result.toString();
-		String geoOk = "?"; // TODO
 
 		double dCost = ideal.cost > 0 ? (result.cost / ideal.cost - 1) * 100 : 0;
 		String sCost = Math.abs(dCost) < deviationYellow ? "ok"
@@ -175,14 +166,10 @@ class RandomRouteReport {
 		this.html += "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, result.type) + // 1
 				String.format("<td><font color=%s>%s</font></td>", colorCost, sCost) +            // 2
-				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +    // 2
-				String.format("<td>%s</td>", geoOk) +                                             // 4
-				String.format("<td>%d</td>", result.visitedSegments) +                            // 5
-				String.format("<td>%.1f</td>", result.runTime / 1000F) +                          // 6
-				String.format("<td>%s</td>", start) +                                             // 7
-				String.format("<td>%s</td>", finish) +                                            // 8
-				String.format("<td>%d</td>", result.entry.via.size()) +                           // 9
-				String.format("<td>%s</td>", mapCreatorProfileParams) +                           // A
+				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +    // 3
+				String.format("<td>%d</td>", result.visitedSegments) +                            // 4
+				String.format("<td>%.1f</td>", result.runTime / 1000F) +                          // 5
+				String.format("<td colspan=4>&nbsp;</td>") +                                      // 6-9
 				"</tr>\n";
 
 		this.text += String.format("%d:%s cost %s dist %s segments=%d seconds=%.1f\n",
@@ -200,13 +187,12 @@ class RandomRouteReport {
 				String.format("<th>%d</th>", n) + // 1
 				"<th>cost</th>" +                 // 2
 				"<th>dist</th>" +                 // 3
-				"<th>geo</th>" +                  // 4
-				"<th>vis</th>" +                  // 5
-				"<th>s</th>" +                    // 6
-				"<th>start</th>" +                // 7
-				"<th>finish</th>" +               // 8
-				"<th>via</th>" +                  // 9
-				"<th>profile</th>" +              // A
+				"<th>vis</th>" +                  // 4
+				"<th>s</th>" +                    // 5
+				"<th>start</th>" +                // 6
+				"<th>finish</th>" +               // 7
+				"<th>via</th>" +                  // 8
+				"<th>profile</th>" +              // 9
 				"</tr>\n";
 	}
 
