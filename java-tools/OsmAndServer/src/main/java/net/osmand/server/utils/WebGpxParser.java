@@ -6,6 +6,7 @@ import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
 import static net.osmand.gpx.GPXUtilities.ICON_NAME_EXTENSION;
 import static net.osmand.gpx.GPXUtilities.PROFILE_TYPE_EXTENSION;
 import static net.osmand.gpx.GPXUtilities.TRKPT_INDEX_EXTENSION;
+import static net.osmand.gpx.GPXUtilities.HIDDEN_EXTENSION;
 import static net.osmand.gpx.GPXUtilities.parseColor;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.util.Algorithms.colorToString;
@@ -78,6 +79,7 @@ public class WebGpxParser {
         public String address;
         public String color;
         public String background;
+        public String hidden;
         public String icon;
         public double lat;
         public double lon;
@@ -125,6 +127,10 @@ public class WebGpxParser {
                     }
                     if (e.getKey().equals(ICON_NAME_EXTENSION)) {
                         icon = e.getValue();
+                        it.remove();
+                    }
+                    if (e.getKey().equals(HIDDEN_EXTENSION)) {
+                        hidden = e.getValue();
                         it.remove();
                     }
                 }
@@ -604,6 +610,9 @@ public class WebGpxParser {
         }
         if (wpt.icon != null) {
             point.extensions.put(ICON_NAME_EXTENSION, wpt.icon);
+        }
+        if (wpt.hidden != null) {
+            point.extensions.put(HIDDEN_EXTENSION, wpt.hidden);
         }
         return point;
     }

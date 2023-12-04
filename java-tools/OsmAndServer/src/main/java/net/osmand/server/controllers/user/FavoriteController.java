@@ -22,6 +22,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.*;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -59,6 +60,31 @@ public class FavoriteController {
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         
         return favoriteService.updateFavoriteFile(fileName, dev, updatetime, file);
+    }
+    
+    @PostMapping(value = "/update-all-favorites")
+    @ResponseBody
+    public ResponseEntity<String> updateAllFavorites(@RequestBody List<String> data,
+                                                     @RequestParam String fileName,
+                                                     @RequestParam Long updatetime) throws IOException {
+        PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
+        GPXFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        UserdataService.ResponseFileStatus respNewGroup;
+        if (file != null) {
+            data.forEach(d -> {
+                GPXUtilities.WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(d, WebGpxParser.Wpt.class));
+                file.updateWptPt(wptPt.name, data.indexOf(d), wptPt);
+            });
+            File newTmpGpx = favoriteService.createTmpGpxFile(file, fileName);
+            favoriteService.uploadFavoriteFile(newTmpGpx, dev, fileName, updatetime);
+            respNewGroup = favoriteService.createResponse(dev, fileName, file, newTmpGpx);
+        } else
+            throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
+                    UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+        
+        return ResponseEntity.ok(gson.toJson(Map.of(
+                "respNewGroup", respNewGroup,
+                "respOldGroup", "")));
     }
     
     @PostMapping(value = "/add")

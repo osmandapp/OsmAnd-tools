@@ -392,7 +392,7 @@ public class MapApiController {
 	
 	private boolean isHidden(WebGpxParser.PointsGroup group) {
 		for (WebGpxParser.Wpt wpt:  group.points) {
-			if (wpt.ext.extensions.get("hidden") != null && wpt.ext.extensions.get("hidden").equals("true")) {
+			if (wpt.hidden != null && wpt.hidden.equals("true")) {
 				return true;
 			}
 		}
