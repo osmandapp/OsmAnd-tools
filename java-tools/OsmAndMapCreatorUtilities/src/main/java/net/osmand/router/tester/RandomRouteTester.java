@@ -20,18 +20,18 @@ import net.osmand.PlatformUtil;
 public class RandomRouteTester {
 	class GeneratorConfig {
 		String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
+//				"https://test.osmand.net/map/?start=48.913403,11.872949&finish=49.079640,11.752095&type=osmand&profile=car#10/48.996521/11.812522"
 //				"https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles#14/48.1852/24.4208",
 //				"https://osmand.net/map/?start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&type=osmand&profile=car#14/50.4505/30.5511",
 //				"start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles",
 //				"start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&profile=car",
 //				"start=50.450128,30.535611&finish=50.460479,30.589365&via=1,2;3,4;5,6&profile=car",
-//				"start=L,L&finish=L,L&via=L,L;L,L&profile=pedestrian&params=height_obstacles" // example
-				"https://test.osmand.net/map/?start=48.913403,11.872949&finish=49.079640,11.752095&type=osmand&profile=car#10/48.996521/11.812522"
+//	/*example*/ "start=L,L&finish=L,L&via=L,L;L,L&profile=pedestrian&params=height_obstacles"
 		};
 
 		// random tests settings
-		int ITERATIONS = 1; // number of random routes
-		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
+		int ITERATIONS = 10; // number of random routes
+		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
 		int MIN_DISTANCE_KM = 20; // min distance between start and finish (50)
 		int MAX_DISTANCE_KM = 30; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
@@ -318,6 +318,7 @@ public class RandomRouteTester {
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
 
 		RoutePlannerFrontEnd.USE_HH_ROUTING = false;
+		RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = false;
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
@@ -340,7 +341,8 @@ public class RandomRouteTester {
 //		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = false; // debug
 //		BinaryRoutePlanner.TRACE_ROUTING = false; // make it public
 
-		List<RouteSegmentResult> routeSegments = fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null);
+		List<RouteSegmentResult> routeSegments =
+				fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null).getList();
 
 		long runTime = System.currentTimeMillis() - started;
 
@@ -355,7 +357,7 @@ public class RandomRouteTester {
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
 
 		RoutePlannerFrontEnd.USE_HH_ROUTING = true;
-//		RoutePlannerFrontEnd.USE_HH_ROUTING_ONLY = true; // TODO
+		RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = true;
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
@@ -372,9 +374,10 @@ public class RandomRouteTester {
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
 		);
 
-		// TODO think how to set HH settings before test
+		// TODO think how to play with HH settings
 
-		List<RouteSegmentResult> routeSegments = fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null);
+		List<RouteSegmentResult> routeSegments =
+				fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null).getList();
 
 		long runTime = System.currentTimeMillis() - started;
 
