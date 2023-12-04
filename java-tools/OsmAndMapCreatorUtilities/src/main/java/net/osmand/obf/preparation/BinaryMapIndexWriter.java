@@ -2,13 +2,6 @@ package net.osmand.obf.preparation;
 
 
 
-import com.google.protobuf.Message;
-import gnu.trove.list.TLongList;
-import gnu.trove.list.array.TByteArrayList;
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.TIntObjectMap;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -30,6 +23,20 @@ import java.util.Stack;
 import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.Message;
+import com.google.protobuf.WireFormat;
+import com.google.protobuf.WireFormat.FieldType;
+
+import gnu.trove.list.TLongList;
+import gnu.trove.list.array.TByteArrayList;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.TIntObjectMap;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
@@ -46,6 +53,11 @@ import net.osmand.binary.OsmandOdb.OsmAndAddressIndex.CitiesIndex;
 import net.osmand.binary.OsmandOdb.OsmAndAddressNameIndexData;
 import net.osmand.binary.OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData;
 import net.osmand.binary.OsmandOdb.OsmAndCategoryTable.Builder;
+import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex;
+import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRouteBlockSegments;
+import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRouteNetworkPoint;
+import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointSegments;
+import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointsBox;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapDataBox;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapEncodingRule;
@@ -83,20 +95,13 @@ import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Node;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import com.google.protobuf.ByteString;
-import com.google.protobuf.CodedOutputStream;
-import com.google.protobuf.WireFormat;
-import com.google.protobuf.WireFormat.FieldType;
 
 public class BinaryMapIndexWriter {
 
@@ -154,6 +159,10 @@ public class BinaryMapIndexWriter {
 
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
+	
+	
+	private final static int HH_INDEX_INIT = 17;
+	private final static int HH_BLOCK_SEGMENTS =18;
 
 
 	public BinaryMapIndexWriter(final RandomAccessFile raf, long timestamp) throws IOException {
@@ -235,6 +244,25 @@ public class BinaryMapIndexWriter {
 		int len = writeInt32Size();
 		log.info("MAP INDEX SIZE : " + len);
 	}
+	
+	
+	public void startHHRoutingIndex(long edition, String profile, String... params) throws IOException {
+		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
+		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+		preserveInt32Size();
+		codedOutStream.writeInt64(OsmandOdb.OsmAndHHRoutingIndex.EDITION_FIELD_NUMBER, edition);
+		codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILE_FIELD_NUMBER, profile);
+		for (String s : params) {
+			codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILEPARAMS_FIELD_NUMBER, s);
+		}
+	}
+
+	public void endHHRoutingIndex() throws IOException {
+		popState(HH_INDEX_INIT);
+		int len = writeInt32Size();
+		log.info("HHROUTING INDEX SIZE : " + len);
+	}
+
 
 	public void startWriteRouteIndex(String name) throws IOException {
 		pushState(ROUTE_INDEX_INIT, OSMAND_STRUCTURE_INIT);
@@ -480,6 +508,87 @@ public class BinaryMapIndexWriter {
 	public void endWriteMapTreeElement() throws IOException {
 		popState(MAP_TREE);
 		stackBounds.pop();
+		writeInt32Size();
+	}
+	
+	public void startHHRouteTreeElement(int leftX, int rightX, int topY, int bottomY) throws IOException {
+		checkPeekState(ROUTE_TREE, HH_INDEX_INIT);
+		if (state.peek() == HH_INDEX_INIT) {
+			codedOutStream.writeTag(OsmAndHHRoutingIndex.POINTBOXES_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+		} else {
+			codedOutStream.writeTag(HHRoutePointsBox.BOXES_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+		}
+		state.push(ROUTE_TREE);
+		preserveInt32Size();
+		Bounds bounds;
+		if (stackBounds.isEmpty()) {
+			bounds = new Bounds(0, 0, 0, 0);
+		} else {
+			bounds = stackBounds.peek();
+		}
+		codedOutStream.writeSInt32(HHRoutePointsBox.LEFT_FIELD_NUMBER, leftX - bounds.leftX);
+		codedOutStream.writeSInt32(HHRoutePointsBox.RIGHT_FIELD_NUMBER, rightX - bounds.rightX);
+		codedOutStream.writeSInt32(HHRoutePointsBox.TOP_FIELD_NUMBER, topY - bounds.topY);
+		codedOutStream.writeSInt32(HHRoutePointsBox.BOTTOM_FIELD_NUMBER, bottomY - bounds.bottomY);
+		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
+	}
+	
+	public void writeHHRoutePoints(List<? extends NetworkDBPoint> l) throws IOException {
+		checkPeekState(ROUTE_TREE);
+		Bounds bounds = stackBounds.peek();
+		for (NetworkDBPoint p : l) {
+			HHRouteNetworkPoint.Builder builder = HHRouteNetworkPoint.newBuilder();
+			builder.setClusterId(p.clusterId);
+			builder.setGlobalId(p.index);
+			builder.setId(p.fileId);
+			builder.setRoadId(p.roadId);
+			builder.setRoadStartEndIndex((p.start << 1) + (p.end > p.start ? 1 : 0));
+			builder.setDx(p.startX - bounds.leftX);
+			builder.setDy(p.startY - bounds.topY);
+			if (p.mapId > 1) {
+				builder.setPartialInd(p.mapId - 1);
+			} else if (p.mapId == 0) {
+				throw new IllegalStateException();
+			}
+			if (p.dualPoint != null) {
+				builder.setDualClusterId(p.dualPoint.clusterId);
+				builder.setDualPointId(p.dualPoint.index);
+			}
+			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointsBox.POINTS_FIELD_NUMBER, builder.build());
+		}
+	}
+
+	public void endHHRouteTreeElement() throws IOException {
+		popState(ROUTE_TREE);
+		stackBounds.pop();
+		writeInt32Size();
+	}
+	
+	public void startHHRouteBlockSegments(int idRangeStart, int idRangeLength, int profileId) throws IOException {
+		checkPeekState(HH_BLOCK_SEGMENTS, HH_INDEX_INIT);
+		if (state.peek() == HH_INDEX_INIT) {
+			codedOutStream.writeTag(OsmAndHHRoutingIndex.POINTSEGMENTS_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+		} else {
+			codedOutStream.writeTag(HHRouteBlockSegments.INNERBLOCKS_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+		}
+		state.push(HH_BLOCK_SEGMENTS);
+		preserveInt32Size();
+		codedOutStream.writeInt32(HHRouteBlockSegments.IDRANGESTART_FIELD_NUMBER, idRangeStart);
+		codedOutStream.writeInt32(HHRouteBlockSegments.IDRANGELENGTH_FIELD_NUMBER, idRangeLength);
+		codedOutStream.writeInt32(HHRouteBlockSegments.PROFILEID_FIELD_NUMBER, profileId);
+	}
+	
+	public void writePointSegments(byte[] segmentsIn, byte[] segmentsOut) throws IOException {
+		checkPeekState(HH_BLOCK_SEGMENTS);
+		HHRoutePointSegments.Builder bld = HHRoutePointSegments.newBuilder();
+		bld.setSegmentsIn(ByteString.copyFrom(segmentsIn));
+		bld.setSegmentsOut(ByteString.copyFrom(segmentsOut));
+		codedOutStream.writeMessage(HHRouteBlockSegments.POINTSEGMENTS_FIELD_NUMBER, bld.build());
+	}
+
+	
+	public void endHHRouteBlockSegments() throws IOException {
+		popState(HH_BLOCK_SEGMENTS);
 		writeInt32Size();
 	}
 

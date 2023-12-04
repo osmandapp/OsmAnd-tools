@@ -28,7 +28,7 @@ osmand:
   web.location: ${osmand.files.location}/website
   srtm.location: ${SRTM_LOCATION:}
   weather.location: ${WEATHER_LOCATION:}
-  wiki.location: ${osmand.files.location}/wikidata/commonswiki.sqlite
+  wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
   
 server:
   port: 8080

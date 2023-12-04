@@ -55,7 +55,7 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 @RequestMapping("/routing")
 public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
-    private static final int MAX_DISTANCE = 1000;
+    private static final int MAX_DISTANCE = 9999; // see also REACT_APP_MAX_ROUTE_DISTANCE in web-repo
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
 	@Autowired

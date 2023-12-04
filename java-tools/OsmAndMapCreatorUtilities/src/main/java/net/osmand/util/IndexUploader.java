@@ -1,9 +1,6 @@
 package net.osmand.util;
 
 
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -32,35 +29,7 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-
-import net.osmand.IndexConstants;
-import net.osmand.PlatformUtil;
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.MapRoot;
-import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
-import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
-import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
-import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
-import net.osmand.binary.OsmandOdb;
-import net.osmand.obf.BinaryMerger;
-import net.osmand.obf.preparation.AbstractIndexPartCreator;
-import net.osmand.obf.preparation.BinaryFileReference;
-import net.osmand.obf.preparation.BinaryMapIndexWriter;
-import net.osmand.obf.preparation.IndexVectorMapCreator;
-
 import org.apache.commons.logging.Log;
-
-import rtree.LeafElement;
-import rtree.RTree;
-import rtree.RTreeException;
-import rtree.Rect;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -69,6 +38,30 @@ import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
+
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.IndexConstants;
+import net.osmand.PlatformUtil;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.binary.OsmandOdb;
+import net.osmand.obf.BinaryMerger;
+import net.osmand.obf.preparation.AbstractIndexPartCreator;
+import net.osmand.obf.preparation.BinaryFileReference;
+import net.osmand.obf.preparation.BinaryMapIndexWriter;
+import net.osmand.obf.preparation.IndexVectorMapCreator;
+import rtree.LeafElement;
+import rtree.RTree;
+import rtree.RTreeException;
+import rtree.Rect;
 
 /**
  * This helper will find obf and zip files, create description for them, and zip them, or update the description. This
@@ -545,21 +538,8 @@ public class IndexUploader {
 				// copy only part of map index
 				copyMapIndex(roadOnlyFile, (MapIndex) part, index, ous, raf, routf);
 				continue;
-			} else if (part instanceof AddressRegion) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else if (part instanceof TransportIndex) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.TRANSPORTINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else if (part instanceof PoiRegion) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else if (part instanceof RouteRegion) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else {
-				throw new UnsupportedOperationException();
-			}
+			} 
+			ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 			BinaryMerger.writeInt(ous, part.getLength());
 			BinaryMerger.copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
 		}

@@ -312,7 +312,7 @@ public class ObfRegionSplitter {
 			int y = stop.y31;
 			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 			for (BinaryMapDataObject b : l) {
-				if (osmandRegions.contain(b, x, y)) {
+				if (OsmandRegions.contain(b, x, y)) {
 					String dw = osmandRegions.getDownloadName(b);
 					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
 					if (dw == null || wr == null) {
@@ -342,7 +342,7 @@ public class ObfRegionSplitter {
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 				for (BinaryMapDataObject b : l) {
-					if (osmandRegions.contain(b, x, y)) {
+					if (OsmandRegions.contain(b, x, y)) {
 						String dw = osmandRegions.getDownloadName(b);
 						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
 						if (dw == null || wr == null) {

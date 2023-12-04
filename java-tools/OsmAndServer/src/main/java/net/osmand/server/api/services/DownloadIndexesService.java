@@ -420,7 +420,7 @@ public class DownloadIndexesService  {
 	    WIKIMAP("wiki", "wiki") ,
 	    TRAVEL("travel", "wikivoyage", "travel") ,
 	    ROAD_MAP("road-indexes", "road"),
-	    HILLSHADE("hillshade"),
+	    HILLSHADE("hillshade", "hillshade"),
 	    HEIGHTMAP("heightmap", "heightmap"), // Deprecated
 	    GEOTIFF("heightmap", "heightmap"),
 	    SLOPE("slope", "slope") ,
@@ -775,11 +775,11 @@ public class DownloadIndexesService  {
 			return globalRegion.getPercent(type, serverName);
 			
 		}
-		
-		
+
 		public String getServer(DownloadServerSpecialty type, String remoteAddr) {
 			DownloadServerRegion region = globalRegion;
-			if (remoteAddr != null) {
+			// avoid IPv6 ~/:/ as incompatible with matchesIp()
+			if (remoteAddr != null && !remoteAddr.contains(":")) {
 				for (DownloadServerRegion r : regions) {
 					if (r.matchesIp(r.asInteger(remoteAddr))) {
 						region = r;
