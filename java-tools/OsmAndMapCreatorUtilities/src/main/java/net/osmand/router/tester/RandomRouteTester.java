@@ -31,9 +31,9 @@ public class RandomRouteTester {
 
 		// random tests settings
 		int ITERATIONS = 10; // number of random routes
-		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
-		int MIN_DISTANCE_KM = 20; // min distance between start and finish (50)
-		int MAX_DISTANCE_KM = 30; // max distance between start and finish (100)
+		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
+		int MIN_DISTANCE_KM = 5; // min distance between start and finish (50)
+		int MAX_DISTANCE_KM = 10; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",

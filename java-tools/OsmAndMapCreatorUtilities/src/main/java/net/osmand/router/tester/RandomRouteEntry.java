@@ -105,7 +105,7 @@ class RandomRouteReport {
 
 	RandomRouteReport(long started, int nObf, int nRoutes, double red, double yellow) {
 		this.deviationRed = red;
-		this.deviationYellow = red;
+		this.deviationYellow = yellow;
 
 		long runTime = System.currentTimeMillis() - started;
 		String dt = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(Calendar.getInstance().getTime());
