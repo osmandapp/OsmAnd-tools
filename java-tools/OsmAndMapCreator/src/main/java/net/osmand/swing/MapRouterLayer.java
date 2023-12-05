@@ -812,6 +812,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
 				} else {
 					RoutePlannerFrontEnd.USE_HH_ROUTING = false;
+					RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = false;
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
 				}
 				if (res != null) {
