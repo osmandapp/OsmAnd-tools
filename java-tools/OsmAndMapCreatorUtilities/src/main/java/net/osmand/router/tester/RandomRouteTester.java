@@ -374,7 +374,7 @@ public class RandomRouteTester {
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
 		);
 
-		// TODO think how to play with HH settings
+//		RoutePlannerFrontEnd.HH_ROUTING_CONFIG = null; // way to set config for hh
 
 		List<RouteSegmentResult> routeSegments =
 				fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null).getList();
