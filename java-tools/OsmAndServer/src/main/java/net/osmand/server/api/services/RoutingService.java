@@ -29,15 +29,15 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 
 @Service
 public class RoutingService {
-    
+
     private static final int DISTANCE_MID_POINT = 25000;
     @Autowired
     OsmAndMapsService osmAndMapsService;
-    
+
     @Autowired
     WebGpxParser webGpxParser;
-    
-    
+
+
     public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode, boolean hasRouting, boolean isLongDist) throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
@@ -48,10 +48,10 @@ public class RoutingService {
         } else {
             routeSegmentResults = osmAndMapsService.routing(routeMode, props, startLatLon,
                     endLatLon, Collections.emptyList(), Collections.emptyList());
-    
+
             pointsRes = getPoints(routeSegmentResults, locations);
         }
-        
+
         if (!pointsRes.isEmpty()) {
             GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
             if (hasRouting) {
@@ -61,7 +61,7 @@ public class RoutingService {
         }
         return pointsRes;
     }
-    
+
     public synchronized List<WebGpxParser.Point> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
         List<Location> locations = new ArrayList<>();
         List<RouteSegmentResult> approximateResult = osmAndMapsService.approximateRoute(points, routeMode);
@@ -73,7 +73,7 @@ public class RoutingService {
         }
         return gpxPoints;
     }
-    
+
     public List<WebGpxParser.Point> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
         List<WebGpxParser.Point> res = new ArrayList<>();
         res.add(points.get(0));
@@ -91,7 +91,7 @@ public class RoutingService {
         }
         return res;
     }
-    
+
     private List<WebGpxParser.Point> getStraightLine(double lat1, double lng1, double lat2, double lng2) {
         List<WebGpxParser.Point> line = new ArrayList<>();
         WebGpxParser.Point firstP = new WebGpxParser.Point();
@@ -102,12 +102,20 @@ public class RoutingService {
         lastP.lng = lng2;
         line.add(firstP);
         line.add(lastP);
-        
+
         return line;
     }
-    
-    public void fillRoutingModeParams(RoutingController.RoutingParameter nativeRouting, RoutingController.RoutingParameter nativeTrack, RoutingController.RoutingParameter calcMode,
-                                       RoutingController.RoutingParameter shortWay, Map.Entry<String, GeneralRouter> e, RoutingController.RoutingMode rm) {
+
+	public void fillRoutingModeParams(
+			RoutingController.RoutingParameter hhRouting,
+			RoutingController.RoutingParameter hhOnly,
+			RoutingController.RoutingParameter nativeRouting,
+			RoutingController.RoutingParameter nativeTrack,
+			RoutingController.RoutingParameter calcMode,
+			RoutingController.RoutingParameter shortWay,
+			Map.Entry<String, GeneralRouter> e,
+			RoutingController.RoutingMode rm
+	) {
         List<RoutingController.RoutingParameter> rps = new ArrayList<>();
         rps.add(shortWay);
         for (Map.Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
@@ -163,11 +171,13 @@ public class RoutingService {
         for (RoutingController.RoutingParameter rp : rps) {
             rm.params.put(rp.key, rp);
         }
-        rm.params.put(nativeRouting.key, nativeRouting);
+        rm.params.put(hhRouting.key, hhRouting);
+		rm.params.put(hhOnly.key, hhOnly);
+		rm.params.put(nativeRouting.key, nativeRouting);
         rm.params.put(nativeTrack.key, nativeTrack);
         rm.params.put(calcMode.key, calcMode);
     }
-    
+
     public void calculateStraightLine(List<LatLon> list) {
         for (int i = 1; i < list.size();) {
             if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {
@@ -178,7 +188,7 @@ public class RoutingService {
             }
         }
     }
-    
+
     public void convertResults(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
         LatLon last = null;
         for (RouteSegmentResult r : res) {
@@ -205,7 +215,7 @@ public class RoutingService {
             resList.add(last);
         }
     }
-    
+
     private GPXUtilities.TrkSegment generateRouteSegments(List<RouteSegmentResult> route, List<Location> locations) {
         GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
         RouteDataResources resources = new RouteDataResources(locations, Collections.emptyList());
@@ -217,7 +227,7 @@ public class RoutingService {
             for (RouteSegmentResult sr : route) {
                 sr.collectNames(resources);
             }
-            
+
             for (RouteSegmentResult sr : route) {
                 RouteDataBundle itemBundle = new RouteDataBundle(resources);
                 sr.writeToBundle(itemBundle);
@@ -231,26 +241,26 @@ public class RoutingService {
             rule.writeToBundle(typeBundle);
             typeList.add(typeBundle);
         }
-        
+
         if (locations.isEmpty()) {
             return trkSegment;
         }
-        
+
         List<GPXUtilities.RouteSegment> routeSegments = new ArrayList<>();
         for (StringBundle item : routeItems) {
             routeSegments.add(GPXUtilities.RouteSegment.fromStringBundle(item));
         }
         trkSegment.routeSegments = routeSegments;
-        
+
         List<GPXUtilities.RouteType> routeTypes = new ArrayList<>();
         for (StringBundle item : typeList) {
             routeTypes.add(GPXUtilities.RouteType.fromStringBundle(item));
         }
         trkSegment.routeTypes = routeTypes;
-        
+
         return trkSegment;
     }
-    
+
     private void addDistance(List<WebGpxParser.Point> pointsRes) {
         for (int i = 1; i < pointsRes.size(); i++) {
             WebGpxParser.Point curr = pointsRes.get(i);
@@ -258,7 +268,7 @@ public class RoutingService {
             pointsRes.get(i).distance = (float) MapUtils.getDistance(prev.lat, prev.lng, curr.lat, curr.lng);
         }
     }
-    
+
     private List<WebGpxParser.Point> getPoints(List<RouteSegmentResult> routeSegmentResults, List<Location> locations) {
         if (routeSegmentResults != null) {
             List<WebGpxParser.Point> pointsRes = new ArrayList<>();
@@ -278,7 +288,7 @@ public class RoutingService {
         }
         return Collections.emptyList();
     }
-    
+
     private void getPoint(int ind, RouteSegmentResult r, List<Location> locations, float[] heightArray, List<WebGpxParser.Point> pointsRes) {
         LatLon point = r.getPoint(ind);
         locations.add(new Location("", point.getLatitude(), point.getLongitude()));

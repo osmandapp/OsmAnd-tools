@@ -161,11 +161,15 @@ public class RoutingController {
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
-		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development", 
-				"[Dev] C++ routing", true);
+		RoutingParameter hhRouting = new RoutingParameter("hhrouting", "Development",
+				"[Dev] Use HH (auto)", true);
+		RoutingParameter hhOnly = new RoutingParameter("hhonly", "Development",
+				"[Dev] Use HH (only)", false);
+		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
+				"[Dev] Use C++ (routing)", true);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
-				"[Dev] C++ route track", true);
-		RoutingParameter calcMode = new RoutingParameter("calcmode", "[Dev] Route mode", 
+				"[Dev] Use C++ (approximation)", true);
+		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
 				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
 		calcMode.section = "Development";
 		calcMode.value = "";
@@ -184,18 +188,20 @@ public class RoutingController {
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
-						routingService.fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+						routingService.fillRoutingModeParams(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
-					routingService.fillRoutingModeParams(nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+					routingService.fillRoutingModeParams(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 				}
 			}
 		}
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
 			RoutingMode rm = new RoutingMode(rs.name);
 			routers.put(rm.key, rm);
+			rm.params.put(hhRouting.key, hhRouting);
+			rm.params.put(hhOnly.key, hhOnly);
 			rm.params.put(nativeRouting.key, nativeRouting);
 			rm.params.put(nativeTrack.key, nativeTrack);
 		}
