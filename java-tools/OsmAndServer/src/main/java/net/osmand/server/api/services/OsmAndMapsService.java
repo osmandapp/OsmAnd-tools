@@ -725,6 +725,11 @@ public class OsmAndMapsService {
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
 		router.setUseNativeApproximation(false);
+
+		// reset every time
+		router.USE_HH_ROUTING = false;
+		router.USE_ONLY_HH_ROUTING = false;
+
 		RouteCalculationMode paramMode = null;
 		for (String p : props) {
 			if (p.length() == 0) {
@@ -741,6 +746,10 @@ public class OsmAndMapsService {
 				useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
+			} else if (key.equals("hhrouting")) {
+				router.USE_HH_ROUTING = Boolean.parseBoolean(value); // default true
+			} else if (key.equals("hhonly")) {
+				router.USE_ONLY_HH_ROUTING = Boolean.parseBoolean(value); // default false
 			} else if (key.equals("calcmode")) {
 				if (value.length() > 0) {
 					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
@@ -817,8 +826,6 @@ public class OsmAndMapsService {
 				routeRes = approximate(ctx, router, props, polyline);
 			} else {
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
-				RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = true;
-//				RoutePlannerFrontEnd.USE_HH_ROUTING = true;
 				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection).getList();
 				putResultProps(ctx, routeRes, props);
 			}
