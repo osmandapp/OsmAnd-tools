@@ -3,13 +3,7 @@ package net.osmand.server.controllers.pub;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.lang.Math;
 
 import javax.validation.Valid;
@@ -160,11 +154,14 @@ public class RoutingController {
 	
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
+		final Set<String> HH_ONLY_FORCED_PROFILES = Set.of("car", "bicycle");
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 		RoutingParameter hhRouting = new RoutingParameter("hhrouting", "Development",
 				"[Dev] Use HH (auto)", true);
-		RoutingParameter hhOnly = new RoutingParameter("hhonly", "Development",
+		RoutingParameter hhOnlyDefault = new RoutingParameter("hhonly", "Development",
 				"[Dev] Use HH (only)", false);
+		RoutingParameter hhOnlyForced = new RoutingParameter("hhonly", "Development",
+				"[Dev] Use HH (only)", true);
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
 				"[Dev] Use C++ (routing)", true);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
@@ -180,6 +177,8 @@ public class RoutingController {
 		};
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false); 
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
+			RoutingParameter hhOnly =
+					HH_ONLY_FORCED_PROFILES.contains(e.getValue().getProfileName()) ? hhOnlyForced : hhOnlyDefault;
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
@@ -188,12 +187,14 @@ public class RoutingController {
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
-						routingService.fillRoutingModeParams(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+						routingService.fillRoutingModeParams(
+								hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
-					routingService.fillRoutingModeParams(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+					routingService.fillRoutingModeParams(
+							hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
 				}
 			}
 		}
@@ -201,7 +202,7 @@ public class RoutingController {
 			RoutingMode rm = new RoutingMode(rs.name);
 			routers.put(rm.key, rm);
 			rm.params.put(hhRouting.key, hhRouting);
-			rm.params.put(hhOnly.key, hhOnly);
+			rm.params.put(hhOnlyDefault.key, hhOnlyDefault);
 			rm.params.put(nativeRouting.key, nativeRouting);
 			rm.params.put(nativeTrack.key, nativeTrack);
 		}
