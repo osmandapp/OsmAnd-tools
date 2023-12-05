@@ -96,7 +96,7 @@ public class BinaryInspector {
 					"-latlon=42.7405,18.6357",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Ukraine_europe_2.obf"
+					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

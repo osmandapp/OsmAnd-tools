@@ -51,23 +51,24 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
-//F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
-//F.4 FILE: Utility to cut cluster by countries
-//!!! RoutePlannerFrontEnd integration with Android !!!
-//2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
-//2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+// F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
+// F.4 FILE: Utility to cut cluster by countries
+// !!! RoutePlannerFrontEnd integration with Android !!!
+// 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
+// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
+// HH routing + C++ routing wrong turns
+// 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
+// Long routes crashes ? (issue with limit)?
+// 1.2.1 Empty HH file (Monaco) - too small so it start / end good
 
 /////////////////////////////////
 // IN PROGRESS
-// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
-// HH routing + C++ routing wrong turns
 // TEST: Java / C++ approximation, Java / C++ routing 
-// Long routes crashes
-// 1.1 Error HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
-// 1.2 Check coverage HH is not enough & don't calculate 
-// 1.2.1 Empty HH file (Monaco)
-// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
-// 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
+// 1.1 Error ! HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
+// 1.2 Check coverage HH is not enough & don't calculate (limit used maps by BBOX similar to Web) 
+// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
+// 2.0.1 Progress bar for HHRoutePlanner
+// 2.0.2 Intermediate points
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
@@ -76,17 +77,17 @@ import net.osmand.util.MapUtils;
 // C.4 C++ implementation HHRoutePlanner / Progress Bar
 
 // 2. SHORT-TERM HHRoutePlanner - fixes related to live data
-// 2.0.1 Progress bar for HHRoutePlanner
-// 2.0.2 Intermediate points
 // 2.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
 // 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 // 2.5 Avoid specific road
 // 2.6 Deprioritize or exclude roads (parameters)
 // 2.7 Live data (think about it)
 // 2.8 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
+// 2.9 BUG: Ferry not calculated in detailed to London / Marseille 
+// 2.10 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 
 // 3. MID-TERM Speedups, small bugs and Data research
-// 3.0 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
