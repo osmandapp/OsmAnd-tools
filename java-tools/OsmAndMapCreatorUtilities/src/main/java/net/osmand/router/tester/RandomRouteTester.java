@@ -96,10 +96,16 @@ public class RandomRouteTester {
 	private String optLibsDir;
 	private String optObfPrefix;
 	private String optHtmlReport;
+	private enum PrimaryRouting {
+		JAVA,
+		CPP,
+		HH		
+	}
+	private PrimaryRouting primaryRouting;
 
 	private long started;
 	private File obfDirectory;
-	NativeLibrary nativeLibrary = null;
+	private NativeLibrary nativeLibrary = null;
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 	private HashMap<String, File> hhFiles = new HashMap<>(); // [Profile]
 
@@ -201,9 +207,21 @@ public class RandomRouteTester {
 			System.exit(0);
 		}
 
+		if (opts.getOpt("--ideal") != null) {
+			// TODO ideal => primaryRouting
+			if ("java".equals(opts.getOpt("--ideal"))) {
+				primaryRouting = PrimaryRouting.JAVA;
+			} else if ("cpp".equals(opts.getOpt("--ideal"))) {
+				primaryRouting = PrimaryRouting.CPP;
+			} else if ("hh".equals(opts.getOpt("--ideal"))) {
+				primaryRouting = PrimaryRouting.HH;
+			}
+		}
+
 	}
 
 	private void reportResult() throws IOException {
+
 		RandomRouteReport report = new RandomRouteReport(
 				started, obfReaders.size(), testList.size(),
 				config.DEVIATION_RED, config.DEVIATION_YELLOW);
@@ -215,6 +233,7 @@ public class RandomRouteTester {
 				RandomRouteResult ideal = entry.results.get(0);
 				RandomRouteResult result = entry.results.get(j);
 				if (j == 0) {
+					//TODO rename
 					report.resultIdeal(i + 1, ideal);
 				} else {
 					report.resultCompare(i + 1, result, ideal);
@@ -251,7 +270,7 @@ public class RandomRouteTester {
 		}
 
 		if (obfReaders.size() == 0) {
-			throw new IllegalStateException("empty obfReaders");
+			throw new IllegalStateException("OBF files are not initialized!");
 		}
 	}
 
@@ -265,25 +284,34 @@ public class RandomRouteTester {
 		}
 		Counter counter = new Counter(); // TODO remove
 
-		testList.forEach(entry -> {
+		for (RandomRouteEntry entry : testList) {
 			System.err.printf("\n\n%d / %d ...\n\n", ++counter.value, testList.size());
 			try {
 				// ideal is always 1st route call of the entry
 				// other route calls will be compared to the ideal
 
 				// process --ideal and set --avoid-xxx
-				if (opts.getOpt("--ideal") != null) {
-					if ("java".equals(opts.getOpt("--ideal"))) {
-						opts.setOpt("--avoid-java", "true");
-						runBinaryRoutePlannerJava(entry);
-					} else if ("cpp".equals(opts.getOpt("--ideal"))) {
-						opts.setOpt("--avoid-cpp", "true");
-						runBinaryRoutePlannerCpp(entry);
-					} else if ("hh".equals(opts.getOpt("--ideal"))) {
-						opts.setOpt("--avoid-hh", "true");
-						runHHRoutePlannerJava(entry);
+				if (primaryRouting != null) {
+					switch (primaryRouting) {
+						case JAVA:
+							opts.setOpt("--avoid-java", "true");
+							// TODO resultsEntry is return here
+							runBinaryRoutePlannerJava(entry);
+							break;
+						case CPP:
+							opts.setOpt("--avoid-cpp", "true");
+							runBinaryRoutePlannerCpp(entry);
+							break;
+						case HH:
+							opts.setOpt("--avoid-hh", "true");
+							runHHRoutePlannerJava(entry);
+							break;
+						default:
+							throw new RuntimeException("Primary routing is wrong");
 					}
 				}
+
+				// TODO entry.results.add(resultsEntry);
 
 				// process --avoid-xxx options
 				if (opts.getOpt("--avoid-java") == null) {
@@ -295,14 +323,10 @@ public class RandomRouteTester {
 				if (opts.getOpt("--avoid-hh") == null) {
 					runHHRoutePlannerJava(entry);
 				}
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			} catch (InterruptedException e) {
-				throw new RuntimeException(e);
-			} catch (SQLException e) {
+			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
 			}
-		});
+		}
 	}
 
 	private void runBinaryRoutePlannerJava(RandomRouteEntry entry) throws IOException, InterruptedException {

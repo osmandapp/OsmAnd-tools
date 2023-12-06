@@ -99,10 +99,11 @@ class RandomRouteGenerator {
 
 	private void getObfHighwayRoadRandomPoints(
 			BinaryMapIndexReader index, List<LatLon> randomPoints, int limit, int seed) throws IOException {
+
+
 		class Counter {
 			private int value;
 		}
-
 		Counter added = new Counter();
 
 		// pointSkipDivisor used to hop over sequential points to enlarge distances between them
@@ -199,7 +200,7 @@ class RandomRouteGenerator {
 			for (int j = 0; j < randomPoints.size(); j++) {
 				int startIndex = fixedRandom(randomPoints.size(), randomActions.GET_START, i, j);
 				entry.start = randomPoints.get(startIndex);
-				if (false == avoidDupes.contains(entry.start)) {
+				if (!avoidDupes.contains(entry.start)) {
 					break;
 				}
 			}
@@ -220,12 +221,12 @@ class RandomRouteGenerator {
 					int pointIndex = fixedRandom(randomPoints.size(), randomActions.GET_POINTS, i, nNextPoints + j);
 					point = randomPoints.get(pointIndex);
 					double km = MapUtils.getDistance(prevPoint, point) / 1000;
-					if (km >= minDistanceKm && km <= maxDistanceKm && false == avoidDupes.contains((point))) {
+					if (km >= minDistanceKm && km <= maxDistanceKm && !avoidDupes.contains(point)) {
 						pointFound = true;
 						break;
 					}
 				}
-				if (pointFound == false) {
+				if (!pointFound) {
 					restart = true;
 					break;
 				} else if (point != null) {

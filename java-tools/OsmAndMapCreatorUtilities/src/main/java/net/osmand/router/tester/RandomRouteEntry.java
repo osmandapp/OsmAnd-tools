@@ -132,7 +132,7 @@ class RandomRouteReport {
 		String sDistance = ideal.distance > 0 ? String.format("%.2f", ideal.distance) : "zero";
 		String colorDistance = costDistHtmlColor(ideal.distance);
 
-		this.html += "<tr align=center>" +
+		html += "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, ideal.type) + // 1
 				String.format("<td><font color=%s>%s</font></td>", colorCost, sCost) +           // 2
 				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +   // 3
@@ -144,7 +144,7 @@ class RandomRouteReport {
 				String.format("<td>%s</td>", mapCreatorProfileParams) +                          // 9
 				"</tr>\n";
 
-		this.text += String.format("%d:%s cost=%.2f dist=%.2f segments=%d seconds=%.1f via=%d profile=%s\n",
+		text += String.format("%d:%s cost=%.2f dist=%.2f segments=%d seconds=%.1f via=%d profile=%s\n",
 				n,
 				ideal.type,
 				ideal.cost,
@@ -169,7 +169,7 @@ class RandomRouteReport {
 				: (result.distance > 0 ? String.format("%s%.2f%%", dDistance > 0 ? "+" : "", dDistance) : "zero");
 		String colorDistance = deviationHtmlColor(dDistance);
 
-		this.html += "<tr align=center>" +
+		html += "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, result.type) + // 1
 				String.format("<td><font color=%s>%s</font></td>", colorCost, sCost) +            // 2
 				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +    // 3
@@ -178,7 +178,7 @@ class RandomRouteReport {
 				String.format("<td colspan=4>&nbsp;</td>") +                                      // 6-9
 				"</tr>\n";
 
-		this.text += String.format("%d:%s cost %s dist %s segments=%d seconds=%.1f\n",
+		text += String.format("%d:%s cost %s dist %s segments=%d seconds=%.1f\n",
 				n,
 				result.type,
 				sCost,
