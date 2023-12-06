@@ -50,7 +50,7 @@ public class HHRoutingOBFWriter {
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
 		File dbFile = null;
 		File obfPolyFile = null;
-		String subFolder = "";
+		File outFolder = null;
 		boolean updateExistingFiles = false;
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
@@ -67,8 +67,8 @@ public class HHRoutingOBFWriter {
 			for (String arg : args) {
 				if (arg.startsWith("--db=")) {
 					dbFile = new File(arg.substring("--db=".length()));
-				} else if (arg.startsWith("--subfolder=")) {
-					subFolder = "/" + arg.substring("--subfolder=".length());
+				} else if (arg.startsWith("--outfolder=")) {
+					outFolder = new File(arg.substring("--outfolder=".length()));
 				} else if (arg.startsWith("--update-existing-files")) {
 					updateExistingFiles = true;
 				} else if (arg.startsWith("--obf=")) {
@@ -76,11 +76,10 @@ public class HHRoutingOBFWriter {
 				}
 			}
 		}
-		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, subFolder, updateExistingFiles);
+		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, outFolder, updateExistingFiles);
 	}
 	
-	public void writeFile(File dbFile, File obfPolyFileIn, String subFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
-		
+	public void writeFile(File dbFile, File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
 		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
 		TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
@@ -92,6 +91,9 @@ public class HHRoutingOBFWriter {
 			}
 			writeFileBbox(db, points, outFile, edition, new QuadRect(), null);
 		} else {
+			if (outFolder == null) {
+				outFolder = obfPolyFileIn.isDirectory() ? obfPolyFileIn : obfPolyFileIn.getParentFile();
+			}
 			OsmandRegions or = new OsmandRegions();
 			or.prepareFile();
 			or.cacheAllCountries();
@@ -127,7 +129,7 @@ public class HHRoutingOBFWriter {
 				}
 			}
 			for (File obfPolyFile : obfPolyFiles) {
-				File outFile = new File(obfPolyFile.getParentFile() + subFolder,
+				File outFile = new File(outFolder,
 						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
 				if (updateExistingFiles) {
 					outFile = obfPolyFile;
