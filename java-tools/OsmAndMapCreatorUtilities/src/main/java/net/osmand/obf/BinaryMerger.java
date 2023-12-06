@@ -242,8 +242,11 @@ public class BinaryMerger {
 				sargs.add("--poi");
 				for (CountryRegion reg : list) {
 					if (reg.map || (!mapFiles && reg.roads)) {
-						sargs.add(pathWithGeneratedMapZips
-								+ Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext + ".zip");
+						File fl = new File(pathWithGeneratedMapZips, Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext);
+						if(!fl.exists()) {
+							fl = new File(fl.getParentFile(), fl.getName() + ".zip");
+						}
+						sargs.add(fl.getAbsolutePath());
 					}
 				}
 				log.info("Merge file with arguments: " + sargs);
