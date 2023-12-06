@@ -822,6 +822,7 @@ public class IndexUploader {
 					fout.close();
 					toUpload.delete();
 				}
+				toBackup.setLastModified(System.currentTimeMillis()); // keep upload timestamp to compare
 				if (srcFile.equals(zipFile)) {
 					srcFile.delete();
 				}

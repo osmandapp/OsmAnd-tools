@@ -142,7 +142,7 @@ public class HHRoutingOBFWriter {
 				
 				if (or.getRegionDataByDownloadName(countryName) != null) {
 					filteredPoints = pointsByDownloadName.get(countryName);
-					if(filteredPoints == null) {
+					if (filteredPoints == null) {
 						System.out.printf("Skip %s as it has no points\n", countryName);
 						continue;
 					}
@@ -201,7 +201,7 @@ public class HHRoutingOBFWriter {
 						break;
 					}
 				}
-				if(profileAlreadyExist) {
+				if (profileAlreadyExist) {
 					System.out.println("Skip file as hh routing profile already exist");
 					return;
 				}
@@ -295,7 +295,7 @@ public class HHRoutingOBFWriter {
 			if (reader != null) {
 				reader.close();
 				writeFile.renameTo(outFile);
-//				outFile.setLastModified(timestamp); // not needed for upload but problem for web files
+//				outFile.setLastModified(timestamp); // don't update timestamp to use to compare with latest files
 			}
 		} catch (RTreeException | RTreeInsertException e) {
 			throw new IOException(e);
