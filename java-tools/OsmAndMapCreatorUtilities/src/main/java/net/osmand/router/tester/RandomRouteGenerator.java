@@ -73,7 +73,6 @@ class RandomRouteGenerator {
 				}
 			}
 			if (entry.start != null && entry.finish != null) {
-//				System.err.printf("+ %s\n", entry);
 				testList.add(entry);
 			}
 		}
@@ -274,7 +273,6 @@ class RandomRouteGenerator {
 
 			// 5) finally, add TestEntry to the testList
 			if (entry.start != null && entry.finish != null) {
-//				System.err.printf("+ %s\n", entry);
 				replenishCounter = 0;
 				testList.add(entry);
 			}

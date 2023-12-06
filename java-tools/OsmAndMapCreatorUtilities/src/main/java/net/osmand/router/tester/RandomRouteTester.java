@@ -21,11 +21,7 @@ public class RandomRouteTester {
 	class GeneratorConfig {
 		String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
 //				"https://test.osmand.net/map/?start=48.913403,11.872949&finish=49.079640,11.752095&type=osmand&profile=car#10/48.996521/11.812522"
-//				"https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles#14/48.1852/24.4208",
-//				"https://osmand.net/map/?start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&type=osmand&profile=car#14/50.4505/30.5511",
 //				"start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles",
-//				"start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&profile=car",
-//				"start=50.450128,30.535611&finish=50.460479,30.589365&via=1,2;3,4;5,6&profile=car",
 //	/*example*/ "start=L,L&finish=L,L&via=L,L;L,L&profile=pedestrian&params=height_obstacles"
 		};
 
@@ -39,8 +35,6 @@ public class RandomRouteTester {
 				"car",
 //				"bicycle",
 //				"bicycle,height_obstacles",
-//				"bicycle,driving_style_prefer_unpaved,driving_style_balance:false,height_obstacles",
-//				"bicycle,driving_style_prefer_unpaved,driving_style_balance=false,height_obstacles",
 		};
 
 		// cost/distance deviation limits

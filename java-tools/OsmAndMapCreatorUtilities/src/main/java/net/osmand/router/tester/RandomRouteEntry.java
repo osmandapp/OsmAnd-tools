@@ -88,7 +88,6 @@ class RandomRouteResult {
 				this.distance += r.getDistance();
 			}
 		}
-//		System.err.printf("\n\nRandomRouteResult %s (%d) cost=%f dist=%f\n\n", type, runTime, cost, distance);
 	}
 
 	public String toString() {
