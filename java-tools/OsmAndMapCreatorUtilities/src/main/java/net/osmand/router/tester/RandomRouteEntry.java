@@ -117,54 +117,54 @@ class RandomRouteReport {
 				"</style></head><body>\n" + this.text + "<br><table border=1>\n";
 	}
 
-	void resultIdeal(int n, RandomRouteResult ideal) {
-		String mapCreatorProfileParams = (ideal.entry.profile + "," + ideal.entry.params.toString())
+	void resultPrimary(int n, RandomRouteResult primary) {
+		String mapCreatorProfileParams = (primary.entry.profile + "," + primary.entry.params.toString())
 				.replaceAll("[\\[ \\]]", "") // remove array specific chars
 				.replaceAll(":", "=") // replace key:value to key=value
 				.replaceAll(",$", ""); // drop tailing comma
-		String start = String.format("%f,%f", ideal.entry.start.getLatitude(), ideal.entry.start.getLongitude());
-		String finish = String.format("%f,%f", ideal.entry.finish.getLatitude(), ideal.entry.finish.getLongitude());
-		String url = ideal.toString();
+		String start = String.format("%f,%f", primary.entry.start.getLatitude(), primary.entry.start.getLongitude());
+		String finish = String.format("%f,%f", primary.entry.finish.getLatitude(), primary.entry.finish.getLongitude());
+		String url = primary.toString();
 
-		String sCost = ideal.cost > 0 ? String.format("%.2f", ideal.cost) : "zero";
-		String colorCost = costDistHtmlColor(ideal.cost);
+		String sCost = primary.cost > 0 ? String.format("%.2f", primary.cost) : "zero";
+		String colorCost = costDistHtmlColor(primary.cost);
 
-		String sDistance = ideal.distance > 0 ? String.format("%.2f", ideal.distance) : "zero";
-		String colorDistance = costDistHtmlColor(ideal.distance);
+		String sDistance = primary.distance > 0 ? String.format("%.2f", primary.distance) : "zero";
+		String colorDistance = costDistHtmlColor(primary.distance);
 
 		html += "<tr align=center>" +
-				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, ideal.type) + // 1
-				String.format("<td><font color=%s>%s</font></td>", colorCost, sCost) +           // 2
-				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +   // 3
-				String.format("<td>%d</td>", ideal.visitedSegments) +                            // 4
-				String.format("<td>%.1f</td>", ideal.runTime / 1000F) +                          // 5
-				String.format("<td>%s</td>", start) +                                            // 6
-				String.format("<td>%s</td>", finish) +                                           // 7
-				String.format("<td>%d</td>", ideal.entry.via.size()) +                           // 8
-				String.format("<td>%s</td>", mapCreatorProfileParams) +                          // 9
+				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, primary.type) + // 1
+				String.format("<td><font color=%s>%s</font></td>", colorCost, sCost) +             // 2
+				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +     // 3
+				String.format("<td>%d</td>", primary.visitedSegments) +                            // 4
+				String.format("<td>%.1f</td>", primary.runTime / 1000F) +                          // 5
+				String.format("<td>%s</td>", start) +                                              // 6
+				String.format("<td>%s</td>", finish) +                                             // 7
+				String.format("<td>%d</td>", primary.entry.via.size()) +                           // 8
+				String.format("<td>%s</td>", mapCreatorProfileParams) +                            // 9
 				"</tr>\n";
 
 		text += String.format("%d:%s cost=%.2f dist=%.2f segments=%d seconds=%.1f via=%d profile=%s\n",
 				n,
-				ideal.type,
-				ideal.cost,
-				ideal.distance,
-				ideal.visitedSegments,
-				ideal.runTime / 1000F,
-				ideal.entry.via.size(),
+				primary.type,
+				primary.cost,
+				primary.distance,
+				primary.visitedSegments,
+				primary.runTime / 1000F,
+				primary.entry.via.size(),
 				mapCreatorProfileParams
 		);
 	}
 
-	void resultCompare(int n, RandomRouteResult result, RandomRouteResult ideal) {
+	void resultCompare(int n, RandomRouteResult result, RandomRouteResult primary) {
 		String url = result.toString();
 
-		double dCost = ideal.cost > 0 ? (result.cost / ideal.cost - 1) * 100 : 0;
+		double dCost = primary.cost > 0 ? (result.cost / primary.cost - 1) * 100 : 0;
 		String sCost = Math.abs(dCost) < deviationYellow ? "ok"
 				: (result.cost > 0 ? String.format("%s%.2f%%", dCost > 0 ? "+" : "", dCost) : "zero");
 		String colorCost = deviationHtmlColor(dCost);
 
-		double dDistance = ideal.distance > 0 ? (result.distance / ideal.distance - 1) * 100 : 0;
+		double dDistance = primary.distance > 0 ? (result.distance / primary.distance - 1) * 100 : 0;
 		String sDistance = Math.abs(dDistance) < deviationYellow ? "ok"
 				: (result.distance > 0 ? String.format("%s%.2f%%", dDistance > 0 ? "+" : "", dDistance) : "zero");
 		String colorDistance = deviationHtmlColor(dDistance);
@@ -189,7 +189,7 @@ class RandomRouteReport {
 	}
 
 	void entryOpen(int n) {
-		this.html += "<tr>" +
+		html += "<tr>" +
 				String.format("<th>%d</th>", n) + // 1
 				"<th>cost</th>" +                 // 2
 				"<th>dist</th>" +                 // 3
@@ -203,8 +203,8 @@ class RandomRouteReport {
 	}
 
 	void entryClose() {
-		this.text += "\n";
-		this.html += "<tr><td colspan=10>&nbsp;</td></tr>\n";
+		text += "\n";
+		html += "<tr><td colspan=10>&nbsp;</td></tr>\n";
 	}
 
 	private String costDistHtmlColor(double n) {
@@ -222,7 +222,7 @@ class RandomRouteReport {
 
 	void flush(String htmlFileName) throws IOException {
 		FileWriter writer = new FileWriter(htmlFileName);
-		this.html += "</table><br>\n" +
+		html += "</table><br>\n" +
 				"cost - cost of all segments (seconds)<br>\n" +
 				"dist - distance of geometry (meters)<br>\n" +
 				"vis - count of visited segments<br>\n" +

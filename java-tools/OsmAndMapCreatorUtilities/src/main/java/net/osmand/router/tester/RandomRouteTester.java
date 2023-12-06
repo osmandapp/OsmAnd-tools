@@ -31,7 +31,7 @@ public class RandomRouteTester {
 
 		// random tests settings
 		int ITERATIONS = 10; // number of random routes
-		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
+		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
 		int MIN_DISTANCE_KM = 5; // min distance between start and finish (50)
 		int MAX_DISTANCE_KM = 10; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
@@ -91,17 +91,17 @@ public class RandomRouteTester {
 		test.reportResult();
 	}
 
-	CommandLineOpts opts;
+	private CommandLineOpts opts;
 	private String optMapsDir;
 	private String optLibsDir;
 	private String optObfPrefix;
 	private String optHtmlReport;
+	private PrimaryRouting optPrimaryRouting;
 	private enum PrimaryRouting {
 		JAVA,
 		CPP,
 		HH		
 	}
-	private PrimaryRouting primaryRouting;
 
 	private long started;
 	private File obfDirectory;
@@ -142,7 +142,7 @@ public class RandomRouteTester {
 				opts.getOpt("--libs-dir"), optMapsDir + "/../core-legacy/binaries");
 
 		// validate
-		if (false == isFileWriteable(optHtmlReport)) {
+		if (!isFileWriteable(optHtmlReport)) {
 			throw new IllegalStateException(optHtmlReport + " (html-report) file is not writable");
 		}
 
@@ -172,7 +172,17 @@ public class RandomRouteTester {
 			config.PREDEFINED_TESTS = opts.getStrings().toArray(new String[0]);
 		}
 
-		// --ideal --avoid-java --avoid-cpp --avoid-hh will be processed by collectRoutes()
+		// --avoid-java --avoid-cpp --avoid-hh additionally processed by collectRoutes()
+		if (opts.getOpt("--primary") != null) {
+			if ("java".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.JAVA;
+			} else if ("cpp".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.CPP;
+			} else if ("hh".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.HH;
+			}
+		}
+
 
 		if (opts.getOpt("--help") != null) {
 			System.err.printf("%s\n", String.join("\n",
@@ -193,7 +203,7 @@ public class RandomRouteTester {
 					"--max-inter=N number",
 					"--profile=profile,settings,key:value force one profile",
 					"",
-					"--ideal=(java|cpp|hh) compare others against this",
+					"--primary=(java|cpp|hh) compare others against this",
 					"--avoid-java avoid BinaryRoutePlanner (java)",
 					"--avoid-cpp avoid BinaryRoutePlanner (cpp)",
 					"--avoid-hh avoid HHRoutePlanner (java)",
@@ -206,18 +216,6 @@ public class RandomRouteTester {
 			));
 			System.exit(0);
 		}
-
-		if (opts.getOpt("--ideal") != null) {
-			// TODO ideal => primaryRouting
-			if ("java".equals(opts.getOpt("--ideal"))) {
-				primaryRouting = PrimaryRouting.JAVA;
-			} else if ("cpp".equals(opts.getOpt("--ideal"))) {
-				primaryRouting = PrimaryRouting.CPP;
-			} else if ("hh".equals(opts.getOpt("--ideal"))) {
-				primaryRouting = PrimaryRouting.HH;
-			}
-		}
-
 	}
 
 	private void reportResult() throws IOException {
@@ -230,13 +228,12 @@ public class RandomRouteTester {
 			report.entryOpen(i + 1);
 			RandomRouteEntry entry = testList.get(i);
 			for (int j = 0; j < entry.results.size(); j++) {
-				RandomRouteResult ideal = entry.results.get(0);
+				RandomRouteResult primary = entry.results.get(0);
 				RandomRouteResult result = entry.results.get(j);
 				if (j == 0) {
-					//TODO rename
-					report.resultIdeal(i + 1, ideal);
+					report.resultPrimary(i + 1, primary);
 				} else {
-					report.resultCompare(i + 1, result, ideal);
+					report.resultCompare(i + 1, result, primary);
 				}
 			}
 			report.entryClose();
@@ -270,7 +267,7 @@ public class RandomRouteTester {
 		}
 
 		if (obfReaders.size() == 0) {
-			throw new IllegalStateException("OBF files are not initialized!");
+			throw new IllegalStateException("OBF files not initialized");
 		}
 	}
 
@@ -287,41 +284,38 @@ public class RandomRouteTester {
 		for (RandomRouteEntry entry : testList) {
 			System.err.printf("\n\n%d / %d ...\n\n", ++counter.value, testList.size());
 			try {
-				// ideal is always 1st route call of the entry
-				// other route calls will be compared to the ideal
+				// primary is always 1st route call of the entry
+				// other route calls will be compared to the primary
 
-				// process --ideal and set --avoid-xxx
-				if (primaryRouting != null) {
-					switch (primaryRouting) {
+				// process --primary and set --avoid-xxx
+				if (optPrimaryRouting != null) {
+					switch (optPrimaryRouting) {
 						case JAVA:
 							opts.setOpt("--avoid-java", "true");
-							// TODO resultsEntry is return here
-							runBinaryRoutePlannerJava(entry);
+							entry.results.add(runBinaryRoutePlannerJava(entry));
 							break;
 						case CPP:
 							opts.setOpt("--avoid-cpp", "true");
-							runBinaryRoutePlannerCpp(entry);
+							entry.results.add(runBinaryRoutePlannerCpp(entry));
 							break;
 						case HH:
 							opts.setOpt("--avoid-hh", "true");
-							runHHRoutePlannerJava(entry);
+							entry.results.add(runHHRoutePlannerJava(entry));
 							break;
 						default:
-							throw new RuntimeException("Primary routing is wrong");
+							throw new RuntimeException("Wrong primary routing defined");
 					}
 				}
 
-				// TODO entry.results.add(resultsEntry);
-
 				// process --avoid-xxx options
 				if (opts.getOpt("--avoid-java") == null) {
-					runBinaryRoutePlannerJava(entry);
+					entry.results.add(runBinaryRoutePlannerJava(entry));
 				}
 				if (opts.getOpt("--avoid-cpp") == null) {
-					runBinaryRoutePlannerCpp(entry);
+					entry.results.add(runBinaryRoutePlannerCpp(entry));
 				}
 				if (opts.getOpt("--avoid-hh") == null) {
-					runHHRoutePlannerJava(entry);
+					entry.results.add(runHHRoutePlannerJava(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
@@ -329,15 +323,15 @@ public class RandomRouteTester {
 		}
 	}
 
-	private void runBinaryRoutePlannerJava(RandomRouteEntry entry) throws IOException, InterruptedException {
-		runBinaryRoutePlanner(entry, false);
+	private RandomRouteResult runBinaryRoutePlannerJava(RandomRouteEntry entry) throws IOException, InterruptedException {
+		return runBinaryRoutePlanner(entry, false);
 	}
 
-	private void runBinaryRoutePlannerCpp(RandomRouteEntry entry) throws IOException, InterruptedException {
-		runBinaryRoutePlanner(entry, true);
+	private RandomRouteResult runBinaryRoutePlannerCpp(RandomRouteEntry entry) throws IOException, InterruptedException {
+		return runBinaryRoutePlanner(entry, true);
 	}
 
-	private void runBinaryRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
+	private RandomRouteResult runBinaryRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
 
@@ -370,13 +364,10 @@ public class RandomRouteTester {
 
 		long runTime = System.currentTimeMillis() - started;
 
-		RandomRouteResult result = new RandomRouteResult(
-				useNative ? "cpp" : "java", entry, runTime, ctx, routeSegments);
-
-		entry.results.add(result);
+		return new RandomRouteResult(useNative ? "cpp" : "java", entry, runTime, ctx, routeSegments);
 	}
 
-	private void runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+	private RandomRouteResult runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
 
@@ -405,9 +396,7 @@ public class RandomRouteTester {
 
 		long runTime = System.currentTimeMillis() - started;
 
-		RandomRouteResult result = new RandomRouteResult("hh", entry, runTime, ctx, routeSegments);
-
-		entry.results.add(result);
+		return new RandomRouteResult("hh", entry, runTime, ctx, routeSegments);
 	}
 
 	private void loadNativeLibrary() {
@@ -418,7 +407,7 @@ public class RandomRouteTester {
 				return; // success
 			}
 		}
-		throw new IllegalStateException("native library not loaded");
+		throw new IllegalStateException("Native library not loaded");
 	}
 
 	private String getNativeLibPath() { // taken from RouterUtilTest and modified
