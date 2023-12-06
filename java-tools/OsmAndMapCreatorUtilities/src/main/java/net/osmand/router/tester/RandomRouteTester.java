@@ -97,10 +97,11 @@ public class RandomRouteTester {
 	private String optObfPrefix;
 	private String optHtmlReport;
 	private PrimaryRouting optPrimaryRouting;
+
 	private enum PrimaryRouting {
 		JAVA,
 		CPP,
-		HH		
+		HH
 	}
 
 	private long started;
@@ -183,7 +184,6 @@ public class RandomRouteTester {
 			}
 		}
 
-
 		if (opts.getOpt("--help") != null) {
 			System.err.printf("%s\n", String.join("\n",
 					"",
@@ -219,7 +219,6 @@ public class RandomRouteTester {
 	}
 
 	private void reportResult() throws IOException {
-
 		RandomRouteReport report = new RandomRouteReport(
 				started, obfReaders.size(), testList.size(),
 				config.DEVIATION_RED, config.DEVIATION_YELLOW);
@@ -276,18 +275,14 @@ public class RandomRouteTester {
 	}
 
 	private void collectRoutes() {
-		class Counter {
-			private int value;
-		}
-		Counter counter = new Counter(); // TODO remove
-
-		for (RandomRouteEntry entry : testList) {
-			System.err.printf("\n\n%d / %d ...\n\n", ++counter.value, testList.size());
+		for (int i = 0; i < testList.size(); i++) {
+			RandomRouteEntry entry = testList.get(i);
 			try {
-				// primary is always 1st route call of the entry
-				// other route calls will be compared to the primary
+				// Note: this block runs a sequence of routing calls.
+				// Result of 1st call is treated as a primary route.
+				// Other results will be compared to the 1st.
 
-				// process --primary and set --avoid-xxx
+				// if --primary option is used, --avoid-xxx is set here to avoid double-calls
 				if (optPrimaryRouting != null) {
 					switch (optPrimaryRouting) {
 						case JAVA:
@@ -319,6 +314,13 @@ public class RandomRouteTester {
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
+			} finally {
+				System.err.println("---------------------------------------------------------------------------------");
+				// verbose all route results after each cycle
+				for (int j = 0; j < entry.results.size(); j++) {
+					System.err.println(RandomRouteReport.resultPrimaryText(i + 1, entry.results.get(j)));
+				}
+				System.err.println("---------------------------------------------------------------------------------");
 			}
 		}
 	}

@@ -40,7 +40,7 @@ class RandomRouteEntry {
 		String START = String.format("%f,%f", start.getLatitude(), start.getLongitude());
 		String FINISH = String.format("%f,%f", finish.getLatitude(), finish.getLongitude());
 
-		String TYPE = type == null ? "osmand" : type; // TODO process type with conversion to web-style params
+		String TYPE = type == null ? "osmand" : type; // TODO --report-href and web-style params
 
 		String PROFILE = profile;
 		String GO = String.format(
@@ -88,8 +88,7 @@ class RandomRouteResult {
 				this.distance += r.getDistance();
 			}
 		}
-
-		System.err.printf("\n\nRandomRouteResult %s (%d) cost=%f dist=%f\n\n", type, runTime, cost, distance);
+//		System.err.printf("\n\nRandomRouteResult %s (%d) cost=%f dist=%f\n\n", type, runTime, cost, distance);
 	}
 
 	public String toString() {
@@ -117,11 +116,30 @@ class RandomRouteReport {
 				"</style></head><body>\n" + this.text + "<br><table border=1>\n";
 	}
 
-	void resultPrimary(int n, RandomRouteResult primary) {
-		String mapCreatorProfileParams = (primary.entry.profile + "," + primary.entry.params.toString())
+	static String getMapCreatorProfileParams(RandomRouteEntry entry) {
+		return (entry.profile + "," + entry.params.toString())
 				.replaceAll("[\\[ \\]]", "") // remove array specific chars
 				.replaceAll(":", "=") // replace key:value to key=value
 				.replaceAll(",$", ""); // drop tailing comma
+	}
+
+	static String resultPrimaryText(int n, RandomRouteResult primary) {
+		String mapCreatorProfileParams = getMapCreatorProfileParams(primary.entry);
+		return String.format("%d:%s cost=%.2f dist=%.2f segments=%d seconds=%.1f via=%d profile=%s",
+				n,
+				primary.type,
+				primary.cost,
+				primary.distance,
+				primary.visitedSegments,
+				primary.runTime / 1000F,
+				primary.entry.via.size(),
+				mapCreatorProfileParams
+		);
+	}
+
+	String resultPrimaryHtml(int n, RandomRouteResult primary) {
+		String mapCreatorProfileParams = getMapCreatorProfileParams(primary.entry);
+
 		String start = String.format("%f,%f", primary.entry.start.getLatitude(), primary.entry.start.getLongitude());
 		String finish = String.format("%f,%f", primary.entry.finish.getLatitude(), primary.entry.finish.getLongitude());
 		String url = primary.toString();
@@ -132,7 +150,7 @@ class RandomRouteReport {
 		String sDistance = primary.distance > 0 ? String.format("%.2f", primary.distance) : "zero";
 		String colorDistance = costDistHtmlColor(primary.distance);
 
-		html += "<tr align=center>" +
+		return "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, primary.type) + // 1
 				String.format("<td><font color=%s>%s</font></td>", colorCost, sCost) +             // 2
 				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +     // 3
@@ -143,17 +161,12 @@ class RandomRouteReport {
 				String.format("<td>%d</td>", primary.entry.via.size()) +                           // 8
 				String.format("<td>%s</td>", mapCreatorProfileParams) +                            // 9
 				"</tr>\n";
+	}
 
-		text += String.format("%d:%s cost=%.2f dist=%.2f segments=%d seconds=%.1f via=%d profile=%s\n",
-				n,
-				primary.type,
-				primary.cost,
-				primary.distance,
-				primary.visitedSegments,
-				primary.runTime / 1000F,
-				primary.entry.via.size(),
-				mapCreatorProfileParams
-		);
+
+	void resultPrimary(int n, RandomRouteResult primary) {
+		text += resultPrimaryText(n, primary) + "\n";
+		html += resultPrimaryHtml(n, primary);
 	}
 
 	void resultCompare(int n, RandomRouteResult result, RandomRouteResult primary) {
