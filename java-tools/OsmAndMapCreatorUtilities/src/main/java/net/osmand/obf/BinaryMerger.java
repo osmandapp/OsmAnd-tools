@@ -230,6 +230,7 @@ public class BinaryMerger {
 				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + ext;
 				File targetFile = new File(pathToPutJointFiles, targetFileName);
 				File targetUploadedFile = new File(pathWithGeneratedMapZips, targetFileName + ".zip");
+				System.out.println("Checking " + targetFileName);
 				if (skipExisting && targetFile.exists()) {
 					continue;
 				}
