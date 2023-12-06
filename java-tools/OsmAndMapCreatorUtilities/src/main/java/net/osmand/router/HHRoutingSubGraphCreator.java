@@ -192,10 +192,8 @@ public class HHRoutingSubGraphCreator {
 				DEBUG_STORE_ALL_ROADS = 3;
 			}
 		}
-		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
-
-		File dbFile = new File(folder, name + HHRoutingDB.EXT);
+		String name = new File(".").getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
+		File dbFile = new File(name + HHRoutingDB.EXT);
 		if (CLEAN && dbFile.exists()) {
 			dbFile.delete();
 		}
@@ -213,7 +211,7 @@ public class HHRoutingSubGraphCreator {
 			}
 		} finally {
 			if (ctx.visualClusters.size() > 0) {
-				saveOsmFile(visualizeClusters(ctx.visualClusters), new File(folder, name + ".osm"));
+				saveOsmFile(visualizeClusters(ctx.visualClusters), new File(name + ".osm"));
 			}
 			networkDB.close();
 		}
