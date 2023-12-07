@@ -28,8 +28,8 @@ public class RandomRouteTester {
 		// random tests settings
 		int ITERATIONS = 10; // number of random routes
 		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
-		int MIN_DISTANCE_KM = 5; // min distance between start and finish (50)
-		int MAX_DISTANCE_KM = 10; // max distance between start and finish (100)
+		int MIN_DISTANCE_KM = 50; // min distance between start and finish (50)
+		int MAX_DISTANCE_KM = 100; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
@@ -90,6 +90,7 @@ public class RandomRouteTester {
 	private String optLibsDir;
 	private String optObfPrefix;
 	private String optHtmlReport;
+	private String optHtmlDomain;
 	private PrimaryRouting optPrimaryRouting;
 
 	private enum PrimaryRouting {
@@ -133,6 +134,7 @@ public class RandomRouteTester {
 		optMapsDir = Objects.requireNonNullElse(opts.getOpt("--maps-dir"), "./");
 		optObfPrefix = Objects.requireNonNullElse(opts.getOpt("--obf-prefix"), "");
 		optHtmlReport = Objects.requireNonNullElse(opts.getOpt("--html-report"), "rr-report.html");
+		optHtmlDomain = Objects.requireNonNullElse(opts.getOpt("--html-domain"), "test.osmand.net");
 		optLibsDir = Objects.requireNonNullElse(
 				opts.getOpt("--libs-dir"), optMapsDir + "/../core-legacy/binaries");
 
@@ -188,6 +190,7 @@ public class RandomRouteTester {
 					"--maps-dir=/path/to/directory/with/*.obf (default ./)",
 					"--obf-prefix=prefix to filter obf files (default all)",
 					"--html-report=/path/to/report.html (rr-report.html)",
+					"--html-domain=test.osmand.net (used in html-report)",
 					"--libs-dir=/path/to/native/libs/dir (default auto)",
 					"",
 					"--iterations=N",
@@ -213,9 +216,9 @@ public class RandomRouteTester {
 	}
 
 	private void reportResult() throws IOException {
-		RandomRouteReport report = new RandomRouteReport(
-				started, obfReaders.size(), testList.size(),
-				config.DEVIATION_RED, config.DEVIATION_YELLOW);
+		long runTime = System.currentTimeMillis() - started;
+		RandomRouteReport report = new RandomRouteReport(runTime, obfReaders.size(), testList.size(),
+				config.DEVIATION_RED, config.DEVIATION_YELLOW, optHtmlDomain);
 
 		for (int i = 0; i < testList.size(); i++) {
 			report.entryOpen(i + 1);

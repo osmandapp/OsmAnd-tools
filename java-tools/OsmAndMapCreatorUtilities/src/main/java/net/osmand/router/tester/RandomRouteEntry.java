@@ -33,14 +33,18 @@ class RandomRouteEntry {
 	}
 
 	public String toString() {
-		return toURL("osrm"); // osrm is used for quick overview
+		return toURL("osmand");
 	}
 
 	String toURL(String type) {
+		return toURL(type, "test.osmand.net");
+	}
+
+	String toURL(String type, String domain) {
 		String START = String.format("%f,%f", start.getLatitude(), start.getLongitude());
 		String FINISH = String.format("%f,%f", finish.getLatitude(), finish.getLongitude());
 
-		String TYPE = type == null ? "osmand" : type; // TODO --report-href and web-style params
+		String TYPE = type == null ? "osmand" : type;
 
 		String PROFILE = profile;
 		String GO = String.format(
@@ -55,12 +59,31 @@ class RandomRouteEntry {
 		via.forEach(ll -> viaList.add(String.format("%f,%f", ll.getLatitude(), ll.getLongitude())));
 		String VIA = String.join(";", viaList);
 
-		String hasParams = params.size() > 0 ? "&params=" : "";
-		String PARAMS = String.join(",", params); // site will fix it to "profile,params"
+		// convert type->params to make navigation href
+		List<String> typeParams = new ArrayList<>(params);
+		if ("java".equals(TYPE)) {
+			typeParams.add("hhrouting:false,nativerouting:false");
+		}
+		if ("cpp".equals(TYPE)) {
+			typeParams.add("hhrouting:false");
+		}
+		if ("hh".equals(TYPE)) {
+			typeParams.add("hhonly:true");
+		}
+
+		String hasParams = typeParams.size() > 0 ? "&params=" : "";
+		String PARAMS = String.join(",", typeParams); // site will fix it to "profile,params"
+
+		// detect proto: 1) default "https" 2) "http" for localhost 3) might be already included in domain
+		String protoDomain = domain.contains("://") ? domain : (
+				(domain.contains("localhost") ? "http://" : "https://") + domain);
+
+		// finally
+		TYPE = "osmand";
 
 		return String.format(
-				"https://test.osmand.net/map/?start=%s&finish=%s%s%s&type=%s&profile=%s%s%s#%s",
-				START, FINISH, hasVia, VIA, TYPE, PROFILE, hasParams, PARAMS, GO
+				"%s/map/?start=%s&finish=%s%s%s&type=%s&profile=%s%s%s#%s",
+				protoDomain, START, FINISH, hasVia, VIA, TYPE, PROFILE, hasParams, PARAMS, GO
 		);
 	}
 }
@@ -93,19 +116,24 @@ class RandomRouteResult {
 	public String toString() {
 		return entry.toURL(type);
 	}
+
+	public String toURL(String domain) {
+		return entry.toURL(type, domain);
+	}
 }
 
 class RandomRouteReport {
 	private String text;
 	private String html;
+	private String htmlDomain;
 	private double deviationRed;
 	private double deviationYellow;
 
-	RandomRouteReport(long started, int nObf, int nRoutes, double red, double yellow) {
+	RandomRouteReport(long runTime, int nObf, int nRoutes, double red, double yellow, String htmlDomain) {
 		this.deviationRed = red;
 		this.deviationYellow = yellow;
+		this.htmlDomain = htmlDomain;
 
-		long runTime = System.currentTimeMillis() - started;
 		String dt = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(Calendar.getInstance().getTime());
 
 		this.text = String.format("%s Random Route Tester (%d obf files, %d routes, %d seconds)\n\n",
@@ -141,7 +169,7 @@ class RandomRouteReport {
 
 		String start = String.format("%f,%f", primary.entry.start.getLatitude(), primary.entry.start.getLongitude());
 		String finish = String.format("%f,%f", primary.entry.finish.getLatitude(), primary.entry.finish.getLongitude());
-		String url = primary.toString();
+		String url = primary.toURL(htmlDomain);
 
 		String sCost = primary.cost > 0 ? String.format("%.2f", primary.cost) : "zero";
 		String colorCost = costDistHtmlColor(primary.cost);
@@ -169,7 +197,7 @@ class RandomRouteReport {
 	}
 
 	void resultCompare(int n, RandomRouteResult result, RandomRouteResult primary) {
-		String url = result.toString();
+		String url = result.toURL(htmlDomain);
 
 		double dCost = primary.cost > 0 ? (result.cost / primary.cost - 1) * 100 : 0;
 		String sCost = Math.abs(dCost) < deviationYellow ? "ok"
