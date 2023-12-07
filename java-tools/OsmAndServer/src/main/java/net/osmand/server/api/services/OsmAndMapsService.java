@@ -787,11 +787,12 @@ public class OsmAndMapsService {
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
-	
-	
-	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
-	                                        LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
+
+	public synchronized List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
+	                                                     LatLon start, LatLon end, List<LatLon> intermediates,
+	                                                     List<String> avoidRoadsIds)
 			throws IOException, InterruptedException {
+
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
@@ -802,6 +803,9 @@ public class OsmAndMapsService {
 			usedMapList = getReaders(list);
 			
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
+			if (hhOnlyForce) {
+				router.USE_ONLY_HH_ROUTING = true;
+			}
 			if (rsc[0] != null) {
 				StringBuilder url = new StringBuilder(rsc[0].url);
 				url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));

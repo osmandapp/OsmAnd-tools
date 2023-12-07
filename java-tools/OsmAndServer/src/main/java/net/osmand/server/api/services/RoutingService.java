@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import net.osmand.router.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,28 +35,36 @@ public class RoutingService {
     @Autowired
     WebGpxParser webGpxParser;
 
+    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode,
+                                                             boolean hasRouting, boolean hhOnlyForce)
+            throws IOException, InterruptedException {
 
-    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode, boolean hasRouting, boolean isLongDist) throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
         List<WebGpxParser.Point> pointsRes;
         List<RouteSegmentResult> routeSegmentResults = new ArrayList<>();
-        if (routeMode.equals(LINE_PROFILE_TYPE) || isLongDist) {
-            pointsRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(), endLatLon.getLatitude(), endLatLon.getLongitude());
+
+        List<WebGpxParser.Point> lineRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(),
+                endLatLon.getLatitude(), endLatLon.getLongitude());
+
+        if (routeMode.equals(LINE_PROFILE_TYPE)) {
+            return lineRes;
         } else {
-            routeSegmentResults = osmAndMapsService.routing(routeMode, props, startLatLon,
-                    endLatLon, Collections.emptyList(), Collections.emptyList());
+            routeSegmentResults = osmAndMapsService.routing(hhOnlyForce, routeMode, props, startLatLon, endLatLon,
+                    Collections.emptyList(), Collections.emptyList());
 
             pointsRes = getPoints(routeSegmentResults, locations);
         }
 
-        if (!pointsRes.isEmpty()) {
-            GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
-            if (hasRouting) {
-                webGpxParser.addRouteSegmentsToPoints(seg, pointsRes);
-            }
-            addDistance(pointsRes);
+        if (pointsRes.isEmpty()) {
+            return lineRes;
         }
+
+        GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
+        if (hasRouting) {
+            webGpxParser.addRouteSegmentsToPoints(seg, pointsRes);
+        }
+        addDistance(pointsRes);
         return pointsRes;
     }
 
@@ -165,9 +171,7 @@ public class RoutingService {
         for (RoutingController.RoutingParameter rp : rps) {
             rm.params.put(rp.key, rp);
         }
-        passParams.forEach(p -> {
-            rm.params.put(p.key, p);
-        });
+        passParams.forEach(p -> rm.params.put(p.key, p));
     }
 
     public void calculateStraightLine(List<LatLon> list) {

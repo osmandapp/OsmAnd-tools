@@ -49,7 +49,6 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 @RequestMapping("/routing")
 public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
-    private static final int MAX_DISTANCE = 9999; // see also REACT_APP_MAX_ROUTE_DISTANCE in web-repo
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
 	@Autowired
@@ -255,14 +254,15 @@ public class RoutingController {
 	public ResponseEntity<String> routing(@RequestParam String[] points,
 	                                 @RequestParam(defaultValue = "car") String routeMode,
 	                                 @RequestParam(required = false) String[] avoidRoads,
-	                                 @RequestParam int maxDist) throws IOException {
+	                                 @RequestParam(defaultValue = "100") int hhOnlyLimit) throws IOException {
+
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return osmAndMapsService.errorConfig();
 		}
 		List<LatLon> list = new ArrayList<>();
 		double lat = 0;
 		int k = 0;
-		boolean tooLong = false;
+		boolean hhOnlyForce = false;
 		LatLon prev = null;
 		for (String point : points) {
 			String[] sl = point.split(",");
@@ -273,7 +273,7 @@ public class RoutingController {
 				} else {
 					LatLon pnt = new LatLon(lat, vl);
 					if (!list.isEmpty()) {
-						tooLong = tooLong || MapUtils.getDistance(prev, pnt) > Math.min(maxDist, MAX_DISTANCE) * 1000;
+						hhOnlyForce = hhOnlyForce || MapUtils.getDistance(prev, pnt) > hhOnlyLimit * 1000;
 					}
 					list.add(pnt);
 					prev = pnt;
@@ -283,10 +283,12 @@ public class RoutingController {
 		List<LatLon> resList = new ArrayList<>();
 		List<Feature> features = new ArrayList<>();
 		Map<String, Object> props = new TreeMap<>();
-		if (list.size() >= 2 && !tooLong) {
+		if (list.size() >= 2) {
 			try {
-				List<RouteSegmentResult> res = osmAndMapsService.routing(routeMode, props, list.get(0), list.get(list.size() - 1),
-						list.subList(1, list.size() - 1), avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads) );
+				List<RouteSegmentResult> res =
+						osmAndMapsService.routing(hhOnlyForce, routeMode, props, list.get(0),
+								list.get(list.size() - 1), list.subList(1, list.size() - 1),
+								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads));
 				if (res != null) {
 					routingService.convertResults(resList, features, res);
 				}
@@ -294,7 +296,10 @@ public class RoutingController {
 				LOGGER.error(e.getMessage(), e);
 			}
 		}
+
+		boolean reportLimitError = false;
 		if (resList.isEmpty()) {
+			reportLimitError = true;
 			resList = new ArrayList<>(list);
 			routingService.calculateStraightLine(resList);
 			float dist = 0;
@@ -303,13 +308,14 @@ public class RoutingController {
 			}
 			props.put("distance", dist);
 		}
+
 		Feature route = new Feature(Geometry.lineString(resList));
 		route.properties = props;
 		features.add(0, route);
 		
-		if (tooLong) {
+		if (reportLimitError) {
 			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg",
-					MSG_LONG_DIST + maxDist + " km.")));
+					MSG_LONG_DIST + hhOnlyLimit + " km.")));
 		} else {
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		}
@@ -317,18 +323,19 @@ public class RoutingController {
 	
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start,
-	                                                       @RequestParam String end,
-	                                                       @RequestParam String routeMode,
-	                                                       @RequestParam boolean hasRouting,
-	                                                       @RequestParam int maxDist) throws IOException, InterruptedException {
+	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start, @RequestParam String end,
+	                                                       @RequestParam String routeMode, @RequestParam boolean hasRouting,
+	                                                       @RequestParam(defaultValue = "100") int hhOnlyLimit)
+			throws IOException, InterruptedException {
+
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		boolean isLongDist = MapUtils.getDistance(startPoint, endPoint) > Math.min(maxDist, MAX_DISTANCE) * 1000;
-		List<WebGpxParser.Point> trackPointsRes = routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, isLongDist);
-		if (isLongDist) {
+		boolean hhOnlyForce = MapUtils.getDistance(startPoint, endPoint) > hhOnlyLimit * 1000;
+		List<WebGpxParser.Point> trackPointsRes =
+				routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, hhOnlyForce);
+		if (trackPointsRes.size() <= 2 && hhOnlyForce) { // report limit error
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg",
-					MSG_LONG_DIST + maxDist + " km.")));
+					MSG_LONG_DIST + hhOnlyLimit + " km.")));
 		} else {
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 		}
