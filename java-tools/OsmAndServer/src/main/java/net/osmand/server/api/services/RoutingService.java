@@ -106,16 +106,10 @@ public class RoutingService {
         return line;
     }
 
-	public void fillRoutingModeParams(
-			RoutingController.RoutingParameter hhRouting,
-			RoutingController.RoutingParameter hhOnly,
-			RoutingController.RoutingParameter nativeRouting,
-			RoutingController.RoutingParameter nativeTrack,
-			RoutingController.RoutingParameter calcMode,
-			RoutingController.RoutingParameter shortWay,
-			Map.Entry<String, GeneralRouter> e,
-			RoutingController.RoutingMode rm
-	) {
+    public void fillRoutingModeParams(List<RoutingController.RoutingParameter> passParams,
+                                      RoutingController.RoutingParameter shortWay,
+                                      Map.Entry<String, GeneralRouter> e, RoutingController.RoutingMode rm) {
+
         List<RoutingController.RoutingParameter> rps = new ArrayList<>();
         rps.add(shortWay);
         for (Map.Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
@@ -171,11 +165,9 @@ public class RoutingService {
         for (RoutingController.RoutingParameter rp : rps) {
             rm.params.put(rp.key, rp);
         }
-        rm.params.put(hhRouting.key, hhRouting);
-		rm.params.put(hhOnly.key, hhOnly);
-		rm.params.put(nativeRouting.key, nativeRouting);
-        rm.params.put(nativeTrack.key, nativeTrack);
-        rm.params.put(calcMode.key, calcMode);
+        passParams.forEach(p -> {
+            rm.params.put(p.key, p);
+        });
     }
 
     public void calculateStraightLine(List<LatLon> list) {

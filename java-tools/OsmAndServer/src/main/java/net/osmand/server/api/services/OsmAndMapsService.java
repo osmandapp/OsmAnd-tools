@@ -726,7 +726,7 @@ public class OsmAndMapsService {
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
 		router.setUseNativeApproximation(false);
 
-		// reset every time
+		// reset before applying
 		router.USE_HH_ROUTING = false;
 		router.USE_ONLY_HH_ROUTING = false;
 

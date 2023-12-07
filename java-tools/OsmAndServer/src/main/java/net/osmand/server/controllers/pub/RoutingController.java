@@ -188,13 +188,13 @@ public class RoutingController {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
 						routingService.fillRoutingModeParams(
-								hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+								Arrays.asList(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
 					routingService.fillRoutingModeParams(
-							hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode, shortWay, e, rm);
+							Arrays.asList(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
 				}
 			}
 		}
