@@ -368,8 +368,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				throw new RuntimeException(es);
 			}
 			long id = convertId(e);
-			if (propagateToNodes != null) {
-				TLongArrayList propagatedNodeIds = propagateToNodes.registerRestrictionNodes(e);
+			if (propagateToNodes != null && e instanceof Way) {
+				TLongArrayList propagatedNodeIds = propagateToNodes.propagateTagsFromWays((Way) e);
 				if (propagatedNodeIds.size() > 0) {
 					for (int i = 0; i < propagatedNodeIds.size(); i++) {
 						long nodeId = propagatedNodeIds.get(i);

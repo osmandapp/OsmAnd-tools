@@ -207,8 +207,8 @@ public class IndexCreator {
 				heightData.proccess((Way) e);
 			}
 		}
-		if (propagateToNodes != null) {
-			propagateToNodes.propagateRestrictionNodeTags(e);
+		if (propagateToNodes != null && e instanceof Node) {
+			propagateToNodes.propagateTagsToNode((Node) e);
 		}
 		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, icc);

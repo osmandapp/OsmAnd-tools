@@ -60,14 +60,16 @@ import net.osmand.util.MapUtils;
 // 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
 // Long routes crashes ? (issue with limit)?
 // 1.2.1 Empty HH file (Monaco) - too small so it start / end good
+// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
 
 /////////////////////////////////
 // IN PROGRESS
 // TEST: Java / C++ approximation, Java / C++ routing 
 // 1.2 Check coverage HH is not enough & don't calculate (limit used maps by BBOX similar to Web) 
-// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
 // 2.0.1 Progress bar for HHRoutePlanner
 // 2.0.2 Intermediate points HHRoutePlanner
+// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
+// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
@@ -76,13 +78,11 @@ import net.osmand.util.MapUtils;
 // C.4 C++ implementation HHRoutePlanner / Progress Bar
 
 // 2. SHORT-TERM HHRoutePlanner - fixes related to live data
-// 2.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
-// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
+// 2.4 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
 // 2.5 Avoid specific road
 // 2.6 Deprioritize or exclude roads (parameters)
 // 2.7 Live data (think about it)
-// 2.8 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
+// 2.8 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.9 BUG: HHRoutePlanner - TODO lots of incorrect distance in db 
 // 2.10 BUG: Ferry not calculated in detailed to London / Marseille 
 // 2.11 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
