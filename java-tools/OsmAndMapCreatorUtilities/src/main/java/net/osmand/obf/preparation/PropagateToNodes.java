@@ -37,9 +37,9 @@ public class PropagateToNodes {
                 String[] split = entry.getKey().split("/");
     			rule.tag = split[0];
     			rule.value = split[1];
-    			if(propagateRulesByTag.containsKey(rule.tag)) {
-    				propagateRulesByTag.put(rule.tag, new ArrayList<PropagateToNodes.PropagateRule>());
-    			}
+				if (!propagateRulesByTag.containsKey(rule.tag)) {
+					propagateRulesByTag.put(rule.tag, new ArrayList<PropagateToNodes.PropagateRule>());
+				}
                 propagateRulesByTag.get(rule.tag).add(rule);
             }
         }
