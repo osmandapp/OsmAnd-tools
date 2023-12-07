@@ -152,9 +152,11 @@ public class PropagateToNodes {
         }
 		long nodeId = n.getId();
 		Map<String, String> tags = nodePropagatedTags.get(nodeId);
-		for (Map.Entry<String, String> entry : tags.entrySet()) {
-			if (n.getTag(entry.getKey()) == null && entry.getValue() != null) {
-				n.putTag(entry.getKey(), entry.getValue());
+		if (tags != null) {
+			for (Map.Entry<String, String> entry : tags.entrySet()) {
+				if (n.getTag(entry.getKey()) == null && entry.getValue() != null) {
+					n.putTag(entry.getKey(), entry.getValue());
+				}
 			}
 		}
 	}
