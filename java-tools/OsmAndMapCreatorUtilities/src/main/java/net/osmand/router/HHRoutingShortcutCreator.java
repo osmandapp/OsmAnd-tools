@@ -101,13 +101,13 @@ public class HHRoutingShortcutCreator {
 				onlyCompact = true;
 			}
 		}
-		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
-		File dbFile = new File(folder, name + HHRoutingDB.EXT);
+		File folder = new File(".");
+		String name = folder.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
+		File dbFile = new File(name + HHRoutingDB.EXT);
 		if (onlyCompact) {
 			File compactFile = new File(folder, name + HHRoutingDB.CEXT);
 			HHRoutingPreparationDB.compact(dbFile, compactFile);
-			new HHRoutingOBFWriter().writeFile(compactFile, null, ROUTING_PROFILE, false);
+			new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
 			return;
 		}
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
@@ -132,7 +132,7 @@ public class HHRoutingShortcutCreator {
 		networkDB.close();
 		File compactFile = new File(folder, name + HHRoutingDB.CEXT);
 		HHRoutingPreparationDB.compact(dbFile, compactFile);
-		new HHRoutingOBFWriter().writeFile(compactFile, null, ROUTING_PROFILE, false);
+		new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
 	}
 	
 	
