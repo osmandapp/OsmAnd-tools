@@ -52,24 +52,24 @@ import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
 // F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
-// F.4 FILE: Utility to cut cluster by countries
-// !!! RoutePlannerFrontEnd integration with Android !!!
-// 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// HH routing + C++ routing wrong turns
-// 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
-// Long routes crashes ? (issue with limit)?
-// 1.2.1 Empty HH file (Monaco) - too small so it start / end good
 // 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
+// 1.4 Reiterate point (when point surrounded private blocks) implement 
+// 1.9 Intermediate points HHRoutePlanner
+// 2.0 Check coverage HH is not enough & don't calculate - do we need it? We have MAX_REITERATIONS + MAX_PNTS_LIMIT
 
 /////////////////////////////////
 // IN PROGRESS
-// TEST: Java / C++ approximation, Java / C++ routing 
-// 1.2 Check coverage HH is not enough & don't calculate (limit used maps by BBOX similar to Web) 
-// 2.0.1 Progress bar for HHRoutePlanner
-// 2.0.2 Intermediate points HHRoutePlanner
-// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
-// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
+// TEST WEB: Java / C++ approximation, Java / C++ routing
+// TODO better select region (czech vs sacsen old files) - check start / end point
+// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 52.429665 Lon 10.59049 -> Lat 52.431316 Lon 10.586489
+// 2.2.1 route calculation time impact
+// 2.5, 2.2 Avoid specific road
+// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / parameters)
+// 2.6,2.3,2.2 Deprioritize or exclude roads (parameters)
+
+// 2.4 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
+// 2.7 Live data (To think after 2.5, 2.6) - New roads
 
 // C ++ 
 // C.1 C++ BinaryRoutePlanner and others Fixes
@@ -78,22 +78,18 @@ import net.osmand.util.MapUtils;
 // C.4 C++ implementation HHRoutePlanner / Progress Bar
 
 // 2. SHORT-TERM HHRoutePlanner - fixes related to live data
-// 2.4 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
-// 2.5 Avoid specific road
-// 2.6 Deprioritize or exclude roads (parameters)
-// 2.7 Live data (think about it)
-// 2.8 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 2.9 BUG: HHRoutePlanner - TODO lots of incorrect distance in db 
-// 2.10 BUG: Ferry not calculated in detailed to London / Marseille 
-// 2.11 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 2.1  Progress bar for HHRoutePlanner
+// 2.8  BUG DATA! Ferry not calculated in detailed to London / Marseille  - Den Haag -> London
+// 2.9  BUG DATA! HHRoutePlanner - TODO lots of incorrect distance in db 
+// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 2.11 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
 // 3.4 DATA: Tests 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 3.5 DATA: Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
-//    static int TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
+// 3.5 DATA: Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) -  TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
 // 3.6 DATA: EX10 - example that min depth doesn't give good approximation
 // 3.7 BUG: 2-dir routing speed https://github.com/osmandapp/OsmAnd/issues/18566 
 // 3.8 SPEEDUP: HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData())

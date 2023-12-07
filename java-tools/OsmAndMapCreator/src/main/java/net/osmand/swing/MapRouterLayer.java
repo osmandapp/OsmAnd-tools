@@ -1153,12 +1153,12 @@ public class MapRouterLayer implements MapPanelLayer {
 		} catch (NumberFormatException e){
 			e.printStackTrace();
 		}
-		try {
-			config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
-					.parse("19.07.2019 12:40").getTime();
-		} catch (Exception e) {
-		}
-		config.routeCalculationTime = System.currentTimeMillis();
+//		try {
+//			config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
+//					.parse("19.07.2019 12:40").getTime();
+//		} catch (Exception e) {
+//		}
+//		config.routeCalculationTime = System.currentTimeMillis();
 
 		final RoutingContext ctx = router.buildRoutingContext(config,
 				DataExtractionSettings.getSettings().useNativeRouting()

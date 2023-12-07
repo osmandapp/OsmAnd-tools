@@ -194,17 +194,25 @@ public class HHRoutingOBFWriter {
 			File writeFile = outFile; 
 			if (outFile.exists()) {
 				reader = new BinaryMapIndexReader(new RandomAccessFile(outFile, "rw"), outFile);
-				boolean profileAlreadyExist = false;
+				long profileEdition = -1;
 				for (HHRouteRegion h : reader.getHHRoutingIndexes()) {
 					if (h.profile.equals(profile)) {
-						profileAlreadyExist = true;
+						profileEdition = h.edition;
 						break;
 					}
 				}
-				if (profileAlreadyExist) {
-					System.out.println("Skip file as hh routing profile already exist");
+				if (profileEdition > 0) {
+					if (edition == profileEdition) {
+						System.out.printf("Skip file %s as same hh routing profile (%s) already exist\n",
+								outFile.getName(), new Date(edition));
+					} else {
+						System.out.printf(
+								"TODO ! rewrite file %s with another hh routing profile (%s != %s) already exist\n",
+								outFile.getName(), new Date(edition), new Date(profileEdition));
+					}
 					return;
 				}
+				System.out.println("Augment file with hh routing: " + outFile.getName());
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
 			}
 			long timestamp = reader != null ? reader.getDateCreated() : edition;
