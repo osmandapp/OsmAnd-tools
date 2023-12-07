@@ -154,14 +154,11 @@ public class RoutingController {
 	
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
-		final Set<String> HH_ONLY_FORCED_PROFILES = Set.of("car", "bicycle");
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 		RoutingParameter hhRouting = new RoutingParameter("hhrouting", "Development",
 				"[Dev] Use HH (auto)", true);
-		RoutingParameter hhOnlyDefault = new RoutingParameter("hhonly", "Development",
+		RoutingParameter hhOnly = new RoutingParameter("hhonly", "Development",
 				"[Dev] Use HH (only)", false);
-		RoutingParameter hhOnlyForced = new RoutingParameter("hhonly", "Development",
-				"[Dev] Use HH (only)", true);
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
 				"[Dev] Use C++ (routing)", true);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
@@ -177,8 +174,6 @@ public class RoutingController {
 		};
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false); 
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
-			RoutingParameter hhOnly =
-					HH_ONLY_FORCED_PROFILES.contains(e.getValue().getProfileName()) ? hhOnlyForced : hhOnlyDefault;
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
@@ -202,7 +197,7 @@ public class RoutingController {
 			RoutingMode rm = new RoutingMode(rs.name);
 			routers.put(rm.key, rm);
 			rm.params.put(hhRouting.key, hhRouting);
-			rm.params.put(hhOnlyDefault.key, hhOnlyDefault);
+			rm.params.put(hhOnly.key, hhOnly);
 			rm.params.put(nativeRouting.key, nativeRouting);
 			rm.params.put(nativeTrack.key, nativeTrack);
 		}
