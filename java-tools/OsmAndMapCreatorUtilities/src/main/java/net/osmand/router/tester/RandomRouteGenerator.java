@@ -78,7 +78,7 @@ class RandomRouteGenerator {
 		}
 	}
 
-	private enum randomActions {
+	private enum RandomActions {
 		HIGHWAY_SKIP_DIV,
 		HIGHWAY_TO_POINT,
 		N_INTER_POINTS,
@@ -90,7 +90,7 @@ class RandomRouteGenerator {
 
 	// return fixed (pseudo) random int >=0 and < bound
 	// use current week number + action (enum) + i + j as the random seed
-	private int fixedRandom(int bound, randomActions action, long i, long j) {
+	private int fixedRandom(int bound, RandomActions action, long i, long j) {
 		final long week = Calendar.getInstance().get(Calendar.WEEK_OF_YEAR); // 1-52 (reset seed every week)
 		final long seed = (week << 56) + ((long) action.ordinal() << 48) + (i << 1) + j;
 		return bound > 0 ? Math.abs(new Random(seed).nextInt()) % bound : 0;
@@ -107,7 +107,7 @@ class RandomRouteGenerator {
 
 		// pointSkipDivisor used to hop over sequential points to enlarge distances between them
 		// The idea is to read only 1 of 100 points, but the different 1 each method call (seed)
-		int pointSkipDivisor = 1 + fixedRandom(100, randomActions.HIGHWAY_SKIP_DIV, 0, seed);
+		int pointSkipDivisor = 1 + fixedRandom(100, RandomActions.HIGHWAY_SKIP_DIV, 0, seed);
 
 		for (BinaryIndexPart p : index.getIndexes()) {
 			if (p instanceof BinaryMapRouteReaderAdapter.RouteRegion) {
@@ -133,7 +133,7 @@ class RandomRouteGenerator {
 								if (osmId % pointSkipDivisor == 0) {
 									int nPoints = obj.pointsX.length;
 									// use object id and seed (number of class randomPoints) as a unique random seed
-									int pointIndex = fixedRandom(nPoints, randomActions.HIGHWAY_TO_POINT, osmId, seed);
+									int pointIndex = fixedRandom(nPoints, RandomActions.HIGHWAY_TO_POINT, osmId, seed);
 									double lat = MapUtils.get31LatitudeY(obj.pointsY[pointIndex]);
 									double lon = MapUtils.get31LongitudeX(obj.pointsX[pointIndex]);
 									randomPoints.add(new LatLon(lat, lon));
@@ -184,7 +184,7 @@ class RandomRouteGenerator {
 			// 1) select profile,params
 			if (config.RANDOM_PROFILES.length > 0) {
 				boolean isProfileName = true; // "profile[,params]"
-				int profileIndex = fixedRandom(config.RANDOM_PROFILES.length, randomActions.GET_PROFILE, i, 0);
+				int profileIndex = fixedRandom(config.RANDOM_PROFILES.length, RandomActions.GET_PROFILE, i, 0);
 				for (String param : config.RANDOM_PROFILES[profileIndex].split(",")) {
 					if (isProfileName) {
 						entry.profile = param;
@@ -197,7 +197,7 @@ class RandomRouteGenerator {
 
 			// 2) select start
 			for (int j = 0; j < randomPoints.size(); j++) {
-				int startIndex = fixedRandom(randomPoints.size(), randomActions.GET_START, i, j);
+				int startIndex = fixedRandom(randomPoints.size(), RandomActions.GET_START, i, j);
 				entry.start = randomPoints.get(startIndex);
 				if (!avoidDupes.contains(entry.start)) {
 					break;
@@ -206,7 +206,7 @@ class RandomRouteGenerator {
 			avoidDupes.add(entry.start);
 
 			// 3) select via (inter points) and finish points, restart if no suitable points found
-			int nInterpoints = fixedRandom(config.MAX_INTER_POINTS + 1, randomActions.N_INTER_POINTS, i, 0);
+			int nInterpoints = fixedRandom(config.MAX_INTER_POINTS + 1, RandomActions.N_INTER_POINTS, i, 0);
 			int nNextPoints = 1 + nInterpoints; // as minimum, the one (finish) point must be added
 			int minDistanceKm = config.MIN_DISTANCE_KM / nNextPoints;
 			int maxDistanceKm = config.MAX_DISTANCE_KM / nNextPoints;
@@ -217,7 +217,7 @@ class RandomRouteGenerator {
 				LatLon point = null;
 				boolean pointFound = false;
 				for (int j = 0; j < randomPoints.size(); j++) {
-					int pointIndex = fixedRandom(randomPoints.size(), randomActions.GET_POINTS, i, nNextPoints + j);
+					int pointIndex = fixedRandom(randomPoints.size(), RandomActions.GET_POINTS, i, nNextPoints + j);
 					point = randomPoints.get(pointIndex);
 					double km = MapUtils.getDistance(prevPoint, point) / 1000;
 					if (km >= minDistanceKm && km <= maxDistanceKm && !avoidDupes.contains(point)) {
@@ -255,7 +255,7 @@ class RandomRouteGenerator {
 			if (config.MAX_SHIFT_ALL_POINTS_M > 0) {
 				class Shifter {
 					LatLon shiftLatLon(LatLon ll, int i, int j) {
-						int meters = fixedRandom(config.MAX_SHIFT_ALL_POINTS_M, randomActions.SHIFT_METERS, i, j);
+						int meters = fixedRandom(config.MAX_SHIFT_ALL_POINTS_M, RandomActions.SHIFT_METERS, i, j);
 						double shift = meters / 111_000F; // enough approx meters to lat/lon
 						double lat = ll.getLatitude() + shift;
 						double lon = ll.getLongitude() + shift;
