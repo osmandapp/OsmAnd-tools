@@ -102,7 +102,7 @@ public class FavoriteService {
     
     public GPXFile createGpxFile(String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev, Long updatetime) throws IOException {
         PremiumUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
-        if (userGroupFile == null) {
+        if (userGroupFile == null || userGroupFile.filesize == -1) {
             if (groupName.equals(DEFAULT_GROUP_FILE_NAME)) {
                 userGroupFile = createDefaultGroup(groupName, dev, updatetime);
             } else {
