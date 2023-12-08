@@ -10,6 +10,7 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import net.osmand.Location;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ import com.google.gson.GsonBuilder;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
+import net.osmand.data.LatLonEle;
 import net.osmand.data.Street;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
@@ -60,7 +62,7 @@ public class RoutingController {
 	Gson gson = new Gson();
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
-	
+
 	public static class FeatureCollection {
 		public String type = "FeatureCollection";
 		public List<Feature> features = new ArrayList<>();
@@ -92,20 +94,50 @@ public class RoutingController {
 		public Geometry(String type) {
 			this.type = type;
 		}
-		
+
 		public static Geometry lineString(List<LatLon> lst) {
 			Geometry gm = new Geometry("LineString");
-			double[][] coordnates =  new double[lst.size()][];
-			for(int i = 0; i < lst.size() ; i++) {
-				coordnates[i] = new double[] {lst.get(i).getLongitude(), lst.get(i).getLatitude() };
+			float[][] coordnates = new float[lst.size()][];
+			for (int i = 0; i < lst.size(); i++) {
+				coordnates[i] = new float[]{(float) lst.get(i).getLongitude(), (float) lst.get(i).getLatitude()};
 			}
 			gm.coordinates = coordnates;
 			return gm;
 		}
-		
+
+		public static Geometry lineStringElevation(List<LatLonEle> lst) {
+			Geometry gm = new Geometry("LineString");
+			float[][] coordnates = new float[lst.size()][];
+			for (int i = 0; i < lst.size(); i++) {
+				float lat = (float) lst.get(i).getLatitude();
+				float lon = (float) lst.get(i).getLongitude();
+				float ele = (float) lst.get(i).getElevation();
+				if (Float.isNaN(ele)) {
+					coordnates[i] = new float[]{lon, lat}; // GeoJSON [] longitude first, then latitude
+				} else {
+					coordnates[i] = new float[]{lon, lat, ele}; // https://www.rfc-editor.org/rfc/rfc7946 3.1.1
+				}
+			}
+			gm.coordinates = coordnates;
+			return gm;
+		}
+
 		public static Geometry point(LatLon pnt) {
 			Geometry gm = new Geometry("Point");
-			gm.coordinates = new double[] {pnt.getLongitude(), pnt.getLatitude() };
+			gm.coordinates = new float[]{(float) pnt.getLongitude(), (float) pnt.getLatitude()};
+			return gm;
+		}
+
+		public static Geometry pointElevation(LatLonEle pnt) {
+			Geometry gm = new Geometry("Point");
+			float lat = (float) pnt.getLatitude();
+			float lon = (float) pnt.getLongitude();
+			float ele = (float) pnt.getElevation();
+			if (Double.isNaN(ele)) {
+				gm.coordinates = new float[]{lon, lat}; // GeoJSON [] longitude first, then latitude
+			} else {
+				gm.coordinates = new float[]{lon, lat, ele}; // https://www.rfc-editor.org/rfc/rfc7946 3.1.1
+			}
 			return gm;
 		}
 	}
@@ -280,7 +312,7 @@ public class RoutingController {
 				}
 			}
 		}
-		List<LatLon> resList = new ArrayList<>();
+		List<LatLonEle> resListElevation = new ArrayList<>();
 		List<Feature> features = new ArrayList<>();
 		Map<String, Object> props = new TreeMap<>();
 		if (list.size() >= 2) {
@@ -290,26 +322,29 @@ public class RoutingController {
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
 								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads));
 				if (res != null) {
-					routingService.convertResults(resList, features, res);
+					routingService.convertResultsWithElevation(resListElevation, features, res);
 				}
 			} catch (IOException | InterruptedException | RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);
 			}
 		}
 
+		List<LatLon> resListFallbackLine = new ArrayList<>();
 		boolean reportLimitError = false;
-		if (resList.isEmpty()) {
+		if (resListElevation.isEmpty()) {
 			reportLimitError = true;
-			resList = new ArrayList<>(list);
-			routingService.calculateStraightLine(resList);
+			resListFallbackLine = new ArrayList<>(list);
+			routingService.calculateStraightLine(resListFallbackLine);
 			float dist = 0;
-			for (int i = 1; i < resList.size(); i++) {
-				dist += MapUtils.getDistance(resList.get(i - 1), resList.get(i));
+			for (int i = 1; i < resListFallbackLine.size(); i++) {
+				dist += MapUtils.getDistance(resListFallbackLine.get(i - 1), resListFallbackLine.get(i));
 			}
 			props.put("distance", dist);
 		}
 
-		Feature route = new Feature(Geometry.lineString(resList));
+		Feature route = resListElevation.isEmpty() ?
+				new Feature(Geometry.lineString(resListFallbackLine)) :
+				new Feature(Geometry.lineStringElevation(resListElevation));
 		route.properties = props;
 		features.add(0, route);
 		

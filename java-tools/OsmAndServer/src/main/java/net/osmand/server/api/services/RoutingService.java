@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import net.osmand.data.LatLonEle;
 import net.osmand.router.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -185,6 +186,58 @@ public class RoutingService {
         }
     }
 
+    public void convertResultsWithElevation(List<LatLonEle> resListEle,
+                                            List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+        for (RouteSegmentResult r : res) {
+            int dir = r.isForwardDirection() ? 1 : -1;
+            int start = r.getStartPointIndex();
+            int end = r.getEndPointIndex();
+
+            // calculate and validate heights
+            float[] heightArray = r.getObject().calculateHeightArray();
+            boolean isHeightsValid = heightArray.length / 2 == r.getObject().getPointsLength();
+
+//            if (!isHeightsValid) {
+//                System.err.printf("BUG? %d != %d\n", heightArray.length / 2, r.getObject().getPointsLength());
+//            }
+
+            // process (segment/turn) description
+            String description = r.getDescription(true);
+            if (description != null && description.length() > 0) {
+                RoutingController.Geometry point;
+
+                if (isHeightsValid) {
+                    float ele = heightArray[start * 2 + 1];
+                    double lat = r.getStartPoint().getLatitude();
+                    double lon = r.getStartPoint().getLongitude();
+                    point = RoutingController.Geometry.pointElevation(new LatLonEle(lat, lon, ele));
+//                    System.err.printf("%d/%d/%d point-ele %s\n", dir, start, end, new LatLonEle(lat, lon, ele));
+                } else {
+                    point = RoutingController.Geometry.point(r.getStartPoint());
+                }
+
+                RoutingController.Feature f = new RoutingController.Feature(point);
+                f.prop("description", description).prop("routingTime", r.getRoutingTime())
+                        .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
+                        .prop("roadId", r.getObject().getId());
+                features.add(f);
+            }
+
+            // add points
+            int i = start;
+            do {
+                double lat = r.getPoint(i).getLatitude();
+                double lon = r.getPoint(i).getLongitude();
+                if (isHeightsValid) {
+                    float ele = heightArray[i * 2 + 1];
+                    resListEle.add(new LatLonEle(lat, lon, ele));
+                } else {
+                    resListEle.add(new LatLonEle(lat, lon)); // NaN elevation will be excluded from results
+                }
+            } while ((i += dir) != end);
+        }
+    }
+
     public void convertResults(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
         LatLon last = null;
         for (RouteSegmentResult r : res) {
@@ -265,7 +318,7 @@ public class RoutingService {
         }
     }
 
-    private List<WebGpxParser.Point> getPoints(List<RouteSegmentResult> routeSegmentResults, List<Location> locations) {
+   public List<WebGpxParser.Point> getPoints(List<RouteSegmentResult> routeSegmentResults, List<Location> locations) {
         if (routeSegmentResults != null) {
             List<WebGpxParser.Point> pointsRes = new ArrayList<>();
             for (RouteSegmentResult r : routeSegmentResults) {
