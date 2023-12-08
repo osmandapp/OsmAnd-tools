@@ -188,14 +188,31 @@ public class RoutingService {
 
     public void convertResultsWithElevation(List<LatLonEle> resListEle,
                                             List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
-        for (RouteSegmentResult r : res) {
-            int dir = r.isForwardDirection() ? 1 : -1;
-            int start = r.getStartPointIndex();
-            int end = r.getEndPointIndex();
+        for (int i = 0; i < res.size(); i++) {
+            RouteSegmentResult r = res.get(i);
+
+            final int dir = r.isForwardDirection() ? 1 : -1;
+            final int start = r.getStartPointIndex();
+            final int end = r.getEndPointIndex();
 
             // calculate and validate heights
-            float[] heightArray = r.getObject().calculateHeightArray();
-            boolean isHeightsValid = heightArray.length / 2 == r.getObject().getPointsLength();
+            final float[] heightArray = r.getObject().calculateHeightArray();
+            final boolean isHeightsValid = heightArray.length / 2 == r.getObject().getPointsLength();
+
+            // add points: very last segment should include very last point (end+dir)
+            final int lastPointIndex = (i == res.size() - 1) ? (end + dir) : end;
+            for (int j = start; j != lastPointIndex; j += dir) {
+                if (r.getPoint(j) != null) {
+                    double lat = r.getPoint(j).getLatitude();
+                    double lon = r.getPoint(j).getLongitude();
+                    if (isHeightsValid) {
+                        float ele = heightArray[j * 2 + 1];
+                        resListEle.add(new LatLonEle(lat, lon, ele));
+                    } else {
+                        resListEle.add(new LatLonEle(lat, lon)); // NaN elevation will be excluded from results
+                    }
+                }
+            }
 
             // process (segment/turn) description
             String description = r.getDescription(true);
@@ -217,19 +234,6 @@ public class RoutingService {
                         .prop("roadId", r.getObject().getId());
                 features.add(f);
             }
-
-            // add points
-            int i = start;
-            do {
-                double lat = r.getPoint(i).getLatitude();
-                double lon = r.getPoint(i).getLongitude();
-                if (isHeightsValid) {
-                    float ele = heightArray[i * 2 + 1];
-                    resListEle.add(new LatLonEle(lat, lon, ele));
-                } else {
-                    resListEle.add(new LatLonEle(lat, lon)); // NaN elevation will be excluded from results
-                }
-            } while ((i += dir) != end);
         }
     }
 
