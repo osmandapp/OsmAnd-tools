@@ -4,13 +4,11 @@ package net.osmand.server.controllers.pub;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
-import java.lang.Math;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import net.osmand.Location;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,10 +22,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
-import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.LatLonEle;
-import net.osmand.data.Street;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.GeneralRouter;
@@ -35,17 +31,12 @@ import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.RoutingServerConfigEntry;
-import net.osmand.server.api.services.OsmAndMapsService.VectorTileServerConfig;
 import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 
 @Controller
 @RequestMapping("/routing")
@@ -134,9 +125,9 @@ public class RoutingController {
 			float lon = (float) pnt.getLongitude();
 			float ele = (float) pnt.getElevation();
 			if (Double.isNaN(ele)) {
-				gm.coordinates = new float[]{lon, lat}; // GeoJSON [] longitude first, then latitude
+				gm.coordinates = new float[]{lon, lat};
 			} else {
-				gm.coordinates = new float[]{lon, lat, ele}; // https://www.rfc-editor.org/rfc/rfc7946 3.1.1
+				gm.coordinates = new float[]{lon, lat, ele};
 			}
 			return gm;
 		}

@@ -197,10 +197,6 @@ public class RoutingService {
             float[] heightArray = r.getObject().calculateHeightArray();
             boolean isHeightsValid = heightArray.length / 2 == r.getObject().getPointsLength();
 
-//            if (!isHeightsValid) {
-//                System.err.printf("BUG? %d != %d\n", heightArray.length / 2, r.getObject().getPointsLength());
-//            }
-
             // process (segment/turn) description
             String description = r.getDescription(true);
             if (description != null && description.length() > 0) {
@@ -211,7 +207,6 @@ public class RoutingService {
                     double lat = r.getStartPoint().getLatitude();
                     double lon = r.getStartPoint().getLongitude();
                     point = RoutingController.Geometry.pointElevation(new LatLonEle(lat, lon, ele));
-//                    System.err.printf("%d/%d/%d point-ele %s\n", dir, start, end, new LatLonEle(lat, lon, ele));
                 } else {
                     point = RoutingController.Geometry.point(r.getStartPoint());
                 }
