@@ -88,28 +88,28 @@ public class RoutingController {
 
 		public static Geometry lineString(List<LatLon> lst) {
 			Geometry gm = new Geometry("LineString");
-			float[][] coordnates = new float[lst.size()][];
+			float[][] coordinates = new float[lst.size()][];
 			for (int i = 0; i < lst.size(); i++) {
-				coordnates[i] = new float[]{(float) lst.get(i).getLongitude(), (float) lst.get(i).getLatitude()};
+				coordinates[i] = new float[]{(float) lst.get(i).getLongitude(), (float) lst.get(i).getLatitude()};
 			}
-			gm.coordinates = coordnates;
+			gm.coordinates = coordinates;
 			return gm;
 		}
 
 		public static Geometry lineStringElevation(List<LatLonEle> lst) {
 			Geometry gm = new Geometry("LineString");
-			float[][] coordnates = new float[lst.size()][];
+			float[][] coordinates = new float[lst.size()][];
 			for (int i = 0; i < lst.size(); i++) {
 				float lat = (float) lst.get(i).getLatitude();
 				float lon = (float) lst.get(i).getLongitude();
 				float ele = (float) lst.get(i).getElevation();
 				if (Float.isNaN(ele)) {
-					coordnates[i] = new float[]{lon, lat}; // GeoJSON [] longitude first, then latitude
+					coordinates[i] = new float[]{lon, lat}; // GeoJSON [] longitude first, then latitude
 				} else {
-					coordnates[i] = new float[]{lon, lat, ele}; // https://www.rfc-editor.org/rfc/rfc7946 3.1.1
+					coordinates[i] = new float[]{lon, lat, ele}; // https://www.rfc-editor.org/rfc/rfc7946 3.1.1
 				}
 			}
-			gm.coordinates = coordnates;
+			gm.coordinates = coordinates;
 			return gm;
 		}
 
