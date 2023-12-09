@@ -88,6 +88,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
 import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
+import net.osmand.router.GeneralRouter;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.HHRoutingDB;
 import net.osmand.router.HHRoutingUtilities;
@@ -1134,8 +1135,9 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		}
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(2000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
-		// addImpassableRoad(18569170929l).
+		GeneralRouter.IMPASSABLE_ROAD_SHIFT = 6;
 		RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().setDirectionPoints(directionPointsFile)
+//				.addImpassableRoad(70088213l)
 				.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 
 		// config.planRoadDirection = 1;
