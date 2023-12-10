@@ -44,6 +44,21 @@ public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
+	private class ApiLimits {
+		private final int HH_ONLY_LIMIT_PRODUCTION = 100; // production
+		private final int HH_ONLY_LIMIT_TESTING = 1000; // development, staging
+
+		public int hhOnlyLimit;
+
+		public ApiLimits(String limits) {
+			if (limits != null && ("development".equals(limits) || "staging".equals(limits))) {
+				hhOnlyLimit = HH_ONLY_LIMIT_TESTING;
+			} else {
+				hhOnlyLimit = HH_ONLY_LIMIT_PRODUCTION;
+			}
+		}
+	}
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 	
@@ -274,7 +289,9 @@ public class RoutingController {
 	public ResponseEntity<String> routing(@RequestParam String[] points,
 	                                 @RequestParam(defaultValue = "car") String routeMode,
 	                                 @RequestParam(required = false) String[] avoidRoads,
-	                                 @RequestParam(defaultValue = "100") int hhOnlyLimit) throws IOException {
+	                                 @RequestParam(defaultValue = "production") String limits) throws IOException {
+
+		final int hhOnlyLimit = new ApiLimits(limits).hhOnlyLimit;
 
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return osmAndMapsService.errorConfig();
@@ -335,7 +352,7 @@ public class RoutingController {
 				new Feature(Geometry.lineStringElevation(resListElevation));
 		route.properties = props;
 		features.add(0, route);
-		
+
 		if (reportLimitError) {
 			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg",
 					MSG_LONG_DIST + hhOnlyLimit + " km.")));
@@ -343,13 +360,15 @@ public class RoutingController {
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		}
 	}
-	
+
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start, @RequestParam String end,
 	                                                       @RequestParam String routeMode, @RequestParam boolean hasRouting,
-	                                                       @RequestParam(defaultValue = "100") int hhOnlyLimit)
+	                                                       @RequestParam(defaultValue = "production") String limits)
 			throws IOException, InterruptedException {
+
+		final int hhOnlyLimit = new ApiLimits(limits).hhOnlyLimit;
 
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
