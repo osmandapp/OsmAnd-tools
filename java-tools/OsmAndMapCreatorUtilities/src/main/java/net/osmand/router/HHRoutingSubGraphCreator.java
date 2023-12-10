@@ -59,34 +59,29 @@ import net.osmand.util.MapUtils;
 // 2.0 Check coverage HH is not enough & don't calculate - do we need it? We have MAX_REITERATIONS + MAX_PNTS_LIMIT
 // 2.8  BUG DATA! Ferry not calculated in detailed to London / Marseille  - Den Haag -> London
 
-/////////////////////////////////
-// IN PROGRESS
-// TEST WEB: Java / C++ approximation, Java / C++ routing
-
-// TODO 2.4 run DijkstrA (Live data)
-
-// !!! TESTING !!!
+// !!! SPECIAL TESTING !!!
 // 2.2.0 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Map outdated) - 52.429665 Lon 10.59049 -> Lat 52.431316 Lon 10.586489 (+)
 // 2.2.1 Route calculation cause road is inaccessible by conditional (time access)
 // 2.2.2 Avoid specific road (+)
 // 2.2.3 Missing map (+)
 // 2.3 HHRoutePlanner Implement route recalculation in case distance + > original 10% ? (Live / parameters) (+)
-// 2.3.1 Deprioritize or exclude roads based on parameters
 // 2.4 Live data (To think after 2.2, 2.3) - New roads (same private)
+// 2.3.1 Deprioritize or exclude roads based on parameters
 
-// C ++ 
-// C.1 C++ BinaryRoutePlanner and others Fixes
-// C.2 C++ implementation RoutePlannerFrontEnd 
-// C.3 C++ File readers and file structure 
-// C.4 C++ implementation HHRoutePlanner / Progress Bar
+/////////////////////////////////
+// IN PROGRESS
+// TEST WEB: Java / C++ approximation, Java / C++ routing
+// 2.5  CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
+// 2.7.1 HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+// 2.7.2 HHRoutePlanner loop non suitable alternative routes as a main route
+// 2.9  BUG DATA! HHRoutePlanner - TODO lots of incorrect distance in db 
+// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 2.11 TODO Route Spain -> England
 
 // 2. SHORT-TERM HHRoutePlanner 
 // 2.0  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
 // 2.1  Progress bar for HHRoutePlanner
-// 2.9  BUG DATA! HHRoutePlanner - TODO lots of incorrect distance in db 
-// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
-// 2.11 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 2.12 HHRoutePlanner discard non suitable alternative routes as main route
+
 
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
@@ -97,7 +92,7 @@ import net.osmand.util.MapUtils;
 // 3.6 DATA: EX10 - example that min depth doesn't give good approximation
 // 3.7 BUG: 2-dir routing speed https://github.com/osmandapp/OsmAnd/issues/18566 
 // 3.8 SPEEDUP: HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData())
-// 3.9 ROUTING PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
+// 3.9 PRIVATE: full private roads mode support (not only start/end segment)
 
 // *4* LATE Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level

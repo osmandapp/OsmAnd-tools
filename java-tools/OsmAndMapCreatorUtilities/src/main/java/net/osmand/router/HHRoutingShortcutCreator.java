@@ -394,9 +394,9 @@ public class HHRoutingShortcutCreator {
 //				BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = iteration != 0;
 //				BinaryRoutePlanner.DEBUG_PRECISE_DIST_MEASUREMENT = iteration != 0;
 //			}
+//			resUnique = new TLongObjectHashMap<>();
 //			///// TEST BLOCK ////
 			
-			resUnique = new TLongObjectHashMap<>();
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
 			ctx.config.PENALTY_FOR_REVERSE_DIRECTION = -1;

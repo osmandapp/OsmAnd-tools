@@ -1138,6 +1138,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		GeneralRouter.IMPASSABLE_ROAD_SHIFT = 6;
 		RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().setDirectionPoints(directionPointsFile)
 //				.addImpassableRoad(70088213l)
+//				.addImpassableRoad(896092207l)
 				.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 
 		// config.planRoadDirection = 1;
