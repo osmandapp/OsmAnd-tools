@@ -2,9 +2,9 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
-import static net.osmand.server.controllers.user.FavoriteController.FILE_TYPE_FAVOURITES;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
@@ -392,7 +392,7 @@ public class MapApiController {
 	
 	private boolean isHidden(WebGpxParser.PointsGroup group) {
 		for (WebGpxParser.Wpt wpt:  group.points) {
-			if (wpt.ext.extensions.get("hidden") != null && wpt.ext.extensions.get("hidden").equals("true")) {
+			if (wpt.hidden != null && wpt.hidden.equals("true")) {
 				return true;
 			}
 		}

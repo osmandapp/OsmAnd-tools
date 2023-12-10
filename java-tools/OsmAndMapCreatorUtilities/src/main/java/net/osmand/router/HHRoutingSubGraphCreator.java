@@ -52,51 +52,47 @@ import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
 // F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
-// F.4 FILE: Utility to cut cluster by countries
-// !!! RoutePlannerFrontEnd integration with Android !!!
-// 2.1 HHRoutePlanner Improve A* 2-dir finish condition (first met vs visited)
 // 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// HH routing + C++ routing wrong turns
-// 2.4 LIMIT!: Implement check that routing doesn't allow more roads (max cluster size 100K) (custom routing.xml, live data, new maps)
-// Long routes crashes ? (issue with limit)?
-// 1.2.1 Empty HH file (Monaco) - too small so it start / end good
+// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
+// 1.4 Reiterate point (when point surrounded private blocks) implement 
+// 1.9 Intermediate points HHRoutePlanner
+// 2.0 Check coverage HH is not enough & don't calculate - do we need it? We have MAX_REITERATIONS + MAX_PNTS_LIMIT
+// 2.8  BUG DATA! Ferry not calculated in detailed to London / Marseille  - Den Haag -> London
+
+// !!! SPECIAL TESTING !!!
+// 2.2.0 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Map outdated) - 52.429665 Lon 10.59049 -> Lat 52.431316 Lon 10.586489 (+)
+// 2.2.1 Route calculation cause road is inaccessible by conditional (time access)
+// 2.2.2 Avoid specific road (+)
+// 2.2.3 Missing map (+)
+// 2.3 HHRoutePlanner Implement route recalculation in case distance + > original 10% ? (Live / parameters) (+)
+// 2.4 Live data (To think after 2.2, 2.3) - New roads (same private)
+// 2.3.1 Deprioritize or exclude roads based on parameters
 
 /////////////////////////////////
 // IN PROGRESS
-// TEST: Java / C++ approximation, Java / C++ routing 
-// 1.1 Error ! HH A* Kyiv - France err ~0.2 (wrong file?) - Victor
-// 1.2 Check coverage HH is not enough & don't calculate (limit used maps by BBOX similar to Web) 
-// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
-// 2.0.1 Progress bar for HHRoutePlanner
-// 2.0.2 Intermediate points
+// TEST WEB: Java / C++ approximation, Java / C++ routing
+// 2.5  CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
+// 2.7.1 HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+// 2.7.2 HHRoutePlanner loop non suitable alternative routes as a main route
+// 2.9  BUG DATA! HHRoutePlanner - TODO lots of incorrect distance in db 
+// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 2.11 TODO Route Spain -> England
 
-// C ++ 
-// C.1 C++ BinaryRoutePlanner and others Fixes
-// C.2 C++ implementation RoutePlannerFrontEnd 
-// C.3 C++ File readers and file structure 
-// C.4 C++ implementation HHRoutePlanner / Progress Bar
+// 2. SHORT-TERM HHRoutePlanner 
+// 2.0  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
+// 2.1  Progress bar for HHRoutePlanner
 
-// 2. SHORT-TERM HHRoutePlanner - fixes related to live data
-// 2.1 ! HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 2.2 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Live / map update) - 587728540
-// 2.3 HHRoutePlanner Implement route recalculation in case distance > original 10% ? (Live / map update)
-// 2.5 Avoid specific road
-// 2.6 Deprioritize or exclude roads (parameters)
-// 2.7 Live data (think about it)
-// 2.8 Private roads without segments are not loaded (wrong) and should be used for border calculations for private=yes
-// 2.9 BUG: Ferry not calculated in detailed to London / Marseille 
-// 2.10 BUG: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
 // 3.4 DATA: Tests 1) Straight parallel roads -> 4 points 2) parking slots -> exit points 3) road and suburb -> exit points including road?
-// 3.5 DATA: Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) - 
-//    static int TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
+// 3.5 DATA: Investigate difference ALG_BY_DEPTH_REACH_POINTS = true / false (speed / network) -  TOTAL_MAX_POINTS = 99000 vs (50000), TOTAL_MIN_POINTS = 1000
 // 3.6 DATA: EX10 - example that min depth doesn't give good approximation
 // 3.7 BUG: 2-dir routing speed https://github.com/osmandapp/OsmAnd/issues/18566 
 // 3.8 SPEEDUP: HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData())
+// 3.9 PRIVATE: full private roads mode support (not only start/end segment)
 
 // *4* LATE Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
@@ -192,10 +188,8 @@ public class HHRoutingSubGraphCreator {
 				DEBUG_STORE_ALL_ROADS = 3;
 			}
 		}
-		File folder = obfFile.isDirectory() ? obfFile : obfFile.getParentFile();
-		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
-
-		File dbFile = new File(folder, name + HHRoutingDB.EXT);
+		String name = new File(".").getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
+		File dbFile = new File(name + HHRoutingDB.EXT);
 		if (CLEAN && dbFile.exists()) {
 			dbFile.delete();
 		}
@@ -213,7 +207,7 @@ public class HHRoutingSubGraphCreator {
 			}
 		} finally {
 			if (ctx.visualClusters.size() > 0) {
-				saveOsmFile(visualizeClusters(ctx.visualClusters), new File(folder, name + ".osm"));
+				saveOsmFile(visualizeClusters(ctx.visualClusters), new File(name + ".osm"));
 			}
 			networkDB.close();
 		}

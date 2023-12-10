@@ -50,7 +50,7 @@ public class HHRoutingOBFWriter {
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
 		File dbFile = null;
 		File obfPolyFile = null;
-		String subFolder = "";
+		File outFolder = null;
 		boolean updateExistingFiles = false;
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
@@ -67,8 +67,8 @@ public class HHRoutingOBFWriter {
 			for (String arg : args) {
 				if (arg.startsWith("--db=")) {
 					dbFile = new File(arg.substring("--db=".length()));
-				} else if (arg.startsWith("--subfolder=")) {
-					subFolder = "/" + arg.substring("--subfolder=".length());
+				} else if (arg.startsWith("--outfolder=")) {
+					outFolder = new File(arg.substring("--outfolder=".length()));
 				} else if (arg.startsWith("--update-existing-files")) {
 					updateExistingFiles = true;
 				} else if (arg.startsWith("--obf=")) {
@@ -76,11 +76,10 @@ public class HHRoutingOBFWriter {
 				}
 			}
 		}
-		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, subFolder, updateExistingFiles);
+		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, outFolder, updateExistingFiles);
 	}
 	
-	public void writeFile(File dbFile, File obfPolyFileIn, String subFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
-		
+	public void writeFile(File dbFile, File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
 		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
 		TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
@@ -92,6 +91,9 @@ public class HHRoutingOBFWriter {
 			}
 			writeFileBbox(db, points, outFile, edition, new QuadRect(), null);
 		} else {
+			if (outFolder == null) {
+				outFolder = obfPolyFileIn.isDirectory() ? obfPolyFileIn : obfPolyFileIn.getParentFile();
+			}
 			OsmandRegions or = new OsmandRegions();
 			or.prepareFile();
 			or.cacheAllCountries();
@@ -127,7 +129,7 @@ public class HHRoutingOBFWriter {
 				}
 			}
 			for (File obfPolyFile : obfPolyFiles) {
-				File outFile = new File(obfPolyFile.getParentFile() + subFolder,
+				File outFile = new File(outFolder,
 						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
 				if (updateExistingFiles) {
 					outFile = obfPolyFile;
@@ -140,11 +142,12 @@ public class HHRoutingOBFWriter {
 				
 				if (or.getRegionDataByDownloadName(countryName) != null) {
 					filteredPoints = pointsByDownloadName.get(countryName);
-					if(filteredPoints == null) {
+					if (filteredPoints == null) {
 						System.out.printf("Skip %s as it has no points\n", countryName);
 						continue;
 					}
-					System.out.printf("Use native boundary %s - %d\n", countryName, filteredPoints.size());
+					// by default
+//					System.out.printf("Use native boundary %s - %d\n", countryName, filteredPoints.size());
 				} else {
 					BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(obfPolyFile, "r"),
 							obfPolyFile);
@@ -192,17 +195,19 @@ public class HHRoutingOBFWriter {
 			File writeFile = outFile; 
 			if (outFile.exists()) {
 				reader = new BinaryMapIndexReader(new RandomAccessFile(outFile, "rw"), outFile);
-				boolean profileAlreadyExist = false;
+				long profileEdition = -1;
 				for (HHRouteRegion h : reader.getHHRoutingIndexes()) {
 					if (h.profile.equals(profile)) {
-						profileAlreadyExist = true;
+						profileEdition = h.edition;
 						break;
 					}
 				}
-				if(profileAlreadyExist) {
-					System.out.println("Skip file as hh routing profile already exist");
+				if (edition == profileEdition) {
+					System.out.printf("Skip file %s as same hh routing profile (%s) already exist\n", outFile.getName(),
+							new Date(edition));
 					return;
 				}
+				System.out.println((profileEdition > 0 ? "Replace" : "Augment") +" file with hh routing: " + outFile.getName());
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
 			}
 			long timestamp = reader != null ? reader.getDateCreated() : edition;
@@ -211,6 +216,10 @@ public class HHRoutingOBFWriter {
 				byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 				for (int i = 0; i < reader.getIndexes().size(); i++) {
 					BinaryIndexPart part = reader.getIndexes().get(i);
+					if (part instanceof HHRouteRegion && ((HHRouteRegion) part).profile.equals(profile)) {
+						// ignore same
+						continue;
+					}
 					bmiw.getCodedOutStream().writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					BinaryInspector.writeInt(bmiw.getCodedOutStream(), part.getLength());
 					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, reader.getRaf(), part.getFilePointer(), part.getLength());
@@ -293,7 +302,7 @@ public class HHRoutingOBFWriter {
 			if (reader != null) {
 				reader.close();
 				writeFile.renameTo(outFile);
-//				outFile.setLastModified(timestamp); // not needed for upload but problem for web files
+//				outFile.setLastModified(timestamp); // don't update timestamp to use to compare with latest files
 			}
 		} catch (RTreeException | RTreeInsertException e) {
 			throw new IOException(e);
