@@ -177,14 +177,12 @@ public class RoutingController {
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
-		RoutingParameter hhRouting = new RoutingParameter("hhrouting", "Development",
-				"[Dev] Use HH (auto)", true);
-		RoutingParameter hhOnly = new RoutingParameter("hhonly", "Development",
-				"[Dev] Use HH (only)", false);
+		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
+				"[Dev] Disable HH routing", false);
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
-				"[Dev] Use C++ (routing)", true);
+				"[Dev] Use C++ for routing", false);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
-				"[Dev] Use C++ (approximation)", true);
+				"[Dev] Use C++ for GPX approximation", false);
 		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
 				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
 		calcMode.section = "Development";
@@ -205,13 +203,13 @@ public class RoutingController {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
 						routingService.fillRoutingModeParams(
-								Arrays.asList(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
+								Arrays.asList(hhRouting, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
 					routingService.fillRoutingModeParams(
-							Arrays.asList(hhRouting, hhOnly, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
+							Arrays.asList(hhRouting, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
 				}
 			}
 		}
@@ -219,7 +217,6 @@ public class RoutingController {
 			RoutingMode rm = new RoutingMode(rs.name);
 			routers.put(rm.key, rm);
 			rm.params.put(hhRouting.key, hhRouting);
-			rm.params.put(hhOnly.key, hhOnly);
 			rm.params.put(nativeRouting.key, nativeRouting);
 			rm.params.put(nativeTrack.key, nativeTrack);
 		}

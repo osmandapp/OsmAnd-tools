@@ -723,12 +723,12 @@ public class OsmAndMapsService {
 			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
-		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
-		router.setUseNativeApproximation(false);
 
 		// reset before applying
-		router.USE_HH_ROUTING = false;
-		router.USE_ONLY_HH_ROUTING = false;
+		router.USE_HH_ROUTING = true; // "hhoff"
+		router.USE_ONLY_HH_ROUTING = false; // "hhonly"
+		router.setUseNativeApproximation(false); // "nativeapproximation"
+		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 
 		RouteCalculationMode paramMode = null;
 		for (String p : props) {
@@ -746,10 +746,10 @@ public class OsmAndMapsService {
 				useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
-			} else if (key.equals("hhrouting")) {
-				router.USE_HH_ROUTING = Boolean.parseBoolean(value); // default true
+			} else if (key.equals("hhoff")) {
+				router.USE_HH_ROUTING = ! Boolean.parseBoolean(value); // default false
 			} else if (key.equals("hhonly")) {
-				router.USE_ONLY_HH_ROUTING = Boolean.parseBoolean(value); // default false
+				router.USE_ONLY_HH_ROUTING = Boolean.parseBoolean(value); // default false (hhonly is not for ui)
 			} else if (key.equals("calcmode")) {
 				if (value.length() > 0) {
 					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
