@@ -146,7 +146,8 @@ public class HHRoutingOBFWriter {
 						System.out.printf("Skip %s as it has no points\n", countryName);
 						continue;
 					}
-					System.out.printf("Use native boundary %s - %d\n", countryName, filteredPoints.size());
+					// by default
+//					System.out.printf("Use native boundary %s - %d\n", countryName, filteredPoints.size());
 				} else {
 					BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(obfPolyFile, "r"),
 							obfPolyFile);
@@ -194,17 +195,19 @@ public class HHRoutingOBFWriter {
 			File writeFile = outFile; 
 			if (outFile.exists()) {
 				reader = new BinaryMapIndexReader(new RandomAccessFile(outFile, "rw"), outFile);
-				boolean profileAlreadyExist = false;
+				long profileEdition = -1;
 				for (HHRouteRegion h : reader.getHHRoutingIndexes()) {
 					if (h.profile.equals(profile)) {
-						profileAlreadyExist = true;
+						profileEdition = h.edition;
 						break;
 					}
 				}
-				if (profileAlreadyExist) {
-					System.out.println("Skip file as hh routing profile already exist");
+				if (edition == profileEdition) {
+					System.out.printf("Skip file %s as same hh routing profile (%s) already exist\n", outFile.getName(),
+							new Date(edition));
 					return;
 				}
+				System.out.println((profileEdition > 0 ? "Replace" : "Augment") +" file with hh routing: " + outFile.getName());
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
 			}
 			long timestamp = reader != null ? reader.getDateCreated() : edition;
@@ -213,6 +216,10 @@ public class HHRoutingOBFWriter {
 				byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 				for (int i = 0; i < reader.getIndexes().size(); i++) {
 					BinaryIndexPart part = reader.getIndexes().get(i);
+					if (part instanceof HHRouteRegion && ((HHRouteRegion) part).profile.equals(profile)) {
+						// ignore same
+						continue;
+					}
 					bmiw.getCodedOutStream().writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					BinaryInspector.writeInt(bmiw.getCodedOutStream(), part.getLength());
 					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, reader.getRaf(), part.getFilePointer(), part.getLength());

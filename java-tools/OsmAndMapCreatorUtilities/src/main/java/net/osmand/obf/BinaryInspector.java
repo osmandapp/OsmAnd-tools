@@ -93,10 +93,11 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-					"-latlon=42.7405,18.6357",
+					"-latlon=50.868332,15.24471",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_europe_2.road.obf"
+//					System.getProperty("maps.dir") + "Germany_berlin_europe_2.obf"
+//					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
