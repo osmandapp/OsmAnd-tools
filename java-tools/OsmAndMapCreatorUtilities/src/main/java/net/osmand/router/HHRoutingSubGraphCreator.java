@@ -71,17 +71,17 @@ import net.osmand.util.MapUtils;
 /////////////////////////////////
 // IN PROGRESS
 // TEST WEB: Java / C++ approximation, Java / C++ routing
-// 2.5  CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
 // 2.7.1 HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.7.2 HHRoutePlanner loop non suitable alternative routes as a main route
+
+// 2.5  CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
 // 2.9  BUG DATA! HHRoutePlanner - TODO lots of incorrect distance in db 
-// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 // 2.11 TODO Route Spain -> England
 
 // 2. SHORT-TERM HHRoutePlanner 
 // 2.0  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
 // 2.1  Progress bar for HHRoutePlanner
-
+// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
