@@ -247,7 +247,10 @@ public class OsmAndMapsService {
 	@Configuration
 	@ConfigurationProperties("osmand.routing")
 	public static class RoutingServerConfig {
-		
+
+		@Value("${osmand.routing.hh-only-limit}") // --osmand.routing.hh-only-limit= or $HH_ONLY_LIMIT=
+		public int hhOnlyLimit; // See application.yml, set 100 for production, or 1000 for testing server (km)
+
 		public Map<String, RoutingServerConfigEntry> config = new TreeMap<String, RoutingServerConfigEntry>();
 		
 		public void setConfig(Map<String, String> style) {

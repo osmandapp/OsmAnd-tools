@@ -43,7 +43,10 @@ server:
   compression.enabled: true
   compression.min-response-size: 4096
 
-tile-server: 
+osmand.routing:
+  hh-only-limit: ${HH_ONLY_LIMIT:100} # Maximum Start-End direct distance before HH routing is enforced (km)
+
+tile-server:
   obf.location: ${OBF_LOCATION:}
   obf.ziplocation: ${OBF_LOCATION_ZIP:}
   metatile-size: 2048 # render tiles as 2048 x 2048

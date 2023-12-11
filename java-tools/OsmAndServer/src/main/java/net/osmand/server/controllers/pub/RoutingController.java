@@ -44,21 +44,6 @@ public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
-	private class ApiLimits {
-		private final int HH_ONLY_LIMIT_PRODUCTION = 100; // production
-		private final int HH_ONLY_LIMIT_TESTING = 1000; // development, staging
-
-		public int hhOnlyLimit;
-
-		public ApiLimits(String limits) {
-			if (limits != null && ("development".equals(limits) || "staging".equals(limits))) {
-				hhOnlyLimit = HH_ONLY_LIMIT_TESTING;
-			} else {
-				hhOnlyLimit = HH_ONLY_LIMIT_PRODUCTION;
-			}
-		}
-	}
-
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 	
@@ -207,7 +192,8 @@ public class RoutingController {
 				RouteCalculationMode.BASE.name(),
 				RouteCalculationMode.NORMAL.name()
 		};
-		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false); 
+		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
+		// internal profiles (build-in routers)
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
@@ -228,12 +214,14 @@ public class RoutingController {
 				}
 			}
 		}
+		// external profiles (see osmand-server-boot.conf RUN_ARGS --osmand.routing.config)
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
 			RoutingMode rm = new RoutingMode(rs.name);
 			routers.put(rm.key, rm);
-			rm.params.put(hhRouting.key, hhRouting);
-			rm.params.put(nativeRouting.key, nativeRouting);
-			rm.params.put(nativeTrack.key, nativeTrack);
+			// No actually need to append hh/native params for external profiles...
+			// rm.params.put(hhRouting.key, hhRouting);
+			// rm.params.put(nativeRouting.key, nativeRouting);
+			// rm.params.put(nativeTrack.key, nativeTrack);
 		}
 		return ResponseEntity.ok(gson.toJson(routers));
 	}
@@ -291,7 +279,7 @@ public class RoutingController {
 	                                 @RequestParam(required = false) String[] avoidRoads,
 	                                 @RequestParam(defaultValue = "production") String limits) throws IOException {
 
-		final int hhOnlyLimit = new ApiLimits(limits).hhOnlyLimit;
+		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
 
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return osmAndMapsService.errorConfig();
@@ -368,7 +356,7 @@ public class RoutingController {
 	                                                       @RequestParam(defaultValue = "production") String limits)
 			throws IOException, InterruptedException {
 
-		final int hhOnlyLimit = new ApiLimits(limits).hhOnlyLimit;
+		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
 
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
