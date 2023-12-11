@@ -177,6 +177,8 @@ public class RoutingController {
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
+		RoutingParameter applyApproximation = new RoutingParameter("applyaproximation", "Development",
+				"[Dev] Apply Aproximation", true);
 		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
 				"[Dev] Disable HH routing", false);
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
@@ -218,10 +220,14 @@ public class RoutingController {
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
 			RoutingMode rm = new RoutingMode(rs.name);
 			routers.put(rm.key, rm);
-			// No actually need to append hh/native params for external profiles...
+
+			// apply approximation by default for all external profiles
+			rm.params.put(applyApproximation.key, applyApproximation);
+			rm.params.put(nativeTrack.key, nativeTrack);
+
+			// useless for external profiles
 			// rm.params.put(hhRouting.key, hhRouting);
 			// rm.params.put(nativeRouting.key, nativeRouting);
-			// rm.params.put(nativeTrack.key, nativeTrack);
 		}
 		return ResponseEntity.ok(gson.toJson(routers));
 	}
