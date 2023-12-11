@@ -178,7 +178,7 @@ public class RoutingController {
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 		RoutingParameter applyApproximation = new RoutingParameter("applyaproximation", "Development",
-				"[Dev] Apply Aproximation", true);
+				"[Dev] Apply Approximation", true);
 		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
 				"[Dev] Disable HH routing", false);
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
@@ -219,15 +219,16 @@ public class RoutingController {
 		// external profiles (see osmand-server-boot.conf RUN_ARGS --osmand.routing.config)
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
 			RoutingMode rm = new RoutingMode(rs.name);
-			routers.put(rm.key, rm);
+
+			// reuse previously filled params using profile as key
+			if (rs.profile !=null && routers.get(rs.profile) !=null) {
+				routers.get(rs.profile).params.forEach((key, val) -> rm.params.put(key, val));
+			}
 
 			// apply approximation by default for all external profiles
 			rm.params.put(applyApproximation.key, applyApproximation);
-			rm.params.put(nativeTrack.key, nativeTrack);
 
-			// useless for external profiles
-			// rm.params.put(hhRouting.key, hhRouting);
-			// rm.params.put(nativeRouting.key, nativeRouting);
+			routers.put(rm.key, rm);
 		}
 		return ResponseEntity.ok(gson.toJson(routers));
 	}

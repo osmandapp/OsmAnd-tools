@@ -255,15 +255,27 @@ public class OsmAndMapsService {
 		
 		public void setConfig(Map<String, String> style) {
 			for (Entry<String, String> e : style.entrySet()) {
+
+				/**
+				 * Example boot/command-line parameters (osmand-server-boot.conf):
+				 *
+				 * --osmand.routing.config.osrm-bicycle=type=osrm,profile=bicycle,url=https://zlzk.biz/route/v1/bike/
+				 * --osmand.routing.config.rescuetrack=type=online,url=https://apps.rescuetrack.com/api/routing/osmand
+				 *
+				 * name= osrm-bicycle|rescuetrack (Name, as a part of the option)
+				 * type= osrm|online (Type of routing provider, osrm and online are supported)
+				 * profile= [car]|bicycle (Profile for route-approximation params, default is car)
+				 */
+
 				RoutingServerConfigEntry src = new RoutingServerConfigEntry();
-				src.name = e.getKey();
+				src.name = e.getKey(); // name --osmand.routing.config.[rescuetrack]
 				for (String s : e.getValue().split(",")) {
 					String value = s.substring(s.indexOf('=') + 1);
-					if (s.startsWith("type=")) {
+					if (s.startsWith("type=")) { // osrm|online
 						src.type = value;
-					} else if (s.startsWith("url=")) {
+					} else if (s.startsWith("url=")) { // online-provider base url
 						src.url = value;
-					} else if (s.startsWith("profile=")) {
+					} else if (s.startsWith("profile=")) { // osmand profile to catch routeMode params
 						src.profile = value;
 					}
 				}
