@@ -177,8 +177,8 @@ public class RoutingController {
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
-		RoutingParameter applyApproximation = new RoutingParameter("applyaproximation", "Development",
-				"[Dev] Apply Approximation", true);
+//		RoutingParameter applyApproximation = new RoutingParameter("applyapproximation", "",
+//				"Attach to roads (OsmAnd)", true);
 		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
 				"[Dev] Disable HH routing", false);
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
@@ -220,13 +220,13 @@ public class RoutingController {
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
 			RoutingMode rm = new RoutingMode(rs.name);
 
+			// apply approximation by default for all external profiles
+//			rm.params.put(applyApproximation.key, applyApproximation);
+
 			// reuse previously filled params using profile as key
 			if (rs.profile !=null && routers.get(rs.profile) !=null) {
 				routers.get(rs.profile).params.forEach((key, val) -> rm.params.put(key, val));
 			}
-
-			// apply approximation by default for all external profiles
-			rm.params.put(applyApproximation.key, applyApproximation);
 
 			routers.put(rm.key, rm);
 		}
