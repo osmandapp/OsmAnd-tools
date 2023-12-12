@@ -192,42 +192,16 @@ public class AdminController {
 		return "redirect:info#audience";
 	}
 	
-	@PostMapping(path = { "/search-subscription" })
-	public String searchSubscription(Model model, 
-			@RequestParam(required = true) String orderId, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
-		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
-		deviceSub.sku = "not found";
-		deviceSub.orderId = "none";
-		deviceSub.valid = false;
-		if (emailSender.isEmail(orderId)) {
-			PremiumUser pu = usersRepository.findByEmail(orderId);
-			if (pu != null) {
-				deviceSub.sku = orderId + " (pro email)";
-				List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(pu.orderid);
-				if (ls != null && ls.size() > 0) {
-					deviceSub = ls.get(0);
-				}
-				if (deviceSub != null) {
-					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
-					ufs.allFiles.clear();
-					ufs.uniqueFiles.clear();
-					deviceSub.payload = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") + " at "
-							+ pu.tokenTime + "\n" + gson.toJson(ufs);
-				}
-			}
-		} else {
-			List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(orderId);
-			if (ls != null && ls.size() > 0) {
-				deviceSub = ls.get(0);
-			}
-		}
+	@PostMapping(path = {"/search-subscription"})
+	public String searchSubscription(@RequestParam String orderId, final RedirectAttributes redirectAttrs) {
+		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByEmail(orderId);
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
-        return "redirect:info#audience";
+		return "redirect:info#audience";
 	}
 	
 	@Transactional
 	@PostMapping(path = {"/downgrade-subscription"})
-	public String downgradeSubscription(@RequestParam String orderId, @RequestParam String subscriptionType) {
+	public ResponseEntity<String> downgradeSubscription(@RequestParam String orderId, @RequestParam String subscriptionType) {
 		PremiumUser pu = usersRepository.findByOrderid(orderId);
 		if (pu != null) {
 			SupporterDeviceSubscription subscription = new SupporterDeviceSubscription();
@@ -247,7 +221,47 @@ public class AdminController {
 				usersRepository.saveAndFlush(pu);
 			}
 		}
-		return "redirect:info#audience";
+		return ResponseEntity.ok("Downgrade successful");
+	}
+	
+	@GetMapping(path = {"/get-subscription-details"})
+	@ResponseBody
+	public ResponseEntity<SupporterDeviceSubscription> getSubscriptionDetails(@RequestParam String email) {
+		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByEmail(email);
+		return ResponseEntity.ok(deviceSub);
+	}
+	
+	private SupporterDeviceSubscription getSubscriptionDetailsByEmail(String identifier) {
+		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
+		deviceSub.sku = "not found";
+		deviceSub.orderId = "none";
+		deviceSub.valid = false;
+		
+		if (emailSender.isEmail(identifier)) {
+			PremiumUser pu = usersRepository.findByEmail(identifier);
+			if (pu != null) {
+				String suffix = pu.orderid != null ? " (pro email)" : " (osmand start)";
+				deviceSub.sku = identifier + suffix;
+				List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(pu.orderid);
+				if (ls != null && !ls.isEmpty()) {
+					deviceSub = ls.get(0);
+				}
+				if (deviceSub != null) {
+					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
+					ufs.allFiles.clear();
+					ufs.uniqueFiles.clear();
+					deviceSub.payload = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") + " at "
+							+ pu.tokenTime + "\n" + gson.toJson(ufs);
+				}
+			}
+		} else {
+			List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(identifier);
+			if (ls != null && !ls.isEmpty()) {
+				deviceSub = ls.get(0);
+			}
+		}
+		
+		return deviceSub;
 	}
 	
 	@PostMapping("/get-email-by-orderId")
