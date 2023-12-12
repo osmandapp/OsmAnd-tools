@@ -251,8 +251,28 @@ public class OsmAndMapsService {
 		@Value("${osmand.routing.hh-only-limit}") // --osmand.routing.hh-only-limit= or $HH_ONLY_LIMIT=
 		public int hhOnlyLimit; // See application.yml, set 100 for production, or 1000 for testing server (km)
 
-		public Map<String, RoutingServerConfigEntry> config = new TreeMap<String, RoutingServerConfigEntry>();
-		
+		public Map<String, RoutingServerConfigEntry> config = new TreeMap<>(new ProfileComparator());
+
+		private class ProfileComparator implements Comparator<String> {
+			// reorder *-bike, *-car, *-foot to car, bike, foot
+			@Override
+			public int compare(String s1, String s2) {
+				// -car -> 0-car, -bike -> 1-bike, -foot -> 2-foot
+				s1 = reorder(s1, "-car", "-bike", "-foot");
+				s2 = reorder(s2, "-car", "-bike", "-foot");
+				return s1.compareTo(s2);
+			}
+			private String reorder(String s, String... search) {
+				String result = s;
+				for (int i = 0; i < search.length; i++) {
+					if(s.contains(search[i])) {
+						result = Integer.toString(i) + s;
+					}
+				}
+				return result;
+			}
+		}
+
 		public void setConfig(Map<String, String> style) {
 			for (Entry<String, String> e : style.entrySet()) {
 
