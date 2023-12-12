@@ -83,6 +83,9 @@ import net.osmand.util.MapUtils;
 // 2.1  Progress bar for HHRoutePlanner
 // 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
 
+// BUG: Approximation doesnt't work
+// BUG: intermediate points sum statistics (cost, time, ...)
+
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
