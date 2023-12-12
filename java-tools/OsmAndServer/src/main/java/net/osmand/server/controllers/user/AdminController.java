@@ -194,7 +194,7 @@ public class AdminController {
 	
 	@PostMapping(path = {"/search-subscription"})
 	public String searchSubscription(@RequestParam String orderId, final RedirectAttributes redirectAttrs) {
-		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByEmail(orderId);
+		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByIdentifier(orderId);
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
 		return "redirect:info#audience";
 	}
@@ -227,11 +227,11 @@ public class AdminController {
 	@GetMapping(path = {"/get-subscription-details"})
 	@ResponseBody
 	public ResponseEntity<SupporterDeviceSubscription> getSubscriptionDetails(@RequestParam String email) {
-		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByEmail(email);
+		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByIdentifier(email);
 		return ResponseEntity.ok(deviceSub);
 	}
 	
-	private SupporterDeviceSubscription getSubscriptionDetailsByEmail(String identifier) {
+	private SupporterDeviceSubscription getSubscriptionDetailsByIdentifier(String identifier) {
 		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
 		deviceSub.sku = "not found";
 		deviceSub.orderId = "none";
