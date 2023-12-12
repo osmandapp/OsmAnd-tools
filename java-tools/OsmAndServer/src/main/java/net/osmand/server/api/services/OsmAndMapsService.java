@@ -6,6 +6,7 @@ package net.osmand.server.api.services;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
+import java.sql.Array;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.Map.Entry;
@@ -823,6 +824,66 @@ public class OsmAndMapsService {
 		return ctx;
 	}
 
+	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
+	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                               LatLon start, LatLon end, List<LatLon> intermediates)
+			throws IOException, InterruptedException {
+
+		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
+			List<RouteSegmentResult> routeRes;
+
+			// OSRM requires lon,lat not lat,lon
+			List<String> points = new ArrayList<>();
+			points.add(String.format("%f,%f", start.getLongitude(), start.getLatitude()));
+			if (intermediates != null) {
+				intermediates.forEach(p -> points.add(String.format("%f,%f", p.getLongitude(), p.getLatitude())));
+			}
+			points.add(String.format("%f,%f", end.getLongitude(), start.getLatitude()));
+
+			StringBuilder url = new StringBuilder(rsc.url); // base url
+			url.append(String.join(";", points)); // points;points;points
+			url.append("?geometries=geojson&overview=full&steps=true"); // OSRM options
+
+			RestTemplate restTemplate = new RestTemplate();
+			restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+				@Override
+				public void handleError(ClientHttpResponse response) throws IOException {
+					LOGGER.error(String.format("Error GET url (%s)", url));
+					super.handleError(response);
+				}
+			});
+
+			// TODO: GET, convert and approximate
+
+//			routeRes = approximate(ctx, router, props, polyline);
+			return null;
+//			return routeRes;
+		} else { // other types or default treated as "rescuetrack"
+			List<RouteSegmentResult> routeRes;
+			StringBuilder url = new StringBuilder(rsc.url);
+			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
+			url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
+
+			RestTemplate restTemplate = new RestTemplate();
+			restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+				@Override
+				public void handleError(ClientHttpResponse response) throws IOException {
+					LOGGER.error(String.format("Error GET url (%s)", url));
+					super.handleError(response);
+				}
+			});
+			String gpx = restTemplate.getForObject(url.toString(), String.class);
+			GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
+			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+			for (WptPt p : trkSegment.points) {
+				polyline.add(new LatLon(p.lat, p.lon));
+			}
+			routeRes = approximate(ctx, router, props, polyline);
+			return routeRes;
+		}
+	}
+
 	public synchronized List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
 	                                                     LatLon start, LatLon end, List<LatLon> intermediates,
 	                                                     List<String> avoidRoadsIds)
@@ -838,31 +899,13 @@ public class OsmAndMapsService {
 			usedMapList = getReaders(list);
 			
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
+
 			if (hhOnlyForce) {
 				router.USE_ONLY_HH_ROUTING = true;
 			}
-			if (rsc[0] != null) {
-				StringBuilder url = new StringBuilder(rsc[0].url);
-				url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
-				url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
-				
-				RestTemplate restTemplate = new RestTemplate();
-				restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
-					
-					@Override
-					public void handleError(ClientHttpResponse response) throws IOException {
-						LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
-						super.handleError(response);
-					}
-				});
-				String gpx = restTemplate.getForObject(url.toString(), String.class);
-				GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-				TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-				List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-				for (WptPt p : trkSegment.points) {
-					polyline.add(new LatLon(p.lat, p.lon));
-				}
-				routeRes = approximate(ctx, router, props, polyline);
+
+			if (rsc[0] != null && rsc[0].url != null) {
+				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
 			} else {
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection).getList();
