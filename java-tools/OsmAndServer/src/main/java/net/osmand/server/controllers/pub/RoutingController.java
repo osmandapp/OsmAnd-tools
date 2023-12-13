@@ -329,13 +329,13 @@ public class RoutingController {
 			}
 		}
 
-		List<LatLon> resListFallbackLine = new ArrayList<>();
+		float dist = 0;
 		boolean reportLimitError = false;
+		List<LatLon> resListFallbackLine = new ArrayList<>();
 		if (resListElevation.isEmpty()) {
 			reportLimitError = true;
 			resListFallbackLine = new ArrayList<>(list);
 			routingService.calculateStraightLine(resListFallbackLine);
-			float dist = 0;
 			for (int i = 1; i < resListFallbackLine.size(); i++) {
 				dist += MapUtils.getDistance(resListFallbackLine.get(i - 1), resListFallbackLine.get(i));
 			}
@@ -348,7 +348,7 @@ public class RoutingController {
 		route.properties = props;
 		features.add(0, route);
 
-		if (reportLimitError) {
+		if (reportLimitError && dist >= hhOnlyLimit * 1000) {
 			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg",
 					MSG_LONG_DIST + hhOnlyLimit + " km.")));
 		} else {
