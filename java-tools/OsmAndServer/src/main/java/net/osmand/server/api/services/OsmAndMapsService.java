@@ -1,12 +1,8 @@
 package net.osmand.server.api.services;
 
-
-
-
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
-import java.sql.Array;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.Map.Entry;
@@ -15,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
 import net.osmand.IndexConstants;
@@ -23,6 +20,9 @@ import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -35,6 +35,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.DefaultResponseErrorHandler;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
@@ -824,64 +825,94 @@ public class OsmAndMapsService {
 		return ctx;
 	}
 
+	@Nullable
 	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
 	                                               LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
 
+		// OSRM by type, all others treated as "rescuetrack"
 		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
-			List<RouteSegmentResult> routeRes;
-
-			// OSRM requires lon,lat not lat,lon
-			List<String> points = new ArrayList<>();
-			points.add(String.format("%f,%f", start.getLongitude(), start.getLatitude()));
-			if (intermediates != null) {
-				intermediates.forEach(p -> points.add(String.format("%f,%f", p.getLongitude(), p.getLatitude())));
-			}
-			points.add(String.format("%f,%f", end.getLongitude(), start.getLatitude()));
-
-			StringBuilder url = new StringBuilder(rsc.url); // base url
-			url.append(String.join(";", points)); // points;points;points
-			url.append("?geometries=geojson&overview=full&steps=true"); // OSRM options
-
-			RestTemplate restTemplate = new RestTemplate();
-			restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
-				@Override
-				public void handleError(ClientHttpResponse response) throws IOException {
-					LOGGER.error(String.format("Error GET url (%s)", url));
-					super.handleError(response);
-				}
-			});
-
-			// TODO: GET, convert and approximate
-
-//			routeRes = approximate(ctx, router, props, polyline);
-			return null;
-//			return routeRes;
-		} else { // other types or default treated as "rescuetrack"
-			List<RouteSegmentResult> routeRes;
-			StringBuilder url = new StringBuilder(rsc.url);
-			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
-			url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
-
-			RestTemplate restTemplate = new RestTemplate();
-			restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
-				@Override
-				public void handleError(ClientHttpResponse response) throws IOException {
-					LOGGER.error(String.format("Error GET url (%s)", url));
-					super.handleError(response);
-				}
-			});
-			String gpx = restTemplate.getForObject(url.toString(), String.class);
-			GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-			for (WptPt p : trkSegment.points) {
-				polyline.add(new LatLon(p.lat, p.lon));
-			}
-			routeRes = approximate(ctx, router, props, polyline);
-			return routeRes;
+			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
+		} else {
+			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end);
 		}
+	}
+
+	@Nullable
+	private List<RouteSegmentResult> onlineRoutingOSRM(String baseurl, RoutingContext ctx,
+	                                                   RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                                   LatLon start, LatLon end, List<LatLon> intermediates)
+			throws IOException, InterruptedException {
+
+		// OSRM requires lon,lat not lat,lon
+		List<String> points = new ArrayList<>();
+		points.add(String.format("%f,%f", start.getLongitude(), start.getLatitude()));
+		if (intermediates != null) {
+			intermediates.forEach(p -> points.add(String.format("%f,%f", p.getLongitude(), p.getLatitude())));
+		}
+		points.add(String.format("%f,%f", end.getLongitude(), end.getLatitude()));
+
+		StringBuilder url = new StringBuilder(baseurl); // base url
+		url.append(String.join(";", points)); // points;points;points
+		url.append("?geometries=geojson&overview=full&steps=true"); // OSRM options
+
+		List<LatLon> polyline = new ArrayList<>();
+		try {
+			String body = new RestTemplate().getForObject(url.toString(), String.class);
+			if (body != null && body.contains("Ok") && body.contains("coordinates")) {
+				JSONArray coordinates = new JSONObject(body)
+						.getJSONArray("routes")
+						.getJSONObject(0)
+						.getJSONObject("geometry")
+						.getJSONArray("coordinates");
+
+				for (int i = 0; i < coordinates.length(); i++) {
+					JSONArray ll = coordinates.getJSONArray(i);
+					final double lon = ll.getDouble(0);
+					final double lat = ll.getDouble(1);
+					polyline.add(new LatLon(lat, lon));
+				}
+			}
+		} catch(RestClientException | JSONException error) {
+			LOGGER.error(String.format("OSRM get/parse error (%s)", url));
+			return null;
+		}
+
+		if (polyline.size() >= 2) {
+			return approximate(ctx, router, props, polyline);
+		}
+
+		return null;
+	}
+
+	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
+	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                               LatLon start, LatLon end)
+			throws IOException, InterruptedException {
+
+		List<RouteSegmentResult> routeRes;
+		StringBuilder url = new StringBuilder(baseurl);
+		url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
+		url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
+
+		RestTemplate restTemplate = new RestTemplate();
+		restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+			@Override
+			public void handleError(ClientHttpResponse response) throws IOException {
+				LOGGER.error(String.format("Error GET url (%s)", url));
+				super.handleError(response);
+			}
+		});
+		String gpx = restTemplate.getForObject(url.toString(), String.class);
+		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
+		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+		for (WptPt p : trkSegment.points) {
+			polyline.add(new LatLon(p.lat, p.lon));
+		}
+		routeRes = approximate(ctx, router, props, polyline);
+		return routeRes;
 	}
 
 	public synchronized List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
