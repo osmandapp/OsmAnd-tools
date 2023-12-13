@@ -25,6 +25,7 @@ public class ObfDiffMerger {
 	}
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
+	private final int SHIFT_ID = 6;
 	
 	public static void main(String[] args) {
 		try {
@@ -118,11 +119,28 @@ public class ObfDiffMerger {
 		BinaryMapIndexReader.MapIndex mi = commonObf.getMapIndex();
 		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		int deleteId = rl == null ? -1 : rl;
+
+		HashSet<Long> deletedShiftedIds = new HashSet<>();
+		if (deleteId > 0) {
+			for (MapZooms.MapZoomPair mz : commonObf.getZooms()) {
+				TLongObjectHashMap<BinaryMapDataObject> commonMapData = commonObf.get(mz);
+				for (Long id : commonMapData.keys()) {
+					BinaryMapDataObject commonObj = commonMapData.get(id);
+					if (commonObj.containsType(deleteId)) {
+						deletedShiftedIds.add(commonObj.getId() >> SHIFT_ID);
+					}
+				}
+			}
+		}
+
 		int cnt = 0;
 		for (MapZooms.MapZoomPair mz : relObf.getZooms()) {
 			TLongObjectHashMap<BinaryMapDataObject> relMapData = relObf.get(mz);
 			TLongObjectHashMap<BinaryMapDataObject> commonMapData = commonObf.get(mz);
 			for (Long id : relMapData.keys()) {
+				if (deletedShiftedIds.contains(id >> SHIFT_ID)) {
+					continue;
+				}
 				BinaryMapDataObject relObj = relMapData.get(id);
 				BinaryMapDataObject commonObj = commonMapData.get(id);
 				if (commonObj == null) {
@@ -145,8 +163,22 @@ public class ObfDiffMerger {
 		deleteId = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		TLongObjectHashMap<RouteDataObject> relRouteData = relObf.getRoutingData();
 		TLongObjectHashMap<RouteDataObject> commonRouteData = commonObf.getRoutingData();
+
+		deletedShiftedIds.clear();
+		if (deleteId > 0) {
+			for (Long id : relRouteData.keys()) {
+				RouteDataObject commonObj = commonRouteData.get(id);
+				if (commonObj.containsType(deleteId)) {
+					deletedShiftedIds.add(commonObj.getId() >> SHIFT_ID);
+				}
+			}
+		}
+
 		cnt = 0;
 		for (Long id : relRouteData.keys()) {
+			if (deletedShiftedIds.contains(id >> SHIFT_ID)) {
+				continue;
+			}
 			RouteDataObject relObj = relRouteData.get(id);
 			RouteDataObject commonObj = commonRouteData.get(id);
 			if (commonObj == null) {
