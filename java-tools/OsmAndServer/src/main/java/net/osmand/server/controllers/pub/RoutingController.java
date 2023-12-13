@@ -184,7 +184,7 @@ public class RoutingController {
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
 				"[Dev] Use C++ for routing", false);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
-				"[Dev] Use C++ for GPX approximation", false);
+				"[Dev] Use C++ to runNativeSearchGpxRoute", false);
 		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
 				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
 		calcMode.section = "Development";
