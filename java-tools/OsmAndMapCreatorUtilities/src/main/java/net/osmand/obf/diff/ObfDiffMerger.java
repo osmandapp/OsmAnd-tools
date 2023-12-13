@@ -166,7 +166,7 @@ public class ObfDiffMerger {
 
 		deletedShiftedIds.clear();
 		if (deleteId > 0) {
-			for (Long id : relRouteData.keys()) {
+			for (Long id : commonRouteData.keys()) {
 				RouteDataObject commonObj = commonRouteData.get(id);
 				if (commonObj.containsType(deleteId)) {
 					deletedShiftedIds.add(commonObj.getId() >> SHIFT_ID);
