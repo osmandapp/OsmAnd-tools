@@ -146,13 +146,10 @@ public class ObfDiffMerger {
 				if (commonObj == null) {
 					commonMapData.put(id, mi.adoptMapObject(relObj));
 					cnt++;
-				} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
+				} else {
 					commonMapData.remove(id);
 					commonMapData.put(id, mi.adoptMapObject(relObj));
 					cnt++;
-				}
-				if (commonObj != null && commonObj.containsType(deleteId)) {
-					System.out.println("Map id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
 				}
 			}
 		}
@@ -184,13 +181,10 @@ public class ObfDiffMerger {
 			if (commonObj == null) {
 				commonRouteData.put(id, ri.adopt(relObj));
 				cnt++;
-			} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
+			} else {
 				commonRouteData.remove(id);
 				commonRouteData.put(id, ri.adopt(relObj));
 				cnt++;
-			}
-			if (commonObj != null && commonObj.containsType(deleteId)) {
-				System.out.println("Route id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
 			}
 		}
 		System.out.println("Route section. Merged " + cnt);
