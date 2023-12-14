@@ -86,21 +86,23 @@ public class ObfDiffGenerator {
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
 		
-		Set<EntityId> modifiedObjIds = null;
+		Set<EntityId> modifiedObjIds = null, deletedObjIds = null;
 		if (diff != null) {
 			try {
-				modifiedObjIds = DiffParser.fetchModifiedIds(diff);
+				modifiedObjIds = new LinkedHashSet<EntityId>();
+				deletedObjIds = new LinkedHashSet<EntityId>();
+				DiffParser.fetchModifiedDeletedIds(diff, modifiedObjIds, deletedObjIds);
 			} catch (IOException | XmlPullParserException e) {
 				e.printStackTrace();
 			}
 		}
 
 		System.out.println("Comparing the files...");
-		compareMapData(fStart, fEnd, result == null, modifiedObjIds);
-		compareRouteData(fStart, fEnd, result == null, modifiedObjIds);
-		comparePOI(fStart, fEnd, result == null, modifiedObjIds);
+		compareMapData(fStart, fEnd, result == null, modifiedObjIds, deletedObjIds);
+		compareRouteData(fStart, fEnd, result == null, modifiedObjIds, deletedObjIds);
+		comparePOI(fStart, fEnd, result == null, modifiedObjIds, deletedObjIds);
 		if (COMPARE_TRANSPORT) {
-			compareTransport(fStart, fEnd, result == null, modifiedObjIds);
+			compareTransport(fStart, fEnd, result == null, modifiedObjIds, deletedObjIds);
 		}
 		
 		System.out.println("Finished comparing.");
@@ -362,7 +364,7 @@ public class ObfDiffGenerator {
 	}
 
 
-	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
+	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds, Set<EntityId> deletedObjIds) {
 		fStart.filterAllZoomsBelow(13);
 		fEnd.filterAllZoomsBelow(13);		
 		MapIndex mi = fEnd.getMapIndex();
@@ -382,6 +384,13 @@ public class ObfDiffGenerator {
 			}
 			if (endData == null) {
 				continue;
+			}
+			TLongObjectIterator<BinaryMapDataObject> endIterator = endData.iterator();
+			while (endIterator.hasNext()) {
+				endIterator.advance();
+				if (deletedObjIds.contains(getMapEntityId(endIterator.value().getId()))) {
+					endIterator.remove();
+				}
 			}
 			for (Long idx : startData.keys()) {
 				BinaryMapDataObject objE = endData.get(idx);
@@ -409,8 +418,9 @@ public class ObfDiffGenerator {
 					}
 				}
 			}
-			if(print) {
+			if (print) {
 				for (BinaryMapDataObject e : endData.valueCollection()) {
+					
 					System.out.println("Map " + e.getId() + " is missing in (1): " + toString(e));
 				}
 			}
@@ -523,8 +533,7 @@ public class ObfDiffGenerator {
 		private static final String TYPE_WAY = "way";
 		private static final String TYPE_NODE = "node";
 
-		public static Set<EntityId> fetchModifiedIds(File diff) throws IOException, XmlPullParserException {
-			Set<EntityId> result = new HashSet<>();
+		public static void fetchModifiedDeletedIds(File diff, Set<EntityId> modifiedIds, Set<EntityId> deletedIds) throws IOException, XmlPullParserException {
 			InputStream fis ;
 			if(diff.getName().endsWith(".gz")) {
 				fis = new GZIPInputStream(new FileInputStream(diff));
@@ -534,19 +543,32 @@ public class ObfDiffGenerator {
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(fis, "UTF-8");
 			int tok;
+			boolean deleteAction = false;
 			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-				if (tok == XmlPullParser.START_TAG ) {
+				if (tok == XmlPullParser.START_TAG) {
 					String name = parser.getName();
-					if (TYPE_NODE.equals(name)) {
-						result.add(new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1)));
-					} else if (TYPE_WAY.equals(name) ) {
-						result.add(new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1)));
+					EntityId id = null;
+					if ("action".equals(name) && "delete".equals(parser.getAttributeValue("", "type"))) {
+						deleteAction = true;
+					} else if (TYPE_NODE.equals(name)) {
+						id = new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1));
+					} else if (TYPE_WAY.equals(name)) {
+						id = new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1));
 					} else if (TYPE_RELATION.equals(name)) {
-						result.add(new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1)));
-					}	
+						id = new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1));
+					}
+					if (id != null) {
+						modifiedIds.add(id);
+						if (deleteAction) {
+							deletedIds.add(id);
+						}
+					}
+				} else if (tok == XmlPullParser.END_TAG) {
+					if ("action".equals(parser.getName()) && deleteAction) {
+						deleteAction = false;
+					}
 				}
 			}
-			return result;
 		}
 		
 		protected static long parseLong(XmlPullParser parser, String name, long defVal){
