@@ -56,6 +56,10 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             echo "Missing file $DATE_DIR/src/${BASENAME}_before_rel.osm.gz"
             exit 1;
         fi
+        if [ ! -f $DATE_DIR/src/${BASENAME}_diff.osm.gz ]; then
+            echo "Missing file $DATE_DIR/src/${BASENAME}_diff.osm.gz"
+            exit 1;
+        fi
 
         echo "### 1. Generate relation osm : $(date -u) . All nodes and ways copy from before_rel to after_rel " &
         $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-relation-osm \
