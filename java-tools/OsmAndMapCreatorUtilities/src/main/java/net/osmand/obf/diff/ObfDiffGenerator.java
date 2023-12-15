@@ -1,6 +1,5 @@
 package net.osmand.obf.diff;
 
-import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
@@ -13,17 +12,13 @@ import net.osmand.data.TransportStop;
 import net.osmand.obf.BinaryInspector;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
-import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.zip.GZIPInputStream;
 
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -86,21 +81,21 @@ public class ObfDiffGenerator {
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
 		
-		Set<EntityId> modifiedObjIds = null;
+		Set<EntityId> allModifiedObjIds = new HashSet<>();
 		if (diff != null) {
 			try {
-				modifiedObjIds = DiffParser.fetchModifiedIds(diff);
+				DiffParser.fetchModifiedIds(diff, allModifiedObjIds, null);
 			} catch (IOException | XmlPullParserException e) {
 				e.printStackTrace();
 			}
 		}
 
 		System.out.println("Comparing the files...");
-		compareMapData(fStart, fEnd, result == null, modifiedObjIds);
-		compareRouteData(fStart, fEnd, result == null, modifiedObjIds);
-		comparePOI(fStart, fEnd, result == null, modifiedObjIds);
+		compareMapData(fStart, fEnd, result == null, allModifiedObjIds);
+		compareRouteData(fStart, fEnd, result == null, allModifiedObjIds);
+		comparePOI(fStart, fEnd, result == null, allModifiedObjIds);
 		if (COMPARE_TRANSPORT) {
-			compareTransport(fStart, fEnd, result == null, modifiedObjIds);
+			compareTransport(fStart, fEnd, result == null, allModifiedObjIds);
 		}
 		
 		System.out.println("Finished comparing.");
@@ -134,7 +129,7 @@ public class ObfDiffGenerator {
 				} else {
 					EntityId aid = getTransportEntityId(stopS, EntityType.NODE);
 					EntityId aidWay = getTransportEntityId(stopS, EntityType.WAY);
-					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || 
+					if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(aid) ||
 							modifiedObjIds.contains(aidWay)) {
 						stopS.setDeleted();
 						endStopData.put(stopId, stopS);
@@ -321,7 +316,7 @@ public class ObfDiffGenerator {
 				}
 			} else {
 				if (objE == null) {
-					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || aid == null) {
+					if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(aid) || aid == null) {
 						objS.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 						endPoi.put(idx, objS);
 						if (endPoiSource.get(objS.getId()) == null) {
@@ -399,7 +394,7 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (modifiedObjIds == null || modifiedObjIds.contains(thisEntityId) || thisEntityId == null) {
+						if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(thisEntityId) || thisEntityId == null) {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null, 0, 0);
 							endData.put(idx, obj);
@@ -491,7 +486,7 @@ public class ObfDiffGenerator {
 			} else {
 				if (objE == null) {
 					EntityId wayId = new EntityId(EntityType.WAY, idx >> (BinaryInspector.SHIFT_ID));
-					if (modifiedObjIds == null || modifiedObjIds.contains(wayId)) {
+					if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(wayId)) {
 						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
 					}
@@ -515,51 +510,4 @@ public class ObfDiffGenerator {
 		rdo.types = new int[] { deleteId };
 		return rdo;
 	}
-	
-	private static class DiffParser {
-		
-		private static final String ATTR_ID = "id";
-		private static final String TYPE_RELATION = "relation";
-		private static final String TYPE_WAY = "way";
-		private static final String TYPE_NODE = "node";
-
-		public static Set<EntityId> fetchModifiedIds(File diff) throws IOException, XmlPullParserException {
-			Set<EntityId> result = new HashSet<>();
-			InputStream fis ;
-			if(diff.getName().endsWith(".gz")) {
-				fis = new GZIPInputStream(new FileInputStream(diff));
-			} else {
-				fis = new FileInputStream(diff);
-			}
-			XmlPullParser parser = PlatformUtil.newXMLPullParser();
-			parser.setInput(fis, "UTF-8");
-			int tok;
-			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-				if (tok == XmlPullParser.START_TAG ) {
-					String name = parser.getName();
-					if (TYPE_NODE.equals(name)) {
-						result.add(new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1)));
-					} else if (TYPE_WAY.equals(name) ) {
-						result.add(new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1)));
-					} else if (TYPE_RELATION.equals(name)) {
-						result.add(new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1)));
-					}	
-				}
-			}
-			return result;
-		}
-		
-		protected static long parseLong(XmlPullParser parser, String name, long defVal){
-			long ret = defVal; 
-			String value = parser.getAttributeValue("", name);
-			if(value == null) {
-				return defVal;
-			}
-			try {
-				ret = Long.parseLong(value);
-			} catch (NumberFormatException e) {
-			}
-			return ret;
-		}
-	}	
 }
