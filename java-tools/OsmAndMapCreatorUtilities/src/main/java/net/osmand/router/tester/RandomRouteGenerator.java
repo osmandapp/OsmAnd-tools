@@ -243,7 +243,8 @@ class RandomRouteGenerator {
 
 			if (restart) {
 				if (replenishCounter++ >= REPLENISH_LIMIT) {
-					throw new IllegalStateException("Point replenish limit reached");
+					throw new IllegalStateException(
+							"Random routes not generated. Check min/max dist, region size, and OBF connectivity.");
 				}
 				replenishRandomPoints(randomPoints); // read more points
 //				System.err.printf("Read more points i=%d size=%d\n", i, randomPoints.size());
