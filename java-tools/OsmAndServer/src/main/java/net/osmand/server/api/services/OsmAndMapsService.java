@@ -826,11 +826,11 @@ public class OsmAndMapsService {
 	}
 
 	@Nullable
-	private List<RouteSegmentResult> polylineToRouteSegmentResult(List<LatLon> polyline) {
+	private List<RouteSegmentResult> polylineToRouteSegmentResult(List<LatLon> polyline, RoutingContext ctx,
+	                                                              RoutePlannerFrontEnd router ) {
 		List<RouteSegmentResult> segments = new ArrayList<>();
-
-		// TODO
-
+		final float avgSpeed = ctx.getRouter().getDefaultSpeed();
+		segments.add(router.generateStraightLineSegment(avgSpeed, polyline));
 		return segments;
 	}
 
@@ -856,7 +856,7 @@ public class OsmAndMapsService {
 		if ("true".equals(ctx.config.router.getParameterValues().get("applyapproximation"))) {
 			return approximate(ctx, router, props, polyline);
 		} else {
-			return polylineToRouteSegmentResult(polyline);
+			return polylineToRouteSegmentResult(polyline, ctx, router);
 		}
 	}
 
