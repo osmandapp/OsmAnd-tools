@@ -826,21 +826,42 @@ public class OsmAndMapsService {
 	}
 
 	@Nullable
+	private List<RouteSegmentResult> polylineToRouteSegmentResult(List<LatLon> polyline) {
+		List<RouteSegmentResult> segments = new ArrayList<>();
+
+		// TODO
+
+		return segments;
+	}
+
+	@Nullable
 	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
 	                                               LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
 
+		List<LatLon> polyline;
+
 		// OSRM by type, all others treated as "rescuetrack"
 		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
-			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
+			polyline = onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
 		} else {
-			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end);
+			polyline = onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end);
+		}
+
+		if (polyline == null) {
+			return null;
+		}
+
+		if ("true".equals(ctx.config.router.getParameterValues().get("applyapproximation"))) {
+			return approximate(ctx, router, props, polyline);
+		} else {
+			return polylineToRouteSegmentResult(polyline);
 		}
 	}
 
 	@Nullable
-	private List<RouteSegmentResult> onlineRoutingOSRM(String baseurl, RoutingContext ctx,
+	private List<LatLon> onlineRoutingOSRM(String baseurl, RoutingContext ctx,
 	                                                   RoutePlannerFrontEnd router, Map<String, Object> props,
 	                                                   LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
@@ -879,14 +900,15 @@ public class OsmAndMapsService {
 			return null;
 		}
 
-		if (polyline.size() >= 2) {
-			return approximate(ctx, router, props, polyline);
+		if (polyline.size() < 2) {
+			LOGGER.error(String.format("OSRM empty result (%s)", url));
+			return null;
 		}
 
-		return null;
+		return polyline;
 	}
 
-	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
+	private List<LatLon> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
 	                                               LatLon start, LatLon end)
 			throws IOException, InterruptedException {
@@ -911,8 +933,13 @@ public class OsmAndMapsService {
 		for (WptPt p : trkSegment.points) {
 			polyline.add(new LatLon(p.lat, p.lon));
 		}
-		routeRes = approximate(ctx, router, props, polyline);
-		return routeRes;
+
+		if (polyline.size() < 2) {
+			LOGGER.error(String.format("Rescuetrack-provider empty result (%s)", url));
+			return null;
+		}
+
+		return polyline;
 	}
 
 	public synchronized List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
