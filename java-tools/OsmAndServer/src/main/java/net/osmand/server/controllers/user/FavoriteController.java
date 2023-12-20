@@ -22,9 +22,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.*;
-import java.util.List;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
+import java.util.*;
 
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
@@ -77,7 +75,15 @@ public class FavoriteController {
                 file.updateWptPt(wptPt.name, data.indexOf(d), wptPt, hiddenWasChanged);
             });
             File newTmpGpx = favoriteService.createTmpGpxFile(file, fileName);
-            favoriteService.uploadFavoriteFile(newTmpGpx, dev, fileName, updatetime);
+            Date clienttime = null;
+            
+            if (hiddenWasChanged) {
+                PremiumUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, fileName, UserdataService.FILE_TYPE_FAVOURITES);
+                if (userFile != null) {
+                    clienttime = userFile.clienttime;
+                }
+            }
+            favoriteService.uploadFavoriteFile(newTmpGpx, dev, fileName, updatetime, clienttime);
             respNewGroup = favoriteService.createResponse(dev, fileName, file, newTmpGpx);
         } else
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,

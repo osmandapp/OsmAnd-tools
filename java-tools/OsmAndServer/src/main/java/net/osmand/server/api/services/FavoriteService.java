@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Date;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
@@ -59,9 +60,13 @@ public class FavoriteService {
     }
     
     public void uploadFavoriteFile(File tmpFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String name, Long updatetime) throws IOException {
+        uploadFavoriteFile(tmpFile, dev, name, updatetime, null);
+    }
+    
+    public void uploadFavoriteFile(File tmpFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String name, Long updatetime, Date clienttime) throws IOException {
         StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFile(tmpFile);
         userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
-        userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, System.currentTimeMillis());
+        userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
         if (updatetime != null) {
             userdataService.deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_FAVOURITES, null);
         }
