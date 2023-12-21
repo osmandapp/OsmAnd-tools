@@ -747,7 +747,7 @@ public class OsmAndMapsService {
 		for (GpxPoint pnt : r.finalPoints) {
 			route.addAll(pnt.routeToTarget);
 		}
-		if (router.useNativeApproximation) {
+		if (router.isUseNativeApproximation()) {
 			RouteResultPreparation preparation = new RouteResultPreparation();
 			// preparation.prepareTurnResults(gctx.ctx, route);
 			preparation.addTurnInfoDescriptions(route);
@@ -762,8 +762,8 @@ public class OsmAndMapsService {
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 
 		// reset before applying
-		router.USE_HH_ROUTING = true; // "hhoff"
-		router.USE_ONLY_HH_ROUTING = false; // "hhonly"
+		router.setDefaultHHRoutingConfig();
+		router.setUseOnlyHHRouting(false);
 		router.setUseNativeApproximation(false); // "nativeapproximation"
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 
@@ -784,9 +784,9 @@ public class OsmAndMapsService {
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else if (key.equals("hhoff")) {
-				router.USE_HH_ROUTING = ! Boolean.parseBoolean(value); // default false
+				router.setUseOnlyHHRouting(! Boolean.parseBoolean(value)); // default false
 			} else if (key.equals("hhonly")) {
-				router.USE_ONLY_HH_ROUTING = Boolean.parseBoolean(value); // default false (hhonly is not for ui)
+				router.setUseOnlyHHRouting(Boolean.parseBoolean(value));// default false (hhonly is not for ui)
 			} else if (key.equals("calcmode")) {
 				if (value.length() > 0) {
 					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
@@ -932,7 +932,7 @@ public class OsmAndMapsService {
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
 
 			if (hhOnlyForce) {
-				router.USE_ONLY_HH_ROUTING = true;
+				router.setUseOnlyHHRouting(true);
 			}
 
 			if (rsc[0] != null && rsc[0].url != null) {
