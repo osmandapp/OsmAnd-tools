@@ -22,9 +22,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.*;
-import java.util.List;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
+import java.util.*;
 
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
@@ -66,17 +64,26 @@ public class FavoriteController {
     @ResponseBody
     public ResponseEntity<String> updateAllFavorites(@RequestBody List<String> data,
                                                      @RequestParam String fileName,
-                                                     @RequestParam Long updatetime) throws IOException {
+                                                     @RequestParam Long updatetime,
+                                                     @RequestParam boolean updateTimestamp) throws IOException {
         PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
         GPXFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         UserdataService.ResponseFileStatus respNewGroup;
         if (file != null) {
             data.forEach(d -> {
                 GPXUtilities.WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(d, WebGpxParser.Wpt.class));
-                file.updateWptPt(wptPt.name, data.indexOf(d), wptPt);
+                file.updateWptPt(wptPt.name, data.indexOf(d), wptPt, updateTimestamp);
             });
             File newTmpGpx = favoriteService.createTmpGpxFile(file, fileName);
-            favoriteService.uploadFavoriteFile(newTmpGpx, dev, fileName, updatetime);
+            Date clienttime = null;
+            
+            if (!updateTimestamp) {
+                PremiumUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, fileName, UserdataService.FILE_TYPE_FAVOURITES);
+                if (userFile != null) {
+                    clienttime = userFile.clienttime;
+                }
+            }
+            favoriteService.uploadFavoriteFile(newTmpGpx, dev, fileName, updatetime, clienttime);
             respNewGroup = favoriteService.createResponse(dev, fileName, file, newTmpGpx);
         } else
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
@@ -119,7 +126,7 @@ public class FavoriteController {
         GPXUtilities.WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class));
         GPXFile newGpxFile = favoriteService.createGpxFile(newGroupName, dev, newGroupUpdatetime);
         if (newGpxFile != null) {
-            newGpxFile.updateWptPt(wptName, ind, wptPt);
+            newGpxFile.updateWptPt(wptName, ind, wptPt, true);
         } else
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
