@@ -7,8 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import net.osmand.data.LatLonEle;
 import net.osmand.router.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,39 +28,47 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 
 @Service
 public class RoutingService {
-    
+
     private static final int DISTANCE_MID_POINT = 25000;
     @Autowired
     OsmAndMapsService osmAndMapsService;
-    
+
     @Autowired
     WebGpxParser webGpxParser;
-    
-    
-    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode, boolean hasRouting, boolean isLongDist) throws IOException, InterruptedException {
+
+    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode,
+                                                             boolean hasRouting, boolean hhOnlyForce)
+            throws IOException, InterruptedException {
+
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
         List<WebGpxParser.Point> pointsRes;
         List<RouteSegmentResult> routeSegmentResults = new ArrayList<>();
-        if (routeMode.equals(LINE_PROFILE_TYPE) || isLongDist) {
-            pointsRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(), endLatLon.getLatitude(), endLatLon.getLongitude());
+
+        List<WebGpxParser.Point> lineRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(),
+                endLatLon.getLatitude(), endLatLon.getLongitude());
+
+        if (routeMode.equals(LINE_PROFILE_TYPE)) {
+            return lineRes;
         } else {
-            routeSegmentResults = osmAndMapsService.routing(routeMode, props, startLatLon,
-                    endLatLon, Collections.emptyList(), Collections.emptyList());
-    
+            routeSegmentResults = osmAndMapsService.routing(hhOnlyForce, routeMode, props, startLatLon, endLatLon,
+                    Collections.emptyList(), Collections.emptyList());
+
             pointsRes = getPoints(routeSegmentResults, locations);
         }
-        
-        if (!pointsRes.isEmpty()) {
-            GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
-            if (hasRouting) {
-                webGpxParser.addRouteSegmentsToPoints(seg, pointsRes);
-            }
-            addDistance(pointsRes);
+
+        if (pointsRes.isEmpty()) {
+            return lineRes;
         }
+
+        GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
+        if (hasRouting) {
+            webGpxParser.addRouteSegmentsToPoints(seg, pointsRes);
+        }
+        addDistance(pointsRes);
         return pointsRes;
     }
-    
+
     public synchronized List<WebGpxParser.Point> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
         List<Location> locations = new ArrayList<>();
         List<RouteSegmentResult> approximateResult = osmAndMapsService.approximateRoute(points, routeMode);
@@ -73,7 +80,7 @@ public class RoutingService {
         }
         return gpxPoints;
     }
-    
+
     public List<WebGpxParser.Point> getRoute(List<WebGpxParser.Point> points) throws IOException, InterruptedException {
         List<WebGpxParser.Point> res = new ArrayList<>();
         res.add(points.get(0));
@@ -91,7 +98,7 @@ public class RoutingService {
         }
         return res;
     }
-    
+
     private List<WebGpxParser.Point> getStraightLine(double lat1, double lng1, double lat2, double lng2) {
         List<WebGpxParser.Point> line = new ArrayList<>();
         WebGpxParser.Point firstP = new WebGpxParser.Point();
@@ -102,12 +109,14 @@ public class RoutingService {
         lastP.lng = lng2;
         line.add(firstP);
         line.add(lastP);
-        
+
         return line;
     }
-    
-    public void fillRoutingModeParams(RoutingController.RoutingParameter nativeRouting, RoutingController.RoutingParameter nativeTrack, RoutingController.RoutingParameter calcMode,
-                                       RoutingController.RoutingParameter shortWay, Map.Entry<String, GeneralRouter> e, RoutingController.RoutingMode rm) {
+
+    public void fillRoutingModeParams(List<RoutingController.RoutingParameter> passParams,
+                                      RoutingController.RoutingParameter shortWay,
+                                      Map.Entry<String, GeneralRouter> e, RoutingController.RoutingMode rm) {
+
         List<RoutingController.RoutingParameter> rps = new ArrayList<>();
         rps.add(shortWay);
         for (Map.Entry<String, GeneralRouter.RoutingParameter> epm : e.getValue().getParameters().entrySet()) {
@@ -163,11 +172,9 @@ public class RoutingService {
         for (RoutingController.RoutingParameter rp : rps) {
             rm.params.put(rp.key, rp);
         }
-        rm.params.put(nativeRouting.key, nativeRouting);
-        rm.params.put(nativeTrack.key, nativeTrack);
-        rm.params.put(calcMode.key, calcMode);
+        passParams.forEach(p -> rm.params.put(p.key, p));
     }
-    
+
     public void calculateStraightLine(List<LatLon> list) {
         for (int i = 1; i < list.size();) {
             if (MapUtils.getDistance(list.get(i - 1), list.get(i)) > DISTANCE_MID_POINT) {
@@ -178,7 +185,58 @@ public class RoutingService {
             }
         }
     }
-    
+
+    public void convertResultsWithElevation(List<LatLonEle> resListEle,
+                                            List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+        for (int i = 0; i < res.size(); i++) {
+            RouteSegmentResult r = res.get(i);
+
+            final int dir = r.isForwardDirection() ? 1 : -1;
+            final int start = r.getStartPointIndex();
+            final int end = r.getEndPointIndex();
+
+            // calculate and validate heights
+            final float[] heightArray = r.getObject().calculateHeightArray();
+            final boolean isHeightsValid = heightArray.length / 2 == r.getObject().getPointsLength();
+
+            // add points: very last segment should include very last point (end+dir)
+            final int lastPointIndex = (i == res.size() - 1) ? (end + dir) : end;
+            for (int j = start; j != lastPointIndex; j += dir) {
+                if (r.getPoint(j) != null) {
+                    double lat = r.getPoint(j).getLatitude();
+                    double lon = r.getPoint(j).getLongitude();
+                    if (isHeightsValid) {
+                        float ele = heightArray[j * 2 + 1];
+                        resListEle.add(new LatLonEle(lat, lon, ele));
+                    } else {
+                        resListEle.add(new LatLonEle(lat, lon)); // NaN elevation will be excluded from results
+                    }
+                }
+            }
+
+            // process (segment/turn) description
+            String description = r.getDescription(true);
+            if (description != null && description.length() > 0) {
+                RoutingController.Geometry point;
+
+                if (isHeightsValid) {
+                    float ele = heightArray[start * 2 + 1];
+                    double lat = r.getStartPoint().getLatitude();
+                    double lon = r.getStartPoint().getLongitude();
+                    point = RoutingController.Geometry.pointElevation(new LatLonEle(lat, lon, ele));
+                } else {
+                    point = RoutingController.Geometry.point(r.getStartPoint());
+                }
+
+                RoutingController.Feature f = new RoutingController.Feature(point);
+                f.prop("description", description).prop("routingTime", r.getRoutingTime())
+                        .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
+                        .prop("roadId", r.getObject().getId());
+                features.add(f);
+            }
+        }
+    }
+
     public void convertResults(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
         LatLon last = null;
         for (RouteSegmentResult r : res) {
@@ -205,7 +263,7 @@ public class RoutingService {
             resList.add(last);
         }
     }
-    
+
     private GPXUtilities.TrkSegment generateRouteSegments(List<RouteSegmentResult> route, List<Location> locations) {
         GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
         RouteDataResources resources = new RouteDataResources(locations, Collections.emptyList());
@@ -217,7 +275,7 @@ public class RoutingService {
             for (RouteSegmentResult sr : route) {
                 sr.collectNames(resources);
             }
-            
+
             for (RouteSegmentResult sr : route) {
                 RouteDataBundle itemBundle = new RouteDataBundle(resources);
                 sr.writeToBundle(itemBundle);
@@ -231,26 +289,26 @@ public class RoutingService {
             rule.writeToBundle(typeBundle);
             typeList.add(typeBundle);
         }
-        
+
         if (locations.isEmpty()) {
             return trkSegment;
         }
-        
+
         List<GPXUtilities.RouteSegment> routeSegments = new ArrayList<>();
         for (StringBundle item : routeItems) {
             routeSegments.add(GPXUtilities.RouteSegment.fromStringBundle(item));
         }
         trkSegment.routeSegments = routeSegments;
-        
+
         List<GPXUtilities.RouteType> routeTypes = new ArrayList<>();
         for (StringBundle item : typeList) {
             routeTypes.add(GPXUtilities.RouteType.fromStringBundle(item));
         }
         trkSegment.routeTypes = routeTypes;
-        
+
         return trkSegment;
     }
-    
+
     private void addDistance(List<WebGpxParser.Point> pointsRes) {
         for (int i = 1; i < pointsRes.size(); i++) {
             WebGpxParser.Point curr = pointsRes.get(i);
@@ -258,8 +316,8 @@ public class RoutingService {
             pointsRes.get(i).distance = (float) MapUtils.getDistance(prev.lat, prev.lng, curr.lat, curr.lng);
         }
     }
-    
-    private List<WebGpxParser.Point> getPoints(List<RouteSegmentResult> routeSegmentResults, List<Location> locations) {
+
+   public List<WebGpxParser.Point> getPoints(List<RouteSegmentResult> routeSegmentResults, List<Location> locations) {
         if (routeSegmentResults != null) {
             List<WebGpxParser.Point> pointsRes = new ArrayList<>();
             for (RouteSegmentResult r : routeSegmentResults) {
@@ -278,7 +336,7 @@ public class RoutingService {
         }
         return Collections.emptyList();
     }
-    
+
     private void getPoint(int ind, RouteSegmentResult r, List<Location> locations, float[] heightArray, List<WebGpxParser.Point> pointsRes) {
         LatLon point = r.getPoint(ind);
         locations.add(new Location("", point.getLatitude(), point.getLongitude()));

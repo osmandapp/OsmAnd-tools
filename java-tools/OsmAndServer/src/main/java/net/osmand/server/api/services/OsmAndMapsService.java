@@ -1,8 +1,5 @@
 package net.osmand.server.api.services;
 
-
-
-
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
@@ -14,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
 import net.osmand.IndexConstants;
@@ -22,6 +20,9 @@ import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -34,6 +35,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.DefaultResponseErrorHandler;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
@@ -247,20 +249,55 @@ public class OsmAndMapsService {
 	@Configuration
 	@ConfigurationProperties("osmand.routing")
 	public static class RoutingServerConfig {
-		
-		public Map<String, RoutingServerConfigEntry> config = new TreeMap<String, RoutingServerConfigEntry>();
-		
+
+		@Value("${osmand.routing.hh-only-limit}") // --osmand.routing.hh-only-limit= or $HH_ONLY_LIMIT=
+		public int hhOnlyLimit; // See application.yml, set 100 for production, or 1000 for testing server (km)
+
+		public Map<String, RoutingServerConfigEntry> config = new TreeMap<>(new ProfileComparator());
+
+		private class ProfileComparator implements Comparator<String> {
+			// reorder *-bike, *-car, *-foot to car, bike, foot
+			@Override
+			public int compare(String s1, String s2) {
+				// -car -> 0-car, -bike -> 1-bike, -foot -> 2-foot
+				s1 = reorder(s1, "-car", "-bike", "-foot");
+				s2 = reorder(s2, "-car", "-bike", "-foot");
+				return s1.compareTo(s2);
+			}
+			private String reorder(String s, String... search) {
+				String result = s;
+				for (int i = 0; i < search.length; i++) {
+					if(s.contains(search[i])) {
+						result = Integer.toString(i) + s;
+					}
+				}
+				return result;
+			}
+		}
+
 		public void setConfig(Map<String, String> style) {
 			for (Entry<String, String> e : style.entrySet()) {
+
+				/**
+				 * Example boot/command-line parameters (osmand-server-boot.conf):
+				 *
+				 * --osmand.routing.config.osrm-bicycle=type=osrm,profile=bicycle,url=https://zlzk.biz/route/v1/bike/
+				 * --osmand.routing.config.rescuetrack=type=online,url=https://apps.rescuetrack.com/api/routing/osmand
+				 *
+				 * name= osrm-bicycle|rescuetrack (Name, as a part of the option)
+				 * type= osrm|online (Type of routing provider, osrm and online are supported)
+				 * profile= [car]|bicycle (Profile for route-approximation params, default is car)
+				 */
+
 				RoutingServerConfigEntry src = new RoutingServerConfigEntry();
-				src.name = e.getKey();
+				src.name = e.getKey(); // name --osmand.routing.config.[rescuetrack]
 				for (String s : e.getValue().split(",")) {
 					String value = s.substring(s.indexOf('=') + 1);
-					if (s.startsWith("type=")) {
+					if (s.startsWith("type=")) { // osrm|online
 						src.type = value;
-					} else if (s.startsWith("url=")) {
+					} else if (s.startsWith("url=")) { // online-provider base url
 						src.url = value;
-					} else if (s.startsWith("profile=")) {
+					} else if (s.startsWith("profile=")) { // osmand profile to catch routeMode params
 						src.profile = value;
 					}
 				}
@@ -710,7 +747,7 @@ public class OsmAndMapsService {
 		for (GpxPoint pnt : r.finalPoints) {
 			route.addAll(pnt.routeToTarget);
 		}
-		if (router.useNativeApproximation) {
+		if (router.isUseNativeApproximation()) {
 			RouteResultPreparation preparation = new RouteResultPreparation();
 			// preparation.prepareTurnResults(gctx.ctx, route);
 			preparation.addTurnInfoDescriptions(route);
@@ -723,8 +760,13 @@ public class OsmAndMapsService {
 			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
-		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
-		router.setUseNativeApproximation(false);
+
+		// reset before applying
+		router.setDefaultHHRoutingConfig();
+		router.setUseOnlyHHRouting(false);
+		router.setUseNativeApproximation(false); // "nativeapproximation"
+		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
+
 		RouteCalculationMode paramMode = null;
 		for (String p : props) {
 			if (p.length() == 0) {
@@ -741,6 +783,10 @@ public class OsmAndMapsService {
 				useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
+			} else if (key.equals("hhoff")) {
+				router.setUseOnlyHHRouting(! Boolean.parseBoolean(value)); // default false
+			} else if (key.equals("hhonly")) {
+				router.setUseOnlyHHRouting(Boolean.parseBoolean(value));// default false (hhonly is not for ui)
 			} else if (key.equals("calcmode")) {
 				if (value.length() > 0) {
 					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
@@ -778,11 +824,102 @@ public class OsmAndMapsService {
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
-	
-	
-	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
-	                                        LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
+
+	@Nullable
+	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
+	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                               LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
+
+		// OSRM by type, all others treated as "rescuetrack"
+		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
+			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
+		} else {
+			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end);
+		}
+	}
+
+	@Nullable
+	private List<RouteSegmentResult> onlineRoutingOSRM(String baseurl, RoutingContext ctx,
+	                                                   RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                                   LatLon start, LatLon end, List<LatLon> intermediates)
+			throws IOException, InterruptedException {
+
+		// OSRM requires lon,lat not lat,lon
+		List<String> points = new ArrayList<>();
+		points.add(String.format("%f,%f", start.getLongitude(), start.getLatitude()));
+		if (intermediates != null) {
+			intermediates.forEach(p -> points.add(String.format("%f,%f", p.getLongitude(), p.getLatitude())));
+		}
+		points.add(String.format("%f,%f", end.getLongitude(), end.getLatitude()));
+
+		StringBuilder url = new StringBuilder(baseurl); // base url
+		url.append(String.join(";", points)); // points;points;points
+		url.append("?geometries=geojson&overview=full&steps=true"); // OSRM options
+
+		List<LatLon> polyline = new ArrayList<>();
+		try {
+			String body = new RestTemplate().getForObject(url.toString(), String.class);
+			if (body != null && body.contains("Ok") && body.contains("coordinates")) {
+				JSONArray coordinates = new JSONObject(body)
+						.getJSONArray("routes")
+						.getJSONObject(0)
+						.getJSONObject("geometry")
+						.getJSONArray("coordinates");
+
+				for (int i = 0; i < coordinates.length(); i++) {
+					JSONArray ll = coordinates.getJSONArray(i);
+					final double lon = ll.getDouble(0);
+					final double lat = ll.getDouble(1);
+					polyline.add(new LatLon(lat, lon));
+				}
+			}
+		} catch(RestClientException | JSONException error) {
+			LOGGER.error(String.format("OSRM get/parse error (%s)", url));
+			return null;
+		}
+
+		if (polyline.size() >= 2) {
+			return approximate(ctx, router, props, polyline);
+		}
+
+		return null;
+	}
+
+	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
+	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                               LatLon start, LatLon end)
+			throws IOException, InterruptedException {
+
+		List<RouteSegmentResult> routeRes;
+		StringBuilder url = new StringBuilder(baseurl);
+		url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
+		url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
+
+		RestTemplate restTemplate = new RestTemplate();
+		restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+			@Override
+			public void handleError(ClientHttpResponse response) throws IOException {
+				LOGGER.error(String.format("Error GET url (%s)", url));
+				super.handleError(response);
+			}
+		});
+		String gpx = restTemplate.getForObject(url.toString(), String.class);
+		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
+		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+		for (WptPt p : trkSegment.points) {
+			polyline.add(new LatLon(p.lat, p.lon));
+		}
+		routeRes = approximate(ctx, router, props, polyline);
+		return routeRes;
+	}
+
+	public synchronized List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
+	                                                     LatLon start, LatLon end, List<LatLon> intermediates,
+	                                                     List<String> avoidRoadsIds)
+			throws IOException, InterruptedException {
+
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
@@ -793,32 +930,15 @@ public class OsmAndMapsService {
 			usedMapList = getReaders(list);
 			
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
-			if (rsc[0] != null) {
-				StringBuilder url = new StringBuilder(rsc[0].url);
-				url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
-				url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
-				
-				RestTemplate restTemplate = new RestTemplate();
-				restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
-					
-					@Override
-					public void handleError(ClientHttpResponse response) throws IOException {
-						LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
-						super.handleError(response);
-					}
-				});
-				String gpx = restTemplate.getForObject(url.toString(), String.class);
-				GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-				TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-				List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-				for (WptPt p : trkSegment.points) {
-					polyline.add(new LatLon(p.lat, p.lon));
-				}
-				routeRes = approximate(ctx, router, props, polyline);
+
+			if (hhOnlyForce) {
+				router.setUseOnlyHHRouting(true);
+			}
+
+			if (rsc[0] != null && rsc[0].url != null) {
+				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
 			} else {
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
-				RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = true;
-//				RoutePlannerFrontEnd.USE_HH_ROUTING = true;
 				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection).getList();
 				putResultProps(ctx, routeRes, props);
 			}

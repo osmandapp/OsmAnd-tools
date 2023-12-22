@@ -779,7 +779,8 @@ public class MapRouterLayer implements MapPanelLayer {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
+				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null,
+						new RoutePlannerFrontEnd(), RouteCalculationMode.NORMAL);
 				if (entities != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Entity w : entities) {
@@ -805,16 +806,14 @@ public class MapRouterLayer implements MapPanelLayer {
 			public void run() {
 				map.setPoints(new DataTileManager<Entity>(11));
 				Collection<Entity> res;
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 				if(hh) {
 //					res = hhRoute(startRoute, endRoute); // to test DB
-					RoutePlannerFrontEnd.USE_HH_ROUTING = true;
-					RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = true;
-					RoutePlannerFrontEnd.HH_ROUTING_CONFIG = null;
-					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+					router.setUseOnlyHHRouting(true).setHHRoutingConfig(HHRoutePlanner.prepareDefaultRoutingConfig(null));
+					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router,  m);
 				} else {
-					RoutePlannerFrontEnd.USE_HH_ROUTING = false;
-					RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = false;
-					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+					router.setUseOnlyHHRouting(false).setHHRoutingConfig(null);
+					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router, m);
 				}
 				if (res != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
@@ -1044,7 +1043,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 
 	public List<Entity> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
-			boolean gpx, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
+			boolean gpx, List<RouteSegmentResult> previousRoute, RoutePlannerFrontEnd router, RouteCalculationMode rm) {
 		this.gpx = gpx;
 		List<Entity> res = new ArrayList<Entity>();
 		long time = System.currentTimeMillis();
@@ -1069,7 +1068,6 @@ public class MapRouterLayer implements MapPanelLayer {
 							"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
 					return null;
 				}
-				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 				// LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
