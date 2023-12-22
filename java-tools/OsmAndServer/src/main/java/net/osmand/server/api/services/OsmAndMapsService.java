@@ -762,8 +762,8 @@ public class OsmAndMapsService {
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 
 		// reset before applying
-		router.setDefaultHHRoutingConfig();
-		router.setUseOnlyHHRouting(false);
+		router.setDefaultHHRoutingConfig(); // hh is enabled
+		router.setUseOnlyHHRouting(false); // hhonly is disabled
 		router.setUseNativeApproximation(false); // "nativeapproximation"
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 
@@ -784,9 +784,13 @@ public class OsmAndMapsService {
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else if (key.equals("hhoff")) {
-				router.setUseOnlyHHRouting(! Boolean.parseBoolean(value)); // default false
+				if (Boolean.parseBoolean(value)) {
+					router.setHHRoutingConfig(null);
+				}
 			} else if (key.equals("hhonly")) {
-				router.setUseOnlyHHRouting(Boolean.parseBoolean(value));// default false (hhonly is not for ui)
+				if (Boolean.parseBoolean(value)) {
+					router.setUseOnlyHHRouting(true); // default false (hhonly is not for ui)
+				}
 			} else if (key.equals("calcmode")) {
 				if (value.length() > 0) {
 					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
