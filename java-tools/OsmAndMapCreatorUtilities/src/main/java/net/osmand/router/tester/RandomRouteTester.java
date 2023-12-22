@@ -334,9 +334,8 @@ public class RandomRouteTester {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
 
-		RoutePlannerFrontEnd.USE_HH_ROUTING = false;
-		RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = false;
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+		fe.setHHRoutingConfig(null); // hhoff=true
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
@@ -358,9 +357,8 @@ public class RandomRouteTester {
 //		BinaryRoutePlanner.DEBUG_BREAK_EACH_SEGMENT = false; // debug
 //		BinaryRoutePlanner.TRACE_ROUTING = false; // make it public
 
-		List<RouteSegmentResult> routeSegments =
-				fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null).getList();
-
+		RouteResultPreparation.RouteCalcResult res = fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null);
+		List<RouteSegmentResult> routeSegments = res != null ? res.getList() : new ArrayList<>();
 		long runTime = System.currentTimeMillis() - started;
 
 		return new RandomRouteResult(useNative ? "cpp" : "java", entry, runTime, ctx, routeSegments);
@@ -370,9 +368,9 @@ public class RandomRouteTester {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
 
-		RoutePlannerFrontEnd.USE_HH_ROUTING = true;
-		RoutePlannerFrontEnd.USE_ONLY_HH_ROUTING = true;
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+		fe.setDefaultHHRoutingConfig();
+		fe.setUseOnlyHHRouting(true);
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
@@ -390,9 +388,8 @@ public class RandomRouteTester {
 
 //		RoutePlannerFrontEnd.HH_ROUTING_CONFIG = null; // way to set config for hh
 
-		List<RouteSegmentResult> routeSegments =
-				fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null).getList();
-
+		RouteResultPreparation.RouteCalcResult res = fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null);
+		List<RouteSegmentResult> routeSegments = res != null ? res.getList() : new ArrayList<>();
 		long runTime = System.currentTimeMillis() - started;
 
 		return new RandomRouteResult("hh", entry, runTime, ctx, routeSegments);
