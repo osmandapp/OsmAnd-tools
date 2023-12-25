@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.URIException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,10 +99,11 @@ public class WebController {
 		response.setStatus(302);
 	}
 
-	@RequestMapping(path = { "travel" })
+	@RequestMapping(path = {"travel"})
 	public void travel(HttpServletResponse response, @RequestParam(required = false) String title,
-			@RequestParam(required = false) String lang) {
-		response.setHeader("Location", "https://" + lang + ".wikivoyage.org/wiki/" + title);
+	                   @RequestParam(required = false) String lang) throws URIException {
+		URI uri = new URI("https", lang + ".wikivoyage.org", "/wiki/" + title, null);
+		response.setHeader("Location", uri.toString());
 		response.setStatus(302);
 	}
 
