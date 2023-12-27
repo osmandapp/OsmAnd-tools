@@ -16,16 +16,17 @@ import static net.sourceforge.pinyin4j.format.HanyuPinyinToneType.*;
 import static net.sourceforge.pinyin4j.format.HanyuPinyinVCharType.*;
 
 public class ChineseTranslitHelper {
-    
-    private ChineseTranslitHelper() {}
-    
-    private static final String CHINESE_LETTERS = "[\\u4E00-\\u9FA5]+";
-    private static final String DELIMITER = " ";
-    
-    public static String getPinyinTransliteration(String name) {
-        return nameToPinyin(name, getToneMarkPinyinFormat());
-    }
-    
+
+	private ChineseTranslitHelper() {
+	}
+
+	private static final String CHINESE_LETTERS = "[\\u4E00-\\u9FA5]+";
+	private static final String DELIMITER = " ";
+
+	public static String getPinyinTransliteration(String name) {
+		return nameToPinyin(name, getToneMarkPinyinFormat());
+	}
+
 	public static String nameToPinyin(String name, HanyuPinyinOutputFormat pinyinFormat) {
 		StringBuilder pinyinWords = new StringBuilder();
 		boolean prevChinese = false;
@@ -51,16 +52,17 @@ public class ChineseTranslitHelper {
 		}
 		return pinyinWords.toString();
 	}
-    
-    private static HanyuPinyinOutputFormat getToneMarkPinyinFormat() {
-        return getPinyinFormat(LOWERCASE, WITH_TONE_MARK, WITH_U_UNICODE);
-    }
-    
-    public static HanyuPinyinOutputFormat getPinyinFormat(HanyuPinyinCaseType caseType, HanyuPinyinToneType toneType, HanyuPinyinVCharType charType) {
-        HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
-        format.setCaseType(caseType);
-        format.setToneType(toneType);
-        format.setVCharType(charType);
-        return format;
-    }
+
+	private static HanyuPinyinOutputFormat getToneMarkPinyinFormat() {
+		return getPinyinFormat(LOWERCASE, WITH_TONE_MARK, WITH_U_UNICODE);
+	}
+
+	public static HanyuPinyinOutputFormat getPinyinFormat(HanyuPinyinCaseType caseType, HanyuPinyinToneType toneType,
+			HanyuPinyinVCharType charType) {
+		HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
+		format.setCaseType(caseType);
+		format.setToneType(toneType);
+		format.setVCharType(charType);
+		return format;
+	}
 }
