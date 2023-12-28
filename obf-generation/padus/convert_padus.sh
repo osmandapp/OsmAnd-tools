@@ -6,6 +6,7 @@ shapedirname=shp
 tmpdirname=tmp
 outosmdirname=input
 ogr2osmdirname=ogr2osm
+mapcreatordir=/home/xmd5a/utilites/OsmAndMapCreator-main/
 
 export shapedirname
 export tmpdirname
@@ -99,3 +100,7 @@ do
 		generate_osm $base_name
 	fi
 done
+
+cd $mapcreatordir
+
+bash utilities.sh generate-obf-files-in-batch $dir/batch.xml

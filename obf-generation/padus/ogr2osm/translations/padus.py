@@ -30,7 +30,7 @@ class PadusTranslation(ogr2osm.TranslationBase):
 		if 'Unit_Nm' in attrs:
 			tags['padus_unit_name'] = Unit_Nm
 		if 'Loc_Mang' in attrs:
-			tags['padus_local_manager'] = Loc_Mang.lower()
+			tags['padus_local_manager'] = Loc_Mang
 		if 'Own_Name' in attrs:
 			tags['padus_owner_name'] = Own_Name.lower()
 		if 'd_Own_Name' in attrs:
