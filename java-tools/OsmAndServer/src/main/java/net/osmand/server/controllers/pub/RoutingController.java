@@ -177,7 +177,7 @@ public class RoutingController {
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
-		RoutingParameter applyApproximation = new RoutingParameter("applyapproximation", "",
+		RoutingParameter applyApproximation = new RoutingParameter("applyapproximation", null,
 				"Attach to roads (OsmAnd)", true);
 		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
 				"[Dev] Disable HH routing", false);
