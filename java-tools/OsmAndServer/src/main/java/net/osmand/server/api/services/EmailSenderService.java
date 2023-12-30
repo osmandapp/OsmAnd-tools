@@ -54,10 +54,10 @@ public class EmailSenderService {
 		Email to = new Email(email);
 		String topic = "Congratulations and welcome to OsmAnd Cloud!";
 		StringBuilder contentStr = new StringBuilder();
-		contentStr.append("Hello OsmAnd User!");
+		contentStr.append("Dear OsmAnd User!");
 		contentStr.append("<br><br>");
-		contentStr.append("You have been selected for OsmAnd Cloud promo subscription. You promo OsmAnd Pro is <b>"+promo+"</b>.<br>");
-		contentStr.append("Now you can open OsmAnd Settings -> Backup and Restore and Login with this email to OsmAnd Cloud and get all features enabled.<br>."); 
+		contentStr.append("You have been selected for OsmAnd Cloud promo subscription. Your promo OsmAnd Pro is <b>"+promo+"</b><br>");
+		contentStr.append("Now you can open OsmAnd Settings -> Backup and Restore and Login with this email to OsmAnd Cloud and get all features enabled.<br>");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
 		
@@ -85,9 +85,9 @@ public class EmailSenderService {
 		Email to = new Email(email);
 		String topic = "Register web access to OsmAnd Cloud";
 		StringBuilder contentStr = new StringBuilder();
-		contentStr.append("Hello OsmAnd User!");
+		contentStr.append("Dear OsmAnd User!");
 		contentStr.append("<br><br>");
-		contentStr.append("Please use the following verification code to <b>" + action + "</b> your OsmAnd Cloud account. Your verification code is <b>"+token+"</b>.<br>");
+		contentStr.append("Please use the following verification code to <b>" + action + "</b> your OsmAnd Cloud account. Your verification code is <b>"+token+"</b><br>");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
 		
@@ -116,9 +116,9 @@ public class EmailSenderService {
 		Email to = new Email(email);
 		String topic = newUser? "Welcome to OsmAnd Cloud" : "Register new device to OsmAnd Cloud";
 		StringBuilder contentStr = new StringBuilder();
-		contentStr.append("Hello OsmAnd User!");
+		contentStr.append("Dear OsmAnd User!");
 		contentStr.append("<br><br>");
-		contentStr.append("New device has been connected to OsmAnd Cloud. You activation code is <b>"+token+"</b>.<br>");
+		contentStr.append("New device has been connected to OsmAnd Cloud. Your activation code is <b>"+token+"</b><br>");
 		contentStr.append("You can also use <a clicktracking=\"off\" href='https://osmand.net/premium/device-registration?token=" + token
 				+ "'>following link<a> to open it with OsmAnd.");
 		contentStr.append("<br><br>");
@@ -186,7 +186,7 @@ public class EmailSenderService {
 		from.setName("OSM BTC");
 		Email to = new Email(email);
 		String topic = "Important message from OSM BTC!";
-		String contentStr = "Hello OpenStreetMap Editor!" +
+		String contentStr = "Dear OpenStreetMap Editor!" +
 				"<br><br>" +
 				"You received this message because OsmAnd suspect that you didn't follow OSM BTC guidelines and your account was suspended." +
                 "Please contact our support if you believe it was done by mistake.<br>" +
