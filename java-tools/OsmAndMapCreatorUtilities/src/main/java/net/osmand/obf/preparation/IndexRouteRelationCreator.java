@@ -16,15 +16,15 @@ import net.osmand.binary.MapZooms;
 import net.osmand.data.TransportRoute;
 import net.osmand.obf.preparation.IndexHeightData.WayGeneralStats;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.RouteActivityType;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
-import net.osmand.util.MapAlgorithms;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
+import net.osmand.osm.edit.Way;
+import net.osmand.util.MapAlgorithms;
 
 public class IndexRouteRelationCreator {
 	private final static Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
@@ -76,7 +76,7 @@ public class IndexRouteRelationCreator {
 			List<Way> ways = new ArrayList<Way>();
 			List<RelationMember> ms = e.getMembers();
 			tags = new LinkedHashMap<>(tags);
-			RouteActivityType activityType = RouteActivityType.getTypeFromOSMTags(tags);
+			OsmRouteType activityType = OsmRouteType.getTypeFromOSMTags(tags);
 			for (RelationMember rm : ms) {
 				if (rm.getEntity() instanceof Way) {
 					Way w = (Way) rm.getEntity();
@@ -106,7 +106,7 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	private void addRouteRelationTags(Relation e, Way w, Map<String, String> tags, RouteActivityType activityType, IndexCreationContext icc) {
+	private void addRouteRelationTags(Relation e, Way w, Map<String, String> tags, OsmRouteType activityType, IndexCreationContext icc) {
 		if (tags.get("color") != null) {
 			tags.put("colour", tags.get("color"));
 		}
