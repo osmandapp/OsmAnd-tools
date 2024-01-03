@@ -25,28 +25,48 @@ import net.osmand.util.Algorithms;
 public class EmailSenderService {
 
     private static final Log LOGGER = LogFactory.getLog(EmailSenderService.class);
-	private SendGrid sendGridClient;
-	
+
 	private static final String DEFAULT_MAIL_FROM = "contactus@osmand.net";
 	private static final String NOREPLY_MAIL_FROM = "noreply@osmand.net";
 
-	private EmailSenderService() {
-		final String apiKey = System.getenv("SENDGRID_KEY");
-		if (apiKey != null) {
-			sendGridClient = new SendGrid(apiKey);
-		} else {
-			sendGridClient = new SendGrid(null) {
-				@Override
-				public Response api(Request request) throws IOException {
-					LOGGER.info("Send grid emails is not configured: " + request.getBody());
-					return new Response(200, "", null);
-				}
-			};
-			LOGGER.warn("Send grid emails is not configured");
+	private SmtpSendGridSender wrapper;
+
+	private class SmtpSendGridSender {
+		private String smtpServer;
+		private SendGrid sendGridClient;
+
+		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
+			this.smtpServer = smtpServer;
+			if (apiKeySendGrid != null) {
+				sendGridClient = new SendGrid(apiKeySendGrid);
+			} else {
+				sendGridClient = new SendGrid(null) {
+					@Override
+					public Response api(Request request) throws IOException {
+						LOGGER.info("Send grid emails is not configured: " + request.getBody());
+						return new Response(200, "", null);
+					}
+				};
+				LOGGER.warn("Send grid emails is not configured");
+			}
+		}
+
+		private Response send(Mail mail) throws IOException {
+			Request request = new Request();
+			request.setMethod(Method.POST);
+			request.setEndpoint("mail/send");
+			String body = mail.build();
+			request.setBody(body);
+			return sendGridClient.api(request);
 		}
 	}
-    
-    
+
+	private EmailSenderService() {
+		final String smtpServer = System.getenv("SMTP_SERVER");
+		final String apiKey = System.getenv("SENDGRID_KEY");
+		wrapper = new SmtpSendGridSender(smtpServer, apiKey);
+	}
+
     public void sendOsmAndCloudPromoEmail(String email, String promo) {
 		LOGGER.info("Sending mail to: " + email);
 		Email from = new Email(NOREPLY_MAIL_FROM);
@@ -60,18 +80,12 @@ public class EmailSenderService {
 		contentStr.append("Now you can open OsmAnd Settings -> Backup and Restore and Login with this email to OsmAnd Cloud and get all features enabled.<br>");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
-		
-		
+
 		Content content = new Content("text/html", contentStr.toString());
 		Mail mail = new Mail(from, topic, to, content);
 		mail.from = from;
-		Request request = new Request();
 		try {
-			request.setMethod(Method.POST);
-			request.setEndpoint("mail/send");
-			String body = mail.build();
-			request.setBody(body);
-			Response response = sendGridClient.api(request);
+			Response response = wrapper.send(mail);
 			LOGGER.info("Response code: " + response.getStatusCode());
 		} catch (Exception e) {
 			LOGGER.warn(e.getMessage(), e);
@@ -90,23 +104,16 @@ public class EmailSenderService {
 		contentStr.append("Please use the following verification code to <b>" + action + "</b> your OsmAnd Cloud account. Your verification code is <b>"+token+"</b><br>");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
-		
-		
+
 		Content content = new Content("text/html", contentStr.toString());
 		Mail mail = new Mail(from, topic, to, content);
 		mail.from = from;
-		Request request = new Request();
 		try {
-			request.setMethod(Method.POST);
-			request.setEndpoint("mail/send");
-			String body = mail.build();
-			request.setBody(body);
-			Response response = sendGridClient.api(request);
+			Response response = wrapper.send(mail);
 			LOGGER.info("Response code: " + response.getStatusCode());
 		} catch (Exception e) {
 			LOGGER.warn(e.getMessage(), e);
 		}
-		
 	}
     
     public void sendOsmAndCloudRegistrationEmail(String email, String token, boolean newUser) {
@@ -123,23 +130,16 @@ public class EmailSenderService {
 				+ "'>following link<a> to open it with OsmAnd.");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
-		
-		
+
 		Content content = new Content("text/html", contentStr.toString());
 		Mail mail = new Mail(from, topic, to, content);
 		mail.from = from;
-		Request request = new Request();
 		try {
-			request.setMethod(Method.POST);
-			request.setEndpoint("mail/send");
-			String body = mail.build();
-			request.setBody(body);
-			Response response = sendGridClient.api(request);
+			Response response = wrapper.send(mail);
 			LOGGER.info("Response code: " + response.getStatusCode());
 		} catch (Exception e) {
 			LOGGER.warn(e.getMessage(), e);
 		}
-		
 	}
     
     // 6503d80a-4574-461d-95f1-2bd0c43392b8
@@ -165,13 +165,8 @@ public class EmailSenderService {
         footerSetting.setHtml("<html>"+footer+"</html>");
         mailSettings.setFooterSetting(footerSetting);
         mail.setMailSettings(mailSettings);
-        Request request = new Request();
         try {
-            request.setMethod(Method.POST);
-            request.setEndpoint("mail/send");
-            String body = mail.build();
-            request.setBody(body);
-            Response response = sendGridClient.api(request);
+            Response response = wrapper.send(mail);
             LOGGER.info("Response code: " + response.getStatusCode());
             return true;
         } catch (Exception e) {
@@ -195,19 +190,13 @@ public class EmailSenderService {
 		Content content = new Content("text/html", contentStr);
 		Mail mail = new Mail(from, topic, to, content);
 		mail.from = from;
-		Request request = new Request();
 		try {
-			request.setMethod(Method.POST);
-			request.setEndpoint("mail/send");
-			String body = mail.build();
-			request.setBody(body);
-			Response response = sendGridClient.api(request);
+			Response response = wrapper.send(mail);
 			LOGGER.info("Response code: " + response.getStatusCode());
 		} catch (Exception e) {
 			LOGGER.warn(e.getMessage(), e);
 		}
 	}
-
 
 	public boolean isEmail(String comment) {
 		if (comment.contains(" ")) {
@@ -228,8 +217,5 @@ public class EmailSenderService {
 			return false;
 		}
 		return true;
-
 	}
-
-
  }
