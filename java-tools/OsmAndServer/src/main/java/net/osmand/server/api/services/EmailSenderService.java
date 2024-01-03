@@ -4,7 +4,9 @@ import java.io.IOException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.mail.EmailException;
 import org.springframework.stereotype.Service;
+import org.apache.commons.mail.HtmlEmail;
 
 import com.sendgrid.Content;
 import com.sendgrid.Email;
@@ -21,6 +23,15 @@ import net.osmand.util.Algorithms;
 
 @Service
 public class EmailSenderService {
+//	public static void main(String[] args) {
+//		EmailSenderService sender = new EmailSenderService();
+//		String email = "osmand@t-online.de";
+//		sender.sendOsmRecipientsDeleteEmail(email);
+//		sender.sendOsmAndCloudPromoEmail(email, "promo");
+//		sender.sendOsmAndCloudWebEmail(email, "token", "action");
+//		sender.sendOsmAndCloudRegistrationEmail(email, "token", true);
+//		sender.sendPromocodesEmails(email, "59f7ce12-f28d-4d35-9b28-a21e22f00450", "promocodes");
+//	}
 
     private static final Log LOGGER = LogFactory.getLog(EmailSenderService.class);
 
@@ -32,6 +43,7 @@ public class EmailSenderService {
 	private class SmtpSendGridSender {
 		private String smtpServer;
 		private SendGrid sendGridClient;
+		private final int FAKE_SUCCESS_STATUS_CODE = 200;
 		private final int SENDGRID_SUCCESS_STATUS_CODE = 202;
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
@@ -43,7 +55,7 @@ public class EmailSenderService {
 					@Override
 					public Response api(Request request) throws IOException {
 						LOGGER.info("Send grid emails is not configured: " + request.getBody());
-						return new Response(200, "", null);
+						return fakeSuccess();
 					}
 				};
 				LOGGER.warn("Send grid emails is not configured");
@@ -51,23 +63,35 @@ public class EmailSenderService {
 		}
 
 		private Mail mail;
+
+		private Response fakeSuccess() {
+			return new Response(FAKE_SUCCESS_STATUS_CODE, "", null);
+		}
+
 		private String getTo() {
 			return mail.getPersonalization().get(0).getTos().get(0).getEmail();
 		}
-		private boolean runSmtpFirst() {
-			return false;
-//			return getTo().contains("t-online") || getTo().contains("ukr.net");
+
+		private boolean isSmtpFirst() {
+			if (mail.getTemplateId() != null) {
+				return false; // templates are allowed with SendGrid only
+			}
+			if (getTo().contains("t-online") || getTo().contains("osmand.net") || getTo().contains("victor.shcherb")) {
+				return true;
+			}
+			return Math.random() < 0.1; // try SMTP_SERVER on 10% of outgoing emails
 		}
+
 		private Response send(Mail mail) throws IOException {
 			this.mail = mail;
 
-			Response first = runSmtpFirst() ? sendWithSmtp() : sendWithSendGrid(); // first try
+			Response first = isSmtpFirst() ? sendWithSmtp() : sendWithSendGrid(); // first try
 
 			if (first.getStatusCode() == SENDGRID_SUCCESS_STATUS_CODE) {
 				return first;
 			}
 
-			return runSmtpFirst() ? sendWithSendGrid() : sendWithSmtp(); // second try (vice versa)
+			return isSmtpFirst() ? sendWithSendGrid() : sendWithSmtp(); // second try (vice versa)
 		}
 
 		private Response sendWithSendGrid() throws IOException {
@@ -79,7 +103,44 @@ public class EmailSenderService {
 		}
 
 		private Response sendWithSmtp() {
-			return null;
+			if (smtpServer == null) {
+				LOGGER.warn("SMTP_SERVER is not configured");
+				return fakeSuccess();
+			}
+
+			try {
+				org.apache.commons.mail.Email smtp = new HtmlEmail();
+
+				// server self-signed SSL cert requires fine tuning of mail.smtp.ssl.trust
+				System.setProperty("mail.smtp.ssl.trust","*"); // required
+				// smtp.setSSLCheckServerIdentity(false); // optional
+				// smtp.setDebug(true); // optional
+
+				smtp.setHostName(smtpServer);
+
+				smtp.setSSLOnConnect(true); smtp.setSslSmtpPort("465"); // pure SMTPS (SSL)
+				// smtp.setStartTLSEnabled(true); smtp.setSmtpPort(587); // plain SMTP + STARTTLS
+
+				// smtp.setAuthentication("username", "password"); // optional SMTP auth
+
+				String name = mail.getFrom().getName();
+				String from = mail.getFrom().getEmail();
+				String subject = mail.getSubject();
+				String body = mail.getContent().get(0).getValue(); // html content
+				String to = getTo();
+
+				smtp.setFrom(from, name);
+				smtp.setSubject(subject);
+				smtp.setMsg(body);
+				smtp.addTo(to);
+				smtp.send();
+
+			} catch(EmailException e) {
+				LOGGER.warn("SMTP error: " + e.getMessage() + " (" + e.getCause().getMessage() + ")");
+				return fakeSuccess();
+			}
+
+			return new Response(SENDGRID_SUCCESS_STATUS_CODE, "", null);
 		}
 	}
 
