@@ -12,12 +12,10 @@ import com.sendgrid.FooterSetting;
 import com.sendgrid.Mail;
 import com.sendgrid.MailSettings;
 import com.sendgrid.Method;
-import com.sendgrid.OpenTrackingSetting;
 import com.sendgrid.Personalization;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
-import com.sendgrid.TrackingSettings;
 
 import net.osmand.util.Algorithms;
 
@@ -34,6 +32,7 @@ public class EmailSenderService {
 	private class SmtpSendGridSender {
 		private String smtpServer;
 		private SendGrid sendGridClient;
+		private final int SENDGRID_SUCCESS_STATUS_CODE = 202;
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
 			this.smtpServer = smtpServer;
@@ -51,13 +50,36 @@ public class EmailSenderService {
 			}
 		}
 
+		private Mail mail;
+		private String getTo() {
+			return mail.getPersonalization().get(0).getTos().get(0).getEmail();
+		}
+		private boolean runSmtpFirst() {
+			return false;
+//			return getTo().contains("t-online") || getTo().contains("ukr.net");
+		}
 		private Response send(Mail mail) throws IOException {
+			this.mail = mail;
+
+			Response first = runSmtpFirst() ? sendWithSmtp() : sendWithSendGrid(); // first try
+
+			if (first.getStatusCode() == SENDGRID_SUCCESS_STATUS_CODE) {
+				return first;
+			}
+
+			return runSmtpFirst() ? sendWithSendGrid() : sendWithSmtp(); // second try (vice versa)
+		}
+
+		private Response sendWithSendGrid() throws IOException {
 			Request request = new Request();
 			request.setMethod(Method.POST);
 			request.setEndpoint("mail/send");
-			String body = mail.build();
-			request.setBody(body);
+			request.setBody(mail.build());
 			return sendGridClient.api(request);
+		}
+
+		private Response sendWithSmtp() {
+			return null;
 		}
 	}
 
