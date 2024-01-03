@@ -101,38 +101,43 @@ public class HHRoutingShortcutCreator {
 				onlyCompact = true;
 			}
 		}
-		File folder = new File(".");
-		String name = folder.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
-		File dbFile = new File(name + HHRoutingDB.EXT);
-		if (onlyCompact) {
+		for (String routeProfile : ROUTING_PROFILE.split(",")) {
+			System.out.println("----------");
+			System.out.println("Process profile: " + routeProfile);
+			File folder = new File(".");
+			String name = folder.getCanonicalFile().getName() + "_" + routeProfile;
+			File dbFile = new File(name + HHRoutingDB.EXT);
+			if (onlyCompact) {
+				File compactFile = new File(folder, name + HHRoutingDB.CEXT);
+				HHRoutingPreparationDB.compact(dbFile, compactFile);
+				new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
+				return;
+			}
+			HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
+			if (CLEAN && dbFile.exists()) {
+				networkDB.recreateSegments();
+			}
+			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
+			createOSMNetworkPoints(new File(folder, name + "-pnts.osm"), totalPnts);
+			System.out.printf("Loaded %,d points\n", totalPnts.size());
+
+			for (String routingParam : ROUTING_PARAMS) {
+				prepareContext = new HHRoutingPrepareContext(obfFile, routeProfile, routingParam.split(","));
+				int routingProfile = networkDB.insertRoutingProfile(routeProfile, routingParam);
+				HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
+				// reload points to avoid cache
+				TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
+				int segments = networkDB.loadNetworkSegments(pnts.valueCollection(), routingProfile);
+				System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam,
+						segments);
+				Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB, routingProfile);
+				saveOsmFile(objects, new File(folder, name + "-hh.osm"));
+			}
+			networkDB.close();
 			File compactFile = new File(folder, name + HHRoutingDB.CEXT);
 			HHRoutingPreparationDB.compact(dbFile, compactFile);
 			new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
-			return;
 		}
-		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
-		if (CLEAN && dbFile.exists()) {
-			networkDB.recreateSegments();
-		}
-		TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short)0, NetworkDBPoint.class);
-		createOSMNetworkPoints(new File(folder, name + "-pnts.osm"), totalPnts);
-		System.out.printf("Loaded %,d points\n", totalPnts.size());
-		
-		for (String routingParam : ROUTING_PARAMS) {
-			prepareContext = new HHRoutingPrepareContext(obfFile, ROUTING_PROFILE, routingParam.split(","));
-			int routingProfile = networkDB.insertRoutingProfile(ROUTING_PROFILE, routingParam);
-			HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
-			// reload points to avoid cache
-			TLongObjectHashMap<NetworkDBPoint> pnts = networkDB.loadNetworkPoints((short)0, NetworkDBPoint.class);
-			int segments = networkDB.loadNetworkSegments(pnts.valueCollection(), routingProfile);
-			System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam, segments);	
-			Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB, routingProfile);
-			saveOsmFile(objects, new File(folder, name + "-hh.osm"));
-		}
-		networkDB.close();
-		File compactFile = new File(folder, name + HHRoutingDB.CEXT);
-		HHRoutingPreparationDB.compact(dbFile, compactFile);
-		new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
 	}
 	
 	
