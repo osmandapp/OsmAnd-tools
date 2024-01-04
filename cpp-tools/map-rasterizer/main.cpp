@@ -3,6 +3,7 @@
 #include <sstream>
 #include <map>
 #include <memory>
+#include <locale.h>
 #if (defined(UNICODE) || defined(_UNICODE)) && defined(_WIN32)
 #   include <io.h>
 #   include <fcntl.h>
@@ -39,6 +40,9 @@ int main(int argc, char* argv[])
     coreResourcesEmbeddedBundle = OsmAnd::CoreResourcesEmbeddedBundle::loadFromSharedResourcesBundle();
 #endif // defined(OSMAND_CORE_STATIC)
     OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
+
+    // Fix parsing SVG with SkParse
+    setlocale(LC_NUMERIC, "C");
 
     // Parse configuration
     OsmAndTools::EyePiece::Configuration configuration;

@@ -44,7 +44,7 @@ import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.RouteActivityType;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
@@ -253,7 +253,7 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("user", gpxInfo.user);
 			gpxTrackTags.put("date", gpxInfo.timestamp.toString());
 			gpxTrackTags.put("description", gpxInfo.description);
-			RouteActivityType activityType = RouteActivityType.getTypeFromTags(gpxInfo.tags); 
+			OsmRouteType activityType = OsmRouteType.getTypeFromTags(gpxInfo.tags); 
 			for (String tg : gpxInfo.tags) {
 				gpxTrackTags.put("tag_" + tg, tg);
 			}
@@ -471,7 +471,7 @@ public class OsmGpxWriteContext {
 		public String user;
 		public String datestart;
 		public String dateend;
-		public Set<RouteActivityType> activityTypes = null;
+		public Set<OsmRouteType> activityTypes = null;
 		public double minlat = OsmGpxFile.ERROR_NUMBER;
 		public double maxlat = OsmGpxFile.ERROR_NUMBER;
 		public double maxlon = OsmGpxFile.ERROR_NUMBER;

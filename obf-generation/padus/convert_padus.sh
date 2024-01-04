@@ -1,11 +1,12 @@
 #!/bin/bash
-set -x
+#set -x
 dir=$(pwd)
 workdir=/mnt/wd_2tb/padus
 shapedirname=shp
 tmpdirname=tmp
 outosmdirname=input
 ogr2osmdirname=ogr2osm
+mapcreatordir=/home/xmd5a/utilites/OsmAndMapCreator-main/
 
 export shapedirname
 export tmpdirname
@@ -93,9 +94,13 @@ for f in $workdir/$shapedirname/PADUS3_0Combined_State*.shp
 do
 	base_name=$(basename "${f%.*}")
 	padus_name=$(rename_padus $base_name)
-	if [ ! -f $workdir/$outosmdirname/$padus_name.osm ]
+	if [ ! -f "$workdir/$outosmdirname/$padus_name.osm" ]
 	then
 		echo ==============Generating $base_name
 		generate_osm $base_name
 	fi
 done
+
+cd $mapcreatordir
+
+bash utilities.sh generate-obf-files-in-batch $dir/batch.xml

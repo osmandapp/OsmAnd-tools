@@ -74,6 +74,7 @@ public class BinaryMerger {
 	static {
 		COMBINE_ARGS.put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
 		COMBINE_ARGS.put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
+		COMBINE_ARGS.put("--hhindex", OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER);
 		COMBINE_ARGS.put("--owner", OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER);
 	}
 
@@ -240,10 +241,11 @@ public class BinaryMerger {
 				sargs.add(targetFileName);
 				sargs.add("--address");
 				sargs.add("--poi");
+				sargs.add("--hhindex");
 				for (CountryRegion reg : list) {
 					if (reg.map || (!mapFiles && reg.roads)) {
 						File fl = new File(pathWithGeneratedMapZips, Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext);
-						if(!fl.exists()) {
+						if (!fl.exists()) {
 							fl = new File(fl.getParentFile(), fl.getName() + ".zip");
 						}
 						sargs.add(fl.getAbsolutePath());
@@ -677,6 +679,8 @@ public class BinaryMerger {
 						addressRegions[k] = (AddressRegion) part;
 					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
 						poiRegions[k] = (PoiRegion) part;
+					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER) {
+						// ignore as we don't know how to merge
 					}
 				} else if (raf != null) {
 					ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);

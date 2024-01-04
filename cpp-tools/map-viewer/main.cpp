@@ -5,6 +5,7 @@
 #include <chrono>
 #include <future>
 #include <fstream>
+#include <locale.h>
 
 #include <GL/glew.h>
 #include <GL/freeglut.h>
@@ -311,6 +312,9 @@ int main(int argc, char** argv)
     std::cout << "Initialized Core" << std::endl;
 
     //OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
+
+    // Fix parsing SVG with SkParse
+    setlocale(LC_NUMERIC, "C");
 
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::ValueAnimator valueAnimator;
