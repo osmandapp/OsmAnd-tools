@@ -21,6 +21,8 @@ class PadusTranslation(ogr2osm.TranslationBase):
 		d_Des_Tp = attrs['d_Des_Tp']
 		Loc_Ds = attrs['Loc_Ds']
 		Loc_Mang = attrs['Loc_Mang']
+		Pub_Access = attrs['Pub_Access']
+		GAP_Sts = attrs['GAP_Sts']
 		if 'Category' in attrs:
 			tags['padus_category'] = Category.lower()
 		if 'Loc_Nm' in attrs:
@@ -45,6 +47,10 @@ class PadusTranslation(ogr2osm.TranslationBase):
 			tags['padus_designation_type_fullname'] = d_Des_Tp
 		if 'Des_Tp' in attrs:
 			tags['padus_designation_type'] = Des_Tp.lower()
+		if 'Pub_Access' in attrs:
+			tags['padus_public_access'] = Pub_Access.lower()
+		if 'GAP_Sts' in attrs:
+			tags['padus_gap_status_code'] = GAP_Sts
 
 		tags.update({'padus':'area'})
 		return tags

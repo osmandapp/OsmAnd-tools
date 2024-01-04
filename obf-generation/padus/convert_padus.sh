@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+#set -x
 dir=$(pwd)
 workdir=/mnt/wd_2tb/padus
 shapedirname=shp
@@ -94,7 +94,7 @@ for f in $workdir/$shapedirname/PADUS3_0Combined_State*.shp
 do
 	base_name=$(basename "${f%.*}")
 	padus_name=$(rename_padus $base_name)
-	if [ ! -f $workdir/$outosmdirname/$padus_name.osm ]
+	if [ ! -f "$workdir/$outosmdirname/$padus_name.osm" ]
 	then
 		echo ==============Generating $base_name
 		generate_osm $base_name
