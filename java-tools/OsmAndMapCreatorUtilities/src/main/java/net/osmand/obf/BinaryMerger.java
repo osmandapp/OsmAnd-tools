@@ -241,11 +241,11 @@ public class BinaryMerger {
 				sargs.add(targetFileName);
 				sargs.add("--address");
 				sargs.add("--poi");
-				sargs.add("--hhindes");
+				sargs.add("--hhindex");
 				for (CountryRegion reg : list) {
 					if (reg.map || (!mapFiles && reg.roads)) {
 						File fl = new File(pathWithGeneratedMapZips, Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext);
-						if(!fl.exists()) {
+						if (!fl.exists()) {
 							fl = new File(fl.getParentFile(), fl.getName() + ".zip");
 						}
 						sargs.add(fl.getAbsolutePath());
