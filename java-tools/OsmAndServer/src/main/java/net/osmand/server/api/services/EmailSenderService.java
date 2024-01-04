@@ -79,7 +79,8 @@ public class EmailSenderService {
 			if (getTo().contains("t-online") || getTo().contains("osmand.net") || getTo().contains("victor.shcherb")) {
 				return true;
 			}
-			return Math.random() < 0.1; // try SMTP_SERVER on 10% of outgoing emails
+			return true; // use SMTP by default
+//			return Math.random() < 0.1; // try SMTP_SERVER on 10% of outgoing emails
 		}
 
 		private Response send(Mail mail) throws IOException {
