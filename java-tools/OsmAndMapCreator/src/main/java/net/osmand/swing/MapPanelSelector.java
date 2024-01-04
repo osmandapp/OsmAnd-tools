@@ -27,9 +27,11 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities.RouteType;
 import net.osmand.gpx.GPXUtilities.Track;
 import net.osmand.gpx.GPXUtilities.TrkSegment;
 import net.osmand.gpx.GPXUtilities.WptPt;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -37,7 +39,6 @@ import net.osmand.router.network.NetworkRouteContext.NetworkRouteContextStats;
 import net.osmand.router.network.NetworkRouteSelector;
 import net.osmand.router.network.NetworkRouteSelector.NetworkRouteSelectorFilter;
 import net.osmand.router.network.NetworkRouteSelector.RouteKey;
-import net.osmand.router.network.NetworkRouteSelector.RouteType;
 import net.osmand.swing.MapPanel.NativeRendererRunnable;
 import net.osmand.util.MapUtils;
 
@@ -77,7 +78,7 @@ public class MapPanelSelector {
 					continue;
 				}
 				if (o.getX().size() > 1) {
-					List<RouteKey> keys = RouteType.getRouteKeys(o);
+					List<RouteKey> keys = OsmRouteType.getRouteKeys(o.getTags());
 					if (keys.size() > 0) {
 						try {
 							createMenu(o, e.getX(), e.getY()).show(panel, e.getX(), e.getY());
@@ -126,7 +127,7 @@ public class MapPanelSelector {
 			routeKeys = routeMap.keySet();
 		} else {
 			routeMap = null;
-			routeKeys = RouteType.getRouteKeys(renderedObject);
+			routeKeys = OsmRouteType.getRouteKeys(renderedObject.getTags());
 		}
 		for (RouteKey routeKey : routeKeys) {
 			menu.add(new AbstractAction(routeKey.tags.toString()) {

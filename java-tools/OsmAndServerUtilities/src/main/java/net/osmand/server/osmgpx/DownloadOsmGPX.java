@@ -63,7 +63,7 @@ import net.osmand.obf.OsmGpxWriteContext.QueryParams;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.RouteActivityType;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.io.Base64;
 import net.osmand.util.Algorithms;
 import oauth.signpost.OAuthConsumer;
@@ -151,7 +151,7 @@ public class DownloadOsmGPX {
 							if (av.trim().length() == 0) {
 								continue;
 							}
-							qp.activityTypes.add(RouteActivityType.getOrCreateTypeFromName(av.trim()));
+							qp.activityTypes.add(OsmRouteType.getOrCreateTypeFromName(av.trim()));
 						}
 					}
 					break;
@@ -284,7 +284,7 @@ public class DownloadOsmGPX {
 			}
 			gpxInfo.tags = trackTags.toArray(new String[0]);
 			if (qp.activityTypes != null) {
-				RouteActivityType rat = RouteActivityType.getTypeFromTags(gpxInfo.tags);
+				OsmRouteType rat = OsmRouteType.getTypeFromTags(gpxInfo.tags);
 				if (rat == null || !qp.activityTypes.contains(rat)) {
 					continue;
 				}
