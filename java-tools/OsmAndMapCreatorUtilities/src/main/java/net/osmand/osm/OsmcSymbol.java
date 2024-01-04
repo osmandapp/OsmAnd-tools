@@ -124,6 +124,8 @@ public class OsmcSymbol {
 				|| s.equals("yellow")
 				|| s.equals("orange")
 				|| s.equals("purple")
+				|| s.equals("pink")
+				|| s.equals("teal")
 				|| s.equals("brown")
 				|| s.equals("gray");
 	}
