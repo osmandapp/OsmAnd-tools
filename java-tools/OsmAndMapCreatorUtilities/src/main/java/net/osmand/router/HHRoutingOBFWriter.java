@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -44,7 +45,8 @@ import rtree.Rect;
 
 public class HHRoutingOBFWriter {
 	final static Log LOG = PlatformUtil.getLog(HHRoutingOBFWriter.class);
-	private static final int BLOCK_SEGMENTS_SIZE = 24;
+	private static final int BLOCK_SEGMENTS_AVG_BLOCKS_SIZE = 10;
+	private static final int BLOCK_SEGMENTS_AVG_BUCKET_SIZE = 7;
 	public static final int BUFFER_SIZE = 1 << 20;
 	
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
@@ -60,12 +62,12 @@ public class HHRoutingOBFWriter {
 			String polyFile = "Netherlands_europe_2.road.obf";
 			polyFile = "_split";
 			polyFile = "_split/Netherlands_europe_2.road.obf";
-			updateExistingFiles = true;
+			updateExistingFiles = false;
 			dbFile = new File(System.getProperty("maps.dir"), mapName);
 			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
 		} else {
 			for (String arg : args) {
-				if (arg.startsWith("--db=")) {
+				if (arg.startsWith("--dbxr=")) {
 					dbFile = new File(arg.substring("--db=".length()));
 				} else if (arg.startsWith("--outfolder=")) {
 					outFolder = new File(arg.substring("--outfolder=".length()));
@@ -82,7 +84,7 @@ public class HHRoutingOBFWriter {
 	public void writeFile(File dbFile, File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
 		long edition = dbFile.lastModified(); // System.currentTimeMillis();
 		HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
-		TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
+		TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short) 0, NetworkDBPointPrep.class);
 		if (obfPolyFileIn == null) {
 			File outFile = new File(dbFile.getParentFile(),
 					dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
@@ -290,8 +292,20 @@ public class HHRoutingOBFWriter {
 						return Integer.compare(o1.fileId, o2.fileId);
 					}
 				});
+				List<Integer> blocks = new ArrayList<Integer>();
+				int numberOfBlocks = (pntsList.size() - 1) / BLOCK_SEGMENTS_AVG_BUCKET_SIZE + 1;
+				while (numberOfBlocks > 1) {
+					blocks.add(numberOfBlocks);
+					numberOfBlocks = (numberOfBlocks - 1) / BLOCK_SEGMENTS_AVG_BLOCKS_SIZE + 1;
+				}
+				Collections.reverse(blocks);
+				List<Integer> ranges = new ArrayList<Integer>();
+				for (int i = 0; i < blocks.size(); i++) {
+					ranges.add((pntsList.size() - 1) / blocks.get(i) + 1);
+				}
+				System.out.printf("Tree of points %d: ranges - %s, number of subblocks - %s\n", points.size(), ranges, blocks);
 				for (int i = 0; i < profileParamsKeys.length; i++) {
-					writeSegments(db, i, profileParamsKeys[i], bmiw, pntsList, 0);
+					writeSegments(db, i, profileParamsKeys[i], bmiw, pntsList, ranges, 0);
 				}
 			}
 			bmiw.endHHRoutingIndex();
@@ -315,16 +329,18 @@ public class HHRoutingOBFWriter {
 
 
 	private void writeSegments(HHRoutingPreparationDB db, int profile, int dbProfile, BinaryMapIndexWriter writer, 
-			List<NetworkDBPointPrep> pntsList, int shift) throws IOException, SQLException {
+			List<NetworkDBPointPrep> pntsList, List<Integer> ranges, int shift) throws IOException, SQLException {
 		writer.startHHRouteBlockSegments(shift, pntsList.size(), profile);
-		if (pntsList.size() > BLOCK_SEGMENTS_SIZE) {
-			int range = (pntsList.size() - 1) / BLOCK_SEGMENTS_SIZE + 1;
+		if (ranges.size() > 0) {
+			int range = ranges.get(0);
+//			System.out.printf(" BLOCK d-%d range-%d totalpoints-%d\n", ranges.size(),  range, pntsList.size());
 			for (int i = 0; i < pntsList.size(); i += range) {
 				int start = i;
 				int end = Math.min(i + range, pntsList.size());
-				writeSegments(db, profile, dbProfile, writer, pntsList.subList(start, end), shift + start);
+				writeSegments(db, profile, dbProfile, writer, pntsList.subList(start, end), ranges.subList(1, ranges.size()), shift + start);
 			}
 		} else {
+//			System.out.println("   POINTS " +pntsList.size());
 			for (NetworkDBPointPrep ind : pntsList) {
 				if (shift != ind.fileId) {
 					throw new IllegalStateException(shift + " != " + ind.fileId);
