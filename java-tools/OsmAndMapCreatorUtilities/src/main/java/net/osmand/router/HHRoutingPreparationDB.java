@@ -165,7 +165,9 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		
 		HHRoutingDB sourceDB = new HHRoutingDB(source, src);
 		TLongObjectHashMap<NetworkDBPointPrep> pointsById = sourceDB.loadNetworkPoints((short)0, NetworkDBPointPrep.class);
+		// outPoints: points in the same cluster form a closed loop and segments look "outward" the shape
 		TIntObjectHashMap<List<NetworkDBPointPrep>> outPoints = HHRoutePlanner.groupByClusters(pointsById, true);
+		// inPoints: all dual points from the same cluster form a closed loop and segments look "inward" the shape
 		TIntObjectHashMap<List<NetworkDBPointPrep>> inPoints = HHRoutePlanner.groupByClusters(pointsById, false);
 		pIns = tgt.prepareStatement("INSERT INTO points(" + columnNames + ") VALUES (" + insPnts + ")");
 		ResultSet rs = src.createStatement().executeQuery(" select " + columnNames + " from points");

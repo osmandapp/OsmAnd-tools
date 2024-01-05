@@ -1,6 +1,7 @@
 package net.osmand.router;
 
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -15,6 +16,7 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 
+import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -61,7 +63,6 @@ public class HHRoutingOBFWriter {
 //			mapName = "_road_car.chdb";
 			String polyFile = "Netherlands_europe_2.road.obf";
 			polyFile = "_split";
-			polyFile = "_split/Netherlands_europe_2.road.obf";
 			updateExistingFiles = false;
 			dbFile = new File(System.getProperty("maps.dir"), mapName);
 			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
@@ -230,55 +231,71 @@ public class HHRoutingOBFWriter {
 			bmiw.startHHRoutingIndex(edition, profile, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
 			
+			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterIn = new TLongObjectHashMap<>();
+			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterOut = new TLongObjectHashMap<>();
 			for (NetworkDBPointPrep p : points.valueCollection()) {
 				p.mapId = 0;
 				p.fileId = 0;
+				if (validateClusterIn.get(p.clusterId) == null) {
+					validateClusterIn.put(p.clusterId, new ArrayList<>());
+				}
+				if (validateClusterOut.get(p.dualPoint.clusterId) == null) {
+					validateClusterOut.put(p.dualPoint.clusterId, new ArrayList<>());
+				}
+				validateClusterIn.get(p.clusterId).add(p);
+				validateClusterOut.get(p.dualPoint.clusterId).add(p);
 			}
-			boolean useBbox = !bbox31.hasInitialState() || filteredPoints != null;
+			
 			if (filteredPoints != null) {
 				for (NetworkDBPointPrep pnt : filteredPoints) {
 					pnt.mapId = 1;
 					routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
 				}
 			} else {
+				boolean initialState = bbox31.hasInitialState();
 				for (NetworkDBPointPrep pnt : points.valueCollection()) {
-					boolean contains = !useBbox;
-					if (!contains && !bbox31.hasInitialState()) {
-						contains = bbox31.contains(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY());
-					}
-					if (contains) {
+					if (initialState || bbox31.contains(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY())) {
 						pnt.mapId = 1;
 						routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
 					}
 				}
 			}
-			if (useBbox) {
-				TLongHashSet clusters = new TLongHashSet();
-//				TLongHashSet clustersOut = new TLongHashSet();
-				for (NetworkDBPointPrep pnt : points.valueCollection()) {
-					if (pnt.mapId > 0) {
-						clusters.add(pnt.clusterId);
-//						clustersOut.add(pnt.dualPoint.clusterId);
-					}
+			// here we could expand points (or delete) to 1 more cluster to make maps "bigger"
+//			for (NetworkDBPointPrep pnt : points.valueCollection()) {
+//				if (// pnt.dualPoint.mapId == 1 && 
+//						pnt.index % 5 == 2) {
+////					pnt.mapId = -1;
+//					pnt.mapId = 1;
+//				}
+//			}
+			// same(pnt.clusterId) - forms a shape where segments look outward the shape 
+			TLongHashSet clusterDualPointsForInNeeded = new TLongHashSet();
+			TLongHashSet clusterPointsForOutNeeded = new TLongHashSet();
+			for (NetworkDBPointPrep pnt : points.valueCollection()) {
+				if (pnt.mapId > 0) {
+					clusterPointsForOutNeeded.add(pnt.dualPoint.clusterId);
+					clusterDualPointsForInNeeded.add(pnt.clusterId);
 				}
-
-				int pointsInc = 0, partial = 0, completeInc = 0;
-				for (NetworkDBPointPrep pnt : points.valueCollection()) {
-					pointsInc++;
-					if (pnt.mapId == 0) {
-						if (clusters.contains(pnt.clusterId) || clusters.contains(pnt.dualPoint.clusterId)) {
-							pnt.mapId = 2;
-							partial++;
+			}
+			int pointsInc = 0, partial = 0, completeInc = 0;
+			for (NetworkDBPointPrep pnt : points.valueCollection()) {
+				pointsInc++;
+				if (pnt.mapId <= 0) {
+					if (clusterPointsForOutNeeded.contains(pnt.dualPoint.clusterId) || 
+							clusterDualPointsForInNeeded.contains(pnt.clusterId)) {
+						partial++;
+						if(pnt.mapId == 0) {
 							routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
 						}
-					} else {
-						completeInc++;
+						pnt.mapId = 2;
 					}
+				} else {
+					completeInc++;
 				}
-				System.out.printf("Total points %d: included %d (complete clusters), %d (partial clusters) \n",
-						pointsInc, completeInc, partial);
-
 			}
+			System.out.printf("Total points %d: included %d (complete clusters), %d (partial clusters) \n", pointsInc,
+					completeInc, partial);
+				
 			routeTree = AbstractIndexPartCreator.packRtreeFile(routeTree, rTreeFile, rpTreeFile);
 			
 			long rootIndex = routeTree.getFileHdr().getRootIndex();
@@ -286,6 +303,8 @@ public class HHRoutingOBFWriter {
 			Rect rootBounds = IndexVectorMapCreator.calcBounds(root);
 			if (rootBounds != null) {
 				List<NetworkDBPointPrep> pntsList = writeBinaryRouteTree(root, rootBounds, routeTree, bmiw, points, new int[] {0});
+				// validate number of clusters
+				validateClusterSizeMatch(db, validateClusterIn, validateClusterOut, pntsList);
 				pntsList.sort(new Comparator<NetworkDBPointPrep>() {
 					@Override
 					public int compare(NetworkDBPointPrep o1, NetworkDBPointPrep o2) {
@@ -327,6 +346,49 @@ public class HHRoutingOBFWriter {
 		RTree.clearCache();
 	}
 
+	private void validateClusterSizeMatch(HHRoutingPreparationDB db,
+			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterIn,
+			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterOut, List<NetworkDBPointPrep> pntsList)
+			throws SQLException, IOException {
+		for (NetworkDBPointPrep p : pntsList) {
+			if (p.mapId != 1) {
+				continue;
+			}
+			byte[][] res = new byte[2][];
+			db.loadSegmentPointInternal(p.index, 0, res);
+			int sizeIn = 0, sizeOut = 0;
+			ByteArrayInputStream str = new ByteArrayInputStream(res[0]);
+			while (str.available() > 0) {
+				CodedInputStream.readRawVarint32(str);
+				sizeIn++;
+			}
+			str = new ByteArrayInputStream(res[1]);
+			while (str.available() > 0) {
+				CodedInputStream.readRawVarint32(str);
+				sizeOut++;
+			}
+			int sizeTIn = 0, sizeTOut = 0;
+			for (NetworkDBPointPrep l : validateClusterIn.get(p.clusterId)) {
+				if (l.mapId > 0) {
+					sizeTIn++;
+				} else {
+					throw new IllegalStateException(String.format("Into %s <- %s is missing", p, l));
+				}
+			}
+			for (NetworkDBPointPrep l : validateClusterOut.get(p.dualPoint.clusterId)) {
+				if (l.mapId > 0) {
+					sizeTOut++;
+				} else {
+					throw new IllegalStateException(String.format("From %s -> %s is missing", p, l));
+				}
+			}
+			if (sizeTIn != sizeIn || sizeOut != sizeTOut) {
+				throw new IllegalArgumentException(String.format("Point [%d] %d  in %d>=%d out %d>=%d\n ", p.mapId, p.index, sizeIn,
+						sizeTIn, sizeOut, sizeTOut));
+			}
+		}
+	}
+
 
 	private void writeSegments(HHRoutingPreparationDB db, int profile, int dbProfile, BinaryMapIndexWriter writer, 
 			List<NetworkDBPointPrep> pntsList, List<Integer> ranges, int shift) throws IOException, SQLException {
@@ -346,7 +408,12 @@ public class HHRoutingOBFWriter {
 					throw new IllegalStateException(shift + " != " + ind.fileId);
 				}
 				byte[][] res = new byte[2][];
-				db.loadSegmentPointInternal(ind.index, dbProfile, res);
+				if (ind.mapId <= 1) {
+					// don't write mapId=2 point segments as their clusters anyway incomplete
+					db.loadSegmentPointInternal(ind.index, dbProfile, res);
+				} else {
+					res[1] = res[0] = new byte[0];
+				}
 				writer.writePointSegments(res[0], res[1]);
 				shift++;
 			}
@@ -373,8 +440,12 @@ public class HHRoutingOBFWriter {
 			} else {
 				leaf = true;
 				NetworkDBPointPrep pnt = points.get(e.getPtr());
-				pnt.fileId = pntId[0]++;
-				l.add(pnt);
+				if (pnt.mapId > 0) {
+					pnt.fileId = pntId[0]++;
+					l.add(pnt);
+				} else {
+					System.out.println("Deleted point " + pnt);
+				}
 			}
 		}
 		if (l.size() > 0 && leaf) {
