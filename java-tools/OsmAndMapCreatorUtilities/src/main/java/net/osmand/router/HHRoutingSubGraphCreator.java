@@ -51,13 +51,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
-// F.5 FILE: Merge maps cluster and check dates in HHRoutePlanner
-// 2.0.1 Fix routing time (vs db) u-turn via same geo point - (Direction - 30 Routing Lat 48.623177 Lon 2.4295924 -> Lat 48.624382 Lon 2.4252284 )
-// 1.3 Automation fixes: 1) Country road files ? 2) Regenerate 1 file 3) not upload automatically /var/lib/jenkins/indexes/uploaded 
 // 1.4 Reiterate point (when point surrounded private blocks) implement 
-// 1.9 Intermediate points HHRoutePlanner
-// 2.0 Check coverage HH is not enough & don't calculate - do we need it? We have MAX_REITERATIONS + MAX_PNTS_LIMIT
-// 2.8  BUG DATA! Ferry not calculated in detailed to London / Marseille  - Den Haag -> London
 
 // !!! SPECIAL TESTING !!!
 // 2.2.0 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Map outdated) - 52.429665 Lon 10.59049 -> Lat 52.431316 Lon 10.586489 (+)
@@ -68,22 +62,28 @@ import net.osmand.util.MapUtils;
 // 2.4 Live data (To think after 2.2, 2.3) - New roads (same private)
 // 2.3.1 Deprioritize or exclude roads based on parameters
 
+// LATEST FIXES:
+// 2.13 Route not found (dijkstra+recalc) Point 3178542 (863002889 0-1) -> Point 3178508 (4610860 10-11)
+// 2.9  FIXED - BUG DATA! HHRoutePlanner - lots of incorrect distance in db
+// 2.14 - height_obstacles https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.162615,24.411771&type=osmand&profile=pedestrian#18/48.16266/24.41064
+
 /////////////////////////////////
 // IN PROGRESS
-// TEST WEB: Java / C++ approximation, Java / C++ routing
-// BUG: intermediate points sum statistics (cost, time, ...)
-// 2.1  Progress bar for HHRoutePlanner and Cancellation
+// 2.11 TODO Ferry missing Route Spain -> England
+// 2.12 Hangs Parse detailed route segments...No route found between 0 (Lat 49.312305 Lon 16.108898): Road (863002889), ref ('D1') -> 10 (Lat 49.317562 Lon 16.096916): Road (4610860), ref ('D1')
+
+// 2.0.1 TEST WEB: Java / C++ approximation, Java / C++ routing
+// 2.0.2 BUG: intermediate points sum statistics (cost, time, ...)
+// 2.1 Progress bar for HHRoutePlanner and Cancellation
+// 2.5  CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
+
+// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+// 2.14 Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
+
+// ----------------- //
+// 2.2 Automate monthly procedures  
 // 2.7.1 HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
 // 2.7.2 HHRoutePlanner loop non suitable alternative routes as a main route
-
-// 2.5  CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
-// 2.9  BUG DATA! HHRoutePlanner - TODO lots of incorrect distance in db 
-// 2.11 TODO Route Spain -> England
-
-// 2.0  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
-// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
-
-
 
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
