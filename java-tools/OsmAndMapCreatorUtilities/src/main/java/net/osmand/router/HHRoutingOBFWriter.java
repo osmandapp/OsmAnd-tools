@@ -68,7 +68,7 @@ public class HHRoutingOBFWriter {
 			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
 		} else {
 			for (String arg : args) {
-				if (arg.startsWith("--dbxr=")) {
+				if (arg.startsWith("--db=")) {
 					dbFile = new File(arg.substring("--db=".length()));
 				} else if (arg.startsWith("--outfolder=")) {
 					outFolder = new File(arg.substring("--outfolder=".length()));
