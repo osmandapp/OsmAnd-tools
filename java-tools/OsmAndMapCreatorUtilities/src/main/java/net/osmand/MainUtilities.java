@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.wiki.CommonsWikimediaPreparation;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
@@ -142,6 +143,8 @@ public class MainUtilities {
 				HHRoutingOBFWriter.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
 				TestHHRouting.main(subArgsArray);
+			} else if (utl.equals("random-route-tester")) {
+				RandomRouteTester.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("test-icons")) {
@@ -407,5 +410,6 @@ public class MainUtilities {
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
 		System.out.println("\t\t travel-guide-creator: creates custom travel guide from existing resources (.travel.sqlite), --help or -h for more details");
+		System.out.println("\t\t random-route-tester --help # generate random routes and run java/cpp/hh comparison");
 	}
 }
