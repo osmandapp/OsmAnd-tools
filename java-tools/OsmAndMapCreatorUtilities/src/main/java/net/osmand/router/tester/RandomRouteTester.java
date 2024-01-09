@@ -453,5 +453,7 @@ public class RandomRouteTester {
 // TODO RR-3 MapCreator - parse start/finish from url, share route url, route hotkeys (Ctrl + 1/2/3/4/5)
 // TODO RR-4 fix start segment calc: https://osmand.net/map/?start=50.450128,30.535611&finish=50.460479,30.589365&via=50.452647,30.588330&type=osmand&profile=car#14/50.4505/30.5511
 // TODO RR-5 turn back and test recently added "ignored" route test, then remove ignore=true there
+// TODO RR-6 height_obstacles zero route https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=pedestrian#13/48.1833/24.4087
 
 // BinaryRoutePlanner.TRACE_ROUTING = s.getRoad().getId() / 64 == 451406223; // 233801367L;
+
