@@ -282,7 +282,7 @@ public class QtCorePanel implements GLEventListener {
 
 		ObfsCollection obfsCollection = new ObfsCollection();
 		String filesDir = DataExtractionSettings.getSettings().getBinaryFilesDir();
-		obfsCollection.addDirectory(filesDir, false);
+		obfsCollection.addDirectory(filesDir, "", false);
 		MapPresentationEnvironment mapPresentationEnvironment = new MapPresentationEnvironment(mapStyle,
 				options.density, 1.0f, options.symbolsScale / options.density);
         mapPresentationEnvironment.setLocaleLanguageId(options.getLocaleLanguageId());
