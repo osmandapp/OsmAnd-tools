@@ -404,7 +404,7 @@ public class HHRoutingShortcutCreator {
 			
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
-			ctx.config.PENALTY_FOR_REVERSE_DIRECTION = -1;
+			ctx.config.penaltyForReverseDirection = -1;
 			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) routePlanner.searchRouteInternal(ctx, s,
 					null, segments);
 			if (frs != null) {
