@@ -19,7 +19,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import com.google.protobuf.CodedOutputStream;
@@ -1404,32 +1403,17 @@ public class BinaryInspector {
 				MapUtils.get31TileNumberY(verbose.latbottom),
 				verbose.getZoom(),
 				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
-				new ResultMatcher<Amenity>() {
+				new ResultMatcher<>() {
 					@Override
-					public boolean publish(Amenity object) {
-						StringBuilder s = new StringBuilder();
-						printNames(" ", object.getInternalAdditionalInfoMap(), s);
-						printNames(" name:", object.getNamesMap(true), s);
-						
-						long id = (object.getId() );
+					public boolean publish(Amenity amenity) {
+						String s = String.valueOf(amenity.printNamesAndAdditional());
+						long id = (amenity.getId());
 						if(id > 0) {
 							id = id >> 1;
 						}
-						println(object.getType().getKeyName() + ": " + object.getSubType() + " " + object.getName() +
-								" " + object.getLocation() + " osmid=" + id + " " + s);
+						println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
+								" " + amenity.getLocation() + " osmid=" + id + " " + s);
 						return false;
-					}
-
-					private void printNames(String prefix, Map<String, String> mp, StringBuilder s) {
-						Iterator<Entry<String, String>> it = mp.entrySet().iterator();
-						while (it.hasNext()) {
-							Entry<String, String> e = it.next();
-							if (e.getValue().startsWith(" gz ")) {
-								s.append(prefix + e.getKey() + "='gzip ...'");
-							} else {
-								s.append(prefix + e.getKey() + "='" + e.getValue() + "'");
-							}
-						}
 					}
 
 					@Override
