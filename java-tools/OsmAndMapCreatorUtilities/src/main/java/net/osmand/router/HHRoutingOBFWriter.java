@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -50,7 +51,14 @@ public class HHRoutingOBFWriter {
 	private static final int BLOCK_SEGMENTS_AVG_BLOCKS_SIZE = 10;
 	private static final int BLOCK_SEGMENTS_AVG_BUCKET_SIZE = 7;
 	public static final int BUFFER_SIZE = 1 << 20;
+	public static boolean PREINDEX_POINTS_BY_COUNTRIES = true;
 	
+	/**
+	 * @param args
+	 * @throws IOException
+	 * @throws SQLException
+	 * @throws IllegalValueException
+	 */
 	public static void main(String[] args) throws IOException, SQLException, IllegalValueException {
 		File dbFile = null;
 		File obfPolyFile = null;
@@ -60,10 +68,11 @@ public class HHRoutingOBFWriter {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
 //			mapName = "__europe_car.chdb";
-//			mapName = "_road_car.chdb";
-			String polyFile = "Netherlands_europe_2.road.obf";
-			polyFile = "_split";
-			updateExistingFiles = false;
+			mapName = "1/hh-routing_car.chdb";
+			String polyFile = "1/Spain_europe_2.road.obf";
+			PREINDEX_POINTS_BY_COUNTRIES = false;
+//			polyFile = "_split";
+			updateExistingFiles = true;
 			dbFile = new File(System.getProperty("maps.dir"), mapName);
 			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
 		} else {
@@ -99,7 +108,7 @@ public class HHRoutingOBFWriter {
 			}
 			OsmandRegions or = new OsmandRegions();
 			or.prepareFile();
-			or.cacheAllCountries();
+			Map<String, LinkedList<BinaryMapDataObject>> downloadNames = or.cacheAllCountries();
 			List<File> obfPolyFiles = new ArrayList<>();
 			if (obfPolyFileIn.isDirectory()) {
 				for (File o : obfPolyFileIn.listFiles()) {
@@ -116,19 +125,44 @@ public class HHRoutingOBFWriter {
 			Map<String, List<NetworkDBPointPrep>> pointsByDownloadName = new LinkedHashMap<String, List<NetworkDBPointPrep>>();
 			int index = 0;
 			System.out.printf("Indexing points %d...\n", points.size());
-			for (NetworkDBPointPrep p : points.valueCollection()) {
-				List<BinaryMapDataObject> l = or.query(p.midX(), p.midY());
-				if (++index % 100000 == 0) {
-					System.out.printf("Indexed %d of %d - %s \n", index, points.size(), new Date());
-				}
-				for (BinaryMapDataObject b : l) {
-					if (OsmandRegions.contain(b, p.midX(), p.midY())) {
-						String dw = or.getDownloadName(b);
-						if (!pointsByDownloadName.containsKey(dw)) {
-							pointsByDownloadName.put(dw, new ArrayList<NetworkDBPointPrep>());
-						}
-						pointsByDownloadName.get(dw).add(p);
+
+			if (PREINDEX_POINTS_BY_COUNTRIES) {
+				for (NetworkDBPointPrep p : points.valueCollection()) {
+					List<BinaryMapDataObject> lst = or.query(p.midX(), p.midY());
+					if (++index % 100000 == 0) {
+						System.out.printf("Indexed %d of %d - %s \n", index, points.size(), new Date());
 					}
+					for (BinaryMapDataObject b : lst) {
+						if (OsmandRegions.contain(b, p.midX(), p.midY())) {
+							String dw = or.getDownloadName(b);
+							if (!pointsByDownloadName.containsKey(dw)) {
+								pointsByDownloadName.put(dw, new ArrayList<NetworkDBPointPrep>());
+							}
+							pointsByDownloadName.get(dw).add(p);
+						}
+					}
+				}
+			} else {
+				for (File obfPolyFile : obfPolyFiles) {
+					String countryName = getCountryName(obfPolyFile);
+					LinkedList<BinaryMapDataObject> boundaries = downloadNames.get(countryName);
+					List<NetworkDBPointPrep> lst = new ArrayList<NetworkDBPointPrep>();
+					for (NetworkDBPointPrep p : points.valueCollection()) {
+						if (++index % 100000 == 0) {
+							System.out.printf("Indexed %d of %d - %s \n", index, points.size(), new Date());
+						}
+						if (boundaries != null) {
+							for (BinaryMapDataObject b : boundaries) {
+								if (OsmandRegions.contain(b, p.midX(), p.midY())) {
+									lst.add(p);
+									break;
+								}
+							}
+						}
+					}
+					
+					pointsByDownloadName.put(countryName, lst);
+
 				}
 			}
 			for (File obfPolyFile : obfPolyFiles) {
@@ -140,8 +174,7 @@ public class HHRoutingOBFWriter {
 				outFile.getParentFile().mkdirs();
 				QuadRect bbox31 = new QuadRect();
 				List<NetworkDBPointPrep> filteredPoints = null;
-				String countryName = obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('_'))
-						.toLowerCase();
+				String countryName = getCountryName(obfPolyFile);
 				
 				if (or.getRegionDataByDownloadName(countryName) != null) {
 					filteredPoints = pointsByDownloadName.get(countryName);
@@ -176,6 +209,11 @@ public class HHRoutingOBFWriter {
 				writeFileBbox(db, points, outFile, edition, bbox31, filteredPoints);
 			}
 		}
+	}
+
+	private String getCountryName(File obfPolyFile) {
+		return obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('_'))
+				.toLowerCase();
 	}
 
 	private void writeFileBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
@@ -260,41 +298,19 @@ public class HHRoutingOBFWriter {
 					}
 				}
 			}
-			// here we could expand points (or delete) to 1 more cluster to make maps "bigger"
-//			for (NetworkDBPointPrep pnt : points.valueCollection()) {
-//				if (// pnt.dualPoint.mapId == 1 && 
-//						pnt.index % 5 == 2) {
-////					pnt.mapId = -1;
-//					pnt.mapId = 1;
-//				}
-//			}
-			// same(pnt.clusterId) - forms a shape where segments look outward the shape 
-			TLongHashSet clusterDualPointsForInNeeded = new TLongHashSet();
-			TLongHashSet clusterPointsForOutNeeded = new TLongHashSet();
+			addIncompletePointsToFormClusters("Prepare ", points, routeTree);
+			// Expand points for 1 more cluster: here we could expand points (or delete) to 1 more cluster to make maps "bigger"
 			for (NetworkDBPointPrep pnt : points.valueCollection()) {
-				if (pnt.mapId > 0) {
-					clusterPointsForOutNeeded.add(pnt.dualPoint.clusterId);
-					clusterDualPointsForInNeeded.add(pnt.clusterId);
+				if (pnt.mapId == 2) {
+					pnt.mapId = 1;
 				}
+				//				if (// pnt.dualPoint.mapId == 1 && 
+				//				pnt.index % 5 == 2) {
+				//			pnt.mapId = -1;
+				//		}
+
 			}
-			int pointsInc = 0, partial = 0, completeInc = 0;
-			for (NetworkDBPointPrep pnt : points.valueCollection()) {
-				pointsInc++;
-				if (pnt.mapId <= 0) {
-					if (clusterPointsForOutNeeded.contains(pnt.dualPoint.clusterId) || 
-							clusterDualPointsForInNeeded.contains(pnt.clusterId)) {
-						partial++;
-						if(pnt.mapId == 0) {
-							routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
-						}
-						pnt.mapId = 2;
-					}
-				} else {
-					completeInc++;
-				}
-			}
-			System.out.printf("Total points %d: included %d (complete clusters), %d (partial clusters) \n", pointsInc,
-					completeInc, partial);
+			addIncompletePointsToFormClusters("Final ", points, routeTree);
 				
 			routeTree = AbstractIndexPartCreator.packRtreeFile(routeTree, rTreeFile, rpTreeFile);
 			
@@ -344,6 +360,38 @@ public class HHRoutingOBFWriter {
 			new File(rpTreeFile).delete();
 		}
 		RTree.clearCache();
+	}
+
+	private void addIncompletePointsToFormClusters(String msg, TLongObjectHashMap<NetworkDBPointPrep> points, RTree routeTree)
+			throws RTreeInsertException, IllegalValueException {
+		// IMPORTANT: same(pnt.clusterId) - forms a shape where segments look outward the shape
+		TLongHashSet clusterDualPointsForInNeeded = new TLongHashSet();
+		TLongHashSet clusterPointsForOutNeeded = new TLongHashSet();
+		for (NetworkDBPointPrep pnt : points.valueCollection()) {
+			if (pnt.mapId > 0) {
+				clusterPointsForOutNeeded.add(pnt.dualPoint.clusterId);
+				clusterDualPointsForInNeeded.add(pnt.clusterId);
+			}
+		}
+		int pointsInc = 0, partial = 0, completeInc = 0;
+		for (NetworkDBPointPrep pnt : points.valueCollection()) {
+			pointsInc++;
+			if (pnt.mapId <= 0) {
+				if (clusterPointsForOutNeeded.contains(pnt.dualPoint.clusterId) || 
+						clusterDualPointsForInNeeded.contains(pnt.clusterId)) {
+					partial++;
+					if (pnt.mapId == 0) {
+						routeTree.insert(
+								new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+					}
+					pnt.mapId = 2;
+				}
+			} else {
+				completeInc++;
+			}
+		}
+		System.out.printf("%s - total points %d: included %d (complete clusters), %d (partial clusters) \n", msg, pointsInc,
+				completeInc, partial);
 	}
 
 	private void validateClusterSizeMatch(HHRoutingPreparationDB db,

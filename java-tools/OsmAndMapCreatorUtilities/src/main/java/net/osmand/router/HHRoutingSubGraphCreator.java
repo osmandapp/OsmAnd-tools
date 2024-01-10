@@ -51,41 +51,36 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
+// 2.0.2 BUG: intermediate points sum statistics (cost, time, ...)
 // 1.4 Reiterate point (when point surrounded private blocks) implement 
+// 2.3.1 Route not found (dijkstra+recalc) Point 3178542 (863002889 0-1) -> Point 3178508 (4610860 10-11)
+// 2.3.2  FIXED - BUG DATA! HHRoutePlanner - lots of incorrect distance in db
+// 2.3.3 - height_obstacles https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.162615,24.411771&type=osmand&profile=pedestrian#18/48.16266/24.41064
+// 2.4.1 TEST! Ferry missing Route Spain -> England 
 
-// !!! SPECIAL TESTING !!!
+// !!! SPECIAL TESTING - 2.2 !!!
 // 2.2.0 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Map outdated) - 52.429665 Lon 10.59049 -> Lat 52.431316 Lon 10.586489 (+)
 // 2.2.1 Route calculation cause road is inaccessible by conditional (time access)
 // 2.2.2 Avoid specific road (+)
 // 2.2.3 Missing map (+)
-// 2.3 HHRoutePlanner Implement route recalculation in case distance + > original 10% ? (Live / parameters) (+)
-// 2.4 Live data (To think after 2.2, 2.3) - New roads (same private)
-// 2.3.1 Deprioritize or exclude roads based on parameters
+// 2.2.4 HHRoutePlanner Implement route recalculation in case distance + > original 10% ? (Live / parameters) (+)
+// 2.2.5 Live data (To think after 2.2, 2.3) - New roads (same private)
+// 2.2.6 Deprioritize or exclude roads based on parameters
 
-// LATEST FIXES:
-// 2.13 Route not found (dijkstra+recalc) Point 3178542 (863002889 0-1) -> Point 3178508 (4610860 10-11)
-// 2.9  FIXED - BUG DATA! HHRoutePlanner - lots of incorrect distance in db
-// 2.14 - height_obstacles https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.162615,24.411771&type=osmand&profile=pedestrian#18/48.16266/24.41064
-
-/////////////////////////////////
 // IN PROGRESS
-// 2.11 TODO Ferry missing Route Spain -> England
-// 2.12 Hangs Parse detailed route segments...No route found between 0 (Lat 49.312305 Lon 16.108898): Road (863002889), ref ('D1') -> 10 (Lat 49.317562 Lon 16.096916): Road (4610860), ref ('D1')
+// 2.4.2 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
+//   1040363976 Jampea - Kalaotoa (33->32) missing, probably from 33->32 no boundaries reached (empty Jampea)
 
-// 2.0.1 TEST WEB: Java / C++ approximation, Java / C++ routing
-// 2.0.2 BUG: intermediate points sum statistics (cost, time, ...)
-// 2.1 Progress bar for HHRoutePlanner and Cancellation
-// 2.5  CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
-
-// 2.10 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
-// 2.14 Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
-
-// ----------------- //
-// 2.2 Automate monthly procedures  
-// 2.7.1 HHRoutePlanner Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 2.7.2 HHRoutePlanner loop non suitable alternative routes as a main route
+// 2.1 ROUTING: ! Progress bar for HHRoutePlanner and Cancellation
+// 2.5 CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
+// 2.6 ROUTING: Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
 
 // 3. MID-TERM Speedups, small bugs and Data research
+// 2.7 ! SERVER: Automate monthly procedures
+// 2.8 ! ROUTING: Avoid "motorways" could be more efficient to exclude points earlier  
+// 2.9.1 ! ROUTING: Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+// 2.9.2 ! ROUTING: Loop non suitable alternative routes as a main route
+
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
@@ -150,12 +145,13 @@ public class HHRoutingSubGraphCreator {
 	private static File testData() {
 		DEBUG_VERBOSE_LEVEL = 1;
 		DEBUG_STORE_ALL_ROADS = 1;
-		CLEAN = true;
+		CLEAN = false;
 		
 //		TOTAL_MAX_POINTS = 100000;
 //		TOTAL_MIN_POINTS = 1000;
 		
 		String name = "Montenegro_europe_2.road.obf";
+		name = "Indonesia_sulawesi-selatan_asia";
 //		name = "Italy_test";
 //		name = "Netherlands_europe_2.road.obf";
 //		ROUTING_PROFILE = "bicycle";
@@ -190,7 +186,15 @@ public class HHRoutingSubGraphCreator {
 				DEBUG_STORE_ALL_ROADS = 3;
 			}
 		}
-		String name = new File(".").getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
+		String name = new File(".").getCanonicalFile().getName();
+		if (args.length == 0) {
+			File dir = testData();
+			if (!dir.isDirectory()) {
+				dir = dir.getParentFile();
+			}
+			name = dir.getAbsolutePath() + "/" + testData().getCanonicalFile().getName();
+		}
+		name += "_" + ROUTING_PROFILE;
 		File dbFile = new File(name + HHRoutingDB.EXT);
 		if (CLEAN && dbFile.exists()) {
 			dbFile.delete();
