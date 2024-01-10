@@ -244,9 +244,10 @@ public class HHRoutingOBFWriter {
 					}
 				}
 				if (edition == profileEdition) {
-					System.out.printf("Skip file %s as same hh routing profile (%s) already exist\n", outFile.getName(),
+					System.out.printf("File %s as same hh routing profile (%s) already exist\n", outFile.getName(),
 							new Date(edition));
-					return;
+					// regenerate cause there could be issue with writer itself
+//					return;
 				}
 				System.out.println((profileEdition > 0 ? "Replace" : "Augment") +" file with hh routing: " + outFile.getName());
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
