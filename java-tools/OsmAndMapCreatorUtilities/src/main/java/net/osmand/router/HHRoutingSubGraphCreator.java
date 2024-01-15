@@ -51,36 +51,19 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
-// 2.0.2 BUG: intermediate points sum statistics (cost, time, ...)
-// 1.4 Reiterate point (when point surrounded private blocks) implement 
-// 2.3.1 Route not found (dijkstra+recalc) Point 3178542 (863002889 0-1) -> Point 3178508 (4610860 10-11)
-// 2.3.2  FIXED - BUG DATA! HHRoutePlanner - lots of incorrect distance in db
-// 2.3.3 - height_obstacles https://test.osmand.net/map/?start=48.211348,24.478998&finish=48.162615,24.411771&type=osmand&profile=pedestrian#18/48.16266/24.41064
-// 2.4.1 TEST! Ferry missing Route Spain -> England 
+// 2.3 ROUTING: Missing map:  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) -  
 
-// !!! SPECIAL TESTING - 2.2 !!!
-// 2.2.0 HHRoutePlanner Recalculate inaccessible: Error on segment (HHRoutePlanner.java:938) (Map outdated) - 52.429665 Lon 10.59049 -> Lat 52.431316 Lon 10.586489 (+)
-// 2.2.1 Route calculation cause road is inaccessible by conditional (time access)
-// 2.2.2 Avoid specific road (+)
-// 2.2.3 Missing map (+)
-// 2.2.4 HHRoutePlanner Implement route recalculation in case distance + > original 10% ? (Live / parameters) (+)
-// 2.2.5 Live data (To think after 2.2, 2.3) - New roads (same private)
-// 2.2.6 Deprioritize or exclude roads based on parameters
-
-// IN PROGRESS
-// 2.4.2 BUG DATA: Bug with ferries without dual point: 1040363976 (32-33 of 63), 404414837 (5-4 of 13), 1043579898 (12-13 of 25)
-//   1040363976 Jampea - Kalaotoa (33->32) missing, probably from 33->32 no boundaries reached (empty Jampea)
-
-// 2.1 ROUTING: ! Progress bar for HHRoutePlanner and Cancellation
-// 2.5 CHECK PRIVATE: Private roads will be calculated only start/end: middle could be calc using HH (points are not used at all)
-// 2.6 ROUTING: Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) - missing map. 
+// !! IN PROGRESS !!!
+// 2.0 ROUTING: ! Progress bar for HHRoutePlanner and Cancellation
+// 2.1 SERVER: Automate monthly procedures
+// 2.8.0 ROUTING: NPE  (net.osmand.router.HHRouteDataStructure$NetworkDBPointRouteInfo.setDetailedParentRt(HHRouteDataStructure.java:575)
+//      http://localhost:3000/map/?start=51.825843,6.712063&finish=51.954521,8.130041&type=osmand&profile=car&params=car,prefer_unpaved#10/51.8905/7.4206
+// 2.8.1 ROUTING: Avoid "motorways" could be more efficient to exclude points earlier
+// 2.8.2 ROUTING: Too many recalculations with height elevation (https://test.osmand.net/map/?start=42.770191,0.620610&finish=42.980344,-0.419359&type=osmand&profile=pedestrian)
+// 2.8.3 ROUTING: Test live maps 
+// 2.9 Multithread Server routing 
 
 // 3. MID-TERM Speedups, small bugs and Data research
-// 2.7 ! SERVER: Automate monthly procedures
-// 2.8 ! ROUTING: Avoid "motorways" could be more efficient to exclude points earlier  
-// 2.9.1 ! ROUTING: Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
-// 2.9.2 ! ROUTING: Loop non suitable alternative routes as a main route
-
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)
@@ -89,7 +72,9 @@ import net.osmand.util.MapUtils;
 // 3.6 DATA: EX10 - example that min depth doesn't give good approximation
 // 3.7 BUG: 2-dir routing speed https://github.com/osmandapp/OsmAnd/issues/18566 
 // 3.8 SPEEDUP: HHRoutePlanner / BinaryRoutePlanner should be speed up by just clearing visited (review all unloadAllData())
-// 3.9 PRIVATE: full private roads mode support (not only start/end segment)
+// 3.9 PRIVATE: Private roads could be calculated only from start/end (to have private road in the middle, we need special index - Segment Flags)
+// 3.10.1 ! ROUTING: Alternative routes doesn't look correct (!) - could use distributions like 50% route (2 alt), 25%/75% route (1 alt)?
+// 3.10.2 ! ROUTING: Loop non suitable alternative routes as a main route
 
 // *4* LATE Future (if needed) - Introduce 3/4 level 
 // 4.1 Implement midpoint algorithm - HARD to calculate midpoint level
@@ -419,6 +404,7 @@ public class HHRoutingSubGraphCreator {
 				seg.getEndPointY()) > LONG_DISTANCE_SEGMENTS_SPLIT) {
 			return true;
 		}
+		
 		return false;
 	}
 	
@@ -430,7 +416,6 @@ public class HHRoutingSubGraphCreator {
 		int minDepth = 0, maxDepth = ALG_BY_DEPTH_MINMAX_DIFF + 2;
 		if (DEBUG_VERBOSE_LEVEL >= 1) {
 			logf("Cluster %d. %s", ctx.lastClusterInd + 1, pnt );
-					
 		}
 		c.addSegmentToQueue(c.getVertex(pnt));
 		int maxPoints = 0;
@@ -1352,7 +1337,6 @@ public class HHRoutingSubGraphCreator {
 					tl++;
 				}
 			}
-			
 			logf("Saving visited %,d points (%,d border points) from %s to db...", currentProcessingRegion.getPoints(), ins,
 					currentProcessingRegion.getName());
 			networkDB.insertProcessedRegion(currentProcessingRegion, networkPointToDbInd, longRoads);
@@ -1403,8 +1387,8 @@ public class HHRoutingSubGraphCreator {
 				for (int pos = 0; pos < object.getPointsLength() - 1 && ctx.checkLongRoads; pos++) {
 					double dst = segmentDist(object, pos, pos+1);
 					if (dst > LONG_DISTANCE_SEGMENTS_SPLIT) {
-						String msg = String.format("Skip long road to process later %s (length %d) %d <-> %d", 
-								object, object.getPointsLength(), pos, pos + 1);
+						String msg = String.format("Skip long road to process later %s (length %d) %d <-> %d - %.1f", 
+								object, object.getPointsLength(), pos, pos + 1, dst / 1000);
 						System.out.println(msg);
 						ctx.longRoads.add(new NetworkLongRoad(object.getId(), pos, object.pointsX, object.pointsY));
 						return false;
