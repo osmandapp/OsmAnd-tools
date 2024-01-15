@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import net.osmand.IndexConstants;
 import net.osmand.util.Algorithms;
+import net.osmand.util.CollectionUtils;
 
 import java.io.File;
 
@@ -97,7 +98,7 @@ public enum FileSubtype {
     }
     
     public static boolean isSrtmFile(String fileName) {
-        return Algorithms.endsWithAny(fileName,
+        return CollectionUtils.endsWithAny(fileName,
                 IndexConstants.BINARY_SRTM_MAP_INDEX_EXT,
                 IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
     }
