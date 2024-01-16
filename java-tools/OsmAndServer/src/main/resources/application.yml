@@ -23,9 +23,10 @@ logging:
 
 osmand:
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
-  files.location: ${user.dir}/../../../help
+  # ! should contain folders or symlinks indexes, night-builds, gen !
+  files.location: ${user.dir}/../../../
   gen.location: ${osmand.files.location}/gen
-  web.location: ${osmand.files.location}/website
+  web.location: ${osmand.files.location}/web-server-config
   srtm.location: ${SRTM_LOCATION:}
   weather.location: ${WEATHER_LOCATION:}
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
@@ -114,6 +115,7 @@ geoip.url: "http://localhost:8081/json/"
 spring.jpa.hibernate.ddl-auto: validate
 
 osmand.files.location: /var/www-download
+osmand.web.location: ${osmand.files.location}/website
 
 logging:
   file: /var/log/osmand-server-logs/error.log

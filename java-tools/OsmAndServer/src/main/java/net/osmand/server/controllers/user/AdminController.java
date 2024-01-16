@@ -747,6 +747,7 @@ public class AdminController {
 				} else {
 					row.append(String.format("<br>€ %d", valueNewLTV / 1000));
 				}
+				row.append(String.format("<br>Old € %d", valueOld / 1000));
 			}
 			return row.toString();
 		}

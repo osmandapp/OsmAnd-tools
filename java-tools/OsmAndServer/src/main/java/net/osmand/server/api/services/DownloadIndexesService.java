@@ -256,6 +256,9 @@ public class DownloadIndexesService  {
 
 	private void gzipFile(File target, File gzip) {
 		try {
+			if (!target.getParentFile().exists()) {
+				target.getParentFile().mkdirs();
+			}
 			FileInputStream is = new FileInputStream(target);
 			GZIPOutputStream out = new GZIPOutputStream(new FileOutputStream(gzip));
 			Algorithms.streamCopy(is, out);

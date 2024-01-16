@@ -287,7 +287,6 @@ public class RoutingController {
 	                                 @RequestParam(defaultValue = "production") String limits) throws IOException {
 
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
-
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return osmAndMapsService.errorConfig();
 		}

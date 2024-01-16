@@ -44,16 +44,13 @@ public class RoutingService {
         List<Location> locations = new ArrayList<>();
         List<WebGpxParser.Point> pointsRes;
         List<RouteSegmentResult> routeSegmentResults = new ArrayList<>();
-
         List<WebGpxParser.Point> lineRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(),
                 endLatLon.getLatitude(), endLatLon.getLongitude());
-
         if (routeMode.equals(LINE_PROFILE_TYPE)) {
             return lineRes;
         } else {
             routeSegmentResults = osmAndMapsService.routing(hhOnlyForce, routeMode, props, startLatLon, endLatLon,
                     Collections.emptyList(), Collections.emptyList());
-
             pointsRes = getPoints(routeSegmentResults, locations);
         }
 

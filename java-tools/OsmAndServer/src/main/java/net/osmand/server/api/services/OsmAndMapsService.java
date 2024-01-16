@@ -527,7 +527,7 @@ public class OsmAndMapsService {
 		}
 		return tile;
 	}
-
+	
 	public boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && config.initErrorMessage == null) {
 			osmandRegions = new OsmandRegions();
@@ -563,12 +563,16 @@ public class OsmAndMapsService {
 					ios.close();
 				}
 				nativelib = NativeJavaRendering.getDefault(null, config.obfLocation, fontsFolder.getAbsolutePath());
-				if (nativelib == null) {
-					config.initErrorMessage = "Tile rendering engine is not initialized";
-				}
+				
 			}
 		}
 		return config.initErrorMessage == null;
+	}
+	public String validateNativeLib() {
+		if (nativelib == null) {
+			return "Tile rendering engine is not initialized";
+		}
+		return null;
 	}
 
 	public ResponseEntity<String> renderMetaTile(VectorMetatile tile)

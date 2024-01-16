@@ -38,10 +38,9 @@ public class VectorTileController {
 	
 	Gson gson = new Gson();
 
-	private ResponseEntity<?> errorConfig() {
-		VectorTileServerConfig config = osmAndMapsService.getConfig();
+	private ResponseEntity<?> errorConfig(String msg) {
 		return ResponseEntity.badRequest()
-				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
+				.body(msg);
 	}
 	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<?> getStyles() {
@@ -63,7 +62,11 @@ public class VectorTileController {
 	public ResponseEntity<?> getTile(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y)
 			throws IOException, XmlPullParserException, SAXException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			return errorConfig();
+			VectorTileServerConfig config = osmAndMapsService.getConfig();
+			return errorConfig("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
+		}
+		if (osmAndMapsService.validateNativeLib() != null) {
+			return errorConfig("Tile service is not initialized: " + osmAndMapsService.validateNativeLib());
 		}
 		VectorStyle vectorStyle = osmAndMapsService.getStyle(style);
 		if (vectorStyle == null) {

@@ -51,9 +51,10 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
-// 2.3 ROUTING: Missing map:  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) -  
 
 // !! IN PROGRESS !!!
+// 2.3 ROUTING: Missing map:  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) -
+
 // 2.0 ROUTING: ! Progress bar for HHRoutePlanner and Cancellation
 // 2.1 SERVER: Automate monthly procedures
 // 2.8.0 ROUTING: NPE  (net.osmand.router.HHRouteDataStructure$NetworkDBPointRouteInfo.setDetailedParentRt(HHRouteDataStructure.java:575)
@@ -62,6 +63,7 @@ import net.osmand.util.MapUtils;
 // 2.8.2 ROUTING: Too many recalculations with height elevation (https://test.osmand.net/map/?start=42.770191,0.620610&finish=42.980344,-0.419359&type=osmand&profile=pedestrian)
 // 2.8.3 ROUTING: Test live maps 
 // 2.9 Multithread Server routing 
+// 2.7 Suggest that maps need to be downloaded / updated
 
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
