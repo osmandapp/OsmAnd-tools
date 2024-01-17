@@ -365,7 +365,7 @@ public class WebGpxParser {
     }
     
     public void addSrtmEle(List<Track> tracks, GPXTrackAnalysis srtmAnalysis) {
-        if (srtmAnalysis != null) {
+        if (srtmAnalysis != null && tracks != null) {
             for (Track track : tracks) {
                 int pointsSize = 0;
                 for (Point point : track.points) {
