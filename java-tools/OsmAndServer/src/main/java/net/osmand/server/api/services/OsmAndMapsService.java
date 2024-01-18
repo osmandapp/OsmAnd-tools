@@ -113,7 +113,7 @@ public class OsmAndMapsService {
 	RoutingServerConfig routingConfig;
 
 	OsmandRegions osmandRegions;
-	
+
 	public class BinaryMapIndexReaderReference {
 		File file;
 		private static final int WAIT_LOCK_CHECK = 10;
@@ -948,9 +948,8 @@ public class OsmAndMapsService {
 	}
 
 	public List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
-	                                                     LatLon start, LatLon end, List<LatLon> intermediates,
-	                                                     List<String> avoidRoadsIds)
-			throws IOException, InterruptedException {
+			LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
+			RouteCalculationProgress progress) throws IOException, InterruptedException {
 
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -964,12 +963,11 @@ public class OsmAndMapsService {
 			if (incomplete[0]) {
 				return Collections.emptyList();
 			}
-			
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
 			if (hhOnlyForce) {
 				router.setUseOnlyHHRouting(true);
 			}
-
+			ctx.calculationProgress = progress;
 			if (rsc[0] != null && rsc[0].url != null) {
 				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
 			} else {

@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
+import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
@@ -28,6 +29,7 @@ import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.GeneralRouter.RoutingParameterType;
+import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
@@ -43,12 +45,15 @@ import net.osmand.util.MapUtils;
 public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
-
+	
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 	
 	@Autowired
 	RoutingService routingService;
+	
+	@Autowired
+	UserSessionResources session;
 	
 	Gson gson = new Gson();
 	
@@ -281,11 +286,11 @@ public class RoutingController {
 	}
 	
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<String> routing(@RequestParam String[] points,
-	                                 @RequestParam(defaultValue = "car") String routeMode,
+	public ResponseEntity<String> routing(HttpSession session,
+			@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode,
 	                                 @RequestParam(required = false) String[] avoidRoads,
 	                                 @RequestParam(defaultValue = "production") String limits) throws IOException {
-
+		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return osmAndMapsService.errorConfig();
@@ -319,7 +324,7 @@ public class RoutingController {
 				List<RouteSegmentResult> res =
 						osmAndMapsService.routing(hhOnlyForce, routeMode, props, list.get(0),
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
-								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads));
+								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress);
 				if (res != null) {
 					routingService.convertResultsWithElevation(resListElevation, features, res);
 				}
@@ -355,20 +360,20 @@ public class RoutingController {
 		}
 	}
 
+
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> updateRouteBetweenPoints(@RequestParam String start, @RequestParam String end,
-	                                                       @RequestParam String routeMode, @RequestParam boolean hasRouting,
-	                                                       @RequestParam(defaultValue = "production") String limits)
-			throws IOException, InterruptedException {
+	public ResponseEntity<String> updateRouteBetweenPoints(HttpSession session, @RequestParam String start,
+			@RequestParam String end, @RequestParam String routeMode, @RequestParam boolean hasRouting,
+			@RequestParam(defaultValue = "production") String limits) throws IOException, InterruptedException {
 
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
-
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
 		boolean hhOnlyForce = MapUtils.getDistance(startPoint, endPoint) > hhOnlyLimit * 1000;
+		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		List<WebGpxParser.Point> trackPointsRes =
-				routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, hhOnlyForce);
+				routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, hhOnlyForce, progress);
 		if (trackPointsRes.size() <= 2 && hhOnlyForce) { // report limit error
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg",
 					MSG_LONG_DIST + hhOnlyLimit + " km.")));
