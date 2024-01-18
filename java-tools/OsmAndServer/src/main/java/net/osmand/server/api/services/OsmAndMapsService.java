@@ -60,7 +60,6 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter.GeneralRouterProfile;
-import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
@@ -723,7 +722,7 @@ public class OsmAndMapsService {
 		return approximateByPolyline(polyline, routeMode, props);
 	}
 	
-	private synchronized List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
+	private List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
 		List<RouteSegmentResult> route;
 		QuadRect quadRect = points(polyline, null, null);
 		if (!validateAndInitConfig()) {
@@ -742,7 +741,22 @@ public class OsmAndMapsService {
 		return route;
 	}
 
-	private List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
+	
+	public List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
+			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+		if(ctx.nativeLib != null || router.isUseNativeApproximation()) {
+			return approximateSyncNative(ctx, router, props, polyline);
+		}
+		return approximateInternal(ctx, router, props, polyline);
+	}
+	
+
+	private synchronized List<RouteSegmentResult> approximateSyncNative(RoutingContext ctx, RoutePlannerFrontEnd router,
+			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+		return approximateInternal(ctx, router, props, polyline);
+	}
+	
+	private synchronized List<RouteSegmentResult> approximateInternal(RoutingContext ctx, RoutePlannerFrontEnd router,
 			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
@@ -923,7 +937,7 @@ public class OsmAndMapsService {
 		return routeRes;
 	}
 
-	public synchronized List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
+	public List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
 	                                                     LatLon start, LatLon end, List<LatLon> intermediates,
 	                                                     List<String> avoidRoadsIds)
 			throws IOException, InterruptedException {
@@ -938,7 +952,6 @@ public class OsmAndMapsService {
 			usedMapList = getReaders(list);
 			
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
-
 			if (hhOnlyForce) {
 				router.setUseOnlyHHRouting(true);
 			}
@@ -946,14 +959,19 @@ public class OsmAndMapsService {
 			if (rsc[0] != null && rsc[0].url != null) {
 				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
 			} else {
-				PrecalculatedRouteDirection precalculatedRouteDirection = null;
-				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection).getList();
+				routeRes = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
+						: router.searchRoute(ctx, start, end, intermediates, null).getList();
 				putResultProps(ctx, routeRes, props);
 			}
 		} finally {
 			unlockReaders(usedMapList);
 		}
 		return routeRes;
+	}
+
+	private synchronized List<RouteSegmentResult> runRoutingSync(LatLon start, LatLon end, List<LatLon> intermediates,
+			RoutePlannerFrontEnd router, RoutingContext ctx) throws IOException, InterruptedException {
+		return router.searchRoute(ctx, start, end, intermediates, null).getList();
 	}
 	
 
