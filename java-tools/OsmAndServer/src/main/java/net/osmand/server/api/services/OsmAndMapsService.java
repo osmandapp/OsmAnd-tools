@@ -91,7 +91,7 @@ public class OsmAndMapsService {
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
-	private static final int MAXIMUM_OPEN_FILES = 5;
+	private static final int MAX_SAME_FILE_OPEN = 15;
 	
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -154,7 +154,7 @@ public class OsmAndMapsService {
 			if (resReader != null) {
 				return resReader;
 			}
-			if (readers.size() < MAXIMUM_OPEN_FILES) {
+			if (readers.size() < MAX_SAME_FILE_OPEN) {
 				if (cacheFiles == null) {
 					initObfReaders();
 				}
@@ -199,9 +199,9 @@ public class OsmAndMapsService {
 		}
 	}
 	
-	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs) {
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
-		refs.forEach(ref-> {
+		for (BinaryMapIndexReaderReference ref : refs) {
 			BinaryMapIndexReader reader = null;
 			try {
 				reader = ref.getReader(cacheFiles, 1000);
@@ -210,8 +210,10 @@ public class OsmAndMapsService {
 			}
 			if (reader != null) {
 				res.add(reader);
+			} else if (incompleteFlag != null) {
+				incompleteFlag[0] = true;
 			}
-		});
+		};
 		return res;
 	}
 	
@@ -688,7 +690,11 @@ public class OsmAndMapsService {
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
-			usedMapList = getReaders(list);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[1]) {
+				return Collections.emptyList();
+			}
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null, usedMapList);
 			GeocodingUtilities su = new GeocodingUtilities();
@@ -732,7 +738,11 @@ public class OsmAndMapsService {
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0);
-			usedMapList = getReaders(list);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[1]) {
+				return new ArrayList<RouteSegmentResult>();
+			}
 			RoutingContext ctx = prepareRouterContext(routeMode, quadRect, router, null, null, usedMapList);
 			route = approximate(ctx, router, props, polyline);
 		} finally {
@@ -949,7 +959,11 @@ public class OsmAndMapsService {
 		List<RouteSegmentResult> routeRes;
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
-			usedMapList = getReaders(list);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[0]) {
+				return Collections.emptyList();
+			}
 			
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
 			if (hhOnlyForce) {

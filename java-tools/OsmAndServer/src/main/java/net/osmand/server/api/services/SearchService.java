@@ -101,7 +101,7 @@ public class SearchService {
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0);
-            usedMapList = osmAndMapsService.getReaders(list);
+            usedMapList = osmAndMapsService.getReaders(list, null);
             searchUICore.getSearchSettings().setOfflineIndexes(usedMapList);
             searchUICore.init();
             searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
@@ -131,7 +131,7 @@ public class SearchService {
             if (mapList.isEmpty()) {
                 return new PoiSearchResult(false, true, false, null);
             }
-            usedMapList = osmAndMapsService.getReaders(mapList);
+            usedMapList = osmAndMapsService.getReaders(mapList, null);
             for (String category : data.categories) {
                 int sumLimit = limit + leftoverLimit;
                 SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList);
