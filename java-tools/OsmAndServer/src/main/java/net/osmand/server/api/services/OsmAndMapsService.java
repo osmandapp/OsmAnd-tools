@@ -66,6 +66,7 @@ import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation;
+import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
@@ -971,8 +972,9 @@ public class OsmAndMapsService {
 			if (rsc[0] != null && rsc[0].url != null) {
 				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
 			} else {
-				routeRes = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
-						: router.searchRoute(ctx, start, end, intermediates, null).getList();
+				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
+						: router.searchRoute(ctx, start, end, intermediates, null);
+				routeRes = rc == null ? null : rc.getList();
 				putResultProps(ctx, routeRes, props);
 			}
 		} finally {
@@ -981,9 +983,9 @@ public class OsmAndMapsService {
 		return routeRes;
 	}
 
-	private synchronized List<RouteSegmentResult> runRoutingSync(LatLon start, LatLon end, List<LatLon> intermediates,
+	private synchronized RouteCalcResult runRoutingSync(LatLon start, LatLon end, List<LatLon> intermediates,
 			RoutePlannerFrontEnd router, RoutingContext ctx) throws IOException, InterruptedException {
-		return router.searchRoute(ctx, start, end, intermediates, null).getList();
+		return router.searchRoute(ctx, start, end, intermediates, null);
 	}
 	
 
