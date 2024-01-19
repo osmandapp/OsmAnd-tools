@@ -37,7 +37,7 @@ public class RoutingService {
     WebGpxParser webGpxParser;
 
 	public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode,
-			boolean hasRouting, boolean hhOnlyForce, RouteCalculationProgress progress)
+			boolean hasRouting, boolean disableOldRouting, RouteCalculationProgress progress)
 			throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
@@ -48,7 +48,7 @@ public class RoutingService {
         if (routeMode.equals(LINE_PROFILE_TYPE)) {
             return lineRes;
         } else {
-            routeSegmentResults = osmAndMapsService.routing(hhOnlyForce, routeMode, props, startLatLon, endLatLon,
+            routeSegmentResults = osmAndMapsService.routing(disableOldRouting, routeMode, props, startLatLon, endLatLon,
                     Collections.emptyList(), Collections.emptyList(), progress);
             pointsRes = getPoints(routeSegmentResults, locations);
         }

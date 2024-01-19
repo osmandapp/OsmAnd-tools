@@ -814,7 +814,7 @@ public class OsmAndMapsService {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else if (key.equals("hhoff")) {
 				if (Boolean.parseBoolean(value)) {
-					router.setHHRoutingConfig(null);
+					router.disableHHRoutingConfig();
 				}
 			} else if (key.equals("hhonly")) {
 				if (Boolean.parseBoolean(value)) {
@@ -948,7 +948,8 @@ public class OsmAndMapsService {
 		return routeRes;
 	}
 
-	public List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
+	@Nullable
+	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
 			LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
 			RouteCalculationProgress progress) throws IOException, InterruptedException {
 
@@ -965,8 +966,9 @@ public class OsmAndMapsService {
 				return Collections.emptyList();
 			}
 			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
-			if (hhOnlyForce) {
-				router.setUseOnlyHHRouting(true);
+			if (disableOldRouting && !router.isHHRoutingConfigured()) {
+				// BRP is disabled (limited) and HH is disabled (hhoff)
+				return null;
 			}
 			ctx.calculationProgress = progress;
 			if (rsc[0] != null && rsc[0].url != null) {
