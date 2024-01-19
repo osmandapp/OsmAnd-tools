@@ -7,10 +7,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -61,35 +58,39 @@ public class GenerateYMLFromAndroidTranslations {
      * @param webPath The directory path for saving web translations.
      * @param andPath The source directory path for Android XML translations.
      */
-    
     public static void convertAndroidTranslationsToJSON(String webPath, String andPath) {
-        Map<String, JsonObject> webTranslations = getTranslationsFromJSON(webPath);
-        Map<String, JsonObject> andTranslations = getTranslationsFromXml(andPath);
-        
-        JsonObject enWebTranslations = webTranslations.getOrDefault(DEFAULT_LOCALE, new JsonObject());
-        JsonObject enAndTranslations = andTranslations.getOrDefault(DEFAULT_LOCALE, new JsonObject());
-        
-        // Update English translations in web from Android
-        enAndTranslations.entrySet().forEach(entry -> {
-            String key = entry.getKey();
-            if (key.contains("rendering_attr_") || key.contains("routeInfo_")) {
-                enWebTranslations.add(key, entry.getValue());
-            }
-        });
-        webTranslations.put(DEFAULT_LOCALE, enWebTranslations);
-        
-        // Update or create other languages based on updated English translations
-        andTranslations.forEach((lang, andLangTranslations) -> {
-            JsonObject webLangTranslations = webTranslations.getOrDefault(lang, new JsonObject());
-            enWebTranslations.keySet().forEach(key -> {
-                if (andLangTranslations.has(key)) {
-                    webLangTranslations.add(key, andLangTranslations.get(key));
-                }
-            });
-            webTranslations.put(lang, webLangTranslations);
-        });
-        
-        saveTranslationsToFile(webTranslations, webPath);
+	    Map<String, JsonObject> webTranslations = getTranslationsFromJSON(webPath);
+	    Map<String, JsonObject> andTranslations = getTranslationsFromXml(andPath);
+	    
+	    JsonObject enWebTranslations = webTranslations.getOrDefault(DEFAULT_LOCALE, new JsonObject());
+	    JsonObject enAndTranslations = andTranslations.getOrDefault(DEFAULT_LOCALE, new JsonObject());
+	    
+	    // Update English translations in web from Android
+	    enAndTranslations.entrySet().forEach(entry -> {
+		    String key = entry.getKey();
+		    JsonElement value = entry.getValue();
+		    if ((key.contains("rendering_attr_") || key.contains("routeInfo_") || key.startsWith("lang_"))
+				    && (!enWebTranslations.has(key) || !enWebTranslations.get(key).equals(value))) {
+			    enWebTranslations.add(key, value);
+		    }
+	    });
+	    webTranslations.put(DEFAULT_LOCALE, enWebTranslations);
+	    
+	    // Update or create other languages based on updated English translations
+	    andTranslations.forEach((lang, andLangTranslations) -> {
+		    JsonObject webLangTranslations = webTranslations.getOrDefault(lang, new JsonObject());
+		    enWebTranslations.keySet().forEach(key -> {
+			    if (andLangTranslations.has(key)) {
+				    JsonElement newValue = andLangTranslations.get(key);
+				    if (!webLangTranslations.has(key) || !webLangTranslations.get(key).equals(newValue)) {
+					    webLangTranslations.add(key, newValue);
+				    }
+			    }
+		    });
+		    webTranslations.put(lang, webLangTranslations);
+	    });
+	    
+	    saveTranslationsToFile(webTranslations, webPath);
     }
     
     /**
@@ -106,11 +107,12 @@ public class GenerateYMLFromAndroidTranslations {
         }
         
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        
+	    List<String> languages = new ArrayList<>();
         translations.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> {
                     String lang = entry.getKey();
+	                languages.add(lang);
                     JsonObject langTranslations = entry.getValue();
                     File langDir = new File(webDir, lang);
                     if (!langDir.mkdirs() && !langDir.isDirectory()) {
@@ -124,6 +126,13 @@ public class GenerateYMLFromAndroidTranslations {
                         throw new RuntimeException("Error writing to file: " + translationFile.getPath(), e);
                     }
                 });
+	    
+	    File langListFile = new File(webDir, "supportedLanguages.json");
+	    try (FileWriter writer = new FileWriter(langListFile)) {
+		    gson.toJson(languages, writer);
+	    } catch (IOException e) {
+		    throw new RuntimeException("Error writing to file: " + langListFile.getPath(), e);
+	    }
     }
     
     /**
