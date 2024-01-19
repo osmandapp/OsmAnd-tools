@@ -298,7 +298,7 @@ public class RoutingController {
 		List<LatLon> list = new ArrayList<>();
 		double lat = 0;
 		int k = 0;
-		boolean hhOnlyForce = false;
+		boolean disableOldRouting = false;
 		LatLon prev = null;
 		for (String point : points) {
 			String[] sl = point.split(",");
@@ -309,7 +309,7 @@ public class RoutingController {
 				} else {
 					LatLon pnt = new LatLon(lat, vl);
 					if (!list.isEmpty()) {
-						hhOnlyForce = hhOnlyForce || MapUtils.getDistance(prev, pnt) > hhOnlyLimit * 1000;
+						disableOldRouting = disableOldRouting || MapUtils.getDistance(prev, pnt) > hhOnlyLimit * 1000;
 					}
 					list.add(pnt);
 					prev = pnt;
@@ -322,7 +322,7 @@ public class RoutingController {
 		if (list.size() >= 2) {
 			try {
 				List<RouteSegmentResult> res =
-						osmAndMapsService.routing(hhOnlyForce, routeMode, props, list.get(0),
+						osmAndMapsService.routing(disableOldRouting, routeMode, props, list.get(0),
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
 								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress);
 				if (res != null) {
@@ -370,11 +370,11 @@ public class RoutingController {
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		boolean hhOnlyForce = MapUtils.getDistance(startPoint, endPoint) > hhOnlyLimit * 1000;
+		boolean disableOldRouting = MapUtils.getDistance(startPoint, endPoint) > hhOnlyLimit * 1000;
 		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		List<WebGpxParser.Point> trackPointsRes =
-				routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, hhOnlyForce, progress);
-		if (trackPointsRes.size() <= 2 && hhOnlyForce) { // report limit error
+				routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, disableOldRouting, progress);
+		if (trackPointsRes.size() <= 2 && disableOldRouting) { // report limit error
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg",
 					MSG_LONG_DIST + hhOnlyLimit + " km.")));
 		} else {
