@@ -24,11 +24,11 @@ function generate_osm {
 	python3 -m ogr2osm $workdir/$tmpdirname/$1.shp -o $workdir/$outosmdirname/us.$2.osm -t $2.py
 }
 
-# if [ ! -f "$workdir/$outosmdirname/$trailsshpfilename.osm" ] ; then
-# 	echo ==============Generating $trailsshpfilename
-# 	generate_osm "$trailsshpfilename" "nfs_trails"
-# fi
-if [ ! -f "$workdir/$outosmdirname/$roadsshpfilename.pbf" ] ; then
+if [ ! -f "$workdir/$outosmdirname/us.nfs_trails.osm" ] ; then
+	echo ==============Generating $trailsshpfilename
+	generate_osm "$trailsshpfilename" "nfs_trails"
+fi
+if [ ! -f "$workdir/$outosmdirname/us.nfs_roads.pbf" ] ; then
 	echo ==============Generating $roadsshpfilename
 	generate_osm "$roadsshpfilename" "nfs_roads"
 	osmconvert $workdir/$outosmdirname/us.nfs_roads.osm --out-pbf > $workdir/$outosmdirname/us.nfs_roads.pbf

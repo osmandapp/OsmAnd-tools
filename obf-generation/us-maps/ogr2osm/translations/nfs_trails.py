@@ -78,7 +78,7 @@ class USFSTrailsTranslation(ogr2osm.TranslationBase):
 
 		if 'TRAIL_NO' in attrs and TRAIL_NO:
 			tags['nfs_trail_number'] = TRAIL_NO
-		if 'TRAIL_NAME' in attrs and TRAIL_NAME:
+		if 'TRAIL_NAME' in attrs and TRAIL_NAME and TRAIL_NAME != 'NO NAME':
 			tags['nfs_trail_name'] = TRAIL_NAME.lower().title().replace("'S ","'s ")
 		if 'TRAIL_TYPE' in attrs and TRAIL_TYPE:
 			tags['nfs_trail_type'] = TRAIL_TYPE.lower()
@@ -113,15 +113,15 @@ class USFSTrailsTranslation(ogr2osm.TranslationBase):
 		if TRAIL_SURFACE == 'WATER':
 			tags.update({'nfs_trail_surface':'water'})
 		if TRAIL_SURFACE == 'F - FIRM':
-			tags.update({'nfs_surface_firmness':'firm'})
+			tags.update({'nfs_trail_surface_firmness':'firm'})
 		if TRAIL_SURFACE == 'H - HARD':
-			tags.update({'nfs_surface_firmness':'hard'})
+			tags.update({'nfs_trail_surface_firmness':'hard'})
 		if TRAIL_SURFACE == 'P - PAVED':
-			tags.update({'nfs_surface_firmness':'paved'})
+			tags.update({'nfs_trail_surface_firmness':'paved'})
 		if TRAIL_SURFACE == 'S - SOFT':
-			tags.update({'nfs_surface_firmness':'soft'})
+			tags.update({'nfs_trail_surface_firmness':'soft'})
 		if TRAIL_SURFACE == 'VS - VERY SOFT':
-			tags.update({'nfs_surface_firmness':'very_soft'})
+			tags.update({'nfs_trail_surface_firmness':'very_soft'})
 		if 'MINIMUM_TR' in attrs and MINIMUM_TRAIL_WIDTH and MINIMUM_TRAIL_WIDTH != 'N/A':
 			tags['nfs_minimum_trail_width'] = MINIMUM_TRAIL_WIDTH.lower()
 		if 'NATIONAL_T' in attrs and NATIONAL_TRAIL_DESIGNATION:

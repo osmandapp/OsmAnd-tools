@@ -21,7 +21,7 @@ class USFSRoadsTranslation(ogr2osm.TranslationBase):
 
 		if 'ID' in attrs and ID:
 			tags['nfs_road_id'] = ID
-		if 'NAME' in attrs and NAME:
+		if 'NAME' in attrs and NAME and NAME != 'NO NAME':
 			tags['nfs_road_name'] = NAME.lower().title().replace("'S ","'s ")
 
 		if 'OPER_MAINT' in attrs:
@@ -79,7 +79,6 @@ class USFSRoadsTranslation(ogr2osm.TranslationBase):
 		if SURFACE_TYPE == 'OTHER':
 			tags.update({'nfs_road_surface':'other'})
 
-
 		if 'LANES' in attrs:
 			if '1' in LANES or LANES == 'SINGLE':
 				tags.update({'lanes':'1'})
@@ -94,11 +93,12 @@ class USFSRoadsTranslation(ogr2osm.TranslationBase):
 			if '6' in LANES:
 				tags.update({'lanes':'6'})
 
-
 		if OPENFORUSETO == 'ADMIN':
 			tags.update({'nfs_road_accessibility_status':'admin'})
 		if OPENFORUSETO == 'ALL' or OPENFORUSETO == 'PUBLIC':
 			tags.update({'nfs_road_accessibility_status':'all'})
+		if OPENFORUSETO == '':
+			tags.update({'nfs_road_accessibility_status':'no_access'})
 
 		if SYMBOL_NAME == 'Dirt Road, Suitable for Passenger Car':
 			tags.update({'nfs_road_symbol_name':'dirt_road_suitable_for_passenger_car'})
