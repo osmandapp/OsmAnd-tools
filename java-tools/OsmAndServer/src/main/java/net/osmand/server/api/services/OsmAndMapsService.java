@@ -693,7 +693,7 @@ public class OsmAndMapsService {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
-			if (incomplete[1]) {
+			if (incomplete[0]) {
 				return Collections.emptyList();
 			}
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -741,7 +741,7 @@ public class OsmAndMapsService {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0);
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
-			if (incomplete[1]) {
+			if (incomplete[0]) {
 				return new ArrayList<RouteSegmentResult>();
 			}
 			RoutingContext ctx = prepareRouterContext(routeMode, quadRect, router, null, null, usedMapList);
