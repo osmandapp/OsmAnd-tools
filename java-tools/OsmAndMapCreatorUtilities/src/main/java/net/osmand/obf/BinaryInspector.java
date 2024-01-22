@@ -19,7 +19,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import com.google.protobuf.CodedOutputStream;
@@ -30,7 +29,9 @@ import gnu.trove.iterator.TLongIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
@@ -56,11 +57,13 @@ import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.MapUtils;
 
@@ -82,16 +85,18 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-//					"-vrouting",
+					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-zoom=15",
+//					"-zoom=5",
 					// road
-//					"-latlon=48.46614,9.16976",
+					"-latlon=50.868332,15.24471",
+					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir")+"World_basemap_mini_2.obf"
+					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
+//					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -137,6 +142,7 @@ public class BinaryInspector {
 		boolean vpoi;
 		boolean vmap;
 		boolean vrouting;
+		boolean vhhrouting;
 		boolean vmapObjects;
 		boolean vmapCoordinates;
 		boolean vstats;
@@ -167,6 +173,10 @@ public class BinaryInspector {
 
 		public boolean isVpoi() {
 			return vpoi;
+		}
+		
+		public boolean isVHHrouting() {
+			return vhhrouting;
 		}
 
 		public boolean isVtransport() {
@@ -199,6 +209,8 @@ public class BinaryInspector {
 					vstats = true;
 				} else if (params[i].equals("-vrouting")) {
 					vrouting = true;
+				} else if (params[i].equals("-vhhrouting")) {
+					vhhrouting = true;
 				} else if (params[i].equals("-vmapobjects")) {
 					vmapObjects = true;
 				} else if (params[i].equals("-vmapcoordinates")) {
@@ -227,6 +239,15 @@ public class BinaryInspector {
 					lattop = latmid + dist;
 					lonright = lonmid + dist;
 					latbottom = latmid - dist;
+				} else if (params[i].startsWith("-xyz=")) {
+					String[] values = params[i].substring("-xyz=".length()).split(",");
+					int tileX = Integer.parseInt(values[0]);
+					int tileY = Integer.parseInt(values[1]);
+					int z = Integer.parseInt(values[2]);
+					lonleft = MapUtils.getLongitudeFromTile(z, tileX);
+					lonright = MapUtils.getLongitudeFromTile(z, tileX + 1);
+					lattop = MapUtils.getLatitudeFromTile(z, tileY);
+					latbottom = MapUtils.getLatitudeFromTile(z, tileY + 1);
 				} else if (params[i].startsWith("-bbox=")) {
 					String[] values = params[i].substring("-bbox=".length()).split(",");
 					lonleft = Double.parseDouble(values[0]);
@@ -473,7 +494,15 @@ public class BinaryInspector {
 			println("Binary OsmAnd index " + fileName + " was not found.");
 			return;
 		}
-		printFileInformation(file);
+		if (file.isDirectory()) {
+			for(File f : file.listFiles()) {
+				if(f.getName().endsWith(".obf")) {
+					printFileInformation(f);		
+				}
+			}
+		} else {
+			printFileInformation(file);
+		}
 	}
 
 	public void printFileInformation(File file) throws IOException {
@@ -485,23 +514,13 @@ public class BinaryInspector {
 		String filename = file.getName();
 		try {
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			String owner = index.getOwner() != null ? "\n" + index.getOwner().toString() : "";
 			int i = 1;
-			println("Binary index " + filename + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()));
+			println("Binary index " + filename + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()) + owner);
 			for (BinaryIndexPart p : index.getIndexes()) {
-				String partname = "";
-				if (p instanceof MapIndex) {
-					partname = "Map";
-				} else if (p instanceof TransportIndex) {
-					partname = "Transport";
-				} else if (p instanceof RouteRegion) {
-					partname = "Routing";
-				} else if (p instanceof PoiRegion) {
-					partname = "Poi";
-				} else if (p instanceof AddressRegion) {
-					partname = "Address";
-				}
+				String partname = p.getPartName();
 				String name = p.getName() == null ? "" : p.getName();
-				println(MessageFormat.format("{0} {1} data {3} - {2,number,#} bytes",
+				println(MessageFormat.format("{0} {1} data {3} - {2,number,#,###} bytes",
 						new Object[]{i, partname, p.getLength(), name}));
 				if(p instanceof TransportIndex){
 					TransportIndex ti = ((TransportIndex) p);
@@ -510,6 +529,19 @@ public class BinaryInspector {
 							ti.getTop() << sh, ti.getBottom() << sh));
 					if ((vInfo != null && vInfo.isVtransport())) {
 						printTransportDetailInfo(vInfo, index, (TransportIndex) p);
+					}
+				} else if (p instanceof HHRouteRegion) {
+					HHRouteRegion ri = ((HHRouteRegion) p);
+					QuadRect rt = ri.getLatLonBbox();
+					println(String.format("\tBounds %s profile '%s' %s edition = %s", formatLatBounds(rt.left, rt.right,
+							rt.top, rt.bottom), ri.profile, ri.profileParams, new Date(ri.edition)));
+					if ((vInfo != null && vInfo.isVHHrouting())) {
+						TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(ri, (short) 0, NetworkDBPoint.class);
+						for (NetworkDBPoint pnt : pnts.valueCollection()) {
+							System.out.println(String.format("\t\t %s - cluster %d (duap point %d, %d) - %d,%d -> %d,%d", pnt,
+									pnt.clusterId, pnt.dualPoint == null ? 0 : pnt.dualPoint.index,
+									pnt.dualPoint == null ? 0 : pnt.dualPoint.clusterId, pnt.startX, pnt.startY, pnt.endX, pnt.endY));
+						}
 					}
 				} else if (p instanceof RouteRegion) {
 					RouteRegion ri = ((RouteRegion) p);
@@ -524,7 +556,7 @@ public class BinaryInspector {
 					int j = 1;
 					
 					for (MapRoot mi : m.getRoots()) {
-						println(MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2,number,#} bytes \n\t\tBounds {3}",
+						println(MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2,number,#,###} bytes \n\t\tBounds {3}",
 								new Object[] {
 								mi.getMinZoom(), mi.getMaxZoom(), mi.getLength(), 
 								formatBounds(mi.getLeft(), mi.getRight(), mi.getTop(), mi.getBottom()), 
@@ -632,6 +664,7 @@ public class BinaryInspector {
 			@Override
 			public boolean publish(RouteDataObject obj) {
 				mapObjectsCounter.value++;
+				mapObjectsCounter.pntValue += obj.getPointsLength();
 				if (vInfo.osm) {
 					b.setLength(0);
 					printOsmRouteDetails(obj, b);
@@ -721,7 +754,7 @@ public class BinaryInspector {
 				return false;
 			}
 		});
-		println("\tTotal map objects: " + mapObjectsCounter.value);
+		println("\tTotal map objects: " + mapObjectsCounter.value + " points " + mapObjectsCounter.pntValue);
 		if (vInfo.osm) {
 			printToFile("</osm >\n");
 		}
@@ -799,6 +832,7 @@ public class BinaryInspector {
 
 	private static class DamnCounter {
 		int value;
+		int pntValue;
 	}
 
 	private static class MapStatKey {
@@ -968,6 +1002,7 @@ public class BinaryInspector {
 					@Override
 					public boolean publish(BinaryMapDataObject obj) {
 						mapObjectsCounter.value++;
+						mapObjectsCounter.pntValue += obj.getPointsLength();
 						if (vInfo.isVStats()) {
 							mapObjectStats.process(obj);
 						} else if (vInfo.vmapObjects) {
@@ -1368,32 +1403,17 @@ public class BinaryInspector {
 				MapUtils.get31TileNumberY(verbose.latbottom),
 				verbose.getZoom(),
 				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
-				new ResultMatcher<Amenity>() {
+				new ResultMatcher<>() {
 					@Override
-					public boolean publish(Amenity object) {
-						StringBuilder s = new StringBuilder();
-						printNames(" ", object.getInternalAdditionalInfoMap(), s);
-						printNames(" name:", object.getNamesMap(true), s);
-						
-						long id = (object.getId() );
+					public boolean publish(Amenity amenity) {
+						String s = String.valueOf(amenity.printNamesAndAdditional());
+						long id = (amenity.getId());
 						if(id > 0) {
 							id = id >> 1;
 						}
-						println(object.getType().getKeyName() + ": " + object.getSubType() + " " + object.getName() +
-								" " + object.getLocation() + " osmid=" + id + " " + s);
+						println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
+								" " + amenity.getLocation() + " osmid=" + id + " " + s);
 						return false;
-					}
-
-					private void printNames(String prefix, Map<String, String> mp, StringBuilder s) {
-						Iterator<Entry<String, String>> it = mp.entrySet().iterator();
-						while (it.hasNext()) {
-							Entry<String, String> e = it.next();
-							if (e.getValue().startsWith(" gz ")) {
-								s.append(prefix + e.getKey() + "='gzip ...'");
-							} else {
-								s.append(prefix + e.getKey() + "='" + e.getValue() + "'");
-							}
-						}
 					}
 
 					@Override

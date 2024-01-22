@@ -1,6 +1,7 @@
 package net.osmand.swing;
 
 
+
 import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
 import java.awt.Color;
@@ -22,8 +23,10 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.sql.Connection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -50,7 +53,6 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -61,12 +63,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.stream.JsonReader;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.GPXUtilities.Track;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.Location;
 import net.osmand.LocationsHolder;
 import net.osmand.PlatformUtil;
@@ -76,12 +73,25 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.QuadTree;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.Track;
+import net.osmand.gpx.GPXUtilities.TrkSegment;
+import net.osmand.gpx.GPXUtilities.WptPt;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
+import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
+import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
+import net.osmand.router.GeneralRouter;
+import net.osmand.router.HHRoutePlanner;
+import net.osmand.router.HHRoutingDB;
+import net.osmand.router.HHRoutingUtilities;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.router.RouteExporter;
@@ -89,6 +99,7 @@ import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
@@ -106,8 +117,8 @@ public class MapRouterLayer implements MapPanelLayer {
 	private static boolean TEST_INTERMEDIATE_POINTS = false;
 
 	private MapPanel map;
-	private LatLon startRoute ;
-	private LatLon endRoute ;
+	private LatLon startRoute;
+	private LatLon endRoute;
 	private List<LatLon> intermediates = new ArrayList<LatLon>();
 	private boolean nextAvailable = true;
 	private boolean pause = true;
@@ -118,6 +129,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton stopButton;
 	private GPXFile selectedGPXFile;
 	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
+	
 
 	private List<RouteSegmentResult> previousRoute;
 	public ActionListener setStartActionListener = new ActionListener(){
@@ -134,6 +146,11 @@ public class MapRouterLayer implements MapPanelLayer {
 		}
 	};
 	private boolean gpx = false;
+
+
+	private File getHHFile(String profile) {
+		return new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "Maps_" + profile + ".hhdb");
+	}
 
 
 	@Override
@@ -156,8 +173,8 @@ public class MapRouterLayer implements MapPanelLayer {
 	@Override
 	public void initLayer(MapPanel map) {
 		this.map = map;
-		startRoute =  DataExtractionSettings.getSettings().getStartLocation();
-		endRoute =  DataExtractionSettings.getSettings().getEndLocation();
+		startRoute = DataExtractionSettings.getSettings().getStartLocation();
+		endRoute = DataExtractionSettings.getSettings().getEndLocation();
 
 		nextTurn = new JButton(">>"); //$NON-NLS-1$
 		nextTurn.addActionListener(new ActionListener(){
@@ -277,40 +294,52 @@ public class MapRouterLayer implements MapPanelLayer {
 		menu.add(points);
 		final JMenu directions = new JMenu("Directions"); //$NON-NLS-1$
 		menu.add(directions);
-		Action complexRoute = new AbstractAction("Build route (OsmAnd standard|COMPLEX)") {
+		Action complexRoute = new AbstractAction("Build route (OsmAnd 2-phase|COMPLEX)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(RouteCalculationMode.COMPLEX);
+				calcRoute(RouteCalculationMode.COMPLEX, false);
 			}
 		};
 		directions.add(complexRoute);
 
 
-		Action selfRoute = new AbstractAction("Build route (OsmAnd short|NORMAL)") {
+		Action selfRoute = new AbstractAction("Build route (OsmAnd slow+precise|NORMAL)") {
 			private static final long serialVersionUID = 507156107455281238L;
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(RouteCalculationMode.NORMAL);
+				calcRoute(RouteCalculationMode.NORMAL, false);
 			}
 		};
 		directions.add(selfRoute);
 
-		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd long|BASE)") {
+		Action selfBaseRoute = new AbstractAction("Build route (OsmAnd fast+long|BASE)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				previousRoute = null;
-				calcRoute(RouteCalculationMode.BASE);
+				calcRoute(RouteCalculationMode.BASE, false);
 			}
 		};
 		directions.add(selfBaseRoute);
+		
+		Action selfHHRoute = new AbstractAction("Build HH route (only)") {
+			private static final long serialVersionUID = 8049785829806139142L;
 
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				previousRoute = null;
+				calcRoute(RouteCalculationMode.NORMAL, true);
+			}
+		};
+		directions.add(selfHHRoute);
+		
+		
 		if (selectedGPXFile != null) {
 			Action recalculate = new AbstractAction("Calculate GPX route (OsmAnd)") {
 				private static final long serialVersionUID = 507156107455281238L;
@@ -339,33 +368,12 @@ public class MapRouterLayer implements MapPanelLayer {
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					calcRoute(RouteCalculationMode.NORMAL);
+					calcRoute(RouteCalculationMode.NORMAL, false);
 				}
 			};
 			directions.add(recalculate);
 		}
 
-		Action route_YOURS = new AbstractAction("Build route (YOURS)") {
-			private static final long serialVersionUID = 507156107455281238L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				new Thread(){
-					@Override
-					public void run() {
-						List<Way> ways = route_YOURS(startRoute, endRoute);
-						DataTileManager<Entity> points = new DataTileManager<Entity>(11);
-						for(Way w : ways){
-							LatLon n = w.getLatLon();
-							points.registerObject(n.getLatitude(), n.getLongitude(), w);
-						}
-						map.setPoints(points);
-						map.fillPopupActions();
-					}
-				}.start();
-			}
-		};
-		directions.add(route_YOURS);
 		Action straightRoute = new AbstractAction("Build straight route ") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
@@ -464,7 +472,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						}
 					}
 					String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
-					RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null);
+					RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null, null);
 					GPXFile gpxFile = exporter.exportRoute();
 					JFileChooser fileChooser = new JFileChooser(
 							DataExtractionSettings.getSettings().getDefaultWorkingDir());
@@ -490,9 +498,10 @@ public class MapRouterLayer implements MapPanelLayer {
 					// @Override
 					// public void run() {
 					JFileChooser fileChooser = new JFileChooser(
-							DataExtractionSettings.getSettings().getDefaultWorkingDir());
+							DataExtractionSettings.getSettings().getLastUsedDir());
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
+						DataExtractionSettings.getSettings().setLastUsedDir(file.getParent());
 						selectedGPXFile = GPXUtilities.loadGPXFile(file);
 						displayGpxFiles();
 						map.fillPopupActions();
@@ -590,12 +599,12 @@ public class MapRouterLayer implements MapPanelLayer {
 		msg.append(String.format("Track: distance %.1f, distance no gaps %.1f, tracks %d, points %d\n", analysis.totalDistance,
 				analysis.totalDistanceWithoutGaps, analysis.totalTracks, analysis.wptPoints));
 		
-		if (analysis.hasElevationData) {
+		if (analysis.hasElevationData()) {
 			msg.append(String.format("Ele: min - %.1f, max - %.1f, avg - %.1f, uphill - %.1f, downhill - %.1f\n",
 					analysis.minElevation, analysis.maxElevation, analysis.avgElevation, analysis.diffElevationUp,
 					analysis.diffElevationDown));
 		}
-		if (analysis.hasSpeedData) {
+		if (analysis.hasSpeedData()) {
 			msg.append(String.format("Speed: min - %.1f, max - %.1f, avg - %.1f, dist+speed - %.1f, dist+speed no gaps - %.1f\n",
 					analysis.minSpeed, analysis.maxSpeed, analysis.avgSpeed,
 					analysis.totalDistanceMoving,analysis.totalDistanceMovingWithoutGaps));
@@ -770,7 +779,8 @@ public class MapRouterLayer implements MapPanelLayer {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null, RouteCalculationMode.NORMAL);
+				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null,
+						new RoutePlannerFrontEnd(), RouteCalculationMode.NORMAL);
 				if (entities != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Entity w : entities) {
@@ -790,11 +800,21 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 
-	private void calcRoute(final RouteCalculationMode m) {
+	private void calcRoute(final RouteCalculationMode m, boolean hh) {
 		new Thread() {
 			@Override
 			public void run() {
-				List<Entity> res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, m);
+				map.setPoints(new DataTileManager<Entity>(11));
+				Collection<Entity> res;
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+				if(hh) {
+//					res = hhRoute(startRoute, endRoute); // to test DB
+					router.setUseOnlyHHRouting(true).setHHRoutingConfig(HHRoutePlanner.prepareDefaultRoutingConfig(null));
+					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router,  m);
+				} else {
+					router.setUseOnlyHHRouting(false).setHHRoutingConfig(null);
+					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router, m);
+				}
 				if (res != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Entity w : res) {
@@ -805,77 +825,10 @@ public class MapRouterLayer implements MapPanelLayer {
 					map.fillPopupActions();
 				}
 			}
+
 		}.start();
 	}
 
-	public static List<Way> route_YOURS(LatLon start, LatLon end){
-		List<Way> res = new ArrayList<Way>();
-		long time = System.currentTimeMillis();
-		System.out.println("Route from " + start + " to " + end);
-		if (start != null && end != null) {
-			try {
-				StringBuilder uri = new StringBuilder();
-				uri.append("http://www.yournavigation.org/api/1.0/gosmore.php?format=kml");
-				uri.append("&flat=").append(start.getLatitude());
-				uri.append("&flon=").append(start.getLongitude());
-				uri.append("&tlat=").append(end.getLatitude());
-				uri.append("&tlon=").append(end.getLongitude());
-				uri.append("&v=motorcar").append("&fast=1").append("&layer=mapnik");
-
-				URL url = new URL(uri.toString());
-				URLConnection connection = url.openConnection();
-				StringBuilder content = new StringBuilder();
-				BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-				{
-					String s = null;
-					boolean fist = true;
-					while ((s = reader.readLine()) != null) {
-						if (fist) {
-							fist = false;
-						}
-						content.append(s).append("\n");
-					}
-					System.out.println(content);
-				}
-				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-				DocumentBuilder dom = factory.newDocumentBuilder();
-				Document doc = dom.parse(new InputSource(new StringReader(content.toString())));
-				NodeList list = doc.getElementsByTagName("coordinates");
-				for(int i=0; i<list.getLength(); i++){
-					Node item = list.item(i);
-					String str = item.getTextContent();
-					int st = 0;
-					int next = 0;
-					Way w = new Way(-1);
-					while((next = str.indexOf('\n', st)) != -1){
-						String coordinate = str.substring(st, next + 1);
-						int s = coordinate.indexOf(',');
-						if (s != -1) {
-							try {
-								double lon = Double.parseDouble(coordinate.substring(0, s));
-								double lat = Double.parseDouble(coordinate.substring(s + 1));
-								w.addNode(new net.osmand.osm.edit.Node(lat, lon, -1));
-							} catch (NumberFormatException e) {
-							}
-						}
-						st = next + 1;
-					}
-					if(!w.getNodes().isEmpty()){
-						res.add(w);
-					}
-
-				}
-			} catch (IOException e) {
-				ExceptionHandler.handle(e);
-			} catch (ParserConfigurationException e) {
-				ExceptionHandler.handle(e);
-			} catch (SAXException e) {
-				ExceptionHandler.handle(e);
-			}
-			System.out.println("Finding routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
-		}
-		return res;
-	}
 
 	private static Reader getUTF8Reader(InputStream f) throws IOException {
 		BufferedInputStream bis = new BufferedInputStream(f);
@@ -937,80 +890,6 @@ public class MapRouterLayer implements MapPanelLayer {
 
 
 
-	public List<Way> route_CloudMate(LatLon start, LatLon end) {
-		List<Way> res = new ArrayList<Way>();
-		long time = System.currentTimeMillis();
-		System.out.println("Cloud made route from " + start + " to " + end);
-		if (start != null && end != null) {
-			try {
-				StringBuilder uri = new StringBuilder();
-				// possibly hide that API key because it is privacy of osmand
-				uri.append("http://routes.cloudmade.com/A6421860EBB04234AB5EF2D049F2CD8F/api/0.3/");
-
-				uri.append(String.valueOf(start.getLatitude())).append(",");
-				uri.append(String.valueOf(start.getLongitude())).append(",");
-				uri.append(String.valueOf(end.getLatitude())).append(",");
-				uri.append(String.valueOf(end.getLongitude())).append("/");
-				uri.append("car.gpx").append("?lang=ru");
-
-				URL url = new URL(uri.toString());
-				URLConnection connection = url.openConnection();
-				StringBuilder content = new StringBuilder();
-				BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-				{
-					String s = null;
-					boolean fist = true;
-					while ((s = reader.readLine()) != null) {
-						if (fist) {
-							fist = false;
-						}
-						content.append(s).append("\n");
-					}
-					System.out.println(content);
-				}
-				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-				DocumentBuilder dom = factory.newDocumentBuilder();
-				Document doc = dom.parse(new InputSource(new StringReader(content.toString())));
-				NodeList list = doc.getElementsByTagName("wpt");
-				Way w = new Way(-1);
-				for (int i = 0; i < list.getLength(); i++) {
-					Element item = (Element) list.item(i);
-					try {
-						double lon = Double.parseDouble(item.getAttribute("lon"));
-						double lat = Double.parseDouble(item.getAttribute("lat"));
-						w.addNode(new net.osmand.osm.edit.Node(lat, lon, -1));
-					} catch (NumberFormatException e) {
-					}
-				}
-				list = doc.getElementsByTagName("rtept");
-				for (int i = 0; i < list.getLength(); i++) {
-					Element item = (Element) list.item(i);
-					try {
-						double lon = Double.parseDouble(item.getAttribute("lon"));
-						double lat = Double.parseDouble(item.getAttribute("lat"));
-						System.out.println("Lat " + lat + " lon " + lon);
-						System.out.println("Distance : " + item.getElementsByTagName("distance").item(0).getTextContent());
-						System.out.println("Time : " + item.getElementsByTagName("time").item(0).getTextContent());
-						System.out.println("Offset : " + item.getElementsByTagName("offset").item(0).getTextContent());
-						System.out.println("Direction : " + item.getElementsByTagName("direction").item(0).getTextContent());
-					} catch (NumberFormatException e) {
-					}
-				}
-
-				if (!w.getNodes().isEmpty()) {
-					res.add(w);
-				}
-			} catch (IOException e) {
-				ExceptionHandler.handle(e);
-			} catch (ParserConfigurationException e) {
-				ExceptionHandler.handle(e);
-			} catch (SAXException e) {
-				ExceptionHandler.handle(e);
-			}
-			System.out.println("Finding cloudmade routes " + res.size() + " " + (System.currentTimeMillis() - time) + " ms");
-		}
-		return res;
-	}
 
 	private static Double[] decodeGooglePolylinesFlow(String encodedData) {
         final List<Double> decodedValues = new ArrayList<Double>();
@@ -1095,10 +974,76 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 
+	
+	protected Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute) {
+		// specialize testing
+		try {
+			String profile = DataExtractionSettings.getSettings().getRouteMode();
+			if(profile.indexOf(',') != -1) {
+				profile = profile.substring(0, profile.indexOf(',')).trim();
+			}
+			HHRoutePlanner<?> hhRoutePlanner ;
+//			hhRoutePlanner = hhPlanners.get(profile);
+//			if (hhRoutePlanner == null) {
+				File hhFile = getHHFile(profile);
+				BinaryMapIndexReader[] readers = DataExtractionSettings.getSettings().getObfReaders();
+				final RoutingContext ctx = prepareRoutingContext(null, DataExtractionSettings.getSettings().getRouteMode(), 
+						RouteCalculationMode.NORMAL, readers, new RoutePlannerFrontEnd());
+				if (hhFile.exists()) {
+					Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
+					hhRoutePlanner = HHRoutePlanner.createDB(ctx, new HHRoutingDB(hhFile, conn));
+				} else {
+					hhRoutePlanner = HHRoutePlanner.create(ctx);
+				}
+//				hhPlanners.put(profile, hhRoutePlanner);
+//			}
+
+			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
+			List<Entity> lst = new ArrayList<Entity>();
+			if (route.getError() != null) {
+				JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), route.getError(), "Routing error",
+						JOptionPane.ERROR_MESSAGE);
+				System.err.println(route.getError());
+			}
+			if (!route.getList().isEmpty()) {
+				calculateResult(lst, route.getList());
+			} else {
+				TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+				for (HHNetworkSegmentRes r : route.segments) {
+					if (r.list != null) {
+						for (RouteSegmentResult rs : r.list) {
+							HHRoutingUtilities.addWay(entities, rs, "highway", "secondary");
+						}
+					} else if (r.segment != null) {
+						HHRoutingUtilities.addWay(entities, r.segment, "highway", "primary");
+					}
+				}
+				lst.addAll(entities.valueCollection());
+			}
+			for (HHNetworkRouteRes altRoute : route.altRoutes) {
+				TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+				for (HHNetworkSegmentRes r : altRoute.segments) {
+					if (r.list != null) {
+						for (RouteSegmentResult rs : r.list) {
+							HHRoutingUtilities.addWay(entities, rs, "highway", "tertiary");
+						}
+					} else if (r.segment != null) {
+						HHRoutingUtilities.addWay(entities, r.segment, "highway", "tertiary");
+					}
+				}
+				lst.addAll(entities.valueCollection());
+			}
+
+			return lst;
+		} catch (Exception e) {
+			ExceptionHandler.handle(e);
+			return new ArrayList<>();
+		}
+	}
 
 
 	public List<Entity> selfRoute(LatLon start, LatLon end, List<LatLon> intermediates,
-			boolean gpx, List<RouteSegmentResult> previousRoute, RouteCalculationMode rm) {
+			boolean gpx, List<RouteSegmentResult> previousRoute, RoutePlannerFrontEnd router, RouteCalculationMode rm) {
 		this.gpx = gpx;
 		List<Entity> res = new ArrayList<Entity>();
 		long time = System.currentTimeMillis();
@@ -1123,24 +1068,6 @@ public class MapRouterLayer implements MapPanelLayer {
 							"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
 					return null;
 				}
-				String m = DataExtractionSettings.getSettings().getRouteMode();
-				String[] props = m.split("\\,");
-				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-
-				Map<String, String> paramsR = new LinkedHashMap<String, String>();
-				for (String p : props) {
-					if (p.contains("=")) {
-						paramsR.put(p.split("=")[0], p.split("=")[1]);
-					} else {
-						paramsR.put(p, "true");
-					}
-				}
-				RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(2000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
-				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().
-				// addImpassableRoad(6859437l).
-				// addImpassableRoad(46859655089l).
-						setDirectionPoints(directionPointsFile)
-						.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 				// LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
@@ -1149,30 +1076,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				// System.out.println("Start " + start + " end " + end);
 				// precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
 				// precalculatedRouteDirection.setFollowNext(true);
-				// config.planRoadDirection = 1;
-				// Test initial direction
-				// config.initialDirection = 90d / 180d * Math.PI; // EAST
-				// config.initialDirection = 180d / 180d * Math.PI; // SOUTH
-				// config.initialDirection = -90d / 180d * Math.PI; // WEST
-				// config.initialDirection = 0 / 180d * Math.PI; // NORTH
-				// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
-				// config.ZOOM_TO_LOAD_TILES = 14;
-				try {
-					config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
-							.parse("19.07.2019 12:40").getTime();
-				} catch (Exception e) {
-				}
-				config.routeCalculationTime = System.currentTimeMillis();
-
-				final RoutingContext ctx = router.buildRoutingContext(config,
-						DataExtractionSettings.getSettings().useNativeRouting()
-								? NativeSwingRendering.getDefaultFromSettings()
-								: null,
-						files, rm);
-
-				ctx.leftSideNavigation = false;
-				ctx.previouslyCalculatedRoute = previousRoute;
-				log.info("Use " + config.routerName + " mode for routing");
+				
+				final RoutingContext ctx = prepareRoutingContext(previousRoute, DataExtractionSettings.getSettings().getRouteMode(), rm, files, router);
 				final DataTileManager<Entity> points = map.getPoints();
 				map.setPoints(points);
 				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
@@ -1182,9 +1087,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				try {
 					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
-					List<RouteSegmentResult> searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
+					RouteCalcResult searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
 							: router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-					throwExceptionIfRouteNotFound(ctx, searchRoute);
+					throwExceptionIfRouteNotFound(ctx, searchRoute.getList());
 					System.out.println("Routing time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
 						playPauseButton.setVisible(false);
@@ -1192,8 +1097,8 @@ public class MapRouterLayer implements MapPanelLayer {
 						waitNextPress();
 						nextTurn.setText(">>");
 					}
-					this.previousRoute = searchRoute;
-					calculateResult(res, searchRoute);
+					this.previousRoute = searchRoute.getList();
+					calculateResult(res, searchRoute.getList());
 				} finally {
 					if (ctx.calculationProgress != null) {
 						ctx.calculationProgress.isCancelled = true;
@@ -1215,17 +1120,71 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 
-	private List<RouteSegmentResult> getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
+	private RoutingContext prepareRoutingContext(List<RouteSegmentResult> previousRoute, String routeMode, RouteCalculationMode rm,
+			BinaryMapIndexReader[] files, RoutePlannerFrontEnd router) throws IOException {
+		String[] props = routeMode.split("\\,");
+
+		Map<String, String> paramsR = new LinkedHashMap<String, String>();
+		for (String p : props) {
+			if (p.contains("=")) {
+				paramsR.put(p.split("=")[0], p.split("=")[1]);
+			} else {
+				paramsR.put(p, "true");
+			}
+		}
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(2000, DEFAULT_NATIVE_MEMORY_LIMIT * 10);
+		GeneralRouter.IMPASSABLE_ROAD_SHIFT = 6;
+		RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().setDirectionPoints(directionPointsFile)
+//				.addImpassableRoad(70088213l)
+//				.addImpassableRoad(896092207l)
+				.build(props[0], /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
+
+		// config.planRoadDirection = 1;
+		// Test initial direction
+		// config.initialDirection = 90d / 180d * Math.PI; // EAST
+		// config.initialDirection = 180d / 180d * Math.PI; // SOUTH
+		// config.initialDirection = -90d / 180d * Math.PI; // WEST
+		// config.initialDirection = 0 / 180d * Math.PI; // NORTH
+		// config.NUMBER_OF_DESIRABLE_TILES_IN_MEMORY = 300;
+		// config.ZOOM_TO_LOAD_TILES = 14;
+//		config.initialDirection = 30 / 180.0 * Math.PI;
+		try {
+			config.minPointApproximation = RoutingConfiguration.parseSilentFloat(
+					paramsR.get("minPointApproximation"), config.minPointApproximation);
+		} catch (NumberFormatException e){
+			e.printStackTrace();
+		}
+//		try {
+//			config.routeCalculationTime = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US)
+//					.parse("19.07.2019 12:40").getTime();
+//		} catch (Exception e) {
+//		}
+//		config.routeCalculationTime = System.currentTimeMillis();
+
+		final RoutingContext ctx = router.buildRoutingContext(config,
+				DataExtractionSettings.getSettings().useNativeRouting()
+						? NativeSwingRendering.getDefaultFromSettings()
+						: null,
+				files, rm);
+
+		ctx.leftSideNavigation = false;
+		ctx.previouslyCalculatedRoute = previousRoute;
+		log.info("Use " + config.routerName + " mode for routing");
+		return ctx;
+	}
+
+	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
 			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
 		if (TEST_INTERMEDIATE_POINTS) {
-			return r.result;
+			return new RouteCalcResult(r.result);
 		}
 		List<RouteSegmentResult> rsr = new ArrayList<RouteSegmentResult>();
 		for (GpxPoint pnt : r.finalPoints) {
 			rsr.addAll(pnt.routeToTarget);
 		}
-		return rsr;
+		
+		return new RouteCalcResult(rsr);
 	}
 
 	private void throwExceptionIfRouteNotFound(final RoutingContext ctx, List<RouteSegmentResult> searchRoute) {
@@ -1279,7 +1238,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
 			Way way = new Way(-1);
 //					String name = String.format("time %.2f ", s.getSegmentTime());
-			String name = segm.getDescription();
+			String name = segm.getDescription(false);
 			if(segm.getTurnType() != null) {
 				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
 			}

@@ -23,11 +23,11 @@ generate_tiles() {
     local BANDS_NAMES=()
     local BANDS_DESCRIPTIONS=()
     if [[ $MODE =~ "$GFS" ]]; then
-        BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")  
-        BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")  
+        BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")
+        BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")
     elif [[ $MODE =~ "$ECMWF" ]]; then
-        BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")  
-        BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")  
+        BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")
+        BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")
     fi
 
     rm *.O.tiff || true
@@ -36,13 +36,14 @@ generate_tiles() {
         local FILE_NAME=$WFILE
         local TIMESTAMP_NOW=0
         local TIMESTAMP_FILE_FORECAST_DATE=0
+	gdalinfo $WFILE | grep STATISTICS_MAXIMUM
         if [[ $OS =~ "Darwin" ]]; then
             FILE_NAME="${FILE_NAME//".tiff"}"
-            FILE_NAME="${FILE_NAME//"tiff"}"  
+            FILE_NAME="${FILE_NAME//"tiff"}"
             FILE_NAME="${FILE_NAME:1}"
 
-            TIMESTAMP_NOW=$(date "+%s")
-            TIMESTAMP_FILE_FORECAST_DATE=$(date -jf "%Y%m%d_%H00" "${FILE_NAME}" "+%s")
+            TIMESTAMP_NOW=$(TZ=GMT date "+%s")
+            TIMESTAMP_FILE_FORECAST_DATE=$(TZ=GMT date -jf "%Y%m%d_%H00" "${FILE_NAME}" "+%s")
             
         else
             FILE_NAME="${FILE_NAME//"tiff/"}"
@@ -50,11 +51,11 @@ generate_tiles() {
 
             local DATE_PART=${FILE_NAME:0:8}
             local HOURS_PART=${FILE_NAME:9:2}
-            TIMESTAMP_NOW=$(date +%s)
-            TIMESTAMP_FILE_FORECAST_DATE=$(date -d "${DATE_PART} ${HOURS_PART}00" '+%s')
+            TIMESTAMP_NOW=$(TZ=GMT date +%s)
+            TIMESTAMP_FILE_FORECAST_DATE=$(TZ=GMT date -d "${DATE_PART} ${HOURS_PART}00" '+%s')
         fi
 
-        # Don't run script for outdatet yesterday's files
+        # Don't run script for outdated yesterday's files
         local DAYS_DIFFERECE=$(( ($TIMESTAMP_NOW - $TIMESTAMP_FILE_FORECAST_DATE) / (24 * 3600) ))
         if [[ $DAYS_DIFFERECE -ge 1 ]]; then
             echo "Skip"

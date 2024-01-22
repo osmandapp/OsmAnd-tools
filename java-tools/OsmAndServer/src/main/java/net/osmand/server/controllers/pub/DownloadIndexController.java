@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
@@ -31,8 +33,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import net.osmand.server.api.services.DownloadIndexesService;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 @Controller
 public class DownloadIndexController {
@@ -164,47 +167,25 @@ public class DownloadIndexController {
 
 	private Resource findFileResource(MultiValueMap<String, String> params) throws FileNotFoundException {
 		String filename = getFileOrThrow(params);
-		if (params.containsKey("srtm")) {
-			return getFileAsResource("srtm", filename);
-		}
-		if (params.containsKey("srtmcountry")) {
-			return getFileAsResource("srtm-countries", filename);
-		}
-		if (params.containsKey("road")) {
-			return getFileAsResource("road-indexes", filename);
-		}
 		if (params.containsKey("aosmc") || params.containsKey("osmc")) {
 			String folder = filename.substring(0, filename.length() - DATE_AND_EXT_STR_LEN).toLowerCase();
 			return getFileAsResource("aosmc" + File.separator + folder, filename);
 		}
-		if (params.containsKey("wiki")) {
-			return getFileAsResource("wiki", filename);
+//		if (params.containsKey("inapp")) {
+//			String type = params.getFirst("inapp");
+//			return getFileAsResource("indexes/inapp/"+type, filename);
+//		}
+		
+		for (DownloadType type : DownloadType.values()) {
+			for (String httpParam : type.getHeaders()) {
+				if (isContainAndEqual(httpParam, params)) {
+					return getFileAsResource(type.getPath(), filename);
+				}
+			}
 		}
-		if (params.containsKey("hillshade")) {
-			return getFileAsResource("hillshade", filename);
-		}
-		if (params.containsKey("slope")) {
-			return getFileAsResource("slope", filename);
-		}
-		if (params.containsKey("heightmap")) {
-			return getFileAsResource("heightmap", filename);
-		}
-		if (params.containsKey("depth")) {
-			return getFileAsResource("depth", filename);
-		}
-		if (params.containsKey("inapp")) {
-			String type = params.getFirst("inapp");
-			return getFileAsResource("indexes/inapp/"+type, filename);
-		}
-		if (params.containsKey("wikivoyage")) {
-			return getFileAsResource("wikivoyage", filename);
-		}
-		if (params.containsKey("fonts")) {
-			return getFileAsResource("indexes/fonts", filename);
-		}
-		Resource res = getFileAsResource("indexes", filename);
+		Resource res = getFileAsResource(DownloadType.MAP.getPath(), filename);
 		if (res.exists()) {
-			return getFileAsResource("indexes", filename);
+			return getFileAsResource(DownloadType.MAP.getPath(), filename);
 		}
 		String msg = "Requested resource is missing or request is incorrect.\nRequest parameters: " + params;
 		LOGGER.error(msg);
@@ -227,11 +208,16 @@ public class DownloadIndexController {
 							  @RequestHeader HttpHeaders headers,
 							  HttpServletRequest req,
 							  HttpServletResponse resp) throws IOException {
-		DownloadProperties servers = downloadService.getSettings();
+		DownloadServerLoadBalancer servers = downloadService.getSettings();
 		InetSocketAddress inetHost = headers.getHost();
 		if (inetHost == null) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
 			return;
+		}
+		String remoteAddr = req.getRemoteAddr();
+		Enumeration<String> hs = req.getHeaders("X-Forwarded-For");
+		if (hs != null && hs.hasMoreElements()) {
+			remoteAddr = hs.nextElement();
 		}
 		boolean self = isContainAndEqual("self", "true", params) ;
 		String proto = headers.getFirst("X-Forwarded-Proto");
@@ -247,18 +233,22 @@ public class DownloadIndexController {
 				}
 			}
 			String host = null;
+			boolean headerFound = false;
 			for (DownloadServerSpecialty dss : DownloadServerSpecialty.values()) {
-				for (String httpParam : dss.httpParams) {
-					if (isContainAndEqual(httpParam, params)) {
-						host = servers.getServer(dss);
-						if (host != null) {
-							break;
+				for (DownloadType type : dss.types) {
+					for (String httpParam : type.getHeaders()) {
+						if (isContainAndEqual(httpParam, params)) {
+							headerFound = true;
+							host = servers.getServer(dss, remoteAddr);
+							if (host != null) {
+								break;
+							}
 						}
 					}
 				}
 			}
-			if (host == null) {
-				host = servers.getServer(DownloadServerSpecialty.MAIN);
+			if (host == null && !headerFound) {
+				host = servers.getServer(DownloadServerSpecialty.MAIN, remoteAddr);
 			}
 			if (host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);
@@ -276,14 +266,15 @@ public class DownloadIndexController {
 	@RequestMapping(value = {"/download.php", "/download"}, method = RequestMethod.HEAD)
 	public void checkRangeRequests(@RequestParam MultiValueMap<String, String> params, HttpServletResponse resp)
 			throws IOException {
-		try {
-			Resource resource = findFileResource(params);
+		String filename = getFileOrThrow(params);
+		Map<String, Double> mapSizesCache = downloadService.getMapSizesCache();
+		if (mapSizesCache.containsKey(filename)) {
+			long size = mapSizesCache.get(filename).longValue();
 			resp.setStatus(HttpServletResponse.SC_OK);
 			resp.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
-			resp.setContentLengthLong(resource.contentLength());
-		} catch (FileNotFoundException ex) {
-			LOGGER.error(ex.getMessage(), ex);
-			resp.sendError(HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
+			resp.setContentLengthLong(size);
+		} else {
+			resp.sendError(HttpServletResponse.SC_NOT_FOUND);
 		}
 	}
 

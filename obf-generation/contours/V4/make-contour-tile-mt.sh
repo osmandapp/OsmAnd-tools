@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 # Multithreaded tiff tile to contour (osm) converter for OsmAnd
 # requires "gdal", "parallel", "lbzip2" and a lot of RAM
 # optional: -p and -d options requires qgis

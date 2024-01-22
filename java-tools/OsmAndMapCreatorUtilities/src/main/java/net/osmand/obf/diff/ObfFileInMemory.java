@@ -2,6 +2,7 @@ package net.osmand.obf.diff;
 
 import com.google.protobuf.CodedOutputStream;
 
+import com.google.protobuf.Message;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
@@ -75,6 +76,7 @@ public class ObfFileInMemory {
 	private Map<MapZooms.MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>> mapObjects = new LinkedHashMap<>();
 	private TLongObjectHashMap<RouteDataObject> routeObjects = new TLongObjectHashMap<>();
 	private long timestamp = 0;
+	private BinaryMapIndexReader.OsmAndOwner osmAndOwner;
 	private MapIndex mapIndex = new MapIndex(); 
 	private RouteRegion routeIndex = new RouteRegion();
 
@@ -124,14 +126,14 @@ public class ObfFileInMemory {
 
 	public void putMapObjects(MapZoomPair pair, Collection<BinaryMapDataObject> objects, boolean override) {
 		TLongObjectHashMap<BinaryMapDataObject> res = get(pair);
-		for(BinaryMapDataObject o: objects) {
+		for (BinaryMapDataObject o : objects) {
 			o = mapIndex.adoptMapObject(o);
-			if(override) {
+			if (override) {
 				res.put(o.getId(), o);
-			} else if(!res.containsKey(o.getId())){
+			} else if (!res.containsKey(o.getId())) {
 				res.put(o.getId(), o);
 			}
-			
+
 		}
 	}
 	
@@ -195,14 +197,13 @@ public class ObfFileInMemory {
 		}
 		if (poiObjects.size() > 0) {
 			String name = "";
-			boolean overwriteIds = false;
 			if(Algorithms.isEmpty(name)) {
 				name = defName;
 			}
 			MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexPOI = true;
-			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
+			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 			File poiFile = new File(targetFile.getParentFile(), IndexCreator.getPoiFileName(name));
 			indexPoiCreator.createDatabaseStructure(poiFile);
 			for (Map<String, Amenity> mp : poiObjects.valueCollection()) {
@@ -286,6 +287,23 @@ public class ObfFileInMemory {
 			writer.writeTransportStringTable(stringTable);
 			writer.endWriteTransportIndex();
 		}
+
+		if (osmAndOwner != null) {
+			OsmandOdb.OsmAndOwner.Builder b = OsmandOdb.OsmAndOwner.newBuilder();
+			b.setName(osmAndOwner.getName());
+			if (!osmAndOwner.getResource().isEmpty()) {
+				b.setResource(osmAndOwner.getResource());
+			}
+			if (!osmAndOwner.getDescription().isEmpty()) {
+				b.setDescription(osmAndOwner.getDescription());
+			}
+			if (!osmAndOwner.getPluginid().isEmpty()) {
+				b.setPluginid(osmAndOwner.getPluginid());
+			}
+			Message m = b.build();
+			ous.writeMessage(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER, m);
+		}
+
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		raf.close();
@@ -462,13 +480,13 @@ public class ObfFileInMemory {
 			File inputFile = files.get(i);
 			File nonGzip = inputFile;
 			boolean gzip = false;
-			if(inputFile == null) {
+			if (inputFile == null) {
 				continue;
 			}
 			File parentFile = inputFile.getParentFile();
 			LOG.info(String.format("Reading %s / %s ", parentFile == null ? "" : parentFile.getName(),
 					inputFile.getName()));
-			if(inputFile.getName().endsWith(".gz")) {
+			if (inputFile.getName().endsWith(".gz")) {
 				nonGzip = new File(inputFile.getParentFile(), inputFile.getName().substring(0, inputFile.getName().length() - 3));
 				GZIPInputStream gzin = new GZIPInputStream(new FileInputStream(inputFile));
 				FileOutputStream fous = new FileOutputStream(nonGzip);
@@ -480,27 +498,28 @@ public class ObfFileInMemory {
 			RandomAccessFile raf = new RandomAccessFile(nonGzip, "r");
 			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(raf, nonGzip);
 			for (BinaryIndexPart p : indexReader.getIndexes()) {
-				if(p instanceof MapIndex) {
+				if (p instanceof MapIndex) {
 					MapIndex mi = (MapIndex) p;
-					for(MapRoot mr : mi.getRoots()) {
+					for (MapRoot mr : mi.getRoots()) {
 						MapZooms.MapZoomPair pair = new MapZooms.MapZoomPair(mr.getMinZoom(), mr.getMaxZoom());
-						TLongObjectHashMap<BinaryMapDataObject> objects = readBinaryMapData(indexReader, mi, mr.getMinZoom());
+						TLongObjectHashMap<BinaryMapDataObject> objects = readBinaryMapData(indexReader, mi,
+								mr.getMinZoom());
 						putMapObjects(pair, objects.valueCollection(), true);
 					}
 				} else if (p instanceof RouteRegion) {
 					RouteRegion rr = (RouteRegion) p;
 					readRoutingData(indexReader, rr, ZOOM_LEVEL_ROUTING, true);
 				} else if (p instanceof PoiRegion) {
-					 PoiRegion pr = (PoiRegion) p;
-					 TLongObjectHashMap<Map<String, Amenity>> rr = 
-							 readPoiData(indexReader, pr, ZOOM_LEVEL_POI, true);
-					 putPoiData(rr, true);
+					PoiRegion pr = (PoiRegion) p;
+					TLongObjectHashMap<Map<String, Amenity>> rr = readPoiData(indexReader, pr, ZOOM_LEVEL_POI, true);
+					putPoiData(rr, true);
 				} else if (p instanceof TransportIndex) {
 					readTransportData(indexReader, (TransportIndex) p, true);
 				}
 			}
 			
 			updateTimestamp(indexReader.getDateCreated());
+			setOsmAndOwner(indexReader.getOwner());
 			indexReader.close();
 			raf.close();
 			if(gzip) {
@@ -596,7 +615,7 @@ public class ObfFileInMemory {
 				@Override
 				public boolean publish(Amenity object) {
 					if(!local.containsKey(object.getId())) {
-						local.put(object.getId(), new TreeMap<String, Amenity>());
+						local.put(object.getId(), new LinkedHashMap<String, Amenity>());
 					}
 					local.get(object.getId()).put(object.getType().getKeyName(), object);
 					return false;
@@ -692,5 +711,8 @@ public class ObfFileInMemory {
 		}		
 	}
 
+	public void setOsmAndOwner(BinaryMapIndexReader.OsmAndOwner owner) {
+		osmAndOwner = owner;
+	}
 	
 }

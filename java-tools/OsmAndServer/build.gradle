@@ -5,7 +5,7 @@ buildscript {
         maven { url 'https://jitpack.io' }
     }
     dependencies {
-        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.3")
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.14")
     }
 }
 
@@ -77,7 +77,11 @@ dependencies {
     implementation "com.google.code.gson:gson:2.8.2"
     implementation "org.apache.commons:commons-math3:3.6.1"
 
+    implementation 'org.apache.commons:commons-email:1.5'
+
 	implementation 'com.vividsolutions:jts-core:1.14.0'	
+	implementation 'commons-net:commons-net:3.9.0'
+	
 
     // frontend
     implementation "org.webjars:jquery:3.3.1"

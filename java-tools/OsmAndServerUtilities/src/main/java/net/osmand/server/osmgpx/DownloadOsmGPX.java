@@ -1,7 +1,6 @@
 package net.osmand.server.osmgpx;
 
 
-import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.util.Algorithms.readFromInputStream;
 
 import java.io.ByteArrayInputStream;
@@ -25,7 +24,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.TimeZone;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -39,26 +42,35 @@ import javax.net.ssl.X509TrustManager;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
-import net.osmand.data.QuadRect;
-import net.osmand.obf.OsmGpxWriteContext;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
+import net.osmand.data.QuadRect;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.obf.OsmGpxWriteContext.OsmGpxFile;
+import net.osmand.obf.OsmGpxWriteContext.QueryParams;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.RouteActivityType;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.io.Base64;
 import net.osmand.util.Algorithms;
+import oauth.signpost.OAuthConsumer;
+import oauth.signpost.basic.DefaultOAuthConsumer;
+import oauth.signpost.exception.OAuthCommunicationException;
+import oauth.signpost.exception.OAuthExpectationFailedException;
+import oauth.signpost.exception.OAuthMessageSignerException;
 import rtree.RTree;
 
 public class DownloadOsmGPX {
@@ -72,7 +84,7 @@ public class DownloadOsmGPX {
 	private static final int PS_INSERT_GPX_FILE = 3;
 	private static final int PS_INSERT_GPX_DETAILS = 4;
 	private static final long FETCH_INTERVAL = 200;
-	private static final long FETCH_MAX_INTERVAL = 10000;
+	private static final long FETCH_MAX_INTERVAL = 50000;
 	private static final int MAX_EMPTY_FETCH = 5;
 	
 	// preindex before 76787 with maxlat/minlat
@@ -139,7 +151,7 @@ public class DownloadOsmGPX {
 							if (av.trim().length() == 0) {
 								continue;
 							}
-							qp.activityTypes.add(RouteActivityType.getOrCreateTypeFromName(av.trim()));
+							qp.activityTypes.add(OsmRouteType.getOrCreateTypeFromName(av.trim()));
 						}
 					}
 					break;
@@ -272,7 +284,7 @@ public class DownloadOsmGPX {
 			}
 			gpxInfo.tags = trackTags.toArray(new String[0]);
 			if (qp.activityTypes != null) {
-				RouteActivityType rat = RouteActivityType.getTypeFromTags(gpxInfo.tags);
+				OsmRouteType rat = OsmRouteType.getTypeFromTags(gpxInfo.tags);
 				if (rat == null || !qp.activityTypes.contains(rat)) {
 					continue;
 				}
@@ -319,7 +331,7 @@ public class DownloadOsmGPX {
 
 	
 	private String downloadGpx(long id, String name)
-			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException {
+			throws Exception {
 		HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data", MAX_RETRY_TIMEOUT);
 		// content-type: application/x-bzip2
 		// content-type: application/x-gzip
@@ -335,16 +347,19 @@ public class DownloadOsmGPX {
 					return parseZip(gzipIs);
 				}
 				return Algorithms.readFromInputStream(gzipIs).toString();
-			} else if (type.equals("application/x-zip")) {
+			} else if (type.equals("application/x-zip") || type.equals("application/zip")) {
 				return parseZip(inputStream);
 			} else if (type.equals("application/gpx+xml")) {
 				return Algorithms.readFromInputStream(inputStream).toString();
 			} else if (type.equals("application/x-bzip2")) {
 				BZip2CompressorInputStream bzis = new BZip2CompressorInputStream(inputStream);
-				if(zip) {
+				if (zip) {
 					return parseZip(bzis);
 				}
 				return Algorithms.readFromInputStream(bzis).toString();
+			} else if (type.equals("application/x-tar+gzip")) {
+				TarArchiveInputStream tarIs = new TarArchiveInputStream(new GZIPInputStream(inputStream));
+				return parseTar(tarIs);
 			}
 			throw new UnsupportedOperationException("Unsupported content-type: " + type);
 		} finally {
@@ -365,7 +380,18 @@ public class DownloadOsmGPX {
 		}
 		return null;
 	}
-	
+
+	private String parseTar(TarArchiveInputStream inputStream) throws IOException {
+		TarArchiveEntry tarEntry = inputStream.getNextTarEntry();
+		while (tarEntry != null) {
+			if (tarEntry.getName().endsWith(".gpx")) {
+				return readFromInputStream(inputStream).toString();
+			}
+			tarEntry = inputStream.getNextTarEntry();
+		}
+		return null;
+	}
+
 	protected void redownloadTagsDescription() throws SQLException, IOException {
 		PreparedStatementWrapper wgpx = new PreparedStatementWrapper();
 		preparedStatements[PS_UPDATE_GPX_DETAILS] = wgpx;
@@ -652,7 +678,7 @@ public class DownloadOsmGPX {
 
 
 	private HttpsURLConnection getHttpConnection(String url, int retry)
-			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException {
+			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException, OAuthMessageSignerException, OAuthExpectationFailedException, OAuthCommunicationException {
 		HttpsURLConnection con;
 		try {
 			if (!sslInit) {
@@ -676,10 +702,19 @@ public class DownloadOsmGPX {
 			}
 			String name = System.getenv("OSM_USER");
 			String pwd = System.getenv("OSM_PASSWORD");
+			String accessToken = System.getenv("OSM_USER_ACCESS_TOKEN");
+			String accessTokenSecret = System.getenv("OSM_USER_ACCESS_TOKEN_SECRET");
+			String consumerKey = System.getenv("OSM_OAUTH_CONSUMER_KEY");
+			String consumerSecret = System.getenv("OSM_OAUTH_CONSUMER_SECRET");
 			
 			con = (HttpsURLConnection) new URL(url).openConnection();
 			con.setConnectTimeout(HTTP_TIMEOUT);
-			if (name != null && pwd != null) {
+			if (!Algorithms.isEmpty(accessToken)) {
+				OAuthConsumer consumer = new DefaultOAuthConsumer(consumerKey, consumerSecret);
+				consumer.setTokenWithSecret(accessToken, accessTokenSecret);
+				consumer.sign(con);
+//				con.setRequestProperty("Authorization", "Basic " + Base64.encode(name + ":" + pwd));
+			} else if (name != null && pwd != null) {
 				con.setRequestProperty("Authorization", "Basic " + Base64.encode(name + ":" + pwd));
 			}
 

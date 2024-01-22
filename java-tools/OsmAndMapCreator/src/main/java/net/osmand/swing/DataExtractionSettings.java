@@ -56,7 +56,7 @@ public class DataExtractionSettings {
 		if (mapsFolder.exists() && obfFiles.isEmpty() && INDEXES_CACHE.length() > 0) {
 			cache = new CachedOsmandIndexes();
 			if (cacheFile.exists()) {
-				cache.readFromFile(cacheFile, 2);
+				cache.readFromFile(cacheFile);
 			}
 		}
 		for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
@@ -332,6 +332,18 @@ public class DataExtractionSettings {
 
 	public void setBinaryFilesDir(String file){
 		preferences.put("binaryFilesDir", file);
+	}
+
+	public String getLastUsedDir(){
+		String fl = preferences.get("lastUsedDir", null);
+		if(fl != null) {
+			return fl;
+		}
+		return getDefaultWorkingDir().getAbsolutePath();
+	}
+
+	public void setLastUsedDir(String file){
+		preferences.put("lastUsedDir", file);
 	}
 
 

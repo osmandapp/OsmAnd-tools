@@ -76,7 +76,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	// load it in memory
 	private Map<EntityId, City> cities = new LinkedHashMap<EntityId, City>();
 	private List<Long> debugCityIds = new ArrayList<>();
+	private static final double CITY_VILLAGE_DIST = 10000;
 	private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
+	private static final double CITY_DIST = 50000;
 	private DataTileManager<City> cityManager = new DataTileManager<City>(10);
 	private List<Relation> postalCodeRelations = new ArrayList<Relation>();
 	private Map<Entity, Boundary> postcodeBoundaries = new HashMap<>();
@@ -113,6 +115,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
 			City city = EntityParser.parseCity((Node) e);
 			if (city != null) {
+				city.setNames(getOtherNames(e));
 				regCity(city, e);
 			}
 		}
@@ -140,8 +143,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = new ArrayList<City>();
-			citiesToSearch.addAll(cityManager.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), 3));
-			citiesToSearch.addAll(cityVillageManager.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), 3));
+			citiesToSearch.addAll(cityManager.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), CITY_DIST));
+			citiesToSearch.addAll(cityVillageManager.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), CITY_VILLAGE_DIST));
 
 			City cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
@@ -449,6 +452,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private City createMissingCity(Entity e, CityType t) throws SQLException {
 		City c = EntityParser.parseCity(e, t);
+		c.setNames(getOtherNames(e));
 		if (c.getLocation() == null) {
 			return null;
 		}
@@ -631,8 +635,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		name = normalizeStreetName(name, location, icc);
 		Set<City> result = new LinkedHashSet<City>();
 		List<City> nearestObjects = new ArrayList<City>();
-		nearestObjects.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
-		nearestObjects.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
+		nearestObjects.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_DIST));
+		nearestObjects.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_VILLAGE_DIST));
 		//either we found a city boundary the street is in
 		for (City c : nearestObjects) {
 			if (!c.getType().storedAsSeparateAdminEntity()) {
@@ -782,8 +786,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			result = greatestBoundary.getName();
 			list = boundaryToContainingCities.get(greatestBoundary);
 		} else {
-			list.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
-			list.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude()));
+			list.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_DIST));
+			list.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_VILLAGE_DIST));
 		}
 		if (list != null) {
 			for (City c : list) {

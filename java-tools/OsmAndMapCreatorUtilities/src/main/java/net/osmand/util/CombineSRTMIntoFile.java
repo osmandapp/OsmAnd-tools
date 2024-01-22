@@ -218,8 +218,7 @@ public class CombineSRTMIntoFile {
 			File nodesDB = new File(targetFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
 			ic.setNodesDBFile(nodesDB);
 			ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null,
-					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(targetFile.getName()), log, true,
-					false);
+					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(targetFile.getName()), log, true);
 			nodesDB.delete();
 			RTree.clearCache();
 		}

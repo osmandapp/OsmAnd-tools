@@ -127,7 +127,7 @@ public class NativeJavaRendering extends NativeLibrary {
 			public RenderingRulesStorage resolve(String name, RenderingRulesStorageResolver ref) throws XmlPullParserException, IOException {
 				RenderingRulesStorage depends = new RenderingRulesStorage(name, renderingConstants);
 				depends.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream(name+".render.xml"),
-							ref);
+							ref, false);
 				return depends;
 			}
 		};
@@ -135,13 +135,16 @@ public class NativeJavaRendering extends NativeLibrary {
 			loadRenderingAttributes(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),
 					renderingConstants);
 			storage = new RenderingRulesStorage("default", renderingConstants);
-			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),resolver);
+			storage.parseRulesFromXmlInputStream(RenderingRulesStorage.class.getResourceAsStream("default.render.xml"),
+					resolver, false);
 		} else {
 			InputStream is = null;
 			InputStream is2 = null;
+			File stylesDir = null;
 			if (new File(path).exists()) {
 				is = new FileInputStream(new File(path));
 				is2 = new FileInputStream(new File(path));
+				stylesDir = new File(path).getParentFile();
 			} else {
 				is = RenderingRulesStorage.class.getResourceAsStream(path );
 				is2 = RenderingRulesStorage.class.getResourceAsStream(path);
@@ -158,9 +161,18 @@ public class NativeJavaRendering extends NativeLibrary {
 				name = name.substring(name.lastIndexOf('/') + 1);
 			}
 			storage = new RenderingRulesStorage(name, renderingConstants);
-			storage.parseRulesFromXmlInputStream(is2, resolver);
+			storage.parseRulesFromXmlInputStream(is2, resolver, false);
 			is.close();
 			is2.close();
+			if (stylesDir != null) {
+				for (File file : stylesDir.listFiles()) {
+					if (file.isFile() && file.getName().endsWith("addon.render.xml")) {
+						InputStream is3 = new FileInputStream(file);
+						storage.parseRulesFromXmlInputStream(is3, resolver, true);
+						is3.close();
+					}
+				}
+			}
 		}
 		return storage;
 	}
@@ -208,6 +220,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		public final int height;
 		public long searchTime;
 		public long renderingTime;
+		public boolean saveTxt = false;
 		public RenderingContext context;
 
 		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
@@ -322,6 +335,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 		rctx.zoom = ctx.zoom;
 		rctx.tileDivisor = tileDivisor;
+		rctx.saveTextTile = ctx.saveTxt;
 		long search = time + System.currentTimeMillis();
 		final RenderingGenerationResult rres = NativeJavaRendering.generateRenderingIndirect(rctx, res.nativeHandler,
 				false, request, true);
@@ -357,6 +371,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		ImageReader reader = readers.next();
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
+		AllocationUtil.freeDirectBuffer(bitmapBuffer);
 		return img;
 	}
 
@@ -477,7 +492,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		File cacheFile = new File(dir, INDEXES_CACHE);
 		CachedOsmandIndexes cache = new CachedOsmandIndexes();
 		if (cacheFile.exists()) {
-			cache.readFromFile(cacheFile, CachedOsmandIndexes.VERSION);
+			cache.readFromFile(cacheFile);
 		}
 		if (dir.exists() && dir.listFiles() != null) {
 			MapsCollection mapsCollection = new MapsCollection(filterDuplicates);
@@ -524,7 +539,9 @@ public class NativeJavaRendering extends NativeLibrary {
 				defaultLoadedLibrary.initFilesInDir(obfFiles, map);
 			}
 			log.info(String.format("Init native library with maps: %d ms", System.currentTimeMillis() - now));
-			defaultLoadedLibrary.loadFontData(new File(fontsFolder));
+			if (fontsFolder != null) {
+				defaultLoadedLibrary.loadFontData(new File(fontsFolder));
+			}
 		}
 		return defaultLoadedLibrary;
 	}

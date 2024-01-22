@@ -17,6 +17,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import javax.imageio.ImageIO;
 
@@ -63,6 +65,20 @@ public class IndexHeightData {
 	public static final String ELE_ASC_TAG = "osmand_ele_asc";
 	public static final String ELE_DESC_TAG = "osmand_ele_desc";
 	public static final double INEXISTENT_HEIGHT = Double.MIN_VALUE;
+	
+	public static final Set<String> ELEVATION_TAGS = new TreeSet<>(); 
+	
+	static {
+		ELEVATION_TAGS.add(IndexHeightData.ELE_ASC_START);
+		ELEVATION_TAGS.add(IndexHeightData.ELE_ASC_END);
+		ELEVATION_TAGS.add(IndexHeightData.ELE_INCLINE);
+		ELEVATION_TAGS.add(IndexHeightData.ELE_INCLINE_MAX);
+		ELEVATION_TAGS.add(IndexHeightData.ELE_DECLINE);
+		ELEVATION_TAGS.add(IndexHeightData.ELE_DECLINE_MAX);
+		ELEVATION_TAGS.add(IndexHeightData.ELE_ASC_TAG);
+		ELEVATION_TAGS.add(IndexHeightData.ELE_DESC_TAG);
+	}
+
 	
 	private Map<Integer, TileData> map = new HashMap<Integer, TileData>();
 
@@ -311,11 +327,7 @@ public class IndexHeightData {
 	}
 	
 	public void proccess(Way e) {
-		if (e.getTag("highway") == null && e.getTag("cycleway") == null && e.getTag("footway") == null
-				&& e.getTag("waterway") == null && e.getTag("piste:type") == null) {
-			return;
-		}
-		if (e.getTag("tunnel") != null || e.getTag("bridge") != null) {
+		if (!isHeightDataNeeded(e)) {
 			return;
 		}
 
@@ -365,6 +377,22 @@ public class IndexHeightData {
 		// if(wh.desc >= 1){
 		// e.putTag(ELE_DESC_TAG, ((int)wh.desc)+"");
 		// }
+	}
+
+
+
+	public static boolean isHeightDataNeeded(Way e) {
+		if (e.getTag("highway") == null && e.getTag("cycleway") == null && e.getTag("footway") == null
+				&& e.getTag("waterway") == null && e.getTag("piste:type") == null) {
+			return false;
+		}
+		if (e.getTag("osmand_change") != null) {
+			return false;
+		}
+		if (e.getTag("tunnel") != null || e.getTag("bridge") != null) {
+			return false;
+		}
+		return true;
 	}
 	
 	

@@ -1,9 +1,6 @@
 package net.osmand.util;
 
 
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -23,41 +20,16 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-
-import net.osmand.IndexConstants;
-import net.osmand.PlatformUtil;
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.MapRoot;
-import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
-import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
-import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
-import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
-import net.osmand.binary.OsmandOdb;
-import net.osmand.obf.BinaryMerger;
-import net.osmand.obf.preparation.AbstractIndexPartCreator;
-import net.osmand.obf.preparation.BinaryFileReference;
-import net.osmand.obf.preparation.BinaryMapIndexWriter;
-import net.osmand.obf.preparation.IndexVectorMapCreator;
-
 import org.apache.commons.logging.Log;
-
-import rtree.LeafElement;
-import rtree.RTree;
-import rtree.RTreeException;
-import rtree.Rect;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -66,6 +38,30 @@ import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
+
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.IndexConstants;
+import net.osmand.PlatformUtil;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.binary.OsmandOdb;
+import net.osmand.obf.BinaryMerger;
+import net.osmand.obf.preparation.AbstractIndexPartCreator;
+import net.osmand.obf.preparation.BinaryFileReference;
+import net.osmand.obf.preparation.BinaryMapIndexWriter;
+import net.osmand.obf.preparation.IndexVectorMapCreator;
+import rtree.LeafElement;
+import rtree.RTree;
+import rtree.RTreeException;
+import rtree.Rect;
 
 /**
  * This helper will find obf and zip files, create description for them, and zip them, or update the description. This
@@ -137,6 +133,7 @@ public class IndexUploader {
 	private boolean travelProcess;
 	private boolean depthProcess;
 	private boolean mapsProcess;
+	private int numberOfThreads = 2;
 
 	public IndexUploader(String path, String targetPath) throws IndexUploadException {
 		directory = new File(path);
@@ -212,6 +209,9 @@ public class IndexUploader {
 				start++;
 			} else if (args[start].startsWith("--roads")) {
 				roadProcess = true;
+				start++;
+			} else if (args[start].startsWith("--nt=")) {
+				numberOfThreads = Integer.parseInt(args[start].substring("--nt=".length()));
 				start++;
 			} else if (args[start].startsWith("--wiki")) {
 				wikiProcess = true;
@@ -331,83 +331,105 @@ public class IndexUploader {
 		try {
 			uploadCredentials.connect();
 			File[] listFiles = directory.listFiles();
+			ExecutorService service = Executors.newFixedThreadPool(numberOfThreads);
 			for (File f : listFiles) {
-				try {
-					if (!fileFilter.fileCanBeUploaded(f)) {
-						continue;
-					}
-					long timestampCreated = f.lastModified();
-					if (!uploadCredentials.checkIfUploadNeededByTimestamp(f.getName(), timestampCreated)) {
-						log.info("File skipped because timestamp was not changed " + f.getName());
-						continue;
-					}
-					String fileName = f.getName();
-					log.info("Process file " + f.getName());
-					boolean skip = false;
-					if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
-						skip = true;
-					} else if (fileName.contains(".road") != this.roadProcess) {
-						skip = true;
-					} else if (fileName.contains(".wiki") != this.wikiProcess) {
-						skip = true;
-					} else if (fileName.contains(".travel") != this.travelProcess) {
-						skip = true;
-					} else if (fileName.contains(".depth") != this.depthProcess) {
-						skip = true;
-					}
-					if (skip) {
-						log.info("Skip file: " + f.getName());
-						continue;
-					}
-					File unzippedFolder = unzip(f);
-					File mainFile = unzippedFolder;
-					if (unzippedFolder.isDirectory()) {
-						for (File tf : unzippedFolder.listFiles()) {
-							if (tf.getName().endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
-								mainFile = tf;
-								break;
-							}
+				if (checkFileNeedToBeUploaded(f)) {
+					service.submit(new Runnable() {
+						@Override
+						public void run() {
+							processFile(f);
 						}
-					}
-					try {
-						if (mapsProcess) {
-							boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
-							if (!worldFile && !fileName.contains("_ext_")) {
-								extractRoadOnlyFile(mainFile, new File(directory, fileName.replace(IndexConstants.BINARY_MAP_INDEX_EXT,
-										IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
-							}
-						}
-						String description = checkfileAndGetDescription(mainFile);
-						timestampCreated = mainFile.lastModified();
-						if (description == null) {
-							log.info("Skip file empty description " + f.getName());
-							skip = true;
-						} else {
-							File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
-							zip(unzippedFolder, zFile, description, timestampCreated);
-							uploadIndex(f, zFile, description, uploadCredentials);
-						}
-					} finally {
-						if (!skip) {
-							if (!f.getName().equals(unzippedFolder.getName())
-									|| (targetDirectory != null && !targetDirectory.equals(directory))) {
-								Algorithms.removeAllFiles(unzippedFolder);
-							}
-						}
-					}
-				} catch (OneFileException e) {
-					log.error(f.getName() + ": " + e.getMessage(), e);
-				} catch (RuntimeException e) {
-					log.error(f.getName() + ": " + e.getMessage(), e);
+					});
 				}
 			}
+			log.error("Stopping the tasks queue...");
+			service.shutdown();
+			log.error("Waiting termination all tasks...");
+			service.awaitTermination(24, TimeUnit.HOURS);
 			if (deleteFileFilter != null) {
 				log.error("Delete file filter is not supported with this credentions (method) " + uploadCredentials);
 			}
-
+			log.error("All tasks has finished.");
+		} catch (InterruptedException e) {
+			log.error("Await failed: " + e.getMessage(), e);
 		} finally {
 			uploadCredentials.disconnect();
 		}
+	}
+
+	private void processFile(File f) {
+		try {
+			String fileName = f.getName();
+			File unzippedFolder = unzip(f);
+			File mainFile = unzippedFolder;
+			if (unzippedFolder.isDirectory()) {
+				for (File tf : unzippedFolder.listFiles()) {
+					if (tf.getName().endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
+						mainFile = tf;
+						break;
+					}
+				}
+			}
+			boolean skip = false;
+			try {
+				if (mapsProcess) {
+					boolean worldFile = fileName.toLowerCase().contains("basemap") || fileName.toLowerCase().contains("world");
+					if (!worldFile && !fileName.contains("_ext_")) {
+						extractRoadOnlyFile(mainFile, new File(directory, fileName.replace(IndexConstants.BINARY_MAP_INDEX_EXT,
+								IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)));
+					}
+				}
+				String description = checkfileAndGetDescription(mainFile);
+				long timestampCreated = mainFile.lastModified();
+				if (description == null) {
+					log.info("Skip file empty description " + f.getName());
+					skip = true;
+				} else {
+					File zFile = new File(f.getParentFile(), unzippedFolder.getName() + ".zip");
+					zip(unzippedFolder, zFile, description, timestampCreated);
+					uploadIndex(f, zFile, description, uploadCredentials);
+				}
+			} finally {
+				if (!skip) {
+					if (!f.getName().equals(unzippedFolder.getName())
+							|| (targetDirectory != null && !targetDirectory.equals(directory))) {
+						Algorithms.removeAllFiles(unzippedFolder);
+					}
+				}
+			}
+		} catch (OneFileException | IOException | RuntimeException | RTreeException e) {
+			log.error(f.getName() + ": " + e.getMessage(), e);
+		}
+	}
+
+	private boolean checkFileNeedToBeUploaded(File f) {
+		if (!fileFilter.fileCanBeUploaded(f)) {
+			return false;
+		}
+		long timestampCreated = f.lastModified();
+		if (!uploadCredentials.checkIfUploadNeededByTimestamp(f.getName(), timestampCreated)) {
+			log.info("File skipped because timestamp was not changed " + f.getName());
+			return false;
+		}
+		String fileName = f.getName();
+		log.info("Process file " + f.getName());
+		boolean skip = false;
+		if ((fileName.contains(".srtm") || fileName.contains(".srtmf")) != this.srtmProcess) {
+			skip = true;
+		} else if (fileName.contains(".road") != this.roadProcess) {
+			skip = true;
+		} else if (fileName.contains(".wiki") != this.wikiProcess) {
+			skip = true;
+		} else if (fileName.contains(".travel") != this.travelProcess) {
+			skip = true;
+		} else if (fileName.contains(".depth") != this.depthProcess) {
+			skip = true;
+		}
+		if (skip) {
+			log.info("Skip file: " + f.getName());
+			return false;
+		}
+		return true;
 	}
 
 	public static File zip(File folder, File zFile, String description, long lastModifiedTime) throws OneFileException {
@@ -460,7 +482,15 @@ public class IndexUploader {
 				}
 				String summary = getDescription(reader, fileName);
 				reader.close();
-				mainFile.setLastModified(reader.getDateCreated());
+				boolean setLastModified = mainFile.setLastModified(reader.getDateCreated());
+				if (!setLastModified) {
+					// it's possible we can't update timestamp due to permission missing
+					File copy = new File(mainFile.getAbsolutePath() + ".cp");
+					Algorithms.fileCopy(mainFile, copy);
+					mainFile.delete();
+					copy.renameTo(mainFile);
+					setLastModified = mainFile.setLastModified(reader.getDateCreated());
+				}
 				return summary;
 			} catch (IOException e) {
 				if (raf != null) {
@@ -476,7 +506,7 @@ public class IndexUploader {
 		}
 	}
 
-	public static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
+	public synchronized static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
 		RandomAccessFile raf = new RandomAccessFile(mainFile, "r");
 		BinaryMapIndexReader index = new BinaryMapIndexReader(raf, mainFile);
 		final RandomAccessFile routf = new RandomAccessFile(roadOnlyFile, "rw");
@@ -508,21 +538,8 @@ public class IndexUploader {
 				// copy only part of map index
 				copyMapIndex(roadOnlyFile, (MapIndex) part, index, ous, raf, routf);
 				continue;
-			} else if (part instanceof AddressRegion) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else if (part instanceof TransportIndex) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.TRANSPORTINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else if (part instanceof PoiRegion) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else if (part instanceof RouteRegion) {
-				ous.writeTag(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER,
-						WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			} else {
-				throw new UnsupportedOperationException();
-			}
+			} 
+			ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 			BinaryMerger.writeInt(ous, part.getLength());
 			BinaryMerger.copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
 		}
@@ -805,6 +822,7 @@ public class IndexUploader {
 					fout.close();
 					toUpload.delete();
 				}
+				toBackup.setLastModified(System.currentTimeMillis()); // keep upload timestamp to compare
 				if (srcFile.equals(zipFile)) {
 					srcFile.delete();
 				}

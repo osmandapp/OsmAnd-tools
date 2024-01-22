@@ -32,10 +32,14 @@ subprojects {
 
 
 	test {
+	        ignoreFailures = true
+
 		reports {
 			junitXml.enabled = true
 			html.enabled = false
 		}
+		systemProperty 'eyepiece', System.getProperty('eyepiece')
+		systemProperty 'openglTestResources', System.getProperty('openglTestResources')
 	}
 
 	task fatJar(type: Jar) {

@@ -10,10 +10,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.Map;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.transaction.Transactional;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
@@ -21,22 +22,17 @@ import javax.validation.constraints.NotNull;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
+import net.osmand.server.controllers.user.MapApiController;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
@@ -57,6 +53,9 @@ public class UserdataController {
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
+	
+	// This is a permanent token for users who can't receive email but validated identity differently
+	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
 
 	Gson gson = new Gson();
@@ -98,7 +97,7 @@ public class UserdataController {
 	}
 	
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
-		UserFilesResults res = userdataService.generateFiles(userId, null, null, false, false);
+		UserFilesResults res = userdataService.generateFiles(userId, null, false, false);
 		Iterator<UserFileNoData> it = res.uniqueFiles.iterator();
 		StringBuilder sb = new StringBuilder();
 		while (it.hasNext()) {
@@ -131,50 +130,47 @@ public class UserdataController {
 	@GetMapping(value = "/user-validate-sub")
 	@ResponseBody
 	public ResponseEntity<String> check(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException {
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			HttpServletRequest request) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
-			return userdataService.error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
-			return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+			logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
 
-    @GetMapping(value = "/user-validate-ios-sub")
-    @ResponseBody
-    public ResponseEntity<String> checkOrderid(@RequestParam(name = "orderid", required = true) String orderid) throws IOException {
-        JsonObject json = userSubService.revalidateiOSSubscription(orderid);
-        if (json.has("error")) {
-            return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, json.get("error").getAsString());
-        }
-        return ResponseEntity.ok(json.toString());
-    }
+    
 
 	@PostMapping(value = "/user-update-orderid")
 	@ResponseBody
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid) throws IOException {
+			@RequestParam(name = "orderid", required = false) String orderid,
+			HttpServletRequest request) throws IOException {
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (pu == null) {
-			return userdataService.error(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		String errorMsg = userSubService.checkOrderIdPremium(orderid);
-		if (errorMsg != null) {
-			return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-		}
-		PremiumUser otherUser = usersRepository.findByOrderid(orderid);
-		if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
-			String hideEmail = userdataService.hideEmail(otherUser.email);
-			return userdataService.error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-					"user was already signed up as " + hideEmail);
+		// we allow to reset order id to null 
+		if (orderid != null) {
+			String errorMsg = userSubService.checkOrderIdPremium(orderid);
+			if (errorMsg != null) {
+				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+			}
+			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+			if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
+				String hideEmail = userdataService.hideEmail(otherUser.email);
+				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+						"user was already signed up as " + hideEmail);
+			}
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
@@ -183,37 +179,40 @@ public class UserdataController {
 
 	@PostMapping(value = "/user-register")
 	@ResponseBody
-	public ResponseEntity<String> userRegister(@RequestParam(name = "email", required = true) String email,
-			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid,
-			@RequestParam(name = "login", required = false) boolean login) throws IOException {
+	public ResponseEntity<String> userRegister(@RequestParam(name = "email") String email,
+	                                           @RequestParam(name = "deviceid", required = false) String deviceId,
+	                                           @RequestParam(name = "orderid", required = false) String orderid,
+	                                           @RequestParam(name = "login", required = false) boolean login,
+	                                           HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
 		if (!email.contains("@")) {
-			return userdataService.error(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
 		if (pu != null) {
 			if (!login) {
-				return userdataService.error(ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
+				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
+			// keep old order id
 		} else {
-			String error = userSubService.checkOrderIdPremium(orderid);
-			if (error != null) {
-				return userdataService.error(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
-			}
-			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
-			if (otherUser != null) {
-				String hideEmail = userdataService.hideEmail(otherUser.email);
-				List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
-				// check that user already registered at least 1 device (avoid typos in email)
-				if (pud != null && !pud.isEmpty()) {
-					return userdataService.error(ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-							"user was already signed up as " + hideEmail);
-				} else {
-					otherUser.orderid = null;
-					usersRepository.saveAndFlush(otherUser);
+			if (orderid != null) {
+//				String error = userSubService.checkOrderIdPremium(orderid);
+//				if (error != null) {
+//					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
+//				}
+				PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+				if (otherUser != null) {
+					String hideEmail = userdataService.hideEmail(otherUser.email);
+					List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
+					// check that user already registered at least 1 device (avoid typos in email)
+					if (pud != null && !pud.isEmpty()) {
+						logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
+					} else {
+						otherUser.orderid = null;
+						usersRepository.saveAndFlush(otherUser);
+					}
 				}
 			}
 			pu = new PremiumUsersRepository.PremiumUser();
@@ -223,10 +222,13 @@ public class UserdataController {
 		}
 		// keep old order id
 		pu.tokendevice = deviceId;
-		pu.token = (new Random().nextInt(8999) + 1000) + "";
 		pu.tokenTime = new Date();
+		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
+			// see comment on constant
+			pu.token = (new Random().nextInt(8999) + 1000) + "";
+			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
+		}
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
 		return userdataService.ok();
 	}
 
@@ -253,30 +255,20 @@ public class UserdataController {
 		userdataService.deleteFile(name, type, deviceId, clienttime, dev);
 		return userdataService.ok();
 	}
-
+	
 	@PostMapping(value = "/delete-file-version")
 	@ResponseBody
 	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = true) Long updatetime,
-			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
-		UserFile fl = null;
+	                                         @RequestParam(name = "name", required = true) String name,
+	                                         @RequestParam(name = "type", required = true) String type,
+	                                         @RequestParam(name = "updatetime", required = true) Long updatetime,
+	                                         @RequestParam(name = "deviceid", required = true) int deviceId,
+	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		} else {
-			if (updatetime != null) {
-				fl = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
-						new Date(updatetime));
-			}
-			if (fl == null) {
-				return userdataService.error(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, "File is not available");
-			}
-			storageService.deleteFile(fl.storage,userdataService.userFolder(fl), userdataService.storageFileName(fl));
-			filesRepository.delete(fl);
-			return userdataService.ok();
+			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
 	}
 
@@ -295,18 +287,7 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		PremiumUser pu = usersRepository.findById(dev.userid);
-		ResponseEntity<String> validateError = userdataService.validateUser(pu);
-		if (validateError != null) {
-			return validateError;
-		}
-		
-		ResponseEntity<String> uploadError = userdataService.uploadFile(file, dev, name, type, clienttime);
-		if (uploadError != null) {
-			return uploadError;
-		}
-
-		return userdataService.ok();
+		return userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
 	}
 
 	@GetMapping(value = "/check-file-on-server")
@@ -343,7 +324,7 @@ public class UserdataController {
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
 		if (!storageService.hasStorageProviderById(storageId)) {
-			return userdataService.error(400, "Storage id is not configured");
+			throw new OsmAndPublicApiException(400, "Storage id is not configured");
 		}
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
@@ -387,8 +368,39 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		UserFilesResults res = userdataService.generateFiles(dev.userid, name, type, allVersions, false);
+		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, type);
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+	
+	@PostMapping(path = {"/delete-account"})
+	@ResponseBody
+	public ResponseEntity<String> deleteAccount(@RequestBody MapApiController.UserPasswordPost us,
+	                                            @RequestParam(name = "deviceid") int deviceId,
+	                                            @RequestParam String accessToken,
+	                                            HttpServletRequest request) throws ServletException {
+		if (emailSender.isEmail(us.username)) {
+			PremiumUserDevice dev = checkToken(deviceId, accessToken);
+			if (dev == null) {
+				return userdataService.tokenNotValid();
+			}
+			return userdataService.deleteAccount(us, dev, request);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+	
+	@PostMapping(path = {"/send-code"})
+	@ResponseBody
+	public ResponseEntity<String> sendCode(@RequestBody MapApiController.EmailSenderInfo data,
+	                                       @RequestParam(name = "deviceid") int deviceId,
+	                                       @RequestParam String accessToken) {
+		if (emailSender.isEmail(data.email)) {
+			PremiumUserDevice dev = checkToken(deviceId, accessToken);
+			if (dev == null) {
+				return userdataService.tokenNotValid();
+			}
+			return userdataService.sendCode(data.email, data.action, dev);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 
 	public static class UserFilesResults {
@@ -401,5 +413,27 @@ public class UserdataController {
 		public int userid;
 		public long maximumAccountSize;
 
+	}
+
+	private void logErrorWithThrow(HttpServletRequest request, int code, String msg) throws OsmAndPublicApiException {
+		Map<String, String[]> params = request.getParameterMap();
+		String url = request.getRequestURI();
+		String ipAddress = request.getHeader("X-FORWARDED-FOR") == null ? request.getRemoteAddr() : request.getHeader("X-FORWARDED-FOR");
+		String m = "";
+		for (Map.Entry<String, String[]> e : params.entrySet()) {
+			String v = e.getValue().length > 0 ? e.getValue()[0] : "EMPTY";
+			m += ", " + e.getKey() + ":" + v;
+		}
+		LOG.error("URL:" + url + ", ip:" + ipAddress +  ", code:" + code + ", message:" + msg + m);
+		throw new OsmAndPublicApiException(code, msg);
+	}
+	
+	@PostMapping(path = {"/auth/confirm-code"})
+	@ResponseBody
+	public ResponseEntity<String> confirmCode(@RequestBody MapApiController.UserPasswordPost us) {
+		if (emailSender.isEmail(us.username)) {
+			return userdataService.confirmCode(us);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 }

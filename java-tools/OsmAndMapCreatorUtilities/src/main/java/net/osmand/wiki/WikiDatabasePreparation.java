@@ -36,12 +36,14 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.data.LatLon;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import org.xmlpull.v1.XmlPullParserException;
 import org.xwiki.component.embed.EmbeddableComponentManager;
 import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.rendering.block.Block;
@@ -72,36 +74,13 @@ public class WikiDatabasePreparation {
 	private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
 
 	private static final Set<String> unitsOfDistance = new HashSet<>(Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi", "m2"));
-	
-	public static class LatLon {
-		private final double longitude;
-		private final double latitude;
+	public static final String WIKIPEDIA_SQLITE = "wikipedia.sqlite";
+	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
+	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
+	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
 
-		public LatLon(double latitude, double longitude) {
-			this.latitude = latitude;
-			this.longitude = longitude;
-		}
-		
-		public double getLatitude() {
-			return latitude;
-		}
-		
-		public double getLongitude() {
-			return longitude;
-		}
-		
-		public boolean isZero() {
-			return (latitude == 0 && longitude == 0);
-		}
-		
-		@Override
-		public String toString() {
-			return "lat: " + latitude + " lon:" + longitude;
-		}
-
-	}
-
-	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata) throws IOException, SQLException {
+	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang, WikidataConnection wikidata,
+	                                       OsmCoordinatesByTag osmCoordinates) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
@@ -109,20 +88,24 @@ public class WikiDatabasePreparation {
 		int headerCount = 0;
 		for (int i = 0; i < text.length(); i++) {
 			int nt = text.length() - i - 1;
+			if (isCommentOpen(text, nt, i)) {
+				i = skipComment(text, i + 3);
+				continue;
+			}
 			if ((nt > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{')
-					|| (nt > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'p'
-					&& text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')
-					|| (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-')) {
+					|| (nt > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a'
+					&& text.charAt(i + 3) == 'p' && text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')) {
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
 			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}')
-					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n' && text.charAt(i - 3) == 'i'
-					&& text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p')
-					|| (i > 1 && text.charAt(i) == '>' && text.charAt(i - 1) == '-' && text.charAt(i - 2) == '-'))) {
+					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n'
+					&& text.charAt(i - 3) == 'i' && text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p'))) {
+				if (openCnt == 0) {
+					continue;
+				}
 				if (openCnt > 1) {
 					openCnt--;
-					i++;
 					continue;
 				}
 				openCnt--;
@@ -137,7 +120,9 @@ public class WikiDatabasePreparation {
 				}
 				String key = getKey(val.toLowerCase());
 				if (key.equals(WikivoyageTemplates.POI.getType())) {
-					bld.append(parseListing(val, wikidata, lang));
+					String[] stringRef = parsePoiWithAddLatLon(val, wikidata, lang, osmCoordinates);
+					bld.append(stringRef[0]);
+					val = stringRef[1];
 				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
 					bld.append((parseRegionList(val)));
 				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
@@ -209,6 +194,21 @@ public class WikiDatabasePreparation {
 			}
 		}
 		return bld.toString();
+	}
+
+	private static int skipComment(String text, int i) {
+		while (i < text.length() && !isCommentClosed(text, i)) {
+			i++;
+		}
+		return i;
+	}
+
+	private static boolean isCommentClosed(String text, int i) {
+		return i > 1 && text.charAt(i - 2) == '-' && text.charAt(i - 1) == '-' && text.charAt(i) == '>';
+	}
+
+	private static boolean isCommentOpen(String text, int nt, int i) {
+		return nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-';
 	}
 
 	private static int parseGallery(String text, StringBuilder bld, int i) {
@@ -504,8 +504,9 @@ public class WikiDatabasePreparation {
 			blocksMap.put(key, tmp);
 		}
 	}
-	
-	private static String parseListing(String val, WikidataConnection wikiDataconn, String wikiLang) throws IOException, SQLException {
+
+	private static String[] parsePoiWithAddLatLon(String val, WikidataConnection wikiDataconn, String wikiLang,
+												  OsmCoordinatesByTag osmCoordinates) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		val = val.replaceAll("\\{\\{.*}}", "");
 		String[] parts = val.split("\\|");
@@ -513,7 +514,7 @@ public class WikiDatabasePreparation {
 		String lon = null;
 		String areaCode = "";
 		String wikiLink = "";
-		String wikiData = "";
+		String wikiDataQId = "";
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -548,7 +549,7 @@ public class WikiDatabasePreparation {
 							|| field.equalsIgnoreCase("دورنگار")) {
 						bld.append("fax: ").append(value).append(", ");
 					} else if (field.equalsIgnoreCase("wdid") || field.equalsIgnoreCase("wikidata")) {
-						wikiData = value;
+						wikiDataQId = value;
 					} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel")
 							|| field.equalsIgnoreCase("téléphone") || field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
 						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/")
@@ -578,8 +579,25 @@ public class WikiDatabasePreparation {
 				} catch (Exception e) {}
 			}
 		}
-		if (wikiLink.isEmpty() && !wikiData.isEmpty() && wikiDataconn != null) {
-			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiData); 
+		if (wikiLink.isEmpty() && !wikiDataQId.isEmpty() && wikiDataconn != null) {
+			wikiLink = wikiDataconn.getWikipediaTitleByWid(wikiLang, wikiDataQId);
+			LatLon latLon = osmCoordinates.getCoordinatesFromCommonsWikiDB(wikiDataQId);
+			if (latLon != null) {
+				String newLat = String.valueOf(latLon.getLatitude());
+				String newLon = String.valueOf(latLon.getLongitude());
+				if (lat != null) {
+					val = val.replace(lat, newLat);
+				} else {
+					val += "|lat=" + newLat;
+				}
+				if (lon != null) {
+					val = val.replace(lon, newLon);
+				} else {
+					val += "|long=" + newLon;
+				}
+				lat = newLat;
+				lon = newLon;
+			}
 		}
 		if (!wikiLink.isEmpty()) {
 			bld.append(addWikiLink(wikiLang, wikiLink, lat, lon));
@@ -588,10 +606,9 @@ public class WikiDatabasePreparation {
 		if (lat != null && lon != null) {
 			bld.append(" geo:").append(lat).append(",").append(lon);
 		}
-		return bld.toString();
+		String[] result = {bld.toString(), val};
+		return result;
 	}
-	
-
 
 	public static String appendSqareBracketsIfNeeded(int i, String[] parts, String value) {
 		while (StringUtils.countMatches(value, "[[") > StringUtils.countMatches(value, "]]") && i + 1 < parts.length) {
@@ -609,14 +626,14 @@ public class WikiDatabasePreparation {
 	private static String getKey(String str) {
 		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return WikivoyageTemplates.LOCATION.getType();
-		} else if (str.startsWith("ispartof|") || str.startsWith("istinkat") || str.startsWith("isin")
+		} else if (str.startsWith("ispartof|") || str.startsWith("partofitinerary|") || str.startsWith("istinkat") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιΤμήμαΤου") || str.startsWith("commonscat") || str.startsWith("jest w")
-				|| str.startsWith("istinkat")  || str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
+				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی")) {
 			return WikivoyageTemplates.PART_OF.getType();
-		} else if (str.startsWith("do") || str.startsWith("see")
+		} else if (str.startsWith("do") || str.startsWith("see") || str.startsWith("go")
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
 				|| str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("se loger") 
@@ -717,53 +734,99 @@ public class WikiDatabasePreparation {
 
 	}
 
-	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException {
+	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
 		String lang = "";
-		String folder = "";
+		String wikipediaFolder = "";
+		String wikidataFolder = "";
 		String mode = "";
 		long testArticleID = 0;
+		String resultDB = "";
+		String wikipediaSqliteName = "";
+		String wikidataSqliteName = "";
 
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
 			if (arg.startsWith("--lang=")) {
 				lang = val;
 			} else if (arg.startsWith("--dir=")) {
-				folder = val;
+				wikipediaFolder = val;
+				wikidataFolder = val;
 			} else if (arg.startsWith("--mode=")) {
 				mode = val;
 			} else if (arg.startsWith("--testID=")) {
 				testArticleID = Long.parseLong(val);
+			} else if (arg.startsWith("--result_db=")) {
+				resultDB = val;
 			}
 		}
-		if (mode.isEmpty() || folder.isEmpty()
-				|| ((mode.equals("process-wikipedia") || mode.equals("test-wikipedia")) && lang.isEmpty())) {
-			throw new RuntimeException("Correct arguments weren't supplied");
+
+		if (mode.isEmpty()) {
+			throw new RuntimeException("Correct arguments weren't supplied. --mode= is not set");
+		}
+		if (mode.equals("process-wikipedia") || mode.equals("test-wikipedia")) {
+			if (wikipediaFolder.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --dir= is not set");
+			}
+			if (lang.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --lang= is not set");
+			}
+			wikipediaSqliteName = resultDB.isEmpty() ? wikipediaFolder + WIKIPEDIA_SQLITE : resultDB;
+		}
+		if (mode.equals("create-wikidata") || mode.equals("update-wikidata")) {
+			if (resultDB.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
+			}
+			if (wikidataFolder.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --dir= is not set");
+			}
+			wikidataSqliteName = resultDB;
 		}
 
-		final String wikiPg = folder + lang + "wiki-latest-pages-articles.xml.gz";
-		final String sqliteFileName = folder + "wiki.sqlite";
-		final String pathToWikiData = folder + "wikidatawiki-latest-pages-articles.xml.gz";
+		final String pathToWikiData = wikidataFolder + WIKIDATA_ARTICLES_GZ;
+		OsmCoordinatesByTag osmCoordinates;
+		File wikidataDB;
 
 		switch (mode) {
 			case "process-wikidata-regions":
-				processWikidataRegions(sqliteFileName);
+				processWikidataRegions(wikidataSqliteName);
 				break;
-			case "process-wikidata":
-				File wikiDB = new File(sqliteFileName);
+			case "create-wikidata":
+				File wikiDB = new File(wikidataSqliteName);
 				if (!new File(pathToWikiData).exists()) {
-					throw new RuntimeException("Wikidata dump doesn't exist. Exiting.");
+					throw new RuntimeException("Wikidata dump doesn't exist:" + pathToWikiData);
 				}
 				if (wikiDB.exists()) {
 					wikiDB.delete();
 				}
-				log.info("Processing wikidata...");
-				processDump(pathToWikiData, sqliteFileName, null);
+				String wikidataFile = wikidataFolder + WIKIDATA_ARTICLES_GZ;
+				wikidataDB = new File(wikidataSqliteName);
+				log.info("Process OSM coordinates...");
+				osmCoordinates = new OsmCoordinatesByTag(wikidataDB, new String[]{"wikipedia", "wikidata"},
+						new String[] { "wikipedia:" }, true);
+				log.info("Create wikidata...");
+				processWikidata(wikidataDB, wikidataFile, osmCoordinates,0);
+				break;
+			case "update-wikidata":
+				wikidataDB = new File(wikidataSqliteName);
+				log.info("Process OSM coordinates...");
+				osmCoordinates = new OsmCoordinatesByTag(wikidataDB, new String[]{"wikipedia", "wikidata"},
+						new String[] { "wikipedia:" }, true);
+				WikiDatabaseUpdater wdu = new WikiDatabaseUpdater(wikidataDB);
+				List<String> downloadedPages = wdu.getDownloadedPages();
+				long maxQId = wdu.getMaxQId();
+				log.info("Updating wikidata...");
+				for (String f : downloadedPages) {
+					log.info("Updating " + f);
+					processWikidata(wikidataDB, f, osmCoordinates, maxQId);
+				}
+				wdu.removeDownloadedPages();
 				break;
 			case "process-wikipedia":
-				processDump(wikiPg, sqliteFileName, lang);
+				log.info("Processing wikipedia...");
+				processWikipedia(wikipediaFolder, wikipediaSqliteName, lang, 0);
 				break;
 			case "test-wikipedia":
-				processDump(wikiPg, sqliteFileName, lang, testArticleID);
+				processWikipedia(wikipediaFolder, wikipediaSqliteName, lang, testArticleID);
 				break;
 		}
 	}
@@ -814,7 +877,7 @@ public class WikiDatabasePreparation {
 	}
 
 	protected static void testContent(String lang, String folder) throws SQLException, IOException {
-		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + "wiki.sqlite", log);
+		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + lang + WIKIPEDIA_SQLITE, log);
 		ResultSet rs = conn.createStatement().executeQuery("SELECT * from wiki");
 		while(rs.next()) {
 			double lat = rs.getDouble("lat");
@@ -831,29 +894,32 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void processDump(final String wikiPg, String sqliteFileName, String lang)
-			throws SQLException, ParserConfigurationException, IOException, SAXException {
-		processDump(wikiPg, sqliteFileName,lang,0);
+	public static void processWikipedia(final String wikipediaFolder, final String wikipediaSqliteFileName, String lang, long testArticleId)
+			throws ParserConfigurationException, SAXException, IOException, SQLException {
+		File wikipediaSqlite = new File(wikipediaSqliteFileName);
+		String wikiFile = wikipediaFolder + lang + WIKI_ARTICLES_GZ;
+		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
+		FileProgressImplementation progress = new FileProgressImplementation("Read wikipedia file", new File(wikiFile));
+		InputStream streamFile = progress.openFileInputStream();
+		InputSource is = getInputSource(streamFile);
+		final WikipediaHandler handler = new WikipediaHandler(sx, progress, lang, wikipediaSqlite, testArticleId);
+		sx.parse(is, handler);
+		handler.finish();
 	}
 
-	public static void  processDump(final String wikiPg, String sqliteFileName, String lang, long testArticleId)
+	public static void processWikidata(File wikidataSqlite, final String wikidataFile, OsmCoordinatesByTag osmCoordinates, long lastProcessedId)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
-		FileProgressImplementation prog = new FileProgressImplementation("Read wikidata file", new File(wikiPg));
-		InputStream streamFile = prog.openFileInputStream();
+		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file", new File(wikidataFile));
+		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
-		if (lang != null) {
-			final WikiOsmHandler handler = new WikiOsmHandler(sx, prog, lang, new File(sqliteFileName), testArticleId);
-			sx.parse(is, handler);
-			handler.finish();
-		} else {
-			OsmandRegions regions = new OsmandRegions();
-			regions.prepareFile();
-			regions.cacheAllCountries();
-			final WikiDataHandler handler = new WikiDataHandler(sx, prog, new File(sqliteFileName), regions);
-			sx.parse(is, handler);
-			handler.finish();
-		}
+		OsmandRegions regions = new OsmandRegions();
+		regions.prepareFile();
+		regions.cacheAllCountries();
+		final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions, lastProcessedId);
+		sx.parse(is, handler);
+		handler.finish();
+		osmCoordinates.closeConnection();
 	}
 
 	private static InputSource getInputSource(InputStream streamFile) throws IOException {
@@ -864,7 +930,7 @@ public class WikiDatabasePreparation {
 		return is;
 	}
 
-	public static class WikiOsmHandler extends DefaultHandler {
+	public static class WikipediaHandler extends DefaultHandler {
 		long counter = 1;
 		private final SAXParser saxParser;
 		private boolean page = false;
@@ -909,13 +975,13 @@ public class WikiDatabasePreparation {
 		private FileProgressImplementation progIS;
 		private long cid;
 
-		WikiOsmHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, File sqliteFile,
-		               long testArticleId) throws IOException, SQLException {
+		WikipediaHandler(SAXParser saxParser, FileProgressImplementation progIS, String lang, File wikipediaSqlite,
+		                 long testArticleId) throws SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
 			this.testArticleId = testArticleId;
-			conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
+			conn = dialect.getDatabaseConnection(wikipediaSqlite.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipContent blob)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
@@ -925,7 +991,7 @@ public class WikiDatabasePreparation {
 			if (this.testArticleId == 0) {
 				selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
 			}
-			imageUrlStorage = new WikiImageUrlStorage(conn, sqliteFile.getParent(), lang);
+			imageUrlStorage = new WikiImageUrlStorage(conn, wikipediaSqlite.getParent(), lang);
 			log.info("Tables are prepared");
 		}
 
@@ -1059,7 +1125,7 @@ public class WikiDatabasePreparation {
 
 	private static String generateHtmlArticle(String contentText, String lang, WikiImageUrlStorage imageUrlStorage)
 			throws IOException, SQLException {
-		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
+		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null, null);
 		final HTMLConverter converter = new HTMLConverter(false);
 		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
 				"http://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);

@@ -71,7 +71,7 @@ public class IndexController {
         return String.format("%.1f", size);
     }
 
-    private String formatDate(File file) {
+    private synchronized String formatDate(File file) {
         return dateFormat.format(new Date(file.lastModified()));
     }
 
@@ -144,7 +144,7 @@ public class IndexController {
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
     
-    @RequestMapping(value = {"indexes.php", "indexes"})
+    @RequestMapping(value = "admin/indexes")
     public String indexes(@RequestParam(required=false) boolean update,
     		@RequestParam(required=false)  boolean refresh, Model model) throws IOException {
     	// keep this step
@@ -161,7 +161,8 @@ public class IndexController {
 		model.addAttribute("depth", doc.getDepths());
 		model.addAttribute("slope", doc.getSlope());
 		model.addAttribute("heightmap", doc.getHeightmap());
-        return "pub/indexes";
+		model.addAttribute("weather", doc.getWeather());
+        return "admin/indexes";
     }
 
     @RequestMapping(value = {"list", "list.php"})

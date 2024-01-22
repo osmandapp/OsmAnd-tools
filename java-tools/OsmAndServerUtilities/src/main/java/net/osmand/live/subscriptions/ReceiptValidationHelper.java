@@ -28,11 +28,14 @@ public class ReceiptValidationHelper {
 	public static final String FIELD_BUNDLE_ID = "bundle_id";
 	public static final String FIELD_PRODUCT_ID = "product_id";
 	public static final String FIELD_ORIGINAL_TRANSACTION_ID = "original_transaction_id";
+	public static final String FIELD_TRANSACTION_ID = "transaction_id";
 	public static final String FIELD_STATUS = "status";
 	public static final String FIELD_RECEIPT = "receipt";
 	public static final String FIELD_LATEST_RECEIPT_INFO = "latest_receipt_info";
 	
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
+	private final static String SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
+
 	public final static String IOS_MAPS_BUNDLE_ID = "net.osmand.maps";
 
 	public final static int NO_RESPONSE_ERROR_CODE = 1100;
@@ -49,15 +52,29 @@ public class ReceiptValidationHelper {
 		public int error;
 		public JsonObject response;
 	}
+	
+	
+	public static void main(String[] args) {
+		// load ios subscription 
+		String prevReceipt = "";
+//		String currReceipt = "";
+		
+		ReceiptValidationHelper helper = new ReceiptValidationHelper();
+		ReceiptResult loadReceipt = helper.loadReceipt(prevReceipt, false);
+		System.out.println(loadReceipt.error + " " + loadReceipt.result + " " + loadReceipt.response);
+		
+//		loadReceipt = helper.loadReceipt(currReceipt, false);
+//		System.out.println(loadReceipt.error + " " + loadReceipt.result + " " + loadReceipt.response);
+	}
 
-	public ReceiptResult loadReceipt(String receipt) {
+	public ReceiptResult loadReceipt(String receipt, boolean sandbox) {
 		ReceiptResult result = new ReceiptResult();
 
 		JsonObject receiptObj = new JsonObject();
 		receiptObj.addProperty("receipt-data", receipt);
 		receiptObj.addProperty("password", System.getenv().get("IOS_SUBSCRIPTION_SECRET"));
 
-		String jsonAnswer = postReceiptJson(receiptObj);
+		String jsonAnswer = postReceiptJson(receiptObj, sandbox);
 		if (jsonAnswer != null) {
 			JsonObject responseObj = new JsonParser().parse(jsonAnswer).getAsJsonObject();
 			JsonElement statusElement = responseObj.get(FIELD_STATUS);
@@ -66,8 +83,8 @@ public class ReceiptValidationHelper {
 				result.error = status;
 			} else {
 				result.result = true;
-				result.response = responseObj;
 			}
+			result.response = responseObj;
 		} else {
 			result.error = NO_RESPONSE_ERROR_CODE;
 		}
@@ -112,10 +129,10 @@ public class ReceiptValidationHelper {
 		return result;
 	}
 
-	private static String postReceiptJson(JsonObject json) {
+	private static String postReceiptJson(JsonObject json, boolean sandbox) {
 		HttpURLConnection connection = null;
 		try {
-			connection = NetworkUtils.getHttpURLConnection(ReceiptValidationHelper.PRODUCTION_URL);
+			connection = NetworkUtils.getHttpURLConnection(sandbox ? ReceiptValidationHelper.SANDBOX_URL : ReceiptValidationHelper.PRODUCTION_URL);
 			connection.setRequestProperty("Accept-Charset", "UTF-8");
 //			connection.setRequestProperty("User-Agent", "OsmAnd Server 1.0");
 			connection.setConnectTimeout(30000);

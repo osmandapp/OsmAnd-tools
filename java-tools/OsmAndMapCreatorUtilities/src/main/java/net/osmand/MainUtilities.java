@@ -1,24 +1,34 @@
 package net.osmand;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.SQLException;
-import java.util.*;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 
-import net.osmand.obf.*;
+import net.osmand.router.tester.RandomRouteTester;
+import net.osmand.wiki.CommonsWikimediaPreparation;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.diff.AugmentedDiffsInspector;
-import net.osmand.obf.diff.GenerateDailyObf;
+import net.osmand.obf.BinaryComparator;
+import net.osmand.obf.BinaryInspector;
+import net.osmand.obf.BinaryMerger;
+import net.osmand.obf.GenerateRegionTags;
+import net.osmand.obf.IconVisibility;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.diff.ObfDiffGenerator;
 import net.osmand.obf.diff.ObfDiffMerger;
 import net.osmand.obf.diff.ObfRegionSplitter;
+import net.osmand.obf.diff.RelationDiffGenerator;
 import net.osmand.obf.preparation.BasemapProcessor;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexCreator;
@@ -28,21 +38,30 @@ import net.osmand.obf.preparation.OceanTilesCreator;
 import net.osmand.osm.FilterOsmByTags;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.render.OsmAndTestStyleRenderer;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
+import net.osmand.render.SvgMapLegendGenerator;
+import net.osmand.router.HHRoutingOBFWriter;
+import net.osmand.router.HHRoutingShortcutCreator;
+import net.osmand.router.HHRoutingSubGraphCreator;
+import net.osmand.router.HHRoutingTopGraphCreator;
+import net.osmand.router.TestHHRouting;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
 import net.osmand.travel.WikivoyageLangPreparation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.CombineSRTMIntoFile;
+import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
 import net.osmand.util.CountryOcbfGeneration;
 import net.osmand.util.FixBasemapRoads;
 import net.osmand.util.GenerateExtractScript;
 import net.osmand.util.IndexBatchCreator;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.ResourceDeleter;
-import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
+import net.osmand.util.TileListsForRegions;
+import net.osmand.util.WeatherPrepareRasterSqliteRegions;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -52,18 +71,18 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
 
-
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) {
+		try {
+			mainException(args);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
+	public static void mainException(String[] args) throws Exception {
 		if (args.length == 0) {
 			printSynopsys();
-		} else if (args[0].equals("--test-osm-live-tag-removal")) {
-			generateAllOsmLiveTests(new File(System.getProperty("repo.dir")+"/resources/test-resources/osm_live"),
-					System.getProperty("maps.dir"), false);
-//			String test = "2017_06_18-10_30_tagRemovalBug_01.xml";
-//			String osmLivePath = System.getProperty("repo.dir")+"/resources/test-resources/osm_live/";
-//			Algorithms.removeAllFiles(new File(osmLivePath, AugmentedDiffsInspector.DEFAULT_REGION));
-//			AugmentedDiffsInspector.main(new String[] { osmLivePath + test, osmLivePath });
-//			GenerateDailyObf.main(new String[] { osmLivePath });
 		} else {
 			String utl = args[0];
 			List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
@@ -76,6 +95,8 @@ public class MainUtilities {
 				BinaryComparator.main(subArgsArray);
 			} else if (utl.equals("merge-index")) {
 				BinaryMerger.main(subArgsArray);
+			} else if (utl.equals("test-style-rendering")) {
+				OsmAndTestStyleRenderer.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-obf-files-in-batch")) {
@@ -86,11 +107,23 @@ public class MainUtilities {
 				RenderingRulesStoragePrinter.main(subArgsArray);
 			} else if (utl.equals("explain-rendering-style")) {
 				RenderingRulesStorage.main(subArgsArray);
+			} else if (utl.equals("collect-weather-sqlitedb-into-regions")) {
+				WeatherPrepareRasterSqliteRegions.main(subArgsArray);
+            } else if (utl.equals("generate-maplegend-svg")) {
+				if (subArgsArray.length < 1) {
+					System.out.println(
+							"Error parameters: <path to osmand repos dir> <style name>: Generates legend svg images in <repo.dir>/web/main/static/img/legend/osmand/ and react components <repo.dir>/main/src/components/docs/autogenerated/ ");
+				} else { 
+            		SvgMapLegendGenerator.generate(subArgsArray[0], subArgsArray.length > 1 ? subArgsArray[1] : "default");
+            	}
 			} else if (utl.equals("generate-wiki-world-sqlite")) {
 				WikiDatabasePreparation.main(subArgsArray);
 			} else if (utl.equals("generate-wikipedia-by-country")) {
 				WikipediaByCountryDivider.main(subArgsArray);
 			} else if (utl.equals("generate-obf-diff")) {
+				ObfDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("generate-obf-diff-no-transport")) {
+				ObfDiffGenerator.COMPARE_TRANSPORT = false;
 				ObfDiffGenerator.main(subArgsArray);
 			} else if (utl.equals("generate-basemap")) {
 				BasemapProcessor.main(subArgsArray);
@@ -100,6 +133,18 @@ public class MainUtilities {
 				OceanTilesCreator.createTilesFile(subArgsArray[0], subArgsArray.length > 1 ? subArgsArray[1] : null);
 			} else if (utl.equals("create-sqlitedb")) {
 				SQLiteBigPlanetIndex.main(subArgsArray);
+			} else if (utl.equals("hh-routing-2nd-level")) {
+				HHRoutingTopGraphCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-prepare")) {
+				HHRoutingSubGraphCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-shortcuts")) {
+				HHRoutingShortcutCreator.main(subArgsArray);
+			} else if (utl.equals("hh-routing-obf-write")) {
+				HHRoutingOBFWriter.main(subArgsArray);
+			} else if (utl.equals("hh-routing-run")) {
+				TestHHRouting.main(subArgsArray);
+			} else if (utl.equals("random-route-tester")) {
+				RandomRouteTester.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("test-icons")) {
@@ -122,6 +167,16 @@ public class MainUtilities {
 				settings.indexPOI = true;
 				settings.indexTransport = true;
 				settings.indexRouting = true;
+				parseIndexCreatorArgs(subArgs, settings);
+				generateObf(subArgs, settings);
+			} else if (utl.equals("generate-obf-no-address-no-multipolygon")) {
+				IndexCreatorSettings settings = new IndexCreatorSettings();
+				settings.indexMap = true;
+				settings.indexAddress = false;
+				settings.indexPOI = true;
+				settings.indexTransport = false;
+				settings.indexRouting = true;
+				settings.indexMultipolygon = false;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
 			} else if (utl.equals("convert-gpx-to-obf")) {
@@ -176,6 +231,8 @@ public class MainUtilities {
 				CombineSRTMIntoFile.main(subArgsArray);
 			} else if (utl.equals("collect-sqlitedb-into-regions")) {
 				ConvertLargeRasterSqliteIntoRegions.main(subArgsArray);
+			} else if (utl.equals("list-tiles-for-regions")) {
+				TileListsForRegions.main(subArgsArray);
 			} else if (utl.equals("merge-std-files")) {
 				BinaryMerger.mergeStandardFiles(subArgsArray);
 			} else if (utl.equals("generate-roads")) {
@@ -185,29 +242,16 @@ public class MainUtilities {
 				generateObf(subArgs, settings);
 			} else if (utl.equals("filter-osm-by-tag")) {
 				FilterOsmByTags.main(subArgsArray);
-			} else if (utl.contentEquals("generate-osmlive-tests")) {
-				if (subArgsArray.length < 1) {
-					System.out.println("Usage: <path_to_directory_with_resources_project> <optional_path_to_unpack_files>");
-					return;
-				}
-				File testResources = new File(subArgsArray[0]+"/resources/test-resources/osm_live/");
-				generateAllOsmLiveTests(testResources, subArgsArray.length > 1 ? subArgsArray[1] : null, false);
-			} else if (utl.contentEquals("generate-from-overpass")) {
-				if (subArgsArray.length < 2) {
-					System.out.println("Usage: PATH_TO_OVERPASS PATH_TO_WORKING_DIR");
-					return;
-				}
-				String[] argsToGenerateOsm = new String[] {
-						subArgsArray[0],
-						subArgsArray[1]
-				};
-				AugmentedDiffsInspector.main(argsToGenerateOsm);
-				String[] argsToGenerateObf = new String[] {
-						subArgsArray[1]
-				};
-				GenerateDailyObf.main(argsToGenerateObf);
 			} else if (utl.equals("travel-guide-creator")) {
 				TravelGuideCreatorMain.main(subArgsArray);
+			} else if (utl.equals("generate-relation-osm")) {
+				RelationDiffGenerator.main(subArgsArray);
+			} else if (utl.equals("merge-obf-diff")) {
+				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
+			} else if (utl.equals("add-owner-to-obf")) {
+				BinaryMerger.signObfFile(subArgsArray);
+			} else if (utl.equals("parse-commonswiki")) {
+				CommonsWikimediaPreparation.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}
@@ -255,45 +299,8 @@ public class MainUtilities {
 			}
 		}
 	}
-	
-	private static void generateAllOsmLiveTests(File testResources, String unpackFolder, boolean delete) throws IOException {
-		// clean all files
-		if (delete) {
-			Algorithms.removeAllFiles(new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION));
-		}
-		for(File f : testResources.listFiles()) {
-			if(f.getName().endsWith(".diff.osm")) {
-				int DATE_LENGTH = 10;
-				String date = f.getName().substring(0, DATE_LENGTH);
-				String targetFl = AugmentedDiffsInspector.DEFAULT_REGION + f.getName().substring(DATE_LENGTH) + ".gz";
-				FileInputStream fis = new FileInputStream(f);
-				File outFl = new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION + "/" + date + "/"
-						+ targetFl);
-				outFl.getParentFile().mkdirs();
-				GZIPOutputStream out = new GZIPOutputStream(new FileOutputStream(outFl));
-				Algorithms.streamCopy(fis, out);
-				out.close();
-				fis.close();
-			}
-			if(f.getName().endsWith(".xml")) {
-				AugmentedDiffsInspector.main(new String[] { f.getAbsolutePath(), testResources.getAbsolutePath() });
-			}
-		}
-		GenerateDailyObf.main(new String[] { testResources.getAbsolutePath() });
-		if(unpackFolder != null) {
-			for(File obfgz : new File(testResources, AugmentedDiffsInspector.DEFAULT_REGION).listFiles()) {
-				if(obfgz.getName().endsWith(".obf.gz")) {
-					GZIPInputStream is = new GZIPInputStream(new FileInputStream(obfgz));
-					FileOutputStream out = new FileOutputStream(new File(unpackFolder, obfgz.getName().substring(0,
-							obfgz.getName().length() - 3)));
-					Algorithms.streamCopy(is, out);
-					is.close();
-					out.close();
-				}
-			}
-		}
-	}
 
+	
 	private static void generateObf(List<String> subArgs, IndexCreatorSettings settings) throws IOException, SQLException,
 			InterruptedException, XmlPullParserException {
 		String fl = subArgs.get(0);
@@ -301,6 +308,8 @@ public class MainUtilities {
 		if (fl.startsWith("http://") || fl.startsWith("https://")) {
 			URL fu = new URL(fl);
 			HttpURLConnection connection = (HttpURLConnection) fu.openConnection();
+			connection.setConnectTimeout(120000);
+			connection.setReadTimeout(1200000);
 			long lastModified = connection.getLastModified();
 			String fileName = new File(fu.getFile()).getName();
 			System.out.println(String.format("Downloading file %s from %s", fileName, fu));
@@ -315,7 +324,7 @@ public class MainUtilities {
 			IndexHeightData.MAXIMUM_LOADED_DATA = settings.maxHeightTilesInRam;
 		}
 		IndexCreator ic = new IndexCreator(new File("."), settings);
-		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE, 
+		ic.setDialects(settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE,
 				settings.processInRam ? DBDialect.SQLITE_IN_MEMORY : DBDialect.SQLITE);
 		ic.setLastModifiedDate(fileToGen.lastModified());
 		String regionName = fileToGen.getName();
@@ -367,7 +376,7 @@ public class MainUtilities {
 				fout.close();
 			}
 		}
-		System.out.println("File " + res.getName() + " was uploaded to "  + targetDir);     
+		System.out.println("File " + res.getName() + " was uploaded to "  + targetDir);
 
 	}
 
@@ -401,5 +410,6 @@ public class MainUtilities {
 		System.out.println("\t\t compare " + BinaryComparator.helpMessage);
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
 		System.out.println("\t\t travel-guide-creator: creates custom travel guide from existing resources (.travel.sqlite), --help or -h for more details");
+		System.out.println("\t\t random-route-tester --help # generate random routes and run java/cpp/hh comparison");
 	}
 }

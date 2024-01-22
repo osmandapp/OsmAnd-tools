@@ -22,6 +22,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -43,6 +45,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
+import net.osmand.map.OsmandRegions;
 import net.osmand.server.api.repo.DataMissingSearchRepository;
 import net.osmand.server.api.repo.DataMissingSearchRepository.DataMissingSearchFeedback;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -54,13 +57,7 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.services.CameraPlace;
-import net.osmand.server.api.services.IpLocationService;
-import net.osmand.server.api.services.LotteryPlayService;
-import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
-import net.osmand.server.api.services.PlacesService;
-import net.osmand.server.api.services.PollsService;
 import net.osmand.server.api.services.LotteryPlayService.LotteryResult;
 import net.osmand.server.api.services.PollsService.PollQuestion;
 import net.osmand.util.Algorithms;
@@ -76,14 +73,15 @@ public class ApiController {
     @Value("${osmand.files.location}")
     private String filesLocation;
     
-    @Value("${osmand.web.location}")
-    private String websiteLocation;
 
 	@Autowired
 	private DataSource dataSource;
 
     @Autowired
     PlacesService placesService;
+
+	@Autowired
+	WikiService wikiService;
     
     @Autowired
     MotdService motdService;
@@ -114,8 +112,14 @@ public class ApiController {
 	
 	@Autowired
 	LotteryPlayService lotteryPlayService;
+	
+	@Autowired
+	PromoService promoService;
 
 	Gson gson = new Gson();
+	
+	OsmandRegions osmandRegions;
+
 
 
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
@@ -128,14 +132,14 @@ public class ApiController {
     @GetMapping(path = {"/geo-ip"}, produces = "application/json")
     @ResponseBody
     public String findGeoIP(HttpServletRequest request, @RequestParam(required = false) String ip) throws IOException{
-    	String remoteAddr = request.getRemoteAddr();
-    	Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
-        if (hs != null && hs.hasMoreElements()) {
-            remoteAddr = hs.nextElement();
-        }
-        if(ip != null && ip.length() > 0) {
-        	remoteAddr = ip;
-        }
+		String remoteAddr = request.getRemoteAddr();
+		Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
+		if (hs != null && hs.hasMoreElements()) {
+			remoteAddr = hs.nextElement();
+		}
+		if (ip != null && ip.length() > 0) {
+			remoteAddr = ip;
+		}
         return locationService.getLocationAsJson(remoteAddr);
     }
     
@@ -183,6 +187,18 @@ public class ApiController {
 		return pollResult(pq);
 	}
 
+	
+	@GetMapping(path = {"/regions-by-latlon"})
+	@ResponseBody
+	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
+		List<String> regions = new ArrayList<String>();
+		if(osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
+		return gson.toJson(Map.of("regions", regions));
+	}
     
 	@GetMapping(path = { "/poll-results" }, produces = "application/json")
 	@ResponseBody
@@ -266,6 +282,13 @@ public class ApiController {
 	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
 		placesService.processPlacesAround(headers, request, response, gson, lat, lon);
+	}
+
+	@GetMapping(path = {"/wiki_place.php", "/wiki_place"})
+	public void geWikiPlace(@RequestParam(required = false) String article,
+	                        @RequestParam(required = false) String category,
+	                        @RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
+		wikiService.processWikiImages(request, response, gson);
 	}
 
     @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
@@ -575,5 +598,13 @@ public class ApiController {
 	public String runLottery(@RequestParam(required = true) String latestHash) throws IOException {
 		return gson.toJson(lotteryPlayService.runLottery(latestHash));
     }
+	
+	@PostMapping(path = {"/promo-add-user"})
+	public ResponseEntity<String> addUser(@RequestParam String promoKey,
+	                                      @RequestParam String userEmail) {
+		synchronized (this) {
+			return promoService.addUser(promoKey, userEmail);
+		}
+	}
     
 }

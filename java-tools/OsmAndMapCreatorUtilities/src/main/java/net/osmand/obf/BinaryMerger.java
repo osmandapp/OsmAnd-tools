@@ -1,9 +1,39 @@
 package net.osmand.obf;
 
 
+import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.sql.SQLException;
+import java.text.Collator;
+import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
@@ -30,38 +60,8 @@ import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
 import net.osmand.util.CountryOcbfGeneration;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
+import net.osmand.util.IndexUploader;
 import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.sql.SQLException;
-import java.text.Collator;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-
-import gnu.trove.set.hash.TLongHashSet;
-
-import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
 
 public class BinaryMerger {
 
@@ -69,10 +69,13 @@ public class BinaryMerger {
 	private final static Log log = PlatformUtil.getLog(BinaryMerger.class);
 	public static final String helpMessage = "output_file.obf [--address] [--poi] [input_file.obf] ...: merges all obf files and merges poi & address structure into 1";
 	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>();
+	private BinaryMapIndexReader.OsmAndOwner osmAndOwner;
 
 	static {
 		COMBINE_ARGS.put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
 		COMBINE_ARGS.put("--poi", OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
+		COMBINE_ARGS.put("--hhindex", OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER);
+		COMBINE_ARGS.put("--owner", OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER);
 	}
 
 	public static void main(String[] args) throws IOException, SQLException {
@@ -92,6 +95,98 @@ public class BinaryMerger {
 		} else {
 			in.merger(args);
 		}
+	}
+
+	public static void signObfFile(String[] args) throws IOException, SQLException {
+		String pathToObf = "";
+		String name = "";
+		String pluginid = "";
+		String description = "";
+		String resource = "";
+		String usage = "Usage: <path to obf> name=\"Owner name\" resource=\"Link to resource\"(optional) pluginid=\"Plugin name\"(optional) description>\"Description (any text)\"(optional)";
+		if(args.length == 1 && args[0].equals("test")) {
+			pathToObf = "/Users/macmini/OsmAnd/maps/Ukraine_vinnytsya_europe.obf";
+			name = "owner=John";
+			pluginid = "pluginid=Offroad tracks";
+			description = "description=Offroad tracks of Middle-earth";
+			resource = "https://osmand.net OsmAnd";
+		} else {
+			if (args.length < 2) {
+				System.out.println(usage);
+				System.exit(1);
+				return;
+			}
+			pathToObf = args[0];
+			for(int i = 1; i < args.length; i++) {
+				String arg = args[i];
+				if (arg.startsWith("name=")) {
+					name = arg.replace("name=", "");
+					continue;
+				}
+				if (arg.startsWith("pluginid=")) {
+					pluginid = arg.replace("pluginid=", "");
+					continue;
+				}
+				if (arg.startsWith("description=")) {
+					description = arg.replace("description=", "");
+					continue;
+				}
+				if (arg.startsWith("resource=")) {
+					resource = arg.replace("resource=", "");
+					continue;
+				}
+			}
+		}
+		if (pathToObf.isEmpty() || name.isEmpty()) {
+			System.out.println(usage);
+			System.exit(1);
+			return;
+		}
+
+		if (!pathToObf.endsWith(".obf") && !pathToObf.endsWith(".obf.zip")) {
+			System.out.println("Supported file formats are: *.obf, *.obf.zip");
+			System.exit(1);
+			return;
+		}
+
+		BinaryMerger in = new BinaryMerger();
+		in.addOsmAndOwner(pathToObf, name, resource, description, pluginid);
+	}
+
+	public void addOsmAndOwner(String pathToFile, String name, String resource, String description, String pluginid) throws IOException, SQLException {
+		String signed = "";
+		boolean zip = false;
+		if (pathToFile.endsWith(".obf.zip")) {
+			signed = pathToFile.replace(".obf.zip", "_signed.obf");
+			zip = true;
+		} else {
+			signed = pathToFile.replace(".obf", "_signed.obf");
+		}
+		String[] args = new String[]{
+				signed,
+				pathToFile
+		};
+		BinaryMerger in = new BinaryMerger();
+		in.osmAndOwner = new BinaryMapIndexReader.OsmAndOwner(name, resource, pluginid, description);
+		in.merger(args);
+
+		File sFile = new File(signed);
+		if (zip) {
+			try {
+				File zFile = new File(pathToFile);
+				zFile.delete();
+				sFile.renameTo(new File(pathToFile.replace(".obf.zip", ".obf")));
+				IndexUploader.zip(sFile, zFile, "", System.currentTimeMillis());
+				sFile.delete();
+			} catch (IndexUploader.OneFileException e) {
+				e.printStackTrace();
+			}
+		} else {
+			File oFile = new File(pathToFile);
+			oFile.delete();
+			sFile.renameTo(oFile);
+		}
+		System.out.println("Sign added to file:" + pathToFile + " . Sign name=" + name + ", resource=" + resource + ", pluginid=" + pluginid + ", description=" + description);
 	}
 	
 	public static void mergeStandardFiles(String[] args) throws IOException, SQLException, XmlPullParserException {
@@ -135,22 +230,36 @@ public class BinaryMerger {
 						+ (mapFiles ? IndexConstants.BINARY_MAP_INDEX_EXT : IndexConstants.BINARY_ROAD_MAP_INDEX_EXT);
 				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + ext;
 				File targetFile = new File(pathToPutJointFiles, targetFileName);
+				File targetUploadedFile = new File(pathWithGeneratedMapZips, targetFileName + ".zip");
+				System.out.println("Checking " + targetFileName);
 				if (skipExisting && targetFile.exists()) {
+					continue;
+				}
+				if (skipExisting && targetUploadedFile.exists()) {
 					continue;
 				}
 				sargs.add(targetFileName);
 				sargs.add("--address");
 				sargs.add("--poi");
+				sargs.add("--hhindex");
 				for (CountryRegion reg : list) {
 					if (reg.map || (!mapFiles && reg.roads)) {
-						sargs.add(pathWithGeneratedMapZips
-								+ Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext + ".zip");
+						File fl = new File(pathWithGeneratedMapZips, Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext);
+						if (!fl.exists()) {
+							fl = new File(fl.getParentFile(), fl.getName() + ".zip");
+						}
+						sargs.add(fl.getAbsolutePath());
 					}
 				}
 				log.info("Merge file with arguments: " + sargs);
 				try {
 					in.merger(sargs.toArray(new String[sargs.size()]));
-					new File(targetFileName).renameTo(targetFile);
+					File genFile = new File(targetFileName);
+					boolean moved = genFile.renameTo(targetFile);
+					if (!moved) {
+						Algorithms.fileCopy(genFile, targetFile);
+						genFile.delete();
+					}
 				} catch (IOException | SQLException e) {
 					if (!ignoreFailures) {
 						throw e;
@@ -420,11 +529,10 @@ public class BinaryMerger {
 			throws IOException, SQLException {
 		final int[] writtenPoiCount = {0};
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
-		boolean overwriteIds = false;
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexPOI = true;
 		
-		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
+		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
 		final Map<Long, List<Amenity>> amenityRelations = new HashMap<Long, List<Amenity>>();
 		final TLongHashSet set = new TLongHashSet();
@@ -571,6 +679,8 @@ public class BinaryMerger {
 						addressRegions[k] = (AddressRegion) part;
 					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
 						poiRegions[k] = (PoiRegion) part;
+					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER) {
+						// ignore as we don't know how to merge
 					}
 				} else if (raf != null) {
 					ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -591,6 +701,9 @@ public class BinaryMerger {
 		}
 		if (combineParts.contains(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER)) {
 			combinePoiIndex(nm, writer, dateCreated, poiRegions, indexes);
+		}
+		if (combineParts.contains(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER) && osmAndOwner != null) {
+			writer.writeOsmAndOwner(osmAndOwner);
 		}
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();

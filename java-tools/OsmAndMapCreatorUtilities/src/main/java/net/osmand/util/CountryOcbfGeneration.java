@@ -145,7 +145,7 @@ public class CountryOcbfGeneration {
 		public String boundary;
 		public String translate;
 		public String polyExtract;
-
+		public boolean areaExtract;
 
 		public boolean jointMap;
 		public boolean jointRoads;
@@ -158,6 +158,7 @@ public class CountryOcbfGeneration {
 		public boolean srtm ;
 
 		public long timestampToUpdate;
+		
 		
 
 		public CountryRegion getParent() {
@@ -193,7 +194,7 @@ public class CountryOcbfGeneration {
 		}
 
 		public String getPolyExtract() {
-			if(!Algorithms.isEmpty(polyExtract) || parent == null) {
+			if (!Algorithms.isEmpty(polyExtract) || parent == null) {
 				return polyExtract;
 			}
 			return parent.getPolyExtract();
@@ -420,6 +421,10 @@ public class CountryOcbfGeneration {
 	private void processRegion(CountryRegion r, Map<String, Set<TranslateEntity>> translates,
 			Map<String, File> polygonFiles, String targetObf, String targetOsmXml, String indent, XmlSerializer serializer)
 					throws IOException {
+		if (r.areaExtract) {
+			// skip helper regions
+			return;
+		}
 		String line = "key=" + r.name;
 		File boundary = null;
 		if (r.boundary != null) {
@@ -636,12 +641,13 @@ public class CountryOcbfGeneration {
 			parent.children.add(reg);
 		}
 		String type = attrs.get("type");
+		reg.areaExtract = "area-extract".equals(type);
 		reg.name = attrs.get("name");
 		reg.setDownloadSuffix(attrs.get("download_suffix"));
 		reg.setDownloadPrefix(attrs.get("download_prefix"));
 		reg.setInnerDownloadSuffix(attrs.get("inner_download_suffix"));
 		reg.setInnerDownloadPrefix(attrs.get("inner_download_prefix"));
-		for(String tg : CountryRegion.tagsPropagate) {
+		for (String tg : CountryRegion.tagsPropagate) {
 			reg.additionalTags.put(tg, attrs.get(tg));
 		}
 		if (attrs.containsKey("hillshade")) {
@@ -659,47 +665,47 @@ public class CountryOcbfGeneration {
 		} else {
 			reg.slope = type == null || type.equals("slope");
 		}
-		if(attrs.containsKey("srtm")) {
+		if (attrs.containsKey("srtm")) {
 			reg.srtm = parseBoolean(attrs.get("srtm"));
 		} else {
 			reg.srtm = type == null || type.equals("srtm");
 		}
-		if(attrs.containsKey("map")) {
+		if (attrs.containsKey("map")) {
 			reg.map = parseBoolean(attrs.get("map"));
 		} else {
 			reg.map = type == null || type.equals("map");
 		}
-		if(attrs.containsKey("join_road_files")) {
+		if (attrs.containsKey("join_road_files")) {
 			reg.jointRoads = parseBoolean(attrs.get("join_road_files"));
 		}
-		if(attrs.containsKey("join_map_files")) {
+		if (attrs.containsKey("join_map_files")) {
 			reg.jointMap = parseBoolean(attrs.get("join_map_files"));
 		}
 
-		if(attrs.containsKey("roads")) {
+		if (attrs.containsKey("roads")) {
 			reg.roads = parseBoolean(attrs.get("roads"));
 		} else {
 			reg.roads = reg.map;
 		}
-		if(attrs.containsKey("wiki")) {
+		if (attrs.containsKey("wiki")) {
 			reg.wiki = parseBoolean(attrs.get("wiki"));
 		} else {
 			reg.wiki = reg.map;
 		}
-		if(attrs.containsKey("poly_extract")) {
+		if (attrs.containsKey("poly_extract")) {
 			reg.polyExtract = attrs.get("poly_extract");
 		}
-		if(attrs.containsKey("translate")) {
+		if (attrs.containsKey("translate")) {
 			reg.translate = attrs.get("translate").toLowerCase();
-			if(reg.translate.equals("no")) {
+			if (reg.translate.equals("no")) {
 				reg.translate = null;
 			}
 		} else {
-			reg.translate = "entity=node;"+reg.name.toLowerCase();
+			reg.translate = "entity=node;" + reg.name.toLowerCase();
 		}
-		if(attrs.containsKey("boundary")) {
+		if (attrs.containsKey("boundary")) {
 			reg.boundary = attrs.get("boundary");
-			if(reg.boundary.equals("no")) {
+			if (reg.boundary.equals("no")) {
 				reg.boundary = null;
 			}
 		} else {

@@ -63,7 +63,6 @@ import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
-import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.util.Algorithms;
 
 @Configuration

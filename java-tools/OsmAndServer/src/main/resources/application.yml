@@ -17,16 +17,19 @@ storage:
 logging:
   file: logs/server.log
   config: classpath:logback-spring.xml
-  pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{4}"
+  purchase.debug: false
+  pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{10}"
 
 
 osmand:
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
-  files.location: ${user.dir}/../../../help
+  # ! should contain folders or symlinks indexes, night-builds, gen !
+  files.location: ${user.dir}/../../../
   gen.location: ${osmand.files.location}/gen
-  web.location: ${osmand.files.location}/website
+  web.location: ${osmand.files.location}/web-server-config
   srtm.location: ${SRTM_LOCATION:}
-  weather.tiff-location: ${WEATHER_TIFF_LOCATION:}
+  weather.location: ${WEATHER_LOCATION:}
+  wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
   
 server:
   port: 8080
@@ -41,7 +44,10 @@ server:
   compression.enabled: true
   compression.min-response-size: 4096
 
-tile-server: 
+osmand.routing:
+  hh-only-limit: ${HH_ONLY_LIMIT:100} # Maximum Start-End direct distance before HH routing is enforced (km)
+
+tile-server:
   obf.location: ${OBF_LOCATION:}
   obf.ziplocation: ${OBF_LOCATION_ZIP:}
   metatile-size: 2048 # render tiles as 2048 x 2048
@@ -99,7 +105,9 @@ spring:
 mapillary.accesstoken: ${MAPILLARY_ACCESS_TOKEN:}
 
 monitoring:
-  enabled: ${ENABLE_MONITORING:false}
+  enabled: false
+  changes.feed: 
+  changes.publish.channel: 
 
 geoip.url: "http://localhost:8081/json/"
 
@@ -107,6 +115,7 @@ geoip.url: "http://localhost:8081/json/"
 spring.jpa.hibernate.ddl-auto: validate
 
 osmand.files.location: /var/www-download
+osmand.web.location: ${osmand.files.location}/website
 
 logging:
   file: /var/log/osmand-server-logs/error.log

@@ -1,16 +1,13 @@
 package net.osmand.server.api.services;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
-import javax.validation.Valid;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -18,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -30,13 +26,21 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 
+import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.util.Algorithms;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 @Service
 public class StorageService {
 
 	private static final String FILE_SEPARATOR = "/";
-
+	private static final String GPX = "gpx";
+	private static final String GPX_GZ = "gpx.gz";
+	
 	protected static final Log LOGGER = LogFactory.getLog(StorageService.class);
 
 	protected static final String LOCAL_STORAGE = "local";
@@ -102,6 +106,8 @@ public class StorageService {
 				builder = builder.withCredentials(
 						new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey)));
 			}
+			LOGGER.info(String.format("Configure %s with %s in %s bucket=%s: accesskey=%s, secretKeyLength=%d", id, endpointUrl,
+					region, bucket, accessKey, secretKey == null ? 0 : secretKey.length()));
 			AmazonS3 s3 = builder.build();
 			st = new StorageType();
 			st.bucket = bucket;
@@ -178,16 +184,17 @@ public class StorageService {
 		nstorage += "," + storageId;
 		return nstorage; 
 	}
-
-
-	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
+	
+	
+	public String save(String fld, String fileName, @Valid @NotNull @NotEmpty InternalZipFile file) throws IOException {
 		for (StorageType s : getAndInitDefaultStorageProviders()) {
 			InputStream is = file.getInputStream();
 			saveFile(fld, fileName, s, is, file.getSize());
 			is.close();
-		}		
+		}
 		return defaultStorage;
 	}
+	
 
 	private void saveFile(String fld, String fileName, StorageType s, InputStream is, long fileSize) {
 		if (!s.local) {
@@ -202,8 +209,13 @@ public class StorageService {
 			for (String id : storage.split(",")) {
 				StorageType st = getStorageProviderById(id);
 				if (st != null && !st.local) {
-					S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
-					return obj.getObjectContent();
+					try {
+						S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
+						return obj.getObjectContent();
+					} catch (RuntimeException e) {
+						LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename)); 
+						throw e;
+					}
 				}
 			}
 		}
@@ -227,7 +239,97 @@ public class StorageService {
 		boolean local;
 	}
 
+	
+	public static class InternalZipFile {
+    	
+    	
+    	private long contentSize;
+    	private byte[] data;
+		private MultipartFile multipartfile;
+		private File tempzipfile;
+		
+		public long getContentSize() {
+			return contentSize;
+		}
+		
+		public byte[] getBytes() throws IOException {
+			if (data != null) {
+				return data;
+			}
+			if (multipartfile != null) {
+				return multipartfile.getBytes();
+			}
+			if (tempzipfile != null) {
+				return Files.readAllBytes(tempzipfile.toPath());
+			}
+			throw new IllegalStateException();
+		}
+		
+		public long getSize() {
+			if (data != null) {
+				return data.length;
+			}
+			if (multipartfile != null) {
+				return multipartfile.getSize();
+			}
+			if (tempzipfile != null ) {
+				return tempzipfile.length();
+			}
+			throw new IllegalStateException();
+		}
+		
+		public InputStream getInputStream() throws IOException {
+			if (data != null) {
+				return new ByteArrayInputStream(data);
+			}
+			if (multipartfile != null) {
+				return multipartfile.getInputStream();
+			}
+			if (tempzipfile != null) {
+				return new FileInputStream(tempzipfile);
+			}
+			throw new IllegalStateException();
+        }
+		
+		public static InternalZipFile buildFromFile(File file) throws IOException {
+			InternalZipFile zipfile = new InternalZipFile();
+			byte[] buffer = new byte[1024];
+			zipfile.tempzipfile = new File(file.getPath().substring(0, file.getPath().indexOf(GPX)) + GPX_GZ);
+			zipfile.contentSize = file.length();
+			try (FileInputStream fis = new FileInputStream(file);
+			     FileOutputStream fos = new FileOutputStream(zipfile.tempzipfile);
+			     GZIPOutputStream gos = new GZIPOutputStream(fos)) {
+				int len;
+				while ((len = fis.read(buffer)) != -1) {
+					gos.write(buffer, 0, len);
+				}
+			}
+			return zipfile;
+		}
 
-
-
+    	public static InternalZipFile buildFromServerFile(ServerCommonFile file, String name) throws IOException {
+    		InternalZipFile zipfile = new InternalZipFile();
+			zipfile.contentSize = file.di.getContentSize();
+			byte[] bytes = ("{\"type\":\"link\",\"name\":\"" + name + "\"}").getBytes();
+            ByteArrayOutputStream bous = new ByteArrayOutputStream();
+            GZIPOutputStream gz = new GZIPOutputStream(bous);
+            Algorithms.streamCopy(new ByteArrayInputStream(bytes), gz);
+            gz.close();
+            zipfile.data = bous.toByteArray();
+			return zipfile;
+    	}
+		
+    	public static InternalZipFile buildFromMultipartFile(MultipartFile file) throws IOException {
+			InternalZipFile zipfile = new InternalZipFile();
+			zipfile.contentSize = 0;
+			zipfile.multipartfile = file;
+			int cnt;
+			GZIPInputStream gzis = new GZIPInputStream(file.getInputStream());
+			byte[] buf = new byte[1024];
+			while ((cnt = gzis.read(buf)) >= 0) {
+				zipfile.contentSize += cnt;
+			}
+			return zipfile;
+		}
+    }
 }

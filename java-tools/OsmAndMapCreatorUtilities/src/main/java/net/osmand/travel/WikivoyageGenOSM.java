@@ -26,12 +26,11 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlSerializer;
 
-
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageOSMTags;
@@ -249,8 +248,6 @@ public class WikivoyageGenOSM {
 		serializer.endTag(null, "tag");
 	}
 
-	
-
 	private static boolean combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
 		article.updateCategoryCounts();		
 		long idStart = NODE_ID ;
@@ -276,23 +273,25 @@ public class WikivoyageGenOSM {
 				}
 			}
 		}
-		if (mainArticlePoint == null) {
+		if (mainArticlePoint == null && Algorithms.isEmpty(article.partsOf)) {
 			// System.out.println(String.format("Skip article as it has no points: %s", article.titles));
 			return false;
 		}
 
-		points = sortPoints(mainArticlePoint, points);
-		serializer.startTag(null, "node");
-		long mainArticleid = NODE_ID--;
-		serializer.attribute(null, "id", mainArticleid + "");
-		serializer.attribute(null, "action", "modify");
-		serializer.attribute(null, "version", "1");
-		serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
-		serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
-		tagValue(serializer, "route", "point");
-		tagValue(serializer, "route_type", "article");
-		addArticleTags(article, serializer, true);
-		serializer.endTag(null, "node");
+		if (mainArticlePoint != null) {
+			points = sortPoints(mainArticlePoint, points);
+			serializer.startTag(null, "node");
+			long mainArticleid = NODE_ID--;
+			serializer.attribute(null, "id", mainArticleid + "");
+			serializer.attribute(null, "action", "modify");
+			serializer.attribute(null, "version", "1");
+			serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
+			serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
+			tagValue(serializer, "route", "point");
+			tagValue(serializer, "route_type", "article");
+			addArticleTags(article, serializer, true);
+			serializer.endTag(null, "node");
+		}
 		
 		for (WptPt p : points) {
 			String category = simplifyWptCategory(p.category, CAT_OTHER);
@@ -385,9 +384,9 @@ public class WikivoyageGenOSM {
 			}
 			int color = p.getColor(0);
 			if (color != 0) {
-				tagValue(serializer, "color",
+				tagValue(serializer, "colour",
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-				tagValue(serializer, "color_int", Algorithms.colorToString(color));
+				tagValue(serializer, "colour_int", Algorithms.colorToString(color));
 			}
 		}
 

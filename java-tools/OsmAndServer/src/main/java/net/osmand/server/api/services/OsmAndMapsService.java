@@ -1,38 +1,28 @@
 package net.osmand.server.api.services;
 
-
-
-
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.sql.SQLException;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
-import net.osmand.util.MapsCollection;
+import net.osmand.IndexConstants;
+import net.osmand.map.WorldRegion;
+import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -45,14 +35,11 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.DefaultResponseErrorHandler;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
@@ -65,30 +52,30 @@ import net.osmand.binary.OsmandIndex.RoutingPart;
 import net.osmand.binary.OsmandIndex.RoutingSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXUtilities.TrkSegment;
+import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
-import net.osmand.osm.MapPoiTypes;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter.GeneralRouterProfile;
-import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation;
+import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
-import net.osmand.search.SearchUICore;
-import net.osmand.search.SearchUICore.SearchResultCollection;
-import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+
+import static net.osmand.util.MapUtils.rhumbDestinationPoint;
 
 @Service
 public class OsmAndMapsService {
@@ -104,13 +91,13 @@ public class OsmAndMapsService {
 	
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
 	
-	private static final int SEARCH_RADIUS_LEVEL = 1;
-	private static final double SEARCH_RADIUS_DEGREE = 1.5;
-	private static final String SEARCH_LOCALE = "en";
+	// counts only files open for Java (doesn't fit for rendering / routing)
+	private static final int MAX_SAME_FILE_OPEN = 15;
+	
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
-	CachedOsmandIndexes cacheFiles = null; 
+	CachedOsmandIndexes cacheFiles = null;
 
 	AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -126,13 +113,122 @@ public class OsmAndMapsService {
 	@Autowired
 	RoutingServerConfig routingConfig;
 
-	private OsmandRegions osmandRegions;
+	OsmandRegions osmandRegions;
 
-
-	public static class BinaryMapIndexReaderReference {
+	public class BinaryMapIndexReaderReference {
 		File file;
-		BinaryMapIndexReader reader;
+		private static final int WAIT_LOCK_CHECK = 10;
+		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
+		
+		private synchronized void closeUnusedReaders() {
+			readers.forEach((reader, open) -> {
+				if (Boolean.TRUE.equals(open)) {
+					try {
+						reader.close();
+						readers.remove(reader);
+					} catch (IOException e) {
+						LOGGER.error(e.getMessage(), e);
+					}
+				}
+			});
+		}
+		
+		private synchronized BinaryMapIndexReader lockReader() {
+			for (Entry<BinaryMapIndexReader, Boolean> r : readers.entrySet()) {
+				if (Boolean.TRUE.equals(r.getValue())) {
+					r.setValue(false);
+					return r.getKey();
+				}
+			}
+			return null;
+		}
+		
+		public void unlockReader(BinaryMapIndexReader reader) {
+			if (reader != null && !readers.isEmpty()) {
+				readers.computeIfPresent(reader, (key, value) -> true);
+			}
+		}
+		
+		public BinaryMapIndexReader getReader(CachedOsmandIndexes cacheFiles, int maxWaitMs) throws IOException, InterruptedException {
+			BinaryMapIndexReader resReader = lockReader();
+			if (resReader != null) {
+				return resReader;
+			}
+			if (readers.size() < MAX_SAME_FILE_OPEN) {
+				if (cacheFiles == null) {
+					initObfReaders();
+				}
+				BinaryMapIndexReader newReader = createReader();
+				if (newReader != null) {
+					readers.put(newReader, true);
+				}
+			}
+			int ms = 0;
+			while (ms < maxWaitMs) {
+				Thread.sleep(WAIT_LOCK_CHECK);
+				ms += WAIT_LOCK_CHECK;
+				resReader = lockReader();
+				if (resReader != null) {
+					return resReader;
+				}
+			}
+			LOGGER.info("Failed to get a reader for the file " + file.getName());
+			return null;
+		}
+		
+		private BinaryMapIndexReader createReader() throws IOException {
+			if (cacheFiles != null) {
+				long val = System.currentTimeMillis();
+				RandomAccessFile raf = new RandomAccessFile(file, "r");
+				BinaryMapIndexReader reader = cacheFiles.initReaderFromFileIndex(fileIndex, raf, file);
+				LOGGER.info("Initializing file " + file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+				return reader;
+			}
+			LOGGER.info("Failed to create a reader for the file " + file.getName());
+			return null;
+		}
+		
+		public int getOpenFiles() {
+			int cnt = 0;
+			for (Boolean b : readers.values()) {
+				if (Boolean.TRUE.equals(b)) {
+					cnt++;
+				}
+			}
+			return cnt;
+		}
+	}
+	
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
+		List<BinaryMapIndexReader> res = new ArrayList<>();
+		for (BinaryMapIndexReaderReference ref : refs) {
+			BinaryMapIndexReader reader = null;
+			try {
+				reader = ref.getReader(cacheFiles, 1000);
+			} catch (IOException | InterruptedException e) {
+				LOGGER.error(e.getMessage(), e);
+			}
+			if (reader != null) {
+				res.add(reader);
+			} else if (incompleteFlag != null) {
+				incompleteFlag[0] = true;
+			}
+		};
+		return res;
+	}
+	
+	public void unlockReaders(List<BinaryMapIndexReader> mapsReaders) {
+		obfFiles.values().forEach(ref -> mapsReaders.forEach(ref::unlockReader));
+	}
+	
+	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
+	public void closeMapReaders() {
+		obfFiles.forEach((name, ref) -> {
+			if (!ref.readers.isEmpty()) {
+				ref.closeUnusedReaders();
+			}
+		});
 	}
 	
 	
@@ -143,23 +239,67 @@ public class OsmAndMapsService {
 		public String profile = "car";
 	}
 	
+	
+	public int getCurrentOpenJavaFiles() {
+		int cnt = 0;
+		for(BinaryMapIndexReaderReference r: obfFiles.values()) {
+			cnt+= r.getOpenFiles();
+		}
+		return cnt;
+	}
+	
 	@Configuration
 	@ConfigurationProperties("osmand.routing")
 	public static class RoutingServerConfig {
-		
-		public Map<String, RoutingServerConfigEntry> config = new TreeMap<String, RoutingServerConfigEntry>();
-		
+
+		@Value("${osmand.routing.hh-only-limit}") // --osmand.routing.hh-only-limit= or $HH_ONLY_LIMIT=
+		public int hhOnlyLimit; // See application.yml, set 100 for production, or 1000 for testing server (km)
+
+		public Map<String, RoutingServerConfigEntry> config = new TreeMap<>(new ProfileComparator());
+
+		private class ProfileComparator implements Comparator<String> {
+			// reorder *-bike, *-car, *-foot to car, bike, foot
+			@Override
+			public int compare(String s1, String s2) {
+				// -car -> 0-car, -bike -> 1-bike, -foot -> 2-foot
+				s1 = reorder(s1, "-car", "-bike", "-foot");
+				s2 = reorder(s2, "-car", "-bike", "-foot");
+				return s1.compareTo(s2);
+			}
+			private String reorder(String s, String... search) {
+				String result = s;
+				for (int i = 0; i < search.length; i++) {
+					if(s.contains(search[i])) {
+						result = Integer.toString(i) + s;
+					}
+				}
+				return result;
+			}
+		}
+
 		public void setConfig(Map<String, String> style) {
 			for (Entry<String, String> e : style.entrySet()) {
+
+				/**
+				 * Example boot/command-line parameters (osmand-server-boot.conf):
+				 *
+				 * --osmand.routing.config.osrm-bicycle=type=osrm,profile=bicycle,url=https://zlzk.biz/route/v1/bike/
+				 * --osmand.routing.config.rescuetrack=type=online,url=https://apps.rescuetrack.com/api/routing/osmand
+				 *
+				 * name= osrm-bicycle|rescuetrack (Name, as a part of the option)
+				 * type= osrm|online (Type of routing provider, osrm and online are supported)
+				 * profile= [car]|bicycle (Profile for route-approximation params, default is car)
+				 */
+
 				RoutingServerConfigEntry src = new RoutingServerConfigEntry();
-				src.name = e.getKey();
+				src.name = e.getKey(); // name --osmand.routing.config.[rescuetrack]
 				for (String s : e.getValue().split(",")) {
 					String value = s.substring(s.indexOf('=') + 1);
-					if (s.startsWith("type=")) {
+					if (s.startsWith("type=")) { // osrm|online
 						src.type = value;
-					} else if (s.startsWith("url=")) {
+					} else if (s.startsWith("url=")) { // online-provider base url
 						src.url = value;
-					} else if (s.startsWith("profile=")) {
+					} else if (s.startsWith("profile=")) { // osmand profile to catch routeMode params
 						src.profile = value;
 					}
 				}
@@ -326,7 +466,7 @@ public class OsmAndMapsService {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(config.obfLocation, fn);
 					File targetTemp = new File(config.obfLocation, fn + ".new");
-					if (!target.exists() || target.lastModified() != zipFile.lastModified()
+					if (!target.exists() || target.lastModified() < zipFile.lastModified()
 							|| zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
 						ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
@@ -389,7 +529,7 @@ public class OsmAndMapsService {
 		}
 		return tile;
 	}
-
+	
 	public boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && config.initErrorMessage == null) {
 			osmandRegions = new OsmandRegions();
@@ -425,12 +565,16 @@ public class OsmAndMapsService {
 					ios.close();
 				}
 				nativelib = NativeJavaRendering.getDefault(null, config.obfLocation, fontsFolder.getAbsolutePath());
-				if (nativelib == null) {
-					config.initErrorMessage = "Tile rendering engine is not initialized";
-				}
+				
 			}
 		}
 		return config.initErrorMessage == null;
+	}
+	public String validateNativeLib() {
+		if (nativelib == null) {
+			return "Tile rendering engine is not initialized";
+		}
+		return null;
 	}
 
 	public ResponseEntity<String> renderMetaTile(VectorMetatile tile)
@@ -541,62 +685,89 @@ public class OsmAndMapsService {
 				.append('/').append(x).append('/').append(y).toString();
 	}
 	
-	public synchronized List<SearchResult> search(double lat, double lon, String text) throws IOException, InterruptedException {
-		if (!validateAndInitConfig()) {
-			return null;
-		}
-		SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-		searchUICore.getSearchSettings().setRegions(osmandRegions);
-		QuadRect points = points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE), 
-				new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
-		searchUICore.getSearchSettings().setOfflineIndexes(list);
-	    searchUICore.init();
-	    searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-	    
-	    SearchSettings settings = searchUICore.getPhrase().getSettings();
-	    searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
-		SearchResultCollection r = searchUICore.immediateSearch(text, new LatLon(lat, lon));
-		List<SearchResult> results = r.getCurrentSearchResults();
-		
-	    return results;
-	}
-	
-	public synchronized List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
+	public List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
-		List<BinaryMapIndexReader> list = Arrays.asList(getObfReaders(points));
-		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null);
-		GeocodingUtilities su = new GeocodingUtilities();
-		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
-		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
-//		complete.addAll(res);
-//		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
-		
-		return complete;
+		List<GeocodingResult> complete;
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[1]) {
+				return Collections.emptyList();
+			}
+			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+			RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null, usedMapList);
+			GeocodingUtilities su = new GeocodingUtilities();
+			List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
+			complete = su.sortGeocodingResults(usedMapList, res);
+		} finally {
+			unlockReaders(usedMapList);
+		}
+		return complete != null ? complete : Collections.emptyList();
 	}
 	
-
-	public synchronized List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
+	
+	public List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {
 			return Collections.emptyList();
 		}
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+		List<LatLon> polyline = new ArrayList<>(trkSegment.points.size());
 		for (WptPt p : trkSegment.points) {
 			polyline.add(new LatLon(p.lat, p.lon));
 		}
-		QuadRect points = points(polyline, null, null);
-		if (!validateAndInitConfig() || points == null) {
+		return approximateByPolyline(polyline, routeMode, props);
+	}
+	
+	public List<RouteSegmentResult> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
+		List<LatLon> polyline = new ArrayList<>(points.size());
+		for (WebGpxParser.Point p : points) {
+			polyline.add(new LatLon(p.lat, p.lng));
+		}
+		Map<String, Object> props = new HashMap<>();
+		return approximateByPolyline(polyline, routeMode, props);
+	}
+	
+	private List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
+		List<RouteSegmentResult> route;
+		QuadRect quadRect = points(polyline, null, null);
+		if (!validateAndInitConfig()) {
 			return Collections.emptyList();
 		}
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, null, null);
-		List<RouteSegmentResult> route = approximate(ctx, router, props, polyline);
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[1]) {
+				return new ArrayList<RouteSegmentResult>();
+			}
+			RoutingContext ctx = prepareRouterContext(routeMode, quadRect, router, null, null, usedMapList);
+			route = approximate(ctx, router, props, polyline);
+		} finally {
+			unlockReaders(usedMapList);
+		}
 		return route;
 	}
 
-	private List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router, 
+	
+	public List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
+			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+		if(ctx.nativeLib != null || router.isUseNativeApproximation()) {
+			return approximateSyncNative(ctx, router, props, polyline);
+		}
+		return approximateInternal(ctx, router, props, polyline);
+	}
+	
+
+	private synchronized List<RouteSegmentResult> approximateSyncNative(RoutingContext ctx, RoutePlannerFrontEnd router,
+			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+		return approximateInternal(ctx, router, props, polyline);
+	}
+	
+	private synchronized List<RouteSegmentResult> approximateInternal(RoutingContext ctx, RoutePlannerFrontEnd router,
 			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
@@ -605,7 +776,7 @@ public class OsmAndMapsService {
 		for (GpxPoint pnt : r.finalPoints) {
 			route.addAll(pnt.routeToTarget);
 		}
-		if (router.useNativeApproximation) {
+		if (router.isUseNativeApproximation()) {
 			RouteResultPreparation preparation = new RouteResultPreparation();
 			// preparation.prepareTurnResults(gctx.ctx, route);
 			preparation.addTurnInfoDescriptions(route);
@@ -614,12 +785,17 @@ public class OsmAndMapsService {
 		return route;
 	}
 
-	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router, 
-			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds) throws IOException {
+	private RoutingContext prepareRouterContext(String routeMode, QuadRect points, RoutePlannerFrontEnd router,
+			RoutingServerConfigEntry[] serverEntry, List<String> avoidRoadsIds, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
 		String[] props = routeMode.split("\\,");
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
-		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
-		router.setUseNativeApproximation(false);
+
+		// reset before applying
+		router.setDefaultHHRoutingConfig(); // hh is enabled
+		router.setUseOnlyHHRouting(false); // hhonly is disabled
+		router.setUseNativeApproximation(false); // "nativeapproximation"
+		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
+
 		RouteCalculationMode paramMode = null;
 		for (String p : props) {
 			if (p.length() == 0) {
@@ -636,6 +812,14 @@ public class OsmAndMapsService {
 				useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
+			} else if (key.equals("hhoff")) {
+				if (Boolean.parseBoolean(value)) {
+					router.disableHHRoutingConfig();
+				}
+			} else if (key.equals("hhonly")) {
+				if (Boolean.parseBoolean(value)) {
+					router.setUseOnlyHHRouting(true); // default false (hhonly is not for ui)
+				}
 			} else if (key.equals("calcmode")) {
 				if (value.length() > 0) {
 					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
@@ -669,48 +853,141 @@ public class OsmAndMapsService {
 					: RouteCalculationMode.NORMAL;
 		}
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				getObfReaders(points), paramMode); // RouteCalculationMode.BASE
+				usedMapList.toArray(new BinaryMapIndexReader[0]), paramMode); // RouteCalculationMode.BASE
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
-	
-	
-	public synchronized List<RouteSegmentResult> routing(String routeMode, Map<String, Object> props, LatLon start,
-			LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds)
+
+	@Nullable
+	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
+	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                               LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
+
+		// OSRM by type, all others treated as "rescuetrack"
+		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
+			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
+		} else {
+			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end);
+		}
+	}
+
+	@Nullable
+	private List<RouteSegmentResult> onlineRoutingOSRM(String baseurl, RoutingContext ctx,
+	                                                   RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                                   LatLon start, LatLon end, List<LatLon> intermediates)
+			throws IOException, InterruptedException {
+
+		// OSRM requires lon,lat not lat,lon
+		List<String> points = new ArrayList<>();
+		points.add(String.format("%f,%f", start.getLongitude(), start.getLatitude()));
+		if (intermediates != null) {
+			intermediates.forEach(p -> points.add(String.format("%f,%f", p.getLongitude(), p.getLatitude())));
+		}
+		points.add(String.format("%f,%f", end.getLongitude(), end.getLatitude()));
+
+		StringBuilder url = new StringBuilder(baseurl); // base url
+		url.append(String.join(";", points)); // points;points;points
+		url.append("?geometries=geojson&overview=full&steps=true"); // OSRM options
+
+		List<LatLon> polyline = new ArrayList<>();
+		try {
+			String body = new RestTemplate().getForObject(url.toString(), String.class);
+			if (body != null && body.contains("Ok") && body.contains("coordinates")) {
+				JSONArray coordinates = new JSONObject(body)
+						.getJSONArray("routes")
+						.getJSONObject(0)
+						.getJSONObject("geometry")
+						.getJSONArray("coordinates");
+
+				for (int i = 0; i < coordinates.length(); i++) {
+					JSONArray ll = coordinates.getJSONArray(i);
+					final double lon = ll.getDouble(0);
+					final double lat = ll.getDouble(1);
+					polyline.add(new LatLon(lat, lon));
+				}
+			}
+		} catch(RestClientException | JSONException error) {
+			LOGGER.error(String.format("OSRM get/parse error (%s)", url));
+			return null;
+		}
+
+		if (polyline.size() >= 2) {
+			return approximate(ctx, router, props, polyline);
+		}
+
+		return null;
+	}
+
+	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
+	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                               LatLon start, LatLon end)
+			throws IOException, InterruptedException {
+
+		List<RouteSegmentResult> routeRes;
+		StringBuilder url = new StringBuilder(baseurl);
+		url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
+		url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
+
+		RestTemplate restTemplate = new RestTemplate();
+		restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+			@Override
+			public void handleError(ClientHttpResponse response) throws IOException {
+				LOGGER.error(String.format("Error GET url (%s)", url));
+				super.handleError(response);
+			}
+		});
+		String gpx = restTemplate.getForObject(url.toString(), String.class);
+		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
+		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+		for (WptPt p : trkSegment.points) {
+			polyline.add(new LatLon(p.lat, p.lon));
+		}
+		routeRes = approximate(ctx, router, props, polyline);
+		return routeRes;
+	}
+
+	@Nullable
+	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
+			LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
+			RouteCalculationProgress progress) throws IOException, InterruptedException {
+
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
-		RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds);
-		if (rsc[0] != null) {
-			StringBuilder url = new StringBuilder(rsc[0].url);
-			url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
-			url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
-			
-	        RestTemplate restTemplate = new RestTemplate();
-	        restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
-				
-				@Override
-				public void handleError(ClientHttpResponse response) throws IOException {
-					LOGGER.error(String.format("Error handling url for %s : %s", routeMode, url.toString()));
-					super.handleError(response);
-				}
-			});
-	        String gpx = restTemplate.getForObject(url.toString(), String.class);
-	        
-	        GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-			for (WptPt p : trkSegment.points) {
-				polyline.add(new LatLon(p.lat, p.lon));
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		List<RouteSegmentResult> routeRes;
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[0]) {
+				return Collections.emptyList();
 			}
-			return approximate(ctx, router, props, polyline);
-		} else { 
-			PrecalculatedRouteDirection precalculatedRouteDirection = null;
-			List<RouteSegmentResult> route = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-			putResultProps(ctx, route, props);
-			return route;
+			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
+			if (disableOldRouting && !router.isHHRoutingConfigured()) {
+				// BRP is disabled (limited) and HH is disabled (hhoff)
+				return null;
+			}
+			ctx.calculationProgress = progress;
+			if (rsc[0] != null && rsc[0].url != null) {
+				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
+			} else {
+				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
+						: router.searchRoute(ctx, start, end, intermediates, null);
+				routeRes = rc == null ? null : rc.getList();
+				putResultProps(ctx, routeRes, props);
+			}
+		} finally {
+			unlockReaders(usedMapList);
 		}
+		return routeRes;
+	}
+
+	private synchronized RouteCalcResult runRoutingSync(LatLon start, LatLon end, List<LatLon> intermediates,
+			RoutePlannerFrontEnd router, RoutingContext ctx) throws IOException, InterruptedException {
+		return router.searchRoute(ctx, start, end, intermediates, null);
 	}
 	
 
@@ -743,7 +1020,7 @@ public class OsmAndMapsService {
 		}
 	}
 
-	private QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
+	public QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
 		QuadRect upd = null;
 		upd = addPnt(start, upd);
 		upd = addPnt(end, upd);
@@ -781,7 +1058,7 @@ public class OsmAndMapsService {
 	}
 	
 
-	private synchronized void initNewObfFiles(File target, File targetTemp) throws IOException, FileNotFoundException {
+	private void initNewObfFiles(File target, File targetTemp) throws IOException {
 		initObfReaders();
 		long val = System.currentTimeMillis();
 		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
@@ -793,17 +1070,21 @@ public class OsmAndMapsService {
 		if (ref.fileIndex != null) {
 			ref.fileIndex = null;
 		}
-		if (ref.reader != null) {
-			ref.reader.close();
+		
+		if (!ref.readers.isEmpty()) {
+			for (Entry<BinaryMapIndexReader, Boolean> r : ref.readers.entrySet()) {
+				r.getKey().close();
+			}
 		}
 		if (nativelib != null) {
 			nativelib.closeMapFile(target.getAbsolutePath());
 		}
 		target.delete();
 		targetTemp.renameTo(target);
-		RandomAccessFile raf = new RandomAccessFile(target, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-		ref.reader = new BinaryMapIndexReader(raf, target);
-		ref.fileIndex = cacheFiles.addToCache(ref.reader, target);
+		RandomAccessFile raf = new RandomAccessFile(target, "r");
+		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
+		ref.readers.put(reader, true);
+		ref.fileIndex = cacheFiles.addToCache(reader, target);
 		cacheFiles.writeToFile(new File(config.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
 		if (nativelib != null) {
 			nativelib.initMapFile(target.getAbsolutePath(), false);
@@ -811,34 +1092,135 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 	
-	public synchronized BinaryMapIndexReader[] getObfReaders(QuadRect quadRect) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
 		initObfReaders();
-		List<BinaryMapIndexReader> files = new ArrayList<>();
-		MapsCollection mapsCollection = new MapsCollection(true);
+		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
+		List<File> filesToUse = getMaps(quadRect, bbox, maxNumberMaps);
+		if (!filesToUse.isEmpty()) {
+			for (File f : filesToUse) {
+				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+				files.add(ref);
+			}
+		}
+		return files;
+	}
+	
+	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
+		List<File> files = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			boolean intersects;
-			fileOverlaps: for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
+			fileOverlaps:
+			for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
 				for (RoutingSubregion s : rp.getSubregionsList()) {
 					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
 							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
 					if (intersects) {
-						mapsCollection.add(ref.file);
+						files.add(ref.file);
 						break fileOverlaps;
 					}
 				}
 			}
 		}
-		for (File f : mapsCollection.getFilesToUse()) {
-			BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
-			if (ref.reader == null) {
-				long val = System.currentTimeMillis();
-				RandomAccessFile raf = new RandomAccessFile(ref.file, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-				ref.reader = cacheFiles.initReaderFromFileIndex(ref.fileIndex, raf, ref.file);
-				LOGGER.info("Initializing routing file " + ref.file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
-			}
-			files.add(ref.reader);
+		return prepareMaps(files, bbox, maxNumberMaps);
+	}
+	
+	private List<File> prepareMaps(List<File> files,  List<LatLon> bbox, int maxNumberMaps) throws IOException {
+		List<File> filesToUse = filterMap(files);
+		List<File> res;
+		
+		if (!filesToUse.isEmpty() && maxNumberMaps != 0 && filesToUse.size() >= 4 && bbox != null) {
+			LOGGER.info("Files before filter by name " + filesToUse.size());
+			res = filterMapsByName(filesToUse, bbox);
+			LOGGER.info("Files after filter by name " + res.size());
+		} else {
+			res = filesToUse;
 		}
-		return files.toArray(new BinaryMapIndexReader[0]);
+		LOGGER.info("Files to use " + res.size());
+		return res;
+	}
+	
+	private List<File> filterMap(List<File> files) throws IOException {
+		List<File> res = new ArrayList<>();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		TreeSet<String> allDwNames = new TreeSet<>();
+		for (File file : files) {
+			allDwNames.add(getDownloadNameByFileName(file.getName()));
+		}
+		for (File file : files) {
+			String dwName = getDownloadNameByFileName(file.getName());
+			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
+			if (wr != null && wr.getSuperregion() != null && wr.getSuperregion().getRegionDownloadName() != null
+					&& allDwNames.contains(wr.getSuperregion().getRegionDownloadName())) {
+			} else {
+				res.add(file);
+			}
+		}
+		return res;
+	}
+	
+	private String getDownloadNameByFileName(String fileName) {
+		String dwName = fileName.substring(0, fileName.indexOf('.')).toLowerCase();
+		if (dwName.endsWith("_2")) {
+			dwName = dwName.substring(0, dwName.length() - 2);
+		}
+		return dwName;
+	}
+	
+	public List<File> filterMapsByName(List<File> filesToUse, List<LatLon> bbox) throws IOException {
+		List<File> res = new ArrayList<>();
+		HashSet<String> regions = getRegionsNameByBbox(bbox);
+		for (File f : filesToUse) {
+			OsmAndMapsService.BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+			String name = ref.file.getName().toLowerCase().replace("_2.obf", "");
+			if (regions.contains(name)) {
+				res.add(f);
+			}
+		}
+		return res;
+	}
+	
+	private HashSet<String> getRegionsNameByBbox(List<LatLon> bbox) throws IOException {
+		HashSet<String> regions = new HashSet<>();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+		for (LatLon point : getPointsByBbox(bbox)) {
+			List<String> res = new ArrayList<>();
+			res = osmandRegions.getRegionsToDownload(point.getLatitude(), point.getLongitude(), res);
+			regions.addAll(res);
+		}
+		LOGGER.debug("Regions by bbox size " + regions.size());
+		return regions;
+	}
+	
+	private List<LatLon> getPointsByBbox(List<LatLon> bbox) {
+		final int POINT_STEP_M = 20000;
+		
+		List<LatLon> points = new ArrayList<>(bbox);
+		LatLon p1 = bbox.get(0);
+		LatLon p2 = bbox.get(1);
+		
+		LatLon start = p1;
+		LatLon pointStep = start;
+		while (pointStep != null) {
+			LatLon res = rhumbDestinationPoint(pointStep, POINT_STEP_M, 180);
+			if (res.getLatitude() > p2.getLatitude()) {
+				points.add(res);
+				pointStep = res;
+			} else {
+				start = rhumbDestinationPoint(start, POINT_STEP_M, 90);
+				if (start.getLongitude() < p2.getLongitude()) {
+					pointStep = start;
+				} else {
+					pointStep = null;
+				}
+			}
+		}
+		return points;
 	}
 	
 	public synchronized void initObfReaders() throws IOException {
@@ -850,7 +1232,7 @@ public class OsmAndMapsService {
 		if (mapsFolder.exists()) {
 			File cacheFile = new File(mapsFolder, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME);
 			if (cacheFile.exists()) {
-				cacheFiles.readFromFile(cacheFile, 2);
+				cacheFiles.readFromFile(cacheFile);
 			}
 			for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
 				if (obf.getName().endsWith(".obf")) {
@@ -867,7 +1249,32 @@ public class OsmAndMapsService {
 		}
 	}
 	
+	public ResponseEntity<String> errorConfig() {
+		VectorTileServerConfig config = getConfig();
+		return ResponseEntity.badRequest()
+				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
+	}
+	
 	public OsmandRegions getOsmandRegions() {
 		return osmandRegions;
+	}
+	
+	public File getObf(Map<String, GPXFile> files)
+			throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		File tmpOsm = File.createTempFile("gpx_obf", ".osm.gz");
+		File tmpFolder = new File(tmpOsm.getParentFile(), String.valueOf(System.currentTimeMillis()));
+		String fileName = "gpx_" + System.currentTimeMillis();
+		OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
+		qp.osmFile = tmpOsm;
+		qp.details = OsmGpxWriteContext.QueryParams.DETAILS_ELE_SPEED;
+		OsmGpxWriteContext writeCtx = new OsmGpxWriteContext(qp);
+		File targetObf = new File(tmpFolder.getParentFile(), fileName + IndexConstants.BINARY_MAP_INDEX_EXT);
+		writeCtx.writeObf(files, null, tmpFolder, fileName, targetObf);
+		
+		if (!qp.osmFile.delete()) {
+			qp.osmFile.deleteOnExit();
+		}
+		
+		return targetObf;
 	}
 }

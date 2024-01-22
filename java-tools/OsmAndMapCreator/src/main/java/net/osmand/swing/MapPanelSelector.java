@@ -17,19 +17,21 @@ import javax.swing.AbstractAction;
 import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 
-import net.osmand.data.QuadRect;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.Track;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities.RouteType;
+import net.osmand.gpx.GPXUtilities.Track;
+import net.osmand.gpx.GPXUtilities.TrkSegment;
+import net.osmand.gpx.GPXUtilities.WptPt;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
@@ -37,7 +39,6 @@ import net.osmand.router.network.NetworkRouteContext.NetworkRouteContextStats;
 import net.osmand.router.network.NetworkRouteSelector;
 import net.osmand.router.network.NetworkRouteSelector.NetworkRouteSelectorFilter;
 import net.osmand.router.network.NetworkRouteSelector.RouteKey;
-import net.osmand.router.network.NetworkRouteSelector.RouteType;
 import net.osmand.swing.MapPanel.NativeRendererRunnable;
 import net.osmand.util.MapUtils;
 
@@ -77,7 +78,7 @@ public class MapPanelSelector {
 					continue;
 				}
 				if (o.getX().size() > 1) {
-					List<RouteKey> keys = RouteType.getRouteKeys(o);
+					List<RouteKey> keys = OsmRouteType.getRouteKeys(o.getTags());
 					if (keys.size() > 0) {
 						try {
 							createMenu(o, e.getX(), e.getY()).show(panel, e.getX(), e.getY());
@@ -126,10 +127,10 @@ public class MapPanelSelector {
 			routeKeys = routeMap.keySet();
 		} else {
 			routeMap = null;
-			routeKeys = RouteType.getRouteKeys(renderedObject);
+			routeKeys = OsmRouteType.getRouteKeys(renderedObject.getTags());
 		}
 		for (RouteKey routeKey : routeKeys) {
-			menu.add(new AbstractAction(routeKey.set.toString()) {
+			menu.add(new AbstractAction(routeKey.tags.toString()) {
 				private static final long serialVersionUID = 8970133073749840163L;
 
 				@Override
@@ -139,7 +140,7 @@ public class MapPanelSelector {
 							Map<RouteKey, GPXFile> routes;
 							long tms = System.currentTimeMillis();
 							if (routeMap == null || routeMap.get(routeKey) == null) {
-								System.out.println("Start loading " + routeKey.set);
+								System.out.println("Start loading " + routeKey.tags);
 								if (LOAD_ROUTE_BBOX) {
 									Map<RouteKey, GPXFile> res = routeSelector.getRoutes(latLonBBox, true, routeKey);
 									routes = Collections.singletonMap(routeKey, res.get(routeKey));

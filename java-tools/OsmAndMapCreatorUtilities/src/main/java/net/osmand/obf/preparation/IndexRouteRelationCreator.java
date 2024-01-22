@@ -16,15 +16,15 @@ import net.osmand.binary.MapZooms;
 import net.osmand.data.TransportRoute;
 import net.osmand.obf.preparation.IndexHeightData.WayGeneralStats;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.RouteActivityType;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
-import net.osmand.util.MapAlgorithms;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
+import net.osmand.osm.edit.Way;
+import net.osmand.util.MapAlgorithms;
 
 public class IndexRouteRelationCreator {
 	private final static Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
@@ -66,7 +66,7 @@ public class IndexRouteRelationCreator {
 	
 	private void processRouteRelation(Relation e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.MAP);
-		String rt = e.getTag(OSMTagKey.ROUTE);
+		String rt = tags.get(OSMTagKey.ROUTE.name());
 		boolean publicTransport = IndexTransportCreator.acceptedPublicTransportRoute(rt);
 		boolean road = "road".equals(rt);
 		boolean railway = "railway".equals(rt);
@@ -76,7 +76,7 @@ public class IndexRouteRelationCreator {
 			List<Way> ways = new ArrayList<Way>();
 			List<RelationMember> ms = e.getMembers();
 			tags = new LinkedHashMap<>(tags);
-			RouteActivityType activityType = RouteActivityType.getTypeFromOSMTags(tags);
+			OsmRouteType activityType = OsmRouteType.getTypeFromOSMTags(tags);
 			for (RelationMember rm : ms) {
 				if (rm.getEntity() instanceof Way) {
 					Way w = (Way) rm.getEntity();
@@ -93,8 +93,6 @@ public class IndexRouteRelationCreator {
 					icc.calcRegionTag(e, true);
 				}
 				w.replaceTags(tags);
-				icc.translitJapaneseNames(e, settings.addRegionTag);
-				icc.translitChineseNames(e, settings.addRegionTag);
 				for (int level = 0; level < mapZooms.size(); level++) {
 					icc.getIndexMapCreator().processMainEntity(w, w.getId(), w.getId(), level, tags);
 				}
@@ -108,7 +106,7 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	private void addRouteRelationTags(Relation e, Way w, Map<String, String> tags, RouteActivityType activityType, IndexCreationContext icc) {
+	private void addRouteRelationTags(Relation e, Way w, Map<String, String> tags, OsmRouteType activityType, IndexCreationContext icc) {
 		if (tags.get("color") != null) {
 			tags.put("colour", tags.get("color"));
 		}
@@ -126,20 +124,22 @@ public class IndexRouteRelationCreator {
 			}
 			tags.put("route_activity_type", activityType.getName().toLowerCase());
 		}
-		WayGeneralStats wg = icc.getIndexHeightData().calculateWayGeneralStats(w, DIST_STEP);
-		if (tags.get("distance") == null && wg.dist > 0) {
-			tags.put("distance", String.valueOf((int) wg.dist));
-		}
-		if (wg.eleCount > 0) {
-			int st = (int) wg.startEle;
-			tags.put("start_ele", String.valueOf((int) wg.startEle));
-			tags.put("end_ele__start", String.valueOf((int) wg.endEle - st));
-			tags.put("avg_ele__start", String.valueOf((int) (wg.sumEle / wg.eleCount) - st));
-			tags.put("min_ele__start", String.valueOf((int) wg.minEle - st));
-			tags.put("max_ele__start", String.valueOf((int) wg.maxEle - st));
-			tags.put("diff_ele_up", String.valueOf((int) wg.up));
-			tags.put("diff_ele_down", String.valueOf((int) wg.down));
-			tags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wg.step, wg.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
+		if (icc.getIndexHeightData() != null) {
+			WayGeneralStats wg = icc.getIndexHeightData().calculateWayGeneralStats(w, DIST_STEP);
+			if (tags.get("distance") == null && wg.dist > 0) {
+				tags.put("distance", String.valueOf((int) wg.dist));
+			}
+			if (wg.eleCount > 0) {
+				int st = (int) wg.startEle;
+				tags.put("start_ele", String.valueOf((int) wg.startEle));
+				tags.put("end_ele__start", String.valueOf((int) wg.endEle - st));
+				tags.put("avg_ele__start", String.valueOf((int) (wg.sumEle / wg.eleCount) - st));
+				tags.put("min_ele__start", String.valueOf((int) wg.minEle - st));
+				tags.put("max_ele__start", String.valueOf((int) wg.maxEle - st));
+				tags.put("diff_ele_up", String.valueOf((int) wg.up));
+				tags.put("diff_ele_down", String.valueOf((int) wg.down));
+				tags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wg.step, wg.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
+			}
 		}
 		tags.put("route", "segment");
 		tags.put("route_type", "track");

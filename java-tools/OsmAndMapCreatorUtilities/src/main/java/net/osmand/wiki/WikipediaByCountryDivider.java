@@ -39,18 +39,40 @@ public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
 
 	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		String cmd = args[0];
-		String folder = args[1];
+		String mode = "";
+		String folder = "";
 		boolean skip = false;
-		if (args.length > 2) {
-			skip = args[2].equals("--skip-existing");
+		String database = "";
+
+		for (String arg : args) {
+			String val = arg.substring(arg.indexOf("=") + 1);
+			if (arg.startsWith("--skip-existing=")) {
+				skip = true;
+			} else if (arg.startsWith("--dir=")) {
+				folder = val;
+			} else if (arg.startsWith("--mode=")) {
+				mode = val;
+			} else if (arg.startsWith("--database=")) {
+				database = val;
+			}
 		}
-		switch (cmd) {
+
+		if (mode.isEmpty()) {
+			throw new RuntimeException("Set --mode=inspect OR --mode=generate_country_sqlite OR --mode=generate_test_obf");
+		}
+
+		if (!mode.equals("inspect") && folder.isEmpty()) {
+			throw new RuntimeException("Set --dir=/path/to/wikipedia/source");
+		}
+
+		final String sqliteFileName = database.isEmpty() ? folder + WikiDatabasePreparation.WIKIPEDIA_SQLITE : database;
+
+		switch (mode) {
 			case "inspect":
-				inspectWikiFile(folder);
+				inspectWikiFile(sqliteFileName);
 				break;
 			case "generate_country_sqlite":
-				generateCountrySqlite(folder, skip);
+				generateCountrySqlite(folder, sqliteFileName, skip);
 				break;
 			case "generate_test_obf":
 				String[] latLon = null;
@@ -58,16 +80,16 @@ public class WikipediaByCountryDivider {
 					String val = args[2].substring(args[2].indexOf("=") + 1);
 					latLon = val.split(";");
 				}
-				generateCountrySqlite(folder, skip, latLon);
+				generateCountrySqlite(folder, sqliteFileName, skip, latLon);
 		}
 	}
 
-	protected static void generateCountrySqlite(String folder, boolean skip)
+	protected static void generateCountrySqlite(String folder, String database, boolean skip)
 			throws SQLException, IOException, InterruptedException, XmlPullParserException {
-		generateCountrySqlite(folder, skip, null);
+		generateCountrySqlite(folder, database, skip, null);
 	}
 
-	protected static void generateCountrySqlite(String folder, boolean skip, String[] testLatLon)
+	protected static void generateCountrySqlite(String folder, String database, boolean skip, String[] testLatLon)
 			throws SQLException, IOException, InterruptedException, XmlPullParserException {
 		double lat = 0;
 		double lon = 0;
@@ -77,7 +99,7 @@ public class WikipediaByCountryDivider {
 			lon = Double.parseDouble(testLatLon[1]);
 		}
 		String testRegionName = "";
-		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
+		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(database, log);
 		OsmandRegions regs = new OsmandRegions();
 		regs.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
@@ -289,8 +311,8 @@ public class WikipediaByCountryDivider {
 		serializer.endTag(null, "tag");
 	}
 
-	protected static void inspectWikiFile(String folder) throws SQLException {
-		Connection conn = DBDialect.SQLITE.getDatabaseConnection(folder + "wiki.sqlite", log);
+	protected static void inspectWikiFile(String database) throws SQLException {
+		Connection conn = DBDialect.SQLITE.getDatabaseConnection(database, log);
 		ResultSet rs = conn.createStatement().executeQuery("SELECT COUNT(*) cnt, regionName  FROM wiki_region GROUP BY regionName ORDER BY cnt desc");
 		System.out.println("POI by countries");
 		while(rs.next()) {

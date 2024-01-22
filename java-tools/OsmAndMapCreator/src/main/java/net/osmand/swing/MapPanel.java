@@ -61,11 +61,9 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
-import net.osmand.data.RotatedTileBox;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
-import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.MapCreatorVersion;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.MapDiff;
@@ -74,6 +72,8 @@ import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.data.RotatedTileBox;
+import net.osmand.gpx.GPXFile;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.MapTileDownloader;

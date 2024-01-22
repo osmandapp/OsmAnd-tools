@@ -9,16 +9,18 @@ import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionListener;
 
-import net.osmand.GPXUtilities;
 import org.springframework.stereotype.Component;
 
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.router.RouteCalculationProgress;
 
 @WebListener
 @Component
 public class UserSessionResources implements HttpSessionListener {
 
 	protected static final String SESSION_GPX = "gpx";
+	protected static final String SESSION_ROUTING = "routing";
 	
 	static class GPXSessionFile {
 		transient File file;
@@ -28,9 +30,9 @@ public class UserSessionResources implements HttpSessionListener {
 		GPXTrackAnalysis srtmAnalysis;
 	}
 	
-	static class GPXSessionContext {
-		List<GPXSessionFile> files = new ArrayList<GPXSessionFile>();
-		List<File> tempFiles = new ArrayList<File>();
+	public static class GPXSessionContext {
+		List<GPXSessionFile> files = new ArrayList<>();
+		public List<File> tempFiles = new ArrayList<>();
 	}
 	
 	public GPXSessionContext getGpxResources(HttpSession httpSession) {
@@ -40,6 +42,15 @@ public class UserSessionResources implements HttpSessionListener {
 			httpSession.setAttribute(SESSION_GPX, ctx);
 		}
 		return ctx;
+	}
+	
+	public RouteCalculationProgress getRoutingProgress(HttpSession session) {
+		if (session.getAttribute(SESSION_ROUTING) instanceof RouteCalculationProgress) {
+			((RouteCalculationProgress) session.getAttribute(SESSION_ROUTING)).isCancelled = true;
+		}
+		RouteCalculationProgress progress = new RouteCalculationProgress();
+		session.setAttribute(SESSION_ROUTING, progress);
+		return progress;
 	}
 	
 	@Override

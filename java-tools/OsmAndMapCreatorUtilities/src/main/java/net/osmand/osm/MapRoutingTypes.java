@@ -171,9 +171,16 @@ public class MapRoutingTypes {
 
 	private boolean testNonParseableRules(String tag, String value) {
 		// fix possible issues (i.e. non arabic digits)
-		if(tag.equals("maxspeed") && value != null) {
+		if (tag.equals("maxspeed") && value != null) {
 			try {
 				RouteDataObject.parseSpeed(value, 0);
+			} catch (Exception e) {
+				return false;
+			}
+		}
+		if (tag.equals("lanes") && value != null) {
+			try {
+				Integer.parseInt(value);
 			} catch (Exception e) {
 				return false;
 			}
@@ -182,12 +189,12 @@ public class MapRoutingTypes {
 	}
 
 
-	public boolean encodeEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names){
+	public boolean encodeEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names) {
 		boolean init = false;
-		for(Entry<String, String> es : tags.entrySet()) {
+		for (Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = es.getValue();
-			if(!testNonParseableRules(tag, value)){
+			if (!testNonParseableRules(tag, value)) {
 				continue;
 			}
 			if (contains(TAGS_TO_ACCEPT, tag, value)) {
@@ -195,7 +202,7 @@ public class MapRoutingTypes {
 				break;
 			}
 		}
-		if(!init) {
+		if (!init) {
 			return false;
 		}
 		outTypes.clear();
@@ -227,47 +234,43 @@ public class MapRoutingTypes {
 		return true;
 	}
 
-	public boolean encodeBaseEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names){
+	public boolean encodeBaseEntity(Map<String, String> tags, TIntArrayList outTypes, Map<MapRouteType, String> names) {
 		boolean init = false;
-		for(Entry<String, String> es : tags.entrySet()) {
+		for (Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = es.getValue();
 			if (contains(TAGS_TO_ACCEPT, tag, value)) {
-				if(value.startsWith("trunk") || value.startsWith("motorway")
-						|| value.startsWith("primary") || value.startsWith("secondary")
-						|| value.startsWith("tertiary")
-						|| value.startsWith("ferry")
-						) {
+				if (value.startsWith("trunk") || value.startsWith("motorway") || value.startsWith("primary")
+						|| value.startsWith("secondary") || value.startsWith("tertiary") || value.startsWith("ferry")) {
 					init = true;
 					break;
 				}
 			}
 		}
-		if(!init) {
+		if (!init) {
 			return false;
 		}
 		outTypes.clear();
 		names.clear();
-		for(Entry<String, String> es : tags.entrySet()) {
+		for (Entry<String, String> es : tags.entrySet()) {
 			String tag = es.getKey();
 			String value = converBooleanValue(es.getValue());
-			if(!testNonParseableRules(tag, value)){
+			if (!testNonParseableRules(tag, value)) {
 				continue;
 			}
 			String tvl = getMap(BASE_TAGS_TO_REPLACE, tag, value);
-			if(tvl != null) {
+			if (tvl != null) {
 				int i = tvl.indexOf(TAG_DELIMETER);
 				tag = tvl.substring(0, i);
 				value = tvl.substring(i + 1);
 			}
-			if(BASE_TAGS_TEXT.contains(tag)) {
-				if(validateType(tag, value)) {
+			if (BASE_TAGS_TEXT.contains(tag)) {
+				if (validateType(tag, value)) {
 					names.put(registerRule(tag, null), value);
 				}
 			}
-			if(contains(TAGS_TO_ACCEPT, tag, value) ||
-					startsWith(BASE_TAGS_TO_SAVE, tag, value)) {
-				if(validateType(tag, value)) {
+			if (contains(TAGS_TO_ACCEPT, tag, value) || startsWith(BASE_TAGS_TO_SAVE, tag, value)) {
+				if (validateType(tag, value)) {
 					outTypes.add(registerRule(tag, value).id);
 				}
 			}
@@ -285,22 +288,25 @@ public class MapRoutingTypes {
 	}
 
 	public void encodePointTypes(Way e, TLongObjectHashMap<TIntArrayList> pointTypes,
-			TLongObjectHashMap<TIntObjectHashMap<String> > pointNames, boolean base){
+			TLongObjectHashMap<TIntObjectHashMap<String>> pointNames, 
+			RelationTagsPropagation tagsTransformer, MapRenderingTypesEncoder renderingTypes, boolean base) {
 		pointTypes.clear();
-		for(Node nd : e.getNodes() ) {
+		for (Node nd : e.getNodes()) {
 			if (nd != null) {
 				boolean accept = false;
-				Map<String, String> ntags = encoder.transformTags(nd.getTags(), EntityType.NODE, EntityConvertApplyType.ROUTING);
+				Map<String, String> ntags = tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.ROUTING, nd, nd.getTags());
+				ntags = encoder.transformTags(ntags, EntityType.NODE, EntityConvertApplyType.ROUTING);
 				for (Entry<String, String> es : ntags.entrySet()) {
 					String tag = es.getKey();
 					String value = converBooleanValue(es.getValue());
 					String tvl = getMap(base ? BASE_TAGS_TO_REPLACE : TAGS_TO_REPLACE, tag, value);
-					if(tvl != null) {
+					if (tvl != null) {
 						int i = tvl.indexOf(TAG_DELIMETER);
 						tag = tvl.substring(0, i);
 						value = tvl.substring(i + 1);
 					}
-					if (contains(TAGS_TO_ACCEPT, tag, value) || startsWith(base? BASE_TAGS_TO_SAVE : TAGS_TO_SAVE, tag, value)) {
+					if (contains(TAGS_TO_ACCEPT, tag, value)
+							|| startsWith(base ? BASE_TAGS_TO_SAVE : TAGS_TO_SAVE, tag, value)) {
 						if (!pointTypes.containsKey(nd.getId())) {
 							pointTypes.put(nd.getId(), new TIntArrayList());
 						}

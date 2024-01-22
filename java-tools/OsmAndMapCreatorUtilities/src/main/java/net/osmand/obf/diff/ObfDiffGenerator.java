@@ -1,6 +1,5 @@
 package net.osmand.obf.diff;
 
-import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
@@ -13,23 +12,13 @@ import net.osmand.data.TransportStop;
 import net.osmand.obf.BinaryInspector;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
-import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.zip.GZIPInputStream;
 
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -43,12 +32,13 @@ public class ObfDiffGenerator {
 	
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
+	public static boolean COMPARE_TRANSPORT = true;
 	
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
-			args[0] = System.getProperty("maps.dir") + "Iran_bushehr_asia.obf";
-			args[1] = System.getProperty("maps.dir") + "Iran_bushehr_asia_2.obf";
+			args[0] = System.getProperty("maps.dir") + "Andorra_europe_2.obf";
+			args[1] = System.getProperty("maps.dir") + "Andorra_europe_2.obf_";
 			args[2] = "stdout";
 //			args[2] = "19_07_29_20_30_diff.obf";
 //			args[3] = "19_07_29_20_30_diff.osm.gz";
@@ -91,20 +81,22 @@ public class ObfDiffGenerator {
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
 		
-		Set<EntityId> modifiedObjIds = null;
+		Set<EntityId> allModifiedObjIds = new HashSet<>();
 		if (diff != null) {
 			try {
-				modifiedObjIds = DiffParser.fetchModifiedIds(diff);
+				DiffParser.fetchModifiedIds(diff, allModifiedObjIds, null);
 			} catch (IOException | XmlPullParserException e) {
 				e.printStackTrace();
 			}
 		}
 
 		System.out.println("Comparing the files...");
-		compareMapData(fStart, fEnd, result == null, modifiedObjIds);
-		compareRouteData(fStart, fEnd, result == null, modifiedObjIds);
-		comparePOI(fStart, fEnd, result == null, modifiedObjIds);
-		compareTransport(fStart, fEnd, result == null, modifiedObjIds);
+		compareMapData(fStart, fEnd, result == null, allModifiedObjIds);
+		compareRouteData(fStart, fEnd, result == null, allModifiedObjIds);
+		comparePOI(fStart, fEnd, result == null, allModifiedObjIds);
+		if (COMPARE_TRANSPORT) {
+			compareTransport(fStart, fEnd, result == null, allModifiedObjIds);
+		}
 		
 		System.out.println("Finished comparing.");
 		if (result != null) {
@@ -137,7 +129,7 @@ public class ObfDiffGenerator {
 				} else {
 					EntityId aid = getTransportEntityId(stopS, EntityType.NODE);
 					EntityId aidWay = getTransportEntityId(stopS, EntityType.WAY);
-					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || 
+					if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(aid) ||
 							modifiedObjIds.contains(aidWay)) {
 						stopS.setDeleted();
 						endStopData.put(stopId, stopS);
@@ -186,56 +178,61 @@ public class ObfDiffGenerator {
 		TLongObjectHashMap<TransportStop> routeDeletedStops = new TLongObjectHashMap<>();
 		TLongHashSet existingRoutes = new TLongHashSet();
 		for (Long routeId : startRouteData.keys()) {
-			existingRoutes.add(routeId);
-			TransportRoute routeS = startRouteData.get(routeId);
-			TransportRoute routeE = endRouteData.get(routeId);
-			routeDeletedStops.clear();
-			if (routeE == null) {
-				EntityId aid = getTransportRouteId(routeS);
-				if (modifiedObjIds != null && !modifiedObjIds.contains(aid)) {
-					// transport route wasn't modified, so we don't need to delete it 
-					continue;
+			try {
+				existingRoutes.add(routeId);
+				TransportRoute routeS = startRouteData.get(routeId);
+				TransportRoute routeE = endRouteData.get(routeId);
+				routeDeletedStops.clear();
+				if (routeE == null) {
+					EntityId aid = getTransportRouteId(routeS);
+					if (modifiedObjIds != null && !modifiedObjIds.contains(aid)) {
+						// transport route wasn't modified, so we don't need to delete it
+						continue;
 //					throw new IllegalStateException("Transport route " + routeId + " is missing in (2): " + routeS);
-				}
-				// mark route as deleted on all stops!
-				for(TransportStop s : routeS.getForwardStops()) {
-					routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
-				}
-				if (print) {
-					System.out.println("Transport route " + routeId + " is missing in (2): " + routeS);
-				}
-			} else {
-				boolean cmp = routeE.compareRoute(routeS);
-				if (!cmp) {
+					}
+					// mark route as deleted on all stops!
+					for (TransportStop s : routeS.getForwardStops()) {
+						routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+					}
 					if (print) {
-						System.out.println("Transport route " + routeId + " is not equal: " + routeS + " != " + routeE);
+						System.out.println("Transport route " + routeId + " is missing in (2): " + routeS);
 					}
-					// mark on all previous stops to be deleted
-					if (routeS != null) {
-						for (TransportStop s : routeS.getForwardStops()) {
-							routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+				} else {
+					boolean cmp = routeE.compareRoute(routeS);
+					if (!cmp) {
+						if (print) {
+							System.out.println(
+									"Transport route " + routeId + " is not equal: " + routeS + " != " + routeE);
 						}
+						// mark on all previous stops to be deleted
+						if (routeS != null) {
+							for (TransportStop s : routeS.getForwardStops()) {
+								routeDeletedStops.put(adjustTransportRouteStopIdToId(s.getId()), s);
+							}
+						}
+						// don't mark to delete if it will be added
+						for (TransportStop s : routeE.getForwardStops()) {
+							long stopId = adjustTransportRouteStopIdToId(s.getId());
+							routeDeletedStops.remove(stopId);
+							TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, s, routeId,
+									stopId);
+							originalStop.addRouteId(routeId);
+						}
+
 					}
-					// don't mark to delete if it will be added
-					for(TransportStop s : routeE.getForwardStops()) {
-						long stopId = adjustTransportRouteStopIdToId(s.getId());
-						routeDeletedStops.remove(stopId);
-						TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
-								s, routeId, stopId);
-						originalStop.addRouteId(routeId);
+					if (cmp || print) {
+						endRouteData.remove(routeId);
 					}
-					
 				}
-				if(cmp || print){
-					endRouteData.remove(routeId);
+				for (long stopId : routeDeletedStops.keys()) {
+					TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted,
+							routeDeletedStops.get(stopId), routeId, stopId);
+					originalStop.addDeletedRouteId(routeId);
 				}
+			} catch (RuntimeException e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace();
 			}
-			for(long stopId : routeDeletedStops.keys()) {
-				TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
-						routeDeletedStops.get(stopId), routeId, stopId);
-				originalStop.addDeletedRouteId(routeId);
-			}
-			
 			
 		}
 		
@@ -256,8 +253,8 @@ public class ObfDiffGenerator {
 	private TransportStop checkEndStopData(TLongObjectHashMap<TransportStop> endStopData,
 			TLongObjectHashMap<TransportStop> endStopDataDeleted, TransportStop errorStop,
 			long routeId, long stopId) {
-		if(!endStopData.contains(stopId)) {
-			if(!endStopDataDeleted.contains(stopId)) {
+		if (!endStopData.contains(stopId)) {
+			if (!endStopDataDeleted.contains(stopId)) {
 				throw new IllegalArgumentException(
 						String.format("Missing stop %d for route %d: %s", stopId, routeId / 2, errorStop));
 			}
@@ -319,7 +316,7 @@ public class ObfDiffGenerator {
 				}
 			} else {
 				if (objE == null) {
-					if (modifiedObjIds == null || modifiedObjIds.contains(aid) || aid == null) {
+					if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(aid) || aid == null) {
 						objS.setAdditionalInfo(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 						endPoi.put(idx, objS);
 						if (endPoiSource.get(objS.getId()) == null) {
@@ -346,7 +343,7 @@ public class ObfDiffGenerator {
 		}
 	}
 
-	private Map<String, Amenity> buildPoiMap(TLongObjectHashMap<Map<String, Amenity>> startPoiSource) {
+	public Map<String, Amenity> buildPoiMap(TLongObjectHashMap<Map<String, Amenity>> startPoiSource) {
 		HashMap<String, Amenity> map = new HashMap<>();
 		for (Map<String, Amenity> am : startPoiSource.valueCollection()) {
 			Iterator<Entry<String, Amenity>> it = am.entrySet().iterator();
@@ -397,7 +394,7 @@ public class ObfDiffGenerator {
 					}
 				} else {
 					if (objE == null) {
-						if (modifiedObjIds == null || modifiedObjIds.contains(thisEntityId) || thisEntityId == null) {
+						if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(thisEntityId) || thisEntityId == null) {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null, 0, 0);
 							endData.put(idx, obj);
@@ -489,7 +486,7 @@ public class ObfDiffGenerator {
 			} else {
 				if (objE == null) {
 					EntityId wayId = new EntityId(EntityType.WAY, idx >> (BinaryInspector.SHIFT_ID));
-					if (modifiedObjIds == null || modifiedObjIds.contains(wayId)) {
+					if (modifiedObjIds.size() == 0 || modifiedObjIds.contains(wayId)) {
 						RouteDataObject rdo = generateDeletedRouteObject(ri, deleteId, objS);
 						endData.put(idx, rdo);
 					}
@@ -513,51 +510,4 @@ public class ObfDiffGenerator {
 		rdo.types = new int[] { deleteId };
 		return rdo;
 	}
-	
-	private static class DiffParser {
-		
-		private static final String ATTR_ID = "id";
-		private static final String TYPE_RELATION = "relation";
-		private static final String TYPE_WAY = "way";
-		private static final String TYPE_NODE = "node";
-
-		public static Set<EntityId> fetchModifiedIds(File diff) throws IOException, XmlPullParserException {
-			Set<EntityId> result = new HashSet<>();
-			InputStream fis ;
-			if(diff.getName().endsWith(".gz")) {
-				fis = new GZIPInputStream(new FileInputStream(diff));
-			} else {
-				fis = new FileInputStream(diff);
-			}
-			XmlPullParser parser = PlatformUtil.newXMLPullParser();
-			parser.setInput(fis, "UTF-8");
-			int tok;
-			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-				if (tok == XmlPullParser.START_TAG ) {
-					String name = parser.getName();
-					if (TYPE_NODE.equals(name)) {
-						result.add(new EntityId(EntityType.NODE, parseLong(parser, ATTR_ID, -1)));
-					} else if (TYPE_WAY.equals(name) ) {
-						result.add(new EntityId(EntityType.WAY, parseLong(parser, ATTR_ID, -1)));
-					} else if (TYPE_RELATION.equals(name)) {
-						result.add(new EntityId(EntityType.RELATION, parseLong(parser, ATTR_ID, -1)));
-					}	
-				}
-			}
-			return result;
-		}
-		
-		protected static long parseLong(XmlPullParser parser, String name, long defVal){
-			long ret = defVal; 
-			String value = parser.getAttributeValue("", name);
-			if(value == null) {
-				return defVal;
-			}
-			try {
-				ret = Long.parseLong(value);
-			} catch (NumberFormatException e) {
-			}
-			return ret;
-		}
-	}	
 }

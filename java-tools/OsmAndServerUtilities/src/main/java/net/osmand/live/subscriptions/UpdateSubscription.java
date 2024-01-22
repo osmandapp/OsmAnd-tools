@@ -18,6 +18,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
 import org.json.JSONException;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -28,6 +29,8 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
@@ -38,6 +41,7 @@ import com.google.api.services.androidpublisher.model.IntroductoryPriceInfo;
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
+import net.osmand.PlatformUtil;
 import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonIOException;
 import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonSubscription;
 import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiJsonResponseException;
@@ -50,6 +54,8 @@ import net.osmand.util.Algorithms;
 public class UpdateSubscription {
 
 
+    private final static Log LOGGER = PlatformUtil.getLog(UpdateSubscription.class);
+
 	// init one time
 	public static final String GOOGLE_PRODUCT_NAME = "OsmAnd+";
 	public static final String GOOGLE_PRODUCT_NAME_FREE = "OsmAnd";
@@ -60,7 +66,7 @@ public class UpdateSubscription {
 	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y = ".huawei.annual.pro";
 	public static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_M = ".huawei.monthly.pro";
 	public static final String OSMAND_PRO_AMAZON_SUBSCRIPTION_PART = ".amazon.pro";
-    public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription";
+	public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription.pro";
 
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000l * 60 * 60 * 24;
@@ -86,6 +92,7 @@ public class UpdateSubscription {
 	private static class UpdateParams {
 		public boolean verifyAll;
 		public boolean verbose;
+		public boolean forceUpdate;
 	}
 
 	public enum SubscriptionType {
@@ -188,6 +195,8 @@ public class UpdateSubscription {
 				set = EnumSet.of(SubscriptionType.HUAWEI);
 			} else if ("-onlyamazon".equals(args[i])) {
 				set = EnumSet.of(SubscriptionType.AMAZON);
+			} else if ("-forceupdate".equals(args[i])) {
+				up.forceUpdate = true;
 			}
 		}
 		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile);
@@ -196,14 +205,22 @@ public class UpdateSubscription {
 //			return;
 //		}
 		Class.forName("org.postgresql.Driver");
+		List<SubscriptionUpdateException> exceptionsUpdates = new ArrayList<UpdateSubscription.SubscriptionUpdateException>();
 		Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
 				System.getenv("DB_USER"), System.getenv("DB_PWD"));
 		for (SubscriptionType t : set) {
-			new UpdateSubscription(publisher, t, revalidateinvalid).queryPurchases(conn, up);
+			new UpdateSubscription(publisher, t, revalidateinvalid).queryPurchases(conn, up, exceptionsUpdates);
+		}
+		if (exceptionsUpdates.size() > 0) {
+			StringBuilder msg = new StringBuilder();
+			for (SubscriptionUpdateException e : exceptionsUpdates) {
+				msg.append(e.orderid + " " + e.getMessage()).append("\n");
+			}
+			throw new IllegalStateException(msg.toString());
 		}
 	}
 
-	void queryPurchases(Connection conn, UpdateParams pms) throws SQLException {
+	void queryPurchases(Connection conn, UpdateParams pms, List<SubscriptionUpdateException> exceptionsUpdates) throws SQLException {
 		ResultSet rs = conn.createStatement().executeQuery(selQuery);
 		updStat = conn.prepareStatement(updQuery);
 		delStat = conn.prepareStatement(delQuery);
@@ -213,7 +230,6 @@ public class UpdateSubscription {
 		AmazonIAPHelper amazonIAPHelper = null;
 		AndroidPublisher.Purchases purchases = publisher != null ? publisher.purchases() : null;
 		ReceiptValidationHelper receiptValidationHelper = SubscriptionType.IOS == subType ? new ReceiptValidationHelper() : null;
-		List<SubscriptionUpdateException> exceptionsUpdates = new ArrayList<UpdateSubscription.SubscriptionUpdateException>();
 		while (rs.next()) {
 			String purchaseToken = rs.getString("purchaseToken");
 			String prevpurchaseToken = rs.getString("prevvalidpurchasetoken");
@@ -251,36 +267,28 @@ public class UpdateSubscription {
 					startTime == null ? "" : new Date(startTime.getTime()),
 					expireTime == null ? "" : new Date(expireTime.getTime()), activeNow + ""));
 			try {
+				SubscriptionPurchase sub = null;
 				if (subType == SubscriptionType.IOS) {
-					SubscriptionPurchase sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId,
-							regTime, startTime, expireTime, currentTime, introcycles, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new IllegalStateException("This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
+					sub = processIosSubscription(receiptValidationHelper, purchaseToken, sku, orderId,
+							regTime, startTime, expireTime, currentTime, introcycles, pms);
 				} else if (subType == SubscriptionType.HUAWEI) {
 					if (huaweiIAPHelper == null) {
 						huaweiIAPHelper = new HuaweiIAPHelper();
 					}
-					SubscriptionPurchase sub = processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId,
-							regTime, startTime, expireTime, currentTime, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
+					sub = processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId,
+							regTime, startTime, expireTime, currentTime, pms);
 				} else if (subType == SubscriptionType.AMAZON) {
 					if (amazonIAPHelper == null) {
 						amazonIAPHelper = new AmazonIAPHelper();
 					}
-					SubscriptionPurchase sub = processAmazonSubscription(amazonIAPHelper, purchaseToken, sku, orderId,
-							regTime, startTime, expireTime, currentTime, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
+					sub = processAmazonSubscription(amazonIAPHelper, purchaseToken, sku, orderId,
+							regTime, startTime, expireTime, currentTime, pms);
 				} else if (subType == SubscriptionType.ANDROID) {
-					SubscriptionPurchase sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId,
-							regTime, startTime, expireTime, currentTime, pms.verbose);
-					if (sub == null && prevpurchaseToken != null) {
-						throw new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid.");
-					}
+					sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId,
+							regTime, startTime, expireTime, currentTime, pms);
+				}
+				if (sub == null && prevpurchaseToken != null) {
+					exceptionsUpdates.add(new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid."));
 				}
 			} catch (SubscriptionUpdateException e) {
 				exceptionsUpdates.add(e);
@@ -298,26 +306,24 @@ public class UpdateSubscription {
 		if (!conn.getAutoCommit()) {
 			conn.commit();
 		}
-		if (exceptionsUpdates.size() > 0) {
-			StringBuilder msg = new StringBuilder();
-			for (SubscriptionUpdateException e : exceptionsUpdates) {
-				msg.append(e.orderid + " " + e.getMessage()).append("\n");
-			}
-			throw new IllegalStateException(msg.toString());
-		}
 	}
 
 	private SubscriptionPurchase processIosSubscription(ReceiptValidationHelper receiptValidationHelper, String purchaseToken, String sku, String orderId,
 			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, int prevIntroCycles,
-			boolean verbose) throws SQLException, SubscriptionUpdateException {
+			UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		try {
 			SubscriptionPurchase subscription = null;
 			String reasonToDelete = null;
 			String kind = "";
-			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken);
+			ReceiptResult loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken, false);
+			if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
+//				kind = "invalid";
+//				reasonToDelete = "receipt from sandbox environment";
+				loadReceipt = receiptValidationHelper.loadReceipt(purchaseToken, true);
+			}
 			if (loadReceipt.result) {
 				JsonObject receiptObj = loadReceipt.response;
-				if (verbose) {
+				if (pms.verbose) {
 					System.out.println("Result: " + receiptObj.toString());
 				}
 				subscription = parseIosSubscription(sku, orderId, prevIntroCycles, receiptObj);
@@ -325,26 +331,26 @@ public class UpdateSubscription {
 					kind = "empty";
 					reasonToDelete = "no purchases purchase format.";
 				}
-			} else if (loadReceipt.error == ReceiptValidationHelper.SANDBOX_ERROR_CODE_TEST) {
-				// sandbox: do not update anymore
-				kind = "invalid";
-				reasonToDelete = "receipt from sandbox environment";
 			} else if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
 				// sandbox: do not update anymore
 				kind = "invalid";
 				reasonToDelete = "user gone";
 			}
 			if (subscription != null) {
-				updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
+				updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription, pms);
 			} else if (reasonToDelete != null) {
 				deleteSubscription(orderId, sku, currentTime, reasonToDelete, kind);
 			} else {
+				if (pms.verbose && loadReceipt.error > 0 && loadReceipt.response != null) {
+					System.out.println("Error status: " + loadReceipt.error + ", json:" + loadReceipt.response.toString());
+				}
 				System.err.println(String.format(
 						"?? Error updating  sku %s and orderid %s (should be checked and fixed)!", sku, orderId));
 			}
 			return subscription;
 		} catch (RuntimeException e) {
-			throw new SubscriptionUpdateException(orderId, String.format("?? Error updating  sku %s and orderid %s (should be checked and fixed)!!!: %s", sku,
+			LOGGER.warn(e.getMessage(), e);
+			throw new SubscriptionUpdateException(orderId, String.format("??- Error updating  sku %s and orderid %s (should be checked and fixed)!!!: %s", sku,
 					orderId, e.getMessage()));
 		}
 	}
@@ -354,7 +360,7 @@ public class UpdateSubscription {
 		SubscriptionPurchase subscription = null;
 		List<InAppReceipt> inAppReceipts = ReceiptValidationHelper.parseInAppReceipts(receiptObj);
 		if (!inAppReceipts.isEmpty()) {
-			boolean autoRenewing = false;
+			Boolean autoRenewing = null;
 			int introCycles = 0;
 			long startDate = 0;
 			long expiresDate = 0;
@@ -404,7 +410,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId,
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		HuaweiSubscription subscription = null;
 		String reason = "";
 		String kind = null;
@@ -415,7 +421,7 @@ public class UpdateSubscription {
 				return null;
 			}
 			subscription = huaweiIAPHelper.getHuaweiSubscription(orderId, purchaseToken);
-			if (verbose) {
+			if (pms.verbose) {
 				System.out.println("Result: " + subscription.toString());
 			}
 		} catch (IOException e) {
@@ -454,7 +460,7 @@ public class UpdateSubscription {
 				throw new IllegalStateException(
 						String.format("Order id '%s' != '%s' don't match", orderId, subscription.subscriptionId));
 			}
-			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscriptionPurchase);
+			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscriptionPurchase, pms);
 		} else if (kind != null) {
 			deleteSubscription(orderId, sku, currentTime, reason, kind);
 		} else {
@@ -474,7 +480,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processAmazonSubscription(AmazonIAPHelper amazonIAPHelper, String purchaseToken, String sku, String orderId,
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		AmazonSubscription subscription = null;
 		String reason = "";
 		String kind = null;
@@ -483,7 +489,7 @@ public class UpdateSubscription {
 				return null;
 			}
 			subscription = amazonIAPHelper.getAmazonSubscription(orderId, purchaseToken);
-			if (verbose) {
+			if (pms.verbose) {
 				System.out.println("Result: " + subscription.toString());
 			}
 		} catch (IOException e) {
@@ -520,7 +526,7 @@ public class UpdateSubscription {
 				throw new IllegalStateException(
 						String.format("Order id '%s' != '%s' don't match", orderId, subscription.receiptId));
 			}
-			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscriptionPurchase);
+			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscriptionPurchase, pms);
 		} else if (kind != null) {
 			deleteSubscription(orderId, sku, currentTime, reason, kind);
 		} else {
@@ -540,7 +546,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId,
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, boolean verbose) throws SQLException, SubscriptionUpdateException {
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		SubscriptionPurchase subscription = null;
 		String reason = "";
 		String kind = null;
@@ -550,7 +556,7 @@ public class UpdateSubscription {
 			} else {
 				subscription = purchases.subscriptions().get(GOOGLE_PACKAGE_NAME, sku, purchaseToken).execute();
 			}
-			if (verbose) {
+			if (pms.verbose) {
 				System.out.println("Result: " + subscription.toPrettyString());
 			}
 		} catch (IOException e) {
@@ -580,7 +586,7 @@ public class UpdateSubscription {
 				throw new IllegalStateException(
 						String.format("Order id '%s' != '%s' don't match", orderId, appStoreOrderId));
 			}
-			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription);
+			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription, pms);
 		} else if (kind != null) {
 			deleteSubscription(orderId, sku, currentTime, reason, kind);
 		} else {
@@ -623,19 +629,22 @@ public class UpdateSubscription {
 	}
 
 	private boolean updateSubscriptionDb(String orderId, String sku, Timestamp startTime, Timestamp expireTime,
-									  long tm, SubscriptionPurchase subscription) throws SQLException, SubscriptionUpdateException {
+									  long tm, SubscriptionPurchase subscription, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		boolean updated = false;
 		int ind = 1;
 		updStat.setTimestamp(ind++, new Timestamp(tm));
 		if (subscription.getStartTimeMillis() != null) {
 			int maxDays = 40;
 			if (startTime != null && Math.abs(startTime.getTime() - subscription.getStartTimeMillis()) > maxDays * DAY && startTime.getTime() > 100000 * 1000L) {
-				throw new SubscriptionUpdateException(orderId, String.format(
-						"ERROR: Start timestamp changed more than %d days '%s' (db) != '%s' (appstore) '%s' %s",
-						maxDays, new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis()), orderId, sku));
-//				System.err.println(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
-//						new Date(startTime.getTime()),
-//						new Date(subscription.getStartTimeMillis()), orderId, sku));
+				if (!pms.forceUpdate) {
+					throw new SubscriptionUpdateException(orderId, String.format(
+							"ERROR: Start timestamp changed more than %d days '%s' (db) != '%s' (appstore) '%s' %s",
+							maxDays, new Date(startTime.getTime()), new Date(subscription.getStartTimeMillis()), orderId, sku));
+				} else {
+					System.err.println(String.format("ERROR: Start timestamp changed more than 14 days '%s' (db) != '%s' (appstore) '%s' %s",
+							new Date(startTime.getTime()),
+							new Date(subscription.getStartTimeMillis()), orderId, sku));
+				}
 			}
 			updStat.setTimestamp(ind++, new Timestamp(subscription.getStartTimeMillis()));
 			updated = true;
@@ -726,6 +735,18 @@ public class UpdateSubscription {
 		return updated;
 	}
 
+	private static HttpRequestInitializer setHttpTimeout(final HttpRequestInitializer requestInitializer) {
+		  return new HttpRequestInitializer() {
+		    @Override
+		    public void initialize(HttpRequest httpRequest) throws IOException {
+		      requestInitializer.initialize(httpRequest);
+		      // 12 min
+		      httpRequest.setConnectTimeout(12 * 60000);  
+		      httpRequest.setReadTimeout(12 * 60000);  
+		    }
+		  };
+	}
+	
 	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
@@ -747,7 +768,7 @@ public class UpdateSubscription {
 		// bld.setHost(serverPublicUrl);
 		Credential credential = new AuthorizationCodeInstalledApp(flow, bld.build()).authorize("user");
 		System.out.println("Credentials saved to " + dataStoreDir.getAbsolutePath());
-		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, credential)
+		AndroidPublisher publisher = new AndroidPublisher.Builder(httpTransport, jsonFactory, setHttpTimeout(credential))
 				.setApplicationName(GOOGLE_PRODUCT_NAME).build();
 
 		return publisher;

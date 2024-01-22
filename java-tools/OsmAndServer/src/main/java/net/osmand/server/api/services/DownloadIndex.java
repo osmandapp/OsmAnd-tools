@@ -37,8 +37,32 @@ public class DownloadIndex {
 
     private String description;
     
+    private boolean free;
+    
+    private String freeMessage;
+    
     private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd.MM.yyyy");
+    
+    private SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm:ss");
 
+    
+    @XmlAttribute(name = "free")
+	public boolean isFree() {
+		return free;
+	}
+
+	public void setFree(boolean free) {
+		this.free = free;
+	}
+
+	@XmlAttribute(name = "freeMessage")
+	public String getFreeMessage() {
+		return freeMessage;
+	}
+
+	public void setFreeMessage(String freeMessage) {
+		this.freeMessage = freeMessage;
+	}
     public void setType(DownloadType type) {
 		this.type = type;
 	}
@@ -75,6 +99,14 @@ public class DownloadIndex {
 		return type.getType();
 	}
 	
+	
+	public String getHttpParam() {
+		if (type.getHeaders().length > 0) {
+			return type.getHeaders()[0];
+		}
+		return "standard";
+	}
+	
 	public DownloadType getDownloadType() {
 		return type;
 	}
@@ -109,6 +141,10 @@ public class DownloadIndex {
 	@XmlAttribute(name = "name")
 	public String getName() {
 		return name;
+	}
+	
+	public String getTime() {
+		return TIME_FORMAT.format(new Date(timestamp));
 	}
 
 	@XmlAttribute(name = "description")
@@ -175,6 +211,10 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.HILLSHADE;
 			} else if (v.equals("heightmap")) {
 				dt = DownloadIndexesService.DownloadType.HEIGHTMAP;
+			} else if (v.equals("weather")) {
+				dt = DownloadIndexesService.DownloadType.WEATHER;
+			} else if (v.equals("geotiff")) {
+				dt = DownloadIndexesService.DownloadType.GEOTIFF;
 			} else if (v.equals("slope")) {
 				dt = DownloadIndexesService.DownloadType.SLOPE;
 			} else if (v.equals("road_map")) {
@@ -188,6 +228,7 @@ public class DownloadIndex {
 			return v.getType();
 		}
 	}
+
 
 	
 }

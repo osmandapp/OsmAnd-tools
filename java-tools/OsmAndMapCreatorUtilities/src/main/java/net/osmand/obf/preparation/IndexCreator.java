@@ -7,17 +7,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
+
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
@@ -36,12 +36,6 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.util.Algorithms;
-
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.xmlpull.v1.XmlPullParserException;
-
 import rtree.RTreeException;
 
 /**
@@ -81,6 +75,7 @@ public class IndexCreator {
 	IndexRouteRelationCreator indexRouteRelationCreator;
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
+	PropagateToNodes propagateToNodes;
 
 	private File dbFile;
 	private File mapFile;
@@ -206,10 +201,14 @@ public class IndexCreator {
 	/* ***** END OF GETTERS/SETTERS ***** */
 
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
+		calculateRegionTagAndTransliterate(e, icc);
 		if (heightData != null && e instanceof Way) {
 			if (!settings.keepOnlyRouteRelationObjects) {// small speedup
 				heightData.proccess((Way) e);
 			}
+		}
+		if (propagateToNodes != null && e instanceof Node) {
+			propagateToNodes.propagateTagsToNode((Node) e);
 		}
 		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, icc);
@@ -231,6 +230,14 @@ public class IndexCreator {
 		}
 	}
 
+	private void calculateRegionTagAndTransliterate(Entity e, IndexCreationContext icc) {
+		if (settings.addRegionTag) {
+            icc.calcRegionTag(e, true);
+        }
+		icc.translitJapaneseNames(e);
+		icc.translitChineseNames(e);
+	}
+
 	private boolean checkBoundary(Entity e) {
 		if (settings.boundary != null) {
 			if (e instanceof Way) {
@@ -248,8 +255,8 @@ public class IndexCreator {
 	}
 
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, File readFile, IProgress progress,
-			IOsmStorageFilter addFilter, int additionId, int shiftId, boolean ovewriteIds, boolean generateNewIds,
-			boolean createTables, OsmDbCreator previous) throws IOException, SQLException, XmlPullParserException {
+			IOsmStorageFilter addFilter, int idSourceMapInd, int idShift, 
+			boolean generateNewIds, OsmDbCreator previous) throws IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
 		InputStream streamFile = stream;
@@ -281,17 +288,14 @@ public class IndexCreator {
 		});
 
 		// 1. Loading osm file
-		OsmDbCreator dbCreator = new OsmDbCreator(additionId, shiftId, ovewriteIds, generateNewIds);
-		if (previous != null) {
-			dbCreator.setNodeIds(previous.getNodeIds());
-			dbCreator.setWayIds(previous.getWayIds());
-			dbCreator.setRelationIds(previous.getRelationIds());
-		}
+		OsmDbCreator dbCreator = generateNewIds ? new OsmDbCreator(idSourceMapInd, idShift) : new OsmDbCreator();
+		dbCreator.setPropagateToNodes(propagateToNodes);
+		
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(settings.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
 			// 1 init database to store temporary data
-			dbCreator.initDatabase(osmDBdialect, accessor.getDbConn(), createTables);
+			dbCreator.initDatabase(osmDBdialect, accessor.getDbConn(), idSourceMapInd == 0, previous);
 			storage.getFilters().add(dbCreator);
 			if (pbfFile) {
 				((OsmBaseStoragePbf) storage).parseOSMPbf(stream, progress, false);
@@ -314,94 +318,33 @@ public class IndexCreator {
 	}
 
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIds, boolean overwriteIds, boolean regeenerateNewIds)
-			throws IOException, SQLException, InterruptedException, XmlPullParserException {
+			boolean generateUniqueIdsForEachFile) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
-			if (osmDBdialect.databaseFileExists(dbFile)) {
-				osmDBdialect.removeDatabase(dbFile);
-			}
 		}
-		int shift = readFile.length < 16 ? 4 : (readFile.length < 64 ? 6 : 11);
+		if (osmDBdialect.databaseFileExists(dbFile)) {
+			osmDBdialect.removeDatabase(dbFile);
+		}
+		
+		Connection dbConn = (Connection) getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
+		accessor.setDbConn(dbConn, osmDBdialect);
+		OsmDbCreator dbCreator = null;
+		int idShift = readFile.length < 16 ? 4 : (readFile.length < 64 ? 6 : 11);
 		if (readFile.length > (1 << 11)) {
 			throw new UnsupportedOperationException();
 		}
-		int mapInd = 0;
-		Connection dbConn = (Connection) getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
-		Statement stat = dbConn.createStatement();
-		boolean exists = osmDBdialect.checkTableIfExists("input", stat);
-		if (exists) {
-			ResultSet rs = stat.executeQuery("SELECT shift, ind, file, length from input");
-			boolean recreate = settings.indexAddress;
-			List<File> filteredOut = new ArrayList<File>();
-			int maxInd = 0;
-			while (rs.next() && !recreate) {
-				if (shift != rs.getInt(1)) {
-					log.info("Shift has changed in the prepared osm index.");
-					recreate = true;
-					break;
-				}
-				maxInd = Math.max(maxInd, rs.getInt(2));
-				String fn = rs.getString(3);
-				boolean missing = true;
-				for (File f : readFile) {
-					if (f.getAbsolutePath().equals(fn)) {
-						filteredOut.add(f);
-						missing = false;
-						if (f.length() != rs.getInt(4)) {
-							recreate = true;
-							log.info("File " + fn + " has changed in the prepared osm index.");
-						}
-						break;
-					}
-				}
-				if (missing) {
-					log.info("Missing " + fn + " in the prepared osm index.");
-					recreate = true;
-				}
-			}
-			rs.close();
-			if (recreate) {
-				osmDBdialect.closeDatabase(dbConn);
-				osmDBdialect.removeDatabase(dbFile);
-				dbConn = (Connection) getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
-				stat = dbConn.createStatement();
-				stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
-			} else {
-				ArrayList<File> list = new ArrayList<File>(Arrays.asList(readFile));
-				list.removeAll(filteredOut);
-				readFile = list.toArray(new File[list.size()]);
-				mapInd = maxInd + 1;
-			}
-		} else {
-			stat.execute("CREATE TABLE input(shift int, ind int, file varchar, length int)");
-		}
-
-		accessor.setDbConn(dbConn, osmDBdialect);
-		boolean shiftIds = generateUniqueIds || overwriteIds;
-		OsmDbCreator dbCreator = null;
+		int idSourceMapInd = 0;
 		for (File read : readFile) {
-			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, shiftIds ? mapInd : 0,
-					shiftIds ? shift : 0, overwriteIds, regeenerateNewIds, mapInd == 0, dbCreator);
+			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, idSourceMapInd, idShift, generateUniqueIdsForEachFile, null);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
-				log.info("Processing " + (mapInd + 1) + " file out of " + readFile.length);
+				log.info("Processing " + (idSourceMapInd + 1) + " file out of " + readFile.length);
 			}
-			stat.execute("INSERT INTO input(ind, shift, file, length) VALUES (" + Integer.toString(mapInd) + ", "
-					+ shift + ", '" + read.getAbsolutePath() + "'," + read.length() + ")");
-			mapInd++;
+			idSourceMapInd++;
 		}
-		stat.close();
-		// load cities names
-		// accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
-		// @Override
-		// public void iterateEntity(Entity e, OsmDbAccessorContext ctx) {
-		// indexAddressCreator.registerCityIfNeeded(e);
-		// }
-		// });
 		osmDBdialect.commitDatabase(dbConn);
-		accessor.initDatabase(null);
+		accessor.initDatabase();
 		return accessor;
 	}
 
@@ -453,12 +396,12 @@ public class IndexCreator {
 
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes,
 					settings.zoomWaySmoothness);
-			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes, false)
+			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes)
 					: null;
 			if (settings.indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
 			}
-			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, false, true);
+			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true);
 			// 2. Create index connections and index structure
 
 			IndexCreationContext icc = new IndexCreationContext(this, regionName, true);
@@ -468,6 +411,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					calculateRegionTagAndTransliterate(e, icc);
 					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, icc);
@@ -479,6 +423,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					calculateRegionTagAndTransliterate(e, icc);
 					processor.processEntity(mini, e);
 					if (settings.indexPOI) {
 						poiCreator.iterateEntity(e, ctx, icc);
@@ -492,6 +437,7 @@ public class IndexCreator {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					ctx.loadEntityRelation((Relation) e);
+					calculateRegionTagAndTransliterate(e, icc);
 					processor.processEntity(mini, e);
 				}
 			});
@@ -535,14 +481,11 @@ public class IndexCreator {
 	public File generateIndexes(File readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
 			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		return generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false,
-				false);
+		return generateIndexes(new File[] { readFile }, progress, addFilter, mapZooms, renderingTypes, logMapDataWarn, false);
 	}
 
 	public File generateIndexes(File[] readFile, IProgress progress, IOsmStorageFilter addFilter, MapZooms mapZooms,
-			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds,
-			boolean overwriteIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-
+			MapRenderingTypesEncoder renderingTypes, Log logMapDataWarn, boolean generateUniqueIds) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		if (logMapDataWarn == null) {
 			logMapDataWarn = log;
 		}
@@ -565,11 +508,12 @@ public class IndexCreator {
 			renderingTypes = new MapRenderingTypesEncoder(null, regionName);
 		}
 
+		this.propagateToNodes = new PropagateToNodes(renderingTypes);
 		this.indexTransportCreator = new IndexTransportCreator(settings);
-		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, overwriteIds);
+		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
-		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings);
+		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 
 		if (!settings.extraRelations.isEmpty()) {
@@ -615,8 +559,7 @@ public class IndexCreator {
 			} else {
 				// 2. Create index connections and index structure
 				createDatabaseIndexesStructure();
-				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, overwriteIds,
-						false);
+				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds);
 
 				// 3. Processing all entries
 				// 3.1 write all cities
@@ -796,6 +739,7 @@ public class IndexCreator {
 			accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 				@Override
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+					calculateRegionTagAndTransliterate(e, icc);
 					if (settings.indexAddress) {
 						// indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries
 						// !!!
@@ -899,8 +843,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/Diff-end.osm";
-//		String file = rootFolder + "../temp/map.osm";
+//		String file = rootFolder + "../temp/Diff-end.osm";
+		String file = rootFolder + "../temp/map.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";

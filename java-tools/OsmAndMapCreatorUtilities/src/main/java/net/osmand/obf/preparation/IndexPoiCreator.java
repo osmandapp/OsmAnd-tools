@@ -50,8 +50,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Connection poiConnection;
 	private File poiIndexFile;
 	private PreparedStatement poiPreparedStatement;
-	private TLongHashSet ids = new TLongHashSet();
-	private PreparedStatement poiDeleteStatement;
 	private static final int ZOOM_TO_SAVE_END = 16;
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
@@ -62,7 +60,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
 
-	private boolean overwriteIds;
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
 	RelationTagsPropagation tagsTransform = new RelationTagsPropagation();
 
@@ -72,10 +69,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 	private IndexCreatorSettings settings;
 
-	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes, boolean overwriteIds) {
+	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
-		this.overwriteIds = overwriteIds;
 		this.poiTypes = MapPoiTypes.getDefault();
 	}
 
@@ -105,18 +101,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
-		tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e);
-		icc.translitJapaneseNames(e, settings.addRegionTag);
-		icc.translitChineseNames(e, settings.addRegionTag);
-		Map<String, String> tags = e.getTags();
-		Map<String, String> etags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
-		boolean privateReg = "private".equals(e.getTag("access"));
+		Map<String, String> etags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
+		
+		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
-			boolean first = true;
 			long id = e.getId();
 			if (icc.basemap) {
 				id = GENERATE_OBJ_ID--;
@@ -131,10 +123,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			for (Amenity a : tempAmenityList) {
-				if (a.getType().getKeyName().equals("entertainment") && privateReg) {
-					// don't index private swimming pools
-					continue;
-				}
 				if (icc.basemap) {
 					PoiType st = a.getType().getPoiTypeByKeyName(a.getSubType());
 					if (st == null || !a.getType().containsBasemapPoi(st)) {
@@ -149,14 +137,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (a.getLocation() != null) {
 					// do not convert english name
 					// convertEnglishName(a);
-					if (overwriteIds && first) {
-						if (!ids.add(a.getId())) {
-							poiPreparedStatement.executeBatch();
-							poiDeleteStatement.setString(1, a.getId() + "");
-							poiDeleteStatement.execute();
-							first = false;
-						}
-					}
 					try {
 						insertAmenityIntoPoi(a);
 					} catch (Exception excpt) {
@@ -207,6 +187,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(4, amenity.getType().getKeyName());
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
+		poiPreparedStatement.setInt(7, amenity.getOrder());
 		addBatch(poiPreparedStatement);
 	}
 
@@ -298,7 +279,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Statement stat = poiConnection.createStatement();
 		stat.executeUpdate("create table " + IndexConstants.POI_TABLE + //$NON-NLS-1$
 				" (id bigint, x int, y int,"
-				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), "
+				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), priority int, "
 				+ "primary key(id, type, subtype))");
 		stat.executeUpdate("create index poi_loc on poi (x, y, type, subtype)");
 		stat.executeUpdate("create index poi_id on poi (id, type, subtype)");
@@ -307,9 +288,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		// create prepared statment
 		poiPreparedStatement = poiConnection
-				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags) " + //$NON-NLS-1$//$NON-NLS-2$
-						"VALUES (?, ?, ?, ?, ?, ?)");
-		poiDeleteStatement = poiConnection.prepareStatement("DELETE FROM " + IndexConstants.POI_TABLE + " where id = ?");
+				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority) " + //$NON-NLS-1$//$NON-NLS-2$
+						"VALUES (?, ?, ?, ?, ?, ?, ?)");
 		pStatements.put(poiPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);
@@ -474,7 +454,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// not so effective probably better to load in memory one time
 		PreparedStatement prepareStatement = poiConnection
 				.prepareStatement("SELECT id, x, y, type, subtype, additionalTags from poi "
-						+ "where x >= ? AND x < ? AND y >= ? AND y < ?");
+						+ "where x >= ? AND x < ? AND y >= ? AND y < ?"
+						+ " order by priority ");
 		for (Map.Entry<PoiTileBox, List<BinaryFileReference>> entry : fpToWriteSeeks.entrySet()) {
 			int z = entry.getKey().zoom;
 			int x = entry.getKey().x;
@@ -540,9 +521,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException {
 		ResultSet rs;
 		if (useInMemoryCreator) {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi ORDER BY id, priority");
 		} else {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi ORDER BY id, priority");
 		}
 		rootZoomsTree.setNode(new PoiTileBox());
 

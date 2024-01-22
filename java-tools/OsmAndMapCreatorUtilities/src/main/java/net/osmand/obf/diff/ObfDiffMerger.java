@@ -4,17 +4,11 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.TreeSet;
+import java.util.*;
 
+import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.binary.*;
+import net.osmand.data.Amenity;
 import org.apache.commons.logging.Log;
 
 import net.osmand.PlatformUtil;
@@ -29,19 +23,29 @@ public class ObfDiffMerger {
 		day.setTimeZone(TimeZone.getTimeZone("UTC"));
 		month.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
+	private static final String OSMAND_CHANGE_VALUE = "delete";
+	private static final String OSMAND_CHANGE_TAG = "osmand_change";
 	
 	public static void main(String[] args) {
 		try {
 			if(args.length == 1 && args[0].equals("test")) {
 				args = new String[4];
 				List<String> s = new ArrayList<String>();
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_merge.obf_");
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_10.obf");
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_20.obf");
-				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_20_30.obf");
-//				s.add("/Users/victorshcherb/osmand/maps/Netherlands_noord-holland_europe_22_10.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_merge.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_07_10.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_07_30.obf");
+				s.add("/Users/victorshcherb/Desktop/Belarus_gomel_europe_09_00.obf");
 				args = s.toArray(new String[0]);
-			}
+			} else if (args.length == 1 && args[0].equals("mergeRelationTest")) {
+				args = new String[3];
+				List<String> s = new ArrayList<String>();
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff_rel.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_diff.obf");
+				s.add("/Users/macmini/OsmAnd/overpass/test7/23_04_23_23_20_merged.obf");
+				args = s.toArray(new String[0]);
+				mergeRelationOsmLive(args);
+				return;
+			} 
 			ObfDiffMerger merger = new ObfDiffMerger();
 			merger.mergeChanges(args);
 		} catch (Exception e) {
@@ -60,6 +64,9 @@ public class ObfDiffMerger {
 					continue;
 				}
 				String regionName = Algorithms.capitalizeFirstLetter(region.getName());
+				if (regionName.startsWith("_")) {
+					continue;
+				}
 				LOG.info("Processing " + regionName);
 				if (regionName.equals("_diff")) {
 					regionName = "World";
@@ -79,6 +86,121 @@ public class ObfDiffMerger {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
+		}
+	}
+
+	public static void mergeRelationOsmLive(String[] args) {
+		try {
+			if (args.length < 3) {
+				System.out.println("Usage: <path to relation_osm_live.obf> <path to common_osm_live.obf> " +
+						"<path to merged_osm_live.obf>");
+				System.exit(1);
+			}
+			ObfDiffMerger merger = new ObfDiffMerger();
+			merger.mergeRelationDiff(args);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+
+	private void mergeRelationDiff(String[] args) throws IOException {
+		File rel = new File(args[0]);
+		File common = new File(args[1]);
+		ObfFileInMemory relObf = new ObfFileInMemory();
+		relObf.readObfFiles(Collections.singletonList(rel));
+		ObfFileInMemory commonObf = new ObfFileInMemory();
+		commonObf.readObfFiles(Collections.singletonList(common));
+
+		File result = new File(args[2]);
+
+		// Map section
+		BinaryMapIndexReader.MapIndex mi = commonObf.getMapIndex();
+		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		int deleteId = rl == null ? -1 : rl;
+		int cnt = 0;
+		for (MapZooms.MapZoomPair mz : relObf.getZooms()) {
+			TLongObjectHashMap<BinaryMapDataObject> relMapData = relObf.get(mz);
+			TLongObjectHashMap<BinaryMapDataObject> commonMapData = commonObf.get(mz);
+			for (Long id : relMapData.keys()) {
+				BinaryMapDataObject relObj = relMapData.get(id);
+				BinaryMapDataObject commonObj = commonMapData.get(id);
+				if (commonObj == null) {
+					commonMapData.put(id, mi.adoptMapObject(relObj));
+					cnt++;
+				} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
+					commonMapData.remove(id);
+					commonMapData.put(id, mi.adoptMapObject(relObj));
+					cnt++;
+				}
+				if (commonObj != null && commonObj.containsType(deleteId)) {
+					System.out.println("Map id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
+				}
+			}
+		}
+		System.out.println("Map section. Merged " + cnt);
+
+		//Route section
+		BinaryMapRouteReaderAdapter.RouteRegion ri = commonObf.getRouteIndex();
+		deleteId = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		TLongObjectHashMap<RouteDataObject> relRouteData = relObf.getRoutingData();
+		TLongObjectHashMap<RouteDataObject> commonRouteData = commonObf.getRoutingData();
+		cnt = 0;
+		for (Long id : relRouteData.keys()) {
+			RouteDataObject relObj = relRouteData.get(id);
+			RouteDataObject commonObj = commonRouteData.get(id);
+			if (commonObj == null) {
+				commonRouteData.put(id, ri.adopt(relObj));
+				cnt++;
+			} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
+				commonRouteData.remove(id);
+				commonRouteData.put(id, ri.adopt(relObj));
+				cnt++;
+			}
+			if (commonObj != null && commonObj.containsType(deleteId)) {
+				System.out.println("Route id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
+			}
+		}
+		System.out.println("Route section. Merged " + cnt);
+
+		//POI section
+		TLongObjectHashMap<Map<String, Amenity>> relPoiSource = relObf.getPoiObjects();
+		TLongObjectHashMap<Map<String, Amenity>> commonPoiSource = commonObf.getPoiObjects();
+		ObfDiffGenerator obfDiffGenerator = new ObfDiffGenerator();
+		Map<String, Amenity> relPoi = obfDiffGenerator.buildPoiMap(relPoiSource);
+		Map<String, Amenity> commonPoi = obfDiffGenerator.buildPoiMap(commonPoiSource);
+		cnt = 0;
+		for (String id : relPoi.keySet()) {
+			Amenity relObj = relPoi.get(id);
+			if (commonPoiSource.get(relObj.getId()) == null) {
+				commonPoiSource.put(relObj.getId(), new TreeMap<String, Amenity>());
+				commonPoiSource.get(relObj.getId()).put(relObj.getType().getKeyName(), relObj);
+				cnt++;
+			} else {
+				Amenity commonObj = commonPoi.get(id);
+				if (commonObj == null || commonObj.getAdditionalInfo(OSMAND_CHANGE_TAG) == null) {
+					commonPoiSource.get(relObj.getId()).remove(relObj.getType().getKeyName());
+					commonPoiSource.get(relObj.getId()).put(relObj.getType().getKeyName(), relObj);
+					cnt++;
+				}
+				if (commonObj != null && commonObj.getAdditionalInfo(OSMAND_CHANGE_TAG) != null) {
+					System.out.println("Amenity id:" + relObj.getId() + " has osmand_change=delete tag");
+				}
+			}
+		}
+		System.out.println("POI section. Merged " + cnt);
+
+		// Don't merge transport section, because data in relation diff is not complete
+
+		// Write results
+		try {
+			System.out.println("Saving merged file");
+			commonObf.writeFile(result, true);
+			System.out.println("SUCCESS");
+		} catch (RTreeException e) {
+			e.printStackTrace();
+		} catch (SQLException throwables) {
+			throwables.printStackTrace();
 		}
 	}
 	
@@ -208,7 +330,7 @@ public class ObfDiffMerger {
 	public boolean process(File result, List<File> inputDiffs, boolean checkTimestamps) throws IOException,
 			RTreeException, SQLException {
 		List<File> diffs = new ArrayList<>();
-		for(File fl : inputDiffs) {
+		for (File fl : inputDiffs) {
 			if (fl.isDirectory()) {
 				File[] lf = fl.listFiles();
 				List<File> odiffs = new ArrayList<>();
@@ -225,18 +347,18 @@ public class ObfDiffMerger {
 				diffs.add(fl);
 			}
 		}
-		if(checkTimestamps && result.exists()) {
+		if (checkTimestamps && result.exists()) {
 			boolean skipEditing = true;
 			long lastModified = result.lastModified();
-			for(File f : diffs) {
-				if(f.lastModified() > lastModified) {
-					LOG.info("Process " + result.getName() + " because of " + f.getName() + " " + 
-							lastModified + " != " + f.lastModified());
+			for (File f : diffs) {
+				if (f.lastModified() > lastModified) {
+					LOG.info("Process " + result.getName() + " because of " + f.getName() + " " + lastModified + " != "
+							+ f.lastModified());
 					skipEditing = false;
 					break;
 				}
 			}
-			if(skipEditing) {
+			if (skipEditing) {
 				return false;
 			}
 		}

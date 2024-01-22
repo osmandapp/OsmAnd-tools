@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -14,15 +15,14 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.HashMap;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
@@ -36,11 +36,14 @@ import javax.xml.bind.Unmarshaller;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.net.util.SubnetUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 
 import net.osmand.IndexConstants;
 import net.osmand.util.Algorithms;
@@ -51,7 +54,7 @@ public class DownloadIndexesService  {
 	private static final Log LOGGER = LogFactory.getLog(DownloadIndexesService.class);
 
 	private static final String INDEX_FILE = "indexes.xml";
-	private static final String DOWNLOAD_SETTINGS = "api/settings.json";
+	private static final String DOWNLOAD_SETTINGS = "api/download_settings.json";
 	private static final String INDEX_FILE_EXTERNAL_URL = "index-source.info";
     private static final String EXTERNAL_URL = "public-api-indexes/";
 	
@@ -64,15 +67,18 @@ public class DownloadIndexesService  {
 	@Value("${osmand.web.location}")
     private String websiteLocation;
 
-	private DownloadProperties settings;
+	private DownloadServerLoadBalancer settings;
 
 	private Gson gson;
+
+	private Map<String, Double> mapSizesCache;
 	
 	public DownloadIndexesService() {
 		gson = new Gson();
+		mapSizesCache = new HashMap<>();
 	}
 	
-	public DownloadProperties getSettings() {
+	public DownloadServerLoadBalancer getSettings() {
 		if(settings == null) {
 			reloadConfig(new ArrayList<String>());
 		}
@@ -81,7 +87,7 @@ public class DownloadIndexesService  {
 	
 	public boolean reloadConfig(List<String> errors) {
     	try {
-    		DownloadProperties s = gson.fromJson(new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS)), DownloadProperties.class);
+    		DownloadServerLoadBalancer s = gson.fromJson(new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS)), DownloadServerLoadBalancer.class);
     		s.prepare();
     		settings = s;
     	} catch (IOException ex) {
@@ -118,6 +124,18 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getHillshade(), rootFolder, DownloadType.HILLSHADE);
 		loadIndexesFromDir(doc.getSlope(), rootFolder, DownloadType.SLOPE);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.HEIGHTMAP);
+		loadIndexesFromDir(doc.getWeather(), rootFolder, DownloadType.WEATHER);
+		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.GEOTIFF);
+		DownloadFreeMapsConfig free = getSettings().freemaps;
+		for (DownloadIndex di : doc.getAllMaps()) {
+			mapSizesCache.put(di.getName(), di.getSize());
+			for (String pattern : free.namepatterns) {
+				if (di.getName().startsWith(pattern)) {
+					di.setFree(true);
+					di.setFreeMessage(free.message);
+				}
+			}
+		}
 		return doc;
 	}
 	
@@ -176,15 +194,15 @@ public class DownloadIndexesService  {
 				if (file.exists()) {
 					return new ServerCommonFile(file, di);
 				}
-				DownloadProperties servers = getSettings();
+				DownloadServerLoadBalancer servers = getSettings();
 				DownloadServerSpecialty sp = DownloadServerSpecialty.getSpecialtyByDownloadType(di.getDownloadType());
 				if (sp != null) {
-					String host = servers.getServer(sp);
+					String host = servers.getServer(sp, null);
 					if (!Algorithms.isEmpty(host)) {
 						try {
 							String pm = "";
-							if (sp.httpParams.length > 0) {
-								pm = "&" + sp.httpParams[0] + "=yes";
+							if (di.getDownloadType().getHeaders().length > 0) {
+								pm = "&" + di.getDownloadType().getHeaders()[0] + "=yes";
 							}
 							String urlRaw = "https://" + host + "/download?file=" + di.getName() + pm;
 							URL url = new URL(urlRaw);
@@ -238,6 +256,9 @@ public class DownloadIndexesService  {
 
 	private void gzipFile(File target, File gzip) {
 		try {
+			if (!target.getParentFile().exists()) {
+				target.getParentFile().mkdirs();
+			}
 			FileInputStream is = new FileInputStream(target);
 			GZIPOutputStream out = new GZIPOutputStream(new FileOutputStream(gzip));
 			Algorithms.streamCopy(is, out);
@@ -394,23 +415,35 @@ public class DownloadIndexesService  {
 	
 	public enum DownloadType {
 	    MAP("indexes"),
+	    OSMLIVE("aosmc", "aosmc", "osmc"),
 	    VOICE("indexes") ,
-	    DEPTH("indexes/inapp/depth") ,
-	    DEPTHMAP("depth") ,
-	    FONTS("indexes/fonts") ,
-	    WIKIMAP("wiki") ,
-	    TRAVEL("travel") ,
-	    ROAD_MAP("road-indexes") ,
-	    HILLSHADE("hillshade"),
-	    HEIGHTMAP("heightmap"),
-	    SLOPE("slope") ,
-	    SRTM_MAP("srtm-countries") ;
+	    DEPTH("indexes/inapp/depth", "depth"), // Deprecated
+	    DEPTHMAP("depth", "depth") ,
+	    FONTS("indexes/fonts", "fonts") ,
+	    WIKIMAP("wiki", "wiki") ,
+	    TRAVEL("travel", "wikivoyage", "travel") ,
+	    ROAD_MAP("road-indexes", "road"),
+	    HILLSHADE("hillshade", "hillshade"),
+	    HEIGHTMAP("heightmap", "heightmap"), // Deprecated
+	    GEOTIFF("heightmap", "heightmap"),
+	    SLOPE("slope", "slope") ,
+	    SRTM_MAP("srtm-countries", "srtmcountry"),
+	    WEATHER("weather/regions", "weather");
 
 
 		private final String path;
+		private final String[] headers;
 
-		DownloadType(String path) {
+		DownloadType(String path, String... headers) {
 			this.path = path;
+			this.headers = headers;
+		}
+		
+		public String[] getHeaders() {
+			if (headers == null) {
+				return new String[0];
+			}
+			return headers;
 		}
 		
 		public String getPath() {
@@ -422,8 +455,14 @@ public class DownloadIndexesService  {
             switch (this) {
                 case HEIGHTMAP:
                     return fileName.endsWith(".sqlite");
+                case WEATHER:
+                    return fileName.endsWith(".tifsqlite.zip");
+                case GEOTIFF:
+                    return fileName.endsWith(".tif");
                 case TRAVEL:
                     return fileName.endsWith(".travel.obf.zip") || fileName.endsWith(".travel.obf");
+                case OSMLIVE:
+                	return fileName.endsWith(".obf.gz");
                 case MAP:
                 case ROAD_MAP:
                 case WIKIMAP:
@@ -459,10 +498,11 @@ public class DownloadIndexesService  {
 				return String.format("Contour lines (%s) for %s", suf, regionName);
 			case TRAVEL:
 				return String.format("Travel for %s", regionName);
+			case OSMLIVE:
 			case HEIGHTMAP:
-				return String.format("%s", regionName);
+			case WEATHER:
 			case HILLSHADE:
-				return String.format("%s", regionName);
+			case GEOTIFF:
 			case SLOPE:
 				return String.format("%s", regionName);
 			case FONTS:
@@ -479,60 +519,63 @@ public class DownloadIndexesService  {
 	}
 	
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws JsonSyntaxException, JsonIOException, FileNotFoundException {
 		// small test
-		DownloadProperties dp = new DownloadProperties();
-		String key = DownloadServerSpecialty.OSMLIVE.toString().toLowerCase();
-		dp.servers.put(key, new HashMap<>());
-		dp.servers.get(key).put("dl1", 1);
-		dp.servers.get(key).put("dl2", 1);
-		dp.servers.get(key).put("dl3", 3);
+		Gson gson = new Gson();
+		DownloadServerLoadBalancer dp = gson.fromJson(new FileReader(new File(
+				System.getProperty("repo.location") + "/web-server-config/", DOWNLOAD_SETTINGS)), DownloadServerLoadBalancer.class);
 		dp.prepare();
-		System.out.println(dp.getPercent(DownloadServerSpecialty.OSMLIVE, "dl1"));
-		System.out.println(dp.getPercent(DownloadServerSpecialty.OSMLIVE, "dl2"));
-		System.out.println(dp.getPercent(DownloadServerSpecialty.OSMLIVE, "dl3"));
+		DownloadServerSpecialty type = DownloadServerSpecialty.MAIN;
+		for(String serverName : dp.getServerNames()) {
+			System.out.println(serverName + " " + dp.getGlobalPercent(type, serverName)+"%");
+		}			
 		Map<String, Integer> cnts = new TreeMap<String, Integer>();
-		for(String s : dp.serverNames) {
+		for (String s : dp.getServerNames()) {
 			cnts.put(s, 0);
 		}
 		for(int i = 0; i < 1000; i ++) {
-			String s = dp.getServer(DownloadServerSpecialty.OSMLIVE);
+			 String s = dp.getServer(type, "83.85.1.232"); // nl ip
+//			String s = dp.getServer(type, "217.85.4.23"); // german ip
 			cnts.put(s, cnts.get(s) + 1);
+		}
+		for (String serverName : dp.getServerNames()) {
+			System.out.println(serverName + " " + dp.getDownloadCounts(type, serverName));
+		}
+		for (DownloadServerRegion reg : dp.getRegions()) {
+			for (String serverName : dp.getServerNames()) {
+				System.out.println(reg.getName() + " " + reg.getDownloadCounts(type, serverName));
+			}
 		}
 		System.out.println(cnts);
 	}
 	
 	private static class DownloadServerCategory {
 	
-		Map<String, Integer> percents = new TreeMap<>();
+		List<String> serverNames;
 		int sum;
-		String[] serverNames;
 		int[] bounds;
+		int[] counts;
+		int[] percents;
 	}
 	
 	public enum DownloadServerSpecialty {
-		MAIN(new String[0], DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
-		SRTM("srtmcountry", DownloadType.SRTM_MAP),
-		HILLSHADE("hillshade", DownloadType.HILLSHADE),
-		SLOPE("slope", DownloadType.SLOPE),
-		HEIGHTMAP("heightmap", DownloadType.HEIGHTMAP),
-		OSMLIVE(new String[] {"aosmc", "osmc"}, DownloadType.MAP),
-		DEPTH("depth", DownloadType.DEPTH, DownloadType.DEPTHMAP),
-		WIKI(new String[] {"wikivoyage", "wiki", "travel"}, DownloadType.WIKIMAP, DownloadType.TRAVEL),
-		ROADS("road", DownloadType.ROAD_MAP);
+		MAIN(DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
+		SRTM(DownloadType.SRTM_MAP),
+		HILLSHADE(DownloadType.HILLSHADE),
+		SLOPE(DownloadType.SLOPE),
+		HEIGHTMAP(DownloadType.HEIGHTMAP, DownloadType.GEOTIFF),
+		OSMLIVE(DownloadType.OSMLIVE),
+		DEPTH(DownloadType.DEPTH, DownloadType.DEPTHMAP),
+		ROADS(DownloadType.ROAD_MAP),
+		WIKI(DownloadType.WIKIMAP, DownloadType.TRAVEL),
+		WEATHER(DownloadType.WEATHER);
 		
 		public final DownloadType[] types;
-		public final String[] httpParams;
 
-		DownloadServerSpecialty(String httpParam, DownloadType... tp) {
-			this.httpParams = new String[] {httpParam};
+		DownloadServerSpecialty(DownloadType... tp) {
 			this.types = tp;
 		}
 		
-		DownloadServerSpecialty(String[] httpParams, DownloadType... tp) {
-			this.httpParams = httpParams;
-			this.types = tp;
-		}
 		
 		public static DownloadServerSpecialty getSpecialtyByDownloadType(DownloadType c) {
 			for(DownloadServerSpecialty s : values())  {
@@ -550,67 +593,217 @@ public class DownloadIndexesService  {
 		
 	}
 	
-	public static class DownloadProperties {
-		public final static String SELF = "self";
-		
-		Set<String> serverNames = new TreeSet<String>();
-		DownloadServerCategory[] cats = new DownloadServerCategory[DownloadServerSpecialty.values().length];
-		Map<String, Map<String, Integer>> servers = new TreeMap<>();
+	public static class DownloadServerRegion {
+		String name = "Global";
+		List<String> servers = new ArrayList<String>();
+		List<String> zones = new ArrayList<String>();
+		List<SubnetUtils> cidrZones = new ArrayList<>();
+		DownloadServerCategory[] specialties = new DownloadServerCategory[DownloadServerSpecialty.values().length];
+		long ips = 0;
 		
 		public void prepare() {
-			for(DownloadServerSpecialty s : DownloadServerSpecialty.values()) {
-				Map<String, Integer> mp = servers.get(s.name().toLowerCase());
-				prepare(s, mp == null ? Collections.emptyMap() : mp);
+			for (String zone : zones) {
+				try {
+					SubnetUtils ut = new SubnetUtils(zone);
+					ips += ut.getInfo().getAddressCountLong();
+					cidrZones.add(ut);
+				} catch (Exception e) {
+					LOGGER.error("Incorrect CIDR " + e.getMessage(), e);
+				}
 			}
 		}
 		
-		public Set<String> getServers() {
-			return serverNames;
+		public int asInteger(String ip) {
+			if (cidrZones.isEmpty()) {
+				return 0;
+			}
+			return cidrZones.get(0).getInfo().asInteger(ip);
 		}
 		
+		public boolean matchesIp(int ip) {
+			// array is sorted so it could be faster
+			for (SubnetUtils ut : cidrZones) {
+				if (ut.getInfo().isInRange(ip)) {
+					return true;
+				}
+			}
+			return false;
+		}
+		
+		public Collection<String> getServers() {
+			return servers;
+		}
+		
+		@Override
+		public String toString() {
+			return getName() + " " + cidrZones.size();
+		}
+
 		private void prepare(DownloadServerSpecialty tp, Map<String, Integer> mp) {
-			serverNames.addAll(mp.keySet());
 			DownloadServerCategory cat = new DownloadServerCategory();
-			cats[tp.ordinal()] = cat;
-			for(Integer i : mp.values()) {
-				cat.sum += i;
+			specialties[tp.ordinal()] = cat;
+
+			cat.serverNames = new ArrayList<String>();
+			for (String serverName : mp.keySet()) {
+				if (servers.contains(serverName)) {
+					cat.serverNames.add(serverName);
+					cat.sum += mp.get(serverName);
+				}
 			}
-			if(cat.sum > 0) {
+			if (cat.sum > 0) {
+				cat.bounds = new int[cat.serverNames.size()];
+				cat.counts = new int[cat.serverNames.size()];
+				cat.percents = new int[cat.serverNames.size()];
 				int ind = 0;
-				cat.bounds = new int[mp.size()];
-				cat.serverNames = new String[mp.size()];
-				for(String server : mp.keySet()) {
-					cat.serverNames[ind] = SELF.equals(server) ? null : server;
+				for (String server : cat.serverNames) {
 					cat.bounds[ind] = mp.get(server);
-					cat.percents.put(server, 100 * mp.get(server) / cat.sum);
+					cat.percents[ind] = 100 * mp.get(server) / cat.sum;
 					ind++;
 				}
 			} else {
 				cat.bounds = new int[0];
-				cat.serverNames = new String[0];
+				cat.counts = new int[0];
+				cat.percents = new int[0];
+				cat.serverNames = new ArrayList<>();
+			}
+		}
+
+		private int getServerIndex(DownloadServerSpecialty type, String serverName) {
+			DownloadServerCategory s = specialties[type.ordinal()];
+			if (s != null) {
+				return s.serverNames.indexOf(serverName);
+			}
+			return -1;
+		}
+
+		public int getDownloadCounts(DownloadServerSpecialty type, String serverName) {
+			int ind = getServerIndex(type, serverName);
+			if (ind >= 0) {
+				return specialties[type.ordinal()].counts[ind];
+			}
+			return 0;
+		}
+		
+		public int getDownloadCounts(String serverName) {
+			int sum = 0;
+			for (DownloadServerCategory s : specialties) {
+				if (s != null) {
+					int i = s.serverNames.indexOf(serverName);
+					if (i >= 0) {
+						sum += s.counts[i];
+					}
+				}
+			}
+			return sum;
+		}
+
+		public int getPercent(DownloadServerSpecialty type, String serverName) {
+			int ind = getServerIndex(type, serverName);
+			if (ind >= 0 && specialties[type.ordinal()] != null) {
+				return specialties[type.ordinal()].percents[ind];
+			}
+			return 0;
+		}
+
+		public String getName() {
+			return name;
+		}
+		
+	}
+	
+	public static class DownloadFreeMapsConfig {
+		
+		public String message;
+		public List<String> namepatterns = new ArrayList<String>();
+	}
+	
+	public static class DownloadServerLoadBalancer {
+		public final static String SELF = "self";
+				
+		// provided from settings.json
+		Map<String, Map<String, Integer>> servers = new TreeMap<>();
+		List<DownloadServerRegion> regions = new ArrayList<>();
+		DownloadFreeMapsConfig freemaps = new DownloadFreeMapsConfig();
+		DownloadServerRegion globalRegion = new DownloadServerRegion();
+
+		
+		
+		public DownloadFreeMapsConfig getFreemaps() {
+			return freemaps;
+		}
+		
+		public void prepare() {
+			for (DownloadServerRegion region : regions) {
+				region.prepare();
+			}
+			for (DownloadServerSpecialty s : DownloadServerSpecialty.values()) {
+				Map<String, Integer> mp = servers.get(s.name().toLowerCase());
+				if (mp == null) {
+					mp = Collections.emptyMap();
+				}
+				for (String serverName : mp.keySet()) {
+					if (!globalRegion.servers.contains(serverName)) {
+						globalRegion.servers.add(serverName);
+					}
+				}
+				globalRegion.prepare(s, mp);
+				for (DownloadServerRegion region : regions) {
+					region.prepare(s, mp);
+				}
 			}
 			
 		}
-
-		public int getPercent(DownloadServerSpecialty type, String s) {
-			Integer p = cats[type.ordinal()].percents.get(s);
-			if(p == null) {
-				return 0;
-			}
-			return p.intValue();
+		
+		public List<DownloadServerRegion> getRegions() {
+			return regions;
 		}
 		
+		public Collection<String> getServerNames() {
+			return globalRegion.servers;
+		}
 		
-		public String getServer(DownloadServerSpecialty type) {
-			DownloadServerCategory cat = cats[type.ordinal()];
-			if (cat.sum > 0) {
+		public DownloadServerRegion getGlobalRegion() {
+			return globalRegion;
+		}
+		
+		public int getDownloadCounts(DownloadServerSpecialty type, String serverName) {
+			int sum = globalRegion.getDownloadCounts(type, serverName);
+			for (DownloadServerRegion r : regions) {
+				sum += r.getDownloadCounts(type, serverName);
+			}
+			return sum;
+		}
+
+		public int getGlobalPercent(DownloadServerSpecialty type, String serverName) {
+			return globalRegion.getPercent(type, serverName);
+			
+		}
+
+		public String getServer(DownloadServerSpecialty type, String remoteAddr) {
+			DownloadServerRegion region = globalRegion;
+			// avoid IPv6 ~/:/ as incompatible with matchesIp()
+			if (remoteAddr != null && !remoteAddr.contains(":")) {
+				for (DownloadServerRegion r : regions) {
+					if (r.matchesIp(r.asInteger(remoteAddr))) {
+						region = r;
+						break;
+					}
+				}
+			}
+			DownloadServerCategory cat = region.specialties[type.ordinal()];
+			if (cat != null && cat.sum > 0) {
 				ThreadLocalRandom tlr = ThreadLocalRandom.current();
 				int val = tlr.nextInt(cat.sum);
-				for(int i = 0; i < cat.bounds.length; i++) {
-					if(val >= cat.bounds[i]) {
+				for (int i = 0; i < cat.bounds.length; i++) {
+					if (val >= cat.bounds[i]) {
 						val -= cat.bounds[i];
 					} else {
-						return cat.serverNames[i];
+						String serverName = cat.serverNames.get(i);
+						cat.counts[i]++;
+						if (SELF.equals(serverName)) {
+							return null;
+						}
+						return serverName;
 					}
 				}
 			}
@@ -693,4 +886,11 @@ public class DownloadIndexesService  {
             return -1;
         }
     }
+
+	public Map<String, Double> getMapSizesCache() {
+		if (mapSizesCache.size() == 0) {
+			loadDownloadIndexes();
+		}
+		return mapSizesCache;
+	}
 }

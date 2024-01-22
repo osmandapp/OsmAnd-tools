@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 
@@ -11,6 +12,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.router.*;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -33,12 +35,14 @@ import org.apache.commons.logging.Log;
 
 public class ImproveRoadConnectivity {
 	private static final boolean TRACE = false;
-	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = true;
+	private static final boolean USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM = false;
 	private final Log log = PlatformUtil.getLog(ImproveRoadConnectivity.class);
 
 	public static void main(String[] args) throws IOException {
+		ConsoleProgressImplementation.deltaTimeToPrintMax = 10000;
 		ImproveRoadConnectivity crc = new ImproveRoadConnectivity();
-		File fl = new File("/Users/plotva/osmand/Newtestv3.obf");
+//		File fl = new File("/Users/victorshcherb/Desktop/China_henan_asia_2.obf");
+		File fl = new File("/Users/victorshcherb/Desktop/Denmark_central-region_europe_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		TLongObjectHashMap<RouteDataObject> map = crc.collectDisconnectedRoads(new BinaryMapIndexReader(raf, fl));
 		System.out.println("Found roads: " + map.size());
@@ -76,26 +80,26 @@ public class ImproveRoadConnectivity {
 			tiles.addAll(loadTiles);
 		}
 		
-		for(RoutingSubregionTile tile : tiles) {
+		for (RoutingSubregionTile tile : tiles) {
 			ArrayList<RouteDataObject> dataObjects = new ArrayList<>();
 			ctx.loadSubregionTile(tile, false, dataObjects, null);
-			for(RouteDataObject o : dataObjects) {
+			for (RouteDataObject o : dataObjects) {
 				registeredRoadIds.add(o.getId());
 				int len = o.getPointsLength() - 1;
 				double dist = MapUtils.squareRootDist31(o.getPoint31XTile(0), o.getPoint31YTile(0),
 						o.getPoint31XTile(len), o.getPoint31YTile(len));
 				boolean shortFerry = "ferry".equals(o.getRoute()) && dist < 1000;
-				if(shortFerry) {
+				if (shortFerry) {
 					continue;
 				}
 				boolean link = o.getHighway() != null && (o.getHighway().endsWith("link"));
 				long b = calcPointId(o, 0);
 				long e = calcPointId(o, len);
-				if(!link) {
+				if (!link) {
 					addPoint(onlyRoads, o, b);
 					addPoint(onlyRoads, o, e);
 				}
-				for(int i = 0; i < o.getPointsLength(); i++) {
+				for (int i = 0; i < o.getPointsLength(); i++) {
 					addPoint(all, o, calcPointId(o, i));
 				}
 			}
@@ -114,57 +118,64 @@ public class ImproveRoadConnectivity {
 			TLongObjectHashMap<List<RouteDataObject>> all,
 			BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(1000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(4000, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 10);
 		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", memoryLimit);
 
-		long[] pointsToCheck = mapOfObjectToCheck.keys();
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<>();
 		TLongHashSet beginIsolated = new TLongHashSet();
 		TLongHashSet endIsolated = new TLongHashSet();
-		log.info("Start found roads in Normal routing for added to Base routing!");
-		for (int k = 0; k < pointsToCheck.length; k++) {
-			int pers = k * 100/pointsToCheck.length;
-			if (pers % 5 == 0 && pers != (k - 1) * 100/pointsToCheck.length) {
-				log.info("Processing: " + (k * 100/pointsToCheck.length) + "% " + "\r");
+		ConsoleProgressImplementation cpi = new ConsoleProgressImplementation();
+		TLongObjectHashMap<RouteDataObject> pointsToCheck = new TLongObjectHashMap<>();
+		TLongObjectIterator<List<RouteDataObject>> it = mapOfObjectToCheck.iterator();
+		while (it.hasNext()) {
+			it.advance();
+			if (it.value().size() == 1) {
+				pointsToCheck.put(it.key(), it.value().get(0));
 			}
-			long point = pointsToCheck[k];
-			if (all.get(point).size() == 1) {
-				RouteDataObject rdo = all.get(point).get(0);
-				boolean isBeginPoint = calcPointId(rdo, 0) == point;
-				RoutingContext baseCtx = frontEnd.buildRoutingContext(config, null,
-						new BinaryMapIndexReader[]{reader}, RouteCalculationMode.BASE);
-				RoutingContext ctx = frontEnd.buildRoutingContext(config, null,
-						new BinaryMapIndexReader[]{reader}, RouteCalculationMode.NORMAL);
-				
-				if (USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
-					TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(all, point, baseCtx);
-					if (!neighboringPoints.isEmpty()) {
-						TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints =
-								findDisconnectedBasePoints(baseCtx, point, neighboringPoints);
-						if (disconnectedPoints != null) {
-							List<RouteDataObject> result = findConnectedRoads(ctx, rdo, isBeginPoint, disconnectedPoints);
-							if (!result.isEmpty()) {
-								for (RouteDataObject obj : result) {
-									if (!toAdd.contains(obj.id)) {
-										toAdd.put(obj.id, obj);
-									}
+
+		}
+		cpi.startTask("Start found roads in Normal routing for added to Base routing: ", pointsToCheck.size());
+		TLongObjectIterator<RouteDataObject> itn = pointsToCheck.iterator();
+		while (itn.hasNext()) {
+			cpi.progress(1);
+			itn.advance();
+			long point = itn.key();
+			RouteDataObject rdo = itn.value();
+			boolean isBeginPoint = calcPointId(rdo, 0) == point;
+			RoutingContext baseCtx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
+					RouteCalculationMode.BASE);
+			RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
+					RouteCalculationMode.NORMAL);
+
+			if (USE_NEW_IMPROVE_BASE_ROUTING_ALGORITHM) {
+				TLongObjectHashMap<List<RouteDataObject>> neighboringPoints = getPointsForFindDisconnectedRoads(all,
+						point, baseCtx);
+				if (!neighboringPoints.isEmpty()) {
+					TLongObjectHashMap<List<RouteDataObject>> disconnectedPoints = findDisconnectedBasePoints(baseCtx,
+							point, neighboringPoints);
+					if (disconnectedPoints != null) {
+						List<RouteDataObject> result = findConnectedRoads(ctx, rdo, isBeginPoint, disconnectedPoints);
+						if (!result.isEmpty()) {
+							for (RouteDataObject obj : result) {
+								if (!toAdd.contains(obj.id)) {
+									toAdd.put(obj.id, obj);
 								}
 							}
 						}
 					}
-				} else {
-					List<RouteDataObject> result = findConnectedRoadsOld(ctx, rdo, isBeginPoint, all);
-					if (result.isEmpty()) {
-						if(isBeginPoint) {
-							beginIsolated.add(rdo.getId());
-						} else {
-							endIsolated.add(rdo.getId());
-						}
+				}
+			} else {
+				List<RouteDataObject> result = findConnectedRoadsOld(ctx, rdo, isBeginPoint, all);
+				if (result.isEmpty()) {
+					if (isBeginPoint) {
+						beginIsolated.add(rdo.getId());
 					} else {
-						for(RouteDataObject obj : result) {
-							if(!registeredIds.contains(obj.id)) {
-								toAdd.put(obj.id, obj);
-							}
+						endIsolated.add(rdo.getId());
+					}
+				} else {
+					for (RouteDataObject obj : result) {
+						if (!registeredIds.contains(obj.id)) {
+							toAdd.put(obj.id, obj);
 						}
 					}
 				}
@@ -436,7 +447,7 @@ public class ImproveRoadConnectivity {
 			visited.add(calcPointIdUnique(segment.getRoad(), ind));
 			int x = road.getPoint31XTile(ind);
 			int y = road.getPoint31YTile(ind);
-			float spd = ctx.getRouter().defineRoutingSpeed(road) * ctx.getRouter().defineSpeedPriority(road);
+			float spd = ctx.getRouter().defineRoutingSpeed(road, direction) * ctx.getRouter().defineSpeedPriority(road, direction);
 			if (spd > ctx.getRouter().getMaxSpeed()) {
 				spd = ctx.getRouter().getMaxSpeed();
 			}

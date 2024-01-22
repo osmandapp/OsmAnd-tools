@@ -2,11 +2,11 @@ package net.osmand.impl;
 
 import java.text.MessageFormat;
 
+import org.apache.commons.logging.Log;
+
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
-
-import org.apache.commons.logging.Log;
 
 
 public class ConsoleProgressImplementation implements IProgress {
@@ -38,7 +38,7 @@ public class ConsoleProgressImplementation implements IProgress {
 
 	@Override
 	public void finishTask() {
-		log.info("Task " + currentTask + " is finished "); //$NON-NLS-1$ //$NON-NLS-2$
+		print("Task " + currentTask + " is finished "); //$NON-NLS-1$ //$NON-NLS-2$
 		this.currentTask = null;
 
 	}
@@ -60,11 +60,20 @@ public class ConsoleProgressImplementation implements IProgress {
 				now - lastTimePrinted  > deltaTimeToPrintMax) {
 			this.lastPercentPrint = getCurrentPercent();
 			if(now - lastTimePrinted >= deltaTimeToPrint){
-				log.info(getPrintMessage()); //$NON-NLS-1$
+				print(getPrintMessage()); //$NON-NLS-1$
 				lastTimePrinted = now;
 			}
 
 		}
+	}
+
+	private void print(String printMessage) {
+		log.info(printMessage);
+//		System.out.println(new Date() + ": " + printMessage );
+	}
+	
+	private void printDebug(String string) {
+		log.debug(string);
 	}
 
 	protected String getPrintMessage() {
@@ -95,16 +104,18 @@ public class ConsoleProgressImplementation implements IProgress {
 	public void startTaskLong(String taskName, long work) {
 		if(!Algorithms.objectEquals(currentTask, taskName)){
 			this.currentTask = taskName;
-			log.debug("Memory before task exec: " + Runtime.getRuntime().totalMemory() + " free : " + Runtime.getRuntime().freeMemory()); //$NON-NLS-1$ //$NON-NLS-2$
+			printDebug("Memory before task exec: " + Runtime.getRuntime().totalMemory() + " free : " + Runtime.getRuntime().freeMemory()); //$NON-NLS-1$ //$NON-NLS-2$
 			if (previousTaskStarted == 0) {
-				log.info(taskName + " started - " + work); //$NON-NLS-1$
+				print(taskName + " started - " + work); //$NON-NLS-1$
 			} else {
-				log.info(taskName + " started after " + (System.currentTimeMillis() - previousTaskStarted) + " ms" + " - " + work); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+				print(taskName + " started after " + (System.currentTimeMillis() - previousTaskStarted) + " ms" + " - " + work); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 			}
 			previousTaskStarted = System.currentTimeMillis();
 		}
 		startWorkLong(work);
 	}
+
+	
 
 	@Override
 	public void startWork(int work) {
@@ -114,7 +125,7 @@ public class ConsoleProgressImplementation implements IProgress {
 	private void startWorkLong(long work) {
 		if(this.work != work){
 			this.work = work;
-			log.info("Task " + currentTask + ": work total has changed to " + work); //$NON-NLS-1$
+			print("Task " + currentTask + ": work total has changed to " + work); //$NON-NLS-1$
 		}
 		this.currentDone = 0;
 		this.lastPercentPrint = 0;

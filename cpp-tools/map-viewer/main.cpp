@@ -5,6 +5,7 @@
 #include <chrono>
 #include <future>
 #include <fstream>
+#include <locale.h>
 
 #include <GL/glew.h>
 #include <GL/freeglut.h>
@@ -36,6 +37,7 @@
 #include <OsmAndCore/RoadLocator.h>
 #include <OsmAndCore/IRoadLocator.h>
 #include <OsmAndCore/TileSqliteDatabasesCollection.h>
+#include <OsmAndCore/GeoTiffCollection.h>
 #include <OsmAndCore/Data/Road.h>
 #include <OsmAndCore/Data/ObfRoutingSectionInfo.h>
 #include <OsmAndCore/Data/Amenity.h>
@@ -51,9 +53,10 @@
 #include <OsmAndCore/Map/AtlasMapRenderer_Metrics.h>
 #include <OsmAndCore/Map/OnlineRasterMapLayerProvider.h>
 #include <OsmAndCore/Map/OnlineTileSources.h>
-#include <OsmAndCore/Map/HillshadeTileProvider.h>
 #include <OsmAndCore/Map/IMapElevationDataProvider.h>
 #include <OsmAndCore/Map/SqliteHeightmapTileProvider.h>
+#include <OsmAndCore/Map/HillshadeRasterMapLayerProvider.h>
+#include <OsmAndCore/Map/SlopeRasterMapLayerProvider.h>
 #include <OsmAndCore/Map/ObfMapObjectsProvider.h>
 #include <OsmAndCore/Map/MapPrimitivesProvider.h>
 #include <OsmAndCore/Map/MapRasterLayerProvider_Software.h>
@@ -87,6 +90,7 @@ std::shared_ptr<OsmAnd::IMapRenderer> renderer;
 std::shared_ptr<OsmAnd::ResourcesManager> resourcesManager;
 std::shared_ptr<const OsmAnd::IObfsCollection> obfsCollection;
 std::shared_ptr<const OsmAnd::ITileSqliteDatabasesCollection> heightsCollection;
+std::shared_ptr<const OsmAnd::IGeoTiffCollection> geotiffCollection;
 std::shared_ptr<OsmAnd::ObfMapObjectsProvider> binaryMapObjectsProvider;
 std::shared_ptr<OsmAnd::MapPresentationEnvironment> mapPresentationEnvironment;
 std::shared_ptr<OsmAnd::MapPrimitiviser> primitivizer;
@@ -111,8 +115,13 @@ QDir dataDir;
 QDir cacheDir(QDir::current());
 QDir heightsDir;
 bool heightsDirSpecified = false;
+QDir geotiffDir;
+bool geotiffDirSpecified = false;
 QFileInfoList styleFiles;
 QString styleName = "default";
+
+bool heightmap = false;
+bool hillshade = false;
 
 #define USE_GREEN_TEXT_COLOR 1
 #define SCREEN_WIDTH 1024
@@ -304,6 +313,9 @@ int main(int argc, char** argv)
 
     //OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
 
+    // Fix parsing SVG with SkParse
+    setlocale(LC_NUMERIC, "C");
+
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::ValueAnimator valueAnimator;
     valueAnimator.animateValueTo<float>(
@@ -358,6 +370,11 @@ int main(int argc, char** argv)
         {
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
             heightsDirSpecified = true;
+        }
+        else if (arg.startsWith("-geotiffDir="))
+        {
+            geotiffDir = QDir(arg.mid(strlen("-geotiffDir=")));
+            geotiffDirSpecified = true;
         }
         else if (arg == "-nsight")
         {
@@ -496,14 +513,6 @@ int main(int argc, char** argv)
         stylesCollection.reset(pMapStylesCollection);
     }
 
-    if (heightsDirSpecified)
-    {
-        const auto manualHeightsCollection = new OsmAnd::TileSqliteDatabasesCollection();
-        manualHeightsCollection->addDirectory(heightsDir);
-
-        heightsCollection.reset(manualHeightsCollection);
-    }
-
     if (!styleName.isEmpty())
     {
         style = stylesCollection->getResolvedStyleByName(styleName);
@@ -520,9 +529,9 @@ int main(int argc, char** argv)
         style,
         density,
         mapScale,
-        symbolsScale,
-        "ru",
-        OsmAnd::MapPresentationEnvironment::LanguagePreference::LocalizedOrTransliterated));
+        symbolsScale));
+    mapPresentationEnvironment->setLocaleLanguageId("ru");
+    mapPresentationEnvironment->setLanguagePreference(OsmAnd::MapPresentationEnvironment::LanguagePreference::LocalizedOrTransliterated);
     primitivizer.reset(new OsmAnd::MapPrimitiviser(mapPresentationEnvironment));
 
     OsmAnd::MapRendererSetupOptions rendererSetup;
@@ -618,9 +627,10 @@ int main(int argc, char** argv)
 //    renderer->setZoom(8.0f);
 
     // Nice
-    renderer->setTarget(OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-        43.5804,
-        7.1251)));
+    renderer->setMapTarget(OsmAnd::PointI(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2),
+        OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
+            43.5804,
+            7.1251)));
     renderer->setZoom(14.0f);
 
     renderer->setAzimuth(0.0f);
@@ -749,7 +759,7 @@ void mouseHandler(int button, int state, int x, int y)
             else if (modifiers & GLUT_ACTIVE_SHIFT)
             {
                 if (favorites)
-                    favorites->createFavoriteLocation(lastClickedLocation31);
+                    favorites->createFavoriteLocation(OsmAnd::Utilities::convert31ToLatLon(lastClickedLocation31));
             }
             else if (modifiers & GLUT_ACTIVE_ALT)
             {
@@ -846,7 +856,7 @@ void mouseMotion(int x, int y)
         newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
         newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
 
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
     }
 }
 
@@ -876,7 +886,7 @@ void mouseWheelHandler(int button, int dir, int x, int y)
         const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 0.1f : 0.01f;
         const auto state = renderer->getState();
 
-        const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+        const auto zoom = state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f);
         if (dir > 0)
         {
             renderer->setZoom(zoom + step);
@@ -897,9 +907,9 @@ void keyboardHandler(unsigned char key, int x, int y)
 
     const auto state = renderer->getState();
     const auto wasdZoom = static_cast<int>(
-        state.zoomLevel + (state.visualZoom >= 1.0f
-                               ? state.visualZoom - 1.0f
-                               : (state.visualZoom - 1.0f) * 2.0f));
+        state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f
+                               ? state.surfaceVisualZoom - 1.0f
+                               : (state.surfaceVisualZoom - 1.0f) * 2.0f));
     const auto wasdStep = (1 << (31 - wasdZoom));
 
     // ' ' * + - .  0 1 2 3 4 5 6 7 8 9 A D S W [ \\ \x1B ] a b c d e f g h i j k l m n o p q r s t u v w x z
@@ -913,7 +923,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'S':
@@ -921,7 +931,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.y += wasdStep / (key == 's' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'A':
@@ -929,7 +939,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'D':
@@ -937,7 +947,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     {
         auto newTarget = state.target31;
         newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
-        renderer->setTarget(newTarget);
+        renderer->setMapTargetLocation(newTarget);
         return;
     }
     case 'R':
@@ -961,11 +971,43 @@ void keyboardHandler(unsigned char key, int x, int y)
         {
             if (state.elevationDataProvider)
             {
+                heightsCollection.reset();
+                if (!hillshade)
+                    geotiffCollection.reset();
                 renderer->resetElevationDataProvider();
+                heightmap = false;
             }
             else
             {
-                if (heightsCollection)
+                if (heightsDirSpecified)
+                {
+                    const auto manualHeightsCollection = new OsmAnd::TileSqliteDatabasesCollection();
+                    manualHeightsCollection->addDirectory(heightsDir);
+
+                    heightsCollection.reset(manualHeightsCollection);
+                }
+
+                if (geotiffDirSpecified && !geotiffCollection)
+                {
+                    const auto manualGeoTiffCollection = new OsmAnd::GeoTiffCollection();
+                    manualGeoTiffCollection->addDirectory(geotiffDir);
+                    manualGeoTiffCollection->setLocalCache(cacheDir);
+
+                    geotiffCollection.reset(manualGeoTiffCollection);
+                }
+
+                if (heightsCollection && geotiffCollection)
+                {
+                    renderer->setElevationDataProvider(
+                        std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
+                            heightsCollection,
+                            geotiffCollection,
+                            renderer->getElevationDataTileSize()
+                        )
+                    );
+                    heightmap = true;
+                }
+                else if (heightsCollection)
                 {
                     renderer->setElevationDataProvider(
                         std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
@@ -973,6 +1015,19 @@ void keyboardHandler(unsigned char key, int x, int y)
                             renderer->getElevationDataTileSize()
                         )
                     );
+                }
+                else if (geotiffCollection)
+                {
+                    renderer->setElevationDataProvider(
+                        std::make_shared<OsmAnd::SqliteHeightmapTileProvider>(
+                            geotiffCollection,
+                            renderer->getElevationDataTileSize()
+                        )
+                    );
+                    heightmap = true;
+                }
+                if (heightsCollection || geotiffCollection)
+                {
                     elevationConfigurationPresetIndex = 0;
                     renderer->setElevationConfiguration(elevationConfigurationPresets[elevationConfigurationPresetIndex].second);
                 }
@@ -1066,7 +1121,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         auto text = inputDialog(QStringLiteral("Input coordinate"), QStringLiteral("Coordinate: "), latLon.toQString());
         latLon = OsmAnd::CoordinateSearch::search(text);
         auto target31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
-        renderer->setTarget(target31);
+        renderer->setMapTargetLocation(target31);
         return;
     }
     case 'c':
@@ -1178,7 +1233,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
     case 'z':
     {
-        auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.zoomLevel));
+        auto text = inputDialog(QStringLiteral("Input zoom"), QStringLiteral("Zoom: "), QString::number(state.surfaceZoomLevel));
         bool ok;
         double zoom = text.toDouble(&ok);
         if (ok)
@@ -1240,7 +1295,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '-':
         if (modifiers & GLUT_ACTIVE_SHIFT)
         {
-            const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+            const auto zoom = state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f);
             renderer->setZoom(zoom - 1.0f);
         }
         else
@@ -1254,7 +1309,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case '+':
         if (modifiers & GLUT_ACTIVE_SHIFT)
         {
-            const auto zoom = state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f);
+            const auto zoom = state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f);
             renderer->setZoom(zoom + 1.0f);
         }
         else
@@ -1425,6 +1480,38 @@ void activateProvider(int layerIdx, int idx)
             std::shared_ptr<OsmAnd::MapRasterLayerProvider>(new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider)));
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
+    else if (idx == 9)
+    {
+        if (geotiffDirSpecified)
+        {
+            if (!hillshade)
+            {
+                if (!geotiffCollection)
+                {
+                    const auto manualGeoTiffCollection = new OsmAnd::GeoTiffCollection();
+                    manualGeoTiffCollection->addDirectory(geotiffDir);
+                    manualGeoTiffCollection->setLocalCache(cacheDir);
+                    geotiffCollection.reset(manualGeoTiffCollection);
+                }
+                auto reliefRasterMapLayerProvider = new OsmAnd::HillshadeRasterMapLayerProvider(geotiffCollection,
+                    QString("../../../../tools/obf-generation/heightmap/color/hillshade_main.txt"),
+                    QString("../../../../tools/obf-generation/heightmap/color/color_slope.txt"));
+                //auto reliefRasterMapLayerProvider = new OsmAnd::SlopeRasterMapLayerProvider(geotiffCollection,
+                //    QString("../../../../tools/obf-generation/heightmap/color/slopes_main.txt"));
+
+                renderer->setMapLayerProvider(layerIdx,
+                    std::shared_ptr<OsmAnd::IMapLayerProvider>(reliefRasterMapLayerProvider));
+                hillshade = true;
+            }
+            else
+            {
+                if (!heightmap)
+                    geotiffCollection.reset();
+                renderer->resetMapLayerProvider(layerIdx);
+                hillshade = false;
+            }
+        }
+    }
     //else if (idx == 7)
     //{
     //    //        auto hillshadeTileProvider = new OsmAnd::HillshadeTileProvider();
@@ -1544,12 +1631,12 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom (mouse wheel)     : %1").arg(state.zoomLevel + (state.visualZoom >= 1.0f ? state.visualZoom - 1.0f : (state.visualZoom - 1.0f) * 2.0f))));
+            QString("zoom (mouse wheel)     : %1").arg(state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f))));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("zoom level (key z)     : %1").arg(state.zoomLevel)));
+            QString("zoom level (key z)     : %1").arg(state.surfaceZoomLevel)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));

@@ -6,13 +6,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
@@ -35,6 +42,7 @@ import org.springframework.stereotype.Component;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
+import net.osmand.PlatformUtil;
 import net.osmand.server.TelegramBotManager;
 import net.osmand.server.monitor.OsmAndServerMonitoringBot.Sender;
 import net.osmand.util.Algorithms;
@@ -61,7 +69,14 @@ public class OsmAndServerMonitorTasks {
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
-			 "dl2.osmand.net","dl7.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
+			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
+	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
+			"maptile.osmand.net" };
+	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
+			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/",
+			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
+			"https://tile.osmand.net:8080/job/UpdateOsmAndServer/" };
+
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 
 	private static final double PERC = 95;
@@ -81,9 +96,21 @@ public class OsmAndServerMonitorTasks {
 		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
+	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
 
+	
 	@Value("${monitoring.enabled}")
 	private boolean enabled;
+	
+	@Value("${monitoring.changes.feed}")
+	private String urlChangesFeed;
+	
+	@Value("${monitoring.changes.publish.channel}")
+	private String publishChannel;
+	
+	private long lastFeedCheckTimestamp; 
+	
+	private List<FeedEntry> feed = new ArrayList<>();
 
 	@Autowired
 	private StringRedisTemplate redisTemplate;
@@ -92,6 +119,8 @@ public class OsmAndServerMonitorTasks {
 	LiveCheckInfo live = new LiveCheckInfo();
 	// Build Server
 	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
+	// Java servers check
+	JavaServerCheckInfo javaChecks = new JavaServerCheckInfo();
 	// Tile validation
 	double lastResponseTime;
 	// Index map validation
@@ -100,6 +129,16 @@ public class OsmAndServerMonitorTasks {
 
 	OsmAndServerMonitoringBot.Sender telegram;
 
+	static class FeedEntry {
+		Date published;
+		Date updated;
+		String id;
+		String content;
+		String title;
+		String author;
+		String link;
+		String linkTitle;
+	}
 
 
 	@Scheduled(fixedRate = LIVE_STATUS_MINUTES * MINUTE)
@@ -120,8 +159,8 @@ public class OsmAndServerMonitorTasks {
 			br.close();
 			is.close();
 			long currentDelay = System.currentTimeMillis() - dt.getTime();
-			if (currentDelay - live.previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR && telegram != null) {
-				telegram.sendMonitoringAlertMessage(getLiveDelayedMessage(currentDelay));
+			if (currentDelay - live.previousOsmAndLiveDelay > 30 * MINUTE && currentDelay > HOUR ) {
+				sendBroadcastMessage(getLiveDelayedMessage(currentDelay));
 				live.previousOsmAndLiveDelay = currentDelay;
 			}
 			live.lastCheckTimestamp = System.currentTimeMillis();
@@ -130,11 +169,69 @@ public class OsmAndServerMonitorTasks {
 				addStat(RED_KEY_OSMAND_LIVE, currentDelay);
 			}
 		} catch (Exception e) {
-			if (telegram != null) {
-				telegram.sendMonitoringAlertMessage("Exception while checking the server live status.");
-			}
+			sendBroadcastMessage("Exception while checking the server live status.");
 			LOG.error(e.getMessage(), e);
 		}
+	}
+	
+	private void sendBroadcastMessage(String string) {
+		if (telegram != null) {
+			telegram.sendBroadcastMessage(string);
+			telegram.sendChannelMessage(publishChannel, EmojiConstants.ROBOT_EMOJI + string);
+		}
+	}
+
+	@Scheduled(fixedRate = MINUTE)
+	public void checkOsmAndJavaServers() {
+		if (!enabled) {
+			return;
+		}
+		try {
+			Map<String, String> failed = new LinkedHashMap<String, String>();
+			for (int i = 0; i < JAVA_HOSTS_TO_TEST.length; i++) {
+				boolean error = false;
+				try {
+					URL url = new URL(urlToTestJavaServer(JAVA_HOSTS_TO_TEST[i]));
+					HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+					conn.connect();
+					if (conn.getResponseCode() >= 300) {
+						// error
+						error = true;
+					}
+				} catch (Exception e) {
+					LOG.error(e.getMessage(), e);
+					error = true;
+				}
+				if (error) {
+					failed.put(JAVA_HOSTS_TO_TEST[i], JAVA_HOSTS_TO_RESTART[i]);
+				}
+			}
+			boolean stateChanged = failed.size() != javaChecks.failed.size();
+			javaChecks.failed = failed;
+			javaChecks.lastCheckTimestamp = System.currentTimeMillis();
+			if (stateChanged) {
+				if (failed.size() == 0) {
+					sendBroadcastMessage("All java servers are up.");
+				} else {
+					StringBuilder sb = new StringBuilder();
+					Iterator<Entry<String, String>> it = failed.entrySet().iterator();
+					while (it.hasNext()) {
+						Entry<String, String> e = it.next();
+						sb.append(String.format(
+								"Java server <a href='%s'>%s</a> is down - <a href='%s'>restart it</a>.\n",
+								urlToTestJavaServer(e.getKey()), e.getKey(), e.getValue()));
+					}
+					sendBroadcastMessage(sb.toString());
+				}
+			}
+		} catch (Exception e) {
+			sendBroadcastMessage("Exception while checking the java server status.");
+			LOG.error(e.getMessage(), e);
+		}
+	}
+
+	private String urlToTestJavaServer(String u) {
+		return "https://" + u + "/api/giveaway-series";
 	}
 
 	@Scheduled(fixedRate = MINUTE)
@@ -144,7 +241,7 @@ public class OsmAndServerMonitorTasks {
 		}
 		try {
 			Set<String> jobsFailed = new TreeSet<String>();
-			URL url = new URL("https://builder.osmand.net:8080/api/json");
+			URL url = new URL("https://creator.osmand.net:8080/api/json");
 			InputStream is = url.openConnection().getInputStream();
 			JSONObject object = new JSONObject(new JSONTokener(is));
 			JSONArray jsonArray = object.getJSONArray("jobs");
@@ -158,26 +255,24 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 			is.close();
-			if(buildServer.jobsFailed == null) {
+			if (buildServer.jobsFailed == null) {
 				buildServer.jobsFailed = jobsFailed;
 			} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
 				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
 				jobsFailedCopy.removeAll(buildServer.jobsFailed);
-				if (!jobsFailedCopy.isEmpty() && telegram != null) {
-					telegram.sendMonitoringAlertMessage("There are new failures on Build Server: " + formatJobNamesAsHref(jobsFailedCopy));
+				if (!jobsFailedCopy.isEmpty() ) {
+					sendBroadcastMessage("There are new failures on Build Server: " + formatJobNamesAsHref(jobsFailedCopy));
 				}
 				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 				jobsRecoveredCopy.removeAll(jobsFailed);
-				if (!jobsRecoveredCopy.isEmpty() && telegram != null) {
-					telegram.sendMonitoringAlertMessage("There are recovered jobs on Build Server: " + formatJobNamesAsHref(jobsRecoveredCopy));
+				if (!jobsRecoveredCopy.isEmpty() ) {
+					sendBroadcastMessage("There are recovered jobs on Build Server: " + formatJobNamesAsHref(jobsRecoveredCopy));
 				}
 				buildServer.jobsFailed = jobsFailed;
 			}
 			buildServer.lastCheckTimestamp = System.currentTimeMillis();
 		} catch (Exception e) {
-			if (telegram != null) {
-				telegram.sendMonitoringAlertMessage("Exception while checking the build server status.");
-			}
+			sendBroadcastMessage("Exception while checking the build server status.");
 			LOG.error(e.getMessage(), e);
 		}
 	}
@@ -187,6 +282,7 @@ public class OsmAndServerMonitorTasks {
 		if(!enabled) {
 			return;
 		}
+		System.setProperty("https.protocols", "TLSv1,TLSv1.1,TLSv1.2");
 		GZIPInputStream gis = null;
 		try {
 			URL url = new URL("https://osmand.net/get_indexes?gzip=true");
@@ -196,9 +292,7 @@ public class OsmAndServerMonitorTasks {
 			validateAndReport(gis);
 			is.close();
 		} catch (IOException ioex) {
-			if (telegram != null) {
-				telegram.sendMonitoringAlertMessage("Exception while checking the map index validity.");
-			}
+			sendBroadcastMessage("Exception while checking the map index validity.");
 			LOG.error(ioex.getMessage(), ioex);
 		} finally {
 			if (gis != null) {
@@ -218,17 +312,14 @@ public class OsmAndServerMonitorTasks {
 				double spd1 = downloadSpeed(url);
 				double spd2 = downloadSpeed(url);
 				res.addSpeedMeasurement(Math.max(spd1, spd2));
-				if (!res.lastSuccess && telegram != null) {
-					telegram.sendMonitoringAlertMessage(host + " OK. Maps download works fine");
+				if (!res.lastSuccess) {
+					sendBroadcastMessage(host + " OK. Maps download works fine");
 				}
 				res.lastSuccess = true;
 
 			} catch (IOException ex) {
 				if(res.lastSuccess ) {
-					if (telegram != null) {
-						telegram.sendMonitoringAlertMessage(
-							host + " FAILURE: problems downloading maps " + ex.getMessage());
-					}
+					sendBroadcastMessage(host + " FAILURE: problems downloading maps " + ex.getMessage());
 					LOG.error(ex.getMessage(), ex);
 				}
 				res.lastSuccess = false;
@@ -282,24 +373,20 @@ public class OsmAndServerMonitorTasks {
 		int mapsInMapIndex = 0;
 		try {
 			mapsInMapIndex = countMapsInMapIndex(is);
-			if (!mapIndexPrevValidation && telegram != null) {
-				telegram.sendMonitoringAlertMessage(
-						String.format("download.osmand.net: Map index is correct and serves %d maps.", mapsInMapIndex));
+			if (!mapIndexPrevValidation ) {
+				sendBroadcastMessage(String.format("download.osmand.net: Map index is correct and serves %d maps.", mapsInMapIndex));
 			}
 
 			if (mapsInMapIndex < MAPS_COUNT_THRESHOLD) {
 				mapIndexCurrValidation = false;
-				if (mapIndexPrevValidation && telegram != null) {
-					telegram.sendMonitoringAlertMessage(String.format(
-							"download.osmand.net: Maps index is not correct and serves only of %d maps.", mapsInMapIndex));
+				if (mapIndexPrevValidation) {
+					sendBroadcastMessage(String.format("download.osmand.net: Maps index is not correct and serves only of %d maps.", mapsInMapIndex));
 				}
 			}
 		} catch (XmlPullParserException xmlex) {
 			mapIndexCurrValidation = false;
 			if (mapIndexPrevValidation) {
-				if (telegram != null) {
-					telegram.sendMonitoringAlertMessage("download.osmand.net: problems with parsing map index.");
-				}
+				sendBroadcastMessage("download.osmand.net: problems with parsing map index.");
 				LOG.error(xmlex.getMessage(), xmlex);
 			}
 
@@ -351,10 +438,7 @@ public class OsmAndServerMonitorTasks {
 			if (failed >= count / 2) {
 				if(retry-- < 0) {
 					String txStatus = getTirexStatus();
-					if (telegram != null) {
-						telegram.sendMonitoringAlertMessage(
-							String.format("tile.osmand.net: problems with downloading tiles: %s (%d) - %s", times, retryCount, txStatus));
-					}
+					sendBroadcastMessage(String.format("tile.osmand.net: problems with downloading tiles: %s (%d) - %s", times, retryCount, txStatus));
 					return;
 				} else {
 					try {
@@ -524,6 +608,7 @@ public class OsmAndServerMonitorTasks {
 		checkOsmAndLiveStatus(false);
 		checkOsmAndBuildServer();
 		checkIndexesValidity();
+		checkOsmAndJavaServers();
 		tileDownloadTest();
 
 		return getStatusMessage();
@@ -532,46 +617,22 @@ public class OsmAndServerMonitorTasks {
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
 		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
-			msg += "<a href='https://builder.osmand.net:8080'>builder</a>: <b>OK</b>.\n";
+			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>OK</b>.\n";
 		} else {
-			msg += "<a href='https://builder.osmand.net:8080'>builder</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
+			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
 		}
-		for (DownloadTestResult r : downloadTests.values()) {
-			msg += r.fullString() + "\n";
+		for (String host: downloadTests.keySet()) {
+			DownloadTestResult r = downloadTests.get(host);
+			String urlToRestart = javaChecks.failed.get(host);
+			msg += r.fullString(urlToRestart) + "\n";
 		}
 		msg += getTileServerMessage();
-		msg += getOpenPlaceReviewsMessage();
 		return msg;
 	}
 
-	private String getOpenPlaceReviewsMessage() {
-		return String.format("\n<a href='https://r2.openplacereviews.org:890'>OpenPlaceReviews</a>: "
-				+ "<a href='https://openplacereviews.org/api/admin'>%s</a> (test <a href='https://test.openplacereviews.org/api/admin'>%s</a>).",
-				getOprSyncStatus("openplacereviews.org"),  getOprSyncStatus("test.openplacereviews.org"));
-	}
+	
 
-	private String getOprSyncStatus(String url) {
-		long minTimestamp = 0;
-		try {
-			JSONObject object = new JSONObject(new JSONTokener(
-					new URL("https://" + url + "/api/objects-by-id?type=sys.bot&key=osm-sync").openStream()));
-			JSONArray jsonArray = object.getJSONArray("objects");
-			if (jsonArray.length() > 0) {
-				JSONObject osmTags = jsonArray.getJSONObject(0).getJSONObject("bot-state").getJSONObject("osm-tags");
-				for (String key : osmTags.keySet()) {
-					String dt = osmTags.getJSONObject(key).getString("date");
-					long tm = TIMESTAMP_FORMAT_OPR.parse(dt).getTime();
-					if (minTimestamp == 0 || minTimestamp > tm) {
-						minTimestamp = tm;
-					}
-				}
-			}
-			return minTimestamp == 0 ? "failed" : timeAgo(minTimestamp);
-		} catch (Exception e) {
-			LOG.warn(e.getMessage(), e);
-			return "Error: " + e.getMessage();
-		}
-	}
+	
 
 	private String timeAgo(long tm) {
 		float hr = (float) ((System.currentTimeMillis() - tm) / (60 * 60 * 1000.0));
@@ -583,7 +644,7 @@ public class OsmAndServerMonitorTasks {
 	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
 		Set<String> formatted = new TreeSet<>();
 		for (String jobName : jobNames) {
-			formatted.add(String.format("<a href='https://builder.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
+			formatted.add(String.format("<a href='https://creator.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
 		}
 		return formatted;
 	}
@@ -603,6 +664,191 @@ public class OsmAndServerMonitorTasks {
 						formatTime(live7Days.getPercentile(PERC)), formatTime(live7Days.getMean()),
 						formatTime(live30Days.getPercentile(PERC)), formatTime(live30Days.getMean()));
 	}
+	
+	@Scheduled(fixedRate = 5 * MINUTE)
+	public void checkOsmAndChangesFeed() throws IOException, XmlPullParserException, ParseException {
+		if (!Algorithms.isEmpty(urlChangesFeed)) {
+			List<FeedEntry> newFeed = new ArrayList<>();
+			long timestampNow = System.currentTimeMillis();
+			for (FeedEntry e : parseFeed(urlChangesFeed)) {
+				FeedEntry old = null;
+				for (FeedEntry o : feed) {
+					if (Algorithms.objectEquals(o.id, e.id)) {
+						old = o;
+						break;
+					}
+				}
+				if ((old == null || old.updated.getTime() != e.updated.getTime())
+						&& e.updated.getTime() > lastFeedCheckTimestamp) {
+					newFeed.add(e);
+				}
+			}
+			if (lastFeedCheckTimestamp == 0) {
+				if (newFeed.size() > 0) {
+					FeedEntry last = newFeed.get(newFeed.size() - 1);
+					downloadLinkTitle(last);
+					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
+				}
+			} else {
+				for (FeedEntry n : newFeed) {
+					downloadLinkTitle(n);
+					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
+				}
+			}
+			feed.addAll(newFeed);
+			while (feed.size() > 100) {
+				feed.remove(0);
+			}
+			
+
+			lastFeedCheckTimestamp = timestampNow;
+		}
+	}
+	
+	private void downloadLinkTitle(FeedEntry e) {
+		if (e.link != null) {
+			try {
+				URL url = new URL(e.link);
+				InputStream stream = url.openStream();
+				BufferedReader br = new BufferedReader(new InputStreamReader(stream));
+				String s;
+				while ((s = br.readLine()) != null) {
+					if (s.contains("<title>")) {
+						LOG.info("Check " + s);
+						int i1 = s.indexOf("<title>");
+						int i2 = s.indexOf("</title>");
+						if (i1 != -1 && i2 != -1) {
+							e.linkTitle = s.substring(i1 + "<title>".length(), i2).trim();
+							break;
+						}
+					}
+				}
+				br.close();
+			} catch (Exception e1) {
+				LOG.info("Failed to fetch " + e.link, e1);
+			}
+		}
+	}
+
+	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
+	
+	private String formatGithubMsg(FeedEntry n) {
+		String emoji = EmojiConstants.GITHUB_EMOJI;
+		String tags = "";
+		if(n.title.contains("reopen")) {
+			emoji = EmojiConstants.REOPEN_EMOJI;
+			tags = "#reopen";
+		} else if(n.title.contains("open")) {
+			emoji = EmojiConstants.OPEN_EMOJI;
+			tags = "#open";
+		} else if(n.title.contains("create")) {
+			emoji = EmojiConstants.CREATE_EMOJI;
+			tags = "#create";
+		} else if(n.title.contains("close")) {
+			emoji = EmojiConstants.CLOSED_EMOJI;
+			tags = "#close";
+		} else if(n.title.contains("pushed")) {
+			emoji = EmojiConstants.PUSHED_EMOJI;
+			tags = "#push";
+		} else if(n.title.contains("comment")) {
+			emoji = EmojiConstants.COMMENT_EMOJI;
+			tags = "#comment";
+		} else if(n.title.contains("merge")) {
+			emoji = EmojiConstants.MERGE_EMOJI;
+			tags = "#merge";
+		} else if(n.title.contains("delete")) {
+			emoji = EmojiConstants.DELETE_EMOJI;
+			tags = "#delete";
+		} 
+		if(n.title.contains("branch")) {
+			tags += " #branch";
+		} else if (n.title.contains("pull request")) {
+			tags += " #pullrequest";
+		} else if (n.title.contains("issue")) {
+			tags += " #issue";
+		}
+
+		String[] words = n.title.split(" ");
+		StringBuilder bld = new StringBuilder();
+		boolean author = false;
+		for (int i = 0; i < words.length; i++) {
+			bld.append(" ");
+			if (words[i].startsWith("osmandapp/")) {
+				String linkName = n.linkTitle;
+				if (Algorithms.isEmpty(linkName)) {
+					linkName = words[i].substring("osmandapp/".length());
+				}
+				bld.append(String.format("<a href='%s'>%s</a>", n.link, linkName));
+			} else if (words[i].equals(n.author)) {
+				author = true;
+				bld.append(String.format("<b>#%s</b>", words[i].replace('-', '_')));
+			} else {
+				bld.append(words[i]);
+			}
+		}
+		String message = bld.toString();
+		if (!author) {
+			message = " " + String.format("<b>#%s</b>:", n.author.replace('-', '_'));
+		}
+		message = emoji + " " + message;
+		message += "\n<i>" + DATE_FORMAT.format(n.updated) + "</i>\n" + tags.trim();
+		return message;
+	}
+
+	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
+		XmlPullParser parser = PlatformUtil.newXMLPullParser();
+		parser.setInput(new InputStreamReader(new URL(url).openStream()));
+		int token;
+		StringBuilder content = new StringBuilder();
+		FeedEntry lastEntry = null;
+		List<FeedEntry> lst = new ArrayList<FeedEntry>();
+		while((token = parser.nextToken()) != XmlPullParser.END_DOCUMENT) {
+			if(token == XmlPullParser.START_TAG) {
+				switch (parser.getName()) {
+				case "entry": lastEntry = new FeedEntry(); break;
+				case "link": if (lastEntry != null) lastEntry.link = parser.getAttributeValue("", "href"); break;
+				}
+				content.setLength(0);
+			} else if(token == XmlPullParser.TEXT) {
+				content.append(parser.getText());
+			} else if(token == XmlPullParser.END_TAG) {
+				switch (parser.getName()) {
+				case "entry":
+					if (lastEntry != null) {
+						if (lastEntry.published == null) {
+							lastEntry.published = lastEntry.updated;
+						} else if (lastEntry.updated == null) {
+							lastEntry.updated = lastEntry.published;
+						}
+						if (lastEntry.updated != null) {
+							lst.add(lastEntry);
+						}
+					}
+					break;
+				case "name":
+					if (lastEntry != null) lastEntry.author = content.toString(); break;
+				case "published":
+					if (lastEntry != null) lastEntry.published = XML_DATE_FORMAT.parse(content.toString()); break;
+				case "updated":
+					if (lastEntry != null) lastEntry.updated = XML_DATE_FORMAT.parse(content.toString()); break;
+				case "id":
+					if (lastEntry != null) lastEntry.id = content.toString(); break;
+				case "title":
+					if (lastEntry != null) lastEntry.title = content.toString(); break;
+				case "content":
+					if (lastEntry != null) lastEntry.content = content.toString(); break;
+				}
+			}
+		};
+		Collections.sort(lst, new Comparator<FeedEntry>() {
+
+			@Override
+			public int compare(FeedEntry o1, FeedEntry o2) {
+				return Long.compare(o1.updated.getTime(), o2.updated.getTime());
+			}
+		});
+		return lst;
+	}
 
 	private String formatTime(double i) {
 		double f = i / HOUR;
@@ -617,6 +863,11 @@ public class OsmAndServerMonitorTasks {
 	protected static class LiveCheckInfo {
 		long previousOsmAndLiveDelay = 0;
 		long lastOsmAndLiveDelay = 0;
+		long lastCheckTimestamp = 0;
+	}
+	
+	protected static class JavaServerCheckInfo {
+		Map<String, String> failed = new LinkedHashMap<String, String>();
 		long lastCheckTimestamp = 0;
 	}
 
@@ -647,13 +898,17 @@ public class OsmAndServerMonitorTasks {
 			return host != null ? host.equals(that.host) : that.host == null;
 		}
 
-		public String fullString() {
+		public String fullString(String urlFailedJava) {
 			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 0.5);
 			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
 			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD + host, 24);
 			String name = host.substring(0, host.indexOf('.'));
+			String status = (lastSuccess ? "OK" : "FAILED");
+			if (urlFailedJava != null) {
+				status = String.format("FAILED. Server - <a href='%s'>restart</a>", urlFailedJava);
+			}
 			return String.format("<a href='%s'>%s</a>: <b>%s</b>. Speed: %5.2f, 3h — %5.2f MBs · 24h — %5.2f MBs",
-					host, name, (lastSuccess ? "OK" : "FAILED"),
+					host, name, status,
 					last.getMean(), speed3Hours.getPercentile(PERC_SMALL),
 					speed24Hours.getPercentile(PERC_SMALL));
 		}
@@ -696,4 +951,9 @@ public class OsmAndServerMonitorTasks {
 	public void setSender(Sender sender) {
 		this.telegram = sender;
 	}
+	
+	
+	
+	
+	
 }

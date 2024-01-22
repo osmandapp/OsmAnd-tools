@@ -38,8 +38,8 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private int allBoundaries;
 	private boolean realCounts = false;
 	 
-	private Connection dbConn;
-	private DBDialect dialect;
+	protected Connection dbConn;
+	protected DBDialect dialect;
 
 	private PreparedStatement iterateNodes;
 	private PreparedStatement iterateWays;
@@ -51,35 +51,28 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	}
 
 
-	public void initDatabase(OsmDbCreator dbCreator)
+	public void initDatabase()
 			throws SQLException {
-		updateCounts(dbCreator);
-		if(this.allNodes == 0) {
-			final Statement stmt = dbConn.createStatement();
-			computeRealCounts(stmt);
-			stmt.close();
-		}
-
 		pselectNode = dbConn.prepareStatement("select n.latitude, n.longitude, n.tags from node n where n.id = ?"); //$NON-NLS-1$
 		pselectWay = dbConn.prepareStatement("select w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 				"from ways w left join node n on w.node = n.id where w.id = ? order by w.ord"); //$NON-NLS-1$
 		pselectRelation = dbConn.prepareStatement("select r.member, r.type, r.role, r.ord, r.tags " + //$NON-NLS-1$
-				"from relations r where r.id = ? and r.del = ? order by r.ord"); //$NON-NLS-1$
+				"from relations r where r.id = ? order by r.ord"); //$NON-NLS-1$
 
 		iterateNodes = dbConn
-				.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0"); //$NON-NLS-1$
+				.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0 or n.propagate = 1"); //$NON-NLS-1$
 		iterateWays = dbConn.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 				"from ways w left join node n on w.node = n.id order by w.id, w.ord"); //$NON-NLS-1$
 		iterateWayBoundaries = dbConn
 				.prepareStatement("select w.id, w.node, w.ord, w.tags, n.latitude, n.longitude, n.tags " + //$NON-NLS-1$
 						"from ways w left join node n on w.node = n.id  where w.boundary > 0 order by w.id, w.ord"); //$NON-NLS-1$
-		iterateRelations = dbConn.prepareStatement("select r.id, r.tags, r.del from relations r where length(r.tags) > 0"); //$NON-NLS-1$
+		iterateRelations = dbConn.prepareStatement("select r.id, r.tags from relations r where length(r.tags) > 0"); //$NON-NLS-1$
 	}
 
 	public void updateCounts(OsmDbCreator dbCreator) {
-		if(dbCreator != null)  {
+		if (dbCreator != null) {
 			allNodes += dbCreator.getAllNodes();
-			allRelations += dbCreator.getAllRelations() ;
+			allRelations += dbCreator.getAllRelations();
 			allWays += dbCreator.getAllWays();
 		}
 	}
@@ -137,7 +130,6 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		Map<EntityId, Entity> map = new LinkedHashMap<EntityId, Entity>();
 		if (e.getMembers().isEmpty()) {
 			pselectRelation.setLong(1, e.getId());
-			pselectRelation.setInt(2, e.getModify() == Entity.MODIFY_DELETED ? 1 : 0);
 			if (pselectRelation.execute()) {
 				ResultSet rs = pselectRelation.getResultSet();
 				while (rs.next()) {
@@ -212,9 +204,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		PreparedStatement select;
 		int count = 0;
 		if (realCounts) {
-			Statement statement = dbConn.createStatement();
-			computeRealCounts(statement);
-			statement.close();
+			computeRealCounts();
 		}
 
 		BlockingQueue<Entity> toProcess = new ArrayBlockingQueue<Entity>(100000);
@@ -256,14 +246,16 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	}
 
 
-	public void computeRealCounts(Statement statement) throws SQLException {
+	private void computeRealCounts() throws SQLException {
 		if (!realCounts) {
+			Statement statement = dbConn.createStatement();
 			realCounts = true;
 			// filter out all nodes without tags
 			allNodes = statement.executeQuery("select count(distinct n.id) from node n where length(n.tags) > 0").getInt(1); //$NON-NLS-1$
 			allWays = statement.executeQuery("select count(*) from ways w where w.ord = 0").getInt(1); //$NON-NLS-1$
 			allRelations = statement.executeQuery("select count(distinct r.id) from relations r").getInt(1); //$NON-NLS-1$
 			allBoundaries = statement.executeQuery("select count(*) from ways w where w.ord = 0 and w.boundary > 0").getInt(1); //$NON-NLS-1$
+			statement.close();
 		}
 	}
 
@@ -357,7 +349,6 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 					} else {
 						e = new Relation(curId);
 						readTags(e, rs.getBytes(2));
-						e.setModify(rs.getInt(3) == 1 ? Entity.MODIFY_DELETED : Entity.MODIFY_UNKNOWN);
 					}
 					if (newEntity) {
 						if (prevEntity != null) {

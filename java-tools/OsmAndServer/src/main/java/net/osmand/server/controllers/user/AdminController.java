@@ -9,27 +9,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.UUID;
+import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.transaction.Transactional;
 
-import net.osmand.server.api.repo.OsmRecipientsRepository;
+import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -46,29 +32,33 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.gson.Gson;
 
+import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.repo.LotterySeriesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadProperties;
+import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
-import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import net.osmand.util.Algorithms;
 import net.osmand.server.controllers.pub.WebController;
 
 @Controller
@@ -78,6 +68,8 @@ public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
 
 	private static final String ACCESS_LOG_REPORTS_FOLDER = "reports";
+	
+	private static final String RELEASES_FOLDER = "osm-releases";
 
 	@Autowired
 	private MotdService motdService;
@@ -102,9 +94,6 @@ public class AdminController {
 	
 	@Autowired
 	private PremiumUsersRepository usersRepository;
-
-	@Autowired
-	private UserdataController userDataController;
 
 	@Autowired
 	private EmailRegistryService emailService;
@@ -132,6 +121,12 @@ public class AdminController {
 
 	@Autowired
 	private LotterySeriesRepository seriesRepo;
+	
+	@Autowired
+	private PromoCampaignRepository promoCampaignRepository;
+	
+	@Autowired
+	PromoService promoService;
 
 	@Autowired
 	private EmailSenderService emailSender;
@@ -143,6 +138,8 @@ public class AdminController {
 	
 	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
 	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
+	
+	public static final String PROMO_WEBSITE = "promo_website";
 	
 	
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
@@ -188,84 +185,93 @@ public class AdminController {
         return "redirect:info";
 	}
 	
-	@PostMapping(path = { "/register-promo" })
-	public String registerPromo(Model model, 
-			@RequestParam(required = true) String comment, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
-		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
-		deviceSub.sku = "promo_website";
-		deviceSub.orderId = UUID.randomUUID().toString();
-		deviceSub.kind = "promo";
-		Calendar c = Calendar.getInstance();
-		c.setTimeInMillis(System.currentTimeMillis());
-		deviceSub.timestamp = c.getTime();
-		deviceSub.starttime = c.getTime();
-		deviceSub.valid = true;
-		deviceSub.purchaseToken = comment;
-		c.add(Calendar.YEAR, 1);
-		deviceSub.expiretime = c.getTime(); 
-		boolean error = false;
-		if (emailSender.isEmail(comment)) {
-			String email = comment;
-			PremiumUser existingUser = usersRepository.findByEmail(email);
-			if (existingUser == null) {
-				PremiumUser pu = new PremiumUsersRepository.PremiumUser();
-				pu.email = email;
-				pu.regTime = new Date();
-				pu.orderid = deviceSub.orderId;
-				usersRepository.saveAndFlush(pu);
-				deviceSub.purchaseToken += " (email sent & registered)";
-				emailSender.sendOsmAndCloudPromoEmail(comment, deviceSub.orderId);
-			} else {
-				if(existingUser.orderid == null || userSubService.checkOrderIdPremium(existingUser.orderid) != null) {
-					existingUser.orderid = deviceSub.orderId;
-					usersRepository.saveAndFlush(existingUser);
-					deviceSub.purchaseToken += " (new PRO subscription is updated)";
-				} else {
-					error = true;
-					deviceSub.purchaseToken += " (ERROR: user already has PRO subscription)";
-				}
-			}
-		} else {
-			error = true;
-			deviceSub.purchaseToken += " (ERROR: please enter email only)";
-		}
-		if (!error) {
-			subscriptionsRepository.save(deviceSub);
-		}
-		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
-        return "redirect:info#audience";
+	@PostMapping(path = {"/register-promo"})
+	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) {
+		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, PROMO_WEBSITE, null);
+		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(resp.deviceSub));
+		return "redirect:info#audience";
 	}
 	
-	@PostMapping(path = { "/search-subscription" })
-	public String searchSubscription(Model model, 
-			@RequestParam(required = true) String orderId, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+	@PostMapping(path = {"/search-subscription"})
+	public String searchSubscription(@RequestParam String orderId, final RedirectAttributes redirectAttrs) {
+		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByIdentifier(orderId);
+		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
+		return "redirect:info#audience";
+	}
+	
+	@Transactional
+	@PostMapping(path = {"/downgrade-subscription"})
+	public ResponseEntity<String> downgradeSubscription(@RequestParam String orderId, @RequestParam String subscriptionType) {
+		PremiumUser pu = usersRepository.findByOrderid(orderId);
+		if (pu != null) {
+			SupporterDeviceSubscription subscription = new SupporterDeviceSubscription();
+			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(pu.orderid);
+			if (subscriptions != null && !subscriptions.isEmpty()) {
+				subscription = subscriptions.get(0);
+			}
+			// downgrade only promo_website
+			if (subscription != null && subscription.sku.equals(subscriptionType)) {
+				// update expiretime
+				Calendar c = Calendar.getInstance();
+				c.setTimeInMillis(System.currentTimeMillis());
+				subscription.expiretime = c.getTime();
+				subscriptionsRepository.save(subscription);
+				// remove user orderid
+				pu.orderid = null;
+				usersRepository.saveAndFlush(pu);
+			}
+		}
+		return ResponseEntity.ok("Downgrade successful");
+	}
+	
+	@GetMapping(path = {"/get-subscription-details"})
+	@ResponseBody
+	public ResponseEntity<SupporterDeviceSubscription> getSubscriptionDetails(@RequestParam String email) {
+		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByIdentifier(email);
+		return ResponseEntity.ok(deviceSub);
+	}
+	
+	private SupporterDeviceSubscription getSubscriptionDetailsByIdentifier(String identifier) {
 		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
 		deviceSub.sku = "not found";
 		deviceSub.orderId = "none";
 		deviceSub.valid = false;
-		if (emailSender.isEmail(orderId)) {
-			PremiumUser pu = usersRepository.findByEmail(orderId);
+		
+		if (emailSender.isEmail(identifier)) {
+			PremiumUser pu = usersRepository.findByEmail(identifier);
 			if (pu != null) {
-				deviceSub.sku = orderId + " (pro email)";
+				String suffix = pu.orderid != null ? " (pro email)" : " (osmand start)";
+				deviceSub.sku = identifier + suffix;
 				List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(pu.orderid);
-				if (ls != null && ls.size() > 0) {
+				if (ls != null && !ls.isEmpty()) {
 					deviceSub = ls.get(0);
 				}
 				if (deviceSub != null) {
-					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, null, true, false);
+					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
 					ufs.allFiles.clear();
 					ufs.uniqueFiles.clear();
-					deviceSub.payload = gson.toJson(ufs);
+					deviceSub.payload = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") + " at "
+							+ pu.tokenTime + "\n" + gson.toJson(ufs);
 				}
 			}
 		} else {
-			List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(orderId);
-			if (ls != null && ls.size() > 0) {
+			List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(identifier);
+			if (ls != null && !ls.isEmpty()) {
 				deviceSub = ls.get(0);
 			}
 		}
-		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
-        return "redirect:info#audience";
+		
+		return deviceSub;
+	}
+	
+	@PostMapping("/get-email-by-orderId")
+	@ResponseBody
+	public ResponseEntity<String> getEmailByOrderId(@RequestParam String orderId) {
+		PremiumUser pu = usersRepository.findByOrderid(orderId);
+		if (pu != null) {
+			return ResponseEntity.ok().body(pu.email);
+		}
+		return ResponseEntity.badRequest().body("User is not found.");
 	}
 
 	
@@ -463,6 +469,8 @@ public class AdminController {
 		if (settings != null) {
 			model.addAttribute("subSettings", settings);
 		}
+		
+		model.addAttribute("promos", promoCampaignRepository.findAllByOrderByStartTimeDesc());
 		model.addAttribute("giveaways", seriesRepo.findAllByOrderByUpdateTimeDesc());
 		model.addAttribute("downloadServers", getDownloadSettings());
 		model.addAttribute("reports", getReports());
@@ -477,13 +485,11 @@ public class AdminController {
 		model.addAttribute("emailsReport", emailService.getEmailsDBReport());
 		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
+		
+		model.addAttribute("promoSku", PROMO_WEBSITE);
+		
 		return "admin/info";
 	}
-	
-
-
-
-	
 	
 	private BtcTransactionReport getBitcoinReport() {
 //		new File(websiteLocation, BTC_REPORT);
@@ -555,9 +561,11 @@ public class AdminController {
 		public YearSubRetentionGroup ios = new YearSubRetentionGroup();
 		public YearSubRetentionGroup iosFull = new YearSubRetentionGroup();
 		public YearSubRetentionGroup iosIntro = new YearSubRetentionGroup();
+		public YearSubRetentionGroup iosPro = new YearSubRetentionGroup();
 		public YearSubRetentionGroup android = new YearSubRetentionGroup();
 		public YearSubRetentionGroup androidFull = new YearSubRetentionGroup();
 		public YearSubRetentionGroup androidIntro = new YearSubRetentionGroup();
+		public YearSubRetentionGroup androidPro = new YearSubRetentionGroup();
 		public YearSubRetentionGroup androidV2 = new YearSubRetentionGroup();
 		public YearSubRetentionGroup total = new YearSubRetentionGroup();
 		
@@ -569,10 +577,12 @@ public class AdminController {
 			this.ios.addReport(r.ios);
 			this.iosFull.addReport(r.iosFull);
 			this.iosIntro.addReport(r.iosIntro);
+			this.iosPro.addReport(r.iosPro);
 			this.android.addReport(r.android);
 			this.androidFull.addReport(r.androidFull);
 			this.androidIntro.addReport(r.androidIntro);
 			this.androidV2.addReport(r.androidV2);
+			this.androidPro.addReport(r.androidPro);
 			this.total.addReport(r.total);
 		}
 
@@ -627,17 +637,26 @@ public class AdminController {
 						int possibleGone = rs.getInt(ind++);
 						int gone = rs.getInt(ind++);
 						YearSubscriptionRetentionReport report  = res.get(month);
+						if (years == 0) {
+							return;
+						}
 						if (report == null) {
 							report = new YearSubscriptionRetentionReport(month);
 							res.put(month, report);
 						}
+						
 						if (sku.startsWith("net.osmand")) {
 							report.ios.addNumber(years, active, possibleGone, gone);
-							if (intro) {
+							if(sku.contains("pro")) {
+								report.iosPro.addNumber(years, active, possibleGone, gone);
+							} else if (intro) {
 								report.iosIntro.addNumber(years, active, possibleGone, gone);
 							} else {
 								report.iosFull.addNumber(years, active, possibleGone, gone);
 							}
+						} else if(sku.contains("pro")) {
+							report.android.addNumber(years, active, possibleGone, gone);
+							report.androidPro.addNumber(years, active, possibleGone, gone);
 						} else if(sku.contains("v1")) {
 							report.android.addNumber(years, active, possibleGone, gone);
 							if (intro) {
@@ -677,6 +696,7 @@ public class AdminController {
 	
 	public static class AdminGenericSubReportColumnValue {
 		public int active;
+		public int activeRenew;
 		public int totalNew;
 		public int totalOld;
 		public int totalEnd;
@@ -700,14 +720,18 @@ public class AdminController {
 			if (formatVersion == 0) {
 				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
 			}
-			StringBuilder row = new StringBuilder();
-			if(active > 0) {
-				row.append(active).append("<br>");
-			}
 			boolean lvl1 = (formatVersion & (1 << 1)) > 0;
 			boolean lvl2 = (formatVersion & (1 << 2)) > 0;
 			boolean lvl3 = (formatVersion & (1 << 3)) > 0;
 			boolean lvl4 = (formatVersion & (1 << 4)) > 0;
+			StringBuilder row = new StringBuilder();
+			if (active > 0) {
+				if(activeRenew > 0) {
+					row.append(String.format("%d (%d%%) <br>", active, activeRenew * 100 / active));
+				} else {
+					row.append(String.format("%d<br>", active));
+				}
+			}
 			row.append(String.format("<b>+%d</b>&nbsp;-%d", totalNew, totalEnd));
 			if (lvl1 && (totalEnd + totalOld) > 0) {
 				row.append(String.format("<br>•%d&nbsp;-%d%%", totalOld + totalEnd,
@@ -723,6 +747,7 @@ public class AdminController {
 				} else {
 					row.append(String.format("<br>€ %d", valueNewLTV / 1000));
 				}
+				row.append(String.format("<br>Old € %d", valueOld / 1000));
 			}
 			return row.toString();
 		}
@@ -734,6 +759,7 @@ public class AdminController {
 		private int filterDuration = -1;
 		private Boolean discount;
 		private Boolean pro;
+		private Boolean maps;
 		public final String name;
 		
 		public AdminGenericSubReportColumn(String name) {
@@ -761,6 +787,11 @@ public class AdminController {
 		
 		public AdminGenericSubReportColumn pro(boolean pro) {
 			this.pro = pro;
+			return this;
+		}
+		
+		public AdminGenericSubReportColumn maps(boolean maps) {
+			this.maps = maps;
 			return this;
 		}
 		
@@ -793,9 +824,21 @@ public class AdminController {
 			if (pro != null && pro.booleanValue() != sub.pro) {
 				return false;
 			}
+			if (maps != null && maps.booleanValue() != sub.maps) {
+				return false;
+			}
 			if (discount != null) {
-				boolean d = sub.sku.contains("v2") || sub.introPriceMillis >= 0 || sub.introCycles > 0;
-				if (d != discount) {
+				boolean subDiscount;
+				if (sub.sku.contains("v2")) {
+					subDiscount = true; // start from aug 21 (no discount)
+				} else {
+					subDiscount = (sub.introPriceMillis >= 0 && sub.introPriceEurMillis < sub.fullPriceEurMillis)
+							|| sub.introCycles > 0;
+//					if (subDiscount && sub.currentPeriod >= sub.introCycles) {
+//						subDiscount = false;
+//					}
+				}
+				if (subDiscount != discount) {
 					return false;
 				}
 			}
@@ -870,8 +913,7 @@ public class AdminController {
 						}
 					}
 				}
-			}
-			if (s.currentPeriod == 0 && period == YEAR) {
+			} else if (s.currentPeriod == 0 && period == YEAR) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
 				for (int k = 0; k < s.totalMonths; k+= 12) {
@@ -882,6 +924,13 @@ public class AdminController {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
 								vls.get(i).active++;
+								if (k + 12 >= s.totalMonths) {
+									if (s.valid && s.autorenewing) {
+										vls.get(i).activeRenew++;
+									}
+								} else {
+									vls.get(i).activeRenew++;
+								}
 							}
 						}
 					}
@@ -905,23 +954,20 @@ public class AdminController {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.period = period;
 		report.subs = subs;
-		String h = ""; //"<br>New + Renew <br> - Cancel";
 		report.columns.add(new AdminGenericSubReportColumn("All"));
-		report.columns.add(new AdminGenericSubReportColumn("GPlay" + h).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
-		report.columns.add(new AdminGenericSubReportColumn("IOS" + h).app(SubAppType.IOS));
-		report.columns.add(new AdminGenericSubReportColumn("HW/AMZ" + h).app(SubAppType.HUAWEI, SubAppType.AMAZON));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>GPlay").app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>IOS").app(SubAppType.IOS));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>Other" ).app(SubAppType.HUAWEI, SubAppType.AMAZON));
 		
-		report.columns.add(new AdminGenericSubReportColumn("G Y" + h).app(SubAppType.OSMAND).discount(false).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("G/2 Y" + h).app(SubAppType.OSMAND).discount(true).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("G+ Y" + h).app(SubAppType.OSMAND_PLUS).discount(false).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("G+/2 Y" + h).app(SubAppType.OSMAND_PLUS).discount(true).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("I Y" + h).app(SubAppType.IOS).discount(false).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("I/2 Y" + h).app(SubAppType.IOS).discount(true).duration(12));
-
-		report.columns.add(new AdminGenericSubReportColumn("All Q" + h).duration(3));
-		report.columns.add(new AdminGenericSubReportColumn("All M" + h).duration(1));
-		report.columns.add(new AdminGenericSubReportColumn("PRO A" + h).pro(true).duration(12));
-		report.columns.add(new AdminGenericSubReportColumn("PRO M" + h).pro(true).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>Maps A").maps(true));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO A").pro(true).duration(12));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO M").pro(true).duration(1));
+		report.columns.add(new AdminGenericSubReportColumn("Type<br>Other").pro(false).maps(false));
+		
+		report.columns.add(new AdminGenericSubReportColumn("Gplay<br>Full").discount(false).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("Gplay<br>%%").discount(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
+		report.columns.add(new AdminGenericSubReportColumn("iOS<br>Full").discount(false).app(SubAppType.IOS));
+		report.columns.add(new AdminGenericSubReportColumn("iOS<br>%%").discount(true).app(SubAppType.IOS));
 		return report;
 	}
 	
@@ -1021,14 +1067,29 @@ public class AdminController {
 						return s;
 					}
 				});
-		// calculate retention rate
-		Map<String, TIntArrayList> skuRetentions = new LinkedHashMap<String, TIntArrayList>();
+		Map<String,TDoubleArrayList> retentionRates = calculateRetentionRates(subs);
 		for (Subscription s : subs) {
 			if (s.currentPeriod == 0) {
+				s.calculateLTVValue(retentionRates);
+			}
+		}
+		return subs;
+	}
+
+
+	private Map<String, TDoubleArrayList> calculateRetentionRates(List<Subscription> subs) {
+		// calculate retention rate
+		System.out.println("Annual retentions (MOVE TO WEB PAGE): ");
+		Map<String, TIntArrayList> skuRetentions = new TreeMap<>();
+		Map<String, TDoubleArrayList> skuResult = new TreeMap<>();
+		Map<String, Subscription> skuExamples = new TreeMap<>();
+		for (Subscription s : subs) {
+			if (s.currentPeriod == 0 && s.totalPeriods > 0) {
 				TIntArrayList retentionList = skuRetentions.get(s.getSku());
 				if (retentionList == null) {
 					retentionList = new TIntArrayList();
 					skuRetentions.put(s.getSku(), retentionList);
+					skuExamples.put(s.getSku(), s);
 				}
 				boolean ended = s.isEnded();
 				while (retentionList.size() < 2 * s.totalPeriods) {
@@ -1047,46 +1108,64 @@ public class AdminController {
 				}
 			}
 		}
-		System.out.println("Annual retentions (MOVE TO WEB PAGE): ");
 		for (String s : skuRetentions.keySet()) {
 			TIntArrayList arrays = skuRetentions.get(s);
+			Subscription sub = skuExamples.get(s);
+			TDoubleArrayList actualRetention = new TDoubleArrayList();
+			for (int i = 0; i < arrays.size(); i += 2) {
+				int total = arrays.get(i);
+				int left = arrays.get(i + 1);
+				if (total == 0 || left == 0) {
+					break;
+				}
+				actualRetention.add(((double) left) / total);
+			}
+			boolean trim = trimRetention(actualRetention, sub.durationMonth > 1 ? (sub.durationMonth > 3 ? 2 : 3) : 6);
 			StringBuilder bld = new StringBuilder();
-			double partLeft = 1;
 			double sum = 1;
 			if (s.endsWith("-%")) {
 				sum = 0.5;
 			}
-			double retainedAvg = 0;
-			int retainedAvgCnt = 0;
-			for (int i = 0; i < arrays.size(); i += 2) {
-				int t = arrays.get(i);
-				int l = arrays.get(i + 1);
-				if (t == 0 || l == 0) {
-					break;
+			double prod = 1;
+			double last = sub.retention;
+			for (int i = 0; i < actualRetention.size(); i++) {
+				last = actualRetention.get(i);
+				prod *= last;
+				sum += prod;
+				if (i == actualRetention.size() - 1 && trim) {
+					bld.append(String.format("... [%.2f %%] ", 100 * (double) actualRetention.get(i)));
+				} else {
+					bld.append(String.format("%.0f %%, ", 100 * (double) actualRetention.get(i)));
 				}
-				double retained = ((double) l) / t;
-				partLeft = partLeft * retained;
-				if (i > 0) {
-					retainedAvg += retained;
-					retainedAvgCnt++;
-				}
-				sum += partLeft;
-				bld.append(((int) (100 * retained))).append("%, ");
 			}
-			double retainedTail = 0.95;
-			if (retainedAvgCnt > 0 && retainedAvg / retainedAvgCnt < retainedTail) {
-				retainedTail = retainedAvg / retainedAvgCnt;
-			}
-			bld.append('[').append(((int) (100 * retainedTail))).append("%]");
-			sum += partLeft * retainedTail / (1 - retainedTail); // add tail
-			System.out.println(s + " - $ x " + ((float) sum) + " - " + bld.toString());
+			// add up tail
+			last = Math.min(last, 0.95);
+			sum += prod  * last / (1 - last); // add tail
+			
+			
+			double ltv = sub.defPriceEurMillis / 1000 * sum;
+			String msg = String.format("%.0f$ %s - %.1f $ * %.2f: %d%% ~ %s", ltv, s, sub.defPriceEurMillis / 1000.0, sum, 
+					(int) (sub.retention * 100), bld.toString());
+			System.out.println(msg);
+			actualRetention.insert(0, sum);
+			skuResult.put(s, actualRetention);
 		}
-		for (Subscription s : subs) {
-			if (s.currentPeriod == 0) {
-				s.calculateLTVValue();
+		return skuResult;
+	}
+
+
+	private boolean trimRetention(TDoubleArrayList actualRetention, int RET_PERIOD_TRIM) {
+		boolean trim = actualRetention.size() > RET_PERIOD_TRIM;
+		if (trim) {
+			int cnt = actualRetention.size() - RET_PERIOD_TRIM;
+			double prodAverage = 1;
+			for (int i = actualRetention.size() - 1; i >= RET_PERIOD_TRIM; i--) {
+				double vl = actualRetention.removeAt(i);
+				prodAverage *= vl;
 			}
+			actualRetention.add(Math.pow(prodAverage, 1.0 / cnt));
 		}
-		return subs;
+		return trim;
 	}
 
 
@@ -1117,7 +1196,7 @@ public class AdminController {
 		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
 		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
 		
-		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; s.maps = true; break;
 		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
 		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
 		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.58; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
@@ -1128,32 +1207,33 @@ public class AdminController {
 
 		case "osmand_pro_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "osmand_pro_monthly_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
-		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
+		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 
 		case "net.osmand.maps.subscription.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
+		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; s.maps = true; break;
 		
-		case "net.osmand.maps.subscription.pro.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 29000; s.pro = true; break;
+		case "net.osmand.maps.subscription.pro.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 29000; s.pro = true; break;
 		case "net.osmand.maps.subscription.pro.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.maps.subscription.plus.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "net.osmand.maps.subscription.plus.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 
 		case "net.osmand.huawei.annual_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
 		case "net.osmand.huawei.3months_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
 		case "net.osmand.huawei.monthly_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
 
 		case "net.osmand.huawei.monthly.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.huawei.annual.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.huawei.annual.maps_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "net.osmand.huawei.annual.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.6; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "net.osmand.huawei.annual.maps_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 		
 		case "net.osmand.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; break;
+		case "net.osmand.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 		case "net.osmand.plus.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "net.osmand.plus.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		
 
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		};
@@ -1194,8 +1274,12 @@ public class AdminController {
 			this.sku = s.sku;
 			this.priceMillis = s.priceMillis;
 			this.introPriceMillis = s.introPriceMillis;
+			this.priceEurMillis = s.priceEurMillis;
+			this.introPriceEurMillis = s.introPriceEurMillis;
 			this.introCycles = s.introCycles;
 			this.durationMonth = s.durationMonth;
+			this.pro = s.pro;
+			this.maps = s.maps;
 			this.app = s.app;
 			this.defPriceEurMillis = s.defPriceEurMillis;
 			this.totalPeriods = s.totalPeriods;
@@ -1213,6 +1297,7 @@ public class AdminController {
 		// from sku
 		protected int durationMonth;
 		protected boolean pro;
+		protected boolean maps;
 		protected SubAppType app;
 		protected int defPriceEurMillis;
 		
@@ -1239,15 +1324,35 @@ public class AdminController {
 			return ended; 
 		}
 		
-		public void calculateLTVValue() {
+		public void calculateLTVValue(Map<String, TDoubleArrayList> retentionRates) {
 			priceTotalPaidEurMillis = introPriceEurMillis;
+			if (introCycles > 1) {
+				throw new UnsupportedOperationException();
+			}
 			for (int i = 1; i < totalPeriods; i++) {
 				priceTotalPaidEurMillis += fullPriceEurMillis;
 			}
-			priceLTVEurMillis = priceTotalPaidEurMillis;
-			// we could take into account autorenewing but retention will change
-			if (!isEnded()) {
-				priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
+			int methodLTV = 3;
+			TDoubleArrayList rates = retentionRates.get(getSku());
+			if (methodLTV == 1) {
+				priceLTVEurMillis = priceTotalPaidEurMillis;
+				// we could take into account autorenewing but retention will change
+				if (!isEnded()) {
+					priceLTVEurMillis += (long) (fullPriceEurMillis * retention / (1 - retention));
+				}
+			} else if (methodLTV == 2) {
+				priceLTVEurMillis = (int) (fullPriceEurMillis * rates.get(0));
+			} else if (methodLTV == 3) {
+				priceLTVEurMillis = priceTotalPaidEurMillis;
+				if (!isEnded() && autorenewing) {
+					double p = 1;
+					for(int i = totalPeriods; i < rates.size() - 1; i ++) {
+						p *= rates.get(i);
+						priceLTVEurMillis += fullPriceEurMillis * p;
+					}
+					double lastRetention = Math.min(0.95, rates.size() > 1 ? rates.get(rates.size() - 1) : retention);
+					priceLTVEurMillis += (long) (fullPriceEurMillis * lastRetention / (1 - lastRetention)) * p;
+				}
 			}
 		}
 		
@@ -1260,19 +1365,17 @@ public class AdminController {
 			
 			this.fullPriceEurMillis = defPriceEurMillis;
 			this.introPriceEurMillis = defPriceEurMillis;
-			if(this.introCycles > 0) {
+			if (this.introCycles > 0) {
 				this.introPriceEurMillis = defPriceEurMillis / 2;
 			}
-			if (introPriceMillis >= 0 && priceMillis > 0) {
-				introPriceEurMillis = (int) (((double) introPriceMillis * priceEurMillis) / priceMillis);
+			double rate = rts.getEurRate(pricecurrency, startPeriodTime); 
+			if (introPriceMillis >= 0 && priceMillis > 0 && rate == 0) {
+				rate = priceMillis * 1.0 / defPriceEurMillis;
 			}
-			double rate = rts.getEurRate(pricecurrency, startPeriodTime);
-			if(rate > 0) {
+			if (rate > 0) {
 				fullPriceEurMillis = (int) (priceMillis / rate);
 				if (introPriceMillis >= 0) {
-					introPriceEurMillis =(int) (introPriceMillis / rate);
-				} else {
-					introPriceEurMillis = (int) (priceMillis / rate);
+					introPriceEurMillis = (int) (introPriceMillis / rate);
 				}
 			}
 			this.introPeriod = currentPeriod == 0 && introPriceEurMillis != fullPriceEurMillis;
@@ -1389,18 +1492,27 @@ public class AdminController {
 	}
 
 	
-	private List<Map<String, Object>> getDownloadSettings() {
-		DownloadProperties dProps = downloadService.getSettings();
-		List<Map<String, Object>> list = new ArrayList<>();
-		for (String s : dProps.getServers()) {
-			Map<String, Object> mo = new TreeMap<>();
-			mo.put("name", s);
-			for (DownloadServerSpecialty sp : DownloadServerSpecialty.values()) {
-				mo.put(sp.name().toLowerCase(), dProps.getPercent(sp, s) + "%");
+	private Map<String, Object> getDownloadSettings() {
+		DownloadServerLoadBalancer dProps = downloadService.getSettings();
+		List<DownloadServerRegion> regions = new ArrayList<>(dProps.getRegions());
+		regions.add(0, dProps.getGlobalRegion());
+		List<Object> regionResults = new ArrayList<Object>();
+		for (DownloadServerRegion region : regions) {
+			List<Map<String, Object>> servers = new ArrayList<>();
+			for (String serverName : region.getServers()) {
+				Map<String, Object> mo = new TreeMap<>();
+				mo.put("name", serverName);
+				for (DownloadServerSpecialty type : DownloadServerSpecialty.values()) {
+					DownloadServerSpecialty sp = (DownloadServerSpecialty) type;
+					mo.put(sp.name(), String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
+							region.getPercent(sp, serverName)));
+				}
+				servers.add(mo);
 			}
-			list.add(mo);
+			regionResults.add(Map.of("name", region.toString(), "servers", servers));
 		}
-		return list;
+		return Map.of("regions", regionResults, "types", DownloadServerSpecialty.values(),
+				"freemaps", dProps.getFreemaps());
 	}
 	
 	@RequestMapping(path = "report")
@@ -1414,5 +1526,82 @@ public class AdminController {
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
 	
+	@PostMapping(path = {"/register-promo-campaign"})
+	public String registerPromoCampaign(@RequestParam String name,
+	                            @RequestParam int subActiveMonths,
+	                            @RequestParam int numberLimit,
+	                            @RequestParam String endTime,
+	                            final RedirectAttributes redirectAttrs) throws ParseException {
+		
+		PromoCampaignRepository.Promo promo = new PromoCampaignRepository.Promo();
+		promo.name = name;
+		promo.subActiveMonths = subActiveMonths;
+		promo.numberLimit = numberLimit;
+		promo.startTime = new Date();
+		SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
+		promo.endTime = formatter.parse(endTime);
+		
+		promoService.register(promo);
+		
+		redirectAttrs.addFlashAttribute("update_status", "OK");
+		redirectAttrs.addFlashAttribute("update_errors", "");
+		redirectAttrs.addFlashAttribute("update_message", "Promo registered");
+		
+		return "redirect:info#promo";
+	}
+	
+	public static class ReleaseInfo {
+		
+		public static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+		public String name;
+		public String size;
+		public String date;
+		public long timestamp;
+		public String version;
+		public String type;
+		public long length;
+		public ReleaseInfo(File f) {
+			name = f.getName();
+			size = String.format("%.2f MB", f.length() / 1024.0 / 1024.0);
+			length = f.length();
+			timestamp = f.lastModified();
+			date = sdf.format(new Date(f.lastModified()));
+			int i1 = name.indexOf('-');
+			int i2 = name.indexOf('-', i1 + 1);
+			if (i2 > 0) {
+				version = name.substring(i1 + 1, i2);
+			}
+		}
+	}
+	@GetMapping(path = {"/releases"})
+	public String releasesPage(Model model) {
+		List<ReleaseInfo> releases = new ArrayList<>();
+		File fld = new File(filesLocation, RELEASES_FOLDER);
+		if (fld.exists()) {
+			for (File f : fld.listFiles()) {
+				releases.add(new ReleaseInfo(f));
+			}
+		}
+		Collections.sort(releases, new Comparator<ReleaseInfo>() {
+
+			@Override
+			public int compare(ReleaseInfo o1, ReleaseInfo o2) {
+				return -Long.compare(o1.timestamp, o2.timestamp);
+			}
+		});
+		model.addAttribute("releases", releases);
+		return "admin/releases";
+	}
+	
+	@GetMapping(path = {"/download-release"})
+	public ResponseEntity<FileSystemResource> releaseDownload(String file) {
+		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file) ;
+		HttpHeaders headers = new HttpHeaders();
+        // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fl.getName());
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
+		headers.add(HttpHeaders.CONTENT_LENGTH, fl.length() + "");
+		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
+	}
 	
 }

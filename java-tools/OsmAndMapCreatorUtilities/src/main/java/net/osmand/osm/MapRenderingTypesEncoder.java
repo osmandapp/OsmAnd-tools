@@ -5,7 +5,6 @@ import gnu.trove.list.array.TIntArrayList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,10 +32,11 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private static final String HIGH_CHARGING_OUT = "high";
 	private static final String MEDIUM_CHARGING_OUT = "medium";
 	private static final String LOW_CHARGING_OUT = "low";
+	public static final char SOCKET_KEY_DELIMITER = ':';
 	private static Log log = PlatformUtil.getLog(MapRenderingTypesEncoder.class);
 	// stored information to convert from osm tags to int type
 	private List<MapRouteTag> routeTags = new ArrayList<MapRouteTag>();
-	private Map<String, List<EntityConvert>> convertTags = new HashMap<String, List<EntityConvert>>();
+	private Map<String, List<EntityConvert>> convertTags = new LinkedHashMap<String, List<EntityConvert>>();
 	private MapRulType coastlineRuleType;
 	private String regionName;
 	public static final String OSMAND_REGION_NAME_TAG = "osmand_region_name";
@@ -61,14 +61,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private void initSocketTypes() {
-		Map<String, TIntArrayList> m = new HashMap<>();
-		m.put("socket:type2:output", new TIntArrayList(new int[] {20, 35}));
-		m.put("socket:type2_combo:output", new TIntArrayList(new int[] {20, 35}));
-		m.put("socket:type3:output", new TIntArrayList(new int[] {10, 20}));
-		m.put("socket:cee_blue:output", new TIntArrayList(new int[] {2, 5}));
-		m.put("socket:chademo:output", new TIntArrayList(new int[] {20, 40}));
-		m.put("socket:schuko:output", new TIntArrayList(new int[] {2, 3}));
-		socketTypes = Collections.unmodifiableMap(m);
+		socketTypes = Map.ofEntries(Map.entry("socket:type2:output", new TIntArrayList(new int[]{20, 35})),
+				Map.entry("socket:type2_combo:output", new TIntArrayList(new int[]{30, 70})),
+				Map.entry("socket:type2_cable:output", new TIntArrayList(new int[]{30, 70})),
+				Map.entry("socket:type3a:output", new TIntArrayList(new int[]{10, 20})),
+				Map.entry("socket:type3c:output", new TIntArrayList(new int[]{10, 20})),
+				Map.entry("socket:cee_blue:output", new TIntArrayList(new int[]{2, 5})),
+				Map.entry("socket:chademo:output", new TIntArrayList(new int[]{30, 70})),
+				Map.entry("socket:schuko:output", new TIntArrayList(new int[]{2, 3})),
+				Map.entry("socket:type2:voltage", new TIntArrayList(new int[]{230, 500})),
+				Map.entry("socket:type2_combo:voltage", new TIntArrayList(new int[]{500, 800})),
+				Map.entry("socket:type2_cable:voltage", new TIntArrayList(new int[]{230, 500})),
+				Map.entry("socket:cee_blue:voltage", new TIntArrayList(new int[]{220, 250})),
+				Map.entry("socket:chademo:voltage", new TIntArrayList(new int[]{230, 500})),
+				Map.entry("socket:schuko:voltage", new TIntArrayList(new int[]{220, 240})));
 	}
 
 	@Override
@@ -81,10 +87,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return rt;
 	}
-
-
-
-
 
 	private MapRulType getMapRuleType(String tag, String val) {
 		return getRuleType(tag, val, false, true);
@@ -110,7 +112,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		String[] ls = seq.split(":");
 		for (int ind = Integer.parseInt(ls[0]); ind <= Integer.parseInt(ls[1]); ind++) {
-			Map<String, String> mp = new HashMap<String, String>();
+			Map<String, String> mp = new LinkedHashMap<String, String>();
 			for (int i = 0; i < parser.getAttributeCount(); i++) {
 				String at = parser.getAttributeName(i);
 				mp.put(at, parser.getAttributeValue("", at).replace("*", ind + ""));
@@ -124,6 +126,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if (tg != null) {
 				ec.ifNotRegionName.addAll(Arrays.asList(tg.split("\\,")));
 			}
+			ec.lang = "true".equals(mp.get("lang"));
 			ec.verbose = "true".equals(mp.get("verbose")); //$NON-NLS-1$
 			parseConvertCol(mp, ec.ifTags, "if_");
 			parseConvertCol(mp, ec.ifStartsTags, "if_starts_with_");
@@ -337,7 +340,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
 		if (listToTransform != null) {
 			for (EntityConvert ec : listToTransform) {
-				applyTagTransforms(rtags, ec, entity, tags);
+				applyTagTransforms(rtags, ec, tags);
 			}
 		}
 		if (listToCombine != null) {
@@ -401,23 +404,31 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			for (String key : socketTypes.keySet()) {
 				String val = tags.get(key);
 				String socketType = parseSocketType(key);
-				String newKey = "osmand_socket_" + socketType + "_output";
-				if(val != null) {
+				String socketParam = parseSocketParam(key);
+				if (val != null && socketType != null && socketParam != null) {
+					String newKey = "osmand_socket_" + socketType + "_" + socketParam;
 					tags.put(newKey, filterValues(val, socketTypes.get(key)));
 				}
 			}
-
 		}
 		return tags;
 	}
 
-	private String parseSocketType(String string) {
-		int firstColon = string.indexOf(':');
-		int secondColon = string.indexOf(':', firstColon+1);
-		if (firstColon != -1 && secondColon != -1) {
-		    return string.substring(firstColon + 1, secondColon);
+	private String parseSocketParam(String key) {
+		int lastColon = key.lastIndexOf(SOCKET_KEY_DELIMITER);
+		if (lastColon != -1) {
+			return key.substring(lastColon + 1);
 		}
-		return "";
+		return null;
+	}
+
+	private String parseSocketType(String string) {
+		int firstColon = string.indexOf(SOCKET_KEY_DELIMITER);
+		int secondColon = string.indexOf(SOCKET_KEY_DELIMITER, firstColon + 1);
+		if (firstColon != -1 && secondColon != -1) {
+			return string.substring(firstColon + 1, secondColon);
+		}
+		return null;
 	}
 
 	private String filterValues(String val, TIntArrayList limits) {
@@ -464,8 +475,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private Map<String, String> transformIntegrityTags(Map<String, String> tags, EntityType entity,
-			EntityConvertApplyType appType) {
-		if(tags.containsKey("highway") && entity == EntityType.WAY) {
+	                                                   EntityConvertApplyType appType) {
+		if (tags.containsKey("highway") && entity == EntityType.WAY) {
 			tags = new LinkedHashMap<>(tags);
 			int[] integrityResult = calculateIntegrity(tags);
 			int integrity = integrityResult[0];
@@ -474,13 +485,15 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			int normalised_integrity_brouting = 0;
 			if (integrity_bicycle_routing >= 0) {
 				normalised_integrity_brouting = (integrity_bicycle_routing * 10) / max_integrity;
-			} else normalised_integrity_brouting = -1;
-				int normalised_integrity = (integrity * 10) / max_integrity;
-			if(integrity < 100) {
-				tags.put("osmand_highway_integrity", normalised_integrity +"");
+			} else {
+				normalised_integrity_brouting = -1;
 			}
-			tags.put("osmand_highway_integrity_brouting", normalised_integrity_brouting +"");
-			if(normalised_integrity_brouting > 4 && normalised_integrity_brouting <= 10) {
+			int normalised_integrity = (integrity * 10) / max_integrity;
+			if (integrity < 100) {
+				tags.put("osmand_highway_integrity", normalised_integrity + "");
+			}
+			tags.put("osmand_highway_integrity_brouting", normalised_integrity_brouting + "");
+			if (normalised_integrity_brouting > 4 && normalised_integrity_brouting <= 10) {
 				tags.put("osmand_highway_integrity_brouting_low", "yes");
 			}
 		}
@@ -856,23 +869,36 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
+	private void applyTagTransforms(Map<String, String> resultTags, EntityConvert ec, Map<String, String> originalTags) {
+		applyTagTransforms(resultTags, ec, originalTags, "");
+		if (ec.lang) {
+			for (String lang : langs) {
+				applyTagTransforms(resultTags, ec, originalTags, lang);
+			}
+			applyTagTransforms(resultTags, ec, originalTags, "en");
+		}
+	}
 
-	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, EntityType entity,
-			Map<String, String> originaltags) {
-		String fromValue =  originaltags.get(ec.fromTag.tag);
-		tags.remove(ec.fromTag.tag);
-		for(TagValuePattern ift : ec.toTags) {
+	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, Map<String, String> originaltags,
+	                                String lang) {
+		String langSuffix = lang.isEmpty() ? "" : ":" + lang;
+		String fromTag = ec.fromTag.tag + langSuffix;
+		String fromValue = originaltags.get(fromTag);
+		if (tags.remove(fromTag) == null) {
+			return;
+		}
+		for (TagValuePattern ift : ec.toTags) {
 			String vl = ift.value;
 			if (vl == null) {
 				vl = fromValue;
 			}
 			vl = processSubstr(ift, vl);
-			if(ift.tagPrefix != null) {
-				for(String vlSplit : fromValue.split(";")) {
-					tags.put(ift.tagPrefix+vlSplit.trim(), vl);
+			if (ift.tagPrefix != null) {
+				for (String vlSplit : fromValue.split(";")) {
+					tags.put(ift.tagPrefix + vlSplit.trim(), vl);
 				}
 			} else {
-				tags.put(ift.tag, vl);
+				tags.put(ift.tag + langSuffix, vl);
 			}
 		}
 	}
@@ -1255,7 +1281,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		v *= 100;
 
 		if ((h < 16 && s > 25 && v > 30) || (h > 326 && s > 25 && v > 30) || (h < 16 && s > 10 && s < 25 && v > 90) || (h > 326 && s > 10 && s < 25 && v > 90) ||
-				vl.equals("pink") || vl.contains("red") || vl.equals("pink/white") || vl.equals("white-red") || vl.equals("ff0000") || vl.equals("800000") || vl.equals("red/tan") || vl.equals("tan/red") || vl.equals("rose") || vl.equals("salmon")) {
+				vl.contains("red") || vl.equals("pink/white") || vl.equals("white-red") || vl.equals("ff0000") || vl.equals("800000") || vl.equals("red/tan") || vl.equals("tan/red") || vl.equals("rose") || vl.equals("salmon")) {
 			vl = "red";
 		} else if ((h >= 16 && h < 50 && s > 25 && v > 20 && v < 60) || vl.equals("brown") || vl.equals("darkbrown") || vl.equals("tan/brown") || vl.equals("tan_brown") || vl.equals("brown/tan") || vl.equals("light_brown") || vl.equals("brown/white") || vl.equals("tan")) {
 			vl = palette6 ? "red" : "brown";
@@ -1271,7 +1297,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = "green";
 		} else if ((h >= 178 && h < 210 && s > 40 && v > 80) || (h >= 178 && h < 265 && s > 25 && s < 61 && v > 90) || vl.equals("lightblue") || vl.equals("aqua") || vl.equals("cyan") || vl.equals("87ceeb") || vl.equals("turquoise")) {
 			vl = palette6 ? "blue" : "lightblue";
-		} else if ((h >= 178 && h < 210 && s > 40 && v > 35 && v <= 80) || (h >= 210 && h < 265 && s > 40 && v > 30) || vl.contains("blue") || vl.equals("0000ff") || vl.equals("teal") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
+		} else if ((h >= 178 && h < 210 && s > 40 && v > 35 && v <= 80) || (h >= 210 && h < 265 && s > 40 && v > 30) || vl.contains("blue") || vl.equals("0000ff") || vl.equals("darkblue") || vl.equals("blu") || vl.equals("navy")) {
 			vl = "blue";
 		} else if ((h >= 265 && h < 325 && s > 15 && v >= 27) || (h > 250 && h < 325 && s > 10 && s < 25 && v > 90) || vl.equals("purple") || vl.equals("violet") || vl.equals("magenta") || vl.equals("maroon") || vl.equals("fuchsia") || vl.equals("800080")) {
 			vl = palette6 ? "blue" : "purple";
@@ -1281,6 +1307,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = palette6 ? "white" : "gray";
 		} else if ((s < 5 && v > 95) || vl.contains("white") /*|| vl.equals("white/tan")*/) {
 			vl = "white";
+		} else if (vl.contains("pink")) {
+			vl = "pink";
+		} else if (vl.contains("teal")) {
+			vl = "teal";
 		} else if (r != -1 && g != -1 && b != -1) {
 			vl = "gray";
 		}
@@ -1389,7 +1419,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface)
 				|| "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface)
-				|| "metal".equals(surface) || "wood".equals(surface)) {
+				|| "metal".equals(surface) || "wood".equals(surface) || "chipseal".equals(surface)) {
 			result += 3;
 			result_bicycle_routing += 3;
 		} else if ("fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
@@ -1612,5 +1642,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> ifTagsNotLess = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> ifNotTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
+		public boolean lang;
 	}
 }

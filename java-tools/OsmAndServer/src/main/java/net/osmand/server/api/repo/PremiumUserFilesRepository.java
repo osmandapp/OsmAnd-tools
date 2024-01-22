@@ -32,6 +32,12 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
 	Iterable<UserFile> findAllByUserid(int userid);
 	
+	@Query("SELECT uf FROM UserFile uf " +
+			"WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type " +
+			"AND uf.updatetime = (SELECT MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid AND uft.name = uf.name)")
+	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
+	
+	
 //	@Modifying
 //	@Query("update UserFile uf set uf.details = ?1 where uf.id = ?2")
 //	@Transactional
@@ -81,6 +87,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 //      @Fetch(FetchMode.JOIN)
         @Column(name = "data", columnDefinition="bytea")
         public byte[] data;
+        
 //        @Lob
 //        public Blob data;
 
@@ -89,7 +96,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
     
     // COALESCE(length(u.data), -1))
 	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
-			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize ) "
+			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
 			+ " order by updatetime desc")
@@ -97,7 +104,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			@Param(value = "name") String name, @Param(value = "type") String type);
 	
 	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
-			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.details ) "
+			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
 			+ " order by updatetime desc")
@@ -117,6 +124,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public Date clienttime;
         public long clienttimems;
 		public long zipSize;
+		public String storage;
 		public JsonObject details;
 		
 		public UserFileNoData(UserFile c) {
@@ -132,15 +140,16 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.clienttime = c.clienttime;
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
 			this.details = c.details;
+			this.storage = c.storage;
 		}
 		
 		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
-				Date updatetime, Date clienttime, Long filesize, Long zipSize) {
-			this(id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipSize, null);
+				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage) {
+			this(id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipSize, storage, null);
 		}
 		
 		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
-				Date updatetime, Date clienttime, Long filesize, Long zipSize, JsonObject details) {
+				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage, JsonObject details) {
 			this.userid = userid;
 			this.id = id;
 			this.deviceid = deviceid;
@@ -153,6 +162,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.clienttime = clienttime;
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
 			this.details = details;
+			this.storage = storage;
 		}
 	}
 	
