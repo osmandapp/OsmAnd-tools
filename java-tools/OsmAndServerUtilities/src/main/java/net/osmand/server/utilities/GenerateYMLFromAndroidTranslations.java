@@ -69,7 +69,10 @@ public class GenerateYMLFromAndroidTranslations {
 	    enAndTranslations.entrySet().forEach(entry -> {
 		    String key = entry.getKey();
 		    JsonElement value = entry.getValue();
-		    if ((key.contains("rendering_attr_") || key.contains("routeInfo_") || key.startsWith("lang_"))
+		    if ((key.contains("rendering_attr_")
+				    || key.contains("routeInfo_")
+				    || key.startsWith("lang_")
+				    || key.startsWith("poi_"))
 				    && (!enWebTranslations.has(key) || !enWebTranslations.get(key).equals(value))) {
 			    enWebTranslations.add(key, value);
 		    }
