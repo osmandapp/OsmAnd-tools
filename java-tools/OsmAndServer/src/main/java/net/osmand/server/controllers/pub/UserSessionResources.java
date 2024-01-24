@@ -13,12 +13,14 @@ import org.springframework.stereotype.Component;
 
 import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.gpx.GPXUtilities;
+import net.osmand.router.RouteCalculationProgress;
 
 @WebListener
 @Component
 public class UserSessionResources implements HttpSessionListener {
 
 	protected static final String SESSION_GPX = "gpx";
+	protected static final String SESSION_ROUTING = "routing";
 	
 	static class GPXSessionFile {
 		transient File file;
@@ -40,6 +42,15 @@ public class UserSessionResources implements HttpSessionListener {
 			httpSession.setAttribute(SESSION_GPX, ctx);
 		}
 		return ctx;
+	}
+	
+	public RouteCalculationProgress getRoutingProgress(HttpSession session) {
+		if (session.getAttribute(SESSION_ROUTING) instanceof RouteCalculationProgress) {
+			((RouteCalculationProgress) session.getAttribute(SESSION_ROUTING)).isCancelled = true;
+		}
+		RouteCalculationProgress progress = new RouteCalculationProgress();
+		session.setAttribute(SESSION_ROUTING, progress);
+		return progress;
 	}
 	
 	@Override

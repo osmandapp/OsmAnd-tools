@@ -26,15 +26,41 @@ public class RandomRouteTester {
 		};
 
 		// random tests settings
-		int ITERATIONS = 10; // number of random routes
-		int MAX_INTER_POINTS = 2; // 0-2 intermediate points // (2)
+		int ITERATIONS = 50; // number of random routes
+		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
 		int MIN_DISTANCE_KM = 50; // min distance between start and finish (50)
 		int MAX_DISTANCE_KM = 100; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
-//				"bicycle",
+				"bicycle",
+				"pedestrian",
+
+//				"car,short_way",
+//				"bicycle,short_way",
+//				"pedestrian,short_way",
+
 //				"bicycle,height_obstacles",
+//				"pedestrian,height_obstacles",
+
+//				"car,prefer_unpaved",
+//				"car,allow_private",
+//				"car,avoid_unpaved",
+//				"car,avoid_motorway",
+//				"car,weight:3.49",
+//				"car,short_way",
+
+//				"bicycle,driving_style_prefer_unpaved,driving_style_balance:false",
+//				"bicycle,avoid_unpaved",
+//				"bicycle,avoid_footways",
+//				"bicycle,allow_motorway",
+//				"bicycle,allow_private",
+
+//				"pedestrian,avoid_unpaved",
+//				"pedestrian,allow_private",
+//				"pedestrian,prefer_hiking_routes",
+//				"pedestrian,avoid_stairs",
+//				"pedestrian,avoid_motorway",
 		};
 
 		// cost/distance deviation limits
@@ -332,7 +358,7 @@ public class RandomRouteTester {
 
 	private RandomRouteResult runBinaryRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
 		long started = System.currentTimeMillis();
-		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
+		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		fe.setHHRoutingConfig(null); // hhoff=true
@@ -366,7 +392,7 @@ public class RandomRouteTester {
 
 	private RandomRouteResult runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
 		long started = System.currentTimeMillis();
-		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8; // ~ 2 GB from OsmAndMapsService
+		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		fe.setDefaultHHRoutingConfig();

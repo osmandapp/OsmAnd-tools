@@ -60,13 +60,13 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter.GeneralRouterProfile;
-import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation;
+import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
@@ -92,7 +92,7 @@ public class OsmAndMapsService {
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
-	private static final int MAXIMUM_OPEN_FILES = 5;
+	private static final int MAX_SAME_FILE_OPEN = 15;
 	
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -114,7 +114,7 @@ public class OsmAndMapsService {
 	RoutingServerConfig routingConfig;
 
 	OsmandRegions osmandRegions;
-	
+
 	public class BinaryMapIndexReaderReference {
 		File file;
 		private static final int WAIT_LOCK_CHECK = 10;
@@ -155,7 +155,7 @@ public class OsmAndMapsService {
 			if (resReader != null) {
 				return resReader;
 			}
-			if (readers.size() < MAXIMUM_OPEN_FILES) {
+			if (readers.size() < MAX_SAME_FILE_OPEN) {
 				if (cacheFiles == null) {
 					initObfReaders();
 				}
@@ -200,9 +200,9 @@ public class OsmAndMapsService {
 		}
 	}
 	
-	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs) {
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
-		refs.forEach(ref-> {
+		for (BinaryMapIndexReaderReference ref : refs) {
 			BinaryMapIndexReader reader = null;
 			try {
 				reader = ref.getReader(cacheFiles, 1000);
@@ -211,8 +211,10 @@ public class OsmAndMapsService {
 			}
 			if (reader != null) {
 				res.add(reader);
+			} else if (incompleteFlag != null) {
+				incompleteFlag[0] = true;
 			}
-		});
+		};
 		return res;
 	}
 	
@@ -689,7 +691,11 @@ public class OsmAndMapsService {
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
-			usedMapList = getReaders(list);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[0]) {
+				return Collections.emptyList();
+			}
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 			RoutingContext ctx = prepareRouterContext("geocoding", points, router, null, null, usedMapList);
 			GeocodingUtilities su = new GeocodingUtilities();
@@ -723,7 +729,7 @@ public class OsmAndMapsService {
 		return approximateByPolyline(polyline, routeMode, props);
 	}
 	
-	private synchronized List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
+	private List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
 		List<RouteSegmentResult> route;
 		QuadRect quadRect = points(polyline, null, null);
 		if (!validateAndInitConfig()) {
@@ -733,7 +739,11 @@ public class OsmAndMapsService {
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0);
-			usedMapList = getReaders(list);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[0]) {
+				return new ArrayList<RouteSegmentResult>();
+			}
 			RoutingContext ctx = prepareRouterContext(routeMode, quadRect, router, null, null, usedMapList);
 			route = approximate(ctx, router, props, polyline);
 		} finally {
@@ -742,7 +752,22 @@ public class OsmAndMapsService {
 		return route;
 	}
 
-	private List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
+	
+	public List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
+			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+		if(ctx.nativeLib != null || router.isUseNativeApproximation()) {
+			return approximateSyncNative(ctx, router, props, polyline);
+		}
+		return approximateInternal(ctx, router, props, polyline);
+	}
+	
+
+	private synchronized List<RouteSegmentResult> approximateSyncNative(RoutingContext ctx, RoutePlannerFrontEnd router,
+			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+		return approximateInternal(ctx, router, props, polyline);
+	}
+	
+	private synchronized List<RouteSegmentResult> approximateInternal(RoutingContext ctx, RoutePlannerFrontEnd router,
 			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
@@ -789,7 +814,7 @@ public class OsmAndMapsService {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else if (key.equals("hhoff")) {
 				if (Boolean.parseBoolean(value)) {
-					router.setHHRoutingConfig(null);
+					router.disableHHRoutingConfig();
 				}
 			} else if (key.equals("hhonly")) {
 				if (Boolean.parseBoolean(value)) {
@@ -923,10 +948,10 @@ public class OsmAndMapsService {
 		return routeRes;
 	}
 
-	public synchronized List<RouteSegmentResult> routing(boolean hhOnlyForce, String routeMode, Map<String, Object> props,
-	                                                     LatLon start, LatLon end, List<LatLon> intermediates,
-	                                                     List<String> avoidRoadsIds)
-			throws IOException, InterruptedException {
+	@Nullable
+	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
+			LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
+			RouteCalculationProgress progress) throws IOException, InterruptedException {
 
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -935,25 +960,34 @@ public class OsmAndMapsService {
 		List<RouteSegmentResult> routeRes;
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
-			usedMapList = getReaders(list);
-			
-			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
-
-			if (hhOnlyForce) {
-				router.setUseOnlyHHRouting(true);
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[0]) {
+				return Collections.emptyList();
 			}
-
+			RoutingContext ctx = prepareRouterContext(routeMode, points, router, rsc, avoidRoadsIds, usedMapList);
+			if (disableOldRouting && !router.isHHRoutingConfigured()) {
+				// BRP is disabled (limited) and HH is disabled (hhoff)
+				return null;
+			}
+			ctx.calculationProgress = progress;
 			if (rsc[0] != null && rsc[0].url != null) {
 				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
 			} else {
-				PrecalculatedRouteDirection precalculatedRouteDirection = null;
-				routeRes = router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection).getList();
+				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
+						: router.searchRoute(ctx, start, end, intermediates, null);
+				routeRes = rc == null ? null : rc.getList();
 				putResultProps(ctx, routeRes, props);
 			}
 		} finally {
 			unlockReaders(usedMapList);
 		}
 		return routeRes;
+	}
+
+	private synchronized RouteCalcResult runRoutingSync(LatLon start, LatLon end, List<LatLon> intermediates,
+			RoutePlannerFrontEnd router, RoutingContext ctx) throws IOException, InterruptedException {
+		return router.searchRoute(ctx, start, end, intermediates, null);
 	}
 	
 

@@ -989,12 +989,12 @@ public class MapRouterLayer implements MapPanelLayer {
 				BinaryMapIndexReader[] readers = DataExtractionSettings.getSettings().getObfReaders();
 				final RoutingContext ctx = prepareRoutingContext(null, DataExtractionSettings.getSettings().getRouteMode(), 
 						RouteCalculationMode.NORMAL, readers, new RoutePlannerFrontEnd());
-				HHRoutingDB db = null;
 				if (hhFile.exists()) {
 					Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
-					db = new HHRoutingDB(hhFile, conn);
+					hhRoutePlanner = HHRoutePlanner.createDB(ctx, new HHRoutingDB(hhFile, conn));
+				} else {
+					hhRoutePlanner = HHRoutePlanner.create(ctx);
 				}
-				hhRoutePlanner = HHRoutePlanner.create(ctx, db);
 //				hhPlanners.put(profile, hhRoutePlanner);
 //			}
 

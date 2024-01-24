@@ -18,7 +18,6 @@ import org.apache.commons.logging.Log;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
-import net.osmand.router.HHRouteDataStructure.HHRouteRegionPointsCtx;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
@@ -100,11 +99,8 @@ public class HHRoutingTopGraphCreator {
 		String name = obfFile.getCanonicalFile().getName() + "_" + ROUTING_PROFILE;
 		
 		HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(new File(folder, name + HHRoutingDB.EXT));
-		HHRouteRegionPointsCtx<NetworkDBPointPrep> ctx = new HHRouteRegionPointsCtx<NetworkDBPointPrep>((short) 0,
-				networkDB);
-		ctx.routingProfile = 0;
-		HHRoutePlanner<NetworkDBPointPrep> routePlanner = new HHRoutePlanner<NetworkDBPointPrep>(HHRoutePlanner.prepareContext(ROUTING_PROFILE), 
-				ctx, NetworkDBPointPrep.class);
+		HHRoutePlanner<NetworkDBPointPrep> routePlanner = HHRoutePlanner.createDB(
+				HHRoutePlanner.prepareContext(ROUTING_PROFILE), networkDB, NetworkDBPointPrep.class);
 		HHRoutingTopGraphCreator planner = new HHRoutingTopGraphCreator(routePlanner, networkDB);
 		
 		if (PROCESS == PROC_MIDPOINTS) {

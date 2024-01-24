@@ -36,10 +36,9 @@ public class RoutingService {
     @Autowired
     WebGpxParser webGpxParser;
 
-    public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode,
-                                                             boolean hasRouting, boolean hhOnlyForce)
-            throws IOException, InterruptedException {
-
+	public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode,
+			boolean hasRouting, boolean disableOldRouting, RouteCalculationProgress progress)
+			throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
         List<WebGpxParser.Point> pointsRes;
@@ -49,8 +48,8 @@ public class RoutingService {
         if (routeMode.equals(LINE_PROFILE_TYPE)) {
             return lineRes;
         } else {
-            routeSegmentResults = osmAndMapsService.routing(hhOnlyForce, routeMode, props, startLatLon, endLatLon,
-                    Collections.emptyList(), Collections.emptyList());
+            routeSegmentResults = osmAndMapsService.routing(disableOldRouting, routeMode, props, startLatLon, endLatLon,
+                    Collections.emptyList(), Collections.emptyList(), progress);
             pointsRes = getPoints(routeSegmentResults, locations);
         }
 
@@ -89,7 +88,7 @@ public class RoutingService {
             if (prevPoint.profile == null || prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
                 currentPoint.geometry = getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
             } else if (!prevPoint.profile.equals(GAP_PROFILE_TYPE)) {
-                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false);
+                currentPoint.geometry = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false, null);
             }
             res.add(currentPoint);
         }

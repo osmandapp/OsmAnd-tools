@@ -1,6 +1,8 @@
 package net.osmand.server.controllers.pub;
 
 
+import static net.osmand.NativeJavaRendering.parseStorage;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -50,12 +52,16 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.IProgress;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
+import net.osmand.server.api.services.GpxService;
+import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.util.Algorithms;
-
-import static net.osmand.NativeJavaRendering.parseStorage;
 
 
 @RestController

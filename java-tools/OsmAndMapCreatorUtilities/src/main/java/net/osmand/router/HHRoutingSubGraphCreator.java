@@ -51,21 +51,21 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 //////     TESTING     ///////
+// 2.3 ROUTING: Missing map:  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) -
+// 2.7 Multithread Server routing
+// 2.8.0 ROUTING: NPE  (net.osmand.router.HHRouteDataStructure$NetworkDBPointRouteInfo.setDetailedParentRt(HHRouteDataStructure.java:575)
+//  http://localhost:3000/map/?start=51.825843,6.712063&finish=51.954521,8.130041&type=osmand&profile=car&params=car,prefer_unpaved#10/51.8905/7.4206
+// 2.0.1 ROUTING: ! Progress bar - Cancellation
 
 // !! IN PROGRESS !!!
-// 2.3 ROUTING: Missing map:  Better select region (Czech vs Sacsen old files) - check start / end point / route (partial) -
-
-// 2.0 ROUTING: ! Progress bar for HHRoutePlanner and Cancellation
+// 2.0.2 ROUTING: ! Progress bar - Progress
 // 2.1 SERVER: Automate monthly procedures
-// 2.8.0 ROUTING: NPE  (net.osmand.router.HHRouteDataStructure$NetworkDBPointRouteInfo.setDetailedParentRt(HHRouteDataStructure.java:575)
-//      http://localhost:3000/map/?start=51.825843,6.712063&finish=51.954521,8.130041&type=osmand&profile=car&params=car,prefer_unpaved#10/51.8905/7.4206
 // 2.8.1 ROUTING: Avoid "motorways" could be more efficient to exclude points earlier
 // 2.8.2 ROUTING: Too many recalculations with height elevation (https://test.osmand.net/map/?start=42.770191,0.620610&finish=42.980344,-0.419359&type=osmand&profile=pedestrian)
 // 2.8.3 ROUTING: Test live maps 
-// 2.9 Multithread Server routing 
-// 2.7 Suggest that maps need to be downloaded / updated
 
 // 3. MID-TERM Speedups, small bugs and Data research
+// 3.0 UI: Suggest that maps need to be updated (downloaded)
 // 3.1 SERVER: Speedup points: Calculate in parallel (Planet) - Combine 2 processes ? 
 // 3.2 SERVER: Speedup shortcut: group by clusters to use less memory, different unload routing context
 // 3.3 DATA: Merge clusters (and remove border points): 1-2 border point or (22 of 88 clusters has only 2 neighbor clusters)

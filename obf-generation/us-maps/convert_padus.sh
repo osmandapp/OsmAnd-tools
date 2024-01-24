@@ -103,4 +103,4 @@ done
 
 cd $mapcreatordir
 
-bash utilities.sh generate-obf-files-in-batch $dir/batch.xml
+bash utilities.sh generate-obf-files-in-batch $dir/batch-padus.xml
