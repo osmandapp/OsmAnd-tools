@@ -9,9 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -19,6 +17,11 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import com.google.gson.GsonBuilder;
+import net.osmand.render.RenderingRulesStorage;
+import net.osmand.server.api.services.GpxService;
+import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,8 +47,10 @@ import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
+import net.osmand.gpx.GPXUtilities;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.IProgress;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXTrackAnalysis;
@@ -53,11 +58,9 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.services.GpxService;
-import net.osmand.server.api.services.MapResourcesService;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
-import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 
 
@@ -85,9 +88,6 @@ public class GpxController {
 	
 	@Autowired
 	protected GpxService gpxService;
-	
-	@Autowired
-	protected MapResourcesService mapResourcesService;
 	
 	@Value("${osmand.srtm.location}")
 	String srtmLocation;
@@ -312,18 +312,6 @@ public class GpxController {
 		trackData = gpxService.addAnalysisData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
-	}
-	
-	@GetMapping(path = {"/get-styles"})
-	@ResponseBody
-	public String parseStylesXml(@RequestParam List<String> styles, @RequestParam List<String> attributes) throws XmlPullParserException, IOException, SAXException {
-		Map<String, Object> result = new HashMap<>();
-		for (String style : styles) {
-			RenderingRulesStorage storage = parseStorage(style);
-			Map<String, List<Map<String, String>>> attributesRes = mapResourcesService.parseAttributes(storage, attributes);
-			result.put(style, attributesRes);
-		}
-		return gson.toJson(result);
 	}
     
     private double getCommonMaxSizeFiles() {
