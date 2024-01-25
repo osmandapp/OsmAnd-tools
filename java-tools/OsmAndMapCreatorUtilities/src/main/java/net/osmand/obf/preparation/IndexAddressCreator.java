@@ -653,36 +653,34 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				// }
 			}
 		}
-        if (settings.indexByProximity) {
-    		// or we need to find closest city
-	    	Collections.sort(nearestObjects, new Comparator<City>() {
-		    	@Override
-		    	public int compare(City c1, City c2) {
-			    	double r1 = relativeDistance(location, c1);
-				    double r2 = relativeDistance(location, c2);
-			    	return Double.compare(r1, r2);
-			    }
-		    });
-    		for (City c : nearestObjects) {
-	    		if (!c.getType().storedAsSeparateAdminEntity()) {
-		    		// ignore districts, boroughs, neighbourhood, so we don't get streets missing in
-			    	// the final obf
-				    continue;
-    			}
+		// or we need to find closest city
+		Collections.sort(nearestObjects, new Comparator<City>() {
+			@Override
+			public int compare(City c1, City c2) {
+				double r1 = relativeDistance(location, c1);
+				double r2 = relativeDistance(location, c2);
+				return Double.compare(r1, r2);
+			}
+		});
+		for (City c : nearestObjects) {
+			if (!c.getType().storedAsSeparateAdminEntity()) {
+				// ignore districts, boroughs, neighbourhood, so we don't get streets missing in
+				// the final obf
+				continue;
+			}
 
-    			if (relativeDistance(location, c) > 0.2) {
-	    			if (result.isEmpty()) {
-	    				result.add(c);
-		    		}
-			    	break;
-    			} else if (!result.contains(c)) {
-	    			// city doesn't have boundary or there is a mistake in boundaries and we found nothing before
-	    			if (!cityBoundaries.containsKey(c) || result.isEmpty()) {
-	    				result.add(c);
-	    			}
-		    	}
-	    	}
-        }
+			if (relativeDistance(location, c) > 0.2) {
+				if (result.isEmpty()) {
+					result.add(c);
+				}
+				break;
+			} else if (!result.contains(c)) {
+				// city doesn't have boundary or there is a mistake in boundaries and we found nothing before
+				if (!cityBoundaries.containsKey(c) || result.isEmpty()) {
+					result.add(c);
+				}
+			}
+		}
 		return registerStreetInCities(name, names, location, result);
 	}
 
@@ -712,12 +710,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city) throws SQLException {
-		String cityPart;
-        if (settings.indexByProximity) {
-            cityPart = findCityPart(location, city);
-        else {
-            cityPart = city.getName(); 
-        }
+		String cityPart = findCityPart(location, city);
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
 		if (foundStreet == null) {
 			// by default write city with cityPart of the city
