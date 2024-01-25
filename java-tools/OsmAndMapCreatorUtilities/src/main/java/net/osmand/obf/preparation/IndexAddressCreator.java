@@ -715,7 +715,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		String cityPart;
         if (settings.indexByProximity) {
             cityPart = findCityPart(location, city);
-        else {
+        } else {
             cityPart = city.getName(); 
         }
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
