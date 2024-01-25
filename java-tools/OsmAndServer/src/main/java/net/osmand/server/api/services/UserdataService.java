@@ -123,6 +123,7 @@ public class UserdataService {
     public static final String FILE_TYPE_OSM_NOTES = "OSM_NOTES";
     public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
     public static final String EMPTY_FILE_NAME = "empty.ignore";
+    public static final String INFO_EXT = ".info";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
@@ -719,9 +720,9 @@ public class UserdataService {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-				if ((filterTypes != null && !isSelectedType(filterTypes, sf)) || sf.name.endsWith(EMPTY_FILE_NAME)) {
-					continue;
-				}
+                if (shouldSkipFile(filterTypes, sf)) {
+                    continue;
+                }
 				if (fileIds.add(fileId)) {
 					if (sf.filesize >= 0) {
                         itemsJson.put(new JSONObject(toJson(sf.type, sf.name)));
@@ -783,6 +784,12 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
+    
+    private boolean shouldSkipFile(Set<String> filterTypes, UserFileNoData sf) {
+        return (filterTypes != null && !isSelectedType(filterTypes, sf))
+                || sf.name.endsWith(EMPTY_FILE_NAME)
+                || sf.name.endsWith(INFO_EXT);
+    }
     
     @Transactional
     public void getBackupFolder(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
