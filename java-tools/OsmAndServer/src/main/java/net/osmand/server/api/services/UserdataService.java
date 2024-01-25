@@ -720,7 +720,7 @@ public class UserdataService {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-                if (shouldSkipFile(filterTypes, sf)) {
+                if (shouldSkipFile(filterTypes, sf, format)) {
                     continue;
                 }
 				if (fileIds.add(fileId)) {
@@ -785,10 +785,11 @@ public class UserdataService {
 		}
 	}
     
-    private boolean shouldSkipFile(Set<String> filterTypes, UserFileNoData sf) {
+    private boolean shouldSkipFile(Set<String> filterTypes, UserFileNoData sf, String format) {
+        boolean skipInfo = format.equals(".zip") && sf.name.endsWith(INFO_EXT);
         return (filterTypes != null && !isSelectedType(filterTypes, sf))
                 || sf.name.endsWith(EMPTY_FILE_NAME)
-                || sf.name.endsWith(INFO_EXT);
+                || skipInfo;
     }
     
     @Transactional
