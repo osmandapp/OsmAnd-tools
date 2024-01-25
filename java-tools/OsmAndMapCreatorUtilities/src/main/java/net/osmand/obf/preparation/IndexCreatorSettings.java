@@ -66,6 +66,7 @@ public class IndexCreatorSettings {
 
 	public boolean indexMultipolygon = true;
 	
+    public boolean indexByProximity = true;
 	
 
 	public String getString(String key) {
