@@ -285,8 +285,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			// Issue #18809 https://www.openstreetmap.org/relation/444659
-			// Consider public_transport=station as a part of stop_area if role-members are not found.
 			if (!stopAreasByRolesFound) {
 				for (RelationMember entry : e.getMembers()) {
 					if ("station".equals(entry.getEntity().getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
@@ -1122,10 +1120,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				platformsAndStops.add(e);
 				stops.add(e);
 			} else if ("station".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
-				// Issue #18809 https://www.openstreetmap.org/relation/444659
-				// https://wiki.openstreetmap.org/wiki/Tag:public_transport%3Dstop_area
-				// Roles defined by public_transport=platform/stop_position are recommended but not required.
-				// Finally, public_transport=station should be considered as a `stop` if it belongs to the stop area(s).
 				if (stopAreas.containsKey(EntityId.valueOf(e))) {
 					platformsAndStops.add(e);
 					stops.add(e);
