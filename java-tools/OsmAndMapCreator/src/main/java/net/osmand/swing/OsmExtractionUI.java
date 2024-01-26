@@ -795,7 +795,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					}
 					regionName = creator.getRegionName();
 					StringBuilder msg = new StringBuilder();
-					msg.append(Messages.getString("OsmExtractionUI.INDEXES_FOR")).append(regionName).append(" : "); //$NON-NLS-1$ //$NON-NLS-2$
+					msg.append(Messages.getString("OsmExtractionUI.INDEXES_FOR")).append(" ").append(regionName).append(" : "); //$NON-NLS-1$ //$NON-NLS-2$
 					boolean comma = false;
 					if (buildMapIndex.isSelected()) {
 						if(comma) msg.append(", "); //$NON-NLS-1$

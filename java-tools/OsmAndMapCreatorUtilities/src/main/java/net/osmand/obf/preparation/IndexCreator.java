@@ -293,7 +293,7 @@ public class IndexCreator {
 		
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
-			progress.startTask(settings.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
+			progress.startTask(settings.getString("IndexCreator.LOADING_FILE") + " " + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
 			// 1 init database to store temporary data
 			dbCreator.initDatabase(osmDBdialect, accessor.getDbConn(), idSourceMapInd == 0, previous);
 			storage.getFilters().add(dbCreator);
