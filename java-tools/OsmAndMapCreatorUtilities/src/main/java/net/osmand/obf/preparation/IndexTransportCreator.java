@@ -83,7 +83,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private Map<EntityId, Relation> stopAreas = new HashMap<EntityId, Relation>();
 	private Map<EntityId, List<TransportStopExit>> exits = new HashMap<EntityId, List<TransportStopExit>>();
 	private final TransportTags transportRouteTagValues = new TransportTags();
-
+	private Set<EntityId> stationsWithoutRoles = new HashSet<>();
 
 	private static Set<String> acceptedRoutes = new HashSet<String>();
 	private TLongObjectHashMap<TransportRoute> incompleteRoutesMap = new TLongObjectHashMap<TransportRoute>();
@@ -285,15 +285,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			// Consider public_transport=station as a part of stop_area if no role-members found.
-			if (!stopAreasByRolesFound) {
-				for (RelationMember entry : e.getMembers()) {
-					if ("station".equals(entry.getEntity().getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
-						stopAreas.put(entry.getEntityId(), e);
-					}
-				}
-			}
-
 			List<TransportStopExit> stopExitList = new ArrayList<>();
 			for (RelationMember entryAlt : e.getMembers()) {
 				if (entryAlt.getEntity() != null && 
@@ -313,6 +304,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					if (("".equals(role) && "station".equals(entry.getEntity().getTag(OSMTagKey.RAILWAY)))
 							|| "stop".equals(role)) {
 						exits.put(entry.getEntityId(), stopExitList);
+					}
+					// if no role-members found in the stop_area, save `public_transport=station` as a `stop` for later
+					if (!stopAreasByRolesFound) {
+						if ("station".equals(entry.getEntity().getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
+							stationsWithoutRoles.add(entry.getEntityId());
+						}
 					}
 				}
 			}
@@ -1120,13 +1117,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			} else if (role.startsWith("stop")) {
 				platformsAndStops.add(e);
 				stops.add(e);
-			} else if ("station".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
-				// public_transport=station should be considered as a `stop` if it belongs to the stop area(s)
-				if (stopAreas.containsKey(EntityId.valueOf(e))) {
+			} else {
+				// `public_transport=station` should be considered as a `stop` if it belongs to the stop area(s)
+				if (e instanceof Node && stationsWithoutRoles.contains(EntityId.valueOf(e))) {
 					platformsAndStops.add(e);
 					stops.add(e);
 				}
-			} else {
 				if (e instanceof Way && !"backward".equals(entry.getRole())) {
 					route.addWay((Way) e);
 				}
