@@ -27,10 +27,11 @@ public class RandomRouteTester {
 
 		// random tests settings
 		int ITERATIONS = 50; // number of random routes
-		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
+		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (0)
 		int MIN_DISTANCE_KM = 50; // min distance between start and finish (50)
 		int MAX_DISTANCE_KM = 100; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
+		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (0-100)
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
 				"bicycle",
@@ -107,7 +108,9 @@ public class RandomRouteTester {
 		test.loadNativeLibrary();
 		test.initObfReaders();
 		test.generateRoutes();
+		test.startSlowDown();
 		test.collectRoutes();
+		test.stopSlowDown();
 		test.reportResult();
 	}
 
@@ -295,6 +298,29 @@ public class RandomRouteTester {
 
 	private void generateRoutes() {
 		testList = generator.generateTestList(obfReaders);
+	}
+
+	private void startSlowDown() {
+		Runnable endless = () -> {
+			while (config.OPTIONAL_SLOW_DOWN_THREADS > 0) {
+				for (long i = 0; i < 1_000_000_000L; i++) {
+					// 1MM long-counter makes strong load
+				}
+				try {
+					// refresh state
+					Thread.sleep(1);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		};
+		for (int i = 0; i < config.OPTIONAL_SLOW_DOWN_THREADS; i++) {
+			new Thread(endless).start();
+		}
+	}
+
+	private void stopSlowDown() {
+		config.OPTIONAL_SLOW_DOWN_THREADS = 0;
 	}
 
 	private void collectRoutes() {
