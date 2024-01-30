@@ -100,7 +100,7 @@ public class OsmGpxWriteContext {
 	}
 	
 
-	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GPXFile gpxFile, GPXTrackAnalysis analysis, 
+	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GPXFile gpxFile, GPXTrackAnalysis analysis,
 			String routeIdPrefix)
 			throws IOException, SQLException {
 		Map<String, String> gpxTrackTags = new LinkedHashMap<String, String>();
@@ -253,7 +253,7 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("user", gpxInfo.user);
 			gpxTrackTags.put("date", gpxInfo.timestamp.toString());
 			gpxTrackTags.put("description", gpxInfo.description);
-			OsmRouteType activityType = OsmRouteType.getTypeFromTags(gpxInfo.tags); 
+			OsmRouteType activityType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
 			for (String tg : gpxInfo.tags) {
 				gpxTrackTags.put("tag_" + tg, tg);
 			}
@@ -266,27 +266,26 @@ public class OsmGpxWriteContext {
 			}
 		}
 	}
-	
 
 	private void addAnalysisTags(Map<String, String> gpxTrackTags, GPXTrackAnalysis analysis) throws IOException {
-		gpxTrackTags.put("distance", latLonFormat.format(analysis.totalDistance));
+		gpxTrackTags.put("distance", latLonFormat.format(analysis.getTotalDistance()));
 		if (analysis.isTimeSpecified()) {
-			gpxTrackTags.put("time_span", analysis.timeSpan + "");
+			gpxTrackTags.put("time_span", analysis.getTimeSpan() + "");
 			gpxTrackTags.put("time_span_no_gaps", analysis.timeSpanWithoutGaps + "");
-			gpxTrackTags.put("time_moving", analysis.timeMoving + "");
+			gpxTrackTags.put("time_moving", analysis.getTimeMoving() + "");
 			gpxTrackTags.put("time_moving_no_gaps", analysis.timeMovingWithoutGaps + "");
 		}
 		if (analysis.hasElevationData()) {
-			gpxTrackTags.put("avg_ele", latLonFormat.format(analysis.avgElevation));
-			gpxTrackTags.put("min_ele", latLonFormat.format(analysis.minElevation));
-			gpxTrackTags.put("max_ele", latLonFormat.format(analysis.maxElevation));
-			gpxTrackTags.put("diff_ele_up", latLonFormat.format(analysis.diffElevationUp));
-			gpxTrackTags.put("diff_ele_down", latLonFormat.format(analysis.diffElevationDown));
+			gpxTrackTags.put("avg_ele", latLonFormat.format(analysis.getAvgElevation()));
+			gpxTrackTags.put("min_ele", latLonFormat.format(analysis.getMinElevation()));
+			gpxTrackTags.put("max_ele", latLonFormat.format(analysis.getMaxElevation()));
+			gpxTrackTags.put("diff_ele_up", latLonFormat.format(analysis.getDiffElevationUp()));
+			gpxTrackTags.put("diff_ele_down", latLonFormat.format(analysis.getDiffElevationDown()));
 		}
 		if (analysis.hasSpeedData()) {
-			gpxTrackTags.put("avg_speed", latLonFormat.format(analysis.avgSpeed));
-			gpxTrackTags.put("max_speed", latLonFormat.format(analysis.maxSpeed));
-			gpxTrackTags.put("min_speed", latLonFormat.format(analysis.minSpeed));
+			gpxTrackTags.put("avg_speed", latLonFormat.format(analysis.getAvgSpeed()));
+			gpxTrackTags.put("max_speed", latLonFormat.format(analysis.getMaxSpeed()));
+			gpxTrackTags.put("min_speed", latLonFormat.format(analysis.getMinSpeed()));
 		}
 	}
 	
