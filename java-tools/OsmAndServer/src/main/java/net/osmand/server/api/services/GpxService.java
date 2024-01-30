@@ -67,9 +67,9 @@ public class GpxService {
                 trackData.analysis = new LinkedHashMap<>();
             }
             trackData.analysis.put("srtmAnalysis", true);
-            trackData.analysis.put("minElevationSrtm", srtmAnalysis.minElevation);
-            trackData.analysis.put("avgElevationSrtm", srtmAnalysis.avgElevation);
-            trackData.analysis.put("maxElevationSrtm", srtmAnalysis.maxElevation);
+            trackData.analysis.put("minElevationSrtm", srtmAnalysis.getMinElevation());
+            trackData.analysis.put("avgElevationSrtm", srtmAnalysis.getAvgElevation());
+            trackData.analysis.put("maxElevationSrtm", srtmAnalysis.getMaxElevation());
             webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
             if (trackData.analysis.get("elevationData") == null) {
                 webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);

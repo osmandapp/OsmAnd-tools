@@ -433,9 +433,9 @@ public class WebGpxParser {
 
             if (srtmAnalysis != null) {
                 res.put("srtmAnalysis", true);
-                res.put("minElevationSrtm", srtmAnalysis.minElevation);
-                res.put("avgElevationSrtm", srtmAnalysis.avgElevation);
-                res.put("maxElevationSrtm", srtmAnalysis.maxElevation);
+                res.put("minElevationSrtm", srtmAnalysis.getMinElevation());
+                res.put("avgElevationSrtm", srtmAnalysis.getAvgElevation());
+                res.put("maxElevationSrtm", srtmAnalysis.getMaxElevation());
             }
             return res;
         }
