@@ -67,6 +67,9 @@ public class RandomRouteTester {
 		// cost/distance deviation limits
 		double DEVIATION_RED = 1.0F; // > 1% - mark as failed
 		double DEVIATION_YELLOW = 0.1F; // > 0.1% - mark as acceptable
+
+		// enable Android mode for BRP
+		boolean CAR_2PHASE_MODE = false;
 	}
 
 	class CommandLineOpts {
@@ -209,6 +212,10 @@ public class RandomRouteTester {
 			}
 		}
 
+		if (opts.getOpt("--car-2phase") != null) {
+			config.CAR_2PHASE_MODE = true;
+		}
+
 		if (opts.getOpt("--help") != null) {
 			System.err.printf("%s\n", String.join("\n",
 					"",
@@ -233,6 +240,8 @@ public class RandomRouteTester {
 					"--avoid-java avoid BinaryRoutePlanner (java)",
 					"--avoid-cpp avoid BinaryRoutePlanner (cpp)",
 					"--avoid-hh avoid HHRoutePlanner (java)",
+					"",
+					"--car-2phase use COMPLEX mode for car (Android default)",
 					"",
 					"--red= % red-color limit",
 					"--yellow= % yellow-color limit",
@@ -396,11 +405,16 @@ public class RandomRouteTester {
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
 
+		RoutePlannerFrontEnd.RouteCalculationMode mode =
+				(this.config.CAR_2PHASE_MODE && "car".equals(entry.profile)) ?
+						RoutePlannerFrontEnd.RouteCalculationMode.COMPLEX :
+						RoutePlannerFrontEnd.RouteCalculationMode.NORMAL;
+
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
 				useNative ? nativeLibrary : null,
 				obfReaders.toArray(new BinaryMapIndexReader[0]),
-				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
+				mode
 		);
 
 //		ctx.dijkstraMode = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
