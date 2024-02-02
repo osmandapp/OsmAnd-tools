@@ -67,4 +67,4 @@ fi
 
 cd $mapcreatordir
 
-#bash utilities.sh generate-obf-files-in-batch $dir/batch-usfs.xml
+bash utilities.sh generate-obf-files-in-batch $dir/batch-usfs.xml
