@@ -51,7 +51,7 @@ public class GpxService {
         gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
         gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
         if (analysis != null) {
-            boolean addSpeed = analysis.avgSpeed != 0.0 && !analysis.hasSpeedInTrack;
+            boolean addSpeed = analysis.getAvgSpeed() != 0.0 && !analysis.hasSpeedInTrack();
             if (!gpxData.tracks.isEmpty() && (!analysis.pointAttributes.isEmpty() || addSpeed)) {
                 webGpxParser.addAdditionalInfo(gpxData.tracks, analysis, addSpeed);
             }
@@ -67,9 +67,9 @@ public class GpxService {
                 trackData.analysis = new LinkedHashMap<>();
             }
             trackData.analysis.put("srtmAnalysis", true);
-            trackData.analysis.put("minElevationSrtm", srtmAnalysis.minElevation);
-            trackData.analysis.put("avgElevationSrtm", srtmAnalysis.avgElevation);
-            trackData.analysis.put("maxElevationSrtm", srtmAnalysis.maxElevation);
+            trackData.analysis.put("minElevationSrtm", srtmAnalysis.getMinElevation());
+            trackData.analysis.put("avgElevationSrtm", srtmAnalysis.getAvgElevation());
+            trackData.analysis.put("maxElevationSrtm", srtmAnalysis.getMaxElevation());
             webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
             if (trackData.analysis.get("elevationData") == null) {
                 webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);
@@ -159,7 +159,6 @@ public class GpxService {
                         } else if (i == 0) {
                             return null;
                         }
-                        
                     }
                 }
             }
@@ -173,11 +172,12 @@ public class GpxService {
             analysis.minHdop = -1;
             analysis.maxHdop = -1;
         }
-        if (analysis.minSpeed > analysis.maxSpeed) {
-            analysis.minSpeed = analysis.maxSpeed;
+        if (analysis.getMinSpeed() > analysis.getMaxSpeed()) {
+            analysis.setMinSpeed(analysis.getMaxSpeed());
         }
-        if (analysis.startTime > analysis.endTime) {
-            analysis.startTime = analysis.endTime = 0;
+        if (analysis.getStartTime() > analysis.getEndTime()) {
+            analysis.setEndTime(0);
+            analysis.setStartTime(0);
         }
         cleanupFromNan(analysis.locationStart);
         cleanupFromNan(analysis.locationEnd);

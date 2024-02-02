@@ -595,23 +595,23 @@ public class MapRouterLayer implements MapPanelLayer {
 	protected void displayTrackInfo(GPXFile gpxFile, String header) {
 		GPXTrackAnalysis analysis = selectedGPXFile.getAnalysis(gpxFile.modifiedTime);
 		StringBuilder msg = new StringBuilder();
-		
-		msg.append(String.format("Track: distance %.1f, distance no gaps %.1f, tracks %d, points %d\n", analysis.totalDistance,
-				analysis.totalDistanceWithoutGaps, analysis.totalTracks, analysis.wptPoints));
-		
+
+		msg.append(String.format("Track: distance %.1f, distance no gaps %.1f, tracks %d, points %d\n", analysis.getTotalDistance(),
+				analysis.totalDistanceWithoutGaps, analysis.getTotalTracks(), analysis.getWptPoints()));
+
 		if (analysis.hasElevationData()) {
 			msg.append(String.format("Ele: min - %.1f, max - %.1f, avg - %.1f, uphill - %.1f, downhill - %.1f\n",
-					analysis.minElevation, analysis.maxElevation, analysis.avgElevation, analysis.diffElevationUp,
-					analysis.diffElevationDown));
+					analysis.getMinElevation(), analysis.getMaxElevation(), analysis.getAvgElevation(), analysis.getDiffElevationUp(),
+					analysis.getDiffElevationDown()));
 		}
 		if (analysis.hasSpeedData()) {
 			msg.append(String.format("Speed: min - %.1f, max - %.1f, avg - %.1f, dist+speed - %.1f, dist+speed no gaps - %.1f\n",
-					analysis.minSpeed, analysis.maxSpeed, analysis.avgSpeed,
-					analysis.totalDistanceMoving,analysis.totalDistanceMovingWithoutGaps));
+					analysis.getMinSpeed(), analysis.getMaxSpeed(), analysis.getAvgSpeed(),
+					analysis.getTotalDistanceMoving(), analysis.totalDistanceMovingWithoutGaps));
 		}
-		if (analysis.startTime != analysis.endTime) {
+		if (analysis.getStartTime() != analysis.getEndTime()) {
 			msg.append(String.format("Time: start - %s, end - %s, span - %.1f min, span no gaps - %.1f min\n",
-					new Date(analysis.startTime), new Date(analysis.endTime), analysis.timeSpan / 60000.0,
+					new Date(analysis.getStartTime()), new Date(analysis.getEndTime()), analysis.getTimeSpan() / 60000.0,
 					analysis.timeSpanWithoutGaps / 60000.0));
 		}
 		log.info(header + " " + msg);

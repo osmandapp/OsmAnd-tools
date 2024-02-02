@@ -415,27 +415,27 @@ public class WebGpxParser {
     public Map<String, Object> getTrackAnalysis(GPXTrackAnalysis analysis, GPXTrackAnalysis srtmAnalysis) {
         if (analysis != null) {
             Map<String, Object> res = new HashMap<>();
-            res.put("totalDistance", analysis.totalDistance);
-            res.put("startTime", analysis.startTime);
-            res.put("endTime", analysis.endTime);
-            res.put("timeMoving", analysis.timeMoving);
+            res.put("totalDistance", analysis.getTotalDistance());
+            res.put("startTime", analysis.getStartTime());
+            res.put("endTime", analysis.getEndTime());
+            res.put("timeMoving", analysis.getTimeMoving());
             res.put("hasElevationData", analysis.hasElevationData());
-            res.put("diffElevationUp", analysis.diffElevationUp);
-            res.put("diffElevationDown", analysis.diffElevationDown);
-            res.put("minElevation", analysis.minElevation);
-            res.put("avgElevation", analysis.avgElevation);
-            res.put("maxElevation", analysis.maxElevation);
+            res.put("diffElevationUp", analysis.getDiffElevationUp());
+            res.put("diffElevationDown", analysis.getDiffElevationDown());
+            res.put("minElevation", analysis.getMinElevation());
+            res.put("avgElevation", analysis.getAvgElevation());
+            res.put("maxElevation", analysis.getMaxElevation());
             res.put("hasSpeedData", analysis.hasSpeedData());
-            res.put("minSpeed", analysis.minSpeed);
-            res.put("avgSpeed", analysis.avgSpeed);
-            res.put("maxSpeed", analysis.maxSpeed);
-            res.put("points", analysis.wptPoints);
-            
+            res.put("minSpeed", analysis.getMinSpeed());
+            res.put("avgSpeed", analysis.getAvgSpeed());
+            res.put("maxSpeed", analysis.getMaxSpeed());
+            res.put("points", analysis.getWptPoints());
+
             if (srtmAnalysis != null) {
                 res.put("srtmAnalysis", true);
-                res.put("minElevationSrtm", srtmAnalysis.minElevation);
-                res.put("avgElevationSrtm", srtmAnalysis.avgElevation);
-                res.put("maxElevationSrtm", srtmAnalysis.maxElevation);
+                res.put("minElevationSrtm", srtmAnalysis.getMinElevation());
+                res.put("avgElevationSrtm", srtmAnalysis.getAvgElevation());
+                res.put("maxElevationSrtm", srtmAnalysis.getMaxElevation());
             }
             return res;
         }
