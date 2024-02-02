@@ -53,7 +53,7 @@ class USFSRecreationAreaActivitiesTranslation(ogr2osm.TranslationBase):
 			if not MARKERACTIVITY:
 				tags.update({'nfs_recreation_area_marker_activity':'default'})
 		if 'RECAREAURL' in attrs and RECAREAURL:
-			tags['nfs_recreation_area_url'] = RECAREAURL
+			tags['url'] = RECAREAURL
 		if 'FEEDESCRIPTION' in attrs and strip_tags(FEEDESCRIPTION):
 			tags['nfs_recreation_area_fee_description'] = strip_tags(FEEDESCRIPTION)
 		if 'OPEN_SEASON_START' in attrs and OPEN_SEASON_START:
@@ -69,7 +69,7 @@ class USFSRecreationAreaActivitiesTranslation(ogr2osm.TranslationBase):
 		if 'MARKERACTIVITYGROUP' in attrs and MARKERACTIVITYGROUP:
 			tags['nfs_recreation_area_marker_activity_group'] = MARKERACTIVITYGROUP.strip().lower().replace(" ;",";").replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").replace("&","and")
 		if 'RECAREADESCRIPTION' in attrs and strip_tags(RECAREADESCRIPTION):
-			tags['nfs_recreation_area_description'] = strip_tags(RECAREADESCRIPTION)
+			tags['description'] = strip_tags(RECAREADESCRIPTION)
 		if 'RESTRICTIONS' in attrs and strip_tags(RESTRICTIONS):
 			tags['nfs_recreation_area_restrictions'] = strip_tags(RESTRICTIONS)
 		if 'ACTIVITYDESCRIPTION' in attrs and ACTIVITYDESCRIPTION:

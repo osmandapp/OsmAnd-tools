@@ -38,16 +38,16 @@ function generate_osm_from_gdb {
 	python3 -m ogr2osm --suppress-empty-tags $workdir/$sourcedirname/${rec_area_activities_source_filename}_agg.gpkg -o $workdir/$outosmdirname/us_$2.osm -t $2.py
 }
 
-# if [ ! -f "$workdir/$outosmdirname/us_nfs_trails.osm" ] ; then
-# 	echo ==============Generating $trailsshpfilename
-# 	generate_osm_from_shp "$trailsshpfilename" "nfs_trails"
-# fi
-# if [ ! -f "$workdir/$outosmdirname/us_nfs_roads.pbf" ] ; then
-# 	echo ==============Generating $roadsshpfilename
-# 	generate_osm_from_shp "$roadsshpfilename" "nfs_roads"
-# 	osmconvert $workdir/$outosmdirname/us_nfs_roads.osm --out-pbf > $workdir/$outosmdirname/us_nfs_roads.pbf
-# 	rm $workdir/$outosmdirname/us_nfs_roads.osm
-# fi
+if [ ! -f "$workdir/$outosmdirname/us_nfs_trails.osm" ] ; then
+	echo ==============Generating $trailsshpfilename
+	generate_osm_from_shp "$trailsshpfilename" "nfs_trails"
+fi
+if [ ! -f "$workdir/$outosmdirname/us_nfs_roads.pbf" ] ; then
+	echo ==============Generating $roadsshpfilename
+	generate_osm_from_shp "$roadsshpfilename" "nfs_roads"
+	osmconvert $workdir/$outosmdirname/us_nfs_roads.osm --out-pbf > $workdir/$outosmdirname/us_nfs_roads.pbf
+	rm $workdir/$outosmdirname/us_nfs_roads.osm
+fi
 
 if [ ! -f "$workdir/$outosmdirname/us_rec_area_activities.osm" ] ; then
 	echo ==============Generating $rec_area_activities_source_filename
