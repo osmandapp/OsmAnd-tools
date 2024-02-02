@@ -39,6 +39,7 @@ import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -56,10 +57,10 @@ import net.osmand.util.MapUtils;
 // 2.8.0 ROUTING: NPE  (net.osmand.router.HHRouteDataStructure$NetworkDBPointRouteInfo.setDetailedParentRt(HHRouteDataStructure.java:575)
 //  http://localhost:3000/map/?start=51.825843,6.712063&finish=51.954521,8.130041&type=osmand&profile=car&params=car,prefer_unpaved#10/51.8905/7.4206
 // 2.0.1 ROUTING: ! Progress bar - Cancellation
-
-// !! IN PROGRESS !!!
 // 2.0.2 ROUTING: ! Progress bar - Progress
 // 2.1 SERVER: Automate monthly procedures
+
+// !! IN PROGRESS !!!
 // 2.8.1 ROUTING: Avoid "motorways" could be more efficient to exclude points earlier
 // 2.8.2 ROUTING: Too many recalculations with height elevation (https://test.osmand.net/map/?start=42.770191,0.620610&finish=42.980344,-0.419359&type=osmand&profile=pedestrian)
 // 2.8.3 ROUTING: Test live maps 
@@ -138,7 +139,6 @@ public class HHRoutingSubGraphCreator {
 //		TOTAL_MIN_POINTS = 1000;
 		
 		String name = "Montenegro_europe_2.road.obf";
-		name = "Indonesia_sulawesi-selatan_asia";
 //		name = "Italy_test";
 //		name = "Netherlands_europe_2.road.obf";
 //		ROUTING_PROFILE = "bicycle";
@@ -860,6 +860,7 @@ public class HHRoutingSubGraphCreator {
 		public int clusterDbId;
 		public int fileDbId;
 		public boolean inserted;
+		public String[] tagValues;
 		
 		
 		public RouteSegmentBorderPoint(RouteSegment s, boolean dir) {
@@ -872,9 +873,18 @@ public class HHRoutingSubGraphCreator {
 			ey = !dir ? s.getStartPointY() : s.getEndPointY();
 			unidirId = uniId();
 			uniqueId = uniqueId();
+			int[] tps = s.getRoad().getTypes();
+			if (tps != null) {
+				this.tagValues = new String[tps.length * 2];
+				for (int i = 0; i < tps.length; i++) {
+					RouteTypeRule rtr = s.getRoad().region.quickGetEncodingRule(tps[i]);
+					this.tagValues[2 * i] = rtr.getTag();
+					this.tagValues[2 * i + 1] = rtr.getValue();
+				}
+			}
 		}
 		
-		public RouteSegmentBorderPoint(long roadId, int st, int end, int sx, int sy, int ex, int ey) {
+		public RouteSegmentBorderPoint(long roadId, int st, int end, int sx, int sy, int ex, int ey, String[] tagValues) {
 			this.roadId = roadId;
 			this.segmentStart = st;
 			this.segmentEnd = end;
@@ -884,6 +894,7 @@ public class HHRoutingSubGraphCreator {
 			this.ey = ey;
 			unidirId = uniId();
 			uniqueId = uniqueId();
+			this.tagValues = tagValues;
 			inserted = true;
 		}
 
@@ -1496,7 +1507,7 @@ public class HHRoutingSubGraphCreator {
 	private void simpleMerge(NetworkCollectPointCtx ctx, RouteSegmentBorderPoint main, int clusterOppId, RouteSegmentBorderPoint... toMerges) {
 		logf("MERGE route road %s with %s", main, Arrays.toString(toMerges));
 		RouteSegmentBorderPoint newOpp = new RouteSegmentBorderPoint(main.roadId, main.segmentEnd, main.segmentStart,
-				main.ex, main.ey, main.sx, main.sy);
+				main.ex, main.ey, main.sx, main.sy, main.tagValues);
 		if (main.isPositive()) {
 			ctx.networkPointToDbInd.get(main.unidirId).negativeObj = newOpp;
 		} else {

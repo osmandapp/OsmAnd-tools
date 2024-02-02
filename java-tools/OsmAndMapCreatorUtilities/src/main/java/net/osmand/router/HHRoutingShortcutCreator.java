@@ -101,14 +101,21 @@ public class HHRoutingShortcutCreator {
 				onlyCompact = true;
 			}
 		}
+		String prefixName = new File(".").getCanonicalFile().getName();
+		if (args.length == 0) {
+			File dir = sourceFile();
+			if (!dir.isDirectory()) {
+				dir = dir.getParentFile();
+			}
+			prefixName = dir.getAbsolutePath() + "/" + sourceFile().getCanonicalFile().getName();
+		}
 		for (String routeProfile : ROUTING_PROFILE.split(",")) {
 			System.out.println("----------");
 			System.out.println("Process profile: " + routeProfile);
-			File folder = new File(".");
-			String name = folder.getCanonicalFile().getName() + "_" + routeProfile;
+			String name = prefixName + "_" + routeProfile;
 			File dbFile = new File(name + HHRoutingDB.EXT);
 			if (onlyCompact) {
-				File compactFile = new File(folder, name + HHRoutingDB.CEXT);
+				File compactFile = new File(name + HHRoutingDB.CEXT);
 				HHRoutingPreparationDB.compact(dbFile, compactFile);
 				new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
 				return;
@@ -118,7 +125,7 @@ public class HHRoutingShortcutCreator {
 				networkDB.recreateSegments();
 			}
 			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
-			createOSMNetworkPoints(new File(folder, name + "-pnts.osm"), totalPnts);
+			createOSMNetworkPoints(new File(name + "-pnts.osm"), totalPnts);
 			System.out.printf("Loaded %,d points\n", totalPnts.size());
 
 			for (String routingParam : ROUTING_PARAMS) {
@@ -131,10 +138,10 @@ public class HHRoutingShortcutCreator {
 				System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam,
 						segments);
 				Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB, routingProfile);
-				saveOsmFile(objects, new File(folder, name + "-hh.osm"));
+				saveOsmFile(objects, new File(name + "-hh.osm"));
 			}
 			networkDB.close();
-			File compactFile = new File(folder, name + HHRoutingDB.CEXT);
+			File compactFile = new File(name + HHRoutingDB.CEXT);
 			HHRoutingPreparationDB.compact(dbFile, compactFile);
 			new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
 		}
