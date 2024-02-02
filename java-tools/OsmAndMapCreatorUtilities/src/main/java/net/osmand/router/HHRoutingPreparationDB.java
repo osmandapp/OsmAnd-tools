@@ -205,7 +205,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		tgt.close();
 	}
 	
-	static class NetworkDBPointPrep extends NetworkDBPoint {
+	public static class NetworkDBPointPrep extends NetworkDBPoint {
 		int distSegment;
 		int chIndexEdgeDiff;
 		int chFinalInd;
@@ -215,6 +215,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		int midProc;
 		int midDepth;
 		int midPrevMaxDepth;
+		public int[] tagValuesInts = null;
 	}
 	
 	private static byte[] prepareSegments(PreparedStatement selIn, TLongObjectHashMap<NetworkDBPointPrep> pointsById, List<NetworkDBPointPrep> pnts) throws SQLException, IOException {

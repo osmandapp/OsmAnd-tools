@@ -10,10 +10,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
 
@@ -52,7 +54,7 @@ public class HHRoutingOBFWriter {
 	private static final int BLOCK_SEGMENTS_AVG_BUCKET_SIZE = 7;
 	public static final int BUFFER_SIZE = 1 << 20;
 	public static boolean PREINDEX_POINTS_BY_COUNTRIES = true;
-	
+	public static boolean WRITE_TAG_VALUES = true;
 	/**
 	 * @param args
 	 * @throws IOException
@@ -68,13 +70,14 @@ public class HHRoutingOBFWriter {
 			String mapName = "Germany_car.chdb";
 			mapName = "Netherlands_europe_car.chdb";
 //			mapName = "__europe_car.chdb";
-			mapName = "1/hh-routing_car.chdb";
-			String polyFile = "1/Spain_europe_2.road.obf";
-			PREINDEX_POINTS_BY_COUNTRIES = false;
+//			mapName = "1/hh-routing_car.chdb";
+//			String polyFile = null;
+//			polyFile = "1/Spain_europe_2.road.obf";
+//			PREINDEX_POINTS_BY_COUNTRIES = false;
 //			polyFile = "_split";
-			updateExistingFiles = true;
+//			updateExistingFiles = true;
+//			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
 			dbFile = new File(System.getProperty("maps.dir"), mapName);
-			obfPolyFile = new File(System.getProperty("maps.dir"), polyFile);
 		} else {
 			for (String arg : args) {
 				if (arg.startsWith("--db=")) {
@@ -215,10 +218,58 @@ public class HHRoutingOBFWriter {
 		return obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('_'))
 				.toLowerCase();
 	}
+	
+	private Map<String, Integer> prepareTagValuesDictionary(TLongObjectHashMap<NetworkDBPointPrep> points) {
+		Map<String, Integer> tagDict = new LinkedHashMap<String, Integer>();
+		for (NetworkDBPointPrep p : points.valueCollection()) {
+			if (p.tagValues == null) {
+				continue;
+			}
+			Iterator<Entry<String, String>> it = p.tagValues.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<String, String> entry = it.next();
+				String keyValue = entry.getKey() + "=" + entry.getValue();
+				Integer n = tagDict.get(keyValue);
+				if (n == null) {
+					n = 0;
+				}
+				tagDict.put(keyValue, n + 1);
+			}
+		}
+		List<String> tagDictList = new ArrayList<>(tagDict.keySet());
+		Collections.sort(tagDictList, new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				return -Integer.compare(tagDict.get(o1), tagDict.get(o2));
+			}
+		});
+		Map<String, Integer> finalTagDict = new LinkedHashMap<String, Integer>();
+		for (int i = 0; i < tagDictList.size(); i++) {
+			finalTagDict.put(tagDictList.get(i), i);
+		}
+		for (NetworkDBPointPrep p : points.valueCollection()) {
+			if (p.tagValues != null && p.tagValues.size() > 0) {
+				p.tagValuesInts = new int[p.tagValues.size()];
+				Iterator<Entry<String, String>> it = p.tagValues.entrySet().iterator();
+				int k = 0;
+				while (it.hasNext()) {
+					Entry<String, String> entry = it.next();
+					String keyValue = entry.getKey() + "=" + entry.getValue();
+					p.tagValuesInts[k++] = finalTagDict.get(keyValue);
+				}
+			}
+		}
+		return finalTagDict;
+	}
 
 	private void writeFileBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
 			long edition, QuadRect bbox31, List<NetworkDBPointPrep> filteredPoints)
 			throws SQLException, IOException, IllegalValueException {
+		Map<String, Integer> tagValuesDictionary = null;
+		if (WRITE_TAG_VALUES) {
+			tagValuesDictionary = prepareTagValuesDictionary(points);
+		}
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
 		try {
@@ -267,7 +318,7 @@ public class HHRoutingOBFWriter {
 					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, reader.getRaf(), part.getFilePointer(), part.getLength());
 				}
 			}
-			bmiw.startHHRoutingIndex(edition, profile, profileParams);
+			bmiw.startHHRoutingIndex(edition, profile, tagValuesDictionary, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
 			
 			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterIn = new TLongObjectHashMap<>();
@@ -319,7 +370,9 @@ public class HHRoutingOBFWriter {
 			rtree.Node root = routeTree.getReadNode(rootIndex);
 			Rect rootBounds = IndexVectorMapCreator.calcBounds(root);
 			if (rootBounds != null) {
+				long fp = bmiw.getFilePointer();
 				List<NetworkDBPointPrep> pntsList = writeBinaryRouteTree(root, rootBounds, routeTree, bmiw, points, new int[] {0});
+				long size = bmiw.getFilePointer() - fp;
 				// validate number of clusters
 				validateClusterSizeMatch(db, validateClusterIn, validateClusterOut, pntsList);
 				pntsList.sort(new Comparator<NetworkDBPointPrep>() {
@@ -339,10 +392,13 @@ public class HHRoutingOBFWriter {
 				for (int i = 0; i < blocks.size(); i++) {
 					ranges.add((pntsList.size() - 1) / blocks.get(i) + 1);
 				}
+				fp = bmiw.getFilePointer();
 				System.out.printf("Tree of points %d: ranges - %s, number of subblocks - %s\n", points.size(), ranges, blocks);
 				for (int i = 0; i < profileParamsKeys.length; i++) {
 					writeSegments(db, i, profileParamsKeys[i], bmiw, pntsList, ranges, 0);
 				}
+				long size2 = bmiw.getFilePointer() - fp;
+				System.out.printf("Points size %d bytes, segments size %d bytes \n", size, size2);
 			}
 			bmiw.endHHRoutingIndex();
 			bmiw.close();

@@ -99,6 +99,7 @@ import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -246,7 +247,7 @@ public class BinaryMapIndexWriter {
 	}
 	
 	
-	public void startHHRoutingIndex(long edition, String profile, String... params) throws IOException {
+	public void startHHRoutingIndex(long edition, String profile, Map<String, Integer> stringTable,  String... params) throws IOException {
 		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
@@ -254,6 +255,18 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILE_FIELD_NUMBER, profile);
 		for (String s : params) {
 			codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILEPARAMS_FIELD_NUMBER, s);
+		}
+		if (stringTable != null && stringTable.size() > 0) {
+			// expect linked hash map
+			int i = 0;
+			OsmandOdb.StringTable.Builder st = OsmandOdb.StringTable.newBuilder();
+			for (String s : stringTable.keySet()) {
+				if (stringTable.get(s) != i++) {
+					throw new IllegalStateException();
+				}
+				st.addS(s);
+			}
+			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.TAGVALUESTABLE_FIELD_NUMBER, st.build());
 		}
 	}
 
@@ -553,6 +566,11 @@ public class BinaryMapIndexWriter {
 			if (p.dualPoint != null) {
 				builder.setDualClusterId(p.dualPoint.clusterId);
 				builder.setDualPointId(p.dualPoint.index);
+			}
+			if (p instanceof NetworkDBPointPrep && ((NetworkDBPointPrep) p).tagValuesInts != null) {
+				for (int tgv : ((NetworkDBPointPrep) p).tagValuesInts) {
+					builder.addTagValueIds(tgv);
+				}
 			}
 			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointsBox.POINTS_FIELD_NUMBER, builder.build());
 		}
