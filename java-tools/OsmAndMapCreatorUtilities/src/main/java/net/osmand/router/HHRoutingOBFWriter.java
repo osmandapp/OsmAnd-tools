@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
 
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
@@ -55,6 +56,14 @@ public class HHRoutingOBFWriter {
 	public static final int BUFFER_SIZE = 1 << 20;
 	public static boolean PREINDEX_POINTS_BY_COUNTRIES = true;
 	public static boolean WRITE_TAG_VALUES = true;
+	
+	
+	private static final String IGNORE_ROUTE = "route_";
+	private static final String IGNORE_ROAD = "road_";
+	private static final String IGNORE_OSMAND_ELE = "osmand_ele_";
+	private static final String IGNORE_TURN_LANES = "turn:lanes";
+	private static final String IGNORE_DESCRIPTION = ":description";
+	private static final String IGNORE_NOTE = ":note";
 	/**
 	 * @param args
 	 * @throws IOException
@@ -68,7 +77,8 @@ public class HHRoutingOBFWriter {
 		boolean updateExistingFiles = false;
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
-			mapName = "Netherlands_europe_car.chdb";
+//			mapName = "Netherlands_europe_car.chdb";
+//			mapName = "Montenegro_europe_2.road.obf_car.chdb";
 //			mapName = "__europe_car.chdb";
 //			mapName = "1/hh-routing_car.chdb";
 //			String polyFile = null;
@@ -229,6 +239,11 @@ public class HHRoutingOBFWriter {
 			while (it.hasNext()) {
 				Entry<String, String> entry = it.next();
 				String keyValue = entry.getKey() + "=" + entry.getValue();
+				if (keyValue.startsWith(IGNORE_ROUTE) || keyValue.startsWith(IGNORE_TURN_LANES)
+						|| keyValue.startsWith(IGNORE_ROAD) || keyValue.startsWith(IGNORE_OSMAND_ELE)
+						|| keyValue.contains(IGNORE_NOTE) || keyValue.contains(IGNORE_DESCRIPTION) ) {
+					continue;
+				}
 				Integer n = tagDict.get(keyValue);
 				if (n == null) {
 					n = 0;
@@ -247,17 +262,21 @@ public class HHRoutingOBFWriter {
 		Map<String, Integer> finalTagDict = new LinkedHashMap<String, Integer>();
 		for (int i = 0; i < tagDictList.size(); i++) {
 			finalTagDict.put(tagDictList.get(i), i);
+			System.out.println(i + ". " + tagDictList.get(i) + " " + tagDict.get(tagDictList.get(i)));
 		}
 		for (NetworkDBPointPrep p : points.valueCollection()) {
 			if (p.tagValues != null && p.tagValues.size() > 0) {
-				p.tagValuesInts = new int[p.tagValues.size()];
 				Iterator<Entry<String, String>> it = p.tagValues.entrySet().iterator();
-				int k = 0;
+				TIntArrayList lst = new TIntArrayList();
 				while (it.hasNext()) {
 					Entry<String, String> entry = it.next();
 					String keyValue = entry.getKey() + "=" + entry.getValue();
-					p.tagValuesInts[k++] = finalTagDict.get(keyValue);
+					Integer ind = finalTagDict.get(keyValue);
+					if (ind != null) {
+						lst.add(ind);
+					}
 				}
+				p.tagValuesInts = lst.toArray();
 			}
 		}
 		return finalTagDict;
