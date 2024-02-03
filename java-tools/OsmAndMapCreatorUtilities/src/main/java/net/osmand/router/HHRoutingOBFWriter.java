@@ -77,7 +77,7 @@ public class HHRoutingOBFWriter {
 		boolean updateExistingFiles = false;
 		if (args.length == 0) {
 			String mapName = "Germany_car.chdb";
-//			mapName = "Netherlands_europe_car.chdb";
+			mapName = "Netherlands_europe_car.chdb";
 //			mapName = "Montenegro_europe_2.road.obf_car.chdb";
 //			mapName = "__europe_car.chdb";
 //			mapName = "1/hh-routing_car.chdb";
@@ -262,7 +262,7 @@ public class HHRoutingOBFWriter {
 		Map<String, Integer> finalTagDict = new LinkedHashMap<String, Integer>();
 		for (int i = 0; i < tagDictList.size(); i++) {
 			finalTagDict.put(tagDictList.get(i), i);
-			System.out.println(i + ". " + tagDictList.get(i) + " " + tagDict.get(tagDictList.get(i)));
+//			System.out.println(i + ". " + tagDictList.get(i) + " " + tagDict.get(tagDictList.get(i)));
 		}
 		for (NetworkDBPointPrep p : points.valueCollection()) {
 			if (p.tagValues != null && p.tagValues.size() > 0) {
