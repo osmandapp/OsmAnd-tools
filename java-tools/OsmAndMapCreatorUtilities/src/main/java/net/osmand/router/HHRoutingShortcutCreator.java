@@ -128,7 +128,7 @@ public class HHRoutingShortcutCreator {
 			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
 			createOSMNetworkPoints(new File(name + "-pnts.osm"), totalPnts);
 			System.out.printf("Loaded %,d points\n", totalPnts.size());
-			String[] differentProfiles = ROUTING_PARAMS.split(";");
+			String[] differentProfiles = ROUTING_PARAMS.split("@");
 			String routeParamProfile = "";
 			if (ind < differentProfiles.length) {
 				routeParamProfile = differentProfiles[ind];
