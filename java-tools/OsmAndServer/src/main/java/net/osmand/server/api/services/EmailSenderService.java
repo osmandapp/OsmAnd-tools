@@ -161,7 +161,7 @@ public class EmailSenderService {
 		contentStr.append("Dear OsmAnd User!");
 		contentStr.append("<br><br>");
 		contentStr.append("You have been selected for OsmAnd Cloud promo subscription. Your promo OsmAnd Pro is <b>"+promo+"</b><br>");
-		contentStr.append("Now you can open OsmAnd Settings -> Backup and Restore and Login with this email to OsmAnd Cloud and get all features enabled.<br>");
+		contentStr.append("Now you can open OsmAnd Settings -&gt; Backup and Restore and Login with this email to OsmAnd Cloud and get all features enabled.<br>");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
 
@@ -211,7 +211,7 @@ public class EmailSenderService {
 		contentStr.append("<br><br>");
 		contentStr.append("New device has been connected to OsmAnd Cloud. Your activation code is <b>"+token+"</b><br>");
 		contentStr.append("You can also use <a clicktracking=\"off\" href='https://osmand.net/premium/device-registration?token=" + token
-				+ "'>following link<a> to open it with OsmAnd.");
+				+ "'>following link</a> to open it with OsmAnd.");
 		contentStr.append("<br><br>");
 		contentStr.append("Best Regards, <br>OsmAnd Team");
 
