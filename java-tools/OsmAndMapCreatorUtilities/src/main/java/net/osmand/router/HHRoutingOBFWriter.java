@@ -10,12 +10,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
 
@@ -33,6 +31,7 @@ import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.BinaryInspector;
@@ -235,10 +234,8 @@ public class HHRoutingOBFWriter {
 			if (p.tagValues == null) {
 				continue;
 			}
-			Iterator<Entry<String, String>> it = p.tagValues.entrySet().iterator();
-			while (it.hasNext()) {
-				Entry<String, String> entry = it.next();
-				String keyValue = entry.getKey() + "=" + entry.getValue();
+			for (TagValuePair entry : p.tagValues) {
+				String keyValue = entry.tag + "=" + entry.value;
 				if (keyValue.startsWith(IGNORE_ROUTE) || keyValue.startsWith(IGNORE_TURN_LANES)
 						|| keyValue.startsWith(IGNORE_ROAD) || keyValue.startsWith(IGNORE_OSMAND_ELE)
 						|| keyValue.contains(IGNORE_NOTE) || keyValue.contains(IGNORE_DESCRIPTION) ) {
@@ -266,11 +263,9 @@ public class HHRoutingOBFWriter {
 		}
 		for (NetworkDBPointPrep p : points.valueCollection()) {
 			if (p.tagValues != null && p.tagValues.size() > 0) {
-				Iterator<Entry<String, String>> it = p.tagValues.entrySet().iterator();
 				TIntArrayList lst = new TIntArrayList();
-				while (it.hasNext()) {
-					Entry<String, String> entry = it.next();
-					String keyValue = entry.getKey() + "=" + entry.getValue();
+				for (TagValuePair entry : p.tagValues) {
+					String keyValue = entry.tag + "=" + entry.value;
 					Integer ind = finalTagDict.get(keyValue);
 					if (ind != null) {
 						lst.add(ind);
