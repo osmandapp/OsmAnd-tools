@@ -87,7 +87,7 @@ public class EmailSenderTemplate {
 		}
 	}
 
-	private final String HTML_COMMENTS = "<!--.*?-->";
+	private final String HTML_COMMENTS = "(?s)<!--.*?-->"; // (?s) for Pattern.DOTALL multiline mode
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
 
 	private void parseCommandArgumentsFromComment(String line) {
