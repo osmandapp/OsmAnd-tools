@@ -60,10 +60,10 @@ import net.osmand.util.MapUtils;
 // 2.0.2 ROUTING: ! Progress bar - Progress
 // 2.1 SERVER: Automate monthly procedures
 // 2.8.1 ROUTING: Avoid "motorways" could be more efficient to exclude points earlier
+// 2.8.3 ROUTING: Test live maps 
 
 // !! IN PROGRESS !!!
-// 2.8.2 ROUTING: Too many recalculations with height elevation (https://test.osmand.net/map/?start=42.770191,0.620610&finish=42.980344,-0.419359&type=osmand&profile=pedestrian)
-// 2.8.3 ROUTING: Test live maps 
+// 2.8.2 height_obstacles ROUTING: Too many recalculations with height elevation (https://test.osmand.net/map/?start=42.770191,0.620610&finish=42.980344,-0.419359&type=osmand&profile=pedestrian)
 
 // 3. MID-TERM Speedups, small bugs and Data research
 // 3.0 UI: Suggest that maps need to be updated (downloaded)

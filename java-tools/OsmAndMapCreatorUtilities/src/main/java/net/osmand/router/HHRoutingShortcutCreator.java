@@ -57,7 +57,7 @@ public class HHRoutingShortcutCreator {
 	private static int THREAD_POOL = 2;
 	
 	private static String ROUTING_PROFILE = "car";
-	private static String[] ROUTING_PARAMS = new String[] { "" };
+	private static String ROUTING_PARAMS = "";
 
 	private static File sourceFile() {
 		CLEAN = true;
@@ -92,7 +92,7 @@ public class HHRoutingShortcutCreator {
 			if (a.startsWith("--routing_profile=")) {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
 			} else if (a.startsWith("--routing_params=")) {
-				ROUTING_PARAMS = a.substring("--routing_params=".length()).trim().split("---");
+				ROUTING_PARAMS = a.substring("--routing_params=".length()).trim();
 			} else if (a.startsWith("--threads=")) {
 				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
 			} else if (a.equals("--clean")) {
@@ -109,6 +109,7 @@ public class HHRoutingShortcutCreator {
 			}
 			prefixName = dir.getAbsolutePath() + "/" + sourceFile().getCanonicalFile().getName();
 		}
+		int ind = 0;
 		for (String routeProfile : ROUTING_PROFILE.split(",")) {
 			System.out.println("----------");
 			System.out.println("Process profile: " + routeProfile);
@@ -127,8 +128,13 @@ public class HHRoutingShortcutCreator {
 			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
 			createOSMNetworkPoints(new File(name + "-pnts.osm"), totalPnts);
 			System.out.printf("Loaded %,d points\n", totalPnts.size());
-
-			for (String routingParam : ROUTING_PARAMS) {
+			String[] differentProfiles = ROUTING_PARAMS.split(";");
+			String routeParamProfile = "";
+			if (ind < differentProfiles.length) {
+				routeParamProfile = differentProfiles[ind];
+			}
+			for (String routingParam : routeParamProfile.split("---")) {
+				routingParam =routingParam .trim(); 
 				prepareContext = new HHRoutingPrepareContext(obfFile, routeProfile, routingParam.split(","));
 				int routingProfile = networkDB.insertRoutingProfile(routeProfile, routingParam);
 				HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
@@ -144,6 +150,7 @@ public class HHRoutingShortcutCreator {
 			File compactFile = new File(name + HHRoutingDB.CEXT);
 			HHRoutingPreparationDB.compact(dbFile, compactFile);
 			new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
+			ind++;
 		}
 	}
 	
