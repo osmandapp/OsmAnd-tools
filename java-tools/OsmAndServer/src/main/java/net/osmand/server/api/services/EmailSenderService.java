@@ -151,7 +151,7 @@ public class EmailSenderService {
 		wrapper = new SmtpSendGridSender(smtpServer, apiKey);
 	}
 
-    public void sendOsmAndCloudPromoEmail(String email, String promo) {
+    public void sendOsmAndCloudPromoEmail(String email, String promo) { // TODO cloud/promo
 		LOGGER.info("Sending mail to: " + email);
 		Email from = new Email(NOREPLY_MAIL_FROM);
 		from.setName("OsmAnd");
@@ -176,7 +176,7 @@ public class EmailSenderService {
 		}
 	}
     
-    public void sendOsmAndCloudWebEmail(String email, String token, String action) {
+    public void sendOsmAndCloudWebEmail(String email, String token, String action) { // TODO cloud/web
 		LOGGER.info("Sending mail to: " + email);
 		Email from = new Email(NOREPLY_MAIL_FROM);
 		from.setName("OsmAnd");
@@ -200,7 +200,7 @@ public class EmailSenderService {
 		}
 	}
     
-    public void sendOsmAndCloudRegistrationEmail(String email, String token, boolean newUser) {
+    public void sendOsmAndCloudRegistrationEmail(String email, String token, boolean newUser) { // TODO cloud/register
 		LOGGER.info("Sending mail to: " + email);
 		Email from = new Email(NOREPLY_MAIL_FROM);
 		from.setName("OsmAnd");
@@ -227,7 +227,7 @@ public class EmailSenderService {
 	}
     
     // 6503d80a-4574-461d-95f1-2bd0c43392b8
-    public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) {
+    public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) { // TODO promocode/{ios,android}
     	LOGGER.info("Sending mail to: " + mailTo);
         Email from = new Email(DEFAULT_MAIL_FROM);
         from.setName("OsmAnd");
@@ -259,7 +259,7 @@ public class EmailSenderService {
 		}
     }
 	
-	public void sendOsmRecipientsDeleteEmail(String email) {
+	public void sendOsmRecipientsDeleteEmail(String email) { // TODO obsolete
 		LOGGER.info("Sending mail to: " + email);
 		Email from = new Email(DEFAULT_MAIL_FROM);
 		from.setName("OSM BTC");
