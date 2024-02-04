@@ -164,7 +164,11 @@ public class EmailSenderTemplate {
 				continue;
 			}
 
-			bodyLines.add(cleaned + (vars.containsKey(HTML_NEWLINE_TO_BR) ? "<br>\n" : "\n"));
+			if (vars.containsKey(HTML_NEWLINE_TO_BR) && !cleaned.toLowerCase().endsWith("<br>")) {
+				bodyLines.add(cleaned + "<br>" + "\n");
+			} else {
+				bodyLines.add(cleaned + "\n");
+			}
 		}
 
 		String joined = String.join("", bodyLines).replaceAll(HTML_COMMENTS, ""); // drop comments
