@@ -581,6 +581,8 @@ public class OsmAndMapsService {
 			throws IOException, XmlPullParserException, SAXException {
 		// don't synchronize this to not block routing
 		synchronized (config) {
+			// for local debug :
+			// VectorMetatile rendered = null;
 			VectorMetatile rendered = tileCache.get(tile.key);
 			if (rendered != null && rendered.runtimeImage != null) {
 				tile.runtimeImage = rendered.runtimeImage;
@@ -613,6 +615,10 @@ public class OsmAndMapsService {
 				nativelib.setRenderingProps(props);
 			}
 			RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z);
+			
+			// get info for interactive web map
+			ctx.saveTxt = true;
+			
 			if (ctx.width > 8192) {
 				return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
 

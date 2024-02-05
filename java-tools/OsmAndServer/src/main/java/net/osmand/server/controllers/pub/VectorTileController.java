@@ -73,6 +73,9 @@ public class VectorTileController {
 			return ResponseEntity.badRequest().body("Rendering style is undefined: " + style);
 		}
 		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y);
+		// for local debug :
+		// BufferedImage img = null;
+		
 		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
 		if (img == null) {
