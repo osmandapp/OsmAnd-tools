@@ -88,7 +88,7 @@ public class EmailSenderTemplate {
 
 	// send out email(s)
 	public EmailSenderTemplate send() throws UnsupportedEncodingException {
-		validateLoadedTemplates("send"); // final validation
+		validateLoadedTemplates(); // final validation before send
 
 		for(String to : toList) {
 			setVarsByTo(to);
@@ -125,7 +125,6 @@ public class EmailSenderTemplate {
 		include(template, lang, true); // template required
 		include("footer", lang, false); // optional
 		include("unsubscribe", lang, false); // optional
-		validateLoadedTemplates(template);
 		return this;
 	}
 
@@ -212,18 +211,18 @@ public class EmailSenderTemplate {
 		set("TO_BASE64", to64); // @TO_BASE64@
 	}
 
-	private void validateLoadedTemplates(String template) {
+	private void validateLoadedTemplates() {
 		if (fromEmail == null || fromEmail.isEmpty()) {
-			throw new IllegalStateException(template + ": fromEmail is not found (try <!--From: from@email-->)");
+			throw new IllegalStateException("Fatal: fromEmail is not found (try <!--From: from@email-->)");
 		}
 		if (fromName == null || fromName.isEmpty()) {
-			throw new IllegalStateException(template + ": fromName is not found (try <!--Name: CompanyName-->)");
+			throw new IllegalStateException("Fatal: fromName is not found (try <!--Name: CompanyName-->)");
 		}
 		if (subject == null || subject.isEmpty()) {
-			throw new IllegalStateException(template + ": subject is not found (try <!--Subject: hello-->)");
+			throw new IllegalStateException("Fatal: subject is not found (try <!--Subject: hello-->)");
 		}
 		if (body == null || body.isEmpty()) {
-			throw new IllegalStateException(template + ": body is not found (please fill in template)");
+			throw new IllegalStateException("Fatal: body is not found (please fill template in)");
 		}
 	}
 
