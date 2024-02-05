@@ -424,6 +424,7 @@ public class EmailSenderMain {
 // TODO
 //            Response response = sendGridClient.api(request);
 //            LOGGER.info("Response code: " + response.getStatusCode());
+	        System.err.println("sendGridClient sender will be removed soon");
             p.sentSuccess++;
         } catch (IOException ex) {
         	p.sentFailed++;
