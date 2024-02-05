@@ -30,7 +30,6 @@ import com.sendgrid.SendGrid;
 
 import net.osmand.mailsender.data.BlockedUser;
 
-
 // Uses SendGrid's Java Library
 // https://github.com/sendgrid/sendgrid-java
 
@@ -422,8 +421,9 @@ public class EmailSenderMain {
             request.setEndpoint("mail/send");
             String body = mail.build();
             request.setBody(body);
-            Response response = sendGridClient.api(request);
-            LOGGER.info("Response code: " + response.getStatusCode());
+// TODO
+//            Response response = sendGridClient.api(request);
+//            LOGGER.info("Response code: " + response.getStatusCode());
             p.sentSuccess++;
         } catch (IOException ex) {
         	p.sentFailed++;
