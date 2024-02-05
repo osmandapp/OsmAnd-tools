@@ -208,8 +208,8 @@ public class EmailSenderTemplate {
 	// should be called with distinct To before each send() iteration
 	private void setVarsByTo(String to) throws UnsupportedEncodingException {
 		String to64 = URLEncoder.encode(Base64.getEncoder().encodeToString(to.getBytes()), "UTF-8");
+		set("TO", URLEncoder.encode(to, "UTF-8")); // @TO@
 		set("TO_BASE64", to64); // @TO_BASE64@
-		set("TO", to); // @TO@
 	}
 
 	private void validateLoadedTemplates(String template) {
