@@ -327,6 +327,9 @@ public class HHRoutingShortcutCreator {
 		});
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			ind++;
+			if (pnt.connectedReverse.size() > 0) {
+				pnt.connectedReverse.clear();
+			}
 			if (pnt.connected.size() > 0) {
 				pnt.connected.clear(); // for gc
 				continue;
@@ -344,6 +347,7 @@ public class HHRoutingShortcutCreator {
 				batch = new ArrayList<>();
 			}
 		}
+		System.gc();
 		total += batch.size();
 		results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
 		logf("Scheduled %d tasks, %d total points", taskId, total);
@@ -384,6 +388,7 @@ public class HHRoutingShortcutCreator {
 
 							// clean up for gc
 							rpnt.connected.clear();
+							rpnt.connectedReverse.clear();
 						}
 						osmObjects.putAll(res.osmObjects);
 						it.remove();
