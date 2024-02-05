@@ -1,6 +1,5 @@
 package net.osmand.mailsender;
 
-import javax.swing.text.html.HTML;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
@@ -110,9 +109,14 @@ public class EmailSenderTemplate {
 	}
 
 	private String fill(String in) {
-		String filled = in == null ? "(null)" : in;
-		for (String key : vars.keySet()) {
-			filled = filled.replace("@" + key + "@", vars.get(key));
+		String filled = in;
+		if (filled != null) {
+			for (String key : vars.keySet()) {
+				filled = filled.replace("@" + key + "@", vars.get(key));
+			}
+			if (filled.matches("(?s)^.*@[A-Z_]+@.*$")) {
+				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z@");
+			}
 		}
 		return filled;
 	}
