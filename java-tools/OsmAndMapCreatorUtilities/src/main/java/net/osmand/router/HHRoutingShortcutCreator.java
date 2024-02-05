@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -114,8 +115,14 @@ public class HHRoutingShortcutCreator {
 		}
 		int ind = 0;
 		for (String routeProfile : ROUTING_PROFILE.split(",")) {
+			String[] differentProfiles = ROUTING_PARAMS.split("@");
+			String routeParamProfile = "";
+			if (ind < differentProfiles.length) {
+				routeParamProfile = differentProfiles[ind];
+			}
+			String[] params = routeParamProfile.split("---");
 			System.out.println("----------");
-			System.out.println("Process profile: " + routeProfile);
+			System.out.println("Process profile: " + routeProfile + " profiles " + Arrays.toString(params));
 			String name = prefixName + "_" + routeProfile;
 			File dbFile = new File(name + HHRoutingDB.EXT);
 			if (onlyCompact) {
@@ -131,12 +138,8 @@ public class HHRoutingShortcutCreator {
 			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
 			createOSMNetworkPoints(new File(name + "-pnts.osm"), totalPnts);
 			System.out.printf("Loaded %,d points\n", totalPnts.size());
-			String[] differentProfiles = ROUTING_PARAMS.split("@");
-			String routeParamProfile = "";
-			if (ind < differentProfiles.length) {
-				routeParamProfile = differentProfiles[ind];
-			}
-			for (String routingParam : routeParamProfile.split("---")) {
+			
+			for (String routingParam : params) {
 				routingParam =routingParam .trim(); 
 				prepareContext = new HHRoutingPrepareContext(obfFile, routeProfile, routingParam.split(","));
 				int routingProfile = networkDB.insertRoutingProfile(routeProfile, routingParam);
