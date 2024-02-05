@@ -3,73 +3,124 @@ package net.osmand.mailsender;
 import javax.swing.text.html.HTML;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// new EmailSenderTemplate("cloud/web", "ru").to("osmand@t-online.de").set("TOKEN", "777").send();
+// new EmailSenderTemplate().template("...").to("osmand@t-online.de").set("TOKEN", "777").send();
+// new EmailSenderTemplate().load("cloud/web", "ru").to("osmand@t-online.de").set("TOKEN", "777").send();
 
 public class EmailSenderTemplate {
 	public String dir = "/opt/osmand/web-server-config/templates/email";
 
+	private int totalEmails, sentEmails;
 	private List<String> toList = new ArrayList<>(); // added by to()
 	private HashMap<String, String> vars = new HashMap<>(); // set by set()
 	private String fromEmail, fromName, subject, body; // read from the template
 
 	public static void main(String[] args) throws FileNotFoundException {
-		new EmailSenderTemplate("cloud/web", "ru").to("osmand@t-online.de").set("TOKEN", "777").send();
+		EmailSenderTemplate sender = new EmailSenderTemplate()
+//				.load("cloud/web", "ru")
+				.template(
+"<!--Set: DEFAULT_MAIL_FROM=contactus@osmand.net-->\n"+
+"<!-- Set NOREPLY_MAIL_FROM = noreply@osmand.net -->\n"+
+"<!--Set HTML_NEWLINE_TO_BR=true-->\n"+
+"<!--From: @NOREPLY_MAIL_FROM@-->\n"+
+"<!--Name: OsmAnd-->\n"+
+"<!--Subject: hello-->\n"+
+"Hello, world!\n"
+				)
+				.to("osmand@t-online.de")
+				.to("copy@t-online.de")
+				.set("ACTION", "REGISTER")
+				.set("TOKEN", "777")
+				.send();
+		System.err.printf("%s\n", sender);
 	}
 
-	public EmailSenderTemplate(String template, String lang) throws FileNotFoundException {
+	public String toString() {
+		return String.format("From: %s (%s)\nSubject: %s\n\n%s\n",
+				fill(fromEmail), fill(fromName), fill(subject), fill(body));
+	}
+
+	public EmailSenderTemplate() {
+		// TODO settings, environment
+	}
+
+	// send out email(s)
+	public EmailSenderTemplate send() {
+		// TODO smtp/sendgrid support
+		return this;
+	}
+
+	// load template from file by template name and language code
+	public EmailSenderTemplate load(String template, String lang) throws FileNotFoundException {
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 		include("header", lang, false); // optional
 		include(template, lang, true); // template required
 		include("footer", lang, false); // optional
 		include("unsubscribe", lang, false); // optional
 		validateLoadedTemplates(template);
-	}
-
-	public EmailSenderTemplate EmailSenderTemplate(String template) throws FileNotFoundException {
-		return new EmailSenderTemplate(template, "en");
-	}
-
-	public EmailSenderTemplate to(String email) {
-		toList.add(email);
 		return this;
 	}
 
+	// load template from file (default lang)
+	public EmailSenderTemplate load(String template) throws FileNotFoundException {
+		return load(template, "en");
+	}
+
+	// load template from string
+	public EmailSenderTemplate template(String templateAsString) {
+		parse(Arrays.asList(templateAsString.split("\n")));
+		return this;
+	}
+
+	// load template from list
+	public EmailSenderTemplate template(List<String> templateAsList) {
+		parse(templateAsList);
+		return this;
+	}
+
+	// add To from string
+	public EmailSenderTemplate to(String email) {
+		toList.add(email);
+		totalEmails++;
+		return this;
+	}
+
+	// bulk add To(s) from list
 	public EmailSenderTemplate to(List<String> emails) {
+		totalEmails += emails.size();
 		toList.addAll(emails);
 		return this;
 	}
 
+	// set variable (might be used later as @VAR@)
 	public EmailSenderTemplate set(String key, String val) {
 		vars.put(key, val);
 		return this;
 	}
 
+	// bulk set variable(s) from map
 	public EmailSenderTemplate set(HashMap<String, String> keyval) {
 		vars.putAll(keyval);
 		return this;
 	}
 
-	public EmailSenderTemplate send() {
-		// TODO
-		return this;
-	}
-
 	private String fill(String in) {
-		String filled = in;
+		String filled = in == null ? "(null)" : in;
 		for (String key : vars.keySet()) {
 			filled = filled.replace("@" + key + "@", vars.get(key));
 		}
 		return filled;
 	}
 
-	private void setVarsByTo(String to) {
-		// TODO
+	private void setVarsByTo(String to) throws UnsupportedEncodingException {
+		String to64 = URLEncoder.encode(Base64.getEncoder().encodeToString(to.getBytes()), "UTF-8");
+		set("TO_BASE64", to64); // @TO_BASE64@
 		set("TO", to); // @TO@
-		// set("TO_HASH", ...); // UNSUBHASH
 	}
 
 	private void validateLoadedTemplates(String template) {
@@ -152,10 +203,19 @@ public class EmailSenderTemplate {
 		}
 
 		Scanner reader = new Scanner(foundFile);
-		List<String> bodyLines = new ArrayList<>();
+		List<String> templateLines = new ArrayList<>();
 
 		while (reader.hasNextLine()) {
-			String line = reader.nextLine();
+			templateLines.add(reader.nextLine());
+		}
+
+		parse(templateLines);
+	}
+
+	private void parse(List<String> lines) {
+		List<String> bodyLines = new ArrayList<>();
+
+		for(String line : lines) {
 			parseCommandArgumentsFromComment(line);
 
 			String cleaned = line.replaceAll(HTML_COMMENTS, "");
