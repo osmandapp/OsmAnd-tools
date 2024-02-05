@@ -31,13 +31,10 @@ import com.sendgrid.SendGrid;
 
 import net.osmand.mailsender.data.BlockedUser;
 
-// Uses SendGrid's Java Library
-// https://github.com/sendgrid/sendgrid-java
-
 public class EmailSenderMain {
 
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
-    private static final int LIMIT_SENDGRID_API = 500;// probably paging is needed use "offset": ..
+    private static final int LIMIT_SENDGRID_API = 500; // probably paging is needed use "offset": ..
     private static SendGrid sendGridClient;
     
     private static class EmailParams {

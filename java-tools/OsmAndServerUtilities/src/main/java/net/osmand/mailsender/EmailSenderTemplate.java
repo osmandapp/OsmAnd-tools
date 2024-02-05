@@ -286,7 +286,7 @@ public class EmailSenderTemplate {
 
 		if (foundFile == null) {
 			if (required) {
-				throw new IllegalStateException(template + " template is not found");
+				throw new IllegalStateException(template + " template is not found. Use web-server-config repo.");
 			}
 			return; // silent
 		}
