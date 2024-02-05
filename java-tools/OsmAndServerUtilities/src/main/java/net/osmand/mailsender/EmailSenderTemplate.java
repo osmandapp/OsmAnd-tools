@@ -129,7 +129,7 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// load template from file (default lang)
+	// load template from file (using default lang)
 	public EmailSenderTemplate load(String template) throws FileNotFoundException {
 		return load(template, "en");
 	}
@@ -146,19 +146,19 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// set fromEmail, use before load()
+	// optional set fromEmail, use before load()
 	public EmailSenderTemplate from(String from) {
 		fromEmail = from;
 		return this;
 	}
 
-	// set fromName, use before load()
+	// optional set fromName, use before load()
 	public EmailSenderTemplate name(String name) {
 		fromName = name;
 		return this;
 	}
 
-	// set subject, use before load()
+	// optional set subject, use before load()
 	public EmailSenderTemplate subject(String subject) {
 		this.subject = subject;
 		return this;
