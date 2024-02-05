@@ -30,6 +30,8 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
@@ -198,6 +200,14 @@ public class HHRoutingShortcutCreator {
 		public BuildNetworkShortcutResult call() throws Exception {
 			RoutingContext ctx = context.get();
 			ctx = prepareContext.gcMemoryLimitToUnloadAll(ctx, null, ctx == null);
+			((GeneralRouter) ctx.getRouter()).clearCaches();
+			ctx.unloadAllData();
+			for (RouteRegion r : ctx.reverseMap.keySet()) {
+				for (RouteSubregion s : r.getSubregions()) {
+					s.subregions = null;
+					s.dataObjects = null;
+				}
+			}
 			context.set(ctx);
 			BuildNetworkShortcutResult res = new BuildNetworkShortcutResult();
 			res.taskId = taskId;
