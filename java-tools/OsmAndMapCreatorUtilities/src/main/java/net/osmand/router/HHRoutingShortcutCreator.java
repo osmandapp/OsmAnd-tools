@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -289,7 +290,7 @@ public class HHRoutingShortcutCreator {
 
 	}
 
-	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> pnts,HHRoutingPreparationDB networkDB, int routingProfile)
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> pnts, HHRoutingPreparationDB networkDB, int routingProfile)
 			throws InterruptedException, IOException, SQLException, ExecutionException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = pnts.size() / 100.0;
@@ -315,6 +316,15 @@ public class HHRoutingShortcutCreator {
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			networkPointsByGeoId.put(pnt.getGeoPntId() , pnt);
 		}
+		List<NetworkDBPoint> lst = new ArrayList<>(pnts.valueCollection());
+		lst.sort(new Comparator<NetworkDBPoint>() {
+
+			@Override
+			public int compare(NetworkDBPoint o1, NetworkDBPoint o2) {
+				// keep locality principle
+				return Integer.compare(o1.index, o2.index);
+			}
+		});
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			ind++;
 			if (pnt.connected.size() > 0) {
@@ -329,8 +339,7 @@ public class HHRoutingShortcutCreator {
 				break;
 			}
 			if (batch.size() == batchSize) {
-				results.add(
-						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
+				results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
 				total += batch.size();
 				batch = new ArrayList<>();
 			}
