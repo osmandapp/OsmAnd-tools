@@ -107,7 +107,7 @@ public class EmailSenderTemplate {
 
 			try {
 				Response response = sender.send(mailObject);
-				LOG.info(to + ": sender response code: " + response.getStatusCode());
+				LOG.info(to.replaceFirst(".....", ".....") + ": sender response code: " + response.getStatusCode());
 				if (response.getStatusCode() == sender.STATUS_CODE_SENT) {
 					sentEmails++;
 				}
