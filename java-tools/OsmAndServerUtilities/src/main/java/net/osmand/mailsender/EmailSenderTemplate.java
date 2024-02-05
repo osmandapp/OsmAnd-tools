@@ -146,6 +146,24 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
+	// set fromEmail, use before load()
+	public EmailSenderTemplate from(String from) {
+		fromEmail = from;
+		return this;
+	}
+
+	// set fromName, use before load()
+	public EmailSenderTemplate name(String name) {
+		fromName = name;
+		return this;
+	}
+
+	// set subject, use before load()
+	public EmailSenderTemplate subject(String subject) {
+		this.subject = subject;
+		return this;
+	}
+
 	// add To from string
 	public EmailSenderTemplate to(String email) throws UnsupportedEncodingException {
 		setVarsByTo(email);
