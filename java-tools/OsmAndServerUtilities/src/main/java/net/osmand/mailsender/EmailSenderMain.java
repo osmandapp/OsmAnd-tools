@@ -1,5 +1,6 @@
 package net.osmand.mailsender;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -53,7 +54,7 @@ public class EmailSenderMain {
 		String giveawaySeries;
     }
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws SQLException, FileNotFoundException, UnsupportedEncodingException {
     	System.out.println("Send email utility");
         EmailParams p = new EmailParams(); 
         boolean updateBlockList = false;
@@ -225,7 +226,7 @@ public class EmailSenderMain {
 		return s;
 	}
 
-	private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
+	private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException, FileNotFoundException, UnsupportedEncodingException {
         String query = buildQuery(false, p.mailingGroups, p.daySince);
         LOGGER.info("SQL query is " + query);
         PreparedStatement ps = conn.prepareStatement(query);
@@ -307,7 +308,7 @@ public class EmailSenderMain {
         LOGGER.info("Total Blocked: " + count);
     }
 
-    private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) {
+    private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) throws FileNotFoundException, UnsupportedEncodingException {
         LOGGER.info("Sending test messages...");
         String[] testRecipients = p.testAddresses.split(",");
         for (String recipient : testRecipients) {
@@ -365,70 +366,95 @@ public class EmailSenderMain {
         return null;
     }
 
-    private static void sendMail(String mailTo, EmailParams p) {
-    	if(mailTo == null || mailTo.isEmpty()) {
-    		return;
-    	}
-    	String mailHsh = mailTo;
-    	if(mailTo.length() > 5) {
-    		mailHsh = "....." + mailTo.substring(5);
-    	}
-        LOGGER.info("Sending mail to: " + mailHsh);
-        String userHash;
-        try {
-            userHash = URLEncoder.encode(Base64.getEncoder().encodeToString(mailTo.getBytes()), "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            // Shouldn't happen
-            LOGGER.info(e.getMessage());
-            return;
-        }
-        Email from = new Email(p.mailFrom);
-        from.setName("OsmAnd");
-        Email to = new Email(mailTo);
-        Mail mail = new Mail();
-        mail.from = from;
-        Personalization personalization = new Personalization();
-        personalization.addTo(to);
-        mail.addPersonalization(personalization);
-        mail.setTemplateId(p.templateId);
-        if(p.subject != null) {
-        	mail.setSubject(p.subject);
-        }
-        MailSettings mailSettings = new MailSettings();
-        FooterSetting footerSetting = new FooterSetting();
-        footerSetting.setEnable(true);
-        String footer = "<center style='margin:5px 0px 5px 0px'><a href=\"https://osmand.net/api/email/unsubscribe?id=" + 
-        		userHash + "&group=" + p.topic + "\">Unsubscribe</a></center>";
-        if("giveaway".equals(p.topic)) {
-        	String giv = String.format(
-        			"<table border='0' cellPadding='0' cellSpacing='0' class='module' data-role='module-button' data-type='button' role='module' "
-        			+ "style='table-layout:fixed' width='100%%'><tbody><tr><td align='center' class='outer-td' style='padding:0px 0px 0px 0px'>"
-        			+ "<table border='0' cellPadding='0' cellSpacing='0' class='button-css__deep-table___2OZyb wrapper-mobile' style='text-align:center'>"
-        			+ "<tbody><tr><td align='center' bgcolor='#333333' class='inner-td' style='border-radius:6px;font-size:16px;text-align:center;background-color:inherit'>"
-        			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
-        			+ "target='_blank'>%s</a></td></tr></tbody>"
-        			+ "</table></td></tr></tbody></table></td></tr></table>",
-							"https://osmand.net/giveaway?series=" + URLEncoder.encode(p.giveawaySeries, StandardCharsets.UTF_8) + "&email="
-									+ URLEncoder.encode(mailTo, StandardCharsets.UTF_8), "Participate in a Giveaway!");
-        	footer = giv + footer;
-        }
-        footerSetting.setHtml("<html>"+footer+"</html>");
-        mailSettings.setFooterSetting(footerSetting);
-        mail.setMailSettings(mailSettings);
-        Request request = new Request();
-        try {
-            request.setMethod(Method.POST);
-            request.setEndpoint("mail/send");
-            String body = mail.build();
-            request.setBody(body);
-// TODO
-//            Response response = sendGridClient.api(request);
-//            LOGGER.info("Response code: " + response.getStatusCode());
-	        System.err.println("sendGridClient sender will be removed soon");
-            p.sentSuccess++;
-        } catch (IOException ex) {
-        	p.sentFailed++;
-            System.err.println(ex.getMessage());
-        }
-    }
+//    private static void old_sendMail(String mailTo, EmailParams p) {
+//    	if(mailTo == null || mailTo.isEmpty()) {
+//    		return;
+//    	}
+//    	String mailHsh = mailTo;
+//    	if(mailTo.length() > 5) {
+//    		mailHsh = "....." + mailTo.substring(5);
+//    	}
+//        LOGGER.info("Sending mail to: " + mailHsh);
+//        String userHash;
+//        try {
+//            userHash = URLEncoder.encode(Base64.getEncoder().encodeToString(mailTo.getBytes()), "UTF-8");
+//        } catch (UnsupportedEncodingException e) {
+//            // Shouldn't happen
+//            LOGGER.info(e.getMessage());
+//            return;
+//        }
+//        Email from = new Email(p.mailFrom);
+//        from.setName("OsmAnd");
+//        Email to = new Email(mailTo);
+//        Mail mail = new Mail();
+//        mail.from = from;
+//        Personalization personalization = new Personalization();
+//        personalization.addTo(to);
+//        mail.addPersonalization(personalization);
+//        mail.setTemplateId(p.templateId);
+//        if(p.subject != null) {
+//        	mail.setSubject(p.subject);
+//        }
+//        MailSettings mailSettings = new MailSettings();
+//        FooterSetting footerSetting = new FooterSetting();
+//        footerSetting.setEnable(true);
+//        String footer = "<center style='margin:5px 0px 5px 0px'><a href=\"https://osmand.net/api/email/unsubscribe?id=" +
+//        		userHash + "&group=" + p.topic + "\">Unsubscribe</a></center>";
+//        if("giveaway".equals(p.topic)) {
+//        	String giv = String.format(
+//        			"<table border='0' cellPadding='0' cellSpacing='0' class='module' data-role='module-button' data-type='button' role='module' "
+//        			+ "style='table-layout:fixed' width='100%%'><tbody><tr><td align='center' class='outer-td' style='padding:0px 0px 0px 0px'>"
+//        			+ "<table border='0' cellPadding='0' cellSpacing='0' class='button-css__deep-table___2OZyb wrapper-mobile' style='text-align:center'>"
+//        			+ "<tbody><tr><td align='center' bgcolor='#333333' class='inner-td' style='border-radius:6px;font-size:16px;text-align:center;background-color:inherit'>"
+//        			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
+//        			+ "target='_blank'>%s</a></td></tr></tbody>"
+//        			+ "</table></td></tr></tbody></table></td></tr></table>",
+//							"https://osmand.net/giveaway?series=" + URLEncoder.encode(p.giveawaySeries, StandardCharsets.UTF_8) + "&email="
+//									+ URLEncoder.encode(mailTo, StandardCharsets.UTF_8), "Participate in a Giveaway!");
+//        	footer = giv + footer;
+//        }
+//        footerSetting.setHtml("<html>"+footer+"</html>");
+//        mailSettings.setFooterSetting(footerSetting);
+//        mail.setMailSettings(mailSettings);
+//        Request request = new Request();
+//        try {
+//            request.setMethod(Method.POST);
+//            request.setEndpoint("mail/send");
+//            String body = mail.build();
+//            request.setBody(body);
+////            Response response = sendGridClient.api(request);
+////            LOGGER.info("Response code: " + response.getStatusCode());
+//	        System.err.println("sendGridClient sender will be removed soon");
+//            p.sentSuccess++;
+//        } catch (IOException ex) {
+//        	p.sentFailed++;
+//            System.err.println(ex.getMessage());
+//        }
+//    }
+
+	private static void sendMail(String mailTo, EmailParams p) throws UnsupportedEncodingException, FileNotFoundException {
+		if (mailTo == null || mailTo.isEmpty()) {
+			return;
+		}
+
+		boolean ok = new EmailSenderTemplate()
+				// name/from/subject might be replaced by template
+				.name("OsmAnd")
+				.from(p.mailFrom)
+				.subject(p.subject != null ? p.subject : "hello")
+				.load(p.templateId) // should be "giveaway" for OsmAnd giveaway
+				.set("GIVEAWAY_SERIES", "giveaway".equals(p.topic) ? p.giveawaySeries : "series")
+				.set("UNSUBGROUP", p.topic)
+				.to(mailTo)
+				.send()
+				.isSuccess();
+
+		if (ok) {
+			p.sentSuccess++;
+		} else {
+			p.sentFailed++;
+		}
+
+		LOGGER.info("Sending mail to: " + mailTo.replaceFirst(".....", ".....") + " (" + ok + ")");
+	}
 }

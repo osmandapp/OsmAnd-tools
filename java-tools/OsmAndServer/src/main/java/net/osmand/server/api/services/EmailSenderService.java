@@ -59,7 +59,7 @@ public class EmailSenderService {
     
     public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) throws FileNotFoundException, UnsupportedEncodingException { // TODO promocode/{ios,android}
 	    boolean ok = new EmailSenderTemplate()
-			    .load(templateId) // should be promocode/ios or promocode/anroid
+			    .load(templateId) // should be "promocode/ios" or "promocode/anroid"
 			    .to(Arrays.asList(mailTo.split(",")))
 			    .set("PROMOCODE", promocodes)
 			    .send()
