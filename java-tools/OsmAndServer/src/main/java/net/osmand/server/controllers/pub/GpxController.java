@@ -291,10 +291,7 @@ public class GpxController {
 			return ResponseEntity.badRequest().body(resource);
 		}
 		
-		String fileName = gpxFile.metadata.name != null ? gpxFile.metadata.name : tmpGpx.getName();
-		
 		return ResponseEntity.ok()
-				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName)
 				.contentType(MediaType.APPLICATION_XML)
 				.body(resource);
 	}
