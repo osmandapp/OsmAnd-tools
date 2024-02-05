@@ -434,17 +434,22 @@ public class EmailSenderMain {
 			return;
 		}
 
-		boolean ok = new EmailSenderTemplate()
-				// name/from/subject might be replaced by template
-				.name("OsmAnd")
-				.from(p.mailFrom)
-				.subject(p.subject != null ? p.subject : "hello")
-				.load(p.templateId) // should be "giveaway" for OsmAnd giveaway
-				.set("GIVEAWAY_SERIES", "giveaway".equals(p.topic) ? p.giveawaySeries : "series")
+		EmailSenderTemplate sender = new EmailSenderTemplate()
+				.load(p.templateId) // should be "giveaway" for OsmAnd giveaway campaign
 				.set("UNSUBGROUP", p.topic)
-				.to(mailTo)
-				.send()
-				.isSuccess();
+				.from(p.mailFrom)
+				.name("OsmAnd")
+				.to(mailTo);
+
+		if (p.subject != null) {
+			sender.subject(p.subject);
+		}
+
+		if ("giveaway".equals(p.topic)) {
+			sender.set("GIVEAWAY_SERIES", p.giveawaySeries);
+		}
+
+		boolean ok = sender.send().isSuccess();
 
 		if (ok) {
 			p.sentSuccess++;
