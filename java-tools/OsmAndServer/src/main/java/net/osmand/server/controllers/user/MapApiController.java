@@ -644,7 +644,7 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/send-code"})
 	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) {
+	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) throws FileNotFoundException, UnsupportedEncodingException {
 		if (emailSender.isEmail(data.email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
