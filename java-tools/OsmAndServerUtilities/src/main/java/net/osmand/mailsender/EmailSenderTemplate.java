@@ -433,9 +433,9 @@ public class EmailSenderTemplate {
 					smtp.addHeader(key, val);
 				}
 
+				smtp.setHtmlMsg("<html>\n" + body + "</html>\n");
 				smtp.setFrom(from, name);
 				smtp.setSubject(subject);
-				smtp.setHtmlMsg(body);
 				smtp.addTo(to);
 
 				smtp.send();
