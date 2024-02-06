@@ -338,7 +338,7 @@ public class HHRoutingShortcutCreator {
 				return Integer.compare(o1.index, o2.index);
 			}
 		});
-		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+		for (NetworkDBPoint pnt : lst) {
 			ind++;
 			if (pnt.connectedReverse.size() > 0) {
 				pnt.connectedReverse.clear();
