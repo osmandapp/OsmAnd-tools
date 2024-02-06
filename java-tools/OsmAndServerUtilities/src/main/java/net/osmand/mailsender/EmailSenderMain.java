@@ -1,13 +1,15 @@
 package net.osmand.mailsender;
 
-import java.io.FileNotFoundException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -27,7 +29,7 @@ public class EmailSenderMain {
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
     private static final int LIMIT_SENDGRID_API = 500; // probably paging is needed use "offset": ..
     private static SendGrid sendGridClient;
-    
+
     private static class EmailParams {
     	String templateId = null;
         String mailingGroups = null;
@@ -42,10 +44,11 @@ public class EmailSenderMain {
 		String giveawaySeries;
     }
 
-    public static void main(String[] args) throws SQLException, FileNotFoundException, UnsupportedEncodingException {
+    public static void main(String[] args) throws SQLException, IOException {
     	System.out.println("Send email utility");
-        EmailParams p = new EmailParams(); 
+        EmailParams p = new EmailParams();
         boolean updateBlockList = false;
+	    boolean updatePostfixBounced = false;
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
             if (arg.startsWith("--id=")) {
@@ -70,12 +73,22 @@ public class EmailSenderMain {
             	}
             } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
+			} else if (arg.equals("--update_postfix_bounced")) {
+	            updatePostfixBounced = true;
             }
         }
         final String apiKey = System.getenv("SENDGRID_KEY");
         sendGridClient = new SendGrid(apiKey);
 
         Connection conn = getConnection();
+		if (conn == null) {
+			throw new RuntimeException("Please setup DB connection");
+		}
+	    if (updatePostfixBounced) {
+			updatePostfixBounced(conn);
+		    conn.close();
+			return;
+	    }
         if (updateBlockList) {
             updateUnsubscribed(conn);
             updateBlockList(conn);
@@ -83,7 +96,6 @@ public class EmailSenderMain {
             return;
         }
         checkValidity(p);
-
 
         if (conn == null) {
             LOGGER.info("Can't connect to the database");
@@ -105,7 +117,54 @@ public class EmailSenderMain {
         conn.close();
     }
 
-    private static void updateUnsubscribed(Connection conn) {
+	private static void updatePostfixBounced(Connection conn) throws IOException, SQLException {
+		String url = System.getenv("URL_POSTFIX_BOUNCED_CSV");
+		if (url == null) {
+			throw new RuntimeException("URL_POSTFIX_BOUNCED_CSV is not specified");
+		}
+
+		HashMap<String, String> bouncedEmailReason = new HashMap<>();
+		HttpURLConnection http = (HttpURLConnection) new URL(url).openConnection();
+		if (http.getResponseCode() == HttpURLConnection.HTTP_OK) {
+			BufferedReader in = new BufferedReader(new InputStreamReader(http.getInputStream()));
+			String line;
+			while ((line = in.readLine()) != null) {
+				String [] split = line.split("\",\""); // the format is: "email","reason"
+				if (split.length == 2) {
+					String email = split[0].replaceFirst("^\"","");
+					String reason = split[1].replaceFirst("\"$", "");
+					bouncedEmailReason.put(email, reason);
+				}
+			}
+			in.close();
+		}
+		http.disconnect();
+
+		if (!bouncedEmailReason.isEmpty()) {
+			updateBlockDbWithEmailReason(conn, bouncedEmailReason);
+		}
+	}
+
+	private static void updateBlockDbWithEmailReason(Connection conn, HashMap<String, String> bouncedEmailReason) throws SQLException {
+		PreparedStatement ps = conn.prepareStatement("INSERT INTO email_blocked(email, reason, timestamp) " +
+				"SELECT ?, ?, ? " +
+				"WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=?)");
+		for (String email : bouncedEmailReason.keySet()) {
+			String reason = bouncedEmailReason.get(email);
+			ps.setString(1, email);
+			ps.setString(2, reason);
+			ps.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
+			ps.setString(4, email);
+			ps.addBatch();
+		}
+		int[] batch = ps.executeBatch();
+		ps.close();
+
+		LOGGER.info(String.format("Got bounced logs from postfix: inserted %d of %d emails",
+				sumBatch(batch), bouncedEmailReason.size()));
+	}
+
+	private static void updateUnsubscribed(Connection conn) {
     	int offset = 0;
     	boolean repeat = true;
 		while (repeat) {
@@ -203,7 +262,6 @@ public class EmailSenderMain {
         ps.close();
         LOGGER.info(String.format("Updated blocked %s from sendgrid: %d blocked sendgrid, %d updated in db.", blockGroup, users.length, updated));
         return users.length;
-        
     }
 
 	private static int sumBatch(int[] batch) {
@@ -274,9 +332,9 @@ public class EmailSenderMain {
         rs.close();
         prep.close();
         LOGGER.info("Total: " + total);
-        
+
         LOGGER.info("Blocked/unsubscribed for selected topic: " + unsubscribed.size());
-        
+
         prep = conn.prepareStatement("SELECT count(*) FROM email_unsubscribed");
         rs = prep.executeQuery();
         int count = 0;
@@ -287,7 +345,7 @@ public class EmailSenderMain {
         prep.close();
         rs.close();
         count = 0;
-        
+
         prep = conn.prepareStatement("SELECT count(*) FROM email_blocked");
         rs = prep.executeQuery();
         while (rs.next()) {
