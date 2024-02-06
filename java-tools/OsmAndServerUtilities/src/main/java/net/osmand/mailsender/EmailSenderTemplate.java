@@ -38,7 +38,7 @@ Examples:
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
 
-	public String defaultTemplatesDirectory = "/opt/osmand/web-server-config/templates/email";
+	public String defaultTemplatesDirectory = "./web-server-config/templates/email";
 
 	private SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
@@ -191,6 +191,12 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
+	// unset variable
+	public EmailSenderTemplate unset(String key) {
+		vars.remove(key);
+		return this;
+	}
+
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
@@ -246,6 +252,8 @@ public class EmailSenderTemplate {
 				if (keyval.find()) {
 					set(keyval.group(1), keyval.group(2));
 				}
+			} else if ("Unset".equalsIgnoreCase(command)) {
+				unset(argument);
 			} else if ("From".equalsIgnoreCase(command)) {
 				fromEmail = argument;
 			} else if ("Name".equalsIgnoreCase(command)) {
