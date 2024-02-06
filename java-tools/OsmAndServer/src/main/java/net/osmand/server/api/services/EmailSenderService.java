@@ -57,7 +57,7 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + email + " (" + ok + ")");
 	}
     
-    public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) throws FileNotFoundException, UnsupportedEncodingException { // TODO promocode/{ios,android}
+    public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) throws FileNotFoundException, UnsupportedEncodingException {
 	    boolean ok = new EmailSenderTemplate()
 			    .load(templateId) // should be "promocode/ios" or "promocode/anroid"
 			    .to(Arrays.asList(mailTo.split(",")))

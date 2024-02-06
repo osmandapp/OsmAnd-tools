@@ -45,6 +45,7 @@ public class EmailSenderTemplate {
 	private List<String> toList = new ArrayList<>(); // added by to()
 	private HashMap<String, String> vars = new HashMap<>(); // set by set()
 	private String fromEmail, fromName, subject, body; // read from the template
+	private HashMap<String, String> headers = new HashMap<>(); // optional email headers (read from the template)
 
 	public static void test(String[] args) throws FileNotFoundException, UnsupportedEncodingException {
 		EmailSenderTemplate sender = new EmailSenderTemplate()
@@ -90,7 +91,7 @@ public class EmailSenderTemplate {
 	public EmailSenderTemplate send() throws UnsupportedEncodingException {
 		validateLoadedTemplates(); // final validation before send
 
-		for(String to : toList) {
+		for (String to : toList) {
 			setVarsByTo(to);
 
 			// build SendGrid-compatible objects
@@ -197,6 +198,7 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
+	// recursive fill such as A=1 B=@A@ C=@B@ is not supported now
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
@@ -261,7 +263,11 @@ public class EmailSenderTemplate {
 			} else if ("Subject".equalsIgnoreCase(command)) {
 				subject = argument;
 			} else {
-				throw new IllegalStateException(command + ": unknown template command");
+				// optional headers, eg:
+				// <!--List-Unsubscribe: <URL>-->
+				// <!--List-Unsubscribe-Post: List-Unsubscribe=One-Click-->
+				// throw new IllegalStateException(command + ": unknown template command");
+				headers.put(command, argument);
 			}
 		}
 	}
@@ -311,7 +317,7 @@ public class EmailSenderTemplate {
 	private void parse(List<String> lines) {
 		List<String> bodyLines = new ArrayList<>();
 
-		for(String line : lines) {
+		for (String line : lines) {
 			parseCommandArgumentsFromComment(line);
 
 			String cleaned = line.replaceAll(HTML_COMMENTS, "");
@@ -384,6 +390,7 @@ public class EmailSenderTemplate {
 			return sendWithSendGrid(); // fallback
 		}
 
+		// this.headers are not passed to SendGrid
 		private Response sendWithSendGrid() throws IOException {
 			Request request = new Request();
 			request.setMethod(Method.POST);
@@ -421,10 +428,16 @@ public class EmailSenderTemplate {
 				String body = mail.getContent().get(0).getValue(); // html content
 				String to = getTo();
 
+				for (String key : headers.keySet()) {
+					String val = fill(headers.get(key));
+					smtp.addHeader(key, val);
+				}
+
 				smtp.setFrom(from, name);
 				smtp.setSubject(subject);
 				smtp.setHtmlMsg(body);
 				smtp.addTo(to);
+
 				smtp.send();
 
 			} catch(EmailException e) {
