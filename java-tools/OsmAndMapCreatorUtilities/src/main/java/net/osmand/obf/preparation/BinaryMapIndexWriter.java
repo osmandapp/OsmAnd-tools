@@ -99,6 +99,7 @@ import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
 import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -546,29 +547,30 @@ public class BinaryMapIndexWriter {
 		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
 	}
 	
-	public void writeHHRoutePoints(List<? extends NetworkDBPoint> l) throws IOException {
+	public void writeHHRoutePoints(List<NetworkDBPointWrite> l) throws IOException {
 		checkPeekState(ROUTE_TREE);
 		Bounds bounds = stackBounds.peek();
-		for (NetworkDBPoint p : l) {
+		for (NetworkDBPointWrite p : l) {
 			HHRouteNetworkPoint.Builder builder = HHRouteNetworkPoint.newBuilder();
-			builder.setClusterId(p.clusterId);
-			builder.setGlobalId(p.index);
-			builder.setId(p.fileId);
-			builder.setRoadId(p.roadId);
-			builder.setRoadStartEndIndex((p.start << 1) + (p.end > p.start ? 1 : 0));
-			builder.setDx(p.startX - bounds.leftX);
-			builder.setDy(p.startY - bounds.topY);
-			if (p.mapId > 1) {
-				builder.setPartialInd(p.mapId - 1);
-			} else if (p.mapId == 0) {
+			NetworkDBPoint pnt = p.pnt;
+			builder.setClusterId(pnt.clusterId);
+			builder.setGlobalId(pnt.index);
+			builder.setId(p.localId);
+			builder.setRoadId(pnt.roadId);
+			builder.setRoadStartEndIndex((pnt.start << 1) + (pnt.end > pnt.start ? 1 : 0));
+			builder.setDx(pnt.startX - bounds.leftX);
+			builder.setDy(pnt.startY - bounds.topY);
+			if (p.includeFlag > 1) {
+				builder.setPartialInd(p.includeFlag - 1);
+			} else if (p.includeFlag == 0) {
 				throw new IllegalStateException();
 			}
-			if (p.dualPoint != null) {
-				builder.setDualClusterId(p.dualPoint.clusterId);
-				builder.setDualPointId(p.dualPoint.index);
+			if (pnt.dualPoint != null) {
+				builder.setDualClusterId(pnt.dualPoint.clusterId);
+				builder.setDualPointId(pnt.dualPoint.index);
 			}
-			if (p instanceof NetworkDBPointPrep && ((NetworkDBPointPrep) p).tagValuesInts != null) {
-				for (int tgv : ((NetworkDBPointPrep) p).tagValuesInts) {
+			if (p.tagValuesInts != null) {
+				for (int tgv : p.tagValuesInts) {
 					builder.addTagValueIds(tgv);
 				}
 			}

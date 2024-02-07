@@ -205,6 +205,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		tgt.close();
 	}
 	
+	
 	public static class NetworkDBPointPrep extends NetworkDBPoint {
 		int distSegment;
 		int chIndexEdgeDiff;

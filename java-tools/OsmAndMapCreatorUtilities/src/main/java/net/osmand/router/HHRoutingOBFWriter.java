@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -30,8 +31,11 @@ import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
 
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.procedure.TLongObjectProcedure;
+import gnu.trove.procedure.TLongProcedure;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
@@ -47,7 +51,7 @@ import net.osmand.obf.BinaryInspector;
 import net.osmand.obf.preparation.AbstractIndexPartCreator;
 import net.osmand.obf.preparation.BinaryMapIndexWriter;
 import net.osmand.obf.preparation.IndexVectorMapCreator;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.util.MapUtils;
 import rtree.Element;
 import rtree.IllegalValueException;
@@ -74,6 +78,14 @@ public class HHRoutingOBFWriter {
 	private static final String IGNORE_DESCRIPTION = ":description";
 	private static final String IGNORE_NOTE = ":note";
 	private static final boolean VALIDATE_CLUSTER_SIZE = false;
+	
+	TLongObjectHashMap<NetworkDBPoint> points ;
+	private HHRoutingPreparationDB db;
+	private long edition;
+	private File dbFile;
+	private String profile;
+	private String[] profileParams;
+	private int[] dbProfileParamsKeys;
 	/**
 	 * @param args
 	 * @throws IOException
@@ -113,20 +125,35 @@ public class HHRoutingOBFWriter {
 				}
 			}
 		}
-		new HHRoutingOBFWriter().writeFile(dbFile, obfPolyFile, outFolder, updateExistingFiles);
+		new HHRoutingOBFWriter(dbFile).writeFile(obfPolyFile, outFolder, updateExistingFiles);
+	}
+
+	
+	public HHRoutingOBFWriter(File dbFile) throws SQLException {
+		this.dbFile = dbFile;
+		this.edition = dbFile.lastModified(); // System.currentTimeMillis();
+		this.db = new HHRoutingPreparationDB(dbFile);
+		this.points = db.loadNetworkPoints((short) 0, NetworkDBPoint.class);
+		profile = db.getRoutingProfile();
+		TIntObjectHashMap<String> routingProfiles = db.getRoutingProfiles();
+		int pInd = 0;
+		profileParams = new String[routingProfiles.size()];
+		dbProfileParamsKeys = new int[routingProfiles.size()];
+		for (int p : routingProfiles.keys()) {
+			dbProfileParamsKeys[pInd] = p;
+			profileParams[pInd] = routingProfiles.get(p);
+			pInd++;
+		}
 	}
 	
-	public void writeFile(File dbFile, File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
-		long edition = dbFile.lastModified(); // System.currentTimeMillis();
-		HHRoutingPreparationDB db = new HHRoutingPreparationDB(dbFile);
-		TLongObjectHashMap<NetworkDBPointPrep> points = db.loadNetworkPoints((short) 0, NetworkDBPointPrep.class);
+	public void writeFile(File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
 		if (obfPolyFileIn == null) {
 			File outFile = new File(dbFile.getParentFile(),
 					dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
 			if (outFile.exists()) {
 				outFile.delete();
 			}
-			writeObfFileByBbox(db, points, outFile, edition, new QuadRect(), null);
+			writeObfFileByBbox(convertPoints(points), outFile, new QuadRect(), null);
 		} else {
 			if (outFolder == null) {
 				outFolder = obfPolyFileIn.isDirectory() ? obfPolyFileIn : obfPolyFileIn.getParentFile();
@@ -147,12 +174,12 @@ public class HHRoutingOBFWriter {
 			} else {
 				obfPolyFiles.add(obfPolyFileIn);
 			}
-			Map<String, List<NetworkDBPointPrep>> pointsByDownloadName = new LinkedHashMap<String, List<NetworkDBPointPrep>>();
+			Map<String, TLongArrayList> pointsByDownloadName = new LinkedHashMap<>();
 			int index = 0;
 			System.out.printf("Indexing points %d...\n", points.size());
 
 			if (PREINDEX_POINTS_BY_COUNTRIES) {
-				for (NetworkDBPointPrep p : points.valueCollection()) {
+				for (NetworkDBPoint p : points.valueCollection()) {
 					List<BinaryMapDataObject> lst = or.query(p.midX(), p.midY());
 					if (++index % 100000 == 0) {
 						System.out.printf("Indexed %d of %d - %s \n", index, points.size(), new Date());
@@ -161,9 +188,9 @@ public class HHRoutingOBFWriter {
 						if (OsmandRegions.contain(b, p.midX(), p.midY())) {
 							String dw = or.getDownloadName(b);
 							if (!pointsByDownloadName.containsKey(dw)) {
-								pointsByDownloadName.put(dw, new ArrayList<NetworkDBPointPrep>());
+								pointsByDownloadName.put(dw, new TLongArrayList());
 							}
-							pointsByDownloadName.get(dw).add(p);
+							pointsByDownloadName.get(dw).add(p.index);
 						}
 					}
 				}
@@ -171,27 +198,27 @@ public class HHRoutingOBFWriter {
 				for (File obfPolyFile : obfPolyFiles) {
 					String countryName = getCountryName(obfPolyFile);
 					LinkedList<BinaryMapDataObject> boundaries = downloadNames.get(countryName);
-					List<NetworkDBPointPrep> lst = new ArrayList<NetworkDBPointPrep>();
-					for (NetworkDBPointPrep p : points.valueCollection()) {
+					TLongArrayList lst = new TLongArrayList();
+					for (NetworkDBPoint p : points.valueCollection()) {
 						if (++index % 100000 == 0) {
 							System.out.printf("Indexed %d of %d - %s \n", index, points.size(), new Date());
 						}
 						if (boundaries != null) {
 							for (BinaryMapDataObject b : boundaries) {
 								if (OsmandRegions.contain(b, p.midX(), p.midY())) {
-									lst.add(p);
+									lst.add(p.index);
 									break;
 								}
 							}
 						}
 					}
-					
 					pointsByDownloadName.put(countryName, lst);
 
 				}
 			}
 			ExecutorService service = Executors.newFixedThreadPool(THREAD_POOL);
 			List<Future<String>> results = new ArrayList<>();
+			TLongObjectHashMap<NetworkDBPointWrite> wPoints = null;
 			for (File obfPolyFile : obfPolyFiles) {
 				File outFile = new File(outFolder,
 						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
@@ -200,7 +227,7 @@ public class HHRoutingOBFWriter {
 				}
 				outFile.getParentFile().mkdirs();
 				QuadRect bbox31 = new QuadRect();
-				List<NetworkDBPointPrep> filteredPoints = null;
+				TLongArrayList filteredPoints = null;
 				String countryName = getCountryName(obfPolyFile);
 				
 				if (or.getRegionDataByDownloadName(countryName) != null) {
@@ -234,10 +261,13 @@ public class HHRoutingOBFWriter {
 							MapUtils.get31LongitudeX((int) bbox31.right), MapUtils.get31LatitudeY((int) bbox31.bottom));
 				}
 				if (THREAD_POOL > 1) {
-					AugmentObfTask task = new AugmentObfTask(db, points, outFile, edition, bbox31, filteredPoints);
+					AugmentObfTask task = new AugmentObfTask(this, outFile, bbox31, filteredPoints);
 					results.add(service.submit(task));
 				} else {
-					String log = writeObfFileByBbox(db, points, outFile, edition, bbox31, filteredPoints);
+					if (wPoints == null) {
+						wPoints = convertPoints(points);
+					}
+					String log = writeObfFileByBbox(wPoints, outFile, bbox31, filteredPoints);
 					HHRoutingUtilities.logf(log.trim());
 				}
 			}
@@ -279,18 +309,30 @@ public class HHRoutingOBFWriter {
 		}
 	}
 
+	private static TLongObjectHashMap<NetworkDBPointWrite> convertPoints(TLongObjectHashMap<NetworkDBPoint> dbPoints) {
+		TLongObjectHashMap<NetworkDBPointWrite> points = new TLongObjectHashMap<>();
+		dbPoints.forEachEntry(new TLongObjectProcedure<NetworkDBPoint>() {
+			@Override
+			public boolean execute(long a, NetworkDBPoint b) {
+				points.put(a, new NetworkDBPointWrite(b));
+				return true;
+			}
+		});
+		return points;
+	}
+
 	private String getCountryName(File obfPolyFile) {
 		return obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('_'))
 				.toLowerCase();
 	}
 	
-	private Map<String, Integer> prepareTagValuesDictionary(TLongObjectHashMap<NetworkDBPointPrep> points) {
+	private Map<String, Integer> prepareTagValuesDictionary(TLongObjectHashMap<NetworkDBPointWrite> points) {
 		Map<String, Integer> tagDict = new LinkedHashMap<String, Integer>();
-		for (NetworkDBPointPrep p : points.valueCollection()) {
-			if (p.tagValues == null) {
+		for (NetworkDBPointWrite p : points.valueCollection()) {
+			if (p.pnt.tagValues == null) {
 				continue;
 			}
-			for (TagValuePair entry : p.tagValues) {
+			for (TagValuePair entry : p.pnt.tagValues) {
 				String keyValue = entry.tag + "=" + entry.value;
 				if (keyValue.startsWith(IGNORE_ROUTE) || keyValue.startsWith(IGNORE_TURN_LANES)
 						|| keyValue.startsWith(IGNORE_ROAD) || keyValue.startsWith(IGNORE_OSMAND_ELE)
@@ -317,10 +359,10 @@ public class HHRoutingOBFWriter {
 			finalTagDict.put(tagDictList.get(i), i);
 //			System.out.println(i + ". " + tagDictList.get(i) + " " + tagDict.get(tagDictList.get(i)));
 		}
-		for (NetworkDBPointPrep p : points.valueCollection()) {
-			if (p.tagValues != null && p.tagValues.size() > 0) {
+		for (NetworkDBPointWrite p : points.valueCollection()) {
+			if (p.pnt.tagValues != null && p.pnt.tagValues.size() > 0) {
 				TIntArrayList lst = new TIntArrayList();
-				for (TagValuePair entry : p.tagValues) {
+				for (TagValuePair entry : p.pnt.tagValues) {
 					String keyValue = entry.tag + "=" + entry.value;
 					Integer ind = finalTagDict.get(keyValue);
 					if (ind != null) {
@@ -332,24 +374,27 @@ public class HHRoutingOBFWriter {
 		}
 		return finalTagDict;
 	}
+	
+	
+	public static class NetworkDBPointWrite {
+		public NetworkDBPoint pnt;
+		public int[] tagValuesInts;
+		public int includeFlag; // 0 - exclude point, 1 - include with complete cluster, 2 - incomplete 
+		public int localId; // id in specific file
+		
+		public NetworkDBPointWrite(NetworkDBPoint pnt) {
+			this.pnt = pnt;
+		}
+	}
+	
 
-	private String writeObfFileByBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
-			long edition, QuadRect bbox31, List<NetworkDBPointPrep> filteredPoints)
+	private String writeObfFileByBbox(TLongObjectHashMap<NetworkDBPointWrite> points, File outFile, QuadRect bbox31, TLongArrayList filteredPoints)
 			throws SQLException, IOException, IllegalValueException {
 		StringBuilder log = new StringBuilder();
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
 		try {
-			String profile = db.getRoutingProfile();
-			TIntObjectHashMap<String> routingProfiles = db.getRoutingProfiles();
-			int pInd = 0;
-			String[] profileParams = new String[routingProfiles.size()];
-			int[] profileParamsKeys = new int[routingProfiles.size()];
-			for (int p : routingProfiles.keys()) {
-				profileParamsKeys[pInd] = p;
-				profileParams[pInd] = routingProfiles.get(p);
-				pInd++;
-			}
+			
 			BinaryMapIndexReader reader = null;
 			File writeFile = outFile; 
 			if (outFile.exists()) {
@@ -369,6 +414,12 @@ public class HHRoutingOBFWriter {
 				}
 				log.append((profileEdition > 0 ? "Replace" : "Augment") +" file with hh routing: " + outFile.getName()).append("\n");
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
+			}
+			// clear up to re use
+			for (NetworkDBPointWrite p : points.valueCollection()) {
+				p.includeFlag = 0;
+				p.localId = 0;
+				p.tagValuesInts = null;
 			}
 			long timestamp = reader != null ? reader.getDateCreated() : edition;
 			BinaryMapIndexWriter bmiw = new BinaryMapIndexWriter(new RandomAccessFile(writeFile, "rw"), timestamp);
@@ -390,45 +441,53 @@ public class HHRoutingOBFWriter {
 				tagValuesDictionary = prepareTagValuesDictionary(points);
 			}
 			bmiw.startHHRoutingIndex(edition, profile, tagValuesDictionary, profileParams);
-			RTree routeTree = new RTree(rTreeFile);
+			final RTree routeTree = new RTree(rTreeFile);
 			
-			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterIn = new TLongObjectHashMap<>();
-			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterOut = new TLongObjectHashMap<>();
+			TLongObjectHashMap<List<NetworkDBPointWrite>> validateClusterIn = new TLongObjectHashMap<>();
+			TLongObjectHashMap<List<NetworkDBPointWrite>> validateClusterOut = new TLongObjectHashMap<>();
 			if (VALIDATE_CLUSTER_SIZE) {
-				for (NetworkDBPointPrep p : points.valueCollection()) {
-					p.mapId = 0;
-					p.fileId = 0;
-					if (validateClusterIn.get(p.clusterId) == null) {
-						validateClusterIn.put(p.clusterId, new ArrayList<>());
+				for (NetworkDBPointWrite p : points.valueCollection()) {
+					if (validateClusterIn.get(p.pnt.clusterId) == null) {
+						validateClusterIn.put(p.pnt.clusterId, new ArrayList<>());
 					}
-					if (validateClusterOut.get(p.dualPoint.clusterId) == null) {
-						validateClusterOut.put(p.dualPoint.clusterId, new ArrayList<>());
+					if (validateClusterOut.get(p.pnt.dualPoint.clusterId) == null) {
+						validateClusterOut.put(p.pnt.dualPoint.clusterId, new ArrayList<>());
 					}
-					validateClusterIn.get(p.clusterId).add(p);
-					validateClusterOut.get(p.dualPoint.clusterId).add(p);
+					validateClusterIn.get(p.pnt.clusterId).add(p);
+					validateClusterOut.get(p.pnt.dualPoint.clusterId).add(p);
 				}
 			}
 			
 			if (filteredPoints != null) {
-				for (NetworkDBPointPrep pnt : filteredPoints) {
-					pnt.mapId = 1;
-					routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
-				}
+				filteredPoints.forEach(new TLongProcedure() {
+
+					@Override
+					public boolean execute(long value) {
+						NetworkDBPointWrite p = points.get(value);
+						p.includeFlag = 1;
+						try {
+							routeTree.insert(new LeafElement(new Rect(p.pnt.midX(), p.pnt.midY(), p.pnt.midX(), p.pnt.midY()), p.pnt.index));
+						} catch (Exception e) {
+							throw new RuntimeException(e); 
+						}
+						return true;
+					}
+				});
 			} else {
 				boolean initialState = bbox31.hasInitialState();
-				for (NetworkDBPointPrep pnt : points.valueCollection()) {
-					if (initialState || bbox31.contains(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY())) {
-						pnt.mapId = 1;
-						routeTree.insert(new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+				for (NetworkDBPointWrite p : points.valueCollection()) {
+					if (initialState || bbox31.contains(p.pnt.midX(), p.pnt.midY(), p.pnt.midX(), p.pnt.midY())) {
+						p.includeFlag = 1;
+						routeTree.insert(new LeafElement(new Rect(p.pnt.midX(), p.pnt.midY(), p.pnt.midX(), p.pnt.midY()), p.pnt.index));
 					}
 				}
 			}
-			String str = addIncompletePointsToFormClusters("Prepare ", points, routeTree);
+			String str = addIncompletePointsToFormClusters("Prepare ", points.valueCollection(), routeTree);
 			log.append(str);
 			// Expand points for 1 more cluster: here we could expand points (or delete) to 1 more cluster to make maps "bigger"
-			for (NetworkDBPointPrep pnt : points.valueCollection()) {
-				if (pnt.mapId == 2) {
-					pnt.mapId = 1;
+			for (NetworkDBPointWrite pnt : points.valueCollection()) {
+				if (pnt.includeFlag == 2) {
+					pnt.includeFlag = 1;
 				}
 				//				if (// pnt.dualPoint.mapId == 1 && 
 				//				pnt.index % 5 == 2) {
@@ -436,28 +495,26 @@ public class HHRoutingOBFWriter {
 				//		}
 
 			}
-			str = addIncompletePointsToFormClusters("Final ", points, routeTree);
+			str = addIncompletePointsToFormClusters("Final ", points.valueCollection(), routeTree);
 			log.append(str);
 				
-			routeTree = AbstractIndexPartCreator.packRtreeFile(routeTree, rTreeFile, rpTreeFile);
+			RTree packRTree = AbstractIndexPartCreator.packRtreeFile(routeTree, rTreeFile, rpTreeFile);
 			
-			long rootIndex = routeTree.getFileHdr().getRootIndex();
-			rtree.Node root = routeTree.getReadNode(rootIndex);
+			long rootIndex = packRTree.getFileHdr().getRootIndex();
+			rtree.Node root = packRTree.getReadNode(rootIndex);
 			Rect rootBounds = IndexVectorMapCreator.calcBounds(root);
 			if (rootBounds != null) {
 				long fp = bmiw.getFilePointer();
-				List<NetworkDBPointPrep> pntsList = writeBinaryRouteTree(root, rootBounds, routeTree, bmiw, points, new int[] {0});
+				List<NetworkDBPointWrite> pntsList = writeBinaryRouteTree(root, rootBounds, packRTree, bmiw, points, new int[] {0});
 				long size = bmiw.getFilePointer() - fp;
 				// validate number of clusters
 				if (VALIDATE_CLUSTER_SIZE) {
 					validateClusterSizeMatch(db, validateClusterIn, validateClusterOut, pntsList);
 				}
-				
-				
-				pntsList.sort(new Comparator<NetworkDBPointPrep>() {
+				pntsList.sort(new Comparator<NetworkDBPointWrite>() {
 					@Override
-					public int compare(NetworkDBPointPrep o1, NetworkDBPointPrep o2) {
-						return Integer.compare(o1.fileId, o2.fileId);
+					public int compare(NetworkDBPointWrite o1, NetworkDBPointWrite o2) {
+						return Integer.compare(o1.localId, o2.localId);
 					}
 				});
 				List<Integer> blocks = new ArrayList<Integer>();
@@ -473,8 +530,8 @@ public class HHRoutingOBFWriter {
 				}
 				fp = bmiw.getFilePointer();
 				log.append(String.format("Tree of points %d: ranges - %s, number of subblocks - %s\n", points.size(), ranges, blocks));
-				for (int i = 0; i < profileParamsKeys.length; i++) {
-					writeSegments(db, i, profileParamsKeys[i], bmiw, pntsList, ranges, 0);
+				for (int i = 0; i < dbProfileParamsKeys.length; i++) {
+					writeSegments(db, i, dbProfileParamsKeys[i], bmiw, pntsList, ranges, 0);
 				}
 				long size2 = bmiw.getFilePointer() - fp;
 				log.append(String.format("Points size %d bytes, segments size %d bytes \n", size, size2));
@@ -482,7 +539,7 @@ public class HHRoutingOBFWriter {
 			bmiw.endHHRoutingIndex();
 			bmiw.close();
 
-			RandomAccessFile file = routeTree.getFileHdr().getFile();
+			RandomAccessFile file = packRTree.getFileHdr().getFile();
 			file.close();
 			if (reader != null) {
 				reader.close();
@@ -499,29 +556,29 @@ public class HHRoutingOBFWriter {
 		return log.toString();
 	}
 
-	private String addIncompletePointsToFormClusters(String msg, TLongObjectHashMap<NetworkDBPointPrep> points, RTree routeTree)
+	private String addIncompletePointsToFormClusters(String msg, Collection<NetworkDBPointWrite> points, RTree routeTree)
 			throws RTreeInsertException, IllegalValueException {
 		// IMPORTANT: same(pnt.clusterId) - forms a shape where segments look outward the shape
 		TLongHashSet clusterDualPointsForInNeeded = new TLongHashSet();
 		TLongHashSet clusterPointsForOutNeeded = new TLongHashSet();
-		for (NetworkDBPointPrep pnt : points.valueCollection()) {
-			if (pnt.mapId > 0) {
-				clusterPointsForOutNeeded.add(pnt.dualPoint.clusterId);
-				clusterDualPointsForInNeeded.add(pnt.clusterId);
+		for (NetworkDBPointWrite pnt : points) {
+			if (pnt.includeFlag > 0) {
+				clusterPointsForOutNeeded.add(pnt.pnt.dualPoint.clusterId);
+				clusterDualPointsForInNeeded.add(pnt.pnt.clusterId);
 			}
 		}
 		int pointsInc = 0, partial = 0, completeInc = 0;
-		for (NetworkDBPointPrep pnt : points.valueCollection()) {
+		for (NetworkDBPointWrite p : points) {
 			pointsInc++;
-			if (pnt.mapId <= 0) {
-				if (clusterPointsForOutNeeded.contains(pnt.dualPoint.clusterId) || 
-						clusterDualPointsForInNeeded.contains(pnt.clusterId)) {
+			if (p.includeFlag <= 0) {
+				if (clusterPointsForOutNeeded.contains(p.pnt.dualPoint.clusterId) || 
+						clusterDualPointsForInNeeded.contains(p.pnt.clusterId)) {
 					partial++;
-					if (pnt.mapId == 0) {
+					if (p.includeFlag == 0) {
 						routeTree.insert(
-								new LeafElement(new Rect(pnt.midX(), pnt.midY(), pnt.midX(), pnt.midY()), pnt.index));
+								new LeafElement(new Rect(p.pnt.midX(), p.pnt.midY(), p.pnt.midX(), p.pnt.midY()), p.pnt.index));
 					}
-					pnt.mapId = 2;
+					p.includeFlag = 2;
 				}
 			} else {
 				completeInc++;
@@ -532,15 +589,15 @@ public class HHRoutingOBFWriter {
 	}
 
 	private void validateClusterSizeMatch(HHRoutingPreparationDB db,
-			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterIn,
-			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterOut, List<NetworkDBPointPrep> pntsList)
+			TLongObjectHashMap<List<NetworkDBPointWrite>> validateClusterIn,
+			TLongObjectHashMap<List<NetworkDBPointWrite>> validateClusterOut, List<NetworkDBPointWrite> pntsList)
 			throws SQLException, IOException {
-		for (NetworkDBPointPrep p : pntsList) {
-			if (p.mapId != 1) {
+		for (NetworkDBPointWrite p : pntsList) {
+			if (p.includeFlag != 1) {
 				continue;
 			}
 			byte[][] res = new byte[2][];
-			db.loadSegmentPointInternal(p.index, 0, res);
+			db.loadSegmentPointInternal(p.pnt.index, 0, res);
 			int sizeIn = 0, sizeOut = 0;
 			ByteArrayInputStream str = new ByteArrayInputStream(res[0]);
 			while (str.available() > 0) {
@@ -553,22 +610,22 @@ public class HHRoutingOBFWriter {
 				sizeOut++;
 			}
 			int sizeTIn = 0, sizeTOut = 0;
-			for (NetworkDBPointPrep l : validateClusterIn.get(p.clusterId)) {
-				if (l.mapId > 0) {
+			for (NetworkDBPointWrite l : validateClusterIn.get(p.pnt.clusterId)) {
+				if (l.includeFlag > 0) {
 					sizeTIn++;
 				} else {
 					throw new IllegalStateException(String.format("Into %s <- %s is missing", p, l));
 				}
 			}
-			for (NetworkDBPointPrep l : validateClusterOut.get(p.dualPoint.clusterId)) {
-				if (l.mapId > 0) {
+			for (NetworkDBPointWrite l : validateClusterOut.get(p.pnt.dualPoint.clusterId)) {
+				if (l.includeFlag > 0) {
 					sizeTOut++;
 				} else {
 					throw new IllegalStateException(String.format("From %s -> %s is missing", p, l));
 				}
 			}
 			if (sizeTIn != sizeIn || sizeOut != sizeTOut) {
-				throw new IllegalArgumentException(String.format("Point [%d] %d  in %d>=%d out %d>=%d\n ", p.mapId, p.index, sizeIn,
+				throw new IllegalArgumentException(String.format("Point [%d] %d  in %d>=%d out %d>=%d\n ", p.includeFlag, p.pnt.index, sizeIn,
 						sizeTIn, sizeOut, sizeTOut));
 			}
 		}
@@ -576,7 +633,7 @@ public class HHRoutingOBFWriter {
 
 
 	private void writeSegments(HHRoutingPreparationDB db, int profile, int dbProfile, BinaryMapIndexWriter writer, 
-			List<NetworkDBPointPrep> pntsList, List<Integer> ranges, int shift) throws IOException, SQLException {
+			List<NetworkDBPointWrite> pntsList, List<Integer> ranges, int shift) throws IOException, SQLException {
 		writer.startHHRouteBlockSegments(shift, pntsList.size(), profile);
 		if (ranges.size() > 0) {
 			int range = ranges.get(0);
@@ -588,14 +645,14 @@ public class HHRoutingOBFWriter {
 			}
 		} else {
 //			System.out.println("   POINTS " +pntsList.size());
-			for (NetworkDBPointPrep ind : pntsList) {
-				if (shift != ind.fileId) {
-					throw new IllegalStateException(shift + " != " + ind.fileId);
+			for (NetworkDBPointWrite p : pntsList) {
+				if (shift != p.localId) {
+					throw new IllegalStateException(shift + " != " + p.localId);
 				}
 				byte[][] res = new byte[2][];
-				if (ind.mapId <= 1) {
+				if (p.includeFlag <= 1) {
 					// don't write mapId=2 point segments as their clusters anyway incomplete
-					db.loadSegmentPointInternal(ind.index, dbProfile, res);
+					db.loadSegmentPointInternal(p.pnt.index, dbProfile, res);
 				} else {
 					res[1] = res[0] = new byte[0];
 				}
@@ -606,12 +663,12 @@ public class HHRoutingOBFWriter {
 		writer.endHHRouteBlockSegments();
 	}
 
-	private List<NetworkDBPointPrep> writeBinaryRouteTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer,
-			TLongObjectHashMap<NetworkDBPointPrep> points, int[] pntId)
+	private List<NetworkDBPointWrite> writeBinaryRouteTree(rtree.Node parent, Rect re, RTree r, BinaryMapIndexWriter writer,
+			TLongObjectHashMap<NetworkDBPointWrite> points, int[] pntId)
 			throws IOException, RTreeException {
 		Element[] es = parent.getAllElements();
 		writer.startHHRouteTreeElement(re.getMinX(), re.getMaxX(), re.getMinY(), re.getMaxY());
-		List<NetworkDBPointPrep> l = new ArrayList<>();
+		List<NetworkDBPointWrite> l = new ArrayList<>();
 		boolean leaf = false;
 		for (int i = 0; i < parent.getTotalElements(); i++) {
 			Element e = es[i];
@@ -620,13 +677,13 @@ public class HHRoutingOBFWriter {
 					throw new IllegalStateException();
 				}
 				rtree.Node chNode = r.getReadNode(e.getPtr());
-				List<NetworkDBPointPrep> ps = writeBinaryRouteTree(chNode, e.getRect(), r, writer, points, pntId);
+				List<NetworkDBPointWrite> ps = writeBinaryRouteTree(chNode, e.getRect(), r, writer, points, pntId);
 				l.addAll(ps);
 			} else {
 				leaf = true;
-				NetworkDBPointPrep pnt = points.get(e.getPtr());
-				if (pnt.mapId > 0) {
-					pnt.fileId = pntId[0]++;
+				NetworkDBPointWrite pnt = points.get(e.getPtr());
+				if (pnt.includeFlag > 0) {
+					pnt.localId = pntId[0]++;
 					l.add(pnt);
 				} else {
 					System.out.println("Deleted point " + pnt);
@@ -640,28 +697,28 @@ public class HHRoutingOBFWriter {
 		return l;
 	}
 	
-	private class AugmentObfTask implements Callable<String> {
-		
-		private TLongObjectHashMap<NetworkDBPointPrep> points;
-		private HHRoutingPreparationDB db;
+	private static class AugmentObfTask implements Callable<String> {
+		private static ThreadLocal<TLongObjectHashMap<NetworkDBPointWrite>> context = new ThreadLocal<>();
 		private File outFile;
-		private long edition;
 		private QuadRect bbox31;
-		private List<NetworkDBPointPrep> filteredPoints;
+		private TLongArrayList filteredPoints;
+		private HHRoutingOBFWriter writer;
 
-		public AugmentObfTask(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
-				long edition, QuadRect bbox31, List<NetworkDBPointPrep> filteredPoints) {
-			this.db = db;
-			this.points = points;
+		public AugmentObfTask(HHRoutingOBFWriter writer, File outFile, QuadRect bbox31, TLongArrayList filteredPoints) {
+			this.writer = writer;
 			this.outFile = outFile;
-			this.edition = edition;
 			this.bbox31 = bbox31;
 			this.filteredPoints = filteredPoints;
 		}
 
 		@Override
 		public String call() throws Exception {
-			return writeObfFileByBbox(db, points, outFile, edition, bbox31, filteredPoints);
+			TLongObjectHashMap<NetworkDBPointWrite> ctxPoints = context.get();
+			if (ctxPoints == null || ctxPoints.size() != writer.points.size()) {
+				ctxPoints = convertPoints(writer.points);
+			}
+			context.set(ctxPoints);
+			return writer.writeObfFileByBbox(ctxPoints, outFile, bbox31, filteredPoints);
 		}
 	}
 		

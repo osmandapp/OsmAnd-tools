@@ -128,7 +128,7 @@ public class HHRoutingShortcutCreator {
 			if (onlyCompact) {
 				File compactFile = new File(name + HHRoutingDB.CEXT);
 				HHRoutingPreparationDB.compact(dbFile, compactFile);
-				new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
+				new HHRoutingOBFWriter(compactFile).writeFile(null, null, false);
 				return;
 			}
 			HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
@@ -155,7 +155,7 @@ public class HHRoutingShortcutCreator {
 			networkDB.close();
 			File compactFile = new File(name + HHRoutingDB.CEXT);
 			HHRoutingPreparationDB.compact(dbFile, compactFile);
-			new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
+			new HHRoutingOBFWriter(compactFile).writeFile(null, null, false);
 			ind++;
 		}
 	}
