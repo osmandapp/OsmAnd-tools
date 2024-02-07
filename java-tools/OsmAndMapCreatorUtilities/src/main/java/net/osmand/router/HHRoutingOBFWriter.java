@@ -375,7 +375,7 @@ public class HHRoutingOBFWriter {
 				return -Integer.compare(tagDict.get(o1), tagDict.get(o2));
 			}
 		});
-		Map<String, Integer> finalTagDict = new LinkedHashMap<String, Integer>();
+		Map<String, Integer> finalTagDict = new HashMap<String, Integer>();
 		for (int i = 0; i < tagDictList.size(); i++) {
 			finalTagDict.put(tagDictList.get(i), i);
 //			System.out.println(i + ". " + tagDictList.get(i) + " " + tagDict.get(tagDictList.get(i)));
