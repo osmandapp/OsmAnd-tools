@@ -69,7 +69,7 @@ public class HHRoutingOBFWriter {
 	public static final int BUFFER_SIZE = 1 << 20;
 	protected static boolean PREINDEX_POINTS_BY_COUNTRIES = true;
 	protected static boolean WRITE_TAG_VALUES = true;
-	protected static int THREAD_POOL = 2;
+	protected static int THREAD_POOL = 1;
 	protected static boolean VALIDATE_CLUSTER_SIZE = false;
 	
 	
@@ -99,7 +99,7 @@ public class HHRoutingOBFWriter {
 		File outFolder = null;
 		boolean updateExistingFiles = false;
 		if (args.length == 0) {
-			THREAD_POOL = 4;
+//			THREAD_POOL = 4;
 			updateExistingFiles = true;
 			String mapName = "Germany_car.chdb";
 //			mapName = "Netherlands_europe_car.chdb";
@@ -150,6 +150,10 @@ public class HHRoutingOBFWriter {
 	}
 	
 	public void writeFile(File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
+		if (THREAD_POOL > 1) {
+			System.err.println("Threads > 1 are not supported cause of current R-Tree limitations ");
+			THREAD_POOL = 1;
+		}
 		if (obfPolyFileIn == null) {
 			File outFile = new File(dbFile.getParentFile(),
 					dbFile.getName().substring(0, dbFile.getName().lastIndexOf('.')) + ".obf");
