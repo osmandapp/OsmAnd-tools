@@ -597,7 +597,7 @@ public class HHRoutingOBFWriter {
 				continue;
 			}
 			byte[][] res = new byte[2][];
-			db.loadSegmentPointInternal(p.pnt.index, 0, res);
+			db.loadSegmentPointInternalSync(p.pnt.index, 0, res);
 			int sizeIn = 0, sizeOut = 0;
 			ByteArrayInputStream str = new ByteArrayInputStream(res[0]);
 			while (str.available() > 0) {
@@ -652,7 +652,7 @@ public class HHRoutingOBFWriter {
 				byte[][] res = new byte[2][];
 				if (p.includeFlag <= 1) {
 					// don't write mapId=2 point segments as their clusters anyway incomplete
-					db.loadSegmentPointInternal(p.pnt.index, dbProfile, res);
+					db.loadSegmentPointInternalSync(p.pnt.index, dbProfile, res);
 				} else {
 					res[1] = res[0] = new byte[0];
 				}
