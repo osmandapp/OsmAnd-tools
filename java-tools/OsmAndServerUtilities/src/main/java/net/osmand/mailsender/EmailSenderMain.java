@@ -9,9 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
@@ -119,30 +117,48 @@ public class EmailSenderMain {
 
 	private static void updatePostfixBounced(Connection conn) throws IOException, SQLException {
 		String url = System.getenv("URL_POSTFIX_BOUNCED_CSV");
-		if (url == null) {
-			throw new RuntimeException("URL_POSTFIX_BOUNCED_CSV is not specified");
+		String file = System.getenv("FILE_POSTFIX_BOUNCED_CSV");
+		HashMap<String, String> bouncedEmailReason = new HashMap<>();
+		List<String> csvLines = new ArrayList<>();
+
+		if (url != null) {
+			HttpURLConnection http = (HttpURLConnection) new URL(url).openConnection();
+			if (http.getResponseCode() == HttpURLConnection.HTTP_OK) {
+				BufferedReader in = new BufferedReader(new InputStreamReader(http.getInputStream()));
+				String line;
+				while ((line = in.readLine()) != null) {
+					csvLines.add(line);
+				}
+				in.close();
+			}
+			http.disconnect();
 		}
 
-		HashMap<String, String> bouncedEmailReason = new HashMap<>();
-		HttpURLConnection http = (HttpURLConnection) new URL(url).openConnection();
-		if (http.getResponseCode() == HttpURLConnection.HTTP_OK) {
-			BufferedReader in = new BufferedReader(new InputStreamReader(http.getInputStream()));
-			String line;
-			while ((line = in.readLine()) != null) {
-				String [] split = line.split("\",\""); // the format is: "email","reason"
+		if (file != null) {
+			Scanner reader = new Scanner(new File(file));
+			while (reader.hasNextLine()) {
+				csvLines.add(reader.nextLine());
+			}
+			reader.close();
+		}
+
+		if (!csvLines.isEmpty()) {
+			for (String line : csvLines) {
+				String[] split = line.split("\",\""); // the format is: "email","reason"
 				if (split.length == 2) {
-					String email = split[0].replaceFirst("^\"","");
+					String email = split[0].replaceFirst("^\"", "");
 					String reason = split[1].replaceFirst("\"$", "");
 					bouncedEmailReason.put(email, reason);
 				}
 			}
-			in.close();
 		}
-		http.disconnect();
 
 		if (!bouncedEmailReason.isEmpty()) {
 			updateBlockDbWithEmailReason(conn, bouncedEmailReason);
+			return; // success
 		}
+
+		throw new RuntimeException("Empty CSV or no URL_POSTFIX_BOUNCED_CSV/FILE_POSTFIX_BOUNCED_CSV specified");
 	}
 
 	private static void updateBlockDbWithEmailReason(Connection conn, HashMap<String, String> bouncedEmailReason) throws SQLException {

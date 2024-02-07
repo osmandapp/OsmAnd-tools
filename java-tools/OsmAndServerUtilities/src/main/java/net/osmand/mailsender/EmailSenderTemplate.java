@@ -304,12 +304,12 @@ public class EmailSenderTemplate {
 			return; // silent
 		}
 
-		Scanner reader = new Scanner(foundFile);
 		List<String> templateLines = new ArrayList<>();
-
+		Scanner reader = new Scanner(foundFile);
 		while (reader.hasNextLine()) {
 			templateLines.add(reader.nextLine());
 		}
+		reader.close();
 
 		parse(templateLines);
 	}
