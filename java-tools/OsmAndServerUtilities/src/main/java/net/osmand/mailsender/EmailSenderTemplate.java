@@ -6,6 +6,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -120,7 +121,8 @@ public class EmailSenderTemplate {
 	}
 
 	// load template from file by template name and language code
-	public EmailSenderTemplate load(String template, String lang) throws FileNotFoundException {
+	public EmailSenderTemplate load(String template, @Nullable String langNullable) throws FileNotFoundException {
+		String lang = langNullable == null ? "en" : langNullable;
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 		include("header", lang, false); // optional
 		include(template, lang, true); // template required
