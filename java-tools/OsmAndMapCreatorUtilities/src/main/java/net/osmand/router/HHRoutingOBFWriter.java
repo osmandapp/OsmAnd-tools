@@ -346,7 +346,7 @@ public class HHRoutingOBFWriter {
 				.toLowerCase();
 	}
 	
-	private Map<String, Integer> prepareTagValuesDictionary(List<NetworkDBPointWrite> points) {
+	private List<String> prepareTagValuesDictionary(List<NetworkDBPointWrite> points) {
 		Map<String, Integer> tagDict = new HashMap<String, Integer>();
 		for (NetworkDBPointWrite p : points) {
 			if (p.pnt.tagValues == null || p.includeFlag == 0) {
@@ -393,7 +393,7 @@ public class HHRoutingOBFWriter {
 				p.tagValuesInts = lst.toArray();
 			}
 		}
-		return finalTagDict;
+		return tagDictList;
 	}
 	
 	
@@ -456,7 +456,7 @@ public class HHRoutingOBFWriter {
 			rtree.Node root = packRTree.getReadNode(rootIndex);
 			Rect rootBounds = IndexVectorMapCreator.calcBounds(root);
 
-			Map<String, Integer> tagValuesDictionary = null;
+			List<String> tagValuesDictionary = null;
 			if (WRITE_TAG_VALUES) {
 				tagValuesDictionary = prepareTagValuesDictionary(points);
 			}

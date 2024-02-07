@@ -248,7 +248,7 @@ public class BinaryMapIndexWriter {
 	}
 	
 	
-	public void startHHRoutingIndex(long edition, String profile, Map<String, Integer> stringTable,  String... params) throws IOException {
+	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable,  String... params) throws IOException {
 		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
@@ -258,13 +258,8 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILEPARAMS_FIELD_NUMBER, s);
 		}
 		if (stringTable != null && stringTable.size() > 0) {
-			// expect linked hash map
-			int i = 0;
 			OsmandOdb.StringTable.Builder st = OsmandOdb.StringTable.newBuilder();
-			for (String s : stringTable.keySet()) {
-				if (stringTable.get(s) != i++) {
-					throw new IllegalStateException();
-				}
+			for (String s : stringTable) {
 				st.addS(s);
 			}
 			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.TAGVALUESTABLE_FIELD_NUMBER, st.build());
