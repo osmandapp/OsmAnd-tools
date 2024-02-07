@@ -62,6 +62,7 @@ import net.osmand.util.CountryOcbfGeneration;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.MapUtils;
+import rtree.RTreeException;
 
 public class BinaryMerger {
 
@@ -189,11 +190,12 @@ public class BinaryMerger {
 		System.out.println("Sign added to file:" + pathToFile + " . Sign name=" + name + ", resource=" + resource + ", pluginid=" + pluginid + ", description=" + description);
 	}
 	
-	public static void mergeStandardFiles(String[] args) throws IOException, SQLException, XmlPullParserException {
+	public static void mergeStandardFiles(String[] args) throws IOException, SQLException, XmlPullParserException, RTreeException {
 		BinaryMerger in = new BinaryMerger();
 		String pathWithGeneratedMapZips = args[0];
 		String pathToPutJointFiles = args[1];
 		boolean mapFiles = false;
+		boolean roadFiles = false;
 		boolean skipExisting = false;
 		boolean ignoreFailures = true;
 		String filter = null;
@@ -206,6 +208,10 @@ public class BinaryMerger {
 			}
 			if (key.equals("--map")) {
 				mapFiles = true;
+				roadFiles = false;
+			} if (key.equals("--road")) {
+				roadFiles = true;
+				mapFiles = false;
 			} else if (key.equals("--filter")) {
 				filter = val;
 			} else if (key.equals("--skip-existing")) {
@@ -219,16 +225,17 @@ public class BinaryMerger {
 		Iterator<CountryRegion> it = world.iterator();
 		while (it.hasNext()) {
 			CountryRegion cr = it.next();
-			if ((cr.jointMap && mapFiles) || (cr.jointRoads && !mapFiles)) {
+			String roadExt = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_ROAD_MAP_INDEX_EXT;
+			String mapExt = "_" + IndexConstants.BINARY_MAP_VERSION + IndexConstants.BINARY_MAP_INDEX_EXT;
+			if ((cr.jointMap && mapFiles) || (cr.jointRoads && roadFiles && !cr.jointMap)) {
+				boolean road = cr.jointRoads && !cr.jointMap;
 				if (!Algorithms.isEmpty(filter)
 						&& !cr.getDownloadName().toLowerCase().startsWith(filter.toLowerCase())) {
 					continue;
 				}
 				List<CountryRegion> list = cr.getChildren();
 				List<String> sargs = new ArrayList<String>();
-				String ext = "_" + IndexConstants.BINARY_MAP_VERSION
-						+ (mapFiles ? IndexConstants.BINARY_MAP_INDEX_EXT : IndexConstants.BINARY_ROAD_MAP_INDEX_EXT);
-				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + ext;
+				String targetFileName = Algorithms.capitalizeFirstLetterAndLowercase(cr.getDownloadName()) + (road ? roadExt : mapExt);
 				File targetFile = new File(pathToPutJointFiles, targetFileName);
 				File targetUploadedFile = new File(pathWithGeneratedMapZips, targetFileName + ".zip");
 				System.out.println("Checking " + targetFileName);
@@ -243,13 +250,16 @@ public class BinaryMerger {
 				sargs.add("--poi");
 				sargs.add("--hhindex");
 				for (CountryRegion reg : list) {
-					if (reg.map || (!mapFiles && reg.roads)) {
-						File fl = new File(pathWithGeneratedMapZips, Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + ext);
-						if (!fl.exists()) {
-							fl = new File(fl.getParentFile(), fl.getName() + ".zip");
+					File fl = getExistingFile(pathWithGeneratedMapZips, reg, road ? roadExt : mapExt);
+					if (!fl.exists() && road) {
+						fl = getExistingFile(pathWithGeneratedMapZips, reg, mapExt);
+						if (fl.exists()) {
+							File target = new File(fl.getParentFile(), fl.getName() + ".roadtmp");
+							IndexUploader.extractRoadOnlyFile(fl, target);
+							fl = target;
 						}
-						sargs.add(fl.getAbsolutePath());
 					}
+					sargs.add(fl.getAbsolutePath());
 				}
 				log.info("Merge file with arguments: " + sargs);
 				try {
@@ -274,6 +284,14 @@ public class BinaryMerger {
 			log.error(msg);
 			throw new RuntimeException(msg);
 		}
+	}
+
+	private static File getExistingFile(String pathWithZips, CountryRegion reg, String mapExt) {
+		File fl = new File(pathWithZips, Algorithms.capitalizeFirstLetterAndLowercase(reg.getDownloadName()) + mapExt);
+		if (!fl.exists()) {
+			fl = new File(fl.getParentFile(), fl.getName() + ".zip");
+		}
+		return fl;
 	}
 
 	public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
