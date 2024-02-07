@@ -1,6 +1,8 @@
 package net.osmand.router;
 
 
+import static net.osmand.router.HHRoutingUtilities.logf;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -10,11 +12,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 
@@ -56,6 +64,7 @@ public class HHRoutingOBFWriter {
 	public static final int BUFFER_SIZE = 1 << 20;
 	public static boolean PREINDEX_POINTS_BY_COUNTRIES = true;
 	public static boolean WRITE_TAG_VALUES = true;
+	private static int THREAD_POOL = 2;
 	
 	
 	private static final String IGNORE_ROUTE = "route_";
@@ -93,6 +102,8 @@ public class HHRoutingOBFWriter {
 			for (String arg : args) {
 				if (arg.startsWith("--db=")) {
 					dbFile = new File(arg.substring("--db=".length()));
+				} else if (arg.startsWith("--threads=")) {
+					THREAD_POOL = Integer.parseInt(arg.substring("--threads=".length()));
 				} else if (arg.startsWith("--outfolder=")) {
 					outFolder = new File(arg.substring("--outfolder=".length()));
 				} else if (arg.startsWith("--update-existing-files")) {
@@ -179,6 +190,8 @@ public class HHRoutingOBFWriter {
 
 				}
 			}
+			ExecutorService service = Executors.newFixedThreadPool(THREAD_POOL);
+			List<Future<String>> results = new ArrayList<>();
 			for (File obfPolyFile : obfPolyFiles) {
 				File outFile = new File(outFolder,
 						obfPolyFile.getName().substring(0, obfPolyFile.getName().lastIndexOf('.')) + ".hh.obf");
@@ -220,10 +233,49 @@ public class HHRoutingOBFWriter {
 							MapUtils.get31LongitudeX((int) bbox31.left), MapUtils.get31LatitudeY((int) bbox31.top),
 							MapUtils.get31LongitudeX((int) bbox31.right), MapUtils.get31LatitudeY((int) bbox31.bottom));
 				}
-				AugmentObfTask task = new AugmentObfTask(db, points, outFile, edition, bbox31, filteredPoints);
-				String log = writeObfFileByBbox(db, points, outFile, edition, bbox31, filteredPoints);
-				HHRoutingUtilities.logf(log.trim());
+				if (THREAD_POOL > 1) {
+					AugmentObfTask task = new AugmentObfTask(db, points, outFile, edition, bbox31, filteredPoints);
+					results.add(service.submit(task));
+				} else {
+					String log = writeObfFileByBbox(db, points, outFile, edition, bbox31, filteredPoints);
+					HHRoutingUtilities.logf(log.trim());
+				}
 			}
+			
+			service.shutdown();
+			try {
+				while (!results.isEmpty()) {
+					Thread.sleep(3000);
+					Iterator<Future<String>> it = results.iterator();
+					while (it.hasNext()) {
+						Future<String> future = it.next();
+						if (future.isDone()) {
+							String res = future.get();
+							HHRoutingUtilities.logf(res.trim());
+							it.remove();
+						}
+					}
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				throw new RuntimeException(e);
+			} catch (ExecutionException e) {
+				e.printStackTrace();
+				throw new RuntimeException(e);
+			} finally {
+				List<Runnable> runnable = service.shutdownNow();
+				if (!results.isEmpty()) {
+					logf("!!! %d runnable were not executed: exception occurred",
+							runnable == null ? 0 : runnable.size());
+				}
+				try {
+					service.awaitTermination(5, TimeUnit.MINUTES);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+					throw new RuntimeException(e);
+				}
+			}
+
 		}
 	}
 
