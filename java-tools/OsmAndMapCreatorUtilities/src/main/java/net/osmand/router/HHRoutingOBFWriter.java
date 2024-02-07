@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
 
@@ -63,6 +64,7 @@ public class HHRoutingOBFWriter {
 	private static final String IGNORE_TURN_LANES = "turn:lanes";
 	private static final String IGNORE_DESCRIPTION = ":description";
 	private static final String IGNORE_NOTE = ":note";
+	private static final boolean VALIDATE_CLUSTER_SIZE = false;
 	/**
 	 * @param args
 	 * @throws IOException
@@ -113,7 +115,7 @@ public class HHRoutingOBFWriter {
 			if (outFile.exists()) {
 				outFile.delete();
 			}
-			writeFileBbox(db, points, outFile, edition, new QuadRect(), null);
+			writeObfFileByBbox(db, points, outFile, edition, new QuadRect(), null);
 		} else {
 			if (outFolder == null) {
 				outFolder = obfPolyFileIn.isDirectory() ? obfPolyFileIn : obfPolyFileIn.getParentFile();
@@ -210,7 +212,7 @@ public class HHRoutingOBFWriter {
 						for (MapRoot rt : mi.getRoots()) {
 							// use first
 							bbox31.expand(rt.getLeft(), rt.getTop(), rt.getRight(), rt.getBottom());
-							break;
+//							break;
 						}
 					}
 					reader.close();
@@ -218,7 +220,9 @@ public class HHRoutingOBFWriter {
 							MapUtils.get31LongitudeX((int) bbox31.left), MapUtils.get31LatitudeY((int) bbox31.top),
 							MapUtils.get31LongitudeX((int) bbox31.right), MapUtils.get31LatitudeY((int) bbox31.bottom));
 				}
-				writeFileBbox(db, points, outFile, edition, bbox31, filteredPoints);
+				AugmentObfTask task = new AugmentObfTask(db, points, outFile, edition, bbox31, filteredPoints);
+				String log = writeObfFileByBbox(db, points, outFile, edition, bbox31, filteredPoints);
+				HHRoutingUtilities.logf(log.trim());
 			}
 		}
 	}
@@ -277,13 +281,10 @@ public class HHRoutingOBFWriter {
 		return finalTagDict;
 	}
 
-	private void writeFileBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
+	private String writeObfFileByBbox(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
 			long edition, QuadRect bbox31, List<NetworkDBPointPrep> filteredPoints)
 			throws SQLException, IOException, IllegalValueException {
-		Map<String, Integer> tagValuesDictionary = null;
-		if (WRITE_TAG_VALUES) {
-			tagValuesDictionary = prepareTagValuesDictionary(points);
-		}
+		StringBuilder log = new StringBuilder();
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
 		try {
@@ -309,12 +310,12 @@ public class HHRoutingOBFWriter {
 					}
 				}
 				if (edition == profileEdition) {
-					System.out.printf("Skip file %s as same hh routing profile (%s) already exist\n", outFile.getName(),
-							new Date(edition));
+					log.append(String.format("Skip file %s as same hh routing profile (%s) already exist", outFile.getName(),
+							new Date(edition)));
 					// regenerate in case there is an issue with writer itself
-					return;
+					return log.toString();
 				}
-				System.out.println((profileEdition > 0 ? "Replace" : "Augment") +" file with hh routing: " + outFile.getName());
+				log.append((profileEdition > 0 ? "Replace" : "Augment") +" file with hh routing: " + outFile.getName()).append("\n");
 				writeFile = new File(outFile.getParentFile(), outFile.getName() + ".tmp");
 			}
 			long timestamp = reader != null ? reader.getDateCreated() : edition;
@@ -332,22 +333,28 @@ public class HHRoutingOBFWriter {
 					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, reader.getRaf(), part.getFilePointer(), part.getLength());
 				}
 			}
+			Map<String, Integer> tagValuesDictionary = null;
+			if (WRITE_TAG_VALUES) {
+				tagValuesDictionary = prepareTagValuesDictionary(points);
+			}
 			bmiw.startHHRoutingIndex(edition, profile, tagValuesDictionary, profileParams);
 			RTree routeTree = new RTree(rTreeFile);
 			
 			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterIn = new TLongObjectHashMap<>();
 			TLongObjectHashMap<List<NetworkDBPointPrep>> validateClusterOut = new TLongObjectHashMap<>();
-			for (NetworkDBPointPrep p : points.valueCollection()) {
-				p.mapId = 0;
-				p.fileId = 0;
-				if (validateClusterIn.get(p.clusterId) == null) {
-					validateClusterIn.put(p.clusterId, new ArrayList<>());
+			if (VALIDATE_CLUSTER_SIZE) {
+				for (NetworkDBPointPrep p : points.valueCollection()) {
+					p.mapId = 0;
+					p.fileId = 0;
+					if (validateClusterIn.get(p.clusterId) == null) {
+						validateClusterIn.put(p.clusterId, new ArrayList<>());
+					}
+					if (validateClusterOut.get(p.dualPoint.clusterId) == null) {
+						validateClusterOut.put(p.dualPoint.clusterId, new ArrayList<>());
+					}
+					validateClusterIn.get(p.clusterId).add(p);
+					validateClusterOut.get(p.dualPoint.clusterId).add(p);
 				}
-				if (validateClusterOut.get(p.dualPoint.clusterId) == null) {
-					validateClusterOut.put(p.dualPoint.clusterId, new ArrayList<>());
-				}
-				validateClusterIn.get(p.clusterId).add(p);
-				validateClusterOut.get(p.dualPoint.clusterId).add(p);
 			}
 			
 			if (filteredPoints != null) {
@@ -364,7 +371,8 @@ public class HHRoutingOBFWriter {
 					}
 				}
 			}
-			addIncompletePointsToFormClusters("Prepare ", points, routeTree);
+			String str = addIncompletePointsToFormClusters("Prepare ", points, routeTree);
+			log.append(str);
 			// Expand points for 1 more cluster: here we could expand points (or delete) to 1 more cluster to make maps "bigger"
 			for (NetworkDBPointPrep pnt : points.valueCollection()) {
 				if (pnt.mapId == 2) {
@@ -376,7 +384,8 @@ public class HHRoutingOBFWriter {
 				//		}
 
 			}
-			addIncompletePointsToFormClusters("Final ", points, routeTree);
+			str = addIncompletePointsToFormClusters("Final ", points, routeTree);
+			log.append(str);
 				
 			routeTree = AbstractIndexPartCreator.packRtreeFile(routeTree, rTreeFile, rpTreeFile);
 			
@@ -388,7 +397,11 @@ public class HHRoutingOBFWriter {
 				List<NetworkDBPointPrep> pntsList = writeBinaryRouteTree(root, rootBounds, routeTree, bmiw, points, new int[] {0});
 				long size = bmiw.getFilePointer() - fp;
 				// validate number of clusters
-				validateClusterSizeMatch(db, validateClusterIn, validateClusterOut, pntsList);
+				if (VALIDATE_CLUSTER_SIZE) {
+					validateClusterSizeMatch(db, validateClusterIn, validateClusterOut, pntsList);
+				}
+				
+				
 				pntsList.sort(new Comparator<NetworkDBPointPrep>() {
 					@Override
 					public int compare(NetworkDBPointPrep o1, NetworkDBPointPrep o2) {
@@ -407,12 +420,12 @@ public class HHRoutingOBFWriter {
 					ranges.add((pntsList.size() - 1) / blocks.get(i) + 1);
 				}
 				fp = bmiw.getFilePointer();
-				System.out.printf("Tree of points %d: ranges - %s, number of subblocks - %s\n", points.size(), ranges, blocks);
+				log.append(String.format("Tree of points %d: ranges - %s, number of subblocks - %s\n", points.size(), ranges, blocks));
 				for (int i = 0; i < profileParamsKeys.length; i++) {
 					writeSegments(db, i, profileParamsKeys[i], bmiw, pntsList, ranges, 0);
 				}
 				long size2 = bmiw.getFilePointer() - fp;
-				System.out.printf("Points size %d bytes, segments size %d bytes \n", size, size2);
+				log.append(String.format("Points size %d bytes, segments size %d bytes \n", size, size2));
 			}
 			bmiw.endHHRoutingIndex();
 			bmiw.close();
@@ -431,9 +444,10 @@ public class HHRoutingOBFWriter {
 			new File(rpTreeFile).delete();
 		}
 		RTree.clearCache();
+		return log.toString();
 	}
 
-	private void addIncompletePointsToFormClusters(String msg, TLongObjectHashMap<NetworkDBPointPrep> points, RTree routeTree)
+	private String addIncompletePointsToFormClusters(String msg, TLongObjectHashMap<NetworkDBPointPrep> points, RTree routeTree)
 			throws RTreeInsertException, IllegalValueException {
 		// IMPORTANT: same(pnt.clusterId) - forms a shape where segments look outward the shape
 		TLongHashSet clusterDualPointsForInNeeded = new TLongHashSet();
@@ -461,7 +475,7 @@ public class HHRoutingOBFWriter {
 				completeInc++;
 			}
 		}
-		System.out.printf("%s - total points %d: included %d (complete clusters), %d (partial clusters) \n", msg, pointsInc,
+		return String.format("%s - total points %d: included %d (complete clusters), %d (partial clusters) \n", msg, pointsInc,
 				completeInc, partial);
 	}
 
@@ -572,6 +586,31 @@ public class HHRoutingOBFWriter {
 		}
 		writer.endRouteTreeElement();
 		return l;
+	}
+	
+	private class AugmentObfTask implements Callable<String> {
+		
+		private TLongObjectHashMap<NetworkDBPointPrep> points;
+		private HHRoutingPreparationDB db;
+		private File outFile;
+		private long edition;
+		private QuadRect bbox31;
+		private List<NetworkDBPointPrep> filteredPoints;
+
+		public AugmentObfTask(HHRoutingPreparationDB db, TLongObjectHashMap<NetworkDBPointPrep> points, File outFile,
+				long edition, QuadRect bbox31, List<NetworkDBPointPrep> filteredPoints) {
+			this.db = db;
+			this.points = points;
+			this.outFile = outFile;
+			this.edition = edition;
+			this.bbox31 = bbox31;
+			this.filteredPoints = filteredPoints;
+		}
+
+		@Override
+		public String call() throws Exception {
+			return writeObfFileByBbox(db, points, outFile, edition, bbox31, filteredPoints);
+		}
 	}
 		
 
