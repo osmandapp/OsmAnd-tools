@@ -31,7 +31,7 @@ public class EmailSenderService {
 				.to(email)
 				.send()
 				.isSuccess();
-	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + email + " (" + ok + ")");
+	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shorten(email) + " (" + ok + ")");
 	}
     
     public void sendOsmAndCloudWebEmail(String email, String token, String action) throws FileNotFoundException, UnsupportedEncodingException {
@@ -42,7 +42,7 @@ public class EmailSenderService {
 			    .to(email)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudWebEmail to: " + email + " (" + ok + ")");
+	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ")");
 	}
     
     public void sendOsmAndCloudRegistrationEmail(String email, String token, boolean newUser) throws FileNotFoundException, UnsupportedEncodingException {
@@ -54,7 +54,7 @@ public class EmailSenderService {
 			    .to(email)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + email + " (" + ok + ")");
+	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ")");
 	}
     
     public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) throws FileNotFoundException, UnsupportedEncodingException {
@@ -64,7 +64,7 @@ public class EmailSenderService {
 			    .set("PROMOCODE", promocodes)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendPromocodesEmails to: " + mailTo + " (" + ok + ")");
+	    LOGGER.info("sendPromocodesEmails to: " + shorten(mailTo) + " (" + ok + ")");
 		return ok;
     }
 	
@@ -111,5 +111,10 @@ public class EmailSenderService {
 			return false;
 		}
 		return true;
+	}
+
+	// hide full email from logs
+	private String shorten(String full) {
+		return full.replaceFirst(".....", "....."); // osmand@t-online.de -> .....d@t-online.de
 	}
  }
