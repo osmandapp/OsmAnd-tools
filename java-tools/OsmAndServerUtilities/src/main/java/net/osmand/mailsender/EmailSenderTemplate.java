@@ -39,7 +39,7 @@ Examples:
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
 
-	public String defaultTemplatesDirectory = "./web-server-config/templates/email";
+	public String defaultTemplatesDirectory = "/var/www-download/website/templates/email";
 
 	private SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
