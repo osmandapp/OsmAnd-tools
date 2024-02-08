@@ -227,7 +227,6 @@ public class UserdataController {
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
-			// TODO Anroid: add lang in RegisterUserCommand.doInBackground() params.put("lang", ...)
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
 			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		}
@@ -401,7 +400,6 @@ public class UserdataController {
 			if (dev == null) {
 				return userdataService.tokenNotValid();
 			}
-			// TODO Anroid: add lang in SendCodeCommand.getBody() json.putOpt("lang", ...)
 			return userdataService.sendCode(data.email, data.action, data.lang, dev);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
