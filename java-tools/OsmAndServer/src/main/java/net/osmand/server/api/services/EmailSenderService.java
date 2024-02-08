@@ -46,7 +46,7 @@ public class EmailSenderService {
 	}
     
     public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) throws FileNotFoundException, UnsupportedEncodingException {
-		String subject = newUser ? "Welcome to OsmAnd Cloud" : "Register new device to OsmAnd Cloud";
+		String subject = newUser ? "@SUBJECT_NEW@" : "@SUBJECT_OLD@";
 	    boolean ok = new EmailSenderTemplate()
 			    .load("cloud/register", lang)
 			    .set("SUBJECT", subject)
