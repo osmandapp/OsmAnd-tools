@@ -226,7 +226,7 @@ public class UserdataController {
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
-			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, "en", true); // TODO lang
+			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, "en", true); // TODO lang /userdata/user-register
 		}
 		usersRepository.saveAndFlush(pu);
 		return userdataService.ok();
@@ -398,7 +398,7 @@ public class UserdataController {
 			if (dev == null) {
 				return userdataService.tokenNotValid();
 			}
-			return userdataService.sendCode(data.email, data.action, "en", dev); // TODO lang
+			return userdataService.sendCode(data.email, data.action, "en", dev); // TODO lang /userdata/send-code
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
