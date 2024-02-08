@@ -34,15 +34,15 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shorten(email) + " (" + ok + ")");
 	}
     
-    public void sendOsmAndCloudWebEmail(String email, String token, String action) throws FileNotFoundException, UnsupportedEncodingException {
+    public void sendOsmAndCloudWebEmail(String email, String token, String action, String lang) throws FileNotFoundException, UnsupportedEncodingException {
 	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/web")
+			    .load("cloud/web", lang)
 			    .set("ACTION", action)
 			    .set("TOKEN", token)
 			    .to(email)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ")");
+	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
     
     public void sendOsmAndCloudRegistrationEmail(String email, String token, boolean newUser) throws FileNotFoundException, UnsupportedEncodingException {

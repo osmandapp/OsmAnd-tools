@@ -398,7 +398,7 @@ public class UserdataController {
 			if (dev == null) {
 				return userdataService.tokenNotValid();
 			}
-			return userdataService.sendCode(data.email, data.action, dev);
+			return userdataService.sendCode(data.email, data.action, "en", dev); // TODO lang
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
