@@ -35,9 +35,17 @@ public class EmailSenderService {
 	}
     
     public void sendOsmAndCloudWebEmail(String email, String token, String action, String lang) throws FileNotFoundException, UnsupportedEncodingException {
+		String templateAction = action;
+		if ("setup".equals(action)) {
+			templateAction = "@ACTION_SETUP@";
+		} else if("change".equals(action)) {
+			templateAction = "@ACTION_CHANGE@";
+		} else if("delete".equals(action)) {
+			templateAction = "@ACTION_DELETE@";
+		}
 	    boolean ok = new EmailSenderTemplate()
 			    .load("cloud/web", lang)
-			    .set("ACTION", action)
+			    .set("ACTION", templateAction)
 			    .set("TOKEN", token)
 			    .to(email)
 			    .send()
