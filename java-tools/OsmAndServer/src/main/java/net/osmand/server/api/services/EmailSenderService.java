@@ -45,16 +45,16 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
     
-    public void sendOsmAndCloudRegistrationEmail(String email, String token, boolean newUser) throws FileNotFoundException, UnsupportedEncodingException {
+    public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) throws FileNotFoundException, UnsupportedEncodingException {
 		String subject = newUser ? "Welcome to OsmAnd Cloud" : "Register new device to OsmAnd Cloud";
 	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/register")
+			    .load("cloud/register", lang)
 			    .set("SUBJECT", subject)
 			    .set("TOKEN", token)
 			    .to(email)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ")");
+	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
     
     public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) throws FileNotFoundException, UnsupportedEncodingException {

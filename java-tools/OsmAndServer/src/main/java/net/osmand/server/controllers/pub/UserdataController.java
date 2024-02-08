@@ -226,7 +226,7 @@ public class UserdataController {
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
-			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
+			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, "en", true); // TODO lang
 		}
 		usersRepository.saveAndFlush(pu);
 		return userdataService.ok();
