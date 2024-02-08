@@ -200,12 +200,15 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// recursive fill such as A=1 B=@A@ C=@B@ is not supported now
+	// support 1st and 2nd level (A=1 B=@A@ C=@B@ is ok)
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
-			for (String key : vars.keySet()) {
-				filled = filled.replace("@" + key + "@", vars.get(key));
+			final int PASSES = 2; // enough
+			for (int i = 0; i < PASSES; i++) {
+				for (String key : vars.keySet()) {
+					filled = filled.replace("@" + key + "@", vars.get(key));
+				}
 			}
 			if (filled.matches("(?s)^.*@[A-Z_]+@.*$")) {
 				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z@");
