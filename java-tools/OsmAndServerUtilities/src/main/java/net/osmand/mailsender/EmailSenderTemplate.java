@@ -43,6 +43,7 @@ public class EmailSenderTemplate {
 
 	private SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
+	private String testEmailCopy; // TEST_EMAIL_COPY set by env
 	private List<String> toList = new ArrayList<>(); // added by to()
 	private HashMap<String, String> vars = new HashMap<>(); // set by set()
 	private String fromEmail, fromName, subject, body; // read from the template
@@ -84,6 +85,8 @@ public class EmailSenderTemplate {
 		if (apiKey != null) {
 			LOG.info("Using env SENDGRID_KEY: qwerty :-)");
 		}
+
+		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
 
 		this.sender = new SmtpSendGridSender(smtpServer, apiKey);
 	}
@@ -171,6 +174,7 @@ public class EmailSenderTemplate {
 		setVarsByTo(email);
 		toList.add(email);
 		totalEmails++;
+		addTestEmail();
 		return this;
 	}
 
@@ -179,6 +183,7 @@ public class EmailSenderTemplate {
 		setVarsByTo(emails.isEmpty() ? "no@email" : emails.get(0));
 		totalEmails += emails.size();
 		toList.addAll(emails);
+		addTestEmail();
 		return this;
 	}
 
@@ -451,6 +456,13 @@ public class EmailSenderTemplate {
 			}
 
 			return new Response(STATUS_CODE_SENT, "", null);
+		}
+	}
+
+	private void addTestEmail() {
+		if (testEmailCopy != null) {
+			toList.add(testEmailCopy);
+			totalEmails++;
 		}
 	}
 }
