@@ -10,8 +10,10 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -29,6 +31,8 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.MultiFinalRouteSegment;
@@ -57,7 +61,7 @@ public class HHRoutingShortcutCreator {
 	private static int THREAD_POOL = 2;
 	
 	private static String ROUTING_PROFILE = "car";
-	private static String[] ROUTING_PARAMS = new String[] { "" };
+	private static String ROUTING_PARAMS = "";
 
 	private static File sourceFile() {
 		CLEAN = true;
@@ -92,7 +96,7 @@ public class HHRoutingShortcutCreator {
 			if (a.startsWith("--routing_profile=")) {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
 			} else if (a.startsWith("--routing_params=")) {
-				ROUTING_PARAMS = a.substring("--routing_params=".length()).trim().split("---");
+				ROUTING_PARAMS = a.substring("--routing_params=".length()).trim();
 			} else if (a.startsWith("--threads=")) {
 				THREAD_POOL = Integer.parseInt(a.substring("--threads=".length()));
 			} else if (a.equals("--clean")) {
@@ -101,16 +105,30 @@ public class HHRoutingShortcutCreator {
 				onlyCompact = true;
 			}
 		}
+		String prefixName = new File(".").getCanonicalFile().getName();
+		if (args.length == 0) {
+			File dir = sourceFile();
+			if (!dir.isDirectory()) {
+				dir = dir.getParentFile();
+			}
+			prefixName = dir.getAbsolutePath() + "/" + sourceFile().getCanonicalFile().getName();
+		}
+		int ind = 0;
 		for (String routeProfile : ROUTING_PROFILE.split(",")) {
+			String[] differentProfiles = ROUTING_PARAMS.split("@");
+			String routeParamProfile = "";
+			if (ind < differentProfiles.length) {
+				routeParamProfile = differentProfiles[ind];
+			}
+			String[] params = routeParamProfile.split("---");
 			System.out.println("----------");
-			System.out.println("Process profile: " + routeProfile);
-			File folder = new File(".");
-			String name = folder.getCanonicalFile().getName() + "_" + routeProfile;
+			System.out.println("Process profile: " + routeProfile + " profiles " + Arrays.toString(params));
+			String name = prefixName + "_" + routeProfile;
 			File dbFile = new File(name + HHRoutingDB.EXT);
 			if (onlyCompact) {
-				File compactFile = new File(folder, name + HHRoutingDB.CEXT);
+				File compactFile = new File(name + HHRoutingDB.CEXT);
 				HHRoutingPreparationDB.compact(dbFile, compactFile);
-				new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
+				new HHRoutingOBFWriter(compactFile).writeFile(null, null, false);
 				return;
 			}
 			HHRoutingPreparationDB networkDB = new HHRoutingPreparationDB(dbFile);
@@ -118,10 +136,11 @@ public class HHRoutingShortcutCreator {
 				networkDB.recreateSegments();
 			}
 			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
-			createOSMNetworkPoints(new File(folder, name + "-pnts.osm"), totalPnts);
+			createOSMNetworkPoints(new File(name + "-pnts.osm"), totalPnts);
 			System.out.printf("Loaded %,d points\n", totalPnts.size());
-
-			for (String routingParam : ROUTING_PARAMS) {
+			
+			for (String routingParam : params) {
+				routingParam =routingParam .trim(); 
 				prepareContext = new HHRoutingPrepareContext(obfFile, routeProfile, routingParam.split(","));
 				int routingProfile = networkDB.insertRoutingProfile(routeProfile, routingParam);
 				HHRoutingShortcutCreator proc = new HHRoutingShortcutCreator();
@@ -131,12 +150,13 @@ public class HHRoutingShortcutCreator {
 				System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam,
 						segments);
 				Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB, routingProfile);
-				saveOsmFile(objects, new File(folder, name + "-hh.osm"));
+				saveOsmFile(objects, new File(name + "-hh.osm"));
 			}
 			networkDB.close();
-			File compactFile = new File(folder, name + HHRoutingDB.CEXT);
+			File compactFile = new File(name + HHRoutingDB.CEXT);
 			HHRoutingPreparationDB.compact(dbFile, compactFile);
-			new HHRoutingOBFWriter().writeFile(compactFile, null, null, false);
+			new HHRoutingOBFWriter(compactFile).writeFile(null, null, false);
+			ind++;
 		}
 	}
 	
@@ -183,6 +203,14 @@ public class HHRoutingShortcutCreator {
 		public BuildNetworkShortcutResult call() throws Exception {
 			RoutingContext ctx = context.get();
 			ctx = prepareContext.gcMemoryLimitToUnloadAll(ctx, null, ctx == null);
+			((GeneralRouter) ctx.getRouter()).clearCaches();
+			ctx.unloadAllData();
+			for (RouteRegion r : ctx.reverseMap.keySet()) {
+				for (RouteSubregion s : r.getSubregions()) {
+					s.subregions = null;
+					s.dataObjects = null;
+				}
+			}
 			context.set(ctx);
 			BuildNetworkShortcutResult res = new BuildNetworkShortcutResult();
 			res.taskId = taskId;
@@ -275,7 +303,7 @@ public class HHRoutingShortcutCreator {
 
 	}
 
-	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> pnts,HHRoutingPreparationDB networkDB, int routingProfile)
+	private Collection<Entity> buildNetworkShortcuts(TLongObjectHashMap<NetworkDBPoint> pnts, HHRoutingPreparationDB networkDB, int routingProfile)
 			throws InterruptedException, IOException, SQLException, ExecutionException {
 		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<>();
 		double sz = pnts.size() / 100.0;
@@ -301,8 +329,20 @@ public class HHRoutingShortcutCreator {
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			networkPointsByGeoId.put(pnt.getGeoPntId() , pnt);
 		}
-		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+		List<NetworkDBPoint> lst = new ArrayList<>(pnts.valueCollection());
+		lst.sort(new Comparator<NetworkDBPoint>() {
+
+			@Override
+			public int compare(NetworkDBPoint o1, NetworkDBPoint o2) {
+				// keep locality principle
+				return Integer.compare(o1.index, o2.index);
+			}
+		});
+		for (NetworkDBPoint pnt : lst) {
 			ind++;
+			if (pnt.connectedReverse.size() > 0) {
+				pnt.connectedReverse.clear();
+			}
 			if (pnt.connected.size() > 0) {
 				pnt.connected.clear(); // for gc
 				continue;
@@ -315,12 +355,12 @@ public class HHRoutingShortcutCreator {
 				break;
 			}
 			if (batch.size() == batchSize) {
-				results.add(
-						service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
+				results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
 				total += batch.size();
 				batch = new ArrayList<>();
 			}
 		}
+		System.gc();
 		total += batch.size();
 		results.add(service.submit(new BuildNetworkShortcutTask(this, batch, segments, networkPointsByGeoId, taskId++)));
 		logf("Scheduled %d tasks, %d total points", taskId, total);
@@ -361,6 +401,7 @@ public class HHRoutingShortcutCreator {
 
 							// clean up for gc
 							rpnt.connected.clear();
+							rpnt.connectedReverse.clear();
 						}
 						osmObjects.putAll(res.osmObjects);
 						it.remove();

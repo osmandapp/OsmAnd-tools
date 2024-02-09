@@ -99,6 +99,8 @@ import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
+import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -246,7 +248,7 @@ public class BinaryMapIndexWriter {
 	}
 	
 	
-	public void startHHRoutingIndex(long edition, String profile, String... params) throws IOException {
+	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable,  String... params) throws IOException {
 		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
@@ -254,6 +256,13 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILE_FIELD_NUMBER, profile);
 		for (String s : params) {
 			codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILEPARAMS_FIELD_NUMBER, s);
+		}
+		if (stringTable != null && stringTable.size() > 0) {
+			OsmandOdb.StringTable.Builder st = OsmandOdb.StringTable.newBuilder();
+			for (String s : stringTable) {
+				st.addS(s);
+			}
+			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.TAGVALUESTABLE_FIELD_NUMBER, st.build());
 		}
 	}
 
@@ -533,26 +542,32 @@ public class BinaryMapIndexWriter {
 		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
 	}
 	
-	public void writeHHRoutePoints(List<? extends NetworkDBPoint> l) throws IOException {
+	public void writeHHRoutePoints(List<NetworkDBPointWrite> l) throws IOException {
 		checkPeekState(ROUTE_TREE);
 		Bounds bounds = stackBounds.peek();
-		for (NetworkDBPoint p : l) {
+		for (NetworkDBPointWrite p : l) {
 			HHRouteNetworkPoint.Builder builder = HHRouteNetworkPoint.newBuilder();
-			builder.setClusterId(p.clusterId);
-			builder.setGlobalId(p.index);
-			builder.setId(p.fileId);
-			builder.setRoadId(p.roadId);
-			builder.setRoadStartEndIndex((p.start << 1) + (p.end > p.start ? 1 : 0));
-			builder.setDx(p.startX - bounds.leftX);
-			builder.setDy(p.startY - bounds.topY);
-			if (p.mapId > 1) {
-				builder.setPartialInd(p.mapId - 1);
-			} else if (p.mapId == 0) {
+			NetworkDBPoint pnt = p.pnt;
+			builder.setClusterId(pnt.clusterId);
+			builder.setGlobalId(pnt.index);
+			builder.setId(p.localId);
+			builder.setRoadId(pnt.roadId);
+			builder.setRoadStartEndIndex((pnt.start << 1) + (pnt.end > pnt.start ? 1 : 0));
+			builder.setDx(pnt.startX - bounds.leftX);
+			builder.setDy(pnt.startY - bounds.topY);
+			if (p.includeFlag > 1) {
+				builder.setPartialInd(p.includeFlag - 1);
+			} else if (p.includeFlag == 0) {
 				throw new IllegalStateException();
 			}
-			if (p.dualPoint != null) {
-				builder.setDualClusterId(p.dualPoint.clusterId);
-				builder.setDualPointId(p.dualPoint.index);
+			if (pnt.dualPoint != null) {
+				builder.setDualClusterId(pnt.dualPoint.clusterId);
+				builder.setDualPointId(pnt.dualPoint.index);
+			}
+			if (p.tagValuesInts != null) {
+				for (int tgv : p.tagValuesInts) {
+					builder.addTagValueIds(tgv);
+				}
 			}
 			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointsBox.POINTS_FIELD_NUMBER, builder.build());
 		}

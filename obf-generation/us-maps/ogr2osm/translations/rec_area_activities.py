@@ -46,17 +46,14 @@ class USFSRecreationAreaActivitiesTranslation(ogr2osm.TranslationBase):
 		OPENSTATUS = attrs['OPENSTATUS'].replace("none","").replace("not cleared","").replace("unknown","")
 
 		if 'RECAREANAME' in attrs and RECAREANAME:
-			tags['nfs_recreation_area_name'] = RECAREANAME
-		if 'MARKERACTIVITY' in attrs and MARKERACTIVITY:
+			tags['name'] = RECAREANAME
+		if 'MARKERACTIVITY' in attrs:
 			MARKERACTIVITYARRAY = MARKERACTIVITY.split(';')
-			tags['nfs_recreation_area_type'] = MARKERACTIVITYARRAY[0].strip()
-# 			if len(MARKERACTIVITYARRAY) == 2:
-# 				tags['nfs_recreation_area_type_2'] = MARKERACTIVITYARRAY[1]
-# 			if len(MARKERACTIVITYARRAY) > 2:
-# 				tags['nfs_recreation_area_type_2'] = MARKERACTIVITYARRAY[1]
-# 				tags['nfs_recreation_area_type_3'] = MARKERACTIVITYARRAY[2]
+			tags['nfs_recreation_area_marker_activity'] = MARKERACTIVITYARRAY[0].strip()
+			if not MARKERACTIVITY:
+				tags.update({'nfs_recreation_area_marker_activity':'default'})
 		if 'RECAREAURL' in attrs and RECAREAURL:
-			tags['nfs_recreation_area_url'] = RECAREAURL
+			tags['url'] = RECAREAURL
 		if 'FEEDESCRIPTION' in attrs and strip_tags(FEEDESCRIPTION):
 			tags['nfs_recreation_area_fee_description'] = strip_tags(FEEDESCRIPTION)
 		if 'OPEN_SEASON_START' in attrs and OPEN_SEASON_START:
@@ -72,13 +69,13 @@ class USFSRecreationAreaActivitiesTranslation(ogr2osm.TranslationBase):
 		if 'MARKERACTIVITYGROUP' in attrs and MARKERACTIVITYGROUP:
 			tags['nfs_recreation_area_marker_activity_group'] = MARKERACTIVITYGROUP.strip().lower().replace(" ;",";").replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").replace("&","and")
 		if 'RECAREADESCRIPTION' in attrs and strip_tags(RECAREADESCRIPTION):
-			tags['nfs_recreation_area_description'] = strip_tags(RECAREADESCRIPTION)
+			tags['description'] = strip_tags(RECAREADESCRIPTION)
 		if 'RESTRICTIONS' in attrs and strip_tags(RESTRICTIONS):
 			tags['nfs_recreation_area_restrictions'] = strip_tags(RESTRICTIONS)
 		if 'ACTIVITYDESCRIPTION' in attrs and ACTIVITYDESCRIPTION:
 			tags['nfs_recreation_area_activity_description'] = strip_tags(ACTIVITYDESCRIPTION)
 		if 'PARENTACTIVITYNAME' in attrs and PARENTACTIVITYNAME:
-			tags['nfs_recreation_area_parent_activity_name'] = PARENTACTIVITYNAME
+			tags['nfs_recreation_area_parent_activity_name'] = PARENTACTIVITYNAME.strip().lower().replace(" ;",";").replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").replace("&","and")
 		if 'ACTIVITYNAME' in attrs and ACTIVITYNAME:
 			ACTIVITYNAMEARRAY = ACTIVITYNAME.strip().lower().replace(" ;",";").replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").replace("&","and").split(';')
 			for activity in ACTIVITYNAMEARRAY:

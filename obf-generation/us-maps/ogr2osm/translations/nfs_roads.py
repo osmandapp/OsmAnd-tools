@@ -22,7 +22,7 @@ class USFSRoadsTranslation(ogr2osm.TranslationBase):
 		if 'ID' in attrs and ID:
 			tags['nfs_road_id'] = ID
 		if 'NAME' in attrs and NAME and NAME != 'NO NAME':
-			tags['nfs_road_name'] = NAME.lower().title().replace("'S ","'s ")
+			tags['name'] = NAME.lower().title().replace("'S ","'s ")
 
 		if 'OPER_MAINT' in attrs:
 			if '0' in OPER_MAINT_LEVEL:
