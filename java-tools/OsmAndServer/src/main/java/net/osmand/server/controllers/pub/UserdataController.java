@@ -183,6 +183,7 @@ public class UserdataController {
 	                                           @RequestParam(name = "deviceid", required = false) String deviceId,
 	                                           @RequestParam(name = "orderid", required = false) String orderid,
 	                                           @RequestParam(name = "login", required = false) boolean login,
+	                                           @RequestParam(name = "lang", required = false) String lang,
 	                                           HttpServletRequest request) throws FileNotFoundException, UnsupportedEncodingException {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
@@ -226,7 +227,8 @@ public class UserdataController {
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
-			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, true);
+			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
+			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		}
 		usersRepository.saveAndFlush(pu);
 		return userdataService.ok();
@@ -398,7 +400,7 @@ public class UserdataController {
 			if (dev == null) {
 				return userdataService.tokenNotValid();
 			}
-			return userdataService.sendCode(data.email, data.action, dev);
+			return userdataService.sendCode(data.email, data.action, data.lang, dev);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

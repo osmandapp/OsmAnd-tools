@@ -143,11 +143,13 @@ public class MapApiController {
 		public String username;
 		public String password;
 		public String token;
+		public String lang;
 	}
 	
 	public static class EmailSenderInfo {
 		public String email;
 		public String action;
+		public String lang;
 	}
 
 	@GetMapping(path = { "/auth/loginForm" }, produces = "text/html;charset=UTF-8")
@@ -234,7 +236,7 @@ public class MapApiController {
 	@ResponseBody
 	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
 			throws ServletException, IOException {
-		return userdataService.webUserRegister(us.username);
+		return userdataService.webUserRegister(us.username, us.lang);
 	}
 	
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
@@ -650,7 +652,7 @@ public class MapApiController {
 			if (dev == null) {
 				return tokenNotValid();
 			}
-			return userdataService.sendCode(data.email, data.action, dev);
+			return userdataService.sendCode(data.email, data.action, data.lang, dev);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

@@ -319,8 +319,10 @@ public class UserdataService {
         }
         return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
     }
-    
-	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email) throws IOException {
+
+	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email,
+	                                              @RequestParam(name = "lang", required = false) String lang)
+			throws IOException {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		if (!email.contains("@")) {
@@ -341,7 +343,7 @@ public class UserdataService {
 		}
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "setup");
+		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		return ok();
 	}
     
@@ -880,13 +882,13 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String email, String action, PremiumUserDevicesRepository.PremiumUserDevice dev) throws FileNotFoundException, UnsupportedEncodingException {
+    public ResponseEntity<String> sendCode(String email, String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) throws FileNotFoundException, UnsupportedEncodingException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudWebEmail(email, token, action);
+        emailSender.sendOsmAndCloudWebEmail(email, token, action, lang);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);

@@ -6,6 +6,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -38,10 +39,11 @@ Examples:
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
 
-	public String defaultTemplatesDirectory = "./web-server-config/templates/email";
+	public String defaultTemplatesDirectory = "/var/www-download/website/templates/email";
 
 	private SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
+	private String testEmailCopy; // TEST_EMAIL_COPY set by env
 	private List<String> toList = new ArrayList<>(); // added by to()
 	private HashMap<String, String> vars = new HashMap<>(); // set by set()
 	private String fromEmail, fromName, subject, body; // read from the template
@@ -84,6 +86,8 @@ public class EmailSenderTemplate {
 			LOG.info("Using env SENDGRID_KEY: qwerty :-)");
 		}
 
+		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
+
 		this.sender = new SmtpSendGridSender(smtpServer, apiKey);
 	}
 
@@ -120,7 +124,8 @@ public class EmailSenderTemplate {
 	}
 
 	// load template from file by template name and language code
-	public EmailSenderTemplate load(String template, String lang) throws FileNotFoundException {
+	public EmailSenderTemplate load(String template, @Nullable String langNullable) throws FileNotFoundException {
+		String lang = langNullable == null ? "en" : langNullable;
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 		include("header", lang, false); // optional
 		include(template, lang, true); // template required
@@ -169,6 +174,7 @@ public class EmailSenderTemplate {
 		setVarsByTo(email);
 		toList.add(email);
 		totalEmails++;
+		addTestEmail();
 		return this;
 	}
 
@@ -177,6 +183,7 @@ public class EmailSenderTemplate {
 		setVarsByTo(emails.isEmpty() ? "no@email" : emails.get(0));
 		totalEmails += emails.size();
 		toList.addAll(emails);
+		addTestEmail();
 		return this;
 	}
 
@@ -198,12 +205,15 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// recursive fill such as A=1 B=@A@ C=@B@ is not supported now
+	// support 1st and 2nd level (A=1 B=@A@ C=@B@ is ok)
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
-			for (String key : vars.keySet()) {
-				filled = filled.replace("@" + key + "@", vars.get(key));
+			final int PASSES = 2; // enough
+			for (int i = 0; i < PASSES; i++) {
+				for (String key : vars.keySet()) {
+					filled = filled.replace("@" + key + "@", vars.get(key));
+				}
 			}
 			if (filled.matches("(?s)^.*@[A-Z_]+@.*$")) {
 				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z@");
@@ -446,6 +456,13 @@ public class EmailSenderTemplate {
 			}
 
 			return new Response(STATUS_CODE_SENT, "", null);
+		}
+	}
+
+	private void addTestEmail() {
+		if (testEmailCopy != null) {
+			toList.add(testEmailCopy);
+			totalEmails++;
 		}
 	}
 }
