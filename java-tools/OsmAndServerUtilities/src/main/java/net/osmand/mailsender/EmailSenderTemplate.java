@@ -23,6 +23,7 @@ Environment:
 	SMTP_SERVER - address of smtp-server
 	EMAIL_TEMPLATES - path to templates directory
 	SENDGRID_KEY - SendGrid API key (optional for fallback)
+	TEST_EMAIL_COPY - copy each email to this address (testing)
 
 Special variables:
 
