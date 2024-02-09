@@ -78,26 +78,6 @@ public class EmailSenderService {
 	
 	public void sendOsmRecipientsDeleteEmail(String email) {
 		throw new IllegalStateException("sendOsmRecipientsDeleteEmail() is obsolete");
-//		LOGGER.info("Sending mail to: " + email);
-//		Email from = new Email(DEFAULT_MAIL_FROM);
-//		from.setName("OSM BTC");
-//		Email to = new Email(email);
-//		String topic = "Important message from OSM BTC!";
-//		String contentStr = "Dear OpenStreetMap Editor!" +
-//				"<br><br>" +
-//				"You received this message because OsmAnd suspect that you didn't follow OSM BTC guidelines and your account was suspended." +
-//                "Please contact our support if you believe it was done by mistake.<br>" +
-//				"<br><br>" +
-//				"Best Regards, <br>OsmAnd Team";
-//		Content content = new Content("text/html", contentStr);
-//		Mail mail = new Mail(from, topic, to, content);
-//		mail.from = from;
-//		try {
-//			Response response = wrapper.send(mail);
-//			LOGGER.info("Response code: " + response.getStatusCode());
-//		} catch (Exception e) {
-//			LOGGER.warn(e.getMessage(), e);
-//		}
 	}
 
 	public boolean isEmail(String comment) {
