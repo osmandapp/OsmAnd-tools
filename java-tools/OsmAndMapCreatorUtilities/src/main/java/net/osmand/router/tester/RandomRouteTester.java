@@ -126,9 +126,10 @@ public class RandomRouteTester {
 	private PrimaryRouting optPrimaryRouting;
 
 	private enum PrimaryRouting {
-		JAVA,
-		CPP,
-		HH
+		BRP_JAVA,
+		BRP_CPP,
+		HH_JAVA,
+		HH_CPP,
 	}
 
 	private long started;
@@ -203,12 +204,14 @@ public class RandomRouteTester {
 
 		// --avoid-java --avoid-cpp --avoid-hh additionally processed by collectRoutes()
 		if (opts.getOpt("--primary") != null) {
-			if ("java".equals(opts.getOpt("--primary"))) {
-				optPrimaryRouting = PrimaryRouting.JAVA;
-			} else if ("cpp".equals(opts.getOpt("--primary"))) {
-				optPrimaryRouting = PrimaryRouting.CPP;
-			} else if ("hh".equals(opts.getOpt("--primary"))) {
-				optPrimaryRouting = PrimaryRouting.HH;
+			if ("brp-java".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.BRP_JAVA;
+			} else if ("brp-cpp".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.BRP_CPP;
+			} else if ("hh-java".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.HH_JAVA;
+			} else if ("hh-cpp".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.HH_CPP;
 			}
 		}
 
@@ -236,15 +239,16 @@ public class RandomRouteTester {
 					"--max-inter=N number",
 					"--profile=profile,settings,key:value force one profile",
 					"",
-					"--primary=(java|cpp|hh) compare others against this",
-					"--avoid-java avoid BinaryRoutePlanner (java)",
-					"--avoid-cpp avoid BinaryRoutePlanner (cpp)",
-					"--avoid-hh avoid HHRoutePlanner (java)",
+					"--primary=(brp-java|brp-cpp|hh-java|hh-cpp) compare others against this",
+					"--avoid-brp-java avoid BinaryRoutePlanner (java)",
+					"--avoid-brp-cpp avoid BinaryRoutePlanner (cpp)",
+					"--avoid-hh-java avoid HHRoutePlanner (java)",
+					"--avoid-hh-cpp avoid HHRoutePlanner (cpp)",
 					"",
 					"--car-2phase use COMPLEX mode for car (Android default)",
 					"",
-					"--red= % red-color limit",
-					"--yellow= % yellow-color limit",
+					"--red=N % red-color limit",
+					"--yellow=N % yellow-color limit",
 					"",
 					"--help show help",
 					""
@@ -343,17 +347,21 @@ public class RandomRouteTester {
 				// if --primary option is used, --avoid-xxx is set here to avoid double-calls
 				if (optPrimaryRouting != null) {
 					switch (optPrimaryRouting) {
-						case JAVA:
-							opts.setOpt("--avoid-java", "true");
+						case BRP_JAVA:
+							opts.setOpt("--avoid-brp-java", "true");
 							entry.results.add(runBinaryRoutePlannerJava(entry));
 							break;
-						case CPP:
-							opts.setOpt("--avoid-cpp", "true");
+						case BRP_CPP:
+							opts.setOpt("--avoid-brp-cpp", "true");
 							entry.results.add(runBinaryRoutePlannerCpp(entry));
 							break;
-						case HH:
-							opts.setOpt("--avoid-hh", "true");
+						case HH_JAVA:
+							opts.setOpt("--avoid-hh-java", "true");
 							entry.results.add(runHHRoutePlannerJava(entry));
+							break;
+						case HH_CPP:
+							opts.setOpt("--avoid-hh-cpp", "true");
+							entry.results.add(runHHRoutePlannerCpp(entry));
 							break;
 						default:
 							throw new RuntimeException("Wrong primary routing defined");
@@ -361,14 +369,17 @@ public class RandomRouteTester {
 				}
 
 				// process --avoid-xxx options
-				if (opts.getOpt("--avoid-java") == null) {
+				if (opts.getOpt("--avoid-brp-java") == null) {
 					entry.results.add(runBinaryRoutePlannerJava(entry));
 				}
-				if (opts.getOpt("--avoid-cpp") == null) {
+				if (opts.getOpt("--avoid-brp-cpp") == null) {
 					entry.results.add(runBinaryRoutePlannerCpp(entry));
 				}
-				if (opts.getOpt("--avoid-hh") == null) {
+				if (opts.getOpt("--avoid-hh-java") == null) {
 					entry.results.add(runHHRoutePlannerJava(entry));
+				}
+				if (opts.getOpt("--avoid-hh-cpp") == null) {
+					entry.results.add(runHHRoutePlannerCpp(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
@@ -428,6 +439,11 @@ public class RandomRouteTester {
 		long runTime = System.currentTimeMillis() - started;
 
 		return new RandomRouteResult(useNative ? "cpp" : "java", entry, runTime, ctx, routeSegments);
+	}
+
+	private RandomRouteResult runHHRoutePlannerCpp(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+		// TODO
+		return null;
 	}
 
 	private RandomRouteResult runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
