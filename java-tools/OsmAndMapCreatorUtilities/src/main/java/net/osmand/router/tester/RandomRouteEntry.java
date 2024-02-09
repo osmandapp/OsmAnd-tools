@@ -61,14 +61,17 @@ class RandomRouteEntry {
 
 		// convert type->params to make navigation href
 		List<String> typeParams = new ArrayList<>(params);
-		if ("java".equals(TYPE)) {
-			typeParams.add("hhoff:true"); // set Disable HH = true (use nativerouting = false by default)
+		if ("brp-java".equals(TYPE)) {
+			typeParams.add("hhoff:true");
 		}
-		if ("cpp".equals(TYPE)) {
-			typeParams.add("hhoff:true,nativerouting:true"); // Disable HH = true, nativerouting = true
+		if ("brp-cpp".equals(TYPE)) {
+			typeParams.add("hhoff:true,nativerouting:true");
 		}
-		if ("hh".equals(TYPE)) {
-			typeParams.add("hhonly:true"); // force HH by hidden hhonly API-option
+		if ("hh-java".equals(TYPE)) {
+			typeParams.add("hhonly:true");
+		}
+		if ("hh-cpp".equals(TYPE)) {
+			typeParams.add("hhonly:true,nativerouting:true");
 		}
 
 		String hasParams = typeParams.size() > 0 ? "&params=" : "";

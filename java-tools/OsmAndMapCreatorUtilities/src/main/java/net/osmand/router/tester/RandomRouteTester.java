@@ -26,16 +26,17 @@ public class RandomRouteTester {
 		};
 
 		// random tests settings
-		int ITERATIONS = 50; // number of random routes
+		int ITERATIONS = 10; // number of random routes
 		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (0)
 		int MIN_DISTANCE_KM = 50; // min distance between start and finish (50)
 		int MAX_DISTANCE_KM = 100; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
-		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (0-100)
+		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (emulate device speed) (0-100)
+
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
 				"bicycle",
-				"pedestrian",
+//				"pedestrian",
 
 //				"car,short_way",
 //				"bicycle,short_way",
@@ -438,15 +439,18 @@ public class RandomRouteTester {
 		List<RouteSegmentResult> routeSegments = res != null ? res.getList() : new ArrayList<>();
 		long runTime = System.currentTimeMillis() - started;
 
-		return new RandomRouteResult(useNative ? "cpp" : "java", entry, runTime, ctx, routeSegments);
-	}
-
-	private RandomRouteResult runHHRoutePlannerCpp(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
-		// TODO
-		return null;
+		return new RandomRouteResult(useNative ? "brp-cpp" : "brp-java", entry, runTime, ctx, routeSegments);
 	}
 
 	private RandomRouteResult runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+		return runHHRoutePlanner(entry, false);
+	}
+
+	private RandomRouteResult runHHRoutePlannerCpp(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+		return runHHRoutePlanner(entry, true);
+	}
+
+	private RandomRouteResult runHHRoutePlanner(RandomRouteEntry entry, boolean useNative) throws SQLException, IOException, InterruptedException {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
@@ -463,10 +467,12 @@ public class RandomRouteTester {
 
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
-				null,
+				useNative ? nativeLibrary : null,
 				obfReaders.toArray(new BinaryMapIndexReader[0]),
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
 		);
+
+		fe.setHHRouteCpp(useNative);
 
 //		RoutePlannerFrontEnd.HH_ROUTING_CONFIG = null; // way to set config for hh
 
@@ -474,7 +480,7 @@ public class RandomRouteTester {
 		List<RouteSegmentResult> routeSegments = res != null ? res.getList() : new ArrayList<>();
 		long runTime = System.currentTimeMillis() - started;
 
-		return new RandomRouteResult("hh", entry, runTime, ctx, routeSegments);
+		return new RandomRouteResult(useNative ? "hh-cpp" : "hh-java", entry, runTime, ctx, routeSegments);
 	}
 
 	private void loadNativeLibrary() {
