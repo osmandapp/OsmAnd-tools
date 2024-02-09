@@ -14,12 +14,11 @@ public class EmailSenderService {
 	public static void test(String[] args) throws FileNotFoundException, UnsupportedEncodingException {
 		EmailSenderService sender = new EmailSenderService();
 		String email = "dmarc-reports@osmand.net";
-//		sender.sendOsmRecipientsDeleteEmail(email); // obsolete
-//		sender.sendOsmAndCloudPromoEmail(email, "promo"); // test ok
-//		sender.sendOsmAndCloudWebEmail(email, "token", "action"); // test ok
-//		sender.sendOsmAndCloudRegistrationEmail(email, "token", true); // test ok
-//		sender.sendPromocodesEmails(email, "promocode/android", "ANDROID"); // test ok
-//		sender.sendPromocodesEmails(email, "promocode/ios", "IOS"); // test ok
+		sender.sendOsmAndCloudPromoEmail(email, "promo");
+		sender.sendOsmAndCloudWebEmail(email, "token", "en", "delete");
+		sender.sendOsmAndCloudRegistrationEmail(email, "token", "en", true);
+		sender.sendPromocodesEmails(email, "promocode/android", "ANDROID");
+		sender.sendPromocodesEmails(email, "promocode/ios", "IOS");
 	}
 
     private static final Log LOGGER = LogFactory.getLog(EmailSenderService.class);
@@ -77,7 +76,7 @@ public class EmailSenderService {
     }
 	
 	public void sendOsmRecipientsDeleteEmail(String email) {
-		throw new IllegalStateException("sendOsmRecipientsDeleteEmail() is obsolete");
+		throw new IllegalStateException("sendOsmRecipientsDeleteEmail() is obsolete"); // a895722f1
 	}
 
 	public boolean isEmail(String comment) {
