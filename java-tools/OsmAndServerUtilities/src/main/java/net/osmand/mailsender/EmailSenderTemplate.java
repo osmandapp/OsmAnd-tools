@@ -40,7 +40,7 @@ Examples:
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
 
-	public String defaultTemplatesDirectory = "/var/www-download/website/templates/email";
+	public String defaultTemplatesDirectory = "./templates";
 
 	private SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
@@ -310,7 +310,8 @@ public class EmailSenderTemplate {
 
 		if (foundFile == null) {
 			if (required) {
-				throw new IllegalStateException(template + " template is not found. Use web-server-config repo.");
+				throw new IllegalStateException(template + ": template not found in " + defaultTemplatesDirectory +
+						" - fetch web-server-config and set EMAIL_TEMPLATES=/path/to/templates/email (environment)");
 			}
 			return; // silent
 		}
