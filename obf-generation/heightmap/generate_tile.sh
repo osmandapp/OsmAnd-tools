@@ -8,6 +8,7 @@
 
 # Fail on any error
 set -e
+#set -xe
 
 VERBOSE_PARAM=""
 SRC_PATH=$(dirname "$0")
