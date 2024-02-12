@@ -25,6 +25,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
@@ -261,7 +262,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		return storage;
 	}
 
-	public ByteBuffer render(RenderingImageContext renderingImageContext) throws IOException {
+	public RenderingGenerationResult render(RenderingImageContext renderingImageContext) throws IOException {
 		long time = -System.currentTimeMillis();
 		RenderingContext renderingContext = new RenderingContext() {
 			@Override
@@ -343,9 +344,10 @@ public class NativeJavaRendering extends NativeLibrary {
 		renderingContext.saveTextTile = renderingImageContext.saveTxt;
 		long search = time + System.currentTimeMillis();
 		
-		final RenderingGenerationResult rres = NativeLibrary.generateRenderingIndirect(renderingContext, res.nativeHandler,
+		RenderingGenerationResult generationResult = NativeLibrary.generateRenderingIndirect(renderingContext, res.nativeHandler,
 				false, request, true);
 		List<RenderableObject> renderableObjects = new Gson().fromJson(renderingContext.textTile,  new TypeToken<List<RenderableObject>>(){}.getType());
+		generationResult.setInfo(RenderableObject.createGeoJson(renderableObjects));
 		
 		long rendering = time + System.currentTimeMillis() - search;
 		renderingImageContext.searchTime = search;
@@ -353,20 +355,20 @@ public class NativeJavaRendering extends NativeLibrary {
 		renderingImageContext.context = renderingContext;
 		res.deleteNativeResult();
 		
-		return rres.bitmapBuffer;
+		return generationResult;
 	}
 	
 	
-	public BufferedImage renderImage(RenderingImageContext rctx) throws IOException {
-		ByteBuffer bitmapBuffer = render(rctx);
+	public RenderingGenerationResult renderImage(RenderingImageContext renderingImageContext) throws IOException {
+		RenderingGenerationResult generationResult = render(renderingImageContext);
 		InputStream inputStream = new InputStream() {
 			int nextInd = 0;
 			@Override
-			public int read() throws IOException {
-				if(nextInd >= bitmapBuffer.capacity()) {
+			public int read() {
+				if(nextInd >= generationResult.getBitmapBuffer().capacity()) {
 					return -1;
 				}
-				byte b = bitmapBuffer.get(nextInd++) ;
+				byte b = generationResult.getBitmapBuffer().get(nextInd++) ;
 				if(b < 0) {
 					return b + 256;
 				} else {
@@ -378,8 +380,10 @@ public class NativeJavaRendering extends NativeLibrary {
 		ImageReader reader = readers.next();
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
-		AllocationUtil.freeDirectBuffer(bitmapBuffer);
-		return img;
+		AllocationUtil.freeDirectBuffer(generationResult.getBitmapBuffer());
+		generationResult.setImg(img);
+		
+		return generationResult;
 	}
 
 	public void initFilesInDir(File filesDir) throws IOException {

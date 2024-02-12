@@ -14,7 +14,11 @@ import java.util.zip.ZipInputStream;
 import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.osmand.IndexConstants;
+import net.osmand.NativeLibrary;
 import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.server.utils.WebGpxParser;
@@ -390,6 +394,7 @@ public class OsmAndMapsService {
 		public final int tileSizeLog;
 		public final VectorStyle style;
 		private final VectorTileServerConfig cfg;
+		private JsonObject info;
 
 		public VectorMetatile(VectorTileServerConfig cfg, String tileId, VectorStyle style, int z, int left, int top,
 				int metaSizeLog, int tileSizeLog) {
@@ -402,6 +407,14 @@ public class OsmAndMapsService {
 			this.top = top;
 			this.z = z;
 			touch();
+		}
+		
+		public void setInfo(JsonObject info) {
+			this.info = info;
+		}
+		
+		public JsonObject getInfo() {
+			return info;
 		}
 
 		public void touch() {
@@ -425,21 +438,41 @@ public class OsmAndMapsService {
 			if (img != null) {
 				return img;
 			}
-			File cf = getCacheFile();
+			File cf = getCacheFile(".png");
 			if (cf != null && cf.exists()) {
 				runtimeImage = ImageIO.read(cf);
 				return runtimeImage;
 			}
 			return null;
 		}
+		
+		public JsonObject getCacheRuntimeInfo() throws IOException {
+			JsonObject tileInfo = getInfo();
+			if (tileInfo != null) {
+				return tileInfo;
+			}
+			File cf = getCacheFile(".json");
+			if (cf != null && cf.exists()) {
+				String jsonStr = new String(Files.readAllBytes(cf.toPath()));
+				JsonParser parser = new JsonParser();
+				tileInfo = parser.parse(jsonStr).getAsJsonObject();
+				return tileInfo;
+			}
+			return null;
+		}
 
-		public File getCacheFile() {
+		public File getCacheFile(String ext) {
 			if (z > cfg.maxZoomCache || cfg.cacheLocation == null || cfg.cacheLocation.length() == 0) {
 				return null;
 			}
 			int x = left >> (31 - z) >> metaSizeLog;
 			int y = top >> (31 - z) >> metaSizeLog;
 			StringBuilder loc = new StringBuilder();
+			
+			if (ext.equals(".json")) {
+				loc.append("info").append("/");
+			}
+			
 			loc.append(style.key).append("/").append(z);
 			while (x >= MAX_FILES_PER_FOLDER) {
 				int nx = x % MAX_FILES_PER_FOLDER;
@@ -453,7 +486,7 @@ public class OsmAndMapsService {
 				y = (y - ny) / MAX_FILES_PER_FOLDER;
 			}
 			loc.append("/").append(y);
-			loc.append("-").append(metaSizeLog).append("-").append(tileSizeLog).append(".png");
+			loc.append("-").append(metaSizeLog).append("-").append(tileSizeLog).append(ext);
 			return new File(cfg.cacheLocation, loc.toString());
 		}
 	}
@@ -586,6 +619,7 @@ public class OsmAndMapsService {
 			VectorMetatile rendered = tileCache.get(tile.key);
 			if (rendered != null && rendered.runtimeImage != null) {
 				tile.runtimeImage = rendered.runtimeImage;
+				tile.setInfo(rendered.getInfo());
 				return null;
 			}
 			int imgTileSize = (256 << tile.tileSizeLog) << Math.min(tile.z, tile.metaSizeLog);
@@ -627,13 +661,16 @@ public class OsmAndMapsService {
 				return ResponseEntity.badRequest().body(String.format("Metatile has wrong size (%d != %d)", imgTileSize,
 						ctx.width << tile.tileSizeLog));
 			}
-			tile.runtimeImage = nativelib.renderImage(ctx);
+			NativeLibrary.RenderingGenerationResult result = nativelib.renderImage(ctx);
+			tile.runtimeImage = result.getImg();
 			if (tile.runtimeImage != null) {
-				File cacheFile = tile.getCacheFile();
+				tile.setInfo(result.getInfo());
+				File cacheFile = tile.getCacheFile(".png");
 				if (cacheFile != null) {
 					cacheFile.getParentFile().mkdirs();
 					if (cacheFile.getParentFile().exists()) {
 						ImageIO.write(tile.runtimeImage, "png", cacheFile);
+						buildCacheFileInfo(tile);
 					}
 				}
 			}
@@ -642,6 +679,19 @@ public class OsmAndMapsService {
 			System.out.println(msg);
 			// LOGGER.debug();
 			return null;
+		}
+	}
+	
+	private void buildCacheFileInfo(VectorMetatile tile) throws IOException {
+		File cacheFileInfo = tile.getCacheFile(".json");
+		if (cacheFileInfo != null) {
+			cacheFileInfo.getParentFile().mkdirs();
+			if (cacheFileInfo.getParentFile().exists()) {
+				JsonObject info = tile.getInfo();
+				if (info != null) {
+					Files.write(cacheFileInfo.toPath(), info.toString().getBytes());
+				}
+			}
 		}
 	}
 
@@ -1282,5 +1332,49 @@ public class OsmAndMapsService {
 		}
 		
 		return targetObf;
+	}
+	
+	public JsonObject getTileInfo(JsonObject tileInfo, int x, int y, int z) {
+		JsonObject subInfo = new JsonObject();
+		JsonArray featuresArray = tileInfo.getAsJsonArray("features");
+		JsonArray newFeaturesArray = new JsonArray();
+		for (int i = 0; i < featuresArray.size(); i++) {
+			JsonObject featureObject = featuresArray.get(i).getAsJsonObject();
+			JsonObject geometryObject = featureObject.getAsJsonObject("geometry");
+			JsonArray coordinatesArray = geometryObject.getAsJsonArray("coordinates");
+			
+			for (int j = 0; j < coordinatesArray.size(); j++) {
+				JsonArray pointArray = coordinatesArray.get(j).getAsJsonArray();
+				double lat = pointArray.get(0).getAsDouble();
+				double lon = pointArray.get(1).getAsDouble();
+				
+				if (isPointInTile(lat, lon, x, y, z)) {
+					newFeaturesArray.add(featureObject);
+					break;
+				}
+			}
+		}
+		
+		subInfo.addProperty("type", "FeatureCollection");
+		subInfo.add("features", newFeaturesArray);
+		
+		return subInfo;
+	}
+	
+	private boolean isPointInTile(double lat, double lon, int tileX, int tileY, int zoom) {
+		
+		double xmin = MapUtils.getLongitudeFromTile(zoom, tileX);
+		double xmax = MapUtils.getLongitudeFromTile(zoom, tileX + 1);
+		double ymin = MapUtils.getLatitudeFromTile(zoom, tileY + 1);
+		double ymax = MapUtils.getLatitudeFromTile(zoom, tileY);
+		
+		if (lat < ymin || lat >= ymax) {
+			return false;
+		}
+		
+		if (lon < xmin || lon >= xmax) {
+			return false;
+		}
+		return true;
 	}
 }

@@ -6,13 +6,14 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
+import com.google.gson.JsonObject;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.xml.sax.SAXException;
@@ -75,7 +76,6 @@ public class VectorTileController {
 		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y);
 		// for local debug :
 		// BufferedImage img = null;
-		
 		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
 		if (img == null) {
@@ -93,5 +93,21 @@ public class VectorTileController {
 		ImageIO.write(subimage, "png", baos);
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
 	}
-
+	
+	@GetMapping(path = "/info/{style}/{z}/{x}/{y}.json", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<String> getTileInfo(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y) throws IOException {
+		VectorStyle vectorStyle = osmAndMapsService.getStyle(style);
+		if (vectorStyle == null) {
+			return ResponseEntity.badRequest().body("Rendering style is undefined: " + style);
+		}
+		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y);
+		JsonObject tileInfo = osmAndMapsService.getTileInfo(tile.getCacheRuntimeInfo(), x, y, z);
+		tile.touch();
+		if (tileInfo == null) {
+			return ResponseEntity.badRequest().body("Unexpected error during rendering");
+		}
+		osmAndMapsService.cleanupCache();
+		
+		return ResponseEntity.ok(String.valueOf(tileInfo));
+	}
 }

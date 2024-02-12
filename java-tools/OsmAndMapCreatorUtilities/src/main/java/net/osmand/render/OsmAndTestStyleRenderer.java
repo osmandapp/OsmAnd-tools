@@ -258,7 +258,7 @@ public class OsmAndTestStyleRenderer {
 					if (txtFile != null) {
 						ctx.saveTxt = true;
 					}
-					BufferedImage img = pms.nsr.renderImage(ctx);
+					BufferedImage img = pms.nsr.renderImage(ctx).getImg();
 					ImageIO.write(img, ext, outFile);
 					if (txtFile != null && !Algorithms.isEmpty(ctx.context.textTile)) {
 						FileWriter fr = new FileWriter(txtFile);

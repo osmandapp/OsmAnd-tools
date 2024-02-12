@@ -31,6 +31,7 @@ import javax.xml.transform.stream.StreamResult;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
 
+import net.osmand.NativeLibrary;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -275,9 +276,9 @@ public class OsmAndImageRendering {
 					final String fileName = ic.generateName + ".png";
 					System.out.println("Generate to " + fileName);
 					nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
-					BufferedImage mg = nsr.renderImage(
+					NativeLibrary.RenderingGenerationResult generationResult = nsr.renderImage(
 							new RenderingImageContext(lat, lon, imageWidth, imageHeight, ic.zoom, ic.mapDensity));
-
+					BufferedImage mg = generationResult.getImg();
 					ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
 
 					if (html != null) {
