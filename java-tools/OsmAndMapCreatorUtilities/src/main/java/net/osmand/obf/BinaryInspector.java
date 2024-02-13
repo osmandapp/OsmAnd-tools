@@ -1320,14 +1320,14 @@ public class BinaryInspector {
 		println("\nStops:");
 		for (TransportStop s : stops) {
 			lrs.clear();
-			for (int pnt : s.getReferencesToRoutes()) {
+			for (long pnt : s.getReferencesToRoutes()) {
 				TransportRoute route;
-				if (!rs.containsKey((long) pnt)) {
-					TIntObjectHashMap<TransportRoute> pts = index.getTransportRoutes(new int[] { pnt });
+				if (!rs.containsKey(pnt)) {
+					TLongObjectHashMap<TransportRoute> pts = index.getTransportRoutes(new long[] { pnt });
 					route = pts.valueCollection().iterator().next();
-					rs.put((long) pnt, route);
+					rs.put(pnt, route);
 				} else {
-					route = rs.get((long) pnt);
+					route = rs.get(pnt);
 				}
 				if (route != null) {
 					//lrs.add(route.getRef() + " " + route.getName(verbose.lang));
