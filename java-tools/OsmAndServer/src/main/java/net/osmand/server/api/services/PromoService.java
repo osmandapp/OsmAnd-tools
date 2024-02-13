@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
 import java.io.FileNotFoundException;
-import java.io.UnsupportedEncodingException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -42,7 +41,7 @@ public class PromoService {
 	}
 
 	@Transactional
-	public ResponseEntity<String> addUser(String name, String email) throws FileNotFoundException, UnsupportedEncodingException {
+	public ResponseEntity<String> addUser(String name, String email) throws FileNotFoundException {
 		PromoCampaignRepository.Promo promoCampaign = promoCampaignRepository.findByName(name);
 		ResponseEntity<String> error = validatePromo(promoCampaign);
 		if (error == null) {
@@ -101,7 +100,7 @@ public class PromoService {
 		return emails.substring(0, emails.length() - 3);
 	}
 
-	public PromoResponse createPromoSubscription(String email, String key, Date expireTime) throws FileNotFoundException, UnsupportedEncodingException {
+	public PromoResponse createPromoSubscription(String email, String key, Date expireTime) throws FileNotFoundException {
 		email = email.toLowerCase().trim();
 		DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
 		deviceSub.sku = key;

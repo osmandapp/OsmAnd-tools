@@ -882,7 +882,7 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String email, String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) throws FileNotFoundException, UnsupportedEncodingException {
+    public ResponseEntity<String> sendCode(String email, String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) throws FileNotFoundException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");

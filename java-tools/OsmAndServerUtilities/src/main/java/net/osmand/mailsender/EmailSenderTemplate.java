@@ -80,7 +80,7 @@ public class EmailSenderTemplate {
 	private String fromEmail, fromName, subject, body; // read from the template
 	private HashMap<String, String> headers = new HashMap<>(); // optional email headers (read from the template)
 
-	public static void test(String[] args) throws FileNotFoundException, UnsupportedEncodingException {
+	public static void test(String[] args) throws FileNotFoundException {
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load("cloud/web", "en")
 				.to("dmarc-reports@osmand.net")
@@ -122,7 +122,7 @@ public class EmailSenderTemplate {
 		this.sender = new SmtpSendGridSender(smtpServer, apiKey);
 	}
 
-	public EmailSenderTemplate send() throws UnsupportedEncodingException {
+	public EmailSenderTemplate send() {
 		validateLoadedTemplates(); // final validation before send
 
 		for (String to : toList) {
@@ -192,7 +192,7 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	public EmailSenderTemplate to(String email) throws UnsupportedEncodingException {
+	public EmailSenderTemplate to(String email) {
 		setVarsByTo(email);
 		toList.add(email);
 		totalEmails++;
@@ -200,7 +200,7 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	public EmailSenderTemplate to(List<String> emails) throws UnsupportedEncodingException {
+	public EmailSenderTemplate to(List<String> emails) {
 		setVarsByTo(emails.isEmpty() ? "no@email" : emails.get(0));
 		totalEmails += emails.size();
 		toList.addAll(emails);
@@ -240,10 +240,15 @@ public class EmailSenderTemplate {
 	}
 
 	// should be called with distinct To before each send() iteration
-	private void setVarsByTo(String to) throws UnsupportedEncodingException {
-		String to64 = URLEncoder.encode(Base64.getEncoder().encodeToString(to.getBytes()), "UTF-8");
-		set("TO", URLEncoder.encode(to, "UTF-8")); // @TO@
-		set("TO_BASE64", to64); // @TO_BASE64@
+	private void setVarsByTo(String to) {
+		try {
+			String to64 = null;
+			to64 = URLEncoder.encode(Base64.getEncoder().encodeToString(to.getBytes()), "UTF-8");
+			set("TO", URLEncoder.encode(to, "UTF-8")); // @TO@
+			set("TO_BASE64", to64); // @TO_BASE64@
+		} catch (UnsupportedEncodingException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	private void validateLoadedTemplates() {

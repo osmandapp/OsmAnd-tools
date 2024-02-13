@@ -184,7 +184,7 @@ public class UserdataController {
 	                                           @RequestParam(name = "orderid", required = false) String orderid,
 	                                           @RequestParam(name = "login", required = false) boolean login,
 	                                           @RequestParam(name = "lang", required = false) String lang,
-	                                           HttpServletRequest request) throws FileNotFoundException, UnsupportedEncodingException {
+	                                           HttpServletRequest request) throws FileNotFoundException {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmail(email);
@@ -394,7 +394,7 @@ public class UserdataController {
 	@ResponseBody
 	public ResponseEntity<String> sendCode(@RequestBody MapApiController.EmailSenderInfo data,
 	                                       @RequestParam(name = "deviceid") int deviceId,
-	                                       @RequestParam String accessToken) throws FileNotFoundException, UnsupportedEncodingException {
+	                                       @RequestParam String accessToken) throws FileNotFoundException {
 		if (emailSender.isEmail(data.email)) {
 			PremiumUserDevice dev = checkToken(deviceId, accessToken);
 			if (dev == null) {

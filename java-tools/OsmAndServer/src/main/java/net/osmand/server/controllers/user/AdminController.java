@@ -182,7 +182,7 @@ public class AdminController {
 	}
 	
 	@PostMapping(path = {"/register-promo"})
-	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) throws FileNotFoundException, UnsupportedEncodingException {
+	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) throws FileNotFoundException {
 		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, PROMO_WEBSITE, null);
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(resp.deviceSub));
 		return "redirect:info#audience";
@@ -363,7 +363,7 @@ public class AdminController {
 			@RequestParam(required = true) String name, 
 			@RequestParam(required = true) String email, 
 			@RequestParam(required = true) int promocodes, 
-			final RedirectAttributes redirectAttrs) throws JsonProcessingException, FileNotFoundException, UnsupportedEncodingException {
+			final RedirectAttributes redirectAttrs) throws JsonProcessingException, FileNotFoundException {
 		// seriesRepo
 		Optional<LotterySeries> obj = seriesRepo.findById(name);
 		if(!obj.isPresent() || obj.get().status != LotteryStatus.NOTPUBLIC) {

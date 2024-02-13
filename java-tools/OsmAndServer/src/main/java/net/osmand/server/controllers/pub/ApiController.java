@@ -3,7 +3,6 @@ package net.osmand.server.controllers.pub;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -603,7 +602,7 @@ public class ApiController {
 	
 	@PostMapping(path = {"/promo-add-user"})
 	public ResponseEntity<String> addUser(@RequestParam String promoKey,
-	                                      @RequestParam String userEmail) throws FileNotFoundException, UnsupportedEncodingException {
+	                                      @RequestParam String userEmail) throws FileNotFoundException {
 		synchronized (this) {
 			return promoService.addUser(promoKey, userEmail);
 		}
