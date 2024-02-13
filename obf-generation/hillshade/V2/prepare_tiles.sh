@@ -13,7 +13,7 @@ rm -f allheighttiles_tifheightmap.vrt
 
 TILE_RANGE="N63-66W010-030"
 TYPE=tifheightmap # hillshade/slope/tifheightmap # Type of tiles to generate
-TERRAIN=/mnt/wd_2tb/ArticDEM/10m/tiles_fiiled_3602 # path to folder with terrain tiles
+TERRAIN=/mnt/wd_2tb/ArticDEM/10m/tiles_fiiled # path to folder with terrain tiles
 TIFFHEIGHTMAP_OUTPUT=/mnt/wd_2tb/ArticDEM/10m/tiffheightmap
 SQLITEDB_OUTPUT=/mnt/wd_2tb/ArticDEM/10m/${TYPE}-tiles
 GENERATE_TILE_SCRIPTS_PATH=/home/xmd5a/git/OsmAnd-tools/obf-generation/heightmap # see https://github.com/osmandapp/OsmAnd-tools/tree/master/obf-generation/heightmap

@@ -152,7 +152,7 @@ if [ ! -f "$WORK_PATH/${TYPE}_grid.tif" ]; then
     echo "Baking Tile GeoTIFF..."
     gdal_translate -of GTiff -strict -epo \
         -projwin $(($LON - $DELTA)) $(($LAT + 1 + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - $DELTA)) \
-        -mo "AREA_OR_POINT=POINT" -ot Int16 -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
+        -mo "AREA_OR_POINT=POINT" -ot Int16 -co "COMPRESS=LZW" -co "PREDICTOR=2" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
         "allheighttiles_$TYPE.vrt" "$WORK_PATH/${TYPE}_grid.tif"
 fi
 
@@ -173,7 +173,7 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
         fi
       fi
       PIXEL_SIZE=$(printf "%.17g" $((40075016.68557848615314309804 / (2 ** $ZOOM * $TILE_SIZE))))
-      gdalwarp -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -ot Int16 -co "SPARSE_OK=TRUE" \
+      gdalwarp -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "PREDICTOR=2" -ot Int16 -co "SPARSE_OK=TRUE" \
         -t_srs "+init=epsg:3857 +over" -r cubic -multi \
         -tr $PIXEL_SIZE $PIXEL_SIZE -tap \
         "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/${TYPE}_mercator.tif"
@@ -188,45 +188,45 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
       # Step 5. Generate tiles that overlap each other by 1 heixel
       echo "Overlapping..."
       mkdir -p "$WORK_PATH/tiles"
-      "$SRC_PATH/overlap.py" --driver=GTiff --driver-options="COMPRESS=LZW" --extension=tif $VERBOSE_PARAM \
+      "$SRC_PATH/overlap.py" --driver=GTiff --driver-options="COMPRESS=LZW;PREDICTOR=2" --extension=tif $VERBOSE_PARAM \
           "$WORK_PATH/rawtiles" "$WORK_PATH/tiles"
     else
       # Alternative Steps 4-5. Slice projected GeoTIFF to overlapped tiles of specified size and zoom level
       echo "Generating tile GeoTIFFs..."
       "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 \
-          --driver=GTiff --driver-options="COMPRESS=LZW" --extension=tif $VERBOSE_PARAM \
+          --driver=GTiff --driver-options="COMPRESS=LZW;PREDICTOR=2" --extension=tif $VERBOSE_PARAM \
           "$WORK_PATH/${TYPE}_mercator.tif" "$OUTPUT_PATH"
     fi
 else
     echo "Calculating base slope..."
-    gdaldem slope          -co "COMPRESS=LZW" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_slope.tif"
+    gdaldem slope -co "COMPRESS=LZW" -co "PREDICTOR=2" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_slope.tif"
 
     if [ "$TYPE" = "composite" ] || [ "$TYPE" = "hillshade" ]; then
       COLOR_SCHEME="${COLOR_SCHEME:-hillshade_alpha}"
       ZOOM_RANGE=4-12
       TARGET_FILE=hillshade.tif
       echo "Calculating base hillshade..."
-      gdaldem hillshade -z 2 -co "COMPRESS=LZW" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_hillshade.tif"
-	    gdaldem color-relief -co "COMPRESS=LZW" "$WORK_PATH/base_slope.tif" "$SRC_PATH/color/color_slope.txt" "$WORK_PATH/base_hillshade_slope.tif"
+      gdaldem hillshade -z 2 -co "COMPRESS=LZW" -co "PREDICTOR=2" -s 111120 -compute_edges "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/base_hillshade.tif"
+      gdaldem color-relief -co "COMPRESS=LZW" -co "PREDICTOR=2" "$WORK_PATH/base_slope.tif" "$SRC_PATH/color/color_slope.txt" "$WORK_PATH/base_hillshade_slope.tif"
     
       # merge composite hillshade / slope
       echo "Calculate composite hillshade..."
       composite -quiet -compose Multiply "$WORK_PATH/base_hillshade.tif" "$WORK_PATH/base_hillshade_slope.tif" "$WORK_PATH/pre_composite_hillshade.tif"
       convert -level 28%x70% "$WORK_PATH/pre_composite_hillshade.tif" "$WORK_PATH/pre_composite_convert.tif"
       "$SRC_PATH/gdalcopyproj.py" "$WORK_PATH/base_hillshade.tif" "$WORK_PATH/pre_composite_convert.tif"
-      gdalwarp -of GTiff -ot Int16 -co "COMPRESS=LZW" "$WORK_PATH/pre_composite_convert.tif" "$WORK_PATH/base_composite_hillshade.tif"
+      gdalwarp -of GTiff -ot Int16 -co "COMPRESS=LZW" -co "PREDICTOR=2" "$WORK_PATH/pre_composite_convert.tif" "$WORK_PATH/base_composite_hillshade.tif"
 
       # hillshade
       echo "Calculating hillshade..."
-      gdaldem color-relief -alpha "$WORK_PATH/base_composite_hillshade.tif" "$SRC_PATH/color/$COLOR_SCHEME.txt" "$WORK_PATH/hillshade-color.tif" -co "COMPRESS=LZW" 
-      gdal_translate -b 1 -b 4 -colorinterp_1 gray "$WORK_PATH/hillshade-color.tif" "$WORK_PATH/hillshade.tif" -co "COMPRESS=LZW"
+      gdaldem color-relief -alpha "$WORK_PATH/base_composite_hillshade.tif" "$SRC_PATH/color/$COLOR_SCHEME.txt" "$WORK_PATH/hillshade-color.tif" -co "COMPRESS=LZW" -co "PREDICTOR=2"
+      gdal_translate -b 1 -b 4 -colorinterp_1 gray "$WORK_PATH/hillshade-color.tif" "$WORK_PATH/hillshade.tif" -co "COMPRESS=LZW" -co "PREDICTOR=2"
 
     elif [ "$TYPE" = "slopes" ]; then
       COLOR_SCHEME="${COLOR_SCHEME:-slopes_main}"
       ZOOM_RANGE=4-11
       TARGET_FILE=slope.tif
       echo "Calculating slope..."
-      gdaldem color-relief -alpha "$WORK_PATH/base_slope.tif" "$SRC_PATH/color/$COLOR_SCHEME.txt" "$WORK_PATH/slope.tif" -co "COMPRESS=LZW"  
+      gdaldem color-relief -alpha "$WORK_PATH/base_slope.tif" "$SRC_PATH/color/$COLOR_SCHEME.txt" "$WORK_PATH/slope.tif" -co "COMPRESS=LZW" -co "PREDICTOR=2"
     fi
     echo "Split into tiles with $PROCESSES procesess "
     gdal2tiles.py --processes $PROCESSES  -z $ZOOM_RANGE "$WORK_PATH/$TARGET_FILE" "$WORK_PATH/tiles/"
