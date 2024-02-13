@@ -25,10 +25,40 @@ Environment:
 	SENDGRID_KEY - SendGrid API key (optional for fallback)
 	TEST_EMAIL_COPY - copy each email to this address (testing)
 
+Template files structure:
+
+	Check load() to see which common templates may be included.
+	Check findTemplateFile() to see how files are loaded from EMAIL_TEMPLATES directory.
+
 Special variables:
 
 	@TO@, @TO_BASE64@ - automatically set with To-address before sending each email
 	@HTML_NEWLINE_TO_BR@ - user-defined option to convert \n to <br>\n (text-like templates)
+
+Template variables:
+
+	The template engine supports 1st and 2nd level variables (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
+
+Public methods:
+
+	load() - load template from file (+lang)
+	template() - use string(s) as template (not file)
+
+	set() - set template variable (@TOKEN@ etc)
+	unset() - unset template variable
+
+	from() / name() - set From: email / name (optional)
+	subject() - set Subject: (optional)
+
+	to() - add email(s) To:
+	send() - send emails
+
+	isSuccess() - return boolean status (true if all emails sent)
+
+Return values:
+
+	Most methods return "this" to allow chained-style calls.
+	Finally, isSuccess() returns boolean to check the status.
 
 Examples:
 
@@ -92,7 +122,6 @@ public class EmailSenderTemplate {
 		this.sender = new SmtpSendGridSender(smtpServer, apiKey);
 	}
 
-	// send out email(s)
 	public EmailSenderTemplate send() throws UnsupportedEncodingException {
 		validateLoadedTemplates(); // final validation before send
 
@@ -124,7 +153,6 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// load template from file by template name and language code
 	public EmailSenderTemplate load(String template, @Nullable String langNullable) throws FileNotFoundException {
 		String lang = langNullable == null ? "en" : langNullable;
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
@@ -135,42 +163,35 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// load template from file (using default lang)
 	public EmailSenderTemplate load(String template) throws FileNotFoundException {
 		return load(template, "en");
 	}
 
-	// load template from string
 	public EmailSenderTemplate template(String templateAsString) {
 		parse(Arrays.asList(templateAsString.split("\n")));
 		return this;
 	}
 
-	// load template from list
 	public EmailSenderTemplate template(List<String> templateAsList) {
 		parse(templateAsList);
 		return this;
 	}
 
-	// optional set fromEmail, use before load()
 	public EmailSenderTemplate from(String from) {
 		fromEmail = from;
 		return this;
 	}
 
-	// optional set fromName, use before load()
 	public EmailSenderTemplate name(String name) {
 		fromName = name;
 		return this;
 	}
 
-	// optional set subject, use before load()
 	public EmailSenderTemplate subject(String subject) {
 		this.subject = subject;
 		return this;
 	}
 
-	// add To from string
 	public EmailSenderTemplate to(String email) throws UnsupportedEncodingException {
 		setVarsByTo(email);
 		toList.add(email);
@@ -179,7 +200,6 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// bulk add To(s) from list
 	public EmailSenderTemplate to(List<String> emails) throws UnsupportedEncodingException {
 		setVarsByTo(emails.isEmpty() ? "no@email" : emails.get(0));
 		totalEmails += emails.size();
@@ -188,25 +208,21 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	// set variable (might be used later as @VAR@)
 	public EmailSenderTemplate set(String key, String val) {
 		vars.put(key, val);
 		return this;
 	}
 
-	// bulk set variable(s) from map
 	public EmailSenderTemplate set(HashMap<String, String> keyval) {
 		vars.putAll(keyval);
 		return this;
 	}
 
-	// unset variable
 	public EmailSenderTemplate unset(String key) {
 		vars.remove(key);
 		return this;
 	}
 
-	// support 1st and 2nd level (A=1 B=@A@ C=@B@ is ok)
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
