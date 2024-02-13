@@ -95,7 +95,8 @@ public class BinaryInspector {
 					"-latlon=50.868332,15.24471",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
+					"/Users/victorshcherb/Desktop/hh-routing_pedestrian.obf",
+//					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
 //					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -318,7 +319,7 @@ public class BinaryInspector {
 		}
 	}
 
-	public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
+	public static final void writeInt(CodedOutputStream ous, long v) throws IOException {
 		ous.writeRawByte((v >>> 24) & 0xFF);
 		ous.writeRawByte((v >>> 16) & 0xFF);
 		ous.writeRawByte((v >>>  8) & 0xFF);
@@ -457,17 +458,17 @@ public class BinaryInspector {
 	}
 
 
-	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
+	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, long length)
 			throws IOException {
 		raf.seek(fp);
-		int toRead = length;
+		long toRead = length;
 		while (toRead > 0) {
 			int read = raf.read(BUFFER);
 			if (read == -1) {
 				throw new IllegalArgumentException("Unexpected end of file");
 			}
 			if (toRead < read) {
-				read = toRead;
+				read = (int) toRead;
 			}
 			ous.writeRawBytes(BUFFER, 0, read);
 			toRead -= read;
