@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import java.io.FileNotFoundException;
 import java.util.Arrays;
 
 import net.osmand.mailsender.EmailSenderTemplate;
@@ -10,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class EmailSenderService {
-	public static void test(String[] args) throws FileNotFoundException {
+	public static void test(String[] args) {
 		EmailSenderService sender = new EmailSenderService();
 		String email = "dmarc-reports@osmand.net";
 		sender.sendOsmAndCloudPromoEmail(email, "promo");
@@ -22,7 +21,7 @@ public class EmailSenderService {
 
     private static final Log LOGGER = LogFactory.getLog(EmailSenderService.class);
 
-    public void sendOsmAndCloudPromoEmail(String email, String promo) throws FileNotFoundException {
+    public void sendOsmAndCloudPromoEmail(String email, String promo) {
 		boolean ok = new EmailSenderTemplate()
 				.load("cloud/promo")
 				.set("PROMO", promo)
@@ -32,7 +31,7 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shorten(email) + " (" + ok + ")");
 	}
     
-    public void sendOsmAndCloudWebEmail(String email, String token, String action, String lang) throws FileNotFoundException {
+    public void sendOsmAndCloudWebEmail(String email, String token, String action, String lang) {
 		String templateAction = action;
 		if ("setup".equals(action)) {
 			templateAction = "@ACTION_SETUP@";
@@ -51,7 +50,7 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
     
-    public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) throws FileNotFoundException {
+    public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
 		String subject = newUser ? "@SUBJECT_NEW@" : "@SUBJECT_OLD@";
 	    boolean ok = new EmailSenderTemplate()
 			    .load("cloud/register", lang)
@@ -63,7 +62,7 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
     
-    public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) throws FileNotFoundException {
+    public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) {
 	    boolean ok = new EmailSenderTemplate()
 			    .load(templateId) // should be "promocode/ios" or "promocode/anroid"
 			    .to(Arrays.asList(mailTo.split(",")))

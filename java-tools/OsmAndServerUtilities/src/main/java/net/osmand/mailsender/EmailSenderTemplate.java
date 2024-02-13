@@ -80,7 +80,7 @@ public class EmailSenderTemplate {
 	private String fromEmail, fromName, subject, body; // read from the template
 	private HashMap<String, String> headers = new HashMap<>(); // optional email headers (read from the template)
 
-	public static void test(String[] args) throws FileNotFoundException {
+	public static void test(String[] args) {
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load("cloud/web", "en")
 				.to("dmarc-reports@osmand.net")
@@ -153,7 +153,7 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	public EmailSenderTemplate load(String template, @Nullable String langNullable) throws FileNotFoundException {
+	public EmailSenderTemplate load(String template, @Nullable String langNullable) {
 		String lang = langNullable == null ? "en" : langNullable;
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 		include("header", lang, false); // optional
@@ -163,7 +163,7 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	public EmailSenderTemplate load(String template) throws FileNotFoundException {
+	public EmailSenderTemplate load(String template) {
 		return load(template, "en");
 	}
 
@@ -326,7 +326,7 @@ public class EmailSenderTemplate {
 		return null;
 	}
 
-	private void include(String template, String lang, boolean required) throws FileNotFoundException {
+	private void include(String template, String lang, boolean required) {
 		File foundFile = findTemplateFile(template, lang);
 
 		if (foundFile == null) {
@@ -338,7 +338,12 @@ public class EmailSenderTemplate {
 		}
 
 		List<String> templateLines = new ArrayList<>();
-		Scanner reader = new Scanner(foundFile);
+		Scanner reader = null;
+		try {
+			reader = new Scanner(foundFile);
+		} catch (FileNotFoundException e) {
+			throw new RuntimeException(e);
+		}
 		while (reader.hasNextLine()) {
 			templateLines.add(reader.nextLine());
 		}

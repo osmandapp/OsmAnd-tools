@@ -8,9 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
-import java.io.FileNotFoundException;
 import java.text.DateFormat;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -41,7 +39,7 @@ public class PromoService {
 	}
 
 	@Transactional
-	public ResponseEntity<String> addUser(String name, String email) throws FileNotFoundException {
+	public ResponseEntity<String> addUser(String name, String email) {
 		PromoCampaignRepository.Promo promoCampaign = promoCampaignRepository.findByName(name);
 		ResponseEntity<String> error = validatePromo(promoCampaign);
 		if (error == null) {
@@ -100,7 +98,7 @@ public class PromoService {
 		return emails.substring(0, emails.length() - 3);
 	}
 
-	public PromoResponse createPromoSubscription(String email, String key, Date expireTime) throws FileNotFoundException {
+	public PromoResponse createPromoSubscription(String email, String key, Date expireTime) {
 		email = email.toLowerCase().trim();
 		DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
 		deviceSub.sku = key;

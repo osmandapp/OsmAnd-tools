@@ -1,7 +1,6 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.sql.Connection;
@@ -602,7 +601,7 @@ public class ApiController {
 	
 	@PostMapping(path = {"/promo-add-user"})
 	public ResponseEntity<String> addUser(@RequestParam String promoKey,
-	                                      @RequestParam String userEmail) throws FileNotFoundException {
+	                                      @RequestParam String userEmail) {
 		synchronized (this) {
 			return promoService.addUser(promoKey, userEmail);
 		}

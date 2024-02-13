@@ -288,7 +288,7 @@ public class EmailSenderMain {
 		return s;
 	}
 
-	private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException, FileNotFoundException {
+	private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
         String query = buildQuery(false, p.mailingGroups, p.daySince);
         LOGGER.info("SQL query is " + query);
         PreparedStatement ps = conn.prepareStatement(query);
@@ -370,7 +370,7 @@ public class EmailSenderMain {
         LOGGER.info("Total Blocked: " + count);
     }
 
-    private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) throws FileNotFoundException {
+    private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) {
         LOGGER.info("Sending test messages...");
         String[] testRecipients = p.testAddresses.split(",");
         for (String recipient : testRecipients) {
@@ -428,7 +428,7 @@ public class EmailSenderMain {
         return null;
     }
 
-	private static void sendMail(String mailTo, EmailParams p) throws FileNotFoundException {
+	private static void sendMail(String mailTo, EmailParams p) {
 		if (mailTo == null || mailTo.isEmpty()) {
 			return;
 		}

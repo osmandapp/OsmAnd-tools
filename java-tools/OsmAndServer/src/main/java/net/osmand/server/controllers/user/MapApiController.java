@@ -646,7 +646,7 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/send-code"})
 	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) throws FileNotFoundException {
+	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) {
 		if (emailSender.isEmail(data.email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
