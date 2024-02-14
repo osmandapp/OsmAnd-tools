@@ -474,6 +474,10 @@ public class IndexUploader {
 		if (fileName.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
 			RandomAccessFile raf = null;
 			try {
+				if (mainFile.length() > Integer.MAX_VALUE) {
+					throw new OneFileException(String.format("File size exceeds maximum supported - %s %d MB", mainFile.getName(),
+							mainFile.length() >> 20));
+				}
 				raf = new RandomAccessFile(mainFile, "r");
 				BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, mainFile);
 				if (reader.getVersion() != IndexConstants.BINARY_MAP_VERSION) {

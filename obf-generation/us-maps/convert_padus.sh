@@ -1,4 +1,8 @@
 #!/bin/bash
+# This script it intended to prepare PAD-US for use in OsmAnd
+# Data download link: https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
+# shp files are required
+
 #set -x
 dir=$(pwd)
 workdir=/mnt/wd_2tb/padus

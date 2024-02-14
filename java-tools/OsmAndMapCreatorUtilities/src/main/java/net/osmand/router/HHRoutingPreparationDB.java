@@ -108,7 +108,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 			int st = rs.getInt(6);
 			int end = rs.getInt(7);
 			int sx = rs.getInt(8), sy = rs.getInt(9), ex = rs.getInt(10), ey = rs.getInt(11);
-			String[] tagValues = Algorithms.deserializeStringArray(rs.getString(12));
+			String[] tagValues = Algorithms.deserializeStringArray(rs.getString(13));
 			RouteSegmentBorderPoint bp = new RouteSegmentBorderPoint(roadId, st, end, sx, sy, ex, ey, tagValues);
 			bp.pointDbId = rs.getInt(3);
 			bp.clusterDbId = rs.getInt(4);
@@ -204,6 +204,7 @@ public class HHRoutingPreparationDB extends HHRoutingDB {
 		}
 		tgt.close();
 	}
+	
 	
 	public static class NetworkDBPointPrep extends NetworkDBPoint {
 		int distSegment;

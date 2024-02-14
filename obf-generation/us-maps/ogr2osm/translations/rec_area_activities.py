@@ -54,26 +54,26 @@ class USFSRecreationAreaActivitiesTranslation(ogr2osm.TranslationBase):
 				tags.update({'nfs_recreation_area_marker_activity':'default'})
 		if 'RECAREAURL' in attrs and RECAREAURL:
 			tags['url'] = RECAREAURL
-		if 'FEEDESCRIPTION' in attrs and strip_tags(FEEDESCRIPTION):
+		if 'FEEDESCRIPTION' in attrs and strip_tags(FEEDESCRIPTION) and strip_tags(FEEDESCRIPTION).lower() != "none":
 			tags['nfs_recreation_area_fee_description'] = strip_tags(FEEDESCRIPTION)
-		if 'OPEN_SEASON_START' in attrs and OPEN_SEASON_START:
+		if 'OPEN_SEASON_START' in attrs and OPEN_SEASON_START and OPEN_SEASON_START != "." and not OPEN_SEASON_START.startswith(".."):
 			tags['nfs_recreation_area_open_season_start'] = OPEN_SEASON_START
-		if 'OPEN_SEASON_END' in attrs and OPEN_SEASON_END:
+		if 'OPEN_SEASON_END' in attrs and OPEN_SEASON_END and OPEN_SEASON_END != "." and not OPEN_SEASON_END.startswith(".."):
 			tags['nfs_recreation_area_open_season_end'] = OPEN_SEASON_END
-		if 'OPERATIONAL_HOURS' in attrs and strip_tags(OPERATIONAL_HOURS):
+		if 'OPERATIONAL_HOURS' in attrs and strip_tags(OPERATIONAL_HOURS) and strip_tags(OPERATIONAL_HOURS) != ".":
 			tags['nfs_recreation_area_operational_hours'] = strip_tags(OPERATIONAL_HOURS)
 		if 'FORESTNAME' in attrs and FORESTNAME:
 			tags['nfs_recreation_area_forest_name'] = FORESTNAME
-		if 'RESERVATION_INFO' in attrs and strip_tags(RESERVATION_INFO):
+		if 'RESERVATION_INFO' in attrs and strip_tags(RESERVATION_INFO) and strip_tags(RESERVATION_INFO).lower() != "none" and strip_tags(RESERVATION_INFO) != ".":
 			tags['nfs_recreation_area_reservation_info'] = strip_tags(RESERVATION_INFO)
 		if 'MARKERACTIVITYGROUP' in attrs and MARKERACTIVITYGROUP:
 			tags['nfs_recreation_area_marker_activity_group'] = MARKERACTIVITYGROUP.strip().lower().replace(" ;",";").replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").replace("&","and")
 		if 'RECAREADESCRIPTION' in attrs and strip_tags(RECAREADESCRIPTION):
-			tags['description'] = strip_tags(RECAREADESCRIPTION)
-		if 'RESTRICTIONS' in attrs and strip_tags(RESTRICTIONS):
-			tags['nfs_recreation_area_restrictions'] = strip_tags(RESTRICTIONS)
+			tags['description'] = strip_tags(RECAREADESCRIPTION).strip()
+		if 'RESTRICTIONS' in attrs and strip_tags(RESTRICTIONS) and strip_tags(RESTRICTIONS) != ".":
+			tags['nfs_recreation_area_restrictions'] = strip_tags(RESTRICTIONS).strip()
 		if 'ACTIVITYDESCRIPTION' in attrs and ACTIVITYDESCRIPTION:
-			tags['nfs_recreation_area_activity_description'] = strip_tags(ACTIVITYDESCRIPTION)
+			tags['nfs_recreation_area_activity_description'] = strip_tags(ACTIVITYDESCRIPTION).strip()
 		if 'PARENTACTIVITYNAME' in attrs and PARENTACTIVITYNAME:
 			tags['nfs_recreation_area_parent_activity_name'] = PARENTACTIVITYNAME.strip().lower().replace(" ;",";").replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").replace("&","and")
 		if 'ACTIVITYNAME' in attrs and ACTIVITYNAME:
@@ -81,7 +81,7 @@ class USFSRecreationAreaActivitiesTranslation(ogr2osm.TranslationBase):
 			for activity in ACTIVITYNAMEARRAY:
 				if activity:
 					tags['nfs_recreation_area_activity_'+activity] = 'yes'
-		if 'ACCESSIBILITY' in attrs and strip_tags(ACCESSIBILITY):
+		if 'ACCESSIBILITY' in attrs and strip_tags(ACCESSIBILITY) and not strip_tags(ACCESSIBILITY).startswith('.container'):
 			tags['nfs_recreation_area_accessibility_info'] = strip_tags(ACCESSIBILITY)
 		if 'OPENSTATUS' in attrs and OPENSTATUS:
 			OPENSTATUSARRAY = OPENSTATUS.lower().strip().replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").split(';')
