@@ -1557,7 +1557,8 @@ public class BinaryMapIndexWriter {
 		for (net.osmand.data.TransportRoute tr : incompleteRoutes) {
 			OsmandOdb.IncompleteTransportRoute.Builder ir = OsmandOdb.IncompleteTransportRoute.newBuilder();
 			ir.setId(tr.getId());
-			ir.setRouteRef(tr.getFileOffset() - (int) transportIndexOffset);
+			// FIXME
+			ir.setRouteRef((int) (tr.getFileOffset() - transportIndexOffset));
 			ir.setOperator(registerString(stringTable, tr.getOperator()));
 			ir.setRef(registerString(stringTable, tr.getRef()));
 			ir.setType(registerString(stringTable, tr.getType()));

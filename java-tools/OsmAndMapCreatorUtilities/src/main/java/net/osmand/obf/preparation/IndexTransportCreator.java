@@ -223,7 +223,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					int y24 = (int) MapUtils.getTileNumberY(24, stop.getLocation().getLatitude());
 					TLongArrayList routesOffsets = new TLongArrayList();
 					if (stop.getReferencesToRoutes() != null) {
-						for (int referencesToRoute : stop.getReferencesToRoutes()) {
+						for (long referencesToRoute : stop.getReferencesToRoutes()) {
 							routesOffsets.add((long) referencesToRoute);
 						}
 					}

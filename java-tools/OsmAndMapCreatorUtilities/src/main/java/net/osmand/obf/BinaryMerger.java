@@ -294,7 +294,7 @@ public class BinaryMerger {
 		return fl;
 	}
 
-	public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
+	public static final void writeInt(CodedOutputStream ous, long v) throws IOException {
 		ous.writeRawByte((v >>> 24) & 0xFF);
 		ous.writeRawByte((v >>> 16) & 0xFF);
 		ous.writeRawByte((v >>>  8) & 0xFF);
@@ -620,18 +620,18 @@ public class BinaryMerger {
 		log.info("Written " + writtenPoiCount[0] + " POI.");
 	}
 
-	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
+	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, long length)
 			throws IOException {
 		long old = raf.getFilePointer();
 		raf.seek(fp);
-		int toRead = length;
+		long toRead = length;
 		while (toRead > 0) {
 			int read = raf.read(BUFFER);
 			if (read == -1) {
 				throw new IllegalArgumentException("Unexpected end of file");
 			}
 			if (toRead < read) {
-				read = toRead;
+				read = (int) toRead;
 			}
 			ous.writeRawBytes(BUFFER, 0, read);
 			toRead -= read;

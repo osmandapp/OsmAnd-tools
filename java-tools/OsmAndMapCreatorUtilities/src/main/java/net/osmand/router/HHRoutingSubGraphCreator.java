@@ -251,7 +251,7 @@ public class HHRoutingSubGraphCreator {
 				if (c != 0) {
 					return c;
 				}
-				return Integer.compare(o1.region.getLength(), o2.region.getLength());
+				return Long.compare(o1.region.getLength(), o2.region.getLength());
 			}
 		});
 		ctx.networkDB.insertRegions(ctx.routeRegions);
@@ -298,7 +298,7 @@ public class HHRoutingSubGraphCreator {
 								MapUtils.get31TileNumberY(nrouteRegion.region.getBottomLatitude()), 16, null),
 						routeRegion.getSubregions());
 
-				final int estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
+				final long estimatedRoads = 1 + routeRegion.getLength() / 150; // 5 000 / 1 MB - 1 per 200 Byte
 				RouteDataObjectProcessor proc = new RouteDataObjectProcessor(ctx, estimatedRoads);
 				reader.loadRouteIndexData(regions, proc);
 				boolean ok = ctx.finishRegionProcess(overlapBbox);
