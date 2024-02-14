@@ -1,45 +1,33 @@
 package net.osmand.mailsender;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.Base64;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
 import com.google.gson.Gson;
-import com.sendgrid.Email;
-import com.sendgrid.FooterSetting;
-import com.sendgrid.Mail;
-import com.sendgrid.MailSettings;
 import com.sendgrid.Method;
-import com.sendgrid.Personalization;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
 
 import net.osmand.mailsender.data.BlockedUser;
 
-
-// Uses SendGrid's Java Library
-// https://github.com/sendgrid/sendgrid-java
-
 public class EmailSenderMain {
 
     private final static Logger LOGGER = Logger.getLogger(EmailSenderMain.class.getName());
-    private static final int LIMIT_SENDGRID_API = 500;// probably paging is needed use "offset": ..
+    private static final int LIMIT_SENDGRID_API = 500; // probably paging is needed use "offset": ..
     private static SendGrid sendGridClient;
-    
+
     private static class EmailParams {
     	String templateId = null;
         String mailingGroups = null;
@@ -54,10 +42,11 @@ public class EmailSenderMain {
 		String giveawaySeries;
     }
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws SQLException, IOException {
     	System.out.println("Send email utility");
-        EmailParams p = new EmailParams(); 
+        EmailParams p = new EmailParams();
         boolean updateBlockList = false;
+	    boolean updatePostfixBounced = false;
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
             if (arg.startsWith("--id=")) {
@@ -82,12 +71,22 @@ public class EmailSenderMain {
             	}
             } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
+            } else if (arg.equals("--update_postfix_bounced")) {
+              updatePostfixBounced = true;
             }
         }
         final String apiKey = System.getenv("SENDGRID_KEY");
         sendGridClient = new SendGrid(apiKey);
 
         Connection conn = getConnection();
+		if (conn == null) {
+			throw new RuntimeException("Please setup DB connection");
+		}
+	    if (updatePostfixBounced) {
+			updatePostfixBounced(conn);
+		    conn.close();
+			return;
+	    }
         if (updateBlockList) {
             updateUnsubscribed(conn);
             updateBlockList(conn);
@@ -95,7 +94,6 @@ public class EmailSenderMain {
             return;
         }
         checkValidity(p);
-
 
         if (conn == null) {
             LOGGER.info("Can't connect to the database");
@@ -117,7 +115,72 @@ public class EmailSenderMain {
         conn.close();
     }
 
-    private static void updateUnsubscribed(Connection conn) {
+	private static void updatePostfixBounced(Connection conn) throws IOException, SQLException {
+		String url = System.getenv("URL_POSTFIX_BOUNCED_CSV");
+		String file = System.getenv("FILE_POSTFIX_BOUNCED_CSV");
+		HashMap<String, String> bouncedEmailReason = new HashMap<>();
+		List<String> csvLines = new ArrayList<>();
+
+		if (url != null) {
+			HttpURLConnection http = (HttpURLConnection) new URL(url).openConnection();
+			if (http.getResponseCode() == HttpURLConnection.HTTP_OK) {
+				BufferedReader in = new BufferedReader(new InputStreamReader(http.getInputStream()));
+				String line;
+				while ((line = in.readLine()) != null) {
+					csvLines.add(line);
+				}
+				in.close();
+			}
+			http.disconnect();
+		}
+
+		if (file != null) {
+			Scanner reader = new Scanner(new File(file));
+			while (reader.hasNextLine()) {
+				csvLines.add(reader.nextLine());
+			}
+			reader.close();
+		}
+
+		if (!csvLines.isEmpty()) {
+			for (String line : csvLines) {
+				String[] split = line.split("\",\""); // the format is: "email","reason"
+				if (split.length == 2) {
+					String email = split[0].replaceFirst("^\"", "");
+					String reason = split[1].replaceFirst("\"$", "");
+					bouncedEmailReason.put(email, reason);
+				}
+			}
+		}
+
+		if (!bouncedEmailReason.isEmpty()) {
+			updateBlockDbWithEmailReason(conn, bouncedEmailReason);
+			return; // success
+		}
+
+		throw new RuntimeException("Empty CSV or no URL_POSTFIX_BOUNCED_CSV/FILE_POSTFIX_BOUNCED_CSV specified");
+	}
+
+	private static void updateBlockDbWithEmailReason(Connection conn, HashMap<String, String> bouncedEmailReason) throws SQLException {
+		PreparedStatement ps = conn.prepareStatement("INSERT INTO email_blocked(email, reason, timestamp) " +
+				"SELECT ?, ?, ? " +
+				"WHERE NOT EXISTS (SELECT email FROM email_blocked WHERE email=?)");
+		for (String email : bouncedEmailReason.keySet()) {
+			String reason = bouncedEmailReason.get(email);
+			ps.setString(1, email);
+			ps.setString(2, reason);
+			ps.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
+			ps.setString(4, email);
+			ps.addBatch();
+		}
+		int[] batch = ps.executeBatch();
+		ps.close();
+
+		LOGGER.info(String.format("Got bounced logs from postfix: inserted %d of %d emails",
+				sumBatch(batch), bouncedEmailReason.size()));
+	}
+
+	private static void updateUnsubscribed(Connection conn) {
     	int offset = 0;
     	boolean repeat = true;
 		while (repeat) {
@@ -215,7 +278,6 @@ public class EmailSenderMain {
         ps.close();
         LOGGER.info(String.format("Updated blocked %s from sendgrid: %d blocked sendgrid, %d updated in db.", blockGroup, users.length, updated));
         return users.length;
-        
     }
 
 	private static int sumBatch(int[] batch) {
@@ -286,9 +348,9 @@ public class EmailSenderMain {
         rs.close();
         prep.close();
         LOGGER.info("Total: " + total);
-        
+
         LOGGER.info("Blocked/unsubscribed for selected topic: " + unsubscribed.size());
-        
+
         prep = conn.prepareStatement("SELECT count(*) FROM email_unsubscribed");
         rs = prep.executeQuery();
         int count = 0;
@@ -299,7 +361,7 @@ public class EmailSenderMain {
         prep.close();
         rs.close();
         count = 0;
-        
+
         prep = conn.prepareStatement("SELECT count(*) FROM email_blocked");
         rs = prep.executeQuery();
         while (rs.next()) {
@@ -366,68 +428,34 @@ public class EmailSenderMain {
         return null;
     }
 
-    private static void sendMail(String mailTo, EmailParams p) {
-    	if(mailTo == null || mailTo.isEmpty()) {
-    		return;
-    	}
-    	String mailHsh = mailTo;
-    	if(mailTo.length() > 5) {
-    		mailHsh = "....." + mailTo.substring(5);
-    	}
-        LOGGER.info("Sending mail to: " + mailHsh);
-        String userHash;
-        try {
-            userHash = URLEncoder.encode(Base64.getEncoder().encodeToString(mailTo.getBytes()), "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            // Shouldn't happen
-            LOGGER.info(e.getMessage());
-            return;
-        }
-        Email from = new Email(p.mailFrom);
-        from.setName("OsmAnd");
-        Email to = new Email(mailTo);
-        Mail mail = new Mail();
-        mail.from = from;
-        Personalization personalization = new Personalization();
-        personalization.addTo(to);
-        mail.addPersonalization(personalization);
-        mail.setTemplateId(p.templateId);
-        if(p.subject != null) {
-        	mail.setSubject(p.subject);
-        }
-        MailSettings mailSettings = new MailSettings();
-        FooterSetting footerSetting = new FooterSetting();
-        footerSetting.setEnable(true);
-        String footer = "<center style='margin:5px 0px 5px 0px'><a href=\"https://osmand.net/api/email/unsubscribe?id=" + 
-        		userHash + "&group=" + p.topic + "\">Unsubscribe</a></center>";
-        if("giveaway".equals(p.topic)) {
-        	String giv = String.format(
-        			"<table border='0' cellPadding='0' cellSpacing='0' class='module' data-role='module-button' data-type='button' role='module' "
-        			+ "style='table-layout:fixed' width='100%%'><tbody><tr><td align='center' class='outer-td' style='padding:0px 0px 0px 0px'>"
-        			+ "<table border='0' cellPadding='0' cellSpacing='0' class='button-css__deep-table___2OZyb wrapper-mobile' style='text-align:center'>"
-        			+ "<tbody><tr><td align='center' bgcolor='#333333' class='inner-td' style='border-radius:6px;font-size:16px;text-align:center;background-color:inherit'>"
-        			+ "<a href='%s' style='background-color:#333333;border:1px solid #333333;border-color:#333333;border-radius:6px;border-width:1px;color:#ffffff;display:inline-block;font-family:arial,helvetica,sans-serif;font-size:16px;font-weight:normal;letter-spacing:0px;line-height:16px;padding:12px 18px 12px 18px;text-align:center;text-decoration:none' "
-        			+ "target='_blank'>%s</a></td></tr></tbody>"
-        			+ "</table></td></tr></tbody></table></td></tr></table>",
-							"https://osmand.net/giveaway?series=" + URLEncoder.encode(p.giveawaySeries, StandardCharsets.UTF_8) + "&email="
-									+ URLEncoder.encode(mailTo, StandardCharsets.UTF_8), "Participate in a Giveaway!");
-        	footer = giv + footer;
-        }
-        footerSetting.setHtml("<html>"+footer+"</html>");
-        mailSettings.setFooterSetting(footerSetting);
-        mail.setMailSettings(mailSettings);
-        Request request = new Request();
-        try {
-            request.setMethod(Method.POST);
-            request.setEndpoint("mail/send");
-            String body = mail.build();
-            request.setBody(body);
-            Response response = sendGridClient.api(request);
-            LOGGER.info("Response code: " + response.getStatusCode());
-            p.sentSuccess++;
-        } catch (IOException ex) {
-        	p.sentFailed++;
-            System.err.println(ex.getMessage());
-        }
-    }
+	private static void sendMail(String mailTo, EmailParams p) {
+		if (mailTo == null || mailTo.isEmpty()) {
+			return;
+		}
+
+		EmailSenderTemplate sender = new EmailSenderTemplate()
+				.load(p.templateId) // should be "giveaway" for OsmAnd giveaway campaign
+				.set("UNSUBGROUP", p.topic)
+				.from(p.mailFrom)
+				.name("OsmAnd")
+				.to(mailTo);
+
+		if (p.subject != null) {
+			sender.subject(p.subject);
+		}
+
+		if ("giveaway".equals(p.topic)) {
+			sender.set("GIVEAWAY_SERIES", p.giveawaySeries);
+		}
+
+		boolean ok = sender.send().isSuccess();
+
+		if (ok) {
+			p.sentSuccess++;
+		} else {
+			p.sentFailed++;
+		}
+
+		LOGGER.info("Sending mail to: " + mailTo.replaceFirst(".....", ".....") + " (" + ok + ")");
+	}
 }

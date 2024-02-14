@@ -1,10 +1,6 @@
 package net.osmand.server.controllers.user;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
@@ -367,7 +363,7 @@ public class AdminController {
 			@RequestParam(required = true) String name, 
 			@RequestParam(required = true) String email, 
 			@RequestParam(required = true) int promocodes, 
-			final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+			final RedirectAttributes redirectAttrs) {
 		// seriesRepo
 		Optional<LotterySeries> obj = seriesRepo.findById(name);
 		if(!obj.isPresent() || obj.get().status != LotteryStatus.NOTPUBLIC) {

@@ -38,9 +38,8 @@ dependencies {
 	// download gpx
 	implementation 'oauth.signpost:oauth-signpost:2.1.1'
 	implementation 'oauth.signpost:signpost-core:2.1.1'
-
 	
 	// email sender
 	implementation 'com.sendgrid:sendgrid-java:4.2.1'
-    
+	implementation 'org.apache.commons:commons-email:1.5'
 }
