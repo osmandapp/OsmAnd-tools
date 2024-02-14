@@ -149,6 +149,8 @@ public class RouteRelationExtractor {
 			} else {
 				startStorage.parseOSM(startStream, IProgress.EMPTY_PROGRESS);
 			}
+			dbCreator.finishLoading();
+			osmDBdialect.commitDatabase(dbConn);
 			endTime = System.currentTimeMillis();
 			deltaTime = (endTime - startTime) / 1000;
 			startTime = endTime;
@@ -269,14 +271,14 @@ public class RouteRelationExtractor {
 						if (way == null) {
 							way = new Way(i.getEntityId().getId());
 							loadEntityWay(way);
+							map.put(i.getEntityId(), way);
+							for (Node n : way.getNodes()) {
+								map.put(Entity.EntityId.valueOf(n), n);
+							}
 						}
 						way.putTag("relation_ref_" + e.getId(), Long.toString(e.getId()));
 						if (level != MAX_CHILD_LEVEL) {
 							way.putTag("relation_level_" + e.getId(), Integer.toString(MAX_CHILD_LEVEL - level));
-						}
-						map.put(i.getEntityId(), way);
-						for (Node n : way.getNodes()) {
-							map.put(Entity.EntityId.valueOf(n), n);
 						}
 					} else if (i.getEntityId().getType() == Entity.EntityType.RELATION) {
 						Relation rel = new Relation(i.getEntityId().getId());
