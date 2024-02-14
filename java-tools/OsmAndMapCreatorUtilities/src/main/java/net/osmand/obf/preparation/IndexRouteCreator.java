@@ -685,7 +685,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	public void writeBinaryRouteIndex(File fl, BinaryMapIndexWriter writer, String regionName, boolean generateLowLevel) throws IOException, SQLException {
 		closePreparedStatements(mapRouteInsertStat);
-		if(basemapRouteInsertStat != null) {
+		if (basemapRouteInsertStat != null) {
 			closePreparedStatements(basemapRouteInsertStat);
 		}
 		mapConnection.commit();

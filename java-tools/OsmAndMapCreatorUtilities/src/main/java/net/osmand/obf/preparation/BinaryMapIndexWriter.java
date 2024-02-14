@@ -100,7 +100,6 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
-import net.osmand.router.HHRoutingPreparationDB.NetworkDBPointPrep;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -205,6 +204,15 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeFixed32NoTag(0);
 		return ref;
 	}
+	
+	private BinaryFileReference preserveInt64Size() throws IOException {
+		long filePointer = getFilePointer();
+		BinaryFileReference ref = BinaryFileReference.createLongSizeReference(filePointer);
+		stackSizes.push(ref);
+		codedOutStream.writeFixed32NoTag(0);
+		codedOutStream.writeFixed32NoTag(0);
+		return ref;
+	}
 
 	public long getFilePointer() throws IOException {
 		codedOutStream.flush();
@@ -216,19 +224,19 @@ public class BinaryMapIndexWriter {
 		return codedOutStream;
 	}
 
-	private int writeInt32Size() throws IOException {
+	private long writeInt32Size() throws IOException {
 		long filePointer = getFilePointer();
 		BinaryFileReference ref = stackSizes.pop();
 		codedOutStream.flush();
-		int length = ref.writeReference(raf, filePointer);
+		long length = ref.writeReference(raf, filePointer);
 		return length;
 	}
 
-	private int prewriteInt32Size() throws IOException {
+	private long prewriteInt32Size() throws IOException {
 		long filePointer = getFilePointer();
 		BinaryFileReference ref = stackSizes.peek();
 		codedOutStream.flush();
-		int length = ref.writeReference(raf, filePointer);
+		long length = ref.writeReference(raf, filePointer);
 		return length;
 	}
 
@@ -243,15 +251,20 @@ public class BinaryMapIndexWriter {
 
 	public void endWriteMapIndex() throws IOException {
 		popState(MAP_INDEX_INIT);
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		log.info("MAP INDEX SIZE : " + len);
 	}
 	
 	
-	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable,  String... params) throws IOException {
+	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable, 
+			boolean longIndex, String... params) throws IOException {
 		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-		preserveInt32Size();
+		if (longIndex) {
+			preserveInt64Size();
+		} else {
+			preserveInt32Size();
+		}
 		codedOutStream.writeInt64(OsmandOdb.OsmAndHHRoutingIndex.EDITION_FIELD_NUMBER, edition);
 		codedOutStream.writeString(OsmandOdb.OsmAndHHRoutingIndex.PROFILE_FIELD_NUMBER, profile);
 		for (String s : params) {
@@ -268,7 +281,7 @@ public class BinaryMapIndexWriter {
 
 	public void endHHRoutingIndex() throws IOException {
 		popState(HH_INDEX_INIT);
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		log.info("HHROUTING INDEX SIZE : " + len);
 	}
 
@@ -285,7 +298,7 @@ public class BinaryMapIndexWriter {
 
 	public void endWriteRouteIndex() throws IOException {
 		popState(ROUTE_INDEX_INIT);
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		log.info("- ROUTE TYPE SIZE SIZE " + BinaryMapIndexWriter.ROUTE_TYPES_SIZE); //$NON-NLS-1$
 		log.info("- ROUTE COORDINATES SIZE " + BinaryMapIndexWriter.ROUTE_COORDINATES_SIZE + " COUNT " + BinaryMapIndexWriter.ROUTE_COORDINATES_COUNT); //$NON-NLS-1$
 		log.info("- ROUTE POINTS SIZE " + BinaryMapIndexWriter.ROUTE_POINTS_SIZE);
@@ -299,7 +312,7 @@ public class BinaryMapIndexWriter {
 
 	public void simulateWriteEndRouteIndex() throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
-		int len = prewriteInt32Size();
+		long len = prewriteInt32Size();
 		log.info("PREROUTE INDEX SIZE : " + len);
 	}
 
@@ -326,7 +339,7 @@ public class BinaryMapIndexWriter {
 	public void endWriteMapLevelIndex() throws IOException {
 		popState(MAP_ROOT_LEVEL_INIT);
 		stackBounds.pop();
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		log.info("MAP level SIZE : " + len);
 	}
 
@@ -976,7 +989,7 @@ public class BinaryMapIndexWriter {
 
 	public void endWriteAddressIndex() throws IOException {
 		popState(ADDRESS_INDEX_INIT);
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		log.info("ADDRESS INDEX SIZE : " + len);
 	}
 
@@ -1032,7 +1045,7 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeMessageNoTag(builder.build());
 		}
 
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		log.info("ADDRESS NAME INDEX SIZE : " + len);
 	}
 
@@ -1137,7 +1150,7 @@ public class BinaryMapIndexWriter {
 
 	public void endCityBlockIndex() throws IOException {
 		popState(CITY_INDEX_INIT);
-		int length = writeInt32Size();
+		long length = writeInt32Size();
 		log.info("CITIES size " + length);
 	}
 
@@ -1294,7 +1307,7 @@ public class BinaryMapIndexWriter {
 
 	public void endWriteTransportIndex() throws IOException {
 		popState(TRANSPORT_INDEX_INIT);
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		stackBounds.pop();
 		log.info("TRANSPORT INDEX SIZE : " + len);
 	}
@@ -1587,7 +1600,7 @@ public class BinaryMapIndexWriter {
 
 	public void endWritePoiIndex() throws IOException {
 		popState(POI_INDEX_INIT);
-		int len = writeInt32Size();
+		long len = writeInt32Size();
 		stackBounds.pop();
 		log.info("POI INDEX SIZE : " + len);
 	}

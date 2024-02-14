@@ -477,7 +477,11 @@ public class HHRoutingOBFWriter {
 					BinaryInspector.copyBinaryPart(bmiw.getCodedOutStream(), BUFFER_TO_READ, reader.getRaf(), part.getFilePointer(), part.getLength());
 				}
 			}
-			bmiw.startHHRoutingIndex(edition, profile, tagValuesDictionary, profileParams);
+			boolean allowLongSize = false; // worldwide maps - 2 profiles by 8M points
+			if (profileParams.length * points.size() > 8 * 1000 * 1000 * 2) {
+				allowLongSize = true;
+			}
+			bmiw.startHHRoutingIndex(edition, profile, tagValuesDictionary, allowLongSize, profileParams);
 			if (rootBounds != null) {
 				long fp = bmiw.getFilePointer();
 				List<NetworkDBPointWrite> pntsList = writeBinaryRouteTree(root, rootBounds, packRTree, bmiw, pntsMap, new int[] {0});
