@@ -1,5 +1,11 @@
 #!/bin/bash
 #set -x
+# This script it intended to prepare some NFS data for use in OsmAnd
+# Data download link: https://data.fs.usda.gov/geodata/edw/datasets.php
+# National Forest System Trails: https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.TrailNFS_Publish.zip (place files into $sourcedirname)
+# National Forest System Roads: https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.RoadCore_FS.zip (place files into $sourcedirname)
+# Recreation Area Activities: https://data.fs.usda.gov/geodata/edw/edw_resources/fc/S_USA.RECAREAACTIVITIES_V.gdb.zip (place files into $sourceoriginaldirname)
+
 dir=$(pwd)
 workdir=/mnt/wd_2tb/USFS
 sourcedirname=source
