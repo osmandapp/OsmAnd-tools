@@ -223,7 +223,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		public final int height;
 		public long searchTime;
 		public long renderingTime;
-		public boolean saveTxt = false;
+		public boolean saveTextTile = false;
 		public RenderingContext context;
 
 		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
@@ -341,13 +341,15 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 		renderingContext.zoom = renderingImageContext.zoom;
 		renderingContext.tileDivisor = tileDivisor;
-		renderingContext.saveTextTile = renderingImageContext.saveTxt;
+		renderingContext.saveTextTile = renderingImageContext.saveTextTile;
 		long search = time + System.currentTimeMillis();
 		
 		RenderingGenerationResult generationResult = NativeLibrary.generateRenderingIndirect(renderingContext, res.nativeHandler,
 				false, request, true);
 		List<RenderableObject> renderableObjects = new Gson().fromJson(renderingContext.textTile,  new TypeToken<List<RenderableObject>>(){}.getType());
-		generationResult.setInfo(RenderableObject.createGeoJson(renderableObjects));
+		if (renderingContext.saveTextTile) {
+			generationResult.setInfo(RenderableObject.createGeoJson(renderableObjects));
+		}
 		
 		long rendering = time + System.currentTimeMillis() - search;
 		renderingImageContext.searchTime = search;

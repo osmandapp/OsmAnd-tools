@@ -24,6 +24,13 @@ public class RenderableObject {
     private String text;
     private int textSize;
     private int textOnPath;
+    private int textColor;
+    private int textShadow;
+    private int textShadowColor;
+    private boolean bold;
+    private boolean italic;
+    private String shieldRes;
+    private String shieldResIcon;
     
     public static class TypeValue {
         public String tag;
@@ -123,6 +130,13 @@ public class RenderableObject {
         featureObject.addProperty("text", obj.text);
         featureObject.addProperty("textSize", obj.textSize);
         featureObject.addProperty("textOnPath", obj.textOnPath);
+        featureObject.addProperty("textColor", obj.textColor);
+        featureObject.addProperty("textShadow", obj.textShadow);
+        featureObject.addProperty("textShadowColor", obj.textShadowColor);
+        featureObject.addProperty("bold", obj.bold);
+        featureObject.addProperty("italic", obj.italic);
+        featureObject.addProperty("shieldRes", obj.shieldRes);
+        featureObject.addProperty("shieldResIcon", obj.shieldResIcon);
         
         return featureObject;
     }

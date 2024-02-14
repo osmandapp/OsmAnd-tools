@@ -69,11 +69,16 @@ public class VectorTileController {
 		if (osmAndMapsService.validateNativeLib() != null) {
 			return errorConfig("Tile service is not initialized: " + osmAndMapsService.validateNativeLib());
 		}
-		VectorStyle vectorStyle = osmAndMapsService.getStyle(style);
+		
+		String interactiveKey = osmAndMapsService.getInteractiveKeyMap(style);
+		String currentStyle = osmAndMapsService.getMapStyle(style, interactiveKey);
+		VectorStyle vectorStyle = osmAndMapsService.getStyle(currentStyle);
+		
 		if (vectorStyle == null) {
-			return ResponseEntity.badRequest().body("Rendering style is undefined: " + style);
+			return ResponseEntity.badRequest().body("Rendering style is undefined: " + currentStyle);
 		}
-		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y);
+		
+		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y, interactiveKey);
 		// for local debug :
 		// BufferedImage img = null;
 		BufferedImage img = tile.getCacheRuntimeImage();
@@ -96,11 +101,15 @@ public class VectorTileController {
 	
 	@GetMapping(path = "/info/{style}/{z}/{x}/{y}.json", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<String> getTileInfo(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y) throws IOException {
-		VectorStyle vectorStyle = osmAndMapsService.getStyle(style);
+		
+		String interactiveKey = osmAndMapsService.getInteractiveKeyMap(style);
+		String currentStyle = osmAndMapsService.getMapStyle(style, interactiveKey);
+		VectorStyle vectorStyle = osmAndMapsService.getStyle(currentStyle);
+		
 		if (vectorStyle == null) {
-			return ResponseEntity.badRequest().body("Rendering style is undefined: " + style);
+			return ResponseEntity.badRequest().body("Rendering style is undefined: " + currentStyle);
 		}
-		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y);
+		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y, interactiveKey);
 		JsonObject tileInfo = osmAndMapsService.getTileInfo(tile.getCacheRuntimeInfo(), x, y, z);
 		tile.touch();
 		if (tileInfo == null) {

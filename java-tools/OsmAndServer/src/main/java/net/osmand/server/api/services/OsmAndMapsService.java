@@ -97,6 +97,7 @@ public class OsmAndMapsService {
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
+	private static final String INTERACTIVE_KEY = "interactive";
 	
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -395,9 +396,10 @@ public class OsmAndMapsService {
 		public final VectorStyle style;
 		private final VectorTileServerConfig cfg;
 		private JsonObject info;
+		private final String interactiveKey;
 
 		public VectorMetatile(VectorTileServerConfig cfg, String tileId, VectorStyle style, int z, int left, int top,
-				int metaSizeLog, int tileSizeLog) {
+				int metaSizeLog, int tileSizeLog, String interactiveKey) {
 			this.cfg = cfg;
 			this.style = style;
 			this.metaSizeLog = metaSizeLog;
@@ -406,7 +408,12 @@ public class OsmAndMapsService {
 			this.left = left;
 			this.top = top;
 			this.z = z;
+			this.interactiveKey = interactiveKey;
 			touch();
+		}
+		
+		public String getInteractiveKey() {
+			return interactiveKey;
 		}
 		
 		public void setInfo(JsonObject info) {
@@ -462,7 +469,7 @@ public class OsmAndMapsService {
 		}
 
 		public File getCacheFile(String ext) {
-			if (z > cfg.maxZoomCache || cfg.cacheLocation == null || cfg.cacheLocation.length() == 0) {
+			if (z > cfg.maxZoomCache || cfg.cacheLocation == null || cfg.cacheLocation.isEmpty()) {
 				return null;
 			}
 			int x = left >> (31 - z) >> metaSizeLog;
@@ -473,7 +480,7 @@ public class OsmAndMapsService {
 				loc.append("info").append("/");
 			}
 			
-			loc.append(style.key).append("/").append(z);
+			loc.append(interactiveKey != null ? interactiveKey : style.key).append("/").append(z);
 			while (x >= MAX_FILES_PER_FOLDER) {
 				int nx = x % MAX_FILES_PER_FOLDER;
 				loc.append("/").append(nx);
@@ -543,7 +550,7 @@ public class OsmAndMapsService {
 		return config.style.get(style);
 	}
 
-	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y) {
+	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
 		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
 		int left = ((x >> metaSizeLog) << metaSizeLog) << (31 - z);
 		if (left < 0) {
@@ -553,11 +560,12 @@ public class OsmAndMapsService {
 		if (top < 0) {
 			top = 0;
 		}
-		String tileId = encode(vectorStyle.key, left >> (31 - z), top >> (31 - z), z, metaSizeLog,
+		String key = interactiveKey != null ? interactiveKey : vectorStyle.key;
+		String tileId = encode(key, left >> (31 - z), top >> (31 - z), z, metaSizeLog,
 				vectorStyle.tileSizeLog);
 		VectorMetatile tile = tileCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(config, tileId, vectorStyle, z, left, top, metaSizeLog, vectorStyle.tileSizeLog);
+			tile = new VectorMetatile(config, tileId, vectorStyle, z, left, top, metaSizeLog, vectorStyle.tileSizeLog, interactiveKey);
 			tileCache.put(tile.key, tile);
 		}
 		return tile;
@@ -650,8 +658,9 @@ public class OsmAndMapsService {
 			}
 			RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z);
 			
-			// get info for interactive web map
-			ctx.saveTxt = true;
+			if (tile.getInteractiveKey() != null) {
+				ctx.saveTextTile = true;
+			}
 			
 			if (ctx.width > 8192) {
 				return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
@@ -1376,5 +1385,13 @@ public class OsmAndMapsService {
 			return false;
 		}
 		return true;
+	}
+	
+	public String getInteractiveKeyMap(String style) {
+		return style.equals(INTERACTIVE_KEY) ? INTERACTIVE_KEY : null;
+	}
+	
+	public String getMapStyle(String style, String interactiveKey) {
+		return interactiveKey != null ? "hd" : style;
 	}
 }

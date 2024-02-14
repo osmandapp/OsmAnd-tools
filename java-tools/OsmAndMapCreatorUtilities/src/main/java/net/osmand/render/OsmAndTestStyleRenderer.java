@@ -256,7 +256,7 @@ public class OsmAndTestStyleRenderer {
 						pms.nsr.setRenderingProps(props);
 					}
 					if (txtFile != null) {
-						ctx.saveTxt = true;
+						ctx.saveTextTile = true;
 					}
 					BufferedImage img = pms.nsr.renderImage(ctx).getImg();
 					ImageIO.write(img, ext, outFile);
