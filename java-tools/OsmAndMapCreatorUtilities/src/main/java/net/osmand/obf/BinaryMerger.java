@@ -295,11 +295,7 @@ public class BinaryMerger {
 	}
 
 	public static final void writeInt(CodedOutputStream ous, long v) throws IOException {
-		ous.writeRawByte((v >>> 24) & 0xFF);
-		ous.writeRawByte((v >>> 16) & 0xFF);
-		ous.writeRawByte((v >>>  8) & 0xFF);
-		ous.writeRawByte(v & 0xFF);
-		//written += 4;
+		BinaryInspector.writeInt(ous, v);
 	}
 
 	private void mergeCitiesByNameDistance(List<City> orderedCities, Map<City, List<City>> mergeGroup,
@@ -622,21 +618,7 @@ public class BinaryMerger {
 
 	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, long length)
 			throws IOException {
-		long old = raf.getFilePointer();
-		raf.seek(fp);
-		long toRead = length;
-		while (toRead > 0) {
-			int read = raf.read(BUFFER);
-			if (read == -1) {
-				throw new IllegalArgumentException("Unexpected end of file");
-			}
-			if (toRead < read) {
-				read = (int) toRead;
-			}
-			ous.writeRawBytes(BUFFER, 0, read);
-			toRead -= read;
-		}
-		raf.seek(old);
+		BinaryInspector.copyBinaryPart(ous, BUFFER, raf, fp, length);
 	}
 
 	public void combineParts(File fileToExtract, List<File> files, List<BinaryMapIndexReader> readers, Set<Integer> combineParts) throws IOException, SQLException {
