@@ -301,7 +301,7 @@ public class BinaryInspector {
 								return;
 							}
 							if (args[i].startsWith("--") || args[i].startsWith("++")) {
-								String[] st = args[i].substring(1).split(",");
+								String[] st = args[i].substring(2).split(",");
 								TreeSet<Integer> ts = new TreeSet<>();
 								for (String s : st) {
 									int t = 0;
