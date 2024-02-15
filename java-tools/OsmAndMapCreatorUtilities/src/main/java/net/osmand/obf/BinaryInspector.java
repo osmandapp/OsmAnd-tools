@@ -305,17 +305,17 @@ public class BinaryInspector {
 								TreeSet<Integer> ts = new TreeSet<>();
 								for (String s : st) {
 									int t = 0;
-									if(s.equals("address")) {
+									if (s.equals("address")) {
 										t = OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER;
-									} else if(s.equals("routing")) {
+									} else if (s.equals("routing")) {
 										t = OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER;
-									} else if(s.equals("hhrouting")) {
+									} else if (s.equals("hhrouting")) {
 										t = OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER;
-									} else if(s.equals("map")) {
+									} else if (s.equals("map")) {
 										t = OsmandOdb.OsmAndStructure.MAPINDEX_FIELD_NUMBER;
-									} else if(s.equals("poi")) {
+									} else if (s.equals("poi")) {
 										t = OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER;
-									} else if(s.equals("transport")) {
+									} else if (s.equals("transport")) {
 										t = OsmandOdb.OsmAndStructure.TRANSPORTINDEX_FIELD_NUMBER;
 									} else {
 										throw new IllegalArgumentException(s);
