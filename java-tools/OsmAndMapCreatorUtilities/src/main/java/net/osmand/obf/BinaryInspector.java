@@ -451,7 +451,7 @@ public class BinaryInspector {
 					ous.writeTag(fieldNumber, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 					writeInt(ous, part.getLength());
 					copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
-					System.out.printf("%s from %s is extracted %,d bytes\n", part.getPartName(), part.getName(), f.getName(),
+					System.out.printf("%s %s from %s is extracted %,d bytes\n", part.getPartName(), part.getName(), f.getName(),
 							part.getLength());
 				}
 				raf.close();
