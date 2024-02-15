@@ -13,13 +13,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -30,6 +30,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.IndexConstants;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.binary.BinaryIndexPart;
@@ -95,7 +96,8 @@ public class BinaryInspector {
 					"-latlon=50.868332,15.24471",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
+					"/Users/victorshcherb/Desktop/hh-routing_pedestrian.obf",
+//					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
 //					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -272,6 +274,15 @@ public class BinaryInspector {
 
 		}
 	}
+	
+	public class FileExtractFrom {
+		public List<File> from = new ArrayList<File>();
+		public Set<Integer> excludeParts;
+		public Set<Integer> includeParts;
+		public Set<Integer> excludeIndex;
+		public Set<Integer> includeIndex;
+		
+	}
 
 	public void inspector(String[] args) throws IOException {
 		String f = args[0];
@@ -281,24 +292,78 @@ public class BinaryInspector {
 				if (args.length < 4) {
 					printUsage("Too few parameters to extract (require minimum 4)");
 				} else {
-					Map<File, String> parts = new HashMap<File, String>();
+					List<FileExtractFrom> parts = new ArrayList<>();
+					FileExtractFrom lastPart = null;
 					for (int i = 2; i < args.length; i++) {
-						File file = new File(args[i]);
-						if (!file.exists()) {
-							System.err.println("File to extract from doesn't exist " + args[i]);
-							return;
-						}
-						parts.put(file, null);
-						if (i < args.length - 1) {
-							if (args[i + 1].startsWith("-") || args[i + 1].startsWith("+")) {
-								parts.put(file, args[i + 1]);
-								i++;
+						if ((args[i].startsWith("-") || args[i].startsWith("+"))) {
+							if(lastPart == null) {
+								System.err.println("Expected file name instead of " + args[i]);
+								return;
+							}
+							if (args[i].startsWith("--") || args[i].startsWith("++")) {
+								String[] st = args[i].substring(2).split(",");
+								TreeSet<Integer> ts = new TreeSet<>();
+								for (String s : st) {
+									int t = 0;
+									if (s.equals("address")) {
+										t = OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER;
+									} else if (s.equals("routing")) {
+										t = OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER;
+									} else if (s.equals("hhrouting")) {
+										t = OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER;
+									} else if (s.equals("map")) {
+										t = OsmandOdb.OsmAndStructure.MAPINDEX_FIELD_NUMBER;
+									} else if (s.equals("poi")) {
+										t = OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER;
+									} else if (s.equals("transport")) {
+										t = OsmandOdb.OsmAndStructure.TRANSPORTINDEX_FIELD_NUMBER;
+									} else {
+										throw new IllegalArgumentException(s);
+									}
+									ts.add(t);
+								}
+								if (args[i].startsWith("-")) {
+									lastPart.excludeIndex = ts;
+								} else {
+									lastPart.includeIndex = ts;
+								}
+							} else {
+								String[] st = args[i].substring(1).split(",");
+								TreeSet<Integer> ts = new TreeSet<>();
+								for (String s : st) {
+									ts.add(Integer.parseInt(s));
+								}
+								if (args[i].startsWith("-")) {
+									lastPart.excludeParts = ts;
+								} else {
+									lastPart.includeParts = ts;
+								}
+							}
+						} else {
+							File file = new File(args[i]);
+							if (!file.exists()) {
+								System.err.println("File to extract from doesn't exist " + args[i]);
+								return;
+							}	
+							lastPart = new FileExtractFrom();
+							if (file.isDirectory()) {
+								for (File ch : file.listFiles()) {
+									if (ch.getName().endsWith(".obf")) {
+										lastPart.from.add(ch);
+									}
+								}
+							} else {
+								lastPart.from.add(file);
+							}
+							if (!lastPart.from.isEmpty()) {
+								parts.add(lastPart);
 							}
 						}
 					}
-					List<Float> extracted = combineParts(new File(args[1]), parts);
-					if (extracted != null) {
-						println("\n" + extracted.size() + " parts were successfully extracted to " + args[1]);
+					File to = new File(args[1]);
+					int partsS = combineParts(to, parts);
+					if (partsS > 0) {
+						println("\n" + partsS + " parts were successfully extracted to " + to.getName());
 					}
 				}
 			} else if (f.startsWith("-v") || f.startsWith("-osm") || f.startsWith("-zoom")) {
@@ -318,160 +383,107 @@ public class BinaryInspector {
 		}
 	}
 
-	public static final void writeInt(CodedOutputStream ous, int v) throws IOException {
-		ous.writeRawByte((v >>> 24) & 0xFF);
-		ous.writeRawByte((v >>> 16) & 0xFF);
-		ous.writeRawByte((v >>>  8) & 0xFF);
+	public static final void writeInt(CodedOutputStream ous, long v) throws IOException {
+		if (v > Integer.MAX_VALUE) {
+			// mark highest bit to 1 as long
+			ous.writeRawByte(((v >> 54) & 0xFF) | 0x80);
+			ous.writeRawByte((v >> 48) & 0xFF);
+			ous.writeRawByte((v >> 40) & 0xFF);
+			ous.writeRawByte((v >> 32) & 0xFF);
+		}
+		ous.writeRawByte((v >> 24) & 0xFF);
+		ous.writeRawByte((v >> 16) & 0xFF);
+		ous.writeRawByte((v >>  8) & 0xFF);
 		ous.writeRawByte(v & 0xFF);
+		
 		//written += 4;
 	}
 
-	@SuppressWarnings("unchecked")
-	public  static List<Float> combineParts(File fileToExtract, Map<File, String> partsToExtractFrom) throws IOException {
-		BinaryMapIndexReader[] indexes = new BinaryMapIndexReader[partsToExtractFrom.size()];
-		RandomAccessFile[] rafs = new RandomAccessFile[partsToExtractFrom.size()];
+	public  static int combineParts(File fileToExtract, List<FileExtractFrom> partsToExtractFrom) throws IOException {
+		Set<String> uniqueNames = new LinkedHashSet<String>();
 
-		LinkedHashSet<Float>[] partsSet = new LinkedHashSet[partsToExtractFrom.size()];
-		int c = 0;
-		Set<String> addressNames = new LinkedHashSet<String>();
-
-
-		int version = -1;
-		// Go through all files and validate conistency
-		for(File f : partsToExtractFrom.keySet()){
-			if(f.getAbsolutePath().equals(fileToExtract.getAbsolutePath())){
-				System.err.println("Error : Input file is equal to output file " + f.getAbsolutePath());
-				return null;
-			}
-			rafs[c] = new RandomAccessFile(f.getAbsolutePath(), "r");
-			indexes[c] = new BinaryMapIndexReader(rafs[c], f);
-			partsSet[c] = new LinkedHashSet<Float>();
-			if(version == -1){
-				version = indexes[c].getVersion();
-			} else {
-				if(indexes[c].getVersion() != version){
-					System.err.println("Error : Different input files has different input versions " + indexes[c].getVersion() + " != " + version);
-					return null;
-				}
-			}
-
-			LinkedHashSet<Float> temp = new LinkedHashSet<Float>();
-			String pattern = partsToExtractFrom.get(f);
-			boolean minus = true;
-			for (int i = 0; i < indexes[c].getIndexes().size(); i++) {
-				partsSet[c].add(i + 1f);
-				BinaryIndexPart part = indexes[c].getIndexes().get(i);
-				if(part instanceof MapIndex){
-					List<MapRoot> roots = ((MapIndex) part).getRoots();
-					int rsize = roots.size();
-					for(int j=0; j<rsize; j++){
-						partsSet[c].add((i + 1f) + (j + 1) / 10f);
-					}
-				}
-			}
-			if(pattern != null){
-				minus = pattern.startsWith("-");
-				String[] split = pattern.substring(1).split(",");
-				for(String s : split){
-					temp.add(Float.valueOf(s));
-				}
-			}
-
-			Iterator<Float> p = partsSet[c].iterator();
-			while (p.hasNext()) {
-				Float part = p.next();
-				if (minus) {
-					if (temp.contains(part)) {
-						p.remove();
-					}
-				} else {
-					if (!temp.contains(part)) {
-						p.remove();
-					}
-				}
-			}
-
-			c++;
-		}
+		int version = IndexConstants.BINARY_MAP_VERSION;
 
 		// write files
 		FileOutputStream fout = new FileOutputStream(fileToExtract);
 		CodedOutputStream ous = CodedOutputStream.newInstance(fout, BUFFER_SIZE);
-		List<Float> list = new ArrayList<Float>();
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
 		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, System.currentTimeMillis());
-
-
-		for (int k = 0; k < indexes.length; k++) {
-			LinkedHashSet<Float> partSet = partsSet[k];
-			BinaryMapIndexReader index = indexes[k];
-			RandomAccessFile raf = rafs[k];
-			for (int i = 0; i < index.getIndexes().size(); i++) {
-				if (!partSet.contains(Float.valueOf(i + 1f))) {
+		// Go through all files and validate conistency
+		int parts = 0;
+		for (FileExtractFrom extract : partsToExtractFrom) {
+			for (File f : extract.from) {
+				if (f.getAbsolutePath().equals(fileToExtract.getAbsolutePath())) {
+					System.err.println("Error : Input file is equal to output file " + f.getAbsolutePath());
 					continue;
 				}
-				list.add(i + 1f);
-
-				BinaryIndexPart part = index.getIndexes().get(i);
-				String map;
-
-				if (part instanceof MapIndex) {
-					ous.writeTag(OsmandOdb.OsmAndStructure.MAPINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					map = "Map";
-				} else if (part instanceof AddressRegion) {
-					ous.writeTag(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					map = "Address";
-					if (addressNames.contains(part.getName())) {
-						System.err.println("Error : going to merge 2 addresses with same names. Skip " + part.getName());
+				RandomAccessFile raf = new RandomAccessFile(f.getAbsolutePath(), "r");
+				BinaryMapIndexReader bmir = new BinaryMapIndexReader(raf, f);
+				if (bmir.getVersion() != version) {
+					System.err.println("Error : Different input files has different input versions " + bmir.getVersion()
+							+ " != " + version);
+					continue;
+				}
+				for (int i = 0; i < bmir.getIndexes().size(); i++) {
+					BinaryIndexPart part = bmir.getIndexes().get(i);
+					int fieldNumber = part.getFieldNumber();
+					String uniqueName = fieldNumber + " " + part.getName();
+					int ind = i + 1;
+					if (extract.excludeParts != null && extract.excludeParts.contains(ind)) {
 						continue;
 					}
-					addressNames.add(part.getName());
-				} else if (part instanceof TransportIndex) {
-					ous.writeTag(OsmandOdb.OsmAndStructure.TRANSPORTINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					map = "Transport";
-				} else if (part instanceof PoiRegion) {
-					ous.writeTag(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					map = "POI";
-				} else if (part instanceof RouteRegion) {
-					ous.writeTag(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					map = "Routing";
-				} else {
-					throw new UnsupportedOperationException();
+					if (extract.includeParts != null && !extract.includeParts.contains(ind)) {
+						continue;
+					}
+					if (extract.excludeIndex != null && extract.excludeIndex.contains(fieldNumber)) {
+						continue;
+					}
+					if (extract.includeIndex != null && !extract.includeIndex.contains(fieldNumber)) {
+						continue;
+					}
+					if (!uniqueNames.add(uniqueName)) {
+						System.out.printf("Skip %s %s from %s as duplicate \n", part.getPartName(), part.getName(), f.getName());
+						continue;
+					}
+					parts++;
+					ous.writeTag(fieldNumber, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+					writeInt(ous, part.getLength());
+					copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
+					System.out.printf("%s %s from %s is extracted %,d bytes\n", part.getPartName(), part.getName(), f.getName(),
+							part.getLength());
 				}
-				writeInt(ous, part.getLength());
-				copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
-				System.out.println(MessageFormat.format("{2} part {0} is extracted {1} bytes",
-						new Object[]{part.getName(), part.getLength(), map}));
-
+				raf.close();
 			}
 		}
+
+
 
 		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
 		ous.flush();
 		fout.close();
-
-
-		return list;
+		return parts;
 	}
 
 
-	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, int length)
+	public static void copyBinaryPart(CodedOutputStream ous, byte[] BUFFER, RandomAccessFile raf, long fp, long length)
 			throws IOException {
+		long old = raf.getFilePointer();
 		raf.seek(fp);
-		int toRead = length;
+		long toRead = length;
 		while (toRead > 0) {
 			int read = raf.read(BUFFER);
 			if (read == -1) {
 				throw new IllegalArgumentException("Unexpected end of file");
 			}
 			if (toRead < read) {
-				read = toRead;
+				read = (int) toRead;
 			}
 			ous.writeRawBytes(BUFFER, 0, read);
 			toRead -= read;
 		}
+		raf.seek(old);
 	}
 
 
@@ -1319,14 +1331,14 @@ public class BinaryInspector {
 		println("\nStops:");
 		for (TransportStop s : stops) {
 			lrs.clear();
-			for (int pnt : s.getReferencesToRoutes()) {
+			for (long pnt : s.getReferencesToRoutes()) {
 				TransportRoute route;
-				if (!rs.containsKey((long) pnt)) {
-					TIntObjectHashMap<TransportRoute> pts = index.getTransportRoutes(new int[] { pnt });
+				if (!rs.containsKey(pnt)) {
+					TLongObjectHashMap<TransportRoute> pts = index.getTransportRoutes(new long[] { pnt });
 					route = pts.valueCollection().iterator().next();
-					rs.put((long) pnt, route);
+					rs.put(pnt, route);
 				} else {
-					route = rs.get((long) pnt);
+					route = rs.get(pnt);
 				}
 				if (route != null) {
 					//lrs.add(route.getRef() + " " + route.getName(verbose.lang));
@@ -1464,6 +1476,7 @@ public class BinaryInspector {
 		System.out.println("  Example : inspector -c output_file input_file -2,3\n\tExtracts all parts excluding 2, 3");
 		System.out.println("  Example : inspector -c output_file input_file1 input_file2 input_file3\n\tSimply combine 3 files");
 		System.out.println("  Example : inspector -c output_file input_file1 input_file2 -4\n\tCombine all parts of 1st file and all parts excluding 4th part of 2nd file");
+		System.out.println("  Example : inspector -c output_file input_file1 +routing\n\tCopy only routing parts (supports address, poi, routing, hhrouting, transport, map)");
 	}
 
 }

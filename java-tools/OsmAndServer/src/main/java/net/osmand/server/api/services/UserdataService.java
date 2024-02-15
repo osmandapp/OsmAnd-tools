@@ -319,8 +319,10 @@ public class UserdataService {
         }
         return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
     }
-    
-	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email) throws IOException {
+
+	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email,
+	                                              @RequestParam(name = "lang", required = false) String lang)
+			throws IOException {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		if (!email.contains("@")) {
@@ -341,7 +343,7 @@ public class UserdataService {
 		}
 		pu.tokenTime = new Date();
 		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "setup");
+		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		return ok();
 	}
     
@@ -720,7 +722,7 @@ public class UserdataService {
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
-                if (shouldSkipFile(filterTypes, sf)) {
+                if (shouldSkipFile(filterTypes, sf, null)) {
                     continue;
                 }
 				if (fileIds.add(fileId)) {
@@ -785,10 +787,20 @@ public class UserdataService {
 		}
 	}
     
-    private boolean shouldSkipFile(Set<String> filterTypes, UserFileNoData sf) {
-        return (filterTypes != null && !isSelectedType(filterTypes, sf))
-                || sf.name.endsWith(EMPTY_FILE_NAME)
-                || sf.name.endsWith(INFO_EXT);
+    private boolean shouldSkipFile(Set<String> filterTypes, UserFileNoData userFileNoData, UserFile userFile) {
+        if (userFileNoData != null) {
+            // get backup for all files
+            return (filterTypes != null && !isSelectedType(filterTypes, userFileNoData))
+                    || userFileNoData.name.endsWith(EMPTY_FILE_NAME)
+                    || userFileNoData.name.endsWith(INFO_EXT);
+        } else if (userFile != null) {
+            // get backup for folder
+            return (filterTypes != null && !filterTypes.contains(userFile.type))
+                    || userFile.filesize == -1
+                    || userFile.name.endsWith(EMPTY_FILE_NAME)
+                    || userFile.name.endsWith(INFO_EXT);
+        }
+        return false;
     }
     
     @Transactional
@@ -801,7 +813,7 @@ public class UserdataService {
         try (ZipOutputStream zs = new ZipOutputStream(new FileOutputStream(tmpFile))) {
             JSONArray itemsJson = new JSONArray();
             for (UserFile file : files) {
-                if (file.filesize != -1 && !file.name.endsWith(EMPTY_FILE_NAME)) {
+                if (!shouldSkipFile(Collections.singleton(type), null, file)) {
                     itemsJson.put(new JSONObject(toJson(type, file.name)));
                     InputStream is = new GZIPInputStream(getInputStream(dev, file));
                     ZipEntry zipEntry = new ZipEntry(file.name);
@@ -870,13 +882,13 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String email, String action, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> sendCode(String email, String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudWebEmail(email, token, action);
+        emailSender.sendOsmAndCloudWebEmail(email, token, action, lang);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);

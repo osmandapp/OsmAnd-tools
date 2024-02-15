@@ -26,15 +26,17 @@ public class RandomRouteTester {
 		};
 
 		// random tests settings
-		int ITERATIONS = 50; // number of random routes
-		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (2)
+		int ITERATIONS = 10; // number of random routes
+		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (0)
 		int MIN_DISTANCE_KM = 50; // min distance between start and finish (50)
 		int MAX_DISTANCE_KM = 100; // max distance between start and finish (100)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
+		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (emulate device speed) (0-100)
+
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
 				"bicycle",
-				"pedestrian",
+//				"pedestrian",
 
 //				"car,short_way",
 //				"bicycle,short_way",
@@ -66,6 +68,9 @@ public class RandomRouteTester {
 		// cost/distance deviation limits
 		double DEVIATION_RED = 1.0F; // > 1% - mark as failed
 		double DEVIATION_YELLOW = 0.1F; // > 0.1% - mark as acceptable
+
+		// enable Android mode for BRP
+		boolean CAR_2PHASE_MODE = false;
 	}
 
 	class CommandLineOpts {
@@ -107,7 +112,9 @@ public class RandomRouteTester {
 		test.loadNativeLibrary();
 		test.initObfReaders();
 		test.generateRoutes();
+		test.startSlowDown();
 		test.collectRoutes();
+		test.stopSlowDown();
 		test.reportResult();
 	}
 
@@ -120,9 +127,10 @@ public class RandomRouteTester {
 	private PrimaryRouting optPrimaryRouting;
 
 	private enum PrimaryRouting {
-		JAVA,
-		CPP,
-		HH
+		BRP_JAVA,
+		BRP_CPP,
+		HH_JAVA,
+		HH_CPP,
 	}
 
 	private long started;
@@ -197,13 +205,19 @@ public class RandomRouteTester {
 
 		// --avoid-java --avoid-cpp --avoid-hh additionally processed by collectRoutes()
 		if (opts.getOpt("--primary") != null) {
-			if ("java".equals(opts.getOpt("--primary"))) {
-				optPrimaryRouting = PrimaryRouting.JAVA;
-			} else if ("cpp".equals(opts.getOpt("--primary"))) {
-				optPrimaryRouting = PrimaryRouting.CPP;
-			} else if ("hh".equals(opts.getOpt("--primary"))) {
-				optPrimaryRouting = PrimaryRouting.HH;
+			if ("brp-java".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.BRP_JAVA;
+			} else if ("brp-cpp".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.BRP_CPP;
+			} else if ("hh-java".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.HH_JAVA;
+			} else if ("hh-cpp".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.HH_CPP;
 			}
+		}
+
+		if (opts.getOpt("--car-2phase") != null) {
+			config.CAR_2PHASE_MODE = true;
 		}
 
 		if (opts.getOpt("--help") != null) {
@@ -226,13 +240,16 @@ public class RandomRouteTester {
 					"--max-inter=N number",
 					"--profile=profile,settings,key:value force one profile",
 					"",
-					"--primary=(java|cpp|hh) compare others against this",
-					"--avoid-java avoid BinaryRoutePlanner (java)",
-					"--avoid-cpp avoid BinaryRoutePlanner (cpp)",
-					"--avoid-hh avoid HHRoutePlanner (java)",
+					"--primary=(brp-java|brp-cpp|hh-java|hh-cpp) compare others against this",
+					"--avoid-brp-java avoid BinaryRoutePlanner (java)",
+					"--avoid-brp-cpp avoid BinaryRoutePlanner (cpp)",
+					"--avoid-hh-java avoid HHRoutePlanner (java)",
+					"--avoid-hh-cpp avoid HHRoutePlanner (cpp)",
 					"",
-					"--red= % red-color limit",
-					"--yellow= % yellow-color limit",
+					"--car-2phase use COMPLEX mode for car (Android default)",
+					"",
+					"--red=N % red-color limit",
+					"--yellow=N % yellow-color limit",
 					"",
 					"--help show help",
 					""
@@ -297,6 +314,29 @@ public class RandomRouteTester {
 		testList = generator.generateTestList(obfReaders);
 	}
 
+	private void startSlowDown() {
+		Runnable endless = () -> {
+			while (config.OPTIONAL_SLOW_DOWN_THREADS > 0) {
+				for (long i = 0; i < 1_000_000_000L; i++) {
+					// 1MM long-counter makes strong load
+				}
+				try {
+					// refresh state
+					Thread.sleep(1);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		};
+		for (int i = 0; i < config.OPTIONAL_SLOW_DOWN_THREADS; i++) {
+			new Thread(endless).start();
+		}
+	}
+
+	private void stopSlowDown() {
+		config.OPTIONAL_SLOW_DOWN_THREADS = 0;
+	}
+
 	private void collectRoutes() {
 		for (int i = 0; i < testList.size(); i++) {
 			RandomRouteEntry entry = testList.get(i);
@@ -308,17 +348,21 @@ public class RandomRouteTester {
 				// if --primary option is used, --avoid-xxx is set here to avoid double-calls
 				if (optPrimaryRouting != null) {
 					switch (optPrimaryRouting) {
-						case JAVA:
-							opts.setOpt("--avoid-java", "true");
+						case BRP_JAVA:
+							opts.setOpt("--avoid-brp-java", "true");
 							entry.results.add(runBinaryRoutePlannerJava(entry));
 							break;
-						case CPP:
-							opts.setOpt("--avoid-cpp", "true");
+						case BRP_CPP:
+							opts.setOpt("--avoid-brp-cpp", "true");
 							entry.results.add(runBinaryRoutePlannerCpp(entry));
 							break;
-						case HH:
-							opts.setOpt("--avoid-hh", "true");
+						case HH_JAVA:
+							opts.setOpt("--avoid-hh-java", "true");
 							entry.results.add(runHHRoutePlannerJava(entry));
+							break;
+						case HH_CPP:
+							opts.setOpt("--avoid-hh-cpp", "true");
+							entry.results.add(runHHRoutePlannerCpp(entry));
 							break;
 						default:
 							throw new RuntimeException("Wrong primary routing defined");
@@ -326,14 +370,17 @@ public class RandomRouteTester {
 				}
 
 				// process --avoid-xxx options
-				if (opts.getOpt("--avoid-java") == null) {
+				if (opts.getOpt("--avoid-brp-java") == null) {
 					entry.results.add(runBinaryRoutePlannerJava(entry));
 				}
-				if (opts.getOpt("--avoid-cpp") == null) {
+				if (opts.getOpt("--avoid-brp-cpp") == null) {
 					entry.results.add(runBinaryRoutePlannerCpp(entry));
 				}
-				if (opts.getOpt("--avoid-hh") == null) {
+				if (opts.getOpt("--avoid-hh-java") == null) {
 					entry.results.add(runHHRoutePlannerJava(entry));
+				}
+				if (opts.getOpt("--avoid-hh-cpp") == null) {
+					entry.results.add(runHHRoutePlannerCpp(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
@@ -370,11 +417,16 @@ public class RandomRouteTester {
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
 
+		RoutePlannerFrontEnd.RouteCalculationMode mode =
+				(this.config.CAR_2PHASE_MODE && "car".equals(entry.profile)) ?
+						RoutePlannerFrontEnd.RouteCalculationMode.COMPLEX :
+						RoutePlannerFrontEnd.RouteCalculationMode.NORMAL;
+
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
 				useNative ? nativeLibrary : null,
 				obfReaders.toArray(new BinaryMapIndexReader[0]),
-				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
+				mode
 		);
 
 //		ctx.dijkstraMode = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
@@ -387,10 +439,18 @@ public class RandomRouteTester {
 		List<RouteSegmentResult> routeSegments = res != null ? res.getList() : new ArrayList<>();
 		long runTime = System.currentTimeMillis() - started;
 
-		return new RandomRouteResult(useNative ? "cpp" : "java", entry, runTime, ctx, routeSegments);
+		return new RandomRouteResult(useNative ? "brp-cpp" : "brp-java", entry, runTime, ctx, routeSegments);
 	}
 
 	private RandomRouteResult runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+		return runHHRoutePlanner(entry, false);
+	}
+
+	private RandomRouteResult runHHRoutePlannerCpp(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
+		return runHHRoutePlanner(entry, true);
+	}
+
+	private RandomRouteResult runHHRoutePlanner(RandomRouteEntry entry, boolean useNative) throws SQLException, IOException, InterruptedException {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
@@ -407,10 +467,12 @@ public class RandomRouteTester {
 
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
-				null,
+				useNative ? nativeLibrary : null,
 				obfReaders.toArray(new BinaryMapIndexReader[0]),
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
 		);
+
+		fe.setHHRouteCpp(useNative);
 
 //		RoutePlannerFrontEnd.HH_ROUTING_CONFIG = null; // way to set config for hh
 
@@ -418,7 +480,7 @@ public class RandomRouteTester {
 		List<RouteSegmentResult> routeSegments = res != null ? res.getList() : new ArrayList<>();
 		long runTime = System.currentTimeMillis() - started;
 
-		return new RandomRouteResult("hh", entry, runTime, ctx, routeSegments);
+		return new RandomRouteResult(useNative ? "hh-cpp" : "hh-java", entry, runTime, ctx, routeSegments);
 	}
 
 	private void loadNativeLibrary() {

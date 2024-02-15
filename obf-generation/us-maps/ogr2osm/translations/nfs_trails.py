@@ -79,7 +79,7 @@ class USFSTrailsTranslation(ogr2osm.TranslationBase):
 		if 'TRAIL_NO' in attrs and TRAIL_NO:
 			tags['nfs_trail_number'] = TRAIL_NO
 		if 'TRAIL_NAME' in attrs and TRAIL_NAME and TRAIL_NAME != 'NO NAME':
-			tags['nfs_trail_name'] = TRAIL_NAME.lower().title().replace("'S ","'s ")
+			tags['name'] = TRAIL_NAME.lower().title().replace("'S ","'s ")
 		if 'TRAIL_TYPE' in attrs and TRAIL_TYPE:
 			tags['nfs_trail_type'] = TRAIL_TYPE.lower()
 		if 'TRAIL_CN' in attrs and TRAIL_CN:

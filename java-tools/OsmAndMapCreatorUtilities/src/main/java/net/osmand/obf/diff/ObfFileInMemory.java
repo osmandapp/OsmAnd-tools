@@ -53,11 +53,14 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import gnu.trove.iterator.TIntIterator;
+import gnu.trove.iterator.TLongIterator;
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntLongMap;
+import gnu.trove.map.TLongLongMap;
 import gnu.trove.map.hash.TIntLongHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.map.hash.TLongLongHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.LeafElement;
 import rtree.RTree;
@@ -267,9 +270,9 @@ public class ObfFileInMemory {
 			}
 			for (TransportStop stop : transportStops.valueCollection()) {
 				long[] routesIds = stop.getRoutesIds();
-				int[] nrefs = null;
+				long[] nrefs = null;
 				if (routesIds != null) {
-					nrefs = new int[routesIds.length];
+					nrefs = new long[routesIds.length];
 					for (int i = 0; i < routesIds.length; i++) {
 						Long vl = newRoutesIds.get(routesIds[i]);
 						if(vl == null) {
@@ -537,14 +540,14 @@ public class ObfFileInMemory {
 				-1, null);
 		List<TransportStop> sti = indexReader.searchTransportIndex(ind, sr);
 		// merged could not be overridden
-		TIntLongMap routesData = putTransportStops(sti, override);
+		TLongLongMap routesData = putTransportStops(sti, override);
 		if (routesData.size() > 0) {
-			int[] filePointers = routesData.keys();
+			long[] filePointers = routesData.keys();
 			// reads all route
-			TIntObjectHashMap<TransportRoute> transportRoutes = indexReader.getTransportRoutes(filePointers);
-			TIntIterator it = transportRoutes.keySet().iterator();
+			TLongObjectHashMap<TransportRoute> transportRoutes = indexReader.getTransportRoutes(filePointers);
+			TLongIterator it = transportRoutes.keySet().iterator();
 			while (it.hasNext()) {
-				int offset = it.next();
+				long offset = it.next();
 				TransportRoute route = transportRoutes.get(offset);
 				Long routeId = route.getId();
 				if (override || !this.transportRoutes.containsKey(routeId)) {
@@ -554,14 +557,14 @@ public class ObfFileInMemory {
 		}
 	}
 	
-	public TIntLongMap putTransportStops(Collection<TransportStop> newData, boolean override) {
-		TIntLongMap routesStopsData = new TIntLongHashMap(); 
+	public TLongLongMap putTransportStops(Collection<TransportStop> newData, boolean override) {
+		TLongLongMap routesStopsData = new TLongLongHashMap(); 
 		for (TransportStop ts : newData) {
 			Long tid = ts.getId();
 			if (routesStopsData != null) {
-				int[] referencesToRoutes = ts.getReferencesToRoutes();
+				long[] referencesToRoutes = ts.getReferencesToRoutes();
 				if (referencesToRoutes != null && referencesToRoutes.length > 0) {
-					for (int ref : referencesToRoutes) {
+					for (long ref : referencesToRoutes) {
 						routesStopsData.put(ref, tid);
 					}
 				}

@@ -23,10 +23,11 @@ function usage {
 	echo "-d: slightly simplify contours with Douglas-Pecker algorithm to reduce file size in half"
 	echo "-t: threads number"
 	echo "-f: make contours in feet"
+	echo "-c: path to cutline in shp format"
 }
 
 date
-while getopts ":i:o:spdt:f" opt; do
+while getopts ":i:o:spdt:fc:" opt; do
   case $opt in
     i) indir="$OPTARG"
     ;;
@@ -45,12 +46,13 @@ while getopts ":i:o:spdt:f" opt; do
        threads_number_3="$OPTARG"
        threads_number_is_set=true
     ;;
+    c) path_to_cutline="$OPTARG"
+    ;;
     \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
 	usage
     ;;
   esac
 done
-
 if [[ $make_feet == "true" ]] ; then
 	isolines_step=40
 	translation_script=contours_feet.py
@@ -84,6 +86,10 @@ if [ ! -d $outdir ]; then
 	echo "output dir is not found"
 	exit 3
 fi
+if [ ! -f $path_to_cutline ]; then
+	echo "path to cutline is not found"
+	exit 3
+fi
 
 echo -e "\e[104minput dir: $indir\e[49m"
 echo -e "\e[104moutput dir: $outdir\e[49m"
@@ -92,6 +98,7 @@ echo -e "\e[104msimplify: $simplify\e[49m"
 echo -e "\e[104msplit_lines: $split_lines\e[49m"
 echo -e "\e[104mmake_feet: $make_feet\e[49m"
 echo -e "\e[104misolines_step: $isolines_step\e[49m"
+echo -e "\e[104mpath_to_cutline: $path_to_cutline\e[49m"
 if [[ $threads_number_is_set ]]; then
 	echo -e "\e[104mthreads number: $threads_number_1\e[49m"
 fi
@@ -108,6 +115,7 @@ export split_lines
 export make_feet
 export isolines_step
 export translation_script
+export path_to_cutline
 
 process_tiff ()
 {
@@ -195,6 +203,19 @@ process_tiff ()
 				mv ${TMP_DIR}/${filename}_split.prj ${TMP_DIR}/$filename.prj
 				mv ${TMP_DIR}/${filename}_split.shx ${TMP_DIR}/$filename.shx
 			fi
+		fi
+		if [[ $path_to_cutline ]] ; then
+			echo "Cropping by cutline …"
+			time python3 $working_dir/run_alg.py -alg "native:clip" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 OVERLAY -value2 $path_to_cutline -param3 OUTPUT -value3 ${TMP_DIR}/${filename}_cut.shp
+# 			time ogr2ogr ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp -clipsrc $path_to_cutline
+			if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
+			if [ -f ${TMP_DIR}/${filename}_cut.shp ]; then
+				mv ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp
+				mv ${TMP_DIR}/${filename}_cut.dbf ${TMP_DIR}/$filename.dbf
+				mv ${TMP_DIR}/${filename}_cut.prj ${TMP_DIR}/$filename.prj
+				mv ${TMP_DIR}/${filename}_cut.shx ${TMP_DIR}/$filename.shx
+			fi
+
 		fi
 		echo "Building osm file …"
 		if [[ -f $outdir/$filename.osm ]] ; then rm -f $outdir/$filename.osm ; fi

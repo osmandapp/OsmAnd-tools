@@ -1,10 +1,14 @@
 #!/bin/bash
+# This script it intended to prepare PAD-US for use in OsmAnd
+# Data download link: https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
+# shp files are required
+
 #set -x
 dir=$(pwd)
 workdir=/mnt/wd_2tb/padus
 shapedirname=shp
 tmpdirname=tmp
-outosmdirname=input
+outosmdirname=osm
 ogr2osmdirname=ogr2osm
 mapcreatordir=/home/xmd5a/utilites/OsmAndMapCreator-main/
 
@@ -18,7 +22,7 @@ export dir
 function rename_padus {
 	state_code=${1#*PADUS3_0Combined_State}
 	prefix="Us"
-	suffix="northamerica.padus"
+	suffix="padus_northamerica"
 	case $state_code in
 		"AL") padus_name=${prefix}_alabama_${suffix};;
 		"AK") padus_name=${prefix}_alaska_${suffix};;
@@ -48,6 +52,7 @@ function rename_padus {
 		"MN") padus_name=${prefix}_minnesota_${suffix};;
 		"MS") padus_name=${prefix}_mississippi_${suffix};;
 		"MO") padus_name=${prefix}_missouri_${suffix};;
+		"MP") padus_name=${prefix}_northern_mariana_islands_${suffix};;
 		"MT") padus_name=${prefix}_montana_${suffix};;
 		"NE") padus_name=${prefix}_nebraska_${suffix};;
 		"NV") padus_name=${prefix}_nevada_${suffix};;
