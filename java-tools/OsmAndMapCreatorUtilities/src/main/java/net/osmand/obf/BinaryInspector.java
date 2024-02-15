@@ -1476,6 +1476,7 @@ public class BinaryInspector {
 		System.out.println("  Example : inspector -c output_file input_file -2,3\n\tExtracts all parts excluding 2, 3");
 		System.out.println("  Example : inspector -c output_file input_file1 input_file2 input_file3\n\tSimply combine 3 files");
 		System.out.println("  Example : inspector -c output_file input_file1 input_file2 -4\n\tCombine all parts of 1st file and all parts excluding 4th part of 2nd file");
+		System.out.println("  Example : inspector -c output_file input_file1 +routing\n\tCopy only routing parts (supports address, poi, routing, hhrouting, transport, map)");
 	}
 
 }
