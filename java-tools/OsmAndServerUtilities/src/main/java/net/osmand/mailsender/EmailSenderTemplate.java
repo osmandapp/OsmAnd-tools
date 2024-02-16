@@ -23,6 +23,7 @@ Environment:
 	SMTP_SERVER - address of smtp-server
 	EMAIL_TEMPLATES - path to templates directory
 	SENDGRID_KEY - SendGrid API key (optional for fallback)
+	EMAIL_SLEEP - optional delay before each send (in seconds)
 	TEST_EMAIL_COPY - copy each email to this address (testing)
 
 Template files structure:
@@ -104,17 +105,17 @@ public class EmailSenderTemplate {
 		final String templates = System.getenv("EMAIL_TEMPLATES");
 		if (templates != null) {
 			this.defaultTemplatesDirectory = templates;
-			LOG.info("Using env EMAIL_TEMPLATES: " + templates);
+			// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
 		}
 
 		final String smtpServer = System.getenv("SMTP_SERVER");
 		if (smtpServer != null) {
-			LOG.info("Using env SMTP_SERVER: " + smtpServer);
+			// LOG.info("Using env SMTP_SERVER: " + smtpServer);
 		}
 
 		final String apiKey = System.getenv("SENDGRID_KEY");
 		if (apiKey != null) {
-			LOG.info("Using env SENDGRID_KEY: qwerty :-)");
+			// LOG.info("Using env SENDGRID_KEY: qwerty :-)");
 		}
 
 		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
@@ -124,6 +125,15 @@ public class EmailSenderTemplate {
 
 	public EmailSenderTemplate send() {
 		validateLoadedTemplates(); // final validation before send
+
+		final String sleep = System.getenv("EMAIL_SLEEP");
+		if (sleep != null) {
+			try {
+				Thread.sleep(Integer.parseInt(sleep) * 1000);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+		}
 
 		for (String to : toList) {
 			setVarsByTo(to);
@@ -147,7 +157,7 @@ public class EmailSenderTemplate {
 					sentEmails++;
 				}
 			} catch (Exception e) {
-				LOG.warn(e.getMessage(), e);
+				LOG.info(e.getMessage(), e);
 			}
 		}
 		return this;
@@ -402,7 +412,7 @@ public class EmailSenderTemplate {
 						return error();
 					}
 				};
-				LOG.warn("SendGrid sender is not configured");
+				LOG.info("SendGrid sender is not configured");
 			}
 		}
 
@@ -425,6 +435,7 @@ public class EmailSenderTemplate {
 				return first;
 			}
 
+			LOG.info("SMTP failed (" + first.getStatusCode() + ") - fallback to SendGrid");
 			return sendWithSendGrid(); // fallback
 		}
 
@@ -439,7 +450,7 @@ public class EmailSenderTemplate {
 
 		private Response sendWithSmtp() {
 			if (smtpServer == null) {
-				LOG.warn("SMTP_SERVER is not configured");
+				LOG.info("SMTP_SERVER is not configured");
 				return error();
 			}
 
@@ -479,7 +490,7 @@ public class EmailSenderTemplate {
 				smtp.send();
 
 			} catch(EmailException e) {
-				LOG.warn("SMTP error: " + e.getMessage() + " (" + e.getCause().getMessage() + ")");
+				LOG.info("SMTP error: " + e.getMessage() + " (" + e.getCause().getMessage() + ")");
 				return error();
 			}
 
