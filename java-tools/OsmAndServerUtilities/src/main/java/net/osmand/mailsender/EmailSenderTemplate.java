@@ -23,7 +23,7 @@ Environment:
 	SMTP_SERVER - address of smtp-server
 	EMAIL_TEMPLATES - path to templates directory
 	SENDGRID_KEY - SendGrid API key (optional for fallback)
-	EMAIL_SLEEP - optional delay before each send (in seconds)
+	EMAIL_DELAY - optional delay before each send (in seconds)
 	TEST_EMAIL_COPY - copy each email to this address (testing)
 
 Template files structure:
@@ -126,10 +126,10 @@ public class EmailSenderTemplate {
 	public EmailSenderTemplate send() {
 		validateLoadedTemplates(); // final validation before send
 
-		final String sleep = System.getenv("EMAIL_SLEEP");
-		if (sleep != null) {
+		final String seconds = System.getenv("EMAIL_DELAY");
+		if (seconds != null) {
 			try {
-				Thread.sleep(Integer.parseInt(sleep) * 1000);
+				Thread.sleep(Integer.parseInt(seconds) * 1000);
 			} catch (InterruptedException e) {
 				throw new RuntimeException(e);
 			}
