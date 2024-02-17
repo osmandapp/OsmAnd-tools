@@ -86,17 +86,19 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-					"-latlon=50.868332,15.24471",
+//					"-latlon=50.868332,15.24471",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
+					"-c",
 					"/Users/victorshcherb/Desktop/hh-routing_pedestrian.obf",
+					"/Users/victorshcherb/osmand/maps/hh-routing_pedestrian.obf",
 //					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
 //					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -289,8 +291,8 @@ public class BinaryInspector {
 		if (f.charAt(0) == '-') {
 			// command
 			if (f.equals("-c") || f.equals("-combine")) {
-				if (args.length < 4) {
-					printUsage("Too few parameters to extract (require minimum 4)");
+				if (args.length < 3) {
+					printUsage("Too few parameters to extract (require minimum 3)");
 				} else {
 					List<FileExtractFrom> parts = new ArrayList<>();
 					FileExtractFrom lastPart = null;
@@ -352,6 +354,13 @@ public class BinaryInspector {
 										lastPart.from.add(ch);
 									}
 								}
+								Collections.sort(lastPart.from, new Comparator<File>() {
+
+									@Override
+									public int compare(File o1, File o2) {
+										return o1.getName().compareTo(o2.getName());
+									}
+								});
 							} else {
 								lastPart.from.add(file);
 							}
