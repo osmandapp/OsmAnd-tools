@@ -1016,6 +1016,7 @@ public class OsmAndMapsService {
 		try {
 			ctx = lockCacheRoutingContext(router, rsc, routeMode);
 			if (ctx == null) {
+				validateAndInitConfig();
 				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
@@ -1079,8 +1080,13 @@ public class OsmAndMapsService {
 				}
 			}
 			File target = new File(routeObfLocation);
-			RandomAccessFile raf = new RandomAccessFile(target, "r");
-			BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
+			File targetIndex = new File(routeObfLocation + ".index");
+			CachedOsmandIndexes cache = new CachedOsmandIndexes();
+			if(targetIndex.exists()) {
+				cache.readFromFile(targetIndex);
+			}
+			BinaryMapIndexReader reader = cache.getReader(target, true);
+			cache.writeToFile(targetIndex);
 			RoutingCacheContext c = new RoutingCacheContext();
 			c.locked = System.currentTimeMillis();
 			c.created = System.currentTimeMillis();

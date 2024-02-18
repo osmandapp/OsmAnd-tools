@@ -288,9 +288,6 @@ public class RoutingController {
 	                                 @RequestParam(defaultValue = "production") String limits) throws IOException {
 		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
-		if (!osmAndMapsService.validateAndInitConfig()) {
-			return osmAndMapsService.errorConfig();
-		}
 		List<LatLon> list = new ArrayList<>();
 		double lat = 0;
 		int k = 0;
