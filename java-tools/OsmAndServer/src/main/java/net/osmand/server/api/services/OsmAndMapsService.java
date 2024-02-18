@@ -1068,13 +1068,16 @@ public class OsmAndMapsService {
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router,
 			RoutingServerConfigEntry[] rsc, String routeMode) throws IOException, InterruptedException {
 		synchronized (routingCaches) {
+			int scan = 0;
 			List<RoutingCacheContext> lst = routingCaches.get(routeMode);
 			if (lst != null) {
 				for (RoutingCacheContext c : lst) {
+					scan++;
 					if (c.locked == 0) {
 						c.used++;
 						c.locked = System.currentTimeMillis();
 						router.setHHRoutingConfig(c.hhConfig);
+						System.out.printf("Reuse %d of %d routing context \n", scan, lst.size());
 						return c;
 					}
 				}
@@ -1100,6 +1103,7 @@ public class OsmAndMapsService {
 				routingCaches.put(routeMode, new ArrayList<>());
 			}
 			routingCaches.get(routeMode).add(c);
+			System.out.printf("Scanned %d routing contexts but no available was found and new one created \n", scan);
 			return c;
 		}
 	}
