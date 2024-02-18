@@ -1059,10 +1059,8 @@ public class OsmAndMapsService {
 			return null;
 		}
 		RoutingContext c = cache.rCtx;
-		HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cache.hCtx);
 		c.unloadAllData();
 		c.calculationProgress = new RouteCalculationProgress();
-		router.setHHRoutingConfig(hhConfig);
 		return c;
 	}
 
@@ -1100,11 +1098,11 @@ public class OsmAndMapsService {
 	}
 	
 	private boolean unlockCacheRoutingContext(RoutingContext ctx, String routeMode) {
-		List<RoutingCacheContext> lst = routingCaches.get(routeMode);
-		if (lst != null) {
-			for (RoutingCacheContext c : lst) {
-				if (c.rCtx == ctx) {
-					synchronized (routingCaches) {
+		synchronized (routingCaches) {
+			List<RoutingCacheContext> lst = routingCaches.get(routeMode);
+			if (lst != null) {
+				for (RoutingCacheContext c : lst) {
+					if (c.rCtx == ctx) {
 						c.hCtx = c.hhConfig.cacheCtx;
 						c.locked = 0;
 					}
