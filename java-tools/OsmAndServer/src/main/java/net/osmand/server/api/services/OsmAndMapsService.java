@@ -1073,6 +1073,7 @@ public class OsmAndMapsService {
 					if (c.locked == 0) {
 						c.used++;
 						c.locked = System.currentTimeMillis();
+						router.setHHRoutingConfig(c.hhConfig);
 						return c;
 					}
 				}
