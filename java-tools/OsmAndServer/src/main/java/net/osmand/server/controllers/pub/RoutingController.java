@@ -195,8 +195,7 @@ public class RoutingController {
 		calcMode.section = "Development";
 		calcMode.value = "";
 		calcMode.valueDescriptions = new String[] {"Optimal", "Basic", "Slow"};
-		calcMode.values = new String[] {RouteCalculationMode.COMPLEX.name(),
-				RouteCalculationMode.BASE.name(),
+		calcMode.values = new String[] { RouteCalculationMode.COMPLEX.name(), RouteCalculationMode.BASE.name(),
 				RouteCalculationMode.NORMAL.name()
 		};
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
@@ -225,11 +224,8 @@ public class RoutingController {
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
 			RoutingMode rm = new RoutingMode(rs.name);
 
-			// apply approximation by default for all external profiles
-//			rm.params.put(applyApproximation.key, applyApproximation);
-
 			// reuse previously filled params using profile as key
-			if (rs.profile !=null && routers.get(rs.profile) !=null) {
+			if (rs.profile != null && routers.get(rs.profile) != null) {
 				routers.get(rs.profile).params.forEach((key, val) -> rm.params.put(key, val));
 			}
 
