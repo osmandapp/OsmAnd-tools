@@ -122,7 +122,7 @@ public class OsmAndMapsService {
 
 	OsmandRegions osmandRegions;
 	
-	@Value("tile-server.routeObf.location")
+	@Value("${tile-server.routeObf.location}")
 	String routeObfLocation;
 	
 	public class RoutingCacheContext {
