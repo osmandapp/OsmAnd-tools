@@ -98,7 +98,7 @@ public class OsmAndMapsService {
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
-	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 7;
+	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 6;
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
@@ -1116,8 +1116,8 @@ public class OsmAndMapsService {
 					if (c.rCtx == ctx) {
 						c.hCtx = c.hhConfig.cacheCtx;
 						c.locked = 0;
+						return true;
 					}
-					return true;
 				}
 			}
 		}
