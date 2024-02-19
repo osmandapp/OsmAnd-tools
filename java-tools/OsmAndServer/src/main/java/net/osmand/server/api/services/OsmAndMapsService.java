@@ -1077,7 +1077,7 @@ public class OsmAndMapsService {
 						c.used++;
 						c.locked = System.currentTimeMillis();
 						router.setHHRoutingConfig(c.hhConfig);
-						System.out.printf("Reuse %d of %d routing context \n", scan, lst.size());
+//						System.out.printf("Reuse %d of %d routing context \n", scan, lst.size());
 						return c;
 					}
 				}
@@ -1103,7 +1103,7 @@ public class OsmAndMapsService {
 				routingCaches.put(routeMode, new ArrayList<>());
 			}
 			routingCaches.get(routeMode).add(c);
-			System.out.printf("Scanned %d routing contexts but no available was found and new one created \n", scan);
+//			System.out.printf("Scanned %d routing contexts but no available was found and new one created \n", scan);
 			return c;
 		}
 	}
