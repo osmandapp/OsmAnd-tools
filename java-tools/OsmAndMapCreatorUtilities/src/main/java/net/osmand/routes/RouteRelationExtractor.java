@@ -2,6 +2,8 @@ package net.osmand.routes;
 
 
 import net.osmand.IProgress;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.OsmDbAccessor;
@@ -22,12 +24,16 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+
+import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
+import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
 //	on 2024-02-01, the plain OSM XML variant takes over 1854.0 GB
@@ -46,6 +52,9 @@ public class RouteRelationExtractor {
 //	South America	[.osm.pbf]	(3.2 GB)
 
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
+	int countFiles;
+	int countWays;
+	int countNodes;
 	DBDialect osmDBdialect = DBDialect.SQLITE;
 	private final String[] filteredTags = {
 			"-bus",
@@ -172,6 +181,8 @@ public class RouteRelationExtractor {
 					if (accessedRoute(route)) {
 						ctx.loadEntityRelation((Relation) e);
 						resultRelations.add((Relation) e);
+						saveGpx(e, accessor.getAdditionalEntities(), resultFile);
+						accessor.additionalEntities.clear();
 					}
 				}
 			}
@@ -197,7 +208,8 @@ public class RouteRelationExtractor {
 		endTime = System.currentTimeMillis();
 		deltaTime = (endTime - startTime) / 1000;
 		startTime = endTime;
-		System.out.println("Process all entities: " + deltaTime + " sec.");
+		log.info("Process all entities: " + deltaTime + " sec.");
+		log.info(String.format("Process %d files %d ways %d nodes\n ", countFiles, countWays, countNodes));
 
 		resultFile.delete();
 		OutputStream outputStream = new FileOutputStream(resultFile);
@@ -213,8 +225,73 @@ public class RouteRelationExtractor {
 		System.out.println("Wrote result into " + resultFile.getName() + " in " + deltaTime + " sec.");
 	}
 
+	private void saveGpx(Entity e, Map<EntityId, Entity> additionalEntities, File resultFile) {
+		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
+		gpxFile.metadata.name = e.getTag("name");
+		gpxFile.metadata.desc = String.valueOf(e.getId());
+		gpxFile.metadata.getExtensionsToWrite().putAll(e.getTags());
+		File tmp = new File(resultFile.getParentFile(), "tmp");
+		try {
+			if (!tmp.exists()) {
+				Files.createDirectory(tmp.toPath());
+			}
+		} catch (IOException ex) {
+			throw new RuntimeException(ex);
+		}
+
+		GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
+		Node last = new Node(0, 0, 0);
+		GPXUtilities.Track track = new GPXUtilities.Track();
+		gpxFile.tracks.add(track);
+		for (Map.Entry<EntityId, Entity> entry : additionalEntities.entrySet()) {
+
+			if (entry.getKey().getType() == Entity.EntityType.WAY) {
+				countWays++;
+				Way way = (Way) entry.getValue();
+				Node first = way.getFirstNode();
+				if (first == null) {
+					log.info("==== First node Null " + e.getId());
+					continue;
+				}
+				if (!first.compareNode(last)) {
+					trkSegment = new GPXUtilities.TrkSegment();
+					track.segments.add(trkSegment);
+				}
+				for (Node n : way.getNodes()) {
+					GPXUtilities.WptPt pt = new GPXUtilities.WptPt();
+					pt.lat = n.getLatitude();
+					pt.lon = n.getLongitude();
+					trkSegment.points.add(pt);
+				}
+				last = way.getLastNode();
+			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
+				countNodes++;
+				Node node = (Node) entry.getValue();
+				if (node != null) {
+					GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
+					wptPt.lat = node.getLatitude();
+					wptPt.lon = node.getLongitude();
+					wptPt.getExtensionsToWrite().putAll(node.getTags());
+					gpxFile.addPoint(wptPt);
+				}
+			}
+		}
+		File outFile = new File(tmp, e.getId() + GPX_GZ_FILE_EXT);
+		try {
+			OutputStream outputStream = new FileOutputStream(outFile);
+			outputStream = new GZIPOutputStream(outputStream);
+			GPXUtilities.writeGpx(new OutputStreamWriter(outputStream), gpxFile, null);
+			outputStream.close();
+		} catch (IOException ex) {
+			throw new RuntimeException(ex);
+		}
+		countFiles++;
+		if (countFiles % 100 == 0) {
+			log.info(countFiles + " File " + outFile.getName() + " saved ");
+		}
+	}
+
 	static class AccessorForRelationExtract extends OsmDbAccessor {
-		public static final int MAX_CHILD_LEVEL = 5;
 		Map<EntityId, Entity> additionalEntities = new LinkedHashMap<>();
 
 		public Map<EntityId, Entity> getAdditionalEntities() {
@@ -223,14 +300,22 @@ public class RouteRelationExtractor {
 
 		@Override
 		public void loadEntityRelation(Relation e) throws SQLException {
-			loadEntityRelation(e, 5);
+			List<Entity> parentRelations = new ArrayList<>();
+			loadEntityRelation(e, parentRelations);
 		}
 
-		@Override
-		public void loadEntityRelation(Relation e, int level) throws SQLException {
+		public void loadEntityRelation(Relation e, List<Entity> parentRelations) throws SQLException {
+			if (e.getId() == 1207220) {
+				log.info("==== test 1207220");
+			}
 			if (e.isDataLoaded()) {
 				return;
 			}
+			if (parentRelations.contains(e)) {
+				log.info("==== circular relation link " + e.getId() + " on parent " + parentRelations);
+				return;
+			}
+			parentRelations.add(e);
 			Map<EntityId, Entity> map = new LinkedHashMap<>();
 			if (e.getMembers().isEmpty()) {
 				pselectRelation.setLong(1, e.getId());
@@ -247,7 +332,7 @@ public class RouteRelationExtractor {
 				}
 			}
 			Collection<Relation.RelationMember> ids = e.getMembers();
-			if (level > 0) {
+			if (parentRelations.size() > 0) {
 				for (Relation.RelationMember i : ids) {
 					if (i.getEntityId().getType() == Entity.EntityType.NODE) {
 						pselectNode.setLong(1, i.getEntityId().getId());
@@ -264,56 +349,37 @@ public class RouteRelationExtractor {
 							rs.close();
 						}
 					} else if (i.getEntityId().getType() == Entity.EntityType.WAY) {
-						if (i.getEntityId().getId() == 303751529) {
-							System.out.println("==== test 303751529");
-						}
+//						if (i.getEntityId().getId() == 303751529) {
+//							System.out.println("==== test 303751529");
+//						}
 						Way way = (Way) additionalEntities.get(i.getEntityId());
 						if (way == null) {
 							way = new Way(i.getEntityId().getId());
 							loadEntityWay(way);
-							map.put(i.getEntityId(), way);
-							for (Node n : way.getNodes()) {
-								map.put(Entity.EntityId.valueOf(n), n);
+							if (!way.getNodes().isEmpty()) {
+								map.put(i.getEntityId(), way);
+							}
+//							for (Node n : way.getNodes()) {
+//								map.put(Entity.EntityId.valueOf(n), n);
+//							}
+						}
+						for (Entity pr : parentRelations) {
+							if (way.getTag("route_relation_ref:" + pr.getId()) == null) {
+								way.putTag("route_relation_ref:" + pr.getId(), Long.toString(pr.getId()));
 							}
 						}
-						way.putTag("relation_ref_" + e.getId(), Long.toString(e.getId()));
-						if (level != MAX_CHILD_LEVEL) {
-							way.putTag("relation_level_" + e.getId(), Integer.toString(MAX_CHILD_LEVEL - level));
-						}
+
 					} else if (i.getEntityId().getType() == Entity.EntityType.RELATION) {
 						Relation rel = new Relation(i.getEntityId().getId());
-						loadEntityRelation(rel, level - 1);
+						loadEntityRelation(rel, parentRelations);
 						map.put(i.getEntityId(), rel);
 					}
 				}
 
 				e.initializeLinks(map);
 				e.entityDataLoaded();
+				parentRelations.remove(e);
 				additionalEntities.putAll(map);
-			}
-		}
-
-		@Override
-		public void loadEntityWay(Way e) throws SQLException {
-			if (e.getEntityIds().isEmpty()) {
-				pselectWay.setLong(1, e.getId());
-				if (pselectWay.execute()) {
-					ResultSet rs = pselectWay.getResultSet();
-					while (rs.next()) {
-						int ord = rs.getInt(2);
-						if (ord == 0) {
-							readTags(e, rs.getBytes(3));
-						}
-						if (rs.getObject(5) != null) {
-							Node n = new Node(rs.getDouble(4), rs.getDouble(5), rs.getLong(1));
-							e.addNode(n);
-							readTags(n, rs.getBytes(6));
-						} else {
-							e.addNode(rs.getLong(1));
-						}
-					}
-					rs.close();
-				}
 			}
 		}
 	}

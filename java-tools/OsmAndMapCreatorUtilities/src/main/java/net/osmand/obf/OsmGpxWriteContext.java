@@ -5,12 +5,7 @@ import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -25,8 +20,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -363,7 +360,14 @@ public class OsmGpxWriteContext {
 			}
 		} else if (files != null) {
 			for (File gf : files) {
-				GPXFile gpxFile = GPXUtilities.loadGPXFile(gf, null, false);
+				InputStream fis = new FileInputStream(gf);
+				if (gf.getName().endsWith(".gz")) {
+					fis = new GZIPInputStream(fis);
+				} else if (gf.getName().endsWith(".bz2")) {
+					fis = new BZip2CompressorInputStream(fis);
+				}
+				GPXFile gpxFile = GPXUtilities.loadGPXFile(fis, null, false);
+				fis.close();
 				writeFile(gpxFile, gf.getName());
 			}
 		}
