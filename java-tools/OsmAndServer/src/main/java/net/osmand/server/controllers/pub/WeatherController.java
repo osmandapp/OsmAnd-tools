@@ -99,11 +99,11 @@ public class WeatherController {
 	public String getAddressByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException, InterruptedException {
 		List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
 		
-		Optional<GeocodingUtilities.GeocodingResult> smallest = list.stream()
+		Optional<GeocodingUtilities.GeocodingResult> nearestResult = list.stream()
 				.min(Comparator.comparingDouble(GeocodingUtilities.GeocodingResult::getDistance));
 		
-		if (smallest.isPresent()) {
-			GeocodingUtilities.GeocodingResult result = smallest.get();
+		if (nearestResult.isPresent()) {
+			GeocodingUtilities.GeocodingResult result = nearestResult.get();
 			return gson.toJson(new AddressInfo(result.city.getNamesMap(true)));
 			
 		}
