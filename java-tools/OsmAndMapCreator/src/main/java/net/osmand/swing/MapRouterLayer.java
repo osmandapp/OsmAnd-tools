@@ -88,11 +88,15 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
 import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
+import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.HHRoutingDB;
 import net.osmand.router.HHRoutingUtilities;
 import net.osmand.router.PrecalculatedRouteDirection;
+import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.router.RouteExporter;
 import net.osmand.router.RoutePlannerFrontEnd;
@@ -116,6 +120,11 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private static boolean TEST_INTERMEDIATE_POINTS = false;
 
+	private static boolean USE_CACHE_CONTEXT = false;
+	private HHRoutingContext<NetworkDBPoint> cacheHHCtx;
+	private RoutingContext cacheRctx;
+	private String cacheRouteParams;
+	
 	private MapPanel map;
 	private LatLon startRoute;
 	private LatLon endRoute;
@@ -146,6 +155,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		}
 	};
 	private boolean gpx = false;
+
 
 
 	private File getHHFile(String profile) {
@@ -802,18 +812,24 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private void calcRoute(final RouteCalculationMode m, boolean hh) {
 		new Thread() {
+			
+
 			@Override
 			public void run() {
 				map.setPoints(new DataTileManager<Entity>(11));
 				Collection<Entity> res;
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-				if(hh) {
+				if (hh) {
 //					res = hhRoute(startRoute, endRoute); // to test DB
 					if (DataExtractionSettings.getSettings().useNativeRouting()) {
 						router.setHHRouteCpp(true);
 					}
-					router.setUseOnlyHHRouting(true).setHHRoutingConfig(HHRoutePlanner.prepareDefaultRoutingConfig(null));
+					HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cacheHHCtx);
+					router.setUseOnlyHHRouting(true).setHHRoutingConfig(hhConfig);
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router,  m);
+					if (USE_CACHE_CONTEXT) {
+						cacheHHCtx = hhConfig.cacheCtx;
+					}
 				} else {
 					router.setUseOnlyHHRouting(false).setHHRoutingConfig(null);
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router, m);
@@ -1079,8 +1095,14 @@ public class MapRouterLayer implements MapPanelLayer {
 				// System.out.println("Start " + start + " end " + end);
 				// precalculatedRouteDirection = PrecalculatedRouteDirection.build(lts, config.router.getMaxSpeed());
 				// precalculatedRouteDirection.setFollowNext(true);
-				
-				final RoutingContext ctx = prepareRoutingContext(previousRoute, DataExtractionSettings.getSettings().getRouteMode(), rm, files, router);
+
+				RoutingContext ctx = cacheRctx;
+				if(!DataExtractionSettings.getSettings().getRouteMode().equals(cacheRouteParams) || ctx == null) {
+					cacheRouteParams = DataExtractionSettings.getSettings().getRouteMode();
+					ctx = prepareRoutingContext(previousRoute, cacheRouteParams, rm, files, router);
+				} else {
+					ctx.calculationProgress = new RouteCalculationProgress();
+				}
 				final DataTileManager<Entity> points = map.getPoints();
 				map.setPoints(points);
 				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
@@ -1106,6 +1128,9 @@ public class MapRouterLayer implements MapPanelLayer {
 					if (ctx.calculationProgress != null) {
 						ctx.calculationProgress.isCancelled = true;
 					}
+					if (USE_CACHE_CONTEXT) {
+						cacheRctx = ctx;
+					}
 				}
 			} catch (Exception e) {
 				ExceptionHandler.handle(e);
@@ -1126,7 +1151,6 @@ public class MapRouterLayer implements MapPanelLayer {
 	private RoutingContext prepareRoutingContext(List<RouteSegmentResult> previousRoute, String routeMode, RouteCalculationMode rm,
 			BinaryMapIndexReader[] files, RoutePlannerFrontEnd router) throws IOException {
 		String[] props = routeMode.split("\\,");
-
 		Map<String, String> paramsR = new LinkedHashMap<String, String>();
 		for (String p : props) {
 			if (p.contains("=")) {
