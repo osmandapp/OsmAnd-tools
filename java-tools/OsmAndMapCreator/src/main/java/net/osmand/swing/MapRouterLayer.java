@@ -821,6 +821,9 @@ public class MapRouterLayer implements MapPanelLayer {
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 				if (hh) {
 //					res = hhRoute(startRoute, endRoute); // to test DB
+					if (DataExtractionSettings.getSettings().useNativeRouting()) {
+						router.setHHRouteCpp(true);
+					}
 					HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cacheHHCtx);
 					router.setUseOnlyHHRouting(true).setHHRoutingConfig(hhConfig);
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router,  m);
@@ -1288,7 +1291,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 				
 				int[] pointTypes = segm.getObject().getPointTypes(ind);
-				if (pointTypes != null && pointTypes.length == 1) {
+				if (pointTypes != null && pointTypes.length == 1 && segm.getObject().region.routeEncodingRules.size() > pointTypes[0]) {
 					RouteTypeRule rtr = segm.getObject().region.quickGetEncodingRule(pointTypes[0]);
 					if (rtr == null || !rtr.getTag().equals("osmand_dp")) {
 						// skip all intermediate added points (should no be visual difference)
