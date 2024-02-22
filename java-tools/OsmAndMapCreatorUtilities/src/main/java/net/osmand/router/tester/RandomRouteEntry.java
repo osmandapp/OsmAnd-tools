@@ -1,8 +1,10 @@
 package net.osmand.router.tester;
 
+import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingContext;
+import net.osmand.util.MapUtils;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -96,7 +98,7 @@ class RandomRouteResult {
 	double cost;
 	long runTime; // ms
 	int visitedSegments;
-	double distance; // meters
+	float distance; // meters
 	RandomRouteEntry entry; // ref to the parent: start, finish, etc
 
 	RandomRouteResult(String type, RandomRouteEntry entry, long runTime,
@@ -110,10 +112,34 @@ class RandomRouteResult {
 		this.visitedSegments = ctx.calculationProgress.visitedSegments;
 
 		if (segments != null) {
+			float untrustedDistance = 0;
 			for (RouteSegmentResult r : segments) {
-				this.distance += r.getDistance();
+				untrustedDistance += r.getDistance();
+				this.distance += calcSegmentDistance(r);
+			}
+			if (Float.compare(this.distance, untrustedDistance) != 0) {
+				System.err.printf("WARN: %s got different distance (%f != %f)\n", type, this.distance, untrustedDistance);
 			}
 		}
+	}
+
+	private float calcSegmentDistance(RouteSegmentResult rr) {
+		int next;
+		double distance = 0;
+		RouteDataObject road = rr.getObject();
+		boolean plus = rr.getStartPointIndex() < rr.getEndPointIndex();
+		for (int j = rr.getStartPointIndex(); j != rr.getEndPointIndex(); j = next) {
+			next = plus ? j + 1 : j - 1;
+			double d = measuredDist(road.getPoint31XTile(j), road.getPoint31YTile(j),
+					road.getPoint31XTile(next), road.getPoint31YTile(next));
+			distance += d;
+		}
+		return (float) distance;
+	}
+
+	private double measuredDist(int x1, int y1, int x2, int y2) {
+		return MapUtils.getDistance(MapUtils.get31LatitudeY(y1), MapUtils.get31LongitudeX(x1),
+				MapUtils.get31LatitudeY(y2), MapUtils.get31LongitudeX(x2));
 	}
 
 	public String toString() {
