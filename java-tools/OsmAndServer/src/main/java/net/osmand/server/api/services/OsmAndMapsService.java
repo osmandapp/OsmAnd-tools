@@ -1017,7 +1017,6 @@ public class OsmAndMapsService {
 		List<RouteSegmentResult> routeRes;
 		RoutingContext ctx = null;
 		try {
-			System.out.printf("Lock %s - %s -> %s ", routeMode, start, end);
 			ctx = lockCacheRoutingContext(router, rsc, routeMode);
 			if (ctx == null) {
 				validateAndInitConfig();
@@ -1049,7 +1048,6 @@ public class OsmAndMapsService {
 			}
 		} finally {
 			unlockReaders(usedMapList);
-			System.out.printf("Unlock %s - %s -> %s ", routeMode, start, end);
 			unlockCacheRoutingContext(ctx, routeMode);
 		}
 		return routeRes;
@@ -1083,6 +1081,7 @@ public class OsmAndMapsService {
 					sz = lst.size();
 					for (RoutingCacheContext c : lst) {
 						if (c.locked == 0 && c.routeMode.equals(routeMode)) {
+							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
 							c.used++;
 							c.locked = System.currentTimeMillis();
 							router.setHHRoutingConfig(c.hhConfig);
@@ -1092,6 +1091,7 @@ public class OsmAndMapsService {
 					for (RoutingCacheContext c : lst) {
 						if (c.locked == 0) {
 							c.used++;
+							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
 							c.locked = System.currentTimeMillis();
 							c.routeMode = routeMode;
 							router.setHHRoutingConfig(c.hhConfig);
@@ -1115,6 +1115,7 @@ public class OsmAndMapsService {
 		newCtx.locked = System.currentTimeMillis();
 		newCtx.created = System.currentTimeMillis();
 		newCtx.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(newCtx.hCtx);
+		newCtx.hhConfig.STATS_VERBOSE_LEVEL = 0;
 		router.setHHRoutingConfig(newCtx.hhConfig);
 		newCtx.routeMode = routeMode;
 		newCtx.profile = profile;
@@ -1147,6 +1148,7 @@ public class OsmAndMapsService {
 			for (List<RoutingCacheContext> l : routingCaches.values()) {
 				for (RoutingCacheContext c : l) {
 					if (c.rCtx == ctx) {
+						System.out.printf("Unlock %s - %s -> %s \n", routeMode);
 						c.hCtx = c.hhConfig.cacheCtx;
 						c.locked = 0;
 						return true;
