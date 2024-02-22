@@ -1095,6 +1095,9 @@ public class OsmAndMapsService {
 					}
 					Thread.sleep(1000);
 				}
+				if (lst.size() > MAX_SAME_PROFILE) {
+					return null;
+				}
 			}
 			File target = new File(routeObfLocation);
 			File targetIndex = new File(routeObfLocation + ".index");
