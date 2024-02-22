@@ -1083,7 +1083,7 @@ public class OsmAndMapsService {
 					}
 				}
 				long waitTime = System.currentTimeMillis();
-				while (lst.size() > MAX_SAME_PROFILE && (System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
+				while (lst.size() >= MAX_SAME_PROFILE && (System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
 					// reuse another parameters profile but same profile and wait
 					for (RoutingCacheContext c : lst) {
 						if (c.locked == 0) {
