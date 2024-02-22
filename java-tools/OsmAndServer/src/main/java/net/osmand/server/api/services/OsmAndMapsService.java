@@ -1110,10 +1110,8 @@ public class OsmAndMapsService {
 		RoutingCacheContext newCtx = new RoutingCacheContext();
 		newCtx.locked = System.currentTimeMillis();
 		newCtx.created = System.currentTimeMillis();
-		if (router.isHHRoutingConfigured()) {
-			newCtx.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(newCtx.hCtx);
-			router.setHHRoutingConfig(newCtx.hhConfig);
-		}
+		newCtx.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(newCtx.hCtx);
+		router.setHHRoutingConfig(newCtx.hhConfig);
 		newCtx.routeMode = routeMode;
 		newCtx.profile = profile;
 		synchronized (routingCaches) {
