@@ -1111,23 +1111,22 @@ public class OsmAndMapsService {
 			return null;
 		}
 
-		RoutingCacheContext newCtx = new RoutingCacheContext();
-		newCtx.locked = System.currentTimeMillis();
-		newCtx.created = System.currentTimeMillis();
-		newCtx.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(newCtx.hCtx);
-		newCtx.hhConfig.STATS_VERBOSE_LEVEL = 0;
-		router.setHHRoutingConfig(newCtx.hhConfig);
-		newCtx.routeMode = routeMode;
-		newCtx.profile = profile;
+		RoutingCacheContext cs = new RoutingCacheContext();
+		cs.locked = System.currentTimeMillis();
+		cs.created = System.currentTimeMillis();
+		cs.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cs.hCtx);
+		cs.hhConfig.STATS_VERBOSE_LEVEL = 0;
+		cs.routeMode = routeMode;
+		cs.profile = profile;
 		synchronized (routingCaches) {
-			if (!routingCaches.containsKey(newCtx.profile)) {
-				routingCaches.put(newCtx.profile, new ArrayList<>());
+			if (!routingCaches.containsKey(cs.profile)) {
+				routingCaches.put(cs.profile, new ArrayList<>());
 			}
-			sz = routingCaches.get(newCtx.profile).size();
+			sz = routingCaches.get(cs.profile).size();
 			if (sz > MAX_SAME_PROFILE) {
 				return null;
 			}
-			routingCaches.get(newCtx.profile).add(newCtx);
+			routingCaches.get(cs.profile).add(cs);
 		}
 		// do outside synchronized to not block
 		File target = new File(routeObfLocation);
@@ -1138,9 +1137,10 @@ public class OsmAndMapsService {
 		}
 		BinaryMapIndexReader reader = cache.getReader(target, true);
 		cache.writeToFile(targetIndex);
-		newCtx.rCtx = prepareRouterContext(routeMode, router, rsc, Collections.singletonList(reader));
+		cs.rCtx = prepareRouterContext(routeMode, router, rsc, Collections.singletonList(reader));
+		router.setHHRoutingConfig(cs.hhConfig); // after prepare
 		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", profile, routeMode, sz + 1);
-		return newCtx;
+		return cs;
 	}
 	
 	private boolean unlockCacheRoutingContext(RoutingContext ctx, String routeMode) {
