@@ -33,23 +33,11 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
+import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
+import static net.osmand.gpx.GPXUtilities.writeNotNullText;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
-//	on 2024-02-01, the plain OSM XML variant takes over 1854.0 GB
-//	Report run at 2024-02-09
-//	Number of nodes	8_942_882_403
-//	Number of ways	999_718_343
-//	Number of relations	11_853_665
-
-//	Africa	[.osm.pbf]	(6.2 GB)
-//	Antarctica	[.osm.pbf]	(31.3 MB)
-//	Asia	[.osm.pbf]	(12.6 GB)
-//	Australia and Oceania	[.osm.pbf]	(1.1 GB)
-//	Central America	[.osm.pbf]	(648 MB)
-//	Europe	[.osm.pbf]	(28.1 GB)
-//	North America	[.osm.pbf]	(13.5 GB)
-//	South America	[.osm.pbf]	(3.2 GB)
 
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
 	int countFiles;
@@ -272,10 +260,24 @@ public class RouteRelationExtractor {
 					wptPt.lat = node.getLatitude();
 					wptPt.lon = node.getLongitude();
 					wptPt.getExtensionsToWrite().putAll(node.getTags());
+					wptPt.setExtensionsWriter(serializer -> {
+						for (Map.Entry<String, String> entry1 : wptPt.getExtensionsToWrite().entrySet()) {
+							String key = entry1.getKey().replace(":", "_-_");
+							if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
+								key = OSMAND_EXTENSIONS_PREFIX + key;
+							}
+							try {
+								writeNotNullText(serializer, key, entry1.getValue());
+							} catch (IOException ex) {
+								throw new RuntimeException(ex);
+							}
+						}
+					});
 					gpxFile.addPoint(wptPt);
 				}
 			}
 		}
+
 		File outFile = new File(tmp, e.getId() + GPX_GZ_FILE_EXT);
 		try {
 			OutputStream outputStream = new FileOutputStream(outFile);
@@ -305,9 +307,6 @@ public class RouteRelationExtractor {
 		}
 
 		public void loadEntityRelation(Relation e, List<Entity> parentRelations) throws SQLException {
-			if (e.getId() == 1207220) {
-				log.info("==== test 1207220");
-			}
 			if (e.isDataLoaded()) {
 				return;
 			}
@@ -349,9 +348,6 @@ public class RouteRelationExtractor {
 							rs.close();
 						}
 					} else if (i.getEntityId().getType() == Entity.EntityType.WAY) {
-//						if (i.getEntityId().getId() == 303751529) {
-//							System.out.println("==== test 303751529");
-//						}
 						Way way = (Way) additionalEntities.get(i.getEntityId());
 						if (way == null) {
 							way = new Way(i.getEntityId().getId());
@@ -359,9 +355,6 @@ public class RouteRelationExtractor {
 							if (!way.getNodes().isEmpty()) {
 								map.put(i.getEntityId(), way);
 							}
-//							for (Node n : way.getNodes()) {
-//								map.put(Entity.EntityId.valueOf(n), n);
-//							}
 						}
 						for (Entity pr : parentRelations) {
 							if (way.getTag("route_relation_ref:" + pr.getId()) == null) {
