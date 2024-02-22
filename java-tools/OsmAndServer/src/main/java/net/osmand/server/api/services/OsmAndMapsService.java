@@ -1148,7 +1148,7 @@ public class OsmAndMapsService {
 			for (List<RoutingCacheContext> l : routingCaches.values()) {
 				for (RoutingCacheContext c : l) {
 					if (c.rCtx == ctx) {
-						System.out.printf("Unlock %s - %s -> %s \n", routeMode);
+						System.out.printf("Unlock %s \n", routeMode);
 						c.hCtx = c.hhConfig.cacheCtx;
 						c.locked = 0;
 						return true;
