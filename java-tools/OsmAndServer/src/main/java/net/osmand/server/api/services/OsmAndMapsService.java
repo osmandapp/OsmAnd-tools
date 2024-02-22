@@ -1118,8 +1118,11 @@ public class OsmAndMapsService {
 			if (!routingCaches.containsKey(newCtx.profile)) {
 				routingCaches.put(newCtx.profile, new ArrayList<>());
 			}
-			routingCaches.get(newCtx.profile).add(newCtx);
 			sz = routingCaches.get(newCtx.profile).size();
+			if (sz > MAX_SAME_PROFILE) {
+				return null;
+			}
+			routingCaches.get(newCtx.profile).add(newCtx);
 		}
 		// do outside synchronized to not block
 		File target = new File(routeObfLocation);
