@@ -1139,7 +1139,7 @@ public class OsmAndMapsService {
 		BinaryMapIndexReader reader = cache.getReader(target, true);
 		cache.writeToFile(targetIndex);
 		newCtx.rCtx = prepareRouterContext(routeMode, router, rsc, Collections.singletonList(reader));
-		System.out.printf("Use new routing context for %s profile (%s params) - in total %d\n", profile, routeMode, sz);
+		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", profile, routeMode, sz + 1);
 		return newCtx;
 	}
 	
