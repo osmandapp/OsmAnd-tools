@@ -1096,6 +1096,7 @@ public class OsmAndMapsService {
 					Thread.sleep(1000);
 				}
 				if (lst.size() > MAX_SAME_PROFILE) {
+					System.out.printf("Global routing cache %s is not available (using old files)\n", profile);
 					return null;
 				}
 			}
