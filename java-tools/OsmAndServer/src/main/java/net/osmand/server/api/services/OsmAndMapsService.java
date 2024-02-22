@@ -1017,6 +1017,7 @@ public class OsmAndMapsService {
 		List<RouteSegmentResult> routeRes;
 		RoutingContext ctx = null;
 		try {
+			System.out.printf("Lock %s - %s -> %s ", routeMode, start, end);
 			ctx = lockCacheRoutingContext(router, rsc, routeMode);
 			if (ctx == null) {
 				validateAndInitConfig();
@@ -1048,6 +1049,7 @@ public class OsmAndMapsService {
 			}
 		} finally {
 			unlockReaders(usedMapList);
+			System.out.printf("Unlock %s - %s -> %s ", routeMode, start, end);
 			unlockCacheRoutingContext(ctx, routeMode);
 		}
 		return routeRes;
@@ -1091,6 +1093,7 @@ public class OsmAndMapsService {
 						if (c.locked == 0) {
 							c.used++;
 							c.locked = System.currentTimeMillis();
+							c.routeMode = routeMode;
 							router.setHHRoutingConfig(c.hhConfig);
 							return c;
 						}
@@ -1100,6 +1103,7 @@ public class OsmAndMapsService {
 					break;
 				}
 				Thread.sleep(1000);
+				System.out.printf("Busy %d %s routing contexts", lst, routeMode);
 			}
 		}
 		if (sz > MAX_SAME_PROFILE) {
