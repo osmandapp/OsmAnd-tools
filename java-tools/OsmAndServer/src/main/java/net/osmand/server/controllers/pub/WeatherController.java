@@ -6,16 +6,12 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import net.osmand.binary.GeocodingUtilities;
-import net.osmand.server.api.services.OsmAndMapsService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -23,16 +19,12 @@ import com.google.gson.Gson;
 
 import net.osmand.obf.preparation.IndexWeatherData;
 import net.osmand.obf.preparation.IndexWeatherData.WeatherTiff;
-import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 @RequestMapping("/weather-api")
 public class WeatherController {
 	
 	protected static final Log LOGGER = LogFactory.getLog(WeatherController.class);
-	
-	@Autowired
-	OsmAndMapsService osmAndMapsService;
 	
 	private static final String ECWMF_WEATHER_TYPE = "ecmwf";
 	
@@ -86,27 +78,4 @@ public class WeatherController {
 		return ResponseEntity.ok(gson.toJson(dt));
 	}
 	
-	static class AddressInfo {
-		Map<String, String> cityLocalNames;
-		
-		AddressInfo(Map<String, String> names) {
-			this.cityLocalNames = names;
-		}
-	}
-	
-	@GetMapping(path = {"/get-address-by-latlon"})
-	@ResponseBody
-	public String getAddressByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException, InterruptedException {
-		List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
-		
-		Optional<GeocodingUtilities.GeocodingResult> nearestResult = list.stream()
-				.min(Comparator.comparingDouble(GeocodingUtilities.GeocodingResult::getDistance));
-		
-		if (nearestResult.isPresent()) {
-			GeocodingUtilities.GeocodingResult result = nearestResult.get();
-			return gson.toJson(new AddressInfo(result.city.getNamesMap(true)));
-			
-		}
-		return gson.toJson(new AddressInfo(Collections.emptyMap()));
-	}
 }
