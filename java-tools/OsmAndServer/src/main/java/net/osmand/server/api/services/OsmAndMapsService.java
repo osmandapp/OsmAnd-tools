@@ -99,7 +99,8 @@ public class OsmAndMapsService {
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 6;
-	private static final int MAX_SAME_PROFILE = 2;
+	private static final int MAX_SAME_PROFILE_DF = 1;
+	private static final Map<String, Integer> MAX_SAME_PROFILE = Map.of("car", 2, "bicycle", 2, "pedestrian", 2);
 	private static final long MAX_SAME_PROFILE_WAIT_MS = 9000;
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -1071,6 +1072,14 @@ public class OsmAndMapsService {
 		c.calculationProgress = new RouteCalculationProgress();
 		return c;
 	}
+	
+	private int maxProfileMaps(String profile) {
+		Integer i = MAX_SAME_PROFILE.get(profile);
+		if (i != null) {
+			return i;
+		}
+		return MAX_SAME_PROFILE_DF;
+	}
 
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router,
 			RoutingServerConfigEntry[] rsc, String routeMode) throws IOException, InterruptedException {
@@ -1103,13 +1112,13 @@ public class OsmAndMapsService {
 						return best;
 					}
 				}
-				if (sz < MAX_SAME_PROFILE) {
+				if (sz < maxProfileMaps(profile)) {
 					break;
 				}
 				Thread.sleep(1000);
 			}
 		}
-		if (sz >= MAX_SAME_PROFILE) {
+		if (sz >= maxProfileMaps(profile)) {
 			System.out.printf("Global routing cache %s is not available (using old files)\n", profile);
 			return null;
 		}
@@ -1126,7 +1135,7 @@ public class OsmAndMapsService {
 				routingCaches.put(cs.profile, new ArrayList<>());
 			}
 			sz = routingCaches.get(cs.profile).size();
-			if (sz > MAX_SAME_PROFILE) {
+			if (sz > maxProfileMaps(profile)) {
 				return null;
 			}
 			routingCaches.get(cs.profile).add(cs);
