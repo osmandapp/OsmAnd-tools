@@ -99,6 +99,8 @@ public class OsmAndMapsService {
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 6;
+	private static final int MAX_SAME_PROFILE = 2;
+	private static final long MAX_SAME_PROFILE_WAIT_MS = 15000;
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
@@ -133,6 +135,7 @@ public class OsmAndMapsService {
 		long created;
 		int used;
 		HHRoutingConfig hhConfig;
+		public String profile;
 		
 		public double importance() {
 			double minutesAlive = (System.currentTimeMillis() - created) / 1000.0 / 60.0;
@@ -280,7 +283,7 @@ public class OsmAndMapsService {
 					break;
 				}
 				RoutingCacheContext remove = all.remove(0);
-				List<RoutingCacheContext> lst = routingCaches.get(remove.routeMode);
+				List<RoutingCacheContext> lst = routingCaches.get(remove.profile);
 				lst.remove(remove);
 				BinaryMapIndexReader reader = remove.rCtx.map.keySet().iterator().next();
 				try {
@@ -1067,53 +1070,85 @@ public class OsmAndMapsService {
 
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router,
 			RoutingServerConfigEntry[] rsc, String routeMode) throws IOException, InterruptedException {
-		synchronized (routingCaches) {
-			int scan = 0;
-			List<RoutingCacheContext> lst = routingCaches.get(routeMode);
-			if (lst != null) {
-				for (RoutingCacheContext c : lst) {
-					scan++;
-					if (c.locked == 0) {
-						c.used++;
-						c.locked = System.currentTimeMillis();
-						router.setHHRoutingConfig(c.hhConfig);
-//						System.out.printf("Reuse %d of %d routing context \n", scan, lst.size());
-						return c;
+		int sz = 0;
+		String profile = routeMode.split("\\,")[0];
+		long waitTime = System.currentTimeMillis();
+		while ((System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
+			synchronized (routingCaches) {
+				List<RoutingCacheContext> lst = routingCaches.get(profile);
+				sz = 0;
+				if (lst != null) {
+					sz = lst.size();
+					for (RoutingCacheContext c : lst) {
+						if (c.locked == 0 && c.routeMode.equals(routeMode)) {
+							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
+							c.used++;
+							c.locked = System.currentTimeMillis();
+							router.setHHRoutingConfig(c.hhConfig);
+							return c;
+						}
+					}
+					for (RoutingCacheContext c : lst) {
+						if (c.locked == 0) {
+							c.used++;
+							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
+							c.locked = System.currentTimeMillis();
+							c.routeMode = routeMode;
+							router.setHHRoutingConfig(c.hhConfig);
+							return c;
+						}
 					}
 				}
+				if (sz < MAX_SAME_PROFILE) {
+					break;
+				}
+				Thread.sleep(1000);
+				System.out.printf("Busy %d %s routing contexts", lst, routeMode);
 			}
-			File target = new File(routeObfLocation);
-			File targetIndex = new File(routeObfLocation + ".index");
-			CachedOsmandIndexes cache = new CachedOsmandIndexes();
-			if(targetIndex.exists()) {
-				cache.readFromFile(targetIndex);
-			}
-			BinaryMapIndexReader reader = cache.getReader(target, true);
-			cache.writeToFile(targetIndex);
-			RoutingCacheContext c = new RoutingCacheContext();
-			c.locked = System.currentTimeMillis();
-			c.created = System.currentTimeMillis();
-			c.rCtx = prepareRouterContext(routeMode, router, rsc, Collections.singletonList(reader));
-			if (router.isHHRoutingConfigured()) {
-				c.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(c.hCtx);
-				router.setHHRoutingConfig(c.hhConfig);
-			}
-			c.routeMode = routeMode;
-			if (!routingCaches.containsKey(routeMode)) {
-				routingCaches.put(routeMode, new ArrayList<>());
-			}
-			routingCaches.get(routeMode).add(c);
-//			System.out.printf("Scanned %d routing contexts but no available was found and new one created \n", scan);
-			return c;
 		}
+		if (sz > MAX_SAME_PROFILE) {
+			System.out.printf("Global routing cache %s is not available (using old files)\n", profile);
+			return null;
+		}
+
+		RoutingCacheContext cs = new RoutingCacheContext();
+		cs.locked = System.currentTimeMillis();
+		cs.created = System.currentTimeMillis();
+		cs.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cs.hCtx);
+		cs.hhConfig.STATS_VERBOSE_LEVEL = 0;
+		cs.routeMode = routeMode;
+		cs.profile = profile;
+		synchronized (routingCaches) {
+			if (!routingCaches.containsKey(cs.profile)) {
+				routingCaches.put(cs.profile, new ArrayList<>());
+			}
+			sz = routingCaches.get(cs.profile).size();
+			if (sz > MAX_SAME_PROFILE) {
+				return null;
+			}
+			routingCaches.get(cs.profile).add(cs);
+		}
+		// do outside synchronized to not block
+		File target = new File(routeObfLocation);
+		File targetIndex = new File(routeObfLocation + ".index");
+		CachedOsmandIndexes cache = new CachedOsmandIndexes();
+		if (targetIndex.exists()) {
+			cache.readFromFile(targetIndex);
+		}
+		BinaryMapIndexReader reader = cache.getReader(target, true);
+		cache.writeToFile(targetIndex);
+		cs.rCtx = prepareRouterContext(routeMode, router, rsc, Collections.singletonList(reader));
+		router.setHHRoutingConfig(cs.hhConfig); // after prepare
+		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", profile, routeMode, sz + 1);
+		return cs;
 	}
 	
 	private boolean unlockCacheRoutingContext(RoutingContext ctx, String routeMode) {
 		synchronized (routingCaches) {
-			List<RoutingCacheContext> lst = routingCaches.get(routeMode);
-			if (lst != null) {
-				for (RoutingCacheContext c : lst) {
+			for (List<RoutingCacheContext> l : routingCaches.values()) {
+				for (RoutingCacheContext c : l) {
 					if (c.rCtx == ctx) {
+						System.out.printf("Unlock %s \n", routeMode);
 						c.hCtx = c.hhConfig.cacheCtx;
 						c.locked = 0;
 						return true;
