@@ -114,4 +114,5 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
     testImplementation "com.github.tomakehurst:wiremock-standalone:2.18.0"
+    implementation 'it.geosolutions.imageio-ext:imageio-ext:1.1.19'
 }
