@@ -22,7 +22,6 @@ import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
 import com.google.gson.JsonParser;
-import net.osmand.binary.GeocodingUtilities;
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
