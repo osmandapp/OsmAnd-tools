@@ -855,7 +855,11 @@ public class OsmAndMapsService {
 
 		// reset before applying
 		String[] props = routeMode.split("\\,");
-		router.setDefaultHHRoutingConfig(); // hh is enabled
+//		router.setDefaultHHRoutingConfig(); // hh is enabled
+		HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null);
+		hhConfig.STATS_VERBOSE_LEVEL = 0;
+		router.setHHRoutingConfig(hhConfig);
+		
 		router.setUseOnlyHHRouting(false); // hhonly is disabled
 		router.setUseNativeApproximation(false); // "nativeapproximation"
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
