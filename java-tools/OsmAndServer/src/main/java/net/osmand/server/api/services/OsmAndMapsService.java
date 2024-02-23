@@ -100,7 +100,7 @@ public class OsmAndMapsService {
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 6;
 	private static final int MAX_SAME_PROFILE = 2;
-	private static final long MAX_SAME_PROFILE_WAIT_MS = 15000;
+	private static final long MAX_SAME_PROFILE_WAIT_MS = 9000;
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
@@ -1079,24 +1079,24 @@ public class OsmAndMapsService {
 				sz = 0;
 				if (lst != null) {
 					sz = lst.size();
-					for (RoutingCacheContext c : lst) {
-						if (c.locked == 0 && c.routeMode.equals(routeMode)) {
-							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
-							c.used++;
-							c.locked = System.currentTimeMillis();
-							router.setHHRoutingConfig(c.hhConfig);
-							return c;
-						}
-					}
+					RoutingCacheContext best = null;
+					int free = 0;
 					for (RoutingCacheContext c : lst) {
 						if (c.locked == 0) {
-							c.used++;
-							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
-							c.locked = System.currentTimeMillis();
-							c.routeMode = routeMode;
-							router.setHHRoutingConfig(c.hhConfig);
-							return c;
+							free++;
+							if (c.routeMode.equals(routeMode) || best == null) {
+								best = c;
+							}
+
 						}
+					}
+					if (best != null) {
+						System.out.printf("Lock %s - free %d of %d \n", routeMode, free, sz);
+						best.used++;
+						best.locked = System.currentTimeMillis();
+						best.routeMode = routeMode;
+						router.setHHRoutingConfig(best.hhConfig);
+						return best;
 					}
 				}
 				if (sz < MAX_SAME_PROFILE) {
@@ -1105,7 +1105,7 @@ public class OsmAndMapsService {
 				Thread.sleep(1000);
 			}
 		}
-		if (sz > MAX_SAME_PROFILE) {
+		if (sz >= MAX_SAME_PROFILE) {
 			System.out.printf("Global routing cache %s is not available (using old files)\n", profile);
 			return null;
 		}
