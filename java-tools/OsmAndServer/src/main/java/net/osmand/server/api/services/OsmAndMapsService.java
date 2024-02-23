@@ -1103,7 +1103,6 @@ public class OsmAndMapsService {
 					break;
 				}
 				Thread.sleep(1000);
-				System.out.printf("Busy %d %s routing contexts", lst, routeMode);
 			}
 		}
 		if (sz > MAX_SAME_PROFILE) {
