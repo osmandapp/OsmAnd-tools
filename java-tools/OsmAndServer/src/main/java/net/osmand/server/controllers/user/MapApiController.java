@@ -707,16 +707,7 @@ public class MapApiController {
 	@GetMapping(path = {"/get-address-by-latlon"})
 	@ResponseBody
 	public String getAddressByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException, InterruptedException {
-		List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
 		
-		Optional<GeocodingUtilities.GeocodingResult> nearestResult = list.stream()
-				.min(Comparator.comparingDouble(GeocodingUtilities.GeocodingResult::getDistance));
-		
-		if (nearestResult.isPresent()) {
-			GeocodingUtilities.GeocodingResult result = nearestResult.get();
-			return gson.toJson(new AddressInfo(result.city.getNamesMap(true)));
-			
-		}
 		return gson.toJson(new AddressInfo(Collections.emptyMap()));
 	}
 }
