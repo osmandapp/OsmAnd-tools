@@ -98,7 +98,7 @@ public class OsmAndMapsService {
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
-	private static final long MAX_TIME_ROUTING_FILE = 2 * 60 * 60; // 2 hours
+	private static final long MAX_TIME_ROUTING_FILE = 8 * 60 * 60;
 	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 5;
 	private static final int MAX_SAME_PROFILE_DF = 1;
 	private static final Map<String, Integer> MAX_SAME_PROFILE = Map.of("car", 2, "bicycle", 2, "pedestrian", 2);
@@ -774,7 +774,7 @@ public class OsmAndMapsService {
 		List<GeocodingResult> complete;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "geocoding");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -822,7 +822,7 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0, "approximate");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -1049,7 +1049,7 @@ public class OsmAndMapsService {
 			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheInd));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1298,7 +1298,7 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 	
-	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps, String reason) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
 		List<File> filesToUse = getMaps(quadRect, bbox, maxNumberMaps);
@@ -1308,6 +1308,7 @@ public class OsmAndMapsService {
 				files.add(ref);
 			}
 		}
+		LOGGER.info(String.format("Preparing %d files for %s", files.size(), reason));
 		return files;
 	}
 	
@@ -1330,7 +1331,7 @@ public class OsmAndMapsService {
 		return prepareMaps(files, bbox, maxNumberMaps);
 	}
 	
-	private List<File> prepareMaps(List<File> files,  List<LatLon> bbox, int maxNumberMaps) throws IOException {
+	private List<File> prepareMaps(List<File> files, List<LatLon> bbox, int maxNumberMaps) throws IOException {
 		List<File> filesToUse = filterMap(files);
 		List<File> res;
 		
@@ -1339,7 +1340,6 @@ public class OsmAndMapsService {
 		} else {
 			res = filesToUse;
 		}
-		LOGGER.info("Files to use " + res.size());
 		return res;
 	}
 	

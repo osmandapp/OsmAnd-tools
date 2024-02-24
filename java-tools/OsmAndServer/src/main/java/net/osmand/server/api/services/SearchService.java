@@ -100,7 +100,7 @@ public class SearchService {
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0, "search");
             usedMapList = osmAndMapsService.getReaders(list, null);
             searchUICore.getSearchSettings().setOfflineIndexes(usedMapList);
             searchUICore.init();
@@ -167,7 +167,7 @@ public class SearchService {
         if (searchBbox != null) {
             SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
             searchUICore.getSearchSettings().setRegions(osmandRegions);
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, MAX_NUMBER_OF_MAP_SEARCH_POI, "search");
             if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
                 return list;
             }
