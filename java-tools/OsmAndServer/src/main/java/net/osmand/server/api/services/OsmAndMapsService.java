@@ -142,7 +142,9 @@ public class OsmAndMapsService {
 		
 		@Override
 		public String toString() {
-			return (locked == 0 ? "+" : "-") + String.format("%s (%d %s)", profile, used, new Date(created));
+			String p = profile.length() > 5? profile.substring(0, 5) : profile;
+			return (locked == 0 ? "+" : "-")
+					+ String.format("%s %d, %s min", p, used, (System.currentTimeMillis() - created) / 60 / 1000);
 		}
 		
 		public double importance() {
