@@ -499,16 +499,27 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<MapRouteType, String> e : tempNames.entrySet()) {
 			if (e.getValue() != null) {
-				b.append(SPECIAL_CHAR).append(e.getKey().getInternalId()).append(e.getValue());
+				b.append(SPECIAL_CHAR).append(intToStr(e.getKey().getInternalId())).append(e.getValue());
 			}
 		}
 		return b.toString();
 	}
 
+	private static int strToInt(String str, int idx) {
+		return (int) str.charAt(idx + 1) << 16 | (int) str.charAt(idx + 2);
+	}
+
+	private static StringBuilder intToStr(int value) {
+		char[] ch = new char[2];
+		ch[0] = (char) (value >> 16 & 0xFFFF);
+		ch[1] = (char) (value & 0xFFFF);
+		return new StringBuilder().append(ch[0]).append(ch[1]);
+	}
+
 	protected String encodeListNames(List<MapPointName> tempNames) {
 		StringBuilder b = new StringBuilder();
 		for (MapPointName e : tempNames) {
-				b.append(SPECIAL_CHAR).append(e.nameTypeInternalId).append(e.pointIndex).append(e.name);
+			b.append(SPECIAL_CHAR).append(intToStr(e.nameTypeInternalId)).append(intToStr(e.pointIndex)).append(e.name);
 		}
 		return b.toString();
 	}
@@ -1280,13 +1291,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		protected void decodeNames(String name, Map<MapRouteType, String> tempNames) {
 			int i = name.indexOf(SPECIAL_CHAR);
 			while (i != -1) {
-				int n = name.indexOf(SPECIAL_CHAR, i + 4);
-				int ch = name.charAt(i + 2);
+				int n = name.indexOf(SPECIAL_CHAR, i + 3);
+				int ch = strToInt(name, i + 1);
 				MapRouteType rt = routeTypes.getTypeByInternalId(ch);
 				if (n == -1) {
-					tempNames.put(rt, name.substring(i + 4));
+					tempNames.put(rt, name.substring(i + 3));
 				} else {
-					tempNames.put(rt, name.substring(i + 4, n));
+					tempNames.put(rt, name.substring(i + 3, n));
 				}
 				i = n;
 			}
@@ -1295,10 +1306,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		protected void decodeListNames(String name, List<MapPointName> tempNames) {
 			int i = name.indexOf(SPECIAL_CHAR);
 			while (i != -1) {
-				int n = name.indexOf(SPECIAL_CHAR, i + 6);
-				int ch = name.charAt(i + 2);
-				int index = name.charAt(i + 4);
-				String pointName = n == -1 ? name.substring(i + 6) : name.substring(i + 6, n);
+				int n = name.indexOf(SPECIAL_CHAR, i + 5);
+				int ch = strToInt(name, i + 1);
+				int index = strToInt(name, i + 3);
+				String pointName = n == -1 ? name.substring(i + 5) : name.substring(i + 5, n);
 				MapPointName pn = new MapPointName(ch, index, pointName);
 				pn.nameTypeTargetId = routeTypes.getTypeByInternalId(ch).getTargetId();
 				tempNames.add(pn);
