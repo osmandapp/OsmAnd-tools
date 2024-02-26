@@ -22,7 +22,6 @@ import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
 import com.google.gson.JsonParser;
-import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -694,29 +693,5 @@ public class MapApiController {
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
-	}
-	
-	static class AddressInfo {
-		Map<String, String> cityLocalNames;
-		
-		AddressInfo(Map<String, String> names) {
-			this.cityLocalNames = names;
-		}
-	}
-	
-	@GetMapping(path = {"/get-address-by-latlon"})
-	@ResponseBody
-	public String getAddressByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException, InterruptedException {
-		List<GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
-		
-		Optional<GeocodingResult> nearestResult = list.stream()
-				.min(Comparator.comparingDouble(GeocodingResult::getDistance));
-		
-		if (nearestResult.isPresent()) {
-			GeocodingResult result = nearestResult.get();
-			return gson.toJson(new AddressInfo(result.city.getNamesMap(true)));
-			
-		}
-		return gson.toJson(new AddressInfo(Collections.emptyMap()));
 	}
 }
