@@ -80,7 +80,10 @@ class USFSRecreationAreaActivitiesTranslation(ogr2osm.TranslationBase):
 			ACTIVITYNAMEARRAY = ACTIVITYNAME.strip().lower().replace(" ;",";").replace(" - ","_").replace(" ","_").replace("/","_").replace("-","_").replace("&","and").split(';')
 			for activity in ACTIVITYNAMEARRAY:
 				if activity:
-					tags['us_maps_recreation_area_activity_'+activity] = 'yes'
+					if activity == "cabin_rentals":
+						tags['us_maps_recreation_area_facility_'+activity] = 'yes'
+					else:
+						tags['us_maps_recreation_area_activity_'+activity] = 'yes'
 		if 'ACCESSIBILITY' in attrs and strip_tags(ACCESSIBILITY) and not strip_tags(ACCESSIBILITY).startswith('.container'):
 			tags['us_maps_recreation_area_accessibility_info'] = strip_tags(ACCESSIBILITY)
 		if 'OPENSTATUS' in attrs and OPENSTATUS:
