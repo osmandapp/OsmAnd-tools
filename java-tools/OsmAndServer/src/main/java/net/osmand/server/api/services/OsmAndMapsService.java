@@ -98,9 +98,12 @@ public class OsmAndMapsService {
 	
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
-	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 6;
-	private static final int MAX_SAME_PROFILE = 2;
-	private static final long MAX_SAME_PROFILE_WAIT_MS = 15000;
+	private static final long MAX_TIME_ROUTING_FILE = 8 * 60 * 60;
+	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 5;
+	private static final int MAX_SAME_PROFILE_DF = 1;
+	private static final Map<String, Integer> MAX_SAME_PROFILE = Map.of("car", 2, "bicycle", 2, "pedestrian", 2);
+	private static final long MAX_SAME_PROFILE_WAIT_MS = 9000;
+
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 	
@@ -135,7 +138,14 @@ public class OsmAndMapsService {
 		long created;
 		int used;
 		HHRoutingConfig hhConfig;
-		public String profile;
+		String profile;
+		
+		@Override
+		public String toString() {
+			String p = profile.length() > 5? profile.substring(0, 5) : profile;
+			return (locked == 0 ? "+" : "-")
+					+ String.format("%s %d, %s min", p, used, (System.currentTimeMillis() - created) / 60 / 1000);
+		}
 		
 		public double importance() {
 			double minutesAlive = (System.currentTimeMillis() - created) / 1000.0 / 60.0;
@@ -208,10 +218,8 @@ public class OsmAndMapsService {
 		
 		private BinaryMapIndexReader createReader() throws IOException {
 			if (cacheFiles != null) {
-				long val = System.currentTimeMillis();
 				RandomAccessFile raf = new RandomAccessFile(file, "r");
 				BinaryMapIndexReader reader = cacheFiles.initReaderFromFileIndex(fileIndex, raf, file);
-				LOGGER.info("Initializing file " + file.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 				return reader;
 			}
 			LOGGER.info("Failed to create a reader for the file " + file.getName());
@@ -265,33 +273,45 @@ public class OsmAndMapsService {
 		
 		synchronized (routingCaches) {
 			List<RoutingCacheContext> all = new ArrayList<RoutingCacheContext>();
+			int total = 0;
 			for(List<RoutingCacheContext> l : routingCaches.values()) {
-				all.addAll(l);
+				for(RoutingCacheContext s : l) {
+					total++;
+					if(s.locked == 0) {
+						all.add(s);
+					}
+				}
 			}
 			Collections.sort(all, new Comparator<RoutingCacheContext>() {
 
 				@Override
 				public int compare(RoutingCacheContext o1, RoutingCacheContext o2) {
-					if (Boolean.compare(o1.locked > 0, o2.locked > 0) != 0) {
-						return Boolean.compare(o1.locked > 0, o2.locked > 0);
-					}
 					return Double.compare(o1.importance(), o2.importance());
 				}
 			});
-			while (all.size() > MAX_SAME_ROUTING_CONTEXT_OPEN) {
-				if (all.get(0).locked > 0) {
-					break;
+			int hintToRemove = total - MAX_SAME_ROUTING_CONTEXT_OPEN;
+			int removed = 0;
+			for (int i = 0; i < all.size(); i++) {
+				RoutingCacheContext remove = all.get(i);
+				if (hintToRemove > removed || (System.currentTimeMillis() - remove.created) / 1000l >= MAX_TIME_ROUTING_FILE) {
+					removed++;
+					List<RoutingCacheContext> lst = routingCaches.get(remove.profile);
+					lst.remove(remove);
+					BinaryMapIndexReader reader = remove.rCtx.map.keySet().iterator().next();
+					try {
+						reader.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
-				RoutingCacheContext remove = all.remove(0);
-				List<RoutingCacheContext> lst = routingCaches.get(remove.profile);
-				lst.remove(remove);
-				BinaryMapIndexReader reader = remove.rCtx.map.keySet().iterator().next();
-				try {
-					reader.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			} 
+			}
+			if (removed > 0) {
+				System.gc();
+				System.out.printf("Clean up %d global routing contexts, state - %s \n", removed, routingCaches);
+				long MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory()
+						- Runtime.getRuntime().freeMemory()) >> 20;
+				System.out.printf("***** Memory used %d MB *****\n", MEMORY_LAST_USED_MB);
+			}
 		}
 	}
 	
@@ -754,7 +774,7 @@ public class OsmAndMapsService {
 		List<GeocodingResult> complete;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "geocoding");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -802,7 +822,7 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0, "approximate");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -855,7 +875,11 @@ public class OsmAndMapsService {
 
 		// reset before applying
 		String[] props = routeMode.split("\\,");
-		router.setDefaultHHRoutingConfig(); // hh is enabled
+//		router.setDefaultHHRoutingConfig(); // hh is enabled
+		HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null);
+		hhConfig.STATS_VERBOSE_LEVEL = 0;
+		router.setHHRoutingConfig(hhConfig);
+		
 		router.setUseOnlyHHRouting(false); // hhonly is disabled
 		router.setUseNativeApproximation(false); // "nativeapproximation"
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
@@ -1009,7 +1033,7 @@ public class OsmAndMapsService {
 	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
 			LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
 			RouteCalculationProgress progress) throws IOException, InterruptedException {
-
+		String profile = routeMode.split("\\,")[0];
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
@@ -1018,9 +1042,14 @@ public class OsmAndMapsService {
 		RoutingContext ctx = null;
 		try {
 			ctx = lockCacheRoutingContext(router, rsc, routeMode);
+			String routingCacheInd = "";
+			synchronized (routingCaches) {
+				routingCacheInd = routingCaches.get(profile).toString();
+			}
+			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheInd));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0);
+				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1067,6 +1096,14 @@ public class OsmAndMapsService {
 		c.calculationProgress = new RouteCalculationProgress();
 		return c;
 	}
+	
+	private int maxProfileMaps(String profile) {
+		Integer i = MAX_SAME_PROFILE.get(profile);
+		if (i != null) {
+			return i;
+		}
+		return MAX_SAME_PROFILE_DF;
+	}
 
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router,
 			RoutingServerConfigEntry[] rsc, String routeMode) throws IOException, InterruptedException {
@@ -1079,34 +1116,30 @@ public class OsmAndMapsService {
 				sz = 0;
 				if (lst != null) {
 					sz = lst.size();
-					for (RoutingCacheContext c : lst) {
-						if (c.locked == 0 && c.routeMode.equals(routeMode)) {
-							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
-							c.used++;
-							c.locked = System.currentTimeMillis();
-							router.setHHRoutingConfig(c.hhConfig);
-							return c;
-						}
-					}
+					RoutingCacheContext best = null;
 					for (RoutingCacheContext c : lst) {
 						if (c.locked == 0) {
-							c.used++;
-							System.out.printf("Lock %s - %d \n", routeMode, lst.size());
-							c.locked = System.currentTimeMillis();
-							c.routeMode = routeMode;
-							router.setHHRoutingConfig(c.hhConfig);
-							return c;
+							if (c.routeMode.equals(routeMode) || best == null) {
+								best = c;
+							}
+
 						}
 					}
+					if (best != null) {
+						best.used++;
+						best.locked = System.currentTimeMillis();
+						best.routeMode = routeMode;
+						router.setHHRoutingConfig(best.hhConfig);
+						return best;
+					}
 				}
-				if (sz < MAX_SAME_PROFILE) {
+				if (sz < maxProfileMaps(profile)) {
 					break;
 				}
-				Thread.sleep(1000);
-				System.out.printf("Busy %d %s routing contexts", lst, routeMode);
 			}
+			Thread.sleep(1000);
 		}
-		if (sz > MAX_SAME_PROFILE) {
+		if (sz >= maxProfileMaps(profile)) {
 			System.out.printf("Global routing cache %s is not available (using old files)\n", profile);
 			return null;
 		}
@@ -1123,7 +1156,7 @@ public class OsmAndMapsService {
 				routingCaches.put(cs.profile, new ArrayList<>());
 			}
 			sz = routingCaches.get(cs.profile).size();
-			if (sz > MAX_SAME_PROFILE) {
+			if (sz >= maxProfileMaps(profile)) {
 				return null;
 			}
 			routingCaches.get(cs.profile).add(cs);
@@ -1148,7 +1181,6 @@ public class OsmAndMapsService {
 			for (List<RoutingCacheContext> l : routingCaches.values()) {
 				for (RoutingCacheContext c : l) {
 					if (c.rCtx == ctx) {
-						System.out.printf("Unlock %s \n", routeMode);
 						c.hCtx = c.hhConfig.cacheCtx;
 						c.locked = 0;
 						return true;
@@ -1266,7 +1298,7 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 	
-	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps, String reason) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
 		List<File> filesToUse = getMaps(quadRect, bbox, maxNumberMaps);
@@ -1276,6 +1308,7 @@ public class OsmAndMapsService {
 				files.add(ref);
 			}
 		}
+		LOGGER.info(String.format("Preparing %d files for %s", files.size(), reason));
 		return files;
 	}
 	
@@ -1298,18 +1331,15 @@ public class OsmAndMapsService {
 		return prepareMaps(files, bbox, maxNumberMaps);
 	}
 	
-	private List<File> prepareMaps(List<File> files,  List<LatLon> bbox, int maxNumberMaps) throws IOException {
+	private List<File> prepareMaps(List<File> files, List<LatLon> bbox, int maxNumberMaps) throws IOException {
 		List<File> filesToUse = filterMap(files);
 		List<File> res;
 		
 		if (!filesToUse.isEmpty() && maxNumberMaps != 0 && filesToUse.size() >= 4 && bbox != null) {
-			LOGGER.info("Files before filter by name " + filesToUse.size());
 			res = filterMapsByName(filesToUse, bbox);
-			LOGGER.info("Files after filter by name " + res.size());
 		} else {
 			res = filesToUse;
 		}
-		LOGGER.info("Files to use " + res.size());
 		return res;
 	}
 	
