@@ -375,7 +375,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		List<MapPointName> pointNamesEmp = new ArrayList<MapPointName>();
 		try {
 			for (int j = 0; j < outTypes.size(); j++) {
-				Algorithms.writeSmallInt(btypes, outTypes.get(j));
+				Algorithms.writeInt(btypes, outTypes.get(j));
 			}
 			int pointIndex = 0;
 
@@ -387,7 +387,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					TIntArrayList types = pointTypes.get(n.getId());
 					if (types != null) {
 						for (int j = 0; j < types.size(); j++) {
-							Algorithms.writeSmallInt(bpointTypes, types.get(j));
+							Algorithms.writeInt(bpointTypes, types.get(j));
 						}
 					}
 					TIntObjectHashMap<String> namesP = pointNamesRaw.get(n.getId());
@@ -399,7 +399,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 							pointNamesEmp.add(obj);
 						}
 					}
-					Algorithms.writeSmallInt(bpointTypes, 0);
+					Algorithms.writeInt(bpointTypes, 0);
 					// write coordinates
 					int y = MapUtils.get31TileNumberY(n.getLatitude());
 					int x = MapUtils.get31TileNumberX(n.getLongitude());
@@ -506,7 +506,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	private static int strToInt(String str, int idx) {
-		return (int) str.charAt(idx + 1) << 16 | (int) str.charAt(idx + 2);
+		return (int) str.charAt(idx) << 16 | (int) str.charAt(idx + 1);
 	}
 
 	private static StringBuilder intToStr(int value) {
@@ -1341,10 +1341,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					decodeNames(rs.getString(5), wayNames);
 					
 					byte[] types = rs.getBytes(1);
-					this.wayTypes = new int[types.length / 2];
-					for (int j = 0; j < types.length; j += 2) {
-						int ids = Algorithms.parseSmallIntFromBytes(types, j);
-						wayTypes[j / 2] = routeTypes.getTypeByInternalId(ids).getTargetId();
+					this.wayTypes = new int[types.length / 4];
+					for (int j = 0; j < types.length; j += 4) {
+						int ids = Algorithms.parseIntFromBytes(types, j);
+						wayTypes[j / 4] = routeTypes.getTypeByInternalId(ids).getTargetId();
 					}
 					
 					byte[] pointTypes = rs.getBytes(2);
