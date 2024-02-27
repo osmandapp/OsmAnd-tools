@@ -157,7 +157,7 @@ public class EmailSenderTemplate {
 					sentEmails++;
 				}
 			} catch (Exception e) {
-				LOG.info(e.getMessage(), e);
+				LOG.error(e.getMessage(), e);
 			}
 		}
 		return this;
@@ -399,6 +399,7 @@ public class EmailSenderTemplate {
 		private SendGrid sendGridClient;
 		private final int STATUS_CODE_ERROR = 500;
 		private final int STATUS_CODE_SENT = 202; // success code 202 comes originally from SendGrid
+		private final String SENDGRID_ENFORCED = ".*(@hotmail|@outlook|@live|@msn|@windowslive).*"; // temporarily
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
 			this.smtpServer = smtpServer;
@@ -408,12 +409,16 @@ public class EmailSenderTemplate {
 				sendGridClient = new SendGrid(null) {
 					@Override
 					public Response api(Request request) throws IOException {
-						LOG.info("SendGrid sender is not configured: " + request.getBody());
+						LOG.error("SendGrid sender is not configured: " + request.getBody());
 						return error();
 					}
 				};
-				LOG.info("SendGrid sender is not configured");
+				LOG.error("SendGrid sender is not configured");
 			}
+		}
+
+		private boolean enforceViaSendGrid(String to) {
+			return to.matches(SENDGRID_ENFORCED);
 		}
 
 		private Mail mail;
@@ -435,7 +440,7 @@ public class EmailSenderTemplate {
 				return first;
 			}
 
-			LOG.info("SMTP failed (" + first.getStatusCode() + ") - fallback to SendGrid");
+			LOG.warn("SMTP failed (" + first.getStatusCode() + ") - fallback to SendGrid");
 			return sendWithSendGrid(); // fallback
 		}
 
@@ -450,7 +455,14 @@ public class EmailSenderTemplate {
 
 		private Response sendWithSmtp() {
 			if (smtpServer == null) {
-				LOG.info("SMTP_SERVER is not configured");
+				LOG.error("SMTP_SERVER is not configured");
+				return error();
+			}
+
+			String to = getTo();
+
+			if (enforceViaSendGrid(to)) {
+				LOG.warn(to.replaceFirst(".....", ".....") + ": domain goes via SendGrid");
 				return error();
 			}
 
@@ -475,7 +487,6 @@ public class EmailSenderTemplate {
 				String from = mail.getFrom().getEmail();
 				String subject = mail.getSubject();
 				String body = mail.getContent().get(0).getValue(); // html content
-				String to = getTo();
 
 				for (String key : headers.keySet()) {
 					String val = fill(headers.get(key));
@@ -490,7 +501,7 @@ public class EmailSenderTemplate {
 				smtp.send();
 
 			} catch(EmailException e) {
-				LOG.info("SMTP error: " + e.getMessage() + " (" + e.getCause().getMessage() + ")");
+				LOG.error("SMTP error: " + e.getMessage() + " (" + e.getCause().getMessage() + ")");
 				return error();
 			}
 
