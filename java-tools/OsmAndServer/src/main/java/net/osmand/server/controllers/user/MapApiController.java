@@ -200,15 +200,13 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/delete-account"})
 	@ResponseBody
-	public ResponseEntity<String> deleteAccount(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
-		if (emailSender.isEmail(us.username)) {
-			PremiumUserDevice dev = checkUser();
-			if (dev == null) {
-				return tokenNotValid();
-			}
-			return userdataService.deleteAccount(us, dev, request);
+	public ResponseEntity<String> deleteAccount(@RequestParam String token, HttpServletRequest request)
+			throws ServletException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
 		}
-		return ResponseEntity.badRequest().body("Please enter valid email");
+		return userdataService.deleteAccount(token, dev, request);
 	}
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")

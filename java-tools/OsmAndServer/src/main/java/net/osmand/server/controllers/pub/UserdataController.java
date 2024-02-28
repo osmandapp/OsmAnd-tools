@@ -376,18 +376,15 @@ public class UserdataController {
 	
 	@PostMapping(path = {"/delete-account"})
 	@ResponseBody
-	public ResponseEntity<String> deleteAccount(@RequestBody MapApiController.UserPasswordPost us,
+	public ResponseEntity<String> deleteAccount(@RequestParam String token,
 	                                            @RequestParam(name = "deviceid") int deviceId,
 	                                            @RequestParam String accessToken,
-	                                            HttpServletRequest request) throws ServletException {
-		if (emailSender.isEmail(us.username)) {
-			PremiumUserDevice dev = checkToken(deviceId, accessToken);
-			if (dev == null) {
-				return userdataService.tokenNotValid();
-			}
-			return userdataService.deleteAccount(us, dev, request);
+			HttpServletRequest request) throws ServletException {
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValid();
 		}
-		return ResponseEntity.badRequest().body("Please enter valid email");
+		return userdataService.deleteAccount(token, dev, request);
 	}
 	
 	@PostMapping(path = {"/send-code"})
