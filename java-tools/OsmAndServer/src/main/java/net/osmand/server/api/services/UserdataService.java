@@ -882,13 +882,13 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String email, String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> sendCode(String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudWebEmail(email, token, action, lang);
+        emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);

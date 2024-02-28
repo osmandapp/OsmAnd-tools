@@ -147,7 +147,6 @@ public class MapApiController {
 	}
 	
 	public static class EmailSenderInfo {
-		public String email;
 		public String action;
 		public String lang;
 	}
@@ -647,14 +646,11 @@ public class MapApiController {
 	@PostMapping(path = {"/auth/send-code"})
 	@ResponseBody
 	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) {
-		if (emailSender.isEmail(data.email)) {
-			PremiumUserDevice dev = checkUser();
-			if (dev == null) {
-				return tokenNotValid();
-			}
-			return userdataService.sendCode(data.email, data.action, data.lang, dev);
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
 		}
-		return ResponseEntity.badRequest().body("Please enter valid email");
+		return userdataService.sendCode(data.action, data.lang, dev);
 	}
 	
 	@PostMapping(path = {"/auth/confirm-code"})

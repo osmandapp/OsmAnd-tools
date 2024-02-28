@@ -394,15 +394,12 @@ public class UserdataController {
 	@ResponseBody
 	public ResponseEntity<String> sendCode(@RequestBody MapApiController.EmailSenderInfo data,
 	                                       @RequestParam(name = "deviceid") int deviceId,
-	                                       @RequestParam String accessToken) {
-		if (emailSender.isEmail(data.email)) {
-			PremiumUserDevice dev = checkToken(deviceId, accessToken);
-			if (dev == null) {
-				return userdataService.tokenNotValid();
-			}
-			return userdataService.sendCode(data.email, data.action, data.lang, dev);
+			@RequestParam String accessToken) {
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValid();
 		}
-		return ResponseEntity.badRequest().body("Please enter valid email");
+		return userdataService.sendCode(data.action, data.lang, dev);
 	}
 
 	public static class UserFilesResults {
