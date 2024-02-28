@@ -883,6 +883,9 @@ public class UserdataService {
     
     @Transactional
     public ResponseEntity<String> sendCode(String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
+			return ok();
+		}
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
