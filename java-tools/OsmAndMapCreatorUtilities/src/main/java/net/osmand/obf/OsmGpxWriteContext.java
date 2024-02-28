@@ -415,9 +415,9 @@ public class OsmGpxWriteContext {
 				OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
 				qp.osmFile = File.createTempFile(Algorithms.getFileNameWithoutExtension(file), ".osm");
 				OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
-				File tmpFolder = new File(file.getParentFile(), String.valueOf(System.currentTimeMillis()));
-				String path = file.isDirectory() ? file.getAbsolutePath() : file.getParentFile().getPath();
-				File targetObf = new File(path, Algorithms.getFileNameWithoutExtension(file) + BINARY_MAP_INDEX_EXT);
+				File dir = file.isDirectory() ? file : file.getParentFile();
+				File tmpFolder = new File(dir, String.valueOf(System.currentTimeMillis()));
+				File targetObf = new File(dir, Algorithms.getFileNameWithoutExtension(file) + BINARY_MAP_INDEX_EXT);
 				List<File> files = new ArrayList<>();
 				if (file.isDirectory()) {
 					files = Arrays.asList(Objects.requireNonNull(file.listFiles()));

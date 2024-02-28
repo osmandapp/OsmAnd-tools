@@ -27,11 +27,11 @@ class BLMRoadsTrailsTranslation(ogr2osm.TranslationBase):
 		FILE_NAME = attrs['FILE_NAME']
 
 		if 'ROUTE_PRMR' in attrs and ROUTE_PRMRY_NM and ROUTE_PRMRY_NM.lower() != 'no' and ROUTE_PRMRY_NM.lower() != 'unknown' and ROUTE_PRMRY_NM.lower() != '<null>':
-			pre_name = ROUTE_PRMRY_NM.lower().replace("<null","").title().replace("'S ","'s ").replace("Blm ","BLM ")
+			pre_name = ROUTE_PRMRY_NM.lower().replace("<null>","").title().replace("'S ","'s ").replace("Blm ","BLM ")
 			road_name = ''.join(filter(lambda x: x in string.printable, pre_name))
 			tags['name'] = road_name
 		if 'ROUTE_SCND' in attrs and ROUTE_SCNDRY_SPCL_DSGNTN_NM and ROUTE_SCNDRY_SPCL_DSGNTN_NM.lower() != 'no' and ROUTE_SCNDRY_SPCL_DSGNTN_NM.lower() != 'unknown' and ROUTE_SCNDRY_SPCL_DSGNTN_NM.lower() != '<null>':
-			pre_alt_name = ROUTE_SCNDRY_SPCL_DSGNTN_NM.lower().replace("<null","").title().replace("'S ","'s ").replace("Blm ","BLM ")
+			pre_alt_name = ROUTE_SCNDRY_SPCL_DSGNTN_NM.lower().replace("<null>","").title().replace("'S ","'s ").replace("Blm ","BLM ")
 			road_alt_name = ''.join(filter(lambda x: x in string.printable, pre_alt_name))
 			if road_alt_name != road_name:
 				tags['alt_name'] = road_alt_name

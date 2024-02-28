@@ -879,7 +879,7 @@ public class OsmAndMapsService {
 		HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null);
 		hhConfig.STATS_VERBOSE_LEVEL = 0;
 		router.setHHRoutingConfig(hhConfig);
-		
+
 		router.setUseOnlyHHRouting(false); // hhonly is disabled
 		router.setUseNativeApproximation(false); // "nativeapproximation"
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
@@ -898,6 +898,7 @@ public class OsmAndMapsService {
 			}
 			if (key.equals("nativerouting")) {
 				useNativeLib = Boolean.parseBoolean(value);
+				router.setHHRouteCpp(useNativeLib); // HHRoutingType
 			} else if (key.equals("nativeapproximation")) {
 				router.setUseNativeApproximation(Boolean.parseBoolean(value));
 			} else if (key.equals("hhoff")) {
@@ -1044,7 +1045,9 @@ public class OsmAndMapsService {
 			ctx = lockCacheRoutingContext(router, rsc, routeMode);
 			String routingCacheInd = "";
 			synchronized (routingCaches) {
-				routingCacheInd = routingCaches.get(profile).toString();
+				if (routingCaches.containsKey(profile)) {
+					routingCacheInd = routingCaches.get(profile).toString();
+				}
 			}
 			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheInd));
 			if (ctx == null) {
