@@ -845,24 +845,24 @@ public class UserdataService {
     
     
     @Transactional
-    public ResponseEntity<String> deleteAccount(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(us.username);
+    public ResponseEntity<String> deleteAccount(String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
             boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
-            boolean validToken = pu.token.equals(us.token) && !tokenExpired;
+            boolean validToken = pu.token.equals(token) && !tokenExpired;
             if (validToken) {
                 if (deleteAllFiles(dev)) {
-                    int numOfUsersDelete = usersRepository.deleteByEmail(us.username);
+                    int numOfUsersDelete = usersRepository.deleteByEmail(pu.email);
                     if (numOfUsersDelete != -1) {
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
                             request.logout();
-                            return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", us.username));
+                            return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", pu.email));
                         }
                     }
-                    return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", us.username));
+                    return ResponseEntity.badRequest().body(String.format("Account hasn't been deleted (%s)", pu.email));
                 } else {
-                    return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", us.username));
+                    return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", pu.email));
                 }
             }
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h), or password is not valid");
@@ -882,13 +882,16 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String email, String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> sendCode(String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
+			return ok();
+		}
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudWebEmail(email, token, action, lang);
+        emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);

@@ -57,7 +57,6 @@ function download_blm_roads_trails {
 	wget "https://opendata.arcgis.com/api/v3/datasets/3f759ea461d84fd894cec96e360a121f_4/downloads/data?format=shp&spatialRefId=4269&where=1%3D1" -nc -O- | bsdtar -xvf-
 	wget "https://opendata.arcgis.com/api/v3/datasets/2bf84b07ef564902bf9c783826a1f2d5_1/downloads/data?format=shp&spatialRefId=4269&where=1%3D1" -nc -O- | bsdtar -xvf-
 	# Add field "FILE_NAME" to shp to allow objects differentiation after merging
-	echo "Adding field 'FILE_NAME' to source files"
 	python3 $dir/add_file_name_field.py $work_dir/$source_original_dir_name/blm/BLM_Natl_GTLF_Public_Motorized_Roads.shp || if [[ $? == 1 ]]; then exit 1; fi
 	python3 $dir/add_file_name_field.py $work_dir/$source_original_dir_name/blm/BLM_Natl_GTLF_Limited_Public_Motorized_Roads.shp || if [[ $? == 1 ]]; then exit 1; fi
 	python3 $dir/add_file_name_field.py $work_dir/$source_original_dir_name/blm/BLM_Natl_GTLF_Public_Nonmotorized_Trails.shp || if [[ $? == 1 ]]; then exit 1; fi
