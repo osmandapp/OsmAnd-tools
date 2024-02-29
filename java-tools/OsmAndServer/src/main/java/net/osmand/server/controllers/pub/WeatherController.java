@@ -56,11 +56,12 @@ public class WeatherController {
 		if (folder.exists()) {
 			Calendar c = Calendar.getInstance();
 			c.set(Calendar.MINUTE, 0);
+			boolean isShifted = false;
 			if (week || weatherType.equals(ECWMF_WEATHER_TYPE)) {
 				increment = 3;
 				c.setTimeZone(TimeZone.getTimeZone("UTC"));
 				int h = c.get(Calendar.HOUR);
-				c.set(Calendar.HOUR, h - (h % 3));
+				c.set(Calendar.HOUR, h - (h % increment));
 			}
 			while (true) {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
@@ -78,9 +79,19 @@ public class WeatherController {
 						LOGGER.warn(String.format("Error reading %s: %s", fl.getName(), e.getMessage()), e);
 					}
 				} else {
-					break;
+					if (weatherType.equals(ECWMF_WEATHER_TYPE) && increment != 6) {
+						increment = 6;
+						isShifted = true;
+					} else {
+						break;
+					}
 				}
-				c.add(Calendar.HOUR, increment);
+				if (isShifted) {
+					c.add(Calendar.HOUR, 3);
+					isShifted = false;
+				} else {
+					c.add(Calendar.HOUR, increment);
+				}
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(dt));
