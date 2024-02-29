@@ -426,9 +426,14 @@ public class UserdataController {
 	
 	@PostMapping(path = {"/auth/confirm-code"})
 	@ResponseBody
-	public ResponseEntity<String> confirmCode(@RequestBody MapApiController.UserPasswordPost us) {
-		if (emailSender.isEmail(us.username)) {
-			return userdataService.confirmCode(us);
+	public ResponseEntity<String> confirmCode(@RequestBody Map<String, String> credentials) {
+		String username = credentials.get("username");
+		String token = credentials.get("token");
+		if (username == null || token == null) {
+			return ResponseEntity.badRequest().body("Username or token is not provided");
+		}
+		if (emailSender.isEmail(username)) {
+			return userdataService.confirmCode(username, token);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

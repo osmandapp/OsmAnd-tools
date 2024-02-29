@@ -21,7 +21,6 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.gson.JsonParser;
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -137,15 +136,6 @@ public class MapApiController {
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 	
-	JsonParser jsonParser = new JsonParser();
-
-	public static class UserPasswordPost {
-		public String username;
-		public String password;
-		public String token;
-		public String lang;
-	}
-	
 	public static class EmailSenderInfo {
 		public String action;
 		public String lang;
@@ -182,19 +172,22 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request, java.security.Principal user) throws ServletException {
+	public ResponseEntity<String> loginUser(@RequestBody Map<String, String> credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
 		if (user != null) {
 			request.logout();
 		}
-		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(us.username, us.password);
-		try {
-			//Authentication res = 
-			authManager.authenticate(pwt);
-			// System.out.println(res);
-		} catch (AuthenticationException e) {
-			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", us.username));
+		String username = credentials.get("username");
+		String password = credentials.get("password");
+		if (username == null || password == null) {
+			return ResponseEntity.badRequest().body("Username and password are required");
 		}
-		request.login(us.username, us.password); // SecurityContextHolder.getContext().getAuthentication();
+		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(username, password);
+		try {
+			authManager.authenticate(pwt);
+		} catch (AuthenticationException e) {
+			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", username));
+		}
+		request.login(username, password); // SecurityContextHolder.getContext().getAuthentication();
 		return okStatus();
 	}
 	
@@ -211,12 +204,17 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
-			throws ServletException, IOException {
-		ResponseEntity<String> res = userdataService.webUserActivate(us.username, us.token, us.password);
+	public ResponseEntity<String> activateMapUser(@RequestBody Map<String, String> credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.get("username");
+		String password = credentials.get("password");
+		String token = credentials.get("token");
+		if (username == null || password == null || token == null) {
+			return ResponseEntity.badRequest().body("Username, password and token are required");
+		}
+		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password);
 		if (res.getStatusCodeValue() < 300) {
 			request.logout();
-			request.login(us.username, us.password);
+			request.login(username, password);
 			return okStatus();
 		}
 		return res;
@@ -231,9 +229,12 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
-			throws ServletException, IOException {
-		return userdataService.webUserRegister(us.username, us.lang);
+	public ResponseEntity<String> registerMapUser(@RequestBody Map<String, String> credentials, @RequestParam String lang) throws IOException {
+		String username = credentials.get("username");
+		if (username == null) {
+			return ResponseEntity.badRequest().body("Username is required");
+		}
+		return userdataService.webUserRegister(username, lang);
 	}
 	
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
@@ -663,16 +664,19 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/change-email"})
 	@ResponseBody
-	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
-		if (us.username != null) {
-			us.username = us.username.toLowerCase().trim();
+	public ResponseEntity<String> changeEmail(@RequestBody Map<String, String> credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.get("username");
+		String token = credentials.get("token");
+		if (username == null || token == null) {
+			return ResponseEntity.badRequest().body("Username and token are required");
 		}
-		if (emailSender.isEmail(us.username)) {
+		username = username.toLowerCase().trim();
+		if (emailSender.isEmail(username)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
-			return userdataService.changeEmail(us, dev, request);
+			return userdataService.changeEmail(username, token, dev, request);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

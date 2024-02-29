@@ -37,6 +37,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -911,13 +912,13 @@ public class UserdataService {
         }
     }
     
-    public ResponseEntity<String> confirmCode(MapApiController.UserPasswordPost us) {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(us.username);
+    public ResponseEntity<String> confirmCode(String username, String token) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(username);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
-        if (pu.token.equals(us.token) && !tokenExpired) {
+        if (pu.token.equals(token) && !tokenExpired) {
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
@@ -925,15 +926,15 @@ public class UserdataService {
     }
     
     
-    public ResponseEntity<String> changeEmail(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+    public ResponseEntity<String> changeEmail(String username, String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         try {
             boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
-            if (pu.token.equals(us.token) && !tokenExpired) {
-                pu.email = us.username;
+            if (pu.token.equals(token) && !tokenExpired) {
+                pu.email = username;
                 usersRepository.saveAndFlush(pu);
                 request.logout();
                 return ok();
