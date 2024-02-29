@@ -535,5 +535,5 @@ elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
 
     join_tiff_files $ECMWF
     split_tiles
-    clean_temp_files_on_finish
+    #clean_temp_files_on_finish
 fi
