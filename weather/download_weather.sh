@@ -17,7 +17,7 @@ ECMWF_BANDS_FULL_NAMES=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:sur
 ECMWF_BANDS_SHORT_NAMES_ORIG=("2t" "msl" "tp" "10u" "10v")
 ECMWF_BANDS_SHORT_NAMES_SAVING=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
 
-MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-1800} # 30 hours
+MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-3600} # 60 hours (temporary due ECMWF old data available, default 1800 - 30 hours)
 HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
 HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-192}
 
