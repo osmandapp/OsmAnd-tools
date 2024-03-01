@@ -396,7 +396,11 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		return userdataService.sendCode(data.action, data.lang, dev);
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			return ResponseEntity.badRequest().body("User not found");
+		}
+		return userdataService.sendCode(data.action, data.lang, pu);
 	}
 
 	public static class UserFilesResults {

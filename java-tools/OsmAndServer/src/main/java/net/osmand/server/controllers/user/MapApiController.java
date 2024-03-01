@@ -649,7 +649,33 @@ public class MapApiController {
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		return userdataService.sendCode(data.action, data.lang, dev);
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			return ResponseEntity.badRequest().body("User not found");
+		}
+		return userdataService.sendCode(data.action, data.lang, pu);
+	}
+	
+	@PostMapping(path = {"/auth/send-code-to-new-email"})
+	@ResponseBody
+	public ResponseEntity<String> sendCodeToNewEmail(@RequestBody EmailSenderInfo data, @RequestParam String email) {
+		if (emailSender.isEmail(email)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+			if (pu != null) {
+				return ResponseEntity.badRequest().body("User was already registered with such email");
+			}
+			pu = new PremiumUsersRepository.PremiumUser();
+			pu.email = email;
+			pu.regTime = new Date();
+			pu.orderid = null;
+			usersRepository.saveAndFlush(pu);
+			return userdataService.sendCode(data.action, data.lang, pu);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 	
 	@PostMapping(path = {"/auth/confirm-code"})
