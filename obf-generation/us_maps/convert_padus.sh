@@ -5,18 +5,22 @@
 
 #set -x
 dir=$(pwd)
-workdir=/mnt/wd_2tb/padus
-shapedirname=shp
-tmpdirname=tmp
-outosmdirname=osm
-ogr2osmdirname=ogr2osm
-mapcreatordir=/home/xmd5a/utilites/OsmAndMapCreator-main/
+work_dir=/mnt/wd_2tb/padus
+shape_dir=shp
+tmp_dir=tmp
+out_osm_dir=osm
+out_obf_dir=obf
+ogr2osm_dir=ogr2osm
+mapcreator_dir=/home/xmd5a/utilites/OsmAndMapCreator-main
+poi_types_path=/home/xmd5a/git/OsmAnd-resources/poi/poi_types_us-maps.xml
+rendering_types_path=/home/xmd5a/git/OsmAnd-resources/obf_creation/rendering_types_us-maps.xml
 
-export shapedirname
-export tmpdirname
-export workdir
-export outosmdirname
-export ogr2osmdirname
+
+export shape_dir
+export tmp_dir
+export work_dir
+export out_osm_dir
+export ogr2osm_dir
 export dir
 
 function rename_padus {
@@ -89,23 +93,24 @@ function rename_padus {
 function generate_osm {
 	padus_name=$(rename_padus $1)
  	echo $padus_name
-	ogr2ogr $workdir/$tmpdirname/$padus_name.shp $workdir/$shapedirname/$1.shp -explodecollections
-	cd $dir/$ogr2osmdirname
-	python3 -m ogr2osm $workdir/$tmpdirname/$padus_name.shp -o $workdir/$outosmdirname/$padus_name.osm -t padus.py
+	ogr2ogr $work_dir/$tmp_dir/$padus_name.shp $work_dir/$shape_dir/$1.shp -explodecollections
+	cd $dir/$ogr2osm_dir
+	python3 -m ogr2osm $work_dir/$tmp_dir/$padus_name.shp -o $work_dir/$out_osm_dir/$padus_name.osm -t padus.py
 }
 
 shopt -s nullglob
-for f in $workdir/$shapedirname/PADUS3_0Combined_State*.shp
+for f in $work_dir/$shape_dir/PADUS3_0Combined_State*.shp
 do
 	base_name=$(basename "${f%.*}")
 	padus_name=$(rename_padus $base_name)
-	if [ ! -f "$workdir/$outosmdirname/$padus_name.osm" ]
+	if [ ! -f "$work_dir/$out_osm_dir/$padus_name.osm" ]
 	then
 		echo ==============Generating $base_name
 		generate_osm $base_name
 	fi
+	if [ ! -f "$work_dir/$out_obf_dir/$padus_name.obf" ]
+	then
+		cd $work_dir/$out_obf_dir
+		bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/$padus_name.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
+	fi
 done
-
-cd $mapcreatordir
-
-bash utilities.sh generate-obf-files-in-batch $dir/batch-padus.xml

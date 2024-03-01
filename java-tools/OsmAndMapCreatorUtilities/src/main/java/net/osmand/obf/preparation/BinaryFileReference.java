@@ -30,11 +30,11 @@ public class BinaryFileReference {
 		long currentPosition = raf.getFilePointer();
 		raf.seek(pointerToWrite);
 		long val = pointerToCalculateShiftTo - pointerToCalculateShiftFrom;
-		if(_8bit) {
+		if (_8bit) {
 			raf.writeLong(val | (1L << 63)); // mark highest bit to 1 as long
-		} else if(val < Integer.MAX_VALUE){
+		} else if (val < Integer.MAX_VALUE) {
 			raf.writeInt((int) val);
-		}else {
+		} else {
 			throw new IllegalStateException("Out of bounds value: " + val);
 		}
 		raf.seek(currentPosition);
