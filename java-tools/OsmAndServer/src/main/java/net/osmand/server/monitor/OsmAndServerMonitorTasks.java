@@ -75,7 +75,7 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
 			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/",
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
-			"https://tile.osmand.net:8080/job/UpdateOsmAndServer/" };
+			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/" };
 
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 
@@ -467,7 +467,7 @@ public class OsmAndServerMonitorTasks {
 			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			long t = TIMESTAMP_FORMAT_OPR.parse(date.toString()).getTime();
-			res += String.format("\n<a href='https://tile.osmand.net:8080/'>Tile Postgis DB</a>: %s", timeAgo(t));
+			res += String.format("\n<a href='https://maptile.osmand.net:8080/'>Tile Postgis DB</a>: %s", timeAgo(t));
 			return res;
 		} catch (Exception e) {
 			LOG.warn(e.getMessage(), e);
@@ -655,7 +655,7 @@ public class OsmAndServerMonitorTasks {
 		DescriptiveStatistics live3Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 3);
 		DescriptiveStatistics live7Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 7);
 		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 30);
-		return String.format("<a href='osmand.net/osm_live'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
+		return String.format("<a href='https://creator.osmand.net/osm_live/'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
 				+ "Day stats: 3d %s (%s) h  · 7d — %s (%s) h · 30d — %s (%s) h",
 				delay < HOUR ? "OK" : "FAILED",
 						formatTime(delay), formatTime(live3Hours.getPercentile(PERC)),
