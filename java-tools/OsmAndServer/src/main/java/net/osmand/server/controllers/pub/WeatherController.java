@@ -31,6 +31,15 @@ public class WeatherController {
 	
 	protected static final Log LOGGER = LogFactory.getLog(WeatherController.class);
 	
+	// Initial increment value for the weather data time interval
+	private static final int INITIAL_INCREMENT = 1;
+	
+	// Increment value for the ECMWF weather data time interval and for the weekly forecast
+	private static final int ECWMF_INITIAL_INCREMENT = 3;
+	
+	// Increment value for the ECMWF weather data time interval after the first 120 hours
+	private static final int ECWMF_INCREMENT = 6;
+	
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 	
@@ -52,13 +61,13 @@ public class WeatherController {
 	                                            @RequestParam(defaultValue = "false") boolean week) {
 		File folder = new File(weatherLocation + weatherType + "/tiff/");
 		List<Object[]> dt = new ArrayList<>();
-		int increment = 1;
+		int increment = INITIAL_INCREMENT;
 		if (folder.exists()) {
 			Calendar c = Calendar.getInstance();
 			c.set(Calendar.MINUTE, 0);
 			boolean isShifted = false;
 			if (week || weatherType.equals(ECWMF_WEATHER_TYPE)) {
-				increment = 3;
+				increment = ECWMF_INITIAL_INCREMENT;
 				c.setTimeZone(TimeZone.getTimeZone("UTC"));
 				int h = c.get(Calendar.HOUR);
 				c.set(Calendar.HOUR, h - (h % increment));
@@ -79,15 +88,15 @@ public class WeatherController {
 						LOGGER.warn(String.format("Error reading %s: %s", fl.getName(), e.getMessage()), e);
 					}
 				} else {
-					if (weatherType.equals(ECWMF_WEATHER_TYPE) && increment != 6) {
-						increment = 6;
+					if (weatherType.equals(ECWMF_WEATHER_TYPE) && increment != ECWMF_INCREMENT) {
+						increment = ECWMF_INCREMENT;
 						isShifted = true;
 					} else {
 						break;
 					}
 				}
 				if (isShifted) {
-					c.add(Calendar.HOUR, 3);
+					c.add(Calendar.HOUR, ECWMF_INCREMENT - ECWMF_INITIAL_INCREMENT);
 					isShifted = false;
 				} else {
 					c.add(Calendar.HOUR, increment);
