@@ -122,7 +122,7 @@ public class UserdataService {
     public static final String FILE_TYPE_OSM_EDITS = "OSM_EDITS";
     public static final String FILE_TYPE_OSM_NOTES = "OSM_NOTES";
     public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
-    public static final String EMPTY_FILE_NAME = "empty.ignore";
+    public static final String EMPTY_FILE_NAME = "__folder__.info";
     public static final String INFO_EXT = ".info";
     
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
