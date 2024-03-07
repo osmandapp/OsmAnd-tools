@@ -110,9 +110,6 @@ dependencies {
         transitive = true 
     }
 
-    implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.7.0'
-    implementation 'com.twelvemonkeys.imageio:imageio-core:3.7.0'
-
     testImplementation "junit:junit"
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
