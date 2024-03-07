@@ -261,7 +261,7 @@ public class RandomRouteTester {
 	private void reportResult() throws IOException {
 		long runTime = System.currentTimeMillis() - started;
 		RandomRouteReport report = new RandomRouteReport(runTime, obfReaders.size(), testList.size(),
-				config.DEVIATION_RED, config.DEVIATION_YELLOW, optHtmlDomain);
+				config.DEVIATION_RED, config.DEVIATION_YELLOW, optHtmlDomain, config.CAR_2PHASE_MODE);
 
 		for (int i = 0; i < testList.size(); i++) {
 			report.entryOpen(i + 1);

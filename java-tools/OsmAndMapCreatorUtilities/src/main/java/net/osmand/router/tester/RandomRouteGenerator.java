@@ -66,6 +66,9 @@ class RandomRouteGenerator {
 								if (entry.profile.equals(param)) { // /profile/,param1,param2 -> param1,param2
 									continue;
 								}
+								if ("hhoff".equals(param) || "hhonly".equals(param)) { // ignore hh-specific params
+									continue;
+								}
 								entry.params.add(param);
 							}
 						}

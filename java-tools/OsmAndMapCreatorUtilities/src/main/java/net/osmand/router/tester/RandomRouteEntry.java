@@ -158,15 +158,15 @@ class RandomRouteReport {
 	private double deviationRed;
 	private double deviationYellow;
 
-	RandomRouteReport(long runTime, int nObf, int nRoutes, double red, double yellow, String htmlDomain) {
+	RandomRouteReport(long runTime, int nObf, int nRoutes, double red, double yellow, String htmlDomain, boolean car2phase) {
 		this.deviationRed = red;
 		this.deviationYellow = yellow;
 		this.htmlDomain = htmlDomain;
 
 		String dt = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(Calendar.getInstance().getTime());
 
-		this.text = String.format("%s Random Route Tester (%d obf files, %d routes, %d seconds)\n\n",
-				dt, nObf, nRoutes, runTime / 1000);
+		this.text = String.format("%s Random Route Tester (%d obf files, %d routes, %d seconds) %s\n\n",
+				dt, nObf, nRoutes, runTime / 1000, car2phase ? "[car_2phase_mode]" : "");
 
 		this.html = "<html><head><style>" + "table, th, td { border: 1px solid silver; border-collapse: collapse; }" +
 				"</style></head><body>\n" + this.text + "<br><table border=1>\n";
