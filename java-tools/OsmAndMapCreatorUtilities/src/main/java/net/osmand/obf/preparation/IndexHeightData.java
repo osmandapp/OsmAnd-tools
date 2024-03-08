@@ -9,6 +9,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,6 +22,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
@@ -101,22 +104,38 @@ public class IndexHeightData {
 		public File loadData(String srtmDataUrl, File workDir) throws IOException {
 			dataLoaded = true;
 			File f = loadFile(getFileName() + ".tif", srtmDataUrl, workDir);
-			BufferedImage img;
 			if (f.exists()) {
-				try {
-					img = ImageIO.read(f);
+				boolean readSuccess = false;
+				try (ImageInputStream iis = ImageIO.createImageInputStream(f)) {
+					Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("TIFF");
+					while (readers.hasNext() && !readSuccess) {
+						ImageReader reader = readers.next();
+						try {
+							reader.setInput(iis);
+							BufferedImage img = reader.read(0);
+							width = img.getWidth();
+							height = img.getHeight();
+							data = (DataBufferShort) img.getRaster().getDataBuffer();
+							readSuccess = true;
+						} catch (IOException e) {
+							log.error("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+							iis.seek(0); // Reset stream for the next reader
+						} finally {
+							reader.dispose();
+						}
+					}
 				} catch (Exception e) {
-					log.error("Error reading tif file " + getFileName() + " " + e.getMessage(), e);
+					log.error("Error processing TIFF file: " + e.getMessage(), e);
+				}
+				if (!readSuccess) {
+					log.error("Failed to read TIFF file with all available readers.");
+					return f;
+				} else {
+					if (!srtmDataUrl.startsWith("/") && !srtmDataUrl.startsWith(".")) {
+						Files.delete(f.toPath());
+					}
 					return null;
 				}
-				width = img.getWidth();
-				height = img.getHeight();
-				data = (DataBufferShort) img.getRaster().getDataBuffer();
-				// remove all downloaded files to save disk space
-				if (!srtmDataUrl.startsWith("/") && !srtmDataUrl.startsWith(".")) {
-					f.delete();
-				}
-				return null;
 			}
 			return f;
 		}
