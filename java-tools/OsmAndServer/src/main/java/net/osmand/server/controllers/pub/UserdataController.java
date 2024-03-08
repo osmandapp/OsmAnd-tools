@@ -430,15 +430,12 @@ public class UserdataController {
 	
 	@PostMapping(path = {"/auth/confirm-code"})
 	@ResponseBody
-	public ResponseEntity<String> confirmCode(@RequestBody Map<String, String> credentials) {
-		String username = credentials.get("username");
-		String token = credentials.get("token");
-		if (username == null || token == null) {
-			return ResponseEntity.badRequest().body("Username or token is not provided");
+	public ResponseEntity<String> confirmCode(@RequestParam String code, @RequestParam(name = "deviceid") int deviceId,
+	                                          @RequestParam String accessToken) {
+		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValid();
 		}
-		if (emailSender.isEmail(username)) {
-			return userdataService.confirmCode(username, token);
-		}
-		return ResponseEntity.badRequest().body("Please enter valid email");
+		return userdataService.confirmCode(code, dev);
 	}
 }

@@ -661,12 +661,22 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	@ResponseBody
-	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email) {
+	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
 		if (emailSender.isEmail(email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
+			// check token from old email
+			PremiumUsersRepository.PremiumUser currentAcc = usersRepository.findById(dev.userid);
+			if (currentAcc == null) {
+				return ResponseEntity.badRequest().body("User is not registered");
+			}
+			ResponseEntity<String> response = userdataService.confirmCode(currentAcc.email, code);
+			if (!response.getStatusCode().is2xxSuccessful()) {
+				return response;
+			}
+			// check if new email is not registered
 			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
 			if (pu != null) {
 				return ResponseEntity.badRequest().body("User was already registered with such email");
@@ -679,16 +689,6 @@ public class MapApiController {
 			return userdataService.sendCode(action, lang, pu);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
-	}
-	
-	@PostMapping(path = {"/auth/confirm-code"})
-	@ResponseBody
-	public ResponseEntity<String> confirmCode(@RequestBody String code) {
-		PremiumUserDevice dev = checkUser();
-		if (dev == null) {
-			return tokenNotValid();
-		}
-		return userdataService.confirmCode(code, dev);
 	}
 	
 	@PostMapping(path = {"/auth/change-email"})

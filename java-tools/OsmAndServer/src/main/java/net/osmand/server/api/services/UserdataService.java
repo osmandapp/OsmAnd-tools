@@ -924,7 +924,7 @@ public class UserdataService {
         }
     }
     
-    private void clearToken(PremiumUsersRepository.PremiumUser pu) {
+    public void clearToken(PremiumUsersRepository.PremiumUser pu) {
         pu.token = null;
         pu.tokenTime = null;
         usersRepository.saveAndFlush(pu);
@@ -953,24 +953,22 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("You can't change email, because you have devices in account on new email");
         }
         // validate token
-        boolean tokenExpired = System.currentTimeMillis() - tempUser.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
-        if (tokenExpired) {
-            return ResponseEntity.badRequest().body("Token expired (24h)");
+        ResponseEntity<String> response = confirmCode(username, token);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            return response;
         }
         // validate current user
         PremiumUsersRepository.PremiumUser currentUser = usersRepository.findById(dev.userid);
         if (currentUser == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
+        // change email
+        usersRepository.delete(tempUser);
+        currentUser.email = username;
+        usersRepository.saveAndFlush(currentUser);
+        request.logout();
         
-        if (tempUser.token.equals(token)) {
-            usersRepository.delete(tempUser);
-            currentUser.email = username;
-            usersRepository.saveAndFlush(currentUser);
-            request.logout();
-            return ok();
-        }
-        return ResponseEntity.badRequest().body("Token is not valid");
+        return ok();
     }
     
     @Scheduled(fixedDelay = 1000 * 60 * 60 * 24)
