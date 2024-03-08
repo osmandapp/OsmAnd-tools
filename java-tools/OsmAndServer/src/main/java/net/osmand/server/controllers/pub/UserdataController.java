@@ -389,18 +389,14 @@ public class UserdataController {
 	
 	@PostMapping(path = {"/send-code"})
 	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang,
+	public ResponseEntity<String> sendCode(@RequestBody MapApiController.EmailSenderInfo data,
 	                                       @RequestParam(name = "deviceid") int deviceId,
 			@RequestParam String accessToken) {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-		if (pu == null) {
-			return ResponseEntity.badRequest().body("User not found");
-		}
-		return userdataService.sendCode(action, lang, pu);
+		return userdataService.sendCode(data.action, data.lang, dev);
 	}
 
 	public static class UserFilesResults {
@@ -430,12 +426,10 @@ public class UserdataController {
 	
 	@PostMapping(path = {"/auth/confirm-code"})
 	@ResponseBody
-	public ResponseEntity<String> confirmCode(@RequestParam String code, @RequestParam(name = "deviceid") int deviceId,
-	                                          @RequestParam String accessToken) {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
-		if (dev == null) {
-			return userdataService.tokenNotValid();
+	public ResponseEntity<String> confirmCode(@RequestBody MapApiController.UserPasswordPost us) {
+		if (emailSender.isEmail(us.username)) {
+			return userdataService.confirmCode(us);
 		}
-		return userdataService.confirmCode(code, dev);
+		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 }
