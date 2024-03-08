@@ -1,6 +1,7 @@
 package net.osmand.server.api.repo;
 
 import java.util.Date;
+import java.util.List;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -25,8 +26,10 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
     int deleteByEmail(String email);
 	
 	PremiumUser findByOrderid(String orderid);
-	
-	PremiumUser findById(int id);
+    
+    List<PremiumUser> findPremiumUsersByOrderidAndTokendevice(String orderid, String tokendevice);
+    
+    PremiumUser findById(int id);
 	
     @Entity
     @Table(name = "user_accounts")

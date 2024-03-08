@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
@@ -21,7 +22,6 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.gson.JsonParser;
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -137,18 +137,11 @@ public class MapApiController {
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 	
-	JsonParser jsonParser = new JsonParser();
-
 	public static class UserPasswordPost {
+		// security alert: don’t add fields to this class
 		public String username;
 		public String password;
 		public String token;
-		public String lang;
-	}
-	
-	public static class EmailSenderInfo {
-		public String action;
-		public String lang;
 	}
 
 	@GetMapping(path = { "/auth/loginForm" }, produces = "text/html;charset=UTF-8")
@@ -182,19 +175,22 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request, java.security.Principal user) throws ServletException {
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
 		if (user != null) {
 			request.logout();
 		}
-		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(us.username, us.password);
-		try {
-			//Authentication res = 
-			authManager.authenticate(pwt);
-			// System.out.println(res);
-		} catch (AuthenticationException e) {
-			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", us.username));
+		String username = credentials.username;
+		String password = credentials.password;
+		if (username == null || password == null) {
+			return ResponseEntity.badRequest().body("Username and password are required");
 		}
-		request.login(us.username, us.password); // SecurityContextHolder.getContext().getAuthentication();
+		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(username, password);
+		try {
+			authManager.authenticate(pwt);
+		} catch (AuthenticationException e) {
+			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", username));
+		}
+		request.login(username, password); // SecurityContextHolder.getContext().getAuthentication();
 		return okStatus();
 	}
 	
@@ -211,12 +207,17 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
-			throws ServletException, IOException {
-		ResponseEntity<String> res = userdataService.webUserActivate(us.username, us.token, us.password);
+	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.username;
+		String password = credentials.password;
+		String token = credentials.token;
+		if (username == null || password == null || token == null) {
+			return ResponseEntity.badRequest().body("Username, password and token are required");
+		}
+		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password);
 		if (res.getStatusCodeValue() < 300) {
 			request.logout();
-			request.login(us.username, us.password);
+			request.login(username, password);
 			return okStatus();
 		}
 		return res;
@@ -231,9 +232,12 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
-			throws ServletException, IOException {
-		return userdataService.webUserRegister(us.username, us.lang);
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) throws IOException {
+		String username = credentials.username;
+		if (username == null) {
+			return ResponseEntity.badRequest().body("Username is required");
+		}
+		return userdataService.webUserRegister(username, lang);
 	}
 	
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
@@ -643,36 +647,65 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/send-code"})
 	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) {
+	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang) {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		return userdataService.sendCode(data.action, data.lang, dev);
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			return ResponseEntity.badRequest().body("User not found");
+		}
+		return userdataService.sendCode(action, lang, pu);
 	}
 	
-	@PostMapping(path = {"/auth/confirm-code"})
+	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	@ResponseBody
-	public ResponseEntity<String> confirmCode(@RequestBody String code) {
-		PremiumUserDevice dev = checkUser();
-		if (dev == null) {
-			return tokenNotValid();
-		}
-		return userdataService.confirmCode(code, dev);
-	}
-	
-	@PostMapping(path = {"/auth/change-email"})
-	@ResponseBody
-	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
-		if (us.username != null) {
-			us.username = us.username.toLowerCase().trim();
-		}
-		if (emailSender.isEmail(us.username)) {
+	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
+		if (emailSender.isEmail(email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
-			return userdataService.changeEmail(us, dev, request);
+			// check token from old email
+			PremiumUsersRepository.PremiumUser currentAcc = usersRepository.findById(dev.userid);
+			if (currentAcc == null) {
+				return ResponseEntity.badRequest().body("User is not registered");
+			}
+			ResponseEntity<String> response = userdataService.confirmCode(currentAcc.email, code);
+			if (!response.getStatusCode().is2xxSuccessful()) {
+				return response;
+			}
+			// check if new email is not registered
+			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+			if (pu != null) {
+				return ResponseEntity.badRequest().body("User was already registered with such email");
+			}
+			pu = new PremiumUsersRepository.PremiumUser();
+			pu.email = email;
+			pu.regTime = new Date();
+			pu.orderid = null;
+			usersRepository.saveAndFlush(pu);
+			return userdataService.sendCode(action, lang, pu);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+	
+	@PostMapping(path = {"/auth/change-email"})
+	@ResponseBody
+	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.username;
+		String token = credentials.token;
+		if (username == null || token == null) {
+			return ResponseEntity.badRequest().body("Username and token are required");
+		}
+		username = username.toLowerCase().trim();
+		if (emailSender.isEmail(username)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.changeEmail(username, token, dev, request);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
