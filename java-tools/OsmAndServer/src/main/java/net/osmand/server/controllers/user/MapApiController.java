@@ -136,11 +136,6 @@ public class MapApiController {
 	
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 	
-	public static class EmailSenderInfo {
-		public String action;
-		public String lang;
-	}
-	
 	public static class UserPasswordPost {
 		// security alert: don’t add fields to this class
 		public String username;
@@ -651,7 +646,7 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/send-code"})
 	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) {
+	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang) {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
@@ -660,12 +655,12 @@ public class MapApiController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(data.action, data.lang, pu);
+		return userdataService.sendCode(action, lang, pu);
 	}
 	
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	@ResponseBody
-	public ResponseEntity<String> sendCodeToNewEmail(@RequestBody EmailSenderInfo data, @RequestParam String email) {
+	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email) {
 		if (emailSender.isEmail(email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
@@ -680,7 +675,7 @@ public class MapApiController {
 			pu.regTime = new Date();
 			pu.orderid = null;
 			usersRepository.saveAndFlush(pu);
-			return userdataService.sendCode(data.action, data.lang, pu);
+			return userdataService.sendCode(action, lang, pu);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

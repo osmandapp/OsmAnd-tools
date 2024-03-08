@@ -389,7 +389,7 @@ public class UserdataController {
 	
 	@PostMapping(path = {"/send-code"})
 	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestBody MapApiController.EmailSenderInfo data,
+	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang,
 	                                       @RequestParam(name = "deviceid") int deviceId,
 			@RequestParam String accessToken) {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
@@ -400,7 +400,7 @@ public class UserdataController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(data.action, data.lang, pu);
+		return userdataService.sendCode(action, lang, pu);
 	}
 
 	public static class UserFilesResults {
