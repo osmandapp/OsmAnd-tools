@@ -63,8 +63,11 @@ class RandomRouteGenerator {
 							}
 						} else if ("params".equals(k)) { // params=string,string...
 							for (String param : v.split(",")) {
-								if (entry.profile.equals(param)) { // /profile/,param1,param2 -> param1,param2
-									continue;
+								if (entry.profile.equals(param)) {
+									continue; // /profile/,param1,param2 -> param1,param2 (ignore profile in params)
+								}
+								if ("hhoff".equals(param) || "hhonly".equals(param) || "nativerouting".equals(param)) {
+									continue; // do not use routing-type specification from params
 								}
 								entry.params.add(param);
 							}
