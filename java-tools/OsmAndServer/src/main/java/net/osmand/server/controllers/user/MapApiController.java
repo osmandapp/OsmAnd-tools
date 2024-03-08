@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
@@ -660,12 +661,22 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	@ResponseBody
-	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email) {
+	public ResponseEntity<String> sendCodeToNewEmail(@RequestBody UserPasswordPost credentials, @RequestParam String action, @RequestParam String lang, @RequestParam String email) {
 		if (emailSender.isEmail(email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
+			// check token from old email
+			PremiumUsersRepository.PremiumUser currentAcc = usersRepository.findById(dev.userid);
+			if (currentAcc == null) {
+				return ResponseEntity.badRequest().body("User is not registered");
+			}
+			boolean tokenExpired = System.currentTimeMillis() - currentAcc.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+			if (!currentAcc.token.equals(credentials.token) || tokenExpired) {
+				return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+			}
+			// check if new email is not registered
 			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
 			if (pu != null) {
 				return ResponseEntity.badRequest().body("User was already registered with such email");
