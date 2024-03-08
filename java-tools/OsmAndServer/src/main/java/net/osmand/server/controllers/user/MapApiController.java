@@ -140,6 +140,13 @@ public class MapApiController {
 		public String action;
 		public String lang;
 	}
+	
+	public static class UserPasswordPost {
+		// security alert: don’t add fields to this class
+		public String username;
+		public String password;
+		public String token;
+	}
 
 	@GetMapping(path = { "/auth/loginForm" }, produces = "text/html;charset=UTF-8")
 	@ResponseBody
@@ -172,12 +179,12 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> loginUser(@RequestBody Map<String, String> credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
 		if (user != null) {
 			request.logout();
 		}
-		String username = credentials.get("username");
-		String password = credentials.get("password");
+		String username = credentials.username;
+		String password = credentials.password;
 		if (username == null || password == null) {
 			return ResponseEntity.badRequest().body("Username and password are required");
 		}
@@ -204,10 +211,10 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> activateMapUser(@RequestBody Map<String, String> credentials, HttpServletRequest request) throws ServletException {
-		String username = credentials.get("username");
-		String password = credentials.get("password");
-		String token = credentials.get("token");
+	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.username;
+		String password = credentials.password;
+		String token = credentials.token;
 		if (username == null || password == null || token == null) {
 			return ResponseEntity.badRequest().body("Username, password and token are required");
 		}
@@ -229,8 +236,8 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> registerMapUser(@RequestBody Map<String, String> credentials, @RequestParam String lang) throws IOException {
-		String username = credentials.get("username");
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) throws IOException {
+		String username = credentials.username;
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username is required");
 		}
@@ -690,9 +697,9 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/change-email"})
 	@ResponseBody
-	public ResponseEntity<String> changeEmail(@RequestBody Map<String, String> credentials, HttpServletRequest request) throws ServletException {
-		String username = credentials.get("username");
-		String token = credentials.get("token");
+	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.username;
+		String token = credentials.token;
 		if (username == null || token == null) {
 			return ResponseEntity.badRequest().body("Username and token are required");
 		}
