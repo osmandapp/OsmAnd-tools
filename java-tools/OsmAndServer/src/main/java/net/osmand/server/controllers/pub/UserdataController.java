@@ -87,6 +87,9 @@ public class UserdataController {
 	@Autowired
 	UserdataService userdataService;
 
+	public static class TokenPost {
+		public String token;
+	}
 	
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
 		PremiumUserDevice d = devicesRepository.findById(deviceId);
@@ -374,9 +377,10 @@ public class UserdataController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 	
+	// TokenPost for backward compatibility
 	@PostMapping(path = {"/delete-account"})
 	@ResponseBody
-	public ResponseEntity<String> deleteAccount(@RequestParam String token,
+	public ResponseEntity<String> deleteAccount(@RequestBody TokenPost token,
 	                                            @RequestParam(name = "deviceid") int deviceId,
 	                                            @RequestParam String accessToken,
 			HttpServletRequest request) throws ServletException {
@@ -384,7 +388,7 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
-		return userdataService.deleteAccount(token, dev, request);
+		return userdataService.deleteAccount(token.token, dev, request);
 	}
 	
 	@PostMapping(path = {"/send-code"})
