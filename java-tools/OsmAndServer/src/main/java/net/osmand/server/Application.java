@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import net.osmand.router.RouteResultPreparation;
 import net.osmand.server.api.services.StorageService;
 
 @SpringBootApplication
@@ -32,6 +33,7 @@ public class Application  {
 	@Bean
 	public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
 		return args -> {
+			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
 			System.out.println("Application has started");
 			telegram.init();
 		};
