@@ -1055,11 +1055,11 @@ public class OsmAndMapsService {
 		RoutingContext ctx = null;
 		try {
 			RouteParameters rp = parseRouteParameters(routeMode);
-			ctx = lockCacheRoutingContext(router, rp);
 			String routingCacheStr = "";
 			synchronized (routingCaches) {
 				routingCacheStr = routingCaches.toString();
 			}
+			ctx = lockCacheRoutingContext(router, rp);
 			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheStr));
 			if (ctx == null) {
 				validateAndInitConfig();
@@ -1142,11 +1142,12 @@ public class OsmAndMapsService {
 				}
 			}
 			if (best != null) {
+				best.rCtx.unloadAllData();
 				if (!best.routeParamsStr.equals(rp.routeParams.toString())) {
 					best.routeParamsStr = rp.routeParams.toString();
 					GeneralRouter oldRouter = best.rCtx.config.router;
 					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
-					best.rCtx.config.router = newRouter;
+					best.rCtx.setRouter(newRouter);
 				}
 				if (rp.disableHHRouting) {
 					router.disableHHRoutingConfig();
