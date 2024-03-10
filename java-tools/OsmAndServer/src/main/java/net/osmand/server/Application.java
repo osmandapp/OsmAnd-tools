@@ -33,9 +33,9 @@ public class Application  {
 	@Bean
 	public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
 		return args -> {
+			telegram.init();
 			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
 			System.out.println("Application has started");
-			telegram.init();
 		};
 	}
 }

@@ -133,7 +133,7 @@ public class OsmAndMapsService {
 
 	public class RoutingCacheContext {
 		String profile;
-		String routeParamsStr;
+		String routeParamsStr = "";
 		RoutingContext rCtx;
 		HHRoutingContext<NetworkDBPoint> hCtx;
 		long locked;
@@ -143,9 +143,9 @@ public class OsmAndMapsService {
 
 		@Override
 		public String toString() {
-			String p = profile.length() > 5? profile.substring(0, 5) : profile;
+			String p = profile.length() > 5 ? profile.substring(0, 5) : profile;
 			return (locked == 0 ? "+" : "-")
-					+ String.format("%s %d, %s min", p, used, (System.currentTimeMillis() - created) / 60 / 1000);
+					+ String.format("%s %s %d, %s min", p, routeParamsStr, used, (System.currentTimeMillis() - created) / 60 / 1000);
 		}
 
 		public double importance() {
@@ -1152,13 +1152,13 @@ public class OsmAndMapsService {
 					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
 					best.rCtx.config.router = newRouter;
 				}
-				if(rp.disableHHRouting) {
+				if (rp.disableHHRouting) {
 					router.disableHHRoutingConfig();
 				} else {
 					router.setHHRouteCpp(rp.useNativeLib);
 					router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+					router.setHHRoutingConfig(best.hhConfig); // after prepare
 				}
-				router.setHHRoutingConfig(best.hhConfig); // after prepare
 				return best;
 			}
 			Thread.sleep(1000);
