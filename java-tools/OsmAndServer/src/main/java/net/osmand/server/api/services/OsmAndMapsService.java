@@ -879,7 +879,7 @@ public class OsmAndMapsService {
 		boolean useNativeApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
-		RouteCalculationMode calcMode = null;
+		RouteCalculationMode calcMode = RouteCalculationMode.COMPLEX;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
 
@@ -947,10 +947,6 @@ public class OsmAndMapsService {
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config =  cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
 		config.routeCalculationTime = System.currentTimeMillis();
-		if (rp.calcMode == null) {
-			rp.calcMode = GeneralRouterProfile.CAR == config.router.getProfile() ? RouteCalculationMode.COMPLEX
-					: RouteCalculationMode.NORMAL;
-		}
 		final RoutingContext ctx = router.buildRoutingContext(config, rp.useNativeLib ? nativelib : null,
 				usedMapList.toArray(new BinaryMapIndexReader[0]), rp.calcMode);
 		ctx.leftSideNavigation = false;
@@ -1133,7 +1129,7 @@ public class OsmAndMapsService {
 			RoutingCacheContext best = null;
 			synchronized (routingCaches) {
 				for (RoutingCacheContext c : routingCaches) {
-					if (c.locked == 0 && rp.routeProfile.equals(c.profile)) {
+					if (c.locked == 0 && rp.routeProfile.equals(c.profile) && c.rCtx.calculationMode == rp.calcMode) {
 						if (c.routeParamsStr.equals(rp.routeParams.toString()) || best == null) {
 							best = c;
 						}
