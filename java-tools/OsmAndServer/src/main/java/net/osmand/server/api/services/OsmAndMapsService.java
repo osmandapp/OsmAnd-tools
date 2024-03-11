@@ -98,11 +98,12 @@ public class OsmAndMapsService {
 
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
-	private static final long MAX_TIME_ROUTING_FILE = 8 * 60 * 60;
-	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 5;
+	private static final long MAX_TIME_ROUTING_FILE = 4 * 60 * 60;
+	private static final int HINT_SAME_ROUTING_CONTEXT_OPEN = 5;
 	private static final int MAX_SAME_PROFILE_DF = 1;
+	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 8;
 	private static final Map<String, Integer> MAX_SAME_PROFILE = Map.of("car", 2, "bicycle", 2, "pedestrian", 2);
-	private static final long MAX_SAME_PROFILE_WAIT_MS = 9000;
+	private static final long MAX_SAME_PROFILE_WAIT_MS = 6000;
 
 
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -113,7 +114,7 @@ public class OsmAndMapsService {
 
 	Map<String, VectorMetatile> tileCache = new ConcurrentHashMap<>();
 
-	Map<String, List<RoutingCacheContext>> routingCaches = new ConcurrentHashMap<>();
+	List<RoutingCacheContext> routingCaches = new ArrayList<>();
 
 	NativeJavaRendering nativelib;
 
@@ -131,20 +132,20 @@ public class OsmAndMapsService {
 	String routeObfLocation;
 
 	public class RoutingCacheContext {
-		String routeMode;
+		String profile;
+		String routeParamsStr = "";
 		RoutingContext rCtx;
 		HHRoutingContext<NetworkDBPoint> hCtx;
 		long locked;
 		long created;
 		int used;
 		HHRoutingConfig hhConfig;
-		String profile;
 
 		@Override
 		public String toString() {
-			String p = profile.length() > 5? profile.substring(0, 5) : profile;
+			String p = profile.length() > 5 ? profile.substring(0, 5) : profile;
 			return (locked == 0 ? "+" : "-")
-					+ String.format("%s %d, %s min", p, used, (System.currentTimeMillis() - created) / 60 / 1000);
+					+ String.format("%s %s %d, %s min", p, routeParamsStr, used, (System.currentTimeMillis() - created) / 60 / 1000);
 		}
 
 		public double importance() {
@@ -270,48 +271,45 @@ public class OsmAndMapsService {
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void cleanUpRoutingFiles() {
-
+		List<RoutingCacheContext> removed = new ArrayList<>();
 		synchronized (routingCaches) {
-			List<RoutingCacheContext> all = new ArrayList<RoutingCacheContext>();
-			int total = 0;
-			for(List<RoutingCacheContext> l : routingCaches.values()) {
-				for(RoutingCacheContext s : l) {
-					total++;
-					if(s.locked == 0) {
-						all.add(s);
-					}
-				}
-			}
-			Collections.sort(all, new Comparator<RoutingCacheContext>() {
+			Collections.sort(routingCaches, new Comparator<RoutingCacheContext>() {
 
 				@Override
 				public int compare(RoutingCacheContext o1, RoutingCacheContext o2) {
 					return Double.compare(o1.importance(), o2.importance());
 				}
 			});
-			int hintToRemove = total - MAX_SAME_ROUTING_CONTEXT_OPEN;
-			int removed = 0;
-			for (int i = 0; i < all.size(); i++) {
-				RoutingCacheContext remove = all.get(i);
-				if (hintToRemove > removed || (System.currentTimeMillis() - remove.created) / 1000l >= MAX_TIME_ROUTING_FILE) {
-					removed++;
-					List<RoutingCacheContext> lst = routingCaches.get(remove.profile);
-					lst.remove(remove);
-					BinaryMapIndexReader reader = remove.rCtx.map.keySet().iterator().next();
-					try {
-						reader.close();
-					} catch (IOException e) {
-						e.printStackTrace();
+			System.out.println("Prepare to clean up global routing contexts " + routingCaches);
+			while (routingCaches.size() > HINT_SAME_ROUTING_CONTEXT_OPEN) {
+				RoutingCacheContext r = routingCaches.remove(routingCaches.size() - 1);
+				removed.add(r);
+			}
+			for (int i = 0; i < routingCaches.size();) {
+				RoutingCacheContext check = routingCaches.get(i);
+				if ((System.currentTimeMillis() - check.created) / 1000l >= MAX_TIME_ROUTING_FILE) {
+					removed.add(routingCaches.remove(i));
+				} else {
+					i++;
+					if (check.locked == 0) {
+						check.hCtx.clearSegments();
 					}
 				}
 			}
-			if (removed > 0) {
-				System.gc();
-				System.out.printf("Clean up %d global routing contexts, state - %s \n", removed, routingCaches);
-				long MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory()
-						- Runtime.getRuntime().freeMemory()) >> 20;
-				System.out.printf("***** Memory used %d MB *****\n", MEMORY_LAST_USED_MB);
+		}
+		if (removed.size() > 0) {
+			for (RoutingCacheContext r : removed) {
+				BinaryMapIndexReader reader = r.rCtx.map.keySet().iterator().next();
+				try {
+					reader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
+			System.gc();
+			System.out.printf("Clean up %d global routing contexts, state - %s \n", removed.size(), routingCaches);
+			long MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
+			System.out.printf("***** Memory used %d MB *****\n", MEMORY_LAST_USED_MB);
 		}
 	}
 
@@ -781,7 +779,7 @@ public class OsmAndMapsService {
 				return Collections.emptyList();
 			}
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-			RoutingContext ctx = prepareRouterContext("geocoding", router, null, usedMapList);
+			RoutingContext ctx = prepareRouterContext(new RouteParameters("geocoding"), router, usedMapList);
 			GeocodingUtilities su = new GeocodingUtilities();
 			List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
 			complete = su.sortGeocodingResults(usedMapList, res);
@@ -828,7 +826,7 @@ public class OsmAndMapsService {
 			if (incomplete[0]) {
 				return new ArrayList<RouteSegmentResult>();
 			}
-			RoutingContext ctx = prepareRouterContext(routeMode, router, null, usedMapList);
+			RoutingContext ctx = prepareRouterContext(parseRouteParameters(routeMode), router, usedMapList);
 			route = approximate(ctx, router, props, polyline);
 		} finally {
 			unlockReaders(usedMapList);
@@ -868,24 +866,30 @@ public class OsmAndMapsService {
 		putResultProps(ctx, route, props);
 		return route;
 	}
+	
 
-	private RoutingContext prepareRouterContext(String routeMode, RoutePlannerFrontEnd router,
-			RoutingServerConfigEntry[] serverEntry, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
-		Map<String, String> paramsR = new LinkedHashMap<String, String>();
-
-		// reset before applying
-		String[] props = routeMode.split("\\,");
-//		router.setDefaultHHRoutingConfig(); // hh is enabled
-		HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null);
-		hhConfig.STATS_VERBOSE_LEVEL = 0;
-		router.setHHRoutingConfig(hhConfig);
-
-		router.setUseOnlyHHRouting(false); // hhonly is disabled
-		router.setUseNativeApproximation(false); // "nativeapproximation"
+	private static class RouteParameters {
+		String routeProfile;
+		Map<String, String> routeParams = new LinkedHashMap<String, String>();
+		public RouteParameters(String p) {
+			this.routeProfile = p;
+		}
+		
+		boolean useOnlyHHRouting = false;
+		boolean useNativeApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
+		boolean noGlobalFile = false; // "noglobalfile"
+		RouteCalculationMode calcMode = RouteCalculationMode.COMPLEX;
+		public boolean disableHHRouting;
+		public RoutingServerConfigEntry onlineRouting;
 
-		RouteCalculationMode paramMode = null;
-		for (String p : props) {
+	}
+	
+	private RouteParameters parseRouteParameters(String routeMode) {
+		String[] props = routeMode.split("\\,");
+		RouteParameters r = new RouteParameters(props[0]);
+		for (int i = 1; i < props.length; i++) {
+			String p = props[i];
 			if (p.length() == 0) {
 				continue;
 			}
@@ -897,45 +901,54 @@ public class OsmAndMapsService {
 				value = p.substring(ind + 1);
 			}
 			if (key.equals("nativerouting")) {
-				useNativeLib = Boolean.parseBoolean(value);
-				router.setHHRouteCpp(useNativeLib); // HHRoutingType
+				r.useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
-				router.setUseNativeApproximation(Boolean.parseBoolean(value));
+				r.useNativeApproximation = Boolean.parseBoolean(value);
 			} else if (key.equals("hhoff")) {
 				if (Boolean.parseBoolean(value)) {
-					router.disableHHRoutingConfig();
+					r.disableHHRouting = true;
 				}
 			} else if (key.equals("hhonly")) {
 				if (Boolean.parseBoolean(value)) {
-					router.setUseOnlyHHRouting(true); // default false (hhonly is not for ui)
+					r.useOnlyHHRouting = true;
 				}
+			} else if (key.equals("noglobalfile")) {
+				r.noGlobalFile = true;
 			} else if (key.equals("calcmode")) {
 				if (value.length() > 0) {
-					paramMode = RouteCalculationMode.valueOf(value.toUpperCase());
+					r.calcMode = RouteCalculationMode.valueOf(value.toUpperCase());
 				}
 			} else {
-				paramsR.put(key, value);
+				r.routeParams.put(key, value);
 			}
 		}
-		String routeModeKey = props[0];
-		if (routingConfig.config.containsKey(routeModeKey)) {
-			RoutingServerConfigEntry entry = routingConfig.config.get(routeModeKey);
-			routeModeKey = entry.profile;
-			if (serverEntry != null && serverEntry.length > 0) {
-				serverEntry[0] = entry;
-			}
+		if (routingConfig.config.containsKey(r.routeProfile)) {
+			RoutingServerConfigEntry entry = routingConfig.config.get(r.routeProfile);
+			r.routeProfile = entry.profile;
+			r.onlineRouting = entry;
 		}
+		
+		return r;
+	}
+
+	private RoutingContext prepareRouterContext(RouteParameters rp, RoutePlannerFrontEnd router, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
+		if (rp.disableHHRouting) {
+			router.disableHHRoutingConfig();
+		} else {
+			router.setHHRouteCpp(rp.useNativeLib);
+			router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+			HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null);
+			hhConfig.STATS_VERBOSE_LEVEL = 0;
+			router.setHHRoutingConfig(hhConfig);
+		}
+		router.setUseNativeApproximation(rp.useNativeApproximation);
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		// setDirectionPoints(directionPointsFile).
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
-		RoutingConfiguration config =  cfgBuilder.build(routeModeKey, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, paramsR);
+		RoutingConfiguration config =  cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
 		config.routeCalculationTime = System.currentTimeMillis();
-		if (paramMode == null) {
-			paramMode = GeneralRouterProfile.CAR == config.router.getProfile() ? RouteCalculationMode.COMPLEX
-					: RouteCalculationMode.NORMAL;
-		}
-		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
-				usedMapList.toArray(new BinaryMapIndexReader[0]), paramMode); // RouteCalculationMode.BASE
+		final RoutingContext ctx = router.buildRoutingContext(config, rp.useNativeLib ? nativelib : null,
+				usedMapList.toArray(new BinaryMapIndexReader[0]), rp.calcMode);
 		ctx.leftSideNavigation = false;
 		return ctx;
 	}
@@ -1037,19 +1050,17 @@ public class OsmAndMapsService {
 		String profile = routeMode.split("\\,")[0];
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-		RoutingServerConfigEntry[] rsc = new RoutingServerConfigEntry[1];
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		List<RouteSegmentResult> routeRes;
 		RoutingContext ctx = null;
 		try {
-			ctx = lockCacheRoutingContext(router, rsc, routeMode);
-			String routingCacheInd = "";
+			RouteParameters rp = parseRouteParameters(routeMode);
+			String routingCacheStr = "";
 			synchronized (routingCaches) {
-				if (routingCaches.containsKey(profile)) {
-					routingCacheInd = routingCaches.get(profile).toString();
-				}
+				routingCacheStr = routingCaches.toString();
 			}
-			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheInd));
+			ctx = lockCacheRoutingContext(router, rp);
+			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheStr));
 			if (ctx == null) {
 				validateAndInitConfig();
 				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
@@ -1058,7 +1069,7 @@ public class OsmAndMapsService {
 				if (incomplete[0]) {
 					return Collections.emptyList();
 				}
-				ctx = prepareRouterContext(routeMode, router, rsc, usedMapList);
+				ctx = prepareRouterContext(rp, router, usedMapList);
 			}
 			HashSet<Long> impassableRoads = new HashSet<>();
 			for (String s : avoidRoadsIds) {
@@ -1071,8 +1082,8 @@ public class OsmAndMapsService {
 			}
 			ctx.routingTime = 0;
 			ctx.calculationProgress = progress;
-			if (rsc[0] != null && rsc[0].url != null) {
-				routeRes = onlineRouting(rsc[0], ctx, router, props, start, end, intermediates);
+			if (rp.onlineRouting != null) {
+				routeRes = onlineRouting(rp.onlineRouting, ctx, router, props, start, end, intermediates);
 			} else {
 				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
 						: router.searchRoute(ctx, start, end, intermediates, null);
@@ -1081,17 +1092,20 @@ public class OsmAndMapsService {
 			}
 		} finally {
 			unlockReaders(usedMapList);
-			unlockCacheRoutingContext(ctx, routeMode);
+			unlockCacheRoutingContext(ctx);
 		}
 		return routeRes;
 	}
 
 
-	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RoutingServerConfigEntry[] rsc, String routeMode) throws IOException, InterruptedException {
-		if (routeObfLocation == null || routeObfLocation.length() == 0 || routeMode.contains("native")) {
+	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RouteParameters rp) throws IOException, InterruptedException {
+		if (routeObfLocation == null || routeObfLocation.length() == 0) {
 			return null;
 		}
-		RoutingCacheContext cache = lockRoutingCache(router, rsc, routeMode);
+		if (rp.useNativeLib || rp.useNativeApproximation || rp.noGlobalFile) {
+			return null;
+		}
+		RoutingCacheContext cache = lockRoutingCache(router, rp);
 		if (cache == null) {
 			return null;
 		}
@@ -1109,61 +1123,65 @@ public class OsmAndMapsService {
 		return MAX_SAME_PROFILE_DF;
 	}
 
-	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router,
-			RoutingServerConfigEntry[] rsc, String routeMode) throws IOException, InterruptedException {
-		int sz = 0;
-		String profile = routeMode.split("\\,")[0];
+	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router, RouteParameters rp) throws IOException, InterruptedException {
 		long waitTime = System.currentTimeMillis();
 		while ((System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
+			RoutingCacheContext best = null;
 			synchronized (routingCaches) {
-				List<RoutingCacheContext> lst = routingCaches.get(profile);
-				sz = 0;
-				if (lst != null) {
-					sz = lst.size();
-					RoutingCacheContext best = null;
-					for (RoutingCacheContext c : lst) {
-						if (c.locked == 0) {
-							if (c.routeMode.equals(routeMode) || best == null) {
-								best = c;
-							}
-
+				for (RoutingCacheContext c : routingCaches) {
+					if (c.locked == 0 && rp.routeProfile.equals(c.profile) && c.rCtx.calculationMode == rp.calcMode) {
+						if (c.routeParamsStr.equals(rp.routeParams.toString()) || best == null) {
+							best = c;
 						}
 					}
-					if (best != null) {
-						best.used++;
-						best.locked = System.currentTimeMillis();
-						best.routeMode = routeMode;
-						router.setHHRoutingConfig(best.hhConfig);
-						return best;
-					}
 				}
-				if (sz < maxProfileMaps(profile)) {
-					break;
+				if (best != null) {
+					best.used++;
+					best.locked = System.currentTimeMillis();
+					router.setHHRoutingConfig(best.hhConfig);
 				}
+			}
+			if (best != null) {
+				best.rCtx.unloadAllData();
+				if (!best.routeParamsStr.equals(rp.routeParams.toString())) {
+					best.routeParamsStr = rp.routeParams.toString();
+					GeneralRouter oldRouter = best.rCtx.config.router;
+					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
+					best.rCtx.setRouter(newRouter);
+				}
+				if (rp.disableHHRouting) {
+					router.disableHHRoutingConfig();
+				} else {
+					router.setHHRouteCpp(rp.useNativeLib);
+					router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+					router.setHHRoutingConfig(best.hhConfig); // after prepare
+				}
+				return best;
 			}
 			Thread.sleep(1000);
 		}
-		if (sz >= maxProfileMaps(profile)) {
-			System.out.printf("Global routing cache %s is not available (using old files)\n", profile);
-			return null;
-		}
-
+		
 		RoutingCacheContext cs = new RoutingCacheContext();
 		cs.locked = System.currentTimeMillis();
 		cs.created = System.currentTimeMillis();
 		cs.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cs.hCtx);
 		cs.hhConfig.STATS_VERBOSE_LEVEL = 0;
-		cs.routeMode = routeMode;
-		cs.profile = profile;
+		cs.routeParamsStr = rp.routeParams.toString();
+		cs.profile = rp.routeProfile;
+		int sameProfileSize = 0, all = 0;
 		synchronized (routingCaches) {
-			if (!routingCaches.containsKey(cs.profile)) {
-				routingCaches.put(cs.profile, new ArrayList<>());
+			all = sameProfileSize = 0;
+			for (RoutingCacheContext c : routingCaches) {
+				all++;
+				if (rp.routeProfile.equals(c.profile)) {
+					sameProfileSize++;
+				}
 			}
-			sz = routingCaches.get(cs.profile).size();
-			if (sz >= maxProfileMaps(profile)) {
+			if (sameProfileSize >= maxProfileMaps(rp.routeProfile) || all >= MAX_SAME_ROUTING_CONTEXT_OPEN) {
+				System.out.printf("Global routing cache %s is not available (using old files)\n", rp.routeProfile);
 				return null;
 			}
-			routingCaches.get(cs.profile).add(cs);
+			routingCaches.add(cs);
 		}
 		// do outside synchronized to not block
 		File target = new File(routeObfLocation);
@@ -1174,21 +1192,20 @@ public class OsmAndMapsService {
 		}
 		BinaryMapIndexReader reader = cache.getReader(target, true);
 		cache.writeToFile(targetIndex);
-		cs.rCtx = prepareRouterContext(routeMode, router, rsc, Collections.singletonList(reader));
+		cs.rCtx = prepareRouterContext(rp, router, Collections.singletonList(reader));
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
-		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", profile, routeMode, sz + 1);
+		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", cs.profile,
+				cs.routeParamsStr, sameProfileSize + 1);
 		return cs;
 	}
 
-	private boolean unlockCacheRoutingContext(RoutingContext ctx, String routeMode) {
+	private boolean unlockCacheRoutingContext(RoutingContext ctx) {
 		synchronized (routingCaches) {
-			for (List<RoutingCacheContext> l : routingCaches.values()) {
-				for (RoutingCacheContext c : l) {
-					if (c.rCtx == ctx) {
-						c.hCtx = c.hhConfig.cacheCtx;
-						c.locked = 0;
-						return true;
-					}
+			for (RoutingCacheContext c : routingCaches) {
+				if (c.rCtx == ctx) {
+					c.hCtx = c.hhConfig.cacheCtx;
+					c.locked = 0;
+					return true;
 				}
 			}
 		}
