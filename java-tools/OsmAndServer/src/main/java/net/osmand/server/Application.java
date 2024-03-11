@@ -52,23 +52,23 @@ public class Application  {
 	public void configureImageIO() {
 		IIORegistry registry = IIORegistry.getDefaultInstance();
 		
+		ImageReaderSpi twelvemonkeysSpi = null;
 		ImageReaderSpi geoSolutionsSpi = null;
-		ImageReaderSpi sunMediaSpi = null;
 		
 		try {
+			Class<?> twelvemonkeysTiffReaderClass = Class.forName("com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReaderSpi");
 			Class<?> geoSolutionsTiffReaderClass = Class.forName("it.geosolutions.imageioimpl.plugins.tiff.TIFFImageReaderSpi");
-			Class<?> sunMediaTiffReaderClass = Class.forName("com.sun.media.imageioimpl.plugins.tiff.TIFFImageReaderSpi");
 			
 			for (ImageReaderSpi spi : ServiceLoader.load(ImageReaderSpi.class)) {
-				if (geoSolutionsTiffReaderClass.isInstance(spi)) {
+				if (twelvemonkeysTiffReaderClass.isInstance(spi)) {
+					twelvemonkeysSpi = spi;
+				} else if (geoSolutionsTiffReaderClass.isInstance(spi)) {
 					geoSolutionsSpi = spi;
-				} else if (sunMediaTiffReaderClass.isInstance(spi)) {
-					sunMediaSpi = spi;
 				}
 			}
 			
-			if (geoSolutionsSpi != null && sunMediaSpi != null) {
-				registry.setOrdering(ImageReaderSpi.class, geoSolutionsSpi, sunMediaSpi);
+			if (twelvemonkeysSpi != null && geoSolutionsSpi != null) {
+				registry.setOrdering(ImageReaderSpi.class, twelvemonkeysSpi, geoSolutionsSpi);
 				System.out.println("The ImageIO service provider order has been successfully set.");
 			} else {
 				System.err.println("Failed to find the required service providers to set the order.");
