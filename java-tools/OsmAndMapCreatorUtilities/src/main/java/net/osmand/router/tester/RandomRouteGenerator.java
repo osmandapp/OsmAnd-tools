@@ -66,7 +66,7 @@ class RandomRouteGenerator {
 								if (entry.profile.equals(param)) {
 									continue; // /profile/,param1,param2 -> param1,param2 (ignore profile in params)
 								}
-								if ("hhoff".equals(param) || "hhonly".equals(param) || "nativerouting".equals(param)) {
+								if (param.startsWith("hhoff") || param.startsWith("hhonly") || param.startsWith("nativerouting")) {
 									continue; // do not use routing-type specification from params
 								}
 								entry.params.add(param);
@@ -173,6 +173,14 @@ class RandomRouteGenerator {
 		}
 	}
 
+	// cut down LatLon precision via %f
+	private LatLon roundLatLonViaString(LatLon ll) {
+		String str = String.format("%f,%f", ll.getLatitude(), ll.getLongitude());
+		double lat = Double.parseDouble(str.split(",")[0]);
+		double lon = Double.parseDouble(str.split(",")[1]);
+		return new LatLon(lat, lon);
+	}
+
 	private void generateRandomTests() throws IOException {
 		List<LatLon> randomPoints = new ArrayList<>();
 		Set<LatLon> avoidDupes = new HashSet<>();
@@ -201,7 +209,7 @@ class RandomRouteGenerator {
 			// 2) select start
 			for (int j = 0; j < randomPoints.size(); j++) {
 				int startIndex = fixedRandom(randomPoints.size(), RandomActions.GET_START, i, j);
-				entry.start = randomPoints.get(startIndex);
+				entry.start = roundLatLonViaString(randomPoints.get(startIndex));
 				if (!avoidDupes.contains(entry.start)) {
 					break;
 				}
@@ -221,7 +229,7 @@ class RandomRouteGenerator {
 				boolean pointFound = false;
 				for (int j = 0; j < randomPoints.size(); j++) {
 					int pointIndex = fixedRandom(randomPoints.size(), RandomActions.GET_POINTS, i, nNextPoints + j);
-					point = randomPoints.get(pointIndex);
+					point = roundLatLonViaString(randomPoints.get(pointIndex));
 					double km = MapUtils.getDistance(prevPoint, point) / 1000;
 					if (km >= minDistanceKm && km <= maxDistanceKm && !avoidDupes.contains(point)) {
 						pointFound = true;
@@ -263,7 +271,7 @@ class RandomRouteGenerator {
 						double shift = meters / 111_000F; // enough approx meters to lat/lon
 						double lat = ll.getLatitude() + shift;
 						double lon = ll.getLongitude() + shift;
-						return new LatLon(lat, lon);
+						return roundLatLonViaString(new LatLon(lat, lon));
 					}
 				}
 				int n = 0;
