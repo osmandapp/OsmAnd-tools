@@ -42,6 +42,8 @@ public class Application  {
 		return args -> {
 			telegram.init();
 			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
+			HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 0;
+			HHRoutingConfig.STATS_VERBOSE_LEVEL = 0;
 //			HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1 ;
 //			HHRoutingConfig .STATS_VERBOSE_LEVEL = 1 ;
 			System.out.println("Application has started");
