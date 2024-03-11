@@ -47,14 +47,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -74,7 +67,7 @@ import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
 
-@Controller
+@RestController
 @RequestMapping("/mapapi")
 public class MapApiController {
 
@@ -140,25 +133,18 @@ public class MapApiController {
 	JsonParser jsonParser = new JsonParser();
 
 	public static class UserPasswordPost {
+		// security alert: don’t add fields to this class
 		public String username;
 		public String password;
 		public String token;
-		public String lang;
-	}
-	
-	public static class EmailSenderInfo {
-		public String action;
-		public String lang;
 	}
 
 	@GetMapping(path = { "/auth/loginForm" }, produces = "text/html;charset=UTF-8")
-	@ResponseBody
 	public AbstractResource loginForm() {
 		return new ClassPathResource("/test-map-pro-login.html");
 	}
 
 	@GetMapping(path = { "/auth/info" }, produces = "application/json")
-	@ResponseBody
 	public String userInfo(java.security.Principal user) {
 		if (user == null) {
 			return gson.toJson(user);
@@ -181,25 +167,26 @@ public class MapApiController {
 	}
 
 	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
-	@ResponseBody
-	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost us, HttpServletRequest request, java.security.Principal user) throws ServletException {
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
 		if (user != null) {
 			request.logout();
 		}
-		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(us.username, us.password);
-		try {
-			//Authentication res = 
-			authManager.authenticate(pwt);
-			// System.out.println(res);
-		} catch (AuthenticationException e) {
-			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", us.username));
+		String username = credentials.username;
+		String password = credentials.password;
+		if (username == null || password == null) {
+			return ResponseEntity.badRequest().body("Username and password are required");
 		}
-		request.login(us.username, us.password); // SecurityContextHolder.getContext().getAuthentication();
+		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(username, password);
+		try {
+			authManager.authenticate(pwt);
+		} catch (AuthenticationException e) {
+			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", username));
+		}
+		request.login(username, password);
 		return okStatus();
 	}
 	
 	@PostMapping(path = {"/auth/delete-account"})
-	@ResponseBody
 	public ResponseEntity<String> deleteAccount(@RequestParam String token, HttpServletRequest request)
 			throws ServletException {
 		PremiumUserDevice dev = checkUser();
@@ -208,32 +195,37 @@ public class MapApiController {
 		}
 		return userdataService.deleteAccount(token, dev, request);
 	}
-
+	
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
-	@ResponseBody
-	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
-			throws ServletException, IOException {
-		ResponseEntity<String> res = userdataService.webUserActivate(us.username, us.token, us.password);
+	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.username;
+		String password = credentials.password;
+		String token = credentials.token;
+		if (username == null || password == null || token == null) {
+			return ResponseEntity.badRequest().body("Username, password and token are required");
+		}
+		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password);
 		if (res.getStatusCodeValue() < 300) {
 			request.logout();
-			request.login(us.username, us.password);
+			request.login(username, password);
 			return okStatus();
 		}
 		return res;
 	}
 
 	@PostMapping(path = { "/auth/logout" }, consumes = "application/json", produces = "application/json")
-	@ResponseBody
 	public ResponseEntity<String> logoutMapUser(HttpServletRequest request) throws ServletException {
 		request.logout();
 		return okStatus();
 	}
 
 	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
-	@ResponseBody
-	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost us, HttpServletRequest request)
-			throws ServletException, IOException {
-		return userdataService.webUserRegister(us.username, us.lang);
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) throws IOException {
+		String username = credentials.username;
+		if (username == null) {
+			return ResponseEntity.badRequest().body("Username is required");
+		}
+		return userdataService.webUserRegister(username, lang);
 	}
 	
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
@@ -250,7 +242,6 @@ public class MapApiController {
 	}
 	
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
-	@ResponseBody
 	public ResponseEntity<String> uploadFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                     @RequestParam String name, @RequestParam String type) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
@@ -266,7 +257,6 @@ public class MapApiController {
 	}
 	
 	@PostMapping(value = "/delete-file")
-	@ResponseBody
 	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
@@ -277,7 +267,6 @@ public class MapApiController {
 	}
 	
 	@PostMapping(value = "/delete-file-version")
-	@ResponseBody
 	public ResponseEntity<String> deleteFile(@RequestParam String name,
 	                                         @RequestParam String type,
 	                                         @RequestParam Long updatetime) {
@@ -290,7 +279,6 @@ public class MapApiController {
 	}
 	
 	@GetMapping(value = "/rename-file")
-	@ResponseBody
 	public ResponseEntity<String> renameFile(@RequestParam String oldName,
 	                                         @RequestParam String newName,
 	                                         @RequestParam String type,
@@ -306,7 +294,6 @@ public class MapApiController {
 	}
 	
 	@GetMapping(value = "/rename-folder")
-	@ResponseBody
 	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
 	                                           @RequestParam String type,
 	                                           @RequestParam String newFolderName) throws IOException {
@@ -318,7 +305,6 @@ public class MapApiController {
 	}
 	
 	@GetMapping(value = "/delete-folder")
-	@ResponseBody
 	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
 	                                           @RequestParam String type) {
 		PremiumUserDevice dev = checkUser();
@@ -329,7 +315,6 @@ public class MapApiController {
 	}
 	
 	@GetMapping(value = "/list-files")
-	@ResponseBody
 	public ResponseEntity<String> listFiles(
 			@RequestParam(name = "name", required = false) String name,
 			@RequestParam(name = "type", required = false) String type,
@@ -418,7 +403,6 @@ public class MapApiController {
 	}
 	
 	@GetMapping(value = "/download-file")
-	@ResponseBody
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
@@ -436,7 +420,6 @@ public class MapApiController {
 	}
 	
 	@GetMapping(value = "/get-gpx-info")
-	@ResponseBody
 	public ResponseEntity<String> getGpxInfo(HttpServletResponse response, HttpServletRequest request,
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
@@ -489,7 +472,6 @@ public class MapApiController {
 	
 
 	@GetMapping(path = {"/get-srtm-gpx-info"}, produces = "application/json")
-	@ResponseBody
 	public ResponseEntity<String> getSrtmGpx(HttpServletResponse response, HttpServletRequest request,
 			@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type,
@@ -520,7 +502,6 @@ public class MapApiController {
 	}
 	
 	@PostMapping(value = "/download-backup")
-	@ResponseBody
 	public void createBackup(HttpServletResponse response,
 	                         @RequestParam(name = "updatetime", required = false) boolean includeDeleted,
 	                         @RequestParam String format,
@@ -538,7 +519,6 @@ public class MapApiController {
 	}
 	
 	@PostMapping(value = "/download-backup-folder")
-	@ResponseBody
 	public void createBackupFolder(@RequestParam String format,
 	                               @RequestParam String folderName,
 	                               @RequestParam String type,
@@ -556,14 +536,12 @@ public class MapApiController {
 	}
 	
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
-	@ResponseBody
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
 		return okStatus();
 	}
 	
 	@RequestMapping(path = {"/download-obf"})
-	@ResponseBody
 	public ResponseEntity<Resource> downloadObf(HttpServletResponse response, @RequestBody List<String> names)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		PremiumUserDevice dev = checkUser();
@@ -604,7 +582,6 @@ public class MapApiController {
 	}
 	
 	@GetMapping(path = {"/get-account-info"})
-	@ResponseBody
 	public ResponseEntity<String> getAccountInfo() {
 		final String ACCOUNT_KEY = "account";
 		final String FREE_ACCOUNT = "Free";
@@ -642,43 +619,71 @@ public class MapApiController {
 	}
 	
 	@PostMapping(path = {"/auth/send-code"})
-	@ResponseBody
-	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data) {
+	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang) {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		return userdataService.sendCode(data.action, data.lang, dev);
+		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			return ResponseEntity.badRequest().body("User not found");
+		}
+		return userdataService.sendCode(action, lang, pu);
 	}
 	
-	@PostMapping(path = {"/auth/confirm-code"})
-	@ResponseBody
-	public ResponseEntity<String> confirmCode(@RequestBody String code) {
-		PremiumUserDevice dev = checkUser();
-		if (dev == null) {
-			return tokenNotValid();
-		}
-		return userdataService.confirmCode(code, dev);
-	}
-	
-	@PostMapping(path = {"/auth/change-email"})
-	@ResponseBody
-	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost us, HttpServletRequest request) throws ServletException {
-		if (us.username != null) {
-			us.username = us.username.toLowerCase().trim();
-		}
-		if (emailSender.isEmail(us.username)) {
+	@PostMapping(path = {"/auth/send-code-to-new-email"})
+	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
+		if (emailSender.isEmail(email)) {
 			PremiumUserDevice dev = checkUser();
 			if (dev == null) {
 				return tokenNotValid();
 			}
-			return userdataService.changeEmail(us, dev, request);
+			// check token from old email
+			PremiumUsersRepository.PremiumUser currentAcc = usersRepository.findById(dev.userid);
+			if (currentAcc == null) {
+				return ResponseEntity.badRequest().body("User is not registered");
+			}
+			ResponseEntity<String> response = userdataService.confirmCode(currentAcc.email, code);
+			if (!response.getStatusCode().is2xxSuccessful()) {
+				return response;
+			}
+			// check if new email is not registered
+			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+			if (pu != null) {
+				return ResponseEntity.badRequest().body("User was already registered with such email");
+			}
+			// create temp user with new email
+			pu = new PremiumUsersRepository.PremiumUser();
+			pu.email = email;
+			pu.regTime = new Date();
+			pu.orderid = null;
+			usersRepository.saveAndFlush(pu);
+			
+			// send code to new email
+			return userdataService.sendCode(action, lang, pu);
+		}
+		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+	
+	@PostMapping(path = {"/auth/change-email"})
+	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+		String username = credentials.username;
+		String token = credentials.token;
+		if (username == null || token == null) {
+			return ResponseEntity.badRequest().body("Username and token are required");
+		}
+		username = username.toLowerCase().trim();
+		if (emailSender.isEmail(username)) {
+			PremiumUserDevice dev = checkUser();
+			if (dev == null) {
+				return tokenNotValid();
+			}
+			return userdataService.changeEmail(username, token, dev, request);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 	
 	@GetMapping(path = {"/regions-by-latlon"})
-	@ResponseBody
 	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
 		List<String> regions = new ArrayList<>();
 		if(osmandRegions == null) {
