@@ -13,6 +13,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.server.api.services.StorageService;
 
+import javax.imageio.spi.IIORegistry;
+import javax.imageio.spi.ImageReaderSpi;
+import java.util.ServiceLoader;
+
 @SpringBootApplication
 @EnableScheduling
 @EnableJpaAuditing
@@ -36,6 +40,37 @@ public class Application  {
 			telegram.init();
 			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
 			System.out.println("Application has started");
+			configureImageIO();
 		};
+	}
+	
+	public void configureImageIO() {
+		IIORegistry registry = IIORegistry.getDefaultInstance();
+		
+		ImageReaderSpi twelvemonkeysSpi = null;
+		ImageReaderSpi geoSolutionsSpi = null;
+		
+		try {
+			Class<?> twelvemonkeysTiffReaderClass = Class.forName("com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReaderSpi");
+			Class<?> geoSolutionsTiffReaderClass = Class.forName("it.geosolutions.imageioimpl.plugins.tiff.TIFFImageReaderSpi");
+			
+			for (ImageReaderSpi spi : ServiceLoader.load(ImageReaderSpi.class)) {
+				if (twelvemonkeysTiffReaderClass.isInstance(spi)) {
+					twelvemonkeysSpi = spi;
+				} else if (geoSolutionsTiffReaderClass.isInstance(spi)) {
+					geoSolutionsSpi = spi;
+				}
+			}
+			
+			if (twelvemonkeysSpi != null && geoSolutionsSpi != null) {
+				registry.setOrdering(ImageReaderSpi.class, twelvemonkeysSpi, geoSolutionsSpi);
+				System.out.println("The ImageIO service provider order has been successfully set.");
+			} else {
+				System.err.println("Failed to find the required service providers to set the order.");
+			}
+			
+		} catch (ClassNotFoundException e) {
+			System.err.println("One of the service provider classes was not found: " + e.getMessage());
+		}
 	}
 }
