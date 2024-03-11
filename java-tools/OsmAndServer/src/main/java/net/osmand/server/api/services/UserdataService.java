@@ -976,17 +976,4 @@ public class UserdataService {
         
         return ok();
     }
-    
-    @Scheduled(fixedDelay = 1000 * 60 * 60 * 24)
-    public void deleteTempUsers() {
-        List<PremiumUser> tempUsers = usersRepository.findPremiumUsersByOrderidAndTokendevice(null, null);
-        if (tempUsers != null) {
-            for (PremiumUser tempUser : tempUsers) {
-                if (tempUser.tokenTime == null
-                        || (System.currentTimeMillis() - tempUser.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS))) {
-                    usersRepository.delete(tempUser);
-                }
-            }
-        }
-    }
 }
