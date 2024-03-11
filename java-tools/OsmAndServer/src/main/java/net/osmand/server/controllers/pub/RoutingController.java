@@ -189,7 +189,10 @@ public class RoutingController {
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
 				"[Dev] Use C++ for routing", false);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
-				"[Dev] Use C++ to runNativeSearchGpxRoute", false);
+				"[Dev] Use C++ approximation", false);
+		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development", 
+				"[Dev] Use separate maps", false);
+		
 		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
 				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
 		calcMode.section = "Development";
@@ -210,7 +213,7 @@ public class RoutingController {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
 						routingService.fillRoutingModeParams(
-								Arrays.asList(hhRouting, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
+								Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps, calcMode), shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
