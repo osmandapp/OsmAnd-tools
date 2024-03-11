@@ -1,11 +1,29 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.util.MapUtils.rhumbDestinationPoint;
+
 import java.awt.image.BufferedImage;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
@@ -14,10 +32,6 @@ import java.util.zip.ZipInputStream;
 import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
-import net.osmand.IndexConstants;
-import net.osmand.map.WorldRegion;
-import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -40,6 +54,7 @@ import org.springframework.web.client.RestTemplate;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
+import net.osmand.IndexConstants;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
@@ -57,11 +72,11 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXUtilities.TrkSegment;
 import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter;
-import net.osmand.router.HHRoutePlanner;
-import net.osmand.router.GeneralRouter.GeneralRouterProfile;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
@@ -77,10 +92,9 @@ import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
+import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import static net.osmand.util.MapUtils.rhumbDestinationPoint;
 
 @Service
 public class OsmAndMapsService {
@@ -144,7 +158,8 @@ public class OsmAndMapsService {
 		@Override
 		public String toString() {
 			String p = profile.length() > 5 ? profile.substring(0, 5) : profile;
-			return (locked == 0 ? "+" : "-")
+			// \uFE0E
+			return (locked == 0 ? "\u25FB︎" : "\u25FC")
 					+ String.format("%s %s %d, %s min", p, routeParamsStr, used, (System.currentTimeMillis() - created) / 60 / 1000);
 		}
 
@@ -291,7 +306,7 @@ public class OsmAndMapsService {
 					removed.add(routingCaches.remove(i));
 				} else {
 					i++;
-					if (check.locked == 0) {
+					if (check.locked == 0 && check.hCtx != null) {
 						check.hCtx.clearSegments();
 					}
 				}
@@ -1144,9 +1159,13 @@ public class OsmAndMapsService {
 				if (!best.routeParamsStr.equals(rp.routeParams.toString())) {
 					best.routeParamsStr = rp.routeParams.toString();
 					GeneralRouter oldRouter = best.rCtx.config.router;
+					oldRouter.clearCaches();
 					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
 					best.rCtx.setRouter(newRouter);
-					// best.hCtx.clearSegments(); // segments could be affected by params recalculation
+					newRouter.clearCaches();
+					if (best.hCtx != null) {
+						best.hCtx.clearSegments(); // segments could be affected by params recalculation
+					}
 				}
 				if (rp.disableHHRouting) {
 					router.disableHHRoutingConfig();
