@@ -66,7 +66,7 @@ class RandomRouteGenerator {
 								if (entry.profile.equals(param)) {
 									continue; // /profile/,param1,param2 -> param1,param2 (ignore profile in params)
 								}
-								if ("hhoff".equals(param) || "hhonly".equals(param) || "nativerouting".equals(param)) {
+								if (param.startsWith("hhoff") || param.startsWith("hhonly") || param.startsWith("nativerouting")) {
 									continue; // do not use routing-type specification from params
 								}
 								entry.params.add(param);
