@@ -115,6 +115,7 @@ dependencies {
 
     testImplementation "com.github.tomakehurst:wiremock-standalone:2.18.0"
 
-    implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.7.0'
+    implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.10.1'
+    implementation 'com.twelvemonkeys.imageio:imageio-core:3.10.1'
     implementation 'it.geosolutions.imageio-ext:imageio-ext-tiff:1.4.6'
 }
