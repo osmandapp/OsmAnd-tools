@@ -41,9 +41,9 @@ public class Application  {
 	public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
 		return args -> {
 			telegram.init();
-			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
-			HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1 ;
-			HHRoutingConfig .STATS_VERBOSE_LEVEL = 1 ;
+			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
+//			HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1 ;
+//			HHRoutingConfig .STATS_VERBOSE_LEVEL = 1 ;
 			System.out.println("Application has started");
 			configureImageIO();
 		};
