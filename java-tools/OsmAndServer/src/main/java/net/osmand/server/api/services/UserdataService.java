@@ -35,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -882,11 +883,10 @@ public class UserdataService {
     }
     
     @Transactional
-    public ResponseEntity<String> sendCode(String action, String lang, PremiumUserDevicesRepository.PremiumUserDevice dev) {
-		if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
-			return ok();
-		}
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+    public ResponseEntity<String> sendCode(String action, String lang, PremiumUsersRepository.PremiumUser pu) {
+        if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
+            return ok();
+        }
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
@@ -895,6 +895,7 @@ public class UserdataService {
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
+        
         return ok();
     }
     
@@ -905,43 +906,74 @@ public class UserdataService {
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
         if (pu.token.equals(code) && !tokenExpired) {
+            clearToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
         }
     }
     
-    public ResponseEntity<String> confirmCode(MapApiController.UserPasswordPost us) {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(us.username);
+    public ResponseEntity<String> confirmCode(String username, String token) {
+        if (token == null) {
+            return ResponseEntity.badRequest().body("Token is not valid");
+        }
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(username);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
-        if (pu.token.equals(us.token) && !tokenExpired) {
+        if (pu.token.equals(token) && !tokenExpired) {
+            clearToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
         }
     }
     
+    public void clearToken(PremiumUsersRepository.PremiumUser pu) {
+        pu.token = null;
+        pu.tokenTime = null;
+        usersRepository.saveAndFlush(pu);
+    }
     
-    public ResponseEntity<String> changeEmail(MapApiController.UserPasswordPost us, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
-        if (pu == null) {
+    
+    public ResponseEntity<String> changeEmail(String username, String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+        // validate new email
+        PremiumUsersRepository.PremiumUser tempUser = usersRepository.findByEmail(username);
+        if (tempUser == null) {
+            return ResponseEntity.badRequest().body("Something went wrong with your new email");
+        }
+        if (tempUser.orderid != null) {
+            String errorMsg = userSubService.checkOrderIdPremium(tempUser.orderid);
+            if (errorMsg != null) {
+                return ResponseEntity.badRequest().body("You can't change email, because you have subscription on new email");
+            }
+        } else {
+            List<PremiumUserFilesRepository.UserFileNoData> allFiles = filesRepository.listFilesByUserid(tempUser.id, null, null);
+            if (!allFiles.isEmpty()) {
+                return ResponseEntity.badRequest().body("You can't change email, because you have files in account on new email");
+            }
+        }
+        List<PremiumUserDevicesRepository.PremiumUserDevice> devices = devicesRepository.findByUserid(tempUser.id);
+        if (!devices.isEmpty()) {
+            return ResponseEntity.badRequest().body("You can't change email, because you have devices in account on new email");
+        }
+        // validate token
+        ResponseEntity<String> response = confirmCode(username, token);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            return response;
+        }
+        // validate current user
+        PremiumUsersRepository.PremiumUser currentUser = usersRepository.findById(dev.userid);
+        if (currentUser == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        try {
-            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
-            if (pu.token.equals(us.token) && !tokenExpired) {
-                pu.email = us.username;
-                usersRepository.saveAndFlush(pu);
-                request.logout();
-                return ok();
-            }
-        } catch (DataIntegrityViolationException e) {
-            LOG.warn(e.getMessage(), e);
-            return ResponseEntity.badRequest().body("User with this email already exist");
-        }
-        return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+        // change email
+        usersRepository.delete(tempUser);
+        currentUser.email = username;
+        usersRepository.saveAndFlush(currentUser);
+        request.logout();
+        
+        return ok();
     }
 }
