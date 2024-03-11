@@ -937,9 +937,7 @@ public class OsmAndMapsService {
 		} else {
 			router.setHHRouteCpp(rp.useNativeLib);
 			router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
-			HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null);
-			hhConfig.STATS_VERBOSE_LEVEL = 0;
-			router.setHHRoutingConfig(hhConfig);
+			router.setDefaultHHRoutingConfig();
 		}
 		router.setUseNativeApproximation(rp.useNativeApproximation);
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
@@ -1148,6 +1146,7 @@ public class OsmAndMapsService {
 					GeneralRouter oldRouter = best.rCtx.config.router;
 					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
 					best.rCtx.setRouter(newRouter);
+					// best.hCtx.clearSegments(); // segments could be affected by params recalculation
 				}
 				if (rp.disableHHRouting) {
 					router.disableHHRoutingConfig();
@@ -1164,8 +1163,7 @@ public class OsmAndMapsService {
 		RoutingCacheContext cs = new RoutingCacheContext();
 		cs.locked = System.currentTimeMillis();
 		cs.created = System.currentTimeMillis();
-		cs.hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cs.hCtx);
-		cs.hhConfig.STATS_VERBOSE_LEVEL = 0;
+		cs.hhConfig = RoutePlannerFrontEnd.defaultHHConfig().cacheContext(cs.hCtx);
 		cs.routeParamsStr = rp.routeParams.toString();
 		cs.profile = rp.routeProfile;
 		int sameProfileSize = 0, all = 0;

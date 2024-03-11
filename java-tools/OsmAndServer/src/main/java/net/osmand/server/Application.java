@@ -10,6 +10,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
+import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.server.api.services.StorageService;
 
@@ -34,7 +37,9 @@ public class Application  {
 	public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
 		return args -> {
 			telegram.init();
-			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
+			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
+			HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1 ;
+			HHRoutingConfig .STATS_VERBOSE_LEVEL = 1 ;
 			System.out.println("Application has started");
 		};
 	}
