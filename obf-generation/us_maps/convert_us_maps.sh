@@ -22,6 +22,15 @@ roads_shp_filename="S_USA.RoadCore_FS"
 nfs_rec_area_activities_source_filename="S_USA.RECAREAACTIVITIES_V"
 blm_roads_trails_name="blm_roads_trails"
 blm_recreation_site_source_filename="BLM_Natl_Recreation_Site_Points"
+private_lands_test_source_filename="in_marion"
+
+process_nfs_trails=false
+process_nfs_roads=false
+process_nfs_rec_area_activities=false
+process_nfs_trails=false
+process_blm_roads_trails=false
+process_blm_recreation_site_points=false
+process_private_lands_test=false
 
 mkdir -p $work_dir/$source_dir_name
 mkdir -p $work_dir/$source_original_dir_name
@@ -44,7 +53,7 @@ export dir
 function generate_osm_from_shp {
 	ogr2ogr $work_dir/$tmp_dir/$1.shp $work_dir/$source_dir_name/$1.shp -explodecollections
 	cd $dir/$ogr2osm_dir
-	python3 -m ogr2osm --suppress-empty-tags $work_dir/$tmp_dir/$1.shp -o $work_dir/$out_osm_dir/us_$2.osm -t $2.py
+	time python3 -m ogr2osm --suppress-empty-tags $work_dir/$tmp_dir/$1.shp -o $work_dir/$out_osm_dir/us_$2.osm -t $2.py
 }
 
 function download_blm_roads_trails {
@@ -66,53 +75,59 @@ function download_blm_roads_trails {
 	python3 $dir/add_file_name_field.py $work_dir/$source_original_dir_name/blm/BLM_Natl_GTLF_Public_Not_Assessed_Trails.shp || if [[ $? == 1 ]]; then exit 1; fi
 }
 # National Forest System Trails
-cd $work_dir/$source_dir_name
-if [ ! -f $work_dir/$source_dir_name/$trails_shp_filename.shp ]; then
-	wget "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.TrailNFS_Publish.zip" -nc -O- | bsdtar -xvf-
-fi
-if [ ! -f "$work_dir/$out_osm_dir/us_nfs_trails.osm" ] ; then
-	echo ==============Generating $trails_shp_filename
-	generate_osm_from_shp "$trails_shp_filename" "nfs_trails"
+if [[ $process_nfs_trails == true ]] ; then
+	cd $work_dir/$source_dir_name
+	if [ ! -f $work_dir/$source_dir_name/$trails_shp_filename.shp ]; then
+		wget "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.TrailNFS_Publish.zip" -nc -O- | bsdtar -xvf-
+	fi
+	if [ ! -f "$work_dir/$out_osm_dir/us_nfs_trails.osm" ] ; then
+		echo ==============Generating $trails_shp_filename
+		generate_osm_from_shp "$trails_shp_filename" "nfs_trails"
+	fi
 fi
 
 # National Forest System Roads
-if [ ! -f $work_dir/$source_dir_name/$roads_shp_filename.shp ]; then
-	wget "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.RoadCore_FS.zip" -nc -O- | bsdtar -xvf-
-fi
-if [ ! -f "$work_dir/$out_osm_dir/us_nfs_roads.pbf" ] ; then
-	echo ==============Generating $roads_shp_filename
-	generate_osm_from_shp "$roads_shp_filename" "nfs_roads"
-	osmconvert $work_dir/$out_osm_dir/us_nfs_roads.osm --out-pbf > $work_dir/$out_osm_dir/us_nfs_roads.pbf
-	rm $work_dir/$out_osm_dir/us_nfs_roads.osm
+if [[ $process_nfs_roads == true ]] ; then
+	if [ ! -f $work_dir/$source_dir_name/$roads_shp_filename.shp ]; then
+		wget "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.RoadCore_FS.zip" -nc -O- | bsdtar -xvf-
+	fi
+	if [ ! -f "$work_dir/$out_osm_dir/us_nfs_roads.pbf" ] ; then
+		echo ==============Generating $roads_shp_filename
+		generate_osm_from_shp "$roads_shp_filename" "nfs_roads"
+		time osmconvert $work_dir/$out_osm_dir/us_nfs_roads.osm --out-pbf > $work_dir/$out_osm_dir/us_nfs_roads.pbf
+		rm $work_dir/$out_osm_dir/us_nfs_roads.osm
+	fi
 fi
 
 # NFS Recreation Area Activities
-wget "https://data.fs.usda.gov/geodata/edw/edw_resources/fc/S_USA.RECAREAACTIVITIES_V.gdb.zip" -nc -O "$work_dir/$source_dir_name/$nfs_rec_area_activities_source_filename.gdb.zip"
-if [ ! -f "$work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm" ] ; then
-	echo ==============Generating $nfs_rec_area_activities_source_filename
-	if [[ -f $work_dir/$source_dir_name/$nfs_rec_area_activities_source_filename.gpkg ]] ; then
-		rm $work_dir/$source_dir_name/$nfs_rec_area_activities_source_filename.gpkg
+if [[ $process_nfs_rec_area_activities == true ]] ; then
+	wget "https://data.fs.usda.gov/geodata/edw/edw_resources/fc/S_USA.RECAREAACTIVITIES_V.gdb.zip" -nc -O "$work_dir/$source_dir_name/$nfs_rec_area_activities_source_filename.gdb.zip"
+	if [ ! -f "$work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm" ] ; then
+		echo ==============Generating $nfs_rec_area_activities_source_filename
+		if [[ -f $work_dir/$source_dir_name/$nfs_rec_area_activities_source_filename.gpkg ]] ; then
+			rm $work_dir/$source_dir_name/$nfs_rec_area_activities_source_filename.gpkg
+		fi
+		if [[ -f $work_dir/$tmp_dir/${nfs_rec_area_activities_source_filename}_agg.gpkg ]] ; then
+			rm $work_dir/$tmp_dir/${nfs_rec_area_activities_source_filename}_agg.gpkg
+		fi
+		ogr2ogr $work_dir/$tmp_dir/$nfs_rec_area_activities_source_filename.gpkg $work_dir/$source_original_dir_name/$nfs_rec_area_activities_source_filename.gdb.zip -explodecollections
+		cp $dir/$aggregate_nfs_rec_area_activities_template_name.py $work_dir/$tmp_dir/
+		sed -i "s,INPUT_FILE,$work_dir/$tmp_dir/$nfs_rec_area_activities_source_filename.gpkg,g" $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
+		sed -i "s,OUTPUT_FILE,$work_dir/$source_dir_name/${nfs_rec_area_activities_source_filename}_agg.gpkg,g" $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
+		time python3 $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
+		cd $dir/$ogr2osm_dir && python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir_name/${nfs_rec_area_activities_source_filename}_agg.gpkg -o $work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm -t nfs_rec_area_activities.py
 	fi
-	if [[ -f $work_dir/$tmp_dir/${nfs_rec_area_activities_source_filename}_agg.gpkg ]] ; then
-		rm $work_dir/$tmp_dir/${nfs_rec_area_activities_source_filename}_agg.gpkg
-	fi
-	ogr2ogr $work_dir/$tmp_dir/$nfs_rec_area_activities_source_filename.gpkg $work_dir/$source_original_dir_name/$nfs_rec_area_activities_source_filename.gdb.zip -explodecollections
-	cp $dir/$aggregate_nfs_rec_area_activities_template_name.py $work_dir/$tmp_dir/
-	sed -i "s,INPUT_FILE,$work_dir/$tmp_dir/$nfs_rec_area_activities_source_filename.gpkg,g" $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
-	sed -i "s,OUTPUT_FILE,$work_dir/$source_dir_name/${nfs_rec_area_activities_source_filename}_agg.gpkg,g" $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
-	python3 $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
-	cd $dir/$ogr2osm_dir && python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir_name/${nfs_rec_area_activities_source_filename}_agg.gpkg -o $work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm -t nfs_rec_area_activities.py
 fi
 
 # BLM Roads and Trails
-if [ ! -f "$work_dir/$out_osm_dir/us_blm_roads_trails.osm" ] ; then
+if [[ $process_nfs_rec_area_activities == true ]] && [ ! -f "$work_dir/$out_osm_dir/us_blm_roads_trails.osm" ]; then
 	if [ -d $work_dir/$source_original_dir_name/blm ]; then
 		rm -f $work_dir/$source_original_dir_name/blm/*.*
 	else
 		mkdir -p $work_dir/$source_original_dir_name/blm
 	fi
 	download_blm_roads_trails
-	ogrmerge.py -single -overwrite_ds -f "ESRI Shapefile" -o $work_dir/$source_dir_name/$blm_roads_trails_name.shp *.shp
+	time ogrmerge.py -single -overwrite_ds -f "ESRI Shapefile" -o $work_dir/$source_dir_name/$blm_roads_trails_name.shp *.shp
 	rm -rf $work_dir/$source_original_dir_name/blm
 
 	echo ==============Generating $blm_roads_trails_name
@@ -120,17 +135,26 @@ if [ ! -f "$work_dir/$out_osm_dir/us_blm_roads_trails.osm" ] ; then
 fi
 
 # BLM Recreation Site Points
-if [ ! -f "$work_dir/$out_osm_dir/us_blm_rec_area_activities.osm" ] ; then
+if [[ $process_blm_recreation_site_points == true ]] && [ ! -f "$work_dir/$out_osm_dir/us_blm_rec_area_activities.osm" ]; then
 	wget "https://opendata.arcgis.com/api/v3/datasets/7438e9e800914c94bad99f70a4f2092d_1/downloads/data?format=fgdb&spatialRefId=4269&where=1%3D1" -nc -O $work_dir/$source_dir_name/$blm_recreation_site_source_filename.gdb.zip
 	echo ==============Generating $blm_recreation_site_source_filename
-	cd $dir/$ogr2osm_dir && python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir_name/$blm_recreation_site_source_filename.gdb.zip -o $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm -t blm_recreation_site.py
+	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir_name/$blm_recreation_site_source_filename.gdb.zip -o $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm -t blm_recreation_site.py
+fi
+
+# Private lands test (Dallas)
+if [[ $process_private_lands_test == true ]] && [ ! -f "$work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm" ]; then
+	echo ==============Generating $private_lands_test_source_filename
+	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir_name/${private_lands_test_source_filename}.gpkg -o $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm -t private_lands_regrid.py
+	osmconvert $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm --out-pbf > $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.pbf
+# 	rm -f $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm
 fi
 
 
 
 cd $work_dir/$out_obf_dir
-bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_blm_roads_trails.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_trails.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_roads.pbf --poi-types=$poi_types_path --rendering-types=$rendering_types_path
+# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
+# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_blm_roads_trails.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
+# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_trails.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
+# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
+# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_roads.pbf --poi-types=$poi_types_path --rendering-types=$rendering_types_path
+bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.pbf --poi-types=$poi_types_path --rendering-types=$rendering_types_path

@@ -4,7 +4,7 @@
 -- create database changeset owner test;
 -- psql -U test -d changeset
 /*  DDL for changeset database */
-
+-- SET ROLE changeset_user ; /*  inside admin user */
 CREATE TABLE pending_changesets (id bigint, created_at text) ;
 CREATE TABLE changesets (id bigint, bot int, created_at timestamp, closed_at timestamp, username text, closed_at_day text, uid text, created_by text, minlat float, minlon float, maxlat float, maxlon float, changes_count int, PRIMARY KEY(id));
 CREATE TABLE countries(id int, parentid int, name text, fullname text, downloadname text, clat float, clon float,  map int, PRIMARY KEY(id));

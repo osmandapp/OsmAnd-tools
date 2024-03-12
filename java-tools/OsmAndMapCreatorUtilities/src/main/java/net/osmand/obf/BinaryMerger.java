@@ -199,7 +199,7 @@ public class BinaryMerger {
 		boolean skipExisting = false;
 		boolean ignoreFailures = true;
 		String filter = null;
-		for(String arg : args) {
+		for (String arg : args) {
 			String val = null;
 			String[] s = arg.split("=");
 			String key = s[0];
@@ -209,7 +209,8 @@ public class BinaryMerger {
 			if (key.equals("--map")) {
 				mapFiles = true;
 				roadFiles = false;
-			} if (key.equals("--road")) {
+			}
+			if (key.equals("--road")) {
 				roadFiles = true;
 				mapFiles = false;
 			} else if (key.equals("--filter")) {
@@ -250,6 +251,9 @@ public class BinaryMerger {
 				sargs.add("--poi");
 				sargs.add("--hhindex");
 				for (CountryRegion reg : list) {
+					if (!reg.map) {
+						continue;
+					}
 					File fl = getExistingFile(pathWithGeneratedMapZips, reg, road ? roadExt : mapExt);
 					if (!fl.exists() && road) {
 						fl = getExistingFile(pathWithGeneratedMapZips, reg, mapExt);
