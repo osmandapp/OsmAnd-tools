@@ -1185,8 +1185,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
 					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom);
-					NativeLibrary.RenderingGenerationResult result = nativeLibRendering.renderImage(lastContext);
-					nativeRenderingImg = result.getImg();
+					NativeJavaRendering.RenderingImageResult result = nativeLibRendering.renderImage(lastContext);
+					nativeRenderingImg = result.getImage();
 					Rect rect = new Rect();
 					rect.left31 = sleft;
 					rect.top31 = stop;

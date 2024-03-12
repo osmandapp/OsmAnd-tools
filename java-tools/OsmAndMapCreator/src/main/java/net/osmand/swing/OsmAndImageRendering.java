@@ -276,9 +276,9 @@ public class OsmAndImageRendering {
 					final String fileName = ic.generateName + ".png";
 					System.out.println("Generate to " + fileName);
 					nsr.loadRuleStorage(ic.renderingStyle, ic.renderingProperties);
-					NativeLibrary.RenderingGenerationResult generationResult = nsr.renderImage(
+					NativeJavaRendering.RenderingImageResult generationResult = nsr.renderImage(
 							new RenderingImageContext(lat, lon, imageWidth, imageHeight, ic.zoom, ic.mapDensity));
-					BufferedImage mg = generationResult.getImg();
+					BufferedImage mg = generationResult.getImage();
 					ImageWriter writer = ImageIO.getImageWritersBySuffix("png").next();
 
 					if (html != null) {

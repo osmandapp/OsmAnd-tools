@@ -772,10 +772,11 @@ public class OsmAndMapsService {
 				return ResponseEntity.badRequest().body(String.format("Metatile has wrong size (%d != %d)", imgTileSize,
 						ctx.width << tile.tileSizeLog));
 			}
-			NativeLibrary.RenderingGenerationResult result = nativelib.renderImage(ctx);
-			tile.runtimeImage = result.getImg();
+			
+			NativeJavaRendering.RenderingImageResult result = nativelib.renderImage(ctx);
+			tile.runtimeImage = result.getImage();
 			if (tile.runtimeImage != null) {
-				tile.setInfo(result.getInfo());
+				tile.setInfo(result.getGenerationResult().getInfo());
 				File cacheFile = tile.getCacheFile(".png");
 				if (cacheFile != null) {
 					cacheFile.getParentFile().mkdirs();

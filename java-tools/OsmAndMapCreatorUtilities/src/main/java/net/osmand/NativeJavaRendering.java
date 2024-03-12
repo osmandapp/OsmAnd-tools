@@ -360,8 +360,26 @@ public class NativeJavaRendering extends NativeLibrary {
 		return generationResult;
 	}
 	
+	public static class RenderingImageResult {
+		private final BufferedImage img;
+		private final RenderingGenerationResult generationResult;
+		
+		RenderingImageResult(BufferedImage img, RenderingGenerationResult result) {
+			this.img = img;
+			this.generationResult = result;
+		}
+		
+		public BufferedImage getImage() {
+			return img;
+		}
+		
+		public RenderingGenerationResult getGenerationResult() {
+			return generationResult;
+		}
+		
+	}
 	
-	public RenderingGenerationResult renderImage(RenderingImageContext renderingImageContext) throws IOException {
+	public RenderingImageResult renderImage(RenderingImageContext renderingImageContext) throws IOException {
 		RenderingGenerationResult generationResult = render(renderingImageContext);
 		InputStream inputStream = new InputStream() {
 			int nextInd = 0;
@@ -383,9 +401,8 @@ public class NativeJavaRendering extends NativeLibrary {
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
 		AllocationUtil.freeDirectBuffer(generationResult.getBitmapBuffer());
-		generationResult.setImg(img);
 		
-		return generationResult;
+		return new RenderingImageResult(img, generationResult);
 	}
 
 	public void initFilesInDir(File filesDir) throws IOException {
