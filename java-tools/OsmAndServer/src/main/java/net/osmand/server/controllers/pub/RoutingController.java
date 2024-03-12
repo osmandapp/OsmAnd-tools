@@ -219,7 +219,7 @@ public class RoutingController {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
 					routingService.fillRoutingModeParams(
-							Arrays.asList(hhRouting, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
+							Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps, calcMode), shortWay, e, rm);
 				}
 			}
 		}
