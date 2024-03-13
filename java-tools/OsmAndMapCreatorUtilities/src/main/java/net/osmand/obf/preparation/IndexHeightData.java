@@ -4,11 +4,7 @@ import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferFloat;
 import java.awt.image.DataBufferShort;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -106,8 +102,8 @@ public class IndexHeightData {
 			File f = loadFile(getFileName() + ".tif", srtmDataUrl, workDir);
 			BufferedImage img;
 			if (f.exists()) {
-				try {
-					img = ImageIO.read(f);
+				try (FileInputStream fis = new FileInputStream(f)) {
+					img = ImageIO.read(fis);
 					readSRTMData(img);
 				} catch (Exception e) {
 					iterativeReadData(f);
@@ -126,11 +122,12 @@ public class IndexHeightData {
 			boolean readSuccess = false;
 			BufferedImage img = null;
 			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
+			ImageInputStream iis = null;
 			while (readers.hasNext() && !readSuccess) {
 				ImageReader reader = readers.next();
 				if (!(reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader)) {
 					try {
-						ImageInputStream iis = ImageIO.createImageInputStream(file);
+						iis = ImageIO.createImageInputStream(file);
 						reader.setInput(iis, true);
 						img = reader.read(0);
 						readSRTMData(img);
@@ -139,6 +136,13 @@ public class IndexHeightData {
 						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
 					} finally {
 						reader.dispose();
+						if (iis != null) {
+							try {
+								iis.close();
+							} catch (IOException e) {
+								log.error("Error closing ImageInputStream: " + e.getMessage());
+							}
+						}
 					}
 				}
 			}

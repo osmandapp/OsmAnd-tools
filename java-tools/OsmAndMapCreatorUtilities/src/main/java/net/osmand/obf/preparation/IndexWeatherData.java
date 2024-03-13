@@ -6,6 +6,7 @@ import org.apache.commons.logging.Log;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferFloat;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Iterator;
 
@@ -52,8 +53,8 @@ public class IndexWeatherData {
 		private BufferedImage readFile(File file) {
 			BufferedImage img = null;
 			if (file.exists()) {
-				try {
-					img = ImageIO.read(file);
+				try (FileInputStream fis = new FileInputStream(file)) {
+					img = ImageIO.read(fis);
 					readWeatherData(img);
 				} catch (Exception e) {
 					img = iterativeReadData(file);
@@ -66,11 +67,12 @@ public class IndexWeatherData {
 			boolean readSuccess = false;
 			BufferedImage img = null;
 			Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("tiff");
+			ImageInputStream iis = null;
 			while (readers.hasNext() && !readSuccess) {
 				ImageReader reader = readers.next();
 				if (!(reader instanceof com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReader)) {
 					try {
-						ImageInputStream iis = ImageIO.createImageInputStream(file);
+						iis = ImageIO.createImageInputStream(file);
 						reader.setInput(iis, true);
 						img = reader.read(0);
 						readWeatherData(img);
@@ -79,6 +81,13 @@ public class IndexWeatherData {
 						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
 					} finally {
 						reader.dispose();
+						if (iis != null) {
+							try {
+								iis.close();
+							} catch (IOException e) {
+								log.error("Error closing ImageInputStream: " + e.getMessage());
+							}
+						}
 					}
 				}
 			}
