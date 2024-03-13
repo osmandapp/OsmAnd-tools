@@ -207,21 +207,22 @@ public class RoutingController {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
+				List<RoutingController.RoutingParameter> passParams =
+						new ArrayList<>(Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps));
 				if (derivedProfiles != null) {
+					if ("car".equals(e.getKey())) {
+						passParams.add(calcMode); // only for car & derived from car
+					}
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
-						List<RoutingController.RoutingParameter> passParams = "car".equals(e.getKey())
-								? Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps, calcMode)
-								: Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps);
 						routingService.fillRoutingModeParams(passParams, shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
-					routingService.fillRoutingModeParams(
-							Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps), shortWay, e, rm);
+					routingService.fillRoutingModeParams(passParams, shortWay, e, rm);
 				}
 			}
 		}
