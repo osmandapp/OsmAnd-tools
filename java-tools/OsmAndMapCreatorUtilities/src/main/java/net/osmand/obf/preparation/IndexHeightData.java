@@ -106,13 +106,9 @@ public class IndexHeightData {
 			File f = loadFile(getFileName() + ".tif", srtmDataUrl, workDir);
 			BufferedImage img;
 			if (f.exists()) {
-				try {
-					img = ImageIO.read(f);
-					readSRTMData(img);
-				} catch (Exception e) {
-					log.info("Error reading tiff file, try iterative read " + getFileName() + " " + e.getMessage(), e);
-					iterativeReadData(f);
-				}
+				img = iterativeReadData(f);
+				readSRTMData(img);
+				
 				// remove all downloaded files to save disk space
 				if (!srtmDataUrl.startsWith("/") && !srtmDataUrl.startsWith(".")) {
 					f.delete();
@@ -129,16 +125,18 @@ public class IndexHeightData {
 				Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
 				while (readers.hasNext() && !readSuccess) {
 					ImageReader reader = readers.next();
-					try {
-						reader.setInput(iis);
-						img = ImageIO.read(file);
-						readSRTMData(img);
-						readSuccess = true;
-					} catch (IOException e) {
-						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
-						iis.seek(0); // Reset stream for the next reader
-					} finally {
-						reader.dispose();
+					if (!(reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader)) {
+						try {
+							reader.setInput(iis);
+							img = ImageIO.read(file);
+							readSRTMData(img);
+							readSuccess = true;
+						} catch (IOException e) {
+							log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+							iis.seek(0); // Reset stream for the next reader
+						} finally {
+							reader.dispose();
+						}
 					}
 				}
 			} catch (Exception e) {
@@ -151,9 +149,11 @@ public class IndexHeightData {
 		}
 		
 		private void readSRTMData(BufferedImage img) {
-			width = img.getWidth();
-			height = img.getHeight();
-			data = (DataBufferShort) img.getRaster().getDataBuffer();
+			if (img != null) {
+				width = img.getWidth();
+				height = img.getHeight();
+				data = (DataBufferShort) img.getRaster().getDataBuffer();
+			}
 		}
 		
 
