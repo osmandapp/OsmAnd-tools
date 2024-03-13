@@ -42,12 +42,13 @@ public class Application  {
 	public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
 		return args -> {
 			telegram.init();
-			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
 			if (Algorithms.isEmpty(System.getenv("ROUTING_VERBOSE"))) {
+				RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
 				HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 0;
 				HHRoutingConfig.STATS_VERBOSE_LEVEL = 0;
 			} else {
 				HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1;
+				RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
 				HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
 			}
 			System.out.println("Application has started");
