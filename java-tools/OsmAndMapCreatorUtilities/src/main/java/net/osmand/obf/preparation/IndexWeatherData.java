@@ -214,7 +214,6 @@ public class IndexWeatherData {
 	private static void readWeatherData(String folder, String fmt, int min, int max, int step) throws IOException {
 		double lat = 52.3121;
 		double lon = 4.8880;
-		Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
 		int len = (max + 1 - min) / step;
 		double[][] wth = new double[6][len];
 		long ms = System.currentTimeMillis();
