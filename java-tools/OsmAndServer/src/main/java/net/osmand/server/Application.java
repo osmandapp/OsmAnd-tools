@@ -70,7 +70,7 @@ public class Application  {
 			}
 			
 			if (twelvemonkeysSpi != null && geoSolutionsSpi != null) {
-				registry.setOrdering(ImageReaderSpi.class, twelvemonkeysSpi, geoSolutionsSpi);
+				registry.setOrdering(ImageReaderSpi.class, geoSolutionsSpi, twelvemonkeysSpi);
 				System.out.println("The ImageIO service provider order has been successfully set.");
 			} else {
 				System.err.println("Failed to find the required service providers to set the order.");
