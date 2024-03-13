@@ -877,23 +877,13 @@ public class OsmAndMapsService {
 		Map<String, String> routeParams = new LinkedHashMap<String, String>();
 		public RouteParameters(String p) {
 			this.routeProfile = p;
-			final String CAR = "car";
-			Set<String> complexModeProfiles = new HashSet<>();
-			complexModeProfiles.add(CAR);
-			String carDerived = RoutingConfiguration.getDefault().getAllRouters().get(CAR).getAttribute("derivedProfiles");
-			if (carDerived != null) {
-				complexModeProfiles.addAll(List.of(carDerived.split(","))); // default,truck,motorcycle
-			}
-			if (complexModeProfiles.contains(this.routeProfile)) {
-				this.calcMode = RouteCalculationMode.COMPLEX; // used for car-derived profiles
-			}
 		}
 
 		boolean useOnlyHHRouting = false;
 		boolean useNativeApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
-		RouteCalculationMode calcMode = RouteCalculationMode.NORMAL;
+		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
 
