@@ -12,18 +12,8 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
@@ -880,25 +870,35 @@ public class OsmAndMapsService {
 		putResultProps(ctx, route, props);
 		return route;
 	}
-	
+
 
 	private static class RouteParameters {
 		String routeProfile;
 		Map<String, String> routeParams = new LinkedHashMap<String, String>();
 		public RouteParameters(String p) {
 			this.routeProfile = p;
+			final String CAR = "car";
+			Set<String> complexModeProfiles = new HashSet<>();
+			complexModeProfiles.add(CAR);
+			String carDerived = RoutingConfiguration.getDefault().getAllRouters().get(CAR).getAttribute("derivedProfiles");
+			if (carDerived != null) {
+				complexModeProfiles.addAll(List.of(carDerived.split(","))); // default,truck,motorcycle
+			}
+			if (complexModeProfiles.contains(this.routeProfile)) {
+				this.calcMode = RouteCalculationMode.COMPLEX; // used for car-derived profiles
+			}
 		}
-		
+
 		boolean useOnlyHHRouting = false;
 		boolean useNativeApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
-		RouteCalculationMode calcMode = RouteCalculationMode.COMPLEX;
+		RouteCalculationMode calcMode = RouteCalculationMode.NORMAL;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
 
 	}
-	
+
 	private RouteParameters parseRouteParameters(String routeMode) {
 		String[] props = routeMode.split("\\,");
 		RouteParameters r = new RouteParameters(props[0]);
@@ -941,7 +941,7 @@ public class OsmAndMapsService {
 			r.routeProfile = entry.profile;
 			r.onlineRouting = entry;
 		}
-		
+
 		return r;
 	}
 
@@ -1177,7 +1177,7 @@ public class OsmAndMapsService {
 			}
 			Thread.sleep(1000);
 		}
-		
+
 		RoutingCacheContext cs = new RoutingCacheContext();
 		cs.locked = System.currentTimeMillis();
 		cs.created = System.currentTimeMillis();
