@@ -52,29 +52,40 @@ public class IndexWeatherData {
 		private BufferedImage readFile(File file) {
 			BufferedImage img = null;
 			if (file.exists()) {
-				boolean readSuccess = false;
-				try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
-					Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
-					while (readers.hasNext() && !readSuccess) {
-						ImageReader reader = readers.next();
-						try {
-							reader.setInput(iis);
-							img = ImageIO.read(file);
-							readWeatherData(img);
-							readSuccess = true;
-						} catch (IOException e) {
-							log.error("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
-							iis.seek(0); // Reset stream for the next reader
-						} finally {
-							reader.dispose();
-						}
+				try {
+					img = ImageIO.read(file);
+					readWeatherData(img);
+				} catch (IOException e) {
+					img = iterativeReadData(file);
+				}
+			}
+			return img;
+		}
+		
+		private BufferedImage iterativeReadData(File file) {
+			boolean readSuccess = false;
+			BufferedImage img = null;
+			try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
+				Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
+				while (readers.hasNext() && !readSuccess) {
+					ImageReader reader = readers.next();
+					try {
+						reader.setInput(iis);
+						img = ImageIO.read(file);
+						readWeatherData(img);
+						readSuccess = true;
+					} catch (IOException e) {
+						log.error("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+						iis.seek(0); // Reset stream for the next reader
+					} finally {
+						reader.dispose();
 					}
-				} catch (Exception e) {
-					log.error("Error processing TIFF file: " + e.getMessage(), e);
 				}
-				if (!readSuccess) {
-					log.error("Failed to read TIFF file with all available readers.");
-				}
+			} catch (Exception e) {
+				log.error("Error processing TIFF file: " + e.getMessage(), e);
+			}
+			if (!readSuccess) {
+				log.error("Failed to read TIFF file with all available readers.");
 			}
 			return img;
 		}
@@ -203,6 +214,7 @@ public class IndexWeatherData {
 	private static void readWeatherData(String folder, String fmt, int min, int max, int step) throws IOException {
 		double lat = 52.3121;
 		double lon = 4.8880;
+		Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
 		int len = (max + 1 - min) / step;
 		double[][] wth = new double[6][len];
 		long ms = System.currentTimeMillis();
