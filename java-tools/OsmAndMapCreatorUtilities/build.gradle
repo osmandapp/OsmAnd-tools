@@ -82,8 +82,9 @@ dependencies {
 	// implementation 'com.twelvemonkeys.imageio:imageio-core:3.3.2'
 	// implementation 'com.twelvemonkeys.imageio:imageio-metadata:3.3.2'
 
-	implementation 'com.twelvemonkeys.imageio:imageio-jpeg:3.3.2'
-	implementation 'it.geosolutions.imageio-ext:imageio-ext-tiff:1.4.6'
+	implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.10.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-core:3.3.2'
+	implementation 'it.geosolutions.imageio-ext:imageio-ext-tiff:1.4.9'
  
 	// Wikimedia projects
 	implementation 'info.bliki.wiki:bliki-core:3.1.0'

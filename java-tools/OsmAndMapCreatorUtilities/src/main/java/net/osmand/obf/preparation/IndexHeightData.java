@@ -2,6 +2,7 @@ package net.osmand.obf.preparation;
 
 import java.awt.Shape;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferFloat;
 import java.awt.image.DataBufferShort;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -107,13 +108,11 @@ public class IndexHeightData {
 			if (f.exists()) {
 				try {
 					img = ImageIO.read(f);
+					readSRTMData(img);
 				} catch (Exception e) {
 					log.error("Error reading tif file " + getFileName() + " " + e.getMessage(), e);
-					return null;
+					iterativeReadData(f);
 				}
-				width = img.getWidth();
-				height = img.getHeight();
-				data = (DataBufferShort) img.getRaster().getDataBuffer();
 				// remove all downloaded files to save disk space
 				if (!srtmDataUrl.startsWith("/") && !srtmDataUrl.startsWith(".")) {
 					f.delete();
@@ -121,6 +120,40 @@ public class IndexHeightData {
 				return null;
 			}
 			return f;
+		}
+		
+		private BufferedImage iterativeReadData(File file) {
+			boolean readSuccess = false;
+			BufferedImage img = null;
+			try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
+				Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
+				while (readers.hasNext() && !readSuccess) {
+					ImageReader reader = readers.next();
+					try {
+						reader.setInput(iis);
+						img = ImageIO.read(file);
+						readSRTMData(img);
+						readSuccess = true;
+					} catch (IOException e) {
+						log.error("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+						iis.seek(0); // Reset stream for the next reader
+					} finally {
+						reader.dispose();
+					}
+				}
+			} catch (Exception e) {
+				log.error("Error processing TIFF file: " + e.getMessage(), e);
+			}
+			if (!readSuccess) {
+				log.error("Failed to read TIFF file with all available readers.");
+			}
+			return img;
+		}
+		
+		private void readSRTMData(BufferedImage img) {
+			width = img.getWidth();
+			height = img.getHeight();
+			data = (DataBufferShort) img.getRaster().getDataBuffer();
 		}
 		
 
