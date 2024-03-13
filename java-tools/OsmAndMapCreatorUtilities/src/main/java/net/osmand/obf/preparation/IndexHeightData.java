@@ -106,8 +106,12 @@ public class IndexHeightData {
 			File f = loadFile(getFileName() + ".tif", srtmDataUrl, workDir);
 			BufferedImage img;
 			if (f.exists()) {
-				img = iterativeReadData(f);
-				readSRTMData(img);
+				try {
+					img = ImageIO.read(f);
+					readSRTMData(img);
+				} catch (Exception e) {
+					iterativeReadData(f);
+				}
 				
 				// remove all downloaded files to save disk space
 				if (!srtmDataUrl.startsWith("/") && !srtmDataUrl.startsWith(".")) {

@@ -52,8 +52,12 @@ public class IndexWeatherData {
 		private BufferedImage readFile(File file) {
 			BufferedImage img = null;
 			if (file.exists()) {
-				img = iterativeReadData(file);
-				readWeatherData(img);
+				try {
+					img = ImageIO.read(file);
+					readWeatherData(img);
+				} catch (Exception e) {
+					img = iterativeReadData(file);
+				}
 			}
 			return img;
 		}
