@@ -1,19 +1,25 @@
 package net.osmand.obf.preparation;
 
+import net.osmand.PlatformUtil;
+import org.apache.commons.logging.Log;
+
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferFloat;
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 public class IndexWeatherData {
+	
+	private static final Log log = PlatformUtil.getLog(IndexWeatherData.class);
 	public static final int NEAREST_NEIGHBOOR_INTERPOLATION = 0;
 	public static final int BILINEAR_INTERPOLATION = 1;
 	public static final int BICUBIC_INTERPOLATION = 2;
 	public static int INTERPOLATION = BICUBIC_INTERPOLATION;
-
-
 	public static final double INEXISTENT_VALUE = Double.MIN_VALUE;
 	// 1440, 721 - -180.125, 90.125 - 179.8750000, -90.1250000
 	public static final int REF_WIDTH = 1440;
@@ -41,20 +47,44 @@ public class IndexWeatherData {
 		public int getBands() {
 			return bands;
 		}
-
-
-		private BufferedImage readFile(File file) throws IOException {
+		
+		
+		private BufferedImage readFile(File file) {
 			BufferedImage img = null;
 			if (file.exists()) {
-				img = ImageIO.read(file);
-				width = img.getWidth();
-				height = img.getHeight();
-				data = (DataBufferFloat) img.getRaster().getDataBuffer();
-				bands = data.getSize() / width / height;
+				boolean readSuccess = false;
+				try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
+					Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
+					while (readers.hasNext() && !readSuccess) {
+						ImageReader reader = readers.next();
+						try {
+							reader.setInput(iis);
+							img = ImageIO.read(file);
+							readWeatherData(img);
+							readSuccess = true;
+						} catch (IOException e) {
+							log.error("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+							iis.seek(0); // Reset stream for the next reader
+						} finally {
+							reader.dispose();
+						}
+					}
+				} catch (Exception e) {
+					log.error("Error processing TIFF file: " + e.getMessage(), e);
+				}
+				if (!readSuccess) {
+					log.error("Failed to read TIFF file with all available readers.");
+				}
 			}
 			return img;
 		}
-
+		
+		private void readWeatherData(BufferedImage img) {
+			width = img.getWidth();
+			height = img.getHeight();
+			data = (DataBufferFloat) img.getRaster().getDataBuffer();
+			bands = data.getSize() / width / height;
+		}
 
 		public double getValue(int band, double lat, double lon) {
 			double y = (lat - ORIGIN_LAT) / PX_SIZE_LAT;
