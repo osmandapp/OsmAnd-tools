@@ -61,26 +61,22 @@ public class IndexWeatherData {
 		private BufferedImage iterativeReadData(File file) {
 			boolean readSuccess = false;
 			BufferedImage img = null;
-			try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
-				Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("tiff");
-				while (readers.hasNext() && !readSuccess) {
-					ImageReader reader = readers.next();
-					if (!(reader instanceof com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReader)) {
-						try {
-							reader.setInput(iis);
-							img = ImageIO.read(file);
-							readWeatherData(img);
-							readSuccess = true;
-						} catch (IOException e) {
-							log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
-							iis.seek(0); // Reset stream for the next reader
-						} finally {
-							reader.dispose();
-						}
+			Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("tiff");
+			while (readers.hasNext() && !readSuccess) {
+				ImageReader reader = readers.next();
+				if (!(reader instanceof com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReader)) {
+					try {
+						ImageInputStream iis = ImageIO.createImageInputStream(file);
+						reader.setInput(iis, true);
+						img = reader.read(0);
+						readWeatherData(img);
+						readSuccess = true;
+					} catch (IOException e) {
+						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+					} finally {
+						reader.dispose();
 					}
 				}
-			} catch (Exception e) {
-				log.error("Error processing TIFF file: " + e.getMessage(), e);
 			}
 			if (!readSuccess) {
 				log.error("Failed to read TIFF file with all available readers.");

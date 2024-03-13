@@ -121,27 +121,24 @@ public class IndexHeightData {
 		private BufferedImage iterativeReadData(File file) {
 			boolean readSuccess = false;
 			BufferedImage img = null;
-			try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
-				Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
-				while (readers.hasNext() && !readSuccess) {
-					ImageReader reader = readers.next();
-					if (!(reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader)) {
-						try {
-							reader.setInput(iis);
-							img = ImageIO.read(file);
-							readSRTMData(img);
-							readSuccess = true;
-						} catch (IOException e) {
-							log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
-							iis.seek(0); // Reset stream for the next reader
-						} finally {
-							reader.dispose();
-						}
+			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
+			while (readers.hasNext() && !readSuccess) {
+				ImageReader reader = readers.next();
+				if (!(reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader)) {
+					try {
+						ImageInputStream iis = ImageIO.createImageInputStream(file);
+						reader.setInput(iis, true);
+						img = reader.read(0);
+						readSRTMData(img);
+						readSuccess = true;
+					} catch (IOException e) {
+						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+					} finally {
+						reader.dispose();
 					}
 				}
-			} catch (Exception e) {
-				log.error("Error processing TIFF file: " + e.getMessage(), e);
 			}
+			
 			if (!readSuccess) {
 				log.error("Failed to read TIFF file with all available readers.");
 			}
