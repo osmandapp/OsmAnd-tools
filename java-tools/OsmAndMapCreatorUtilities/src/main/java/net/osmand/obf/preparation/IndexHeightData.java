@@ -110,7 +110,7 @@ public class IndexHeightData {
 					img = ImageIO.read(f);
 					readSRTMData(img);
 				} catch (Exception e) {
-					log.error("Error reading tif file " + getFileName() + " " + e.getMessage(), e);
+					log.info("Error reading tiff file, try iterative read " + getFileName() + " " + e.getMessage(), e);
 					iterativeReadData(f);
 				}
 				// remove all downloaded files to save disk space
@@ -135,7 +135,7 @@ public class IndexHeightData {
 						readSRTMData(img);
 						readSuccess = true;
 					} catch (IOException e) {
-						log.error("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
 						iis.seek(0); // Reset stream for the next reader
 					} finally {
 						reader.dispose();

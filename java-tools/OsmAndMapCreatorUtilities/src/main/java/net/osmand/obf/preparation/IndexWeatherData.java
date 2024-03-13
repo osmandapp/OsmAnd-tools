@@ -56,6 +56,7 @@ public class IndexWeatherData {
 					img = ImageIO.read(file);
 					readWeatherData(img);
 				} catch (IOException e) {
+					log.info("Error reading tiff file, try iterative read "  + e.getMessage(), e);
 					img = iterativeReadData(file);
 				}
 			}
@@ -75,7 +76,7 @@ public class IndexWeatherData {
 						readWeatherData(img);
 						readSuccess = true;
 					} catch (IOException e) {
-						log.error("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
 						iis.seek(0); // Reset stream for the next reader
 					} finally {
 						reader.dispose();
