@@ -52,13 +52,8 @@ public class IndexWeatherData {
 		private BufferedImage readFile(File file) {
 			BufferedImage img = null;
 			if (file.exists()) {
-				try {
-					img = ImageIO.read(file);
-					readWeatherData(img);
-				} catch (IOException e) {
-					log.info("Error reading tiff file, try iterative read "  + e.getMessage(), e);
-					img = iterativeReadData(file);
-				}
+				img = iterativeReadData(file);
+				readWeatherData(img);
 			}
 			return img;
 		}
@@ -67,19 +62,21 @@ public class IndexWeatherData {
 			boolean readSuccess = false;
 			BufferedImage img = null;
 			try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
-				Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
+				Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("tiff");
 				while (readers.hasNext() && !readSuccess) {
 					ImageReader reader = readers.next();
-					try {
-						reader.setInput(iis);
-						img = ImageIO.read(file);
-						readWeatherData(img);
-						readSuccess = true;
-					} catch (IOException e) {
-						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
-						iis.seek(0); // Reset stream for the next reader
-					} finally {
-						reader.dispose();
+					if (!(reader instanceof com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReader)) {
+						try {
+							reader.setInput(iis);
+							img = ImageIO.read(file);
+							readWeatherData(img);
+							readSuccess = true;
+						} catch (IOException e) {
+							log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+							iis.seek(0); // Reset stream for the next reader
+						} finally {
+							reader.dispose();
+						}
 					}
 				}
 			} catch (Exception e) {
@@ -92,10 +89,12 @@ public class IndexWeatherData {
 		}
 		
 		private void readWeatherData(BufferedImage img) {
-			width = img.getWidth();
-			height = img.getHeight();
-			data = (DataBufferFloat) img.getRaster().getDataBuffer();
-			bands = data.getSize() / width / height;
+			if (img != null) {
+				width = img.getWidth();
+				height = img.getHeight();
+				data = (DataBufferFloat) img.getRaster().getDataBuffer();
+				bands = data.getSize() / width / height;
+			}
 		}
 
 		public double getValue(int band, double lat, double lon) {
