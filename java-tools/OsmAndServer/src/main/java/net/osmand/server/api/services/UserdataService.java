@@ -852,6 +852,7 @@ public class UserdataService {
             boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
             boolean validToken = pu.token.equals(token) && !tokenExpired;
             if (validToken) {
+                wearOutToken(pu);
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmail(pu.email);
                     if (numOfUsersDelete != -1) {
@@ -906,7 +907,7 @@ public class UserdataService {
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
         if (pu.token.equals(code) && !tokenExpired) {
-            clearToken(pu);
+            wearOutToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
@@ -923,16 +924,19 @@ public class UserdataService {
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
         if (pu.token.equals(token) && !tokenExpired) {
-            clearToken(pu);
+            wearOutToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
         }
     }
     
-    public void clearToken(PremiumUsersRepository.PremiumUser pu) {
-        pu.token = null;
-        pu.tokenTime = null;
+    public void wearOutToken(PremiumUsersRepository.PremiumUser pu) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(pu.tokenTime);
+        cal.add(Calendar.HOUR_OF_DAY, 4);
+        pu.tokenTime = cal.getTime();
+        
         usersRepository.saveAndFlush(pu);
     }
     
