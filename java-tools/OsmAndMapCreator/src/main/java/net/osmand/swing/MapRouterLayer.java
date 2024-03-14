@@ -86,12 +86,14 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
+import net.osmand.router.GeneralRouter;
+import net.osmand.router.GpxRoutingApproximation.GpxApproximationContext;
+import net.osmand.router.GpxRoutingApproximation.GpxPoint;
 import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
 import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
-import net.osmand.router.GeneralRouter;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.HHRoutingDB;
 import net.osmand.router.HHRoutingUtilities;
@@ -100,8 +102,6 @@ import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.router.RouteExporter;
 import net.osmand.router.RoutePlannerFrontEnd;
-import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
-import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RouteSegmentResult;
@@ -1110,7 +1110,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				long nt = System.nanoTime();
 				startProgressThread(ctx);
 				try {
-					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
+					GpxApproximationContext gctx = new GpxApproximationContext(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
 					RouteCalcResult searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
 							: router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
@@ -1200,9 +1200,9 @@ public class MapRouterLayer implements MapPanelLayer {
 		return ctx;
 	}
 
-	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
+	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxApproximationContext gctx,
 			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
-		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
+		GpxApproximationContext r = router.searchGpxRoute(gctx, gpxPoints, null);
 		if (TEST_INTERMEDIATE_POINTS) {
 			return new RouteCalcResult(r.result);
 		}

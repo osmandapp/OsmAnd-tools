@@ -77,13 +77,13 @@ import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.GeneralRouter;
+import net.osmand.router.GpxRoutingApproximation.GpxApproximationContext;
+import net.osmand.router.GpxRoutingApproximation.GpxPoint;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
-import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
-import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
@@ -865,9 +865,9 @@ public class OsmAndMapsService {
 
 	private synchronized List<RouteSegmentResult> approximateInternal(RoutingContext ctx, RoutePlannerFrontEnd router,
 			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
-		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
+		GpxApproximationContext gctx = new GpxApproximationContext(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
-		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
+		GpxApproximationContext r = router.searchGpxRoute(gctx, gpxPoints, null);
 		List<RouteSegmentResult> route = new ArrayList<RouteSegmentResult>();
 		for (GpxPoint pnt : r.finalPoints) {
 			route.addAll(pnt.routeToTarget);
