@@ -64,6 +64,7 @@ public class WeatherController {
 		List<Object[]> dt = new ArrayList<>();
 		int increment = INITIAL_INCREMENT;
 		if (folder.exists()) {
+			LOGGER.info(String.format(folder.list().length + " files"));
 			Calendar c = Calendar.getInstance();
 			c.set(Calendar.MINUTE, 0);
 			boolean isShifted = false;
