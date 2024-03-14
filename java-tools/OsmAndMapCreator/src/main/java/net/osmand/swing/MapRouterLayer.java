@@ -87,8 +87,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.GeneralRouter;
-import net.osmand.router.GpxRoutingApproximation.GpxApproximationContext;
-import net.osmand.router.GpxRoutingApproximation.GpxPoint;
 import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
 import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
@@ -102,6 +100,8 @@ import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.router.RouteExporter;
 import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
+import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RouteSegmentResult;
@@ -1110,7 +1110,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				long nt = System.nanoTime();
 				startProgressThread(ctx);
 				try {
-					GpxApproximationContext gctx = new GpxApproximationContext(ctx);
+					GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
 					RouteCalcResult searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
 							: router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
@@ -1200,9 +1200,9 @@ public class MapRouterLayer implements MapPanelLayer {
 		return ctx;
 	}
 
-	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxApproximationContext gctx,
+	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
 			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
-		GpxApproximationContext r = router.searchGpxRoute(gctx, gpxPoints, null);
+		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
 		if (TEST_INTERMEDIATE_POINTS) {
 			return new RouteCalcResult(r.result);
 		}
