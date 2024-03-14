@@ -12,18 +12,8 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
@@ -880,7 +870,7 @@ public class OsmAndMapsService {
 		putResultProps(ctx, route, props);
 		return route;
 	}
-	
+
 
 	private static class RouteParameters {
 		String routeProfile;
@@ -888,17 +878,17 @@ public class OsmAndMapsService {
 		public RouteParameters(String p) {
 			this.routeProfile = p;
 		}
-		
+
 		boolean useOnlyHHRouting = false;
 		boolean useNativeApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
-		RouteCalculationMode calcMode;
+		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
 
 	}
-	
+
 	private RouteParameters parseRouteParameters(String routeMode) {
 		String[] props = routeMode.split("\\,");
 		RouteParameters r = new RouteParameters(props[0]);
@@ -941,7 +931,7 @@ public class OsmAndMapsService {
 			r.routeProfile = entry.profile;
 			r.onlineRouting = entry;
 		}
-		
+
 		return r;
 	}
 
@@ -1178,7 +1168,7 @@ public class OsmAndMapsService {
 			}
 			Thread.sleep(1000);
 		}
-		
+
 		RoutingCacheContext cs = new RoutingCacheContext();
 		cs.locked = System.currentTimeMillis();
 		cs.created = System.currentTimeMillis();

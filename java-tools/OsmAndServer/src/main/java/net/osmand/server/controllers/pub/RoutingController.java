@@ -45,48 +45,48 @@ import net.osmand.util.MapUtils;
 public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
-	
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
-	
+
 	@Autowired
 	RoutingService routingService;
-	
+
 	@Autowired
 	UserSessionResources session;
-	
+
 	Gson gson = new Gson();
-	
+
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
 	public static class FeatureCollection {
 		public String type = "FeatureCollection";
 		public List<Feature> features = new ArrayList<>();
-		
+
 		public FeatureCollection(Feature... features) {
 			this.features.addAll(Arrays.asList(features));
 		}
 	}
-	
+
 	public static class Feature {
 		public Map<String, Object> properties = new LinkedHashMap<>();
 		public String type = "Feature";
 		public final Geometry geometry;
-		
+
 		public Feature(Geometry geometry) {
 			this.geometry = geometry;
 		}
-		
+
 		public Feature prop(String key, Object vl) {
 			properties.put(key, vl);
 			return this;
 		}
 	}
-	
+
 	public static class Geometry {
 		public final String type;
 		public Object coordinates;
-		
+
 		public Geometry(String type) {
 			this.type = type;
 		}
@@ -137,7 +137,7 @@ public class RoutingController {
 			return gm;
 		}
 	}
-	
+
 	public static class RoutingMode {
 		public String key;
 		public String name;
@@ -148,7 +148,7 @@ public class RoutingController {
 			name = Algorithms.capitalizeFirstLetter(key).replace('_', ' ');
 		}
 	}
-	
+
 	public static class RoutingParameter {
 		public String key;
 		public String label;
@@ -159,7 +159,7 @@ public class RoutingController {
 		public Object value;
 		public String[] valueDescriptions;
 		public Object[] values;
-		
+
 		public RoutingParameter(String key, String section, String name, boolean defValue) {
 			this.key = key;
 			this.label = name;
@@ -168,7 +168,7 @@ public class RoutingController {
 			this.section = section;
 			this.value = defValue;
 		}
-		
+
 		public RoutingParameter(String key,  String name, String description, String group, String type) {
 			this.key = key;
 			this.label = name;
@@ -176,9 +176,9 @@ public class RoutingController {
 			this.type = type;
 			this.group = group;
 		}
-		
+
 	}
-	
+
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
@@ -188,11 +188,11 @@ public class RoutingController {
 				"[Dev] Disable HH routing", false);
 		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
 				"[Dev] Use C++ for routing", false);
-		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
+		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development",
 				"[Dev] Use C++ approximation", false);
-		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development", 
+		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development",
 				"[Dev] Use separate maps", false);
-		
+
 		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
 				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
 		calcMode.section = "Development";
@@ -207,19 +207,22 @@ public class RoutingController {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
+				List<RoutingController.RoutingParameter> passParams =
+						new ArrayList<>(Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps));
 				if (derivedProfiles != null) {
+					if ("car".equals(e.getKey())) {
+						passParams.add(calcMode); // only for car & derived from car
+					}
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
-						routingService.fillRoutingModeParams(
-								Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps, calcMode), shortWay, e, rm);
+						routingService.fillRoutingModeParams(passParams, shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
-					routingService.fillRoutingModeParams(
-							Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps, calcMode), shortWay, e, rm);
+					routingService.fillRoutingModeParams(passParams, shortWay, e, rm);
 				}
 			}
 		}
@@ -262,7 +265,7 @@ public class RoutingController {
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		}
 	}
-	
+
 	@RequestMapping(path = "/geocoding", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<String> geocoding(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -283,7 +286,7 @@ public class RoutingController {
 			throw e;
 		}
 	}
-	
+
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<String> routing(HttpSession session,
 			@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode,
@@ -377,14 +380,14 @@ public class RoutingController {
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/get-route"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> getRoute(@RequestBody List<WebGpxParser.Point> points) throws IOException, InterruptedException {
 		List<WebGpxParser.Point> res = routingService.getRoute(points);
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
 	}
-	
+
 	@PostMapping(path = {"/approximate"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> approximateRoute(@RequestBody List<WebGpxParser.Point> points, @RequestParam String routeMode) throws IOException, InterruptedException {
