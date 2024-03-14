@@ -1044,6 +1044,7 @@ public class OsmAndMapsService {
 				super.handleError(response);
 			}
 		});
+		LOGGER.info("Online request: " + url.toString());
 		String gpx = restTemplate.getForObject(url.toString(), String.class);
 		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
