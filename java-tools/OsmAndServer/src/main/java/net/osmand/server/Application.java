@@ -15,6 +15,7 @@ import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.server.api.services.StorageService;
+import net.osmand.util.Algorithms;
 
 import javax.imageio.spi.IIORegistry;
 import javax.imageio.spi.ImageReaderSpi;
@@ -41,11 +42,15 @@ public class Application  {
 	public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
 		return args -> {
 			telegram.init();
-			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
-			HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 0;
-			HHRoutingConfig.STATS_VERBOSE_LEVEL = 0;
-//			HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1 ;
-//			HHRoutingConfig .STATS_VERBOSE_LEVEL = 1 ;
+			if (Algorithms.isEmpty(System.getenv("ROUTING_VERBOSE"))) {
+				RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
+				HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 0;
+				HHRoutingConfig.STATS_VERBOSE_LEVEL = 0;
+			} else {
+				HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1;
+				RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
+				HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
+			}
 			System.out.println("Application has started");
 			configureImageIO();
 		};

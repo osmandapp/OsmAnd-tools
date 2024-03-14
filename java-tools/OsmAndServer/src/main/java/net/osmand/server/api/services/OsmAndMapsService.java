@@ -893,7 +893,7 @@ public class OsmAndMapsService {
 		boolean useNativeApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
-		RouteCalculationMode calcMode = RouteCalculationMode.COMPLEX;
+		RouteCalculationMode calcMode;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
 
