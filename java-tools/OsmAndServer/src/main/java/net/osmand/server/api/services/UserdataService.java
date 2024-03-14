@@ -380,6 +380,7 @@ public class UserdataService {
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
                 - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
+            wearOutToken(pu);
             throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
         }
         if (pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
