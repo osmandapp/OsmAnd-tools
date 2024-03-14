@@ -60,6 +60,7 @@ public class WeatherController {
 	                                            @RequestParam String weatherType,
 	                                            @RequestParam(defaultValue = "false") boolean week) {
 		File folder = new File(weatherLocation + weatherType + "/tiff/");
+		LOGGER.info(String.format(folder.getAbsolutePath()));
 		List<Object[]> dt = new ArrayList<>();
 		int increment = INITIAL_INCREMENT;
 		if (folder.exists()) {
@@ -74,6 +75,7 @@ public class WeatherController {
 			}
 			while (true) {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
+				LOGGER.info(String.format(fl.getAbsolutePath()));
 				if (fl.exists()) {
 					try {
 						Object[] data = new Object[7];
