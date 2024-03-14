@@ -933,9 +933,12 @@ public class UserdataService {
     }
     
     public void wearOutToken(PremiumUsersRepository.PremiumUser pu) {
+        if (pu == null || pu.tokenTime == null) {
+            return;
+        }
         Calendar cal = Calendar.getInstance();
         cal.setTime(pu.tokenTime);
-        cal.add(Calendar.HOUR_OF_DAY, 4);
+        cal.add(Calendar.HOUR_OF_DAY, -7);
         pu.tokenTime = cal.getTime();
         
         usersRepository.saveAndFlush(pu);
