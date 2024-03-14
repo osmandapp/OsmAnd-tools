@@ -851,8 +851,8 @@ public class UserdataService {
         if (pu != null && pu.id == dev.userid) {
             boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
             boolean validToken = pu.token.equals(token) && !tokenExpired;
+            wearOutToken(pu);
             if (validToken) {
-                wearOutToken(pu);
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmail(pu.email);
                     if (numOfUsersDelete != -1) {
@@ -906,8 +906,8 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        wearOutToken(pu);
         if (pu.token.equals(code) && !tokenExpired) {
-            wearOutToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
@@ -923,8 +923,8 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        wearOutToken(pu);
         if (pu.token.equals(token) && !tokenExpired) {
-            wearOutToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
