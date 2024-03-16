@@ -1105,7 +1105,7 @@ public class OsmAndMapsService {
 		if (routeObfLocation == null || routeObfLocation.length() == 0) {
 			return null;
 		}
-		if (rp.useNativeLib || rp.useNativeApproximation || rp.noGlobalFile) {
+		if (rp.useNativeLib || rp.useNativeApproximation || rp.noGlobalFile || rp.calcMode != null) {
 			return null;
 		}
 		RoutingCacheContext cache = lockRoutingCache(router, rp);
@@ -1132,7 +1132,7 @@ public class OsmAndMapsService {
 			RoutingCacheContext best = null;
 			synchronized (routingCaches) {
 				for (RoutingCacheContext c : routingCaches) {
-					if (c.locked == 0 && rp.routeProfile.equals(c.profile) && c.rCtx.calculationMode == rp.calcMode) {
+					if (c.locked == 0 && rp.routeProfile.equals(c.profile)) {
 						if (c.routeParamsStr.equals(rp.routeParams.toString()) || best == null) {
 							best = c;
 						}
