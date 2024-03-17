@@ -145,7 +145,7 @@ public class OsmCoordinatesByTag {
 				String key = combineTagValue(t, entity.getTag(t));
 				LatLon oldValue = coordinates.put(key, center);
 				if (oldValue != null) {
-					log.debug("For " + key + " old coordinates " + oldValue + " replaced by " + center);
+//					log.debug("For " + key + " old coordinates " + oldValue + " replaced by " + center);
 				}
 //				System.out.println(OsmMapUtils.getCenter(entity) + " " + entity.getTags());
 			}
