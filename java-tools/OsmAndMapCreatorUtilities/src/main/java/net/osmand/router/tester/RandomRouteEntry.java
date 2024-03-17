@@ -39,10 +39,10 @@ class RandomRouteEntry {
 	}
 
 	String toURL(String type) {
-		return toURL(type, "test.osmand.net");
+		return toURL(type, "test.osmand.net", false);
 	}
 
-	String toURL(String type, String domain) {
+	String toURL(String type, String domain, boolean car2phase) {
 		String START = String.format("%f,%f", start.getLatitude(), start.getLongitude());
 		String FINISH = String.format("%f,%f", finish.getLatitude(), finish.getLongitude());
 
@@ -75,6 +75,9 @@ class RandomRouteEntry {
 		if ("hh-cpp".equals(TYPE)) {
 			typeParams.add("hhonly:true,nativerouting:true");
 		}
+		if (TYPE.startsWith("brp") && "car".equals(PROFILE)) {
+			typeParams.add("calcmode:" + (car2phase ? "COMPLEX" : "NORMAL"));
+		}
 
 		String hasParams = typeParams.size() > 0 ? "&params=" : "";
 		String PARAMS = String.join(",", typeParams); // site will fix it to "profile,params"
@@ -83,12 +86,9 @@ class RandomRouteEntry {
 		String protoDomain = domain.contains("://") ? domain : (
 				(domain.contains("localhost") ? "http://" : "https://") + domain);
 
-		// finally
-		TYPE = "osmand";
-
 		return String.format(
-				"%s/map/?start=%s&finish=%s%s%s&type=%s&profile=%s%s%s#%s",
-				protoDomain, START, FINISH, hasVia, VIA, TYPE, PROFILE, hasParams, PARAMS, GO
+				"%s/map/?start=%s&finish=%s%s%s&profile=%s%s%s#%s",
+				protoDomain, START, FINISH, hasVia, VIA, PROFILE, hasParams, PARAMS, GO
 		);
 	}
 }
@@ -146,8 +146,8 @@ class RandomRouteResult {
 		return entry.toURL(type);
 	}
 
-	public String toURL(String domain) {
-		return entry.toURL(type, domain);
+	public String toURL(String domain, boolean car2phase) {
+		return entry.toURL(type, domain, car2phase);
 	}
 }
 
@@ -155,6 +155,7 @@ class RandomRouteReport {
 	private String text;
 	private String html;
 	private String htmlDomain;
+	private boolean car2phase;
 	private double deviationRed;
 	private double deviationYellow;
 
@@ -162,6 +163,7 @@ class RandomRouteReport {
 		this.deviationRed = red;
 		this.deviationYellow = yellow;
 		this.htmlDomain = htmlDomain;
+		this.car2phase = car2phase;
 
 		String dt = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(Calendar.getInstance().getTime());
 
@@ -198,7 +200,7 @@ class RandomRouteReport {
 
 		String start = String.format("%f,%f", primary.entry.start.getLatitude(), primary.entry.start.getLongitude());
 		String finish = String.format("%f,%f", primary.entry.finish.getLatitude(), primary.entry.finish.getLongitude());
-		String url = primary.toURL(htmlDomain);
+		String url = primary.toURL(htmlDomain, car2phase);
 
 		String sCost = primary.cost > 0 ? String.format("%.2f", primary.cost) : "zero";
 		String colorCost = costDistHtmlColor(primary.cost);
@@ -226,17 +228,17 @@ class RandomRouteReport {
 	}
 
 	void resultCompare(int n, RandomRouteResult result, RandomRouteResult primary) {
-		String url = result.toURL(htmlDomain);
+		String url = result.toURL(htmlDomain, car2phase);
 
 		double dCost = primary.cost > 0 ? (result.cost / primary.cost - 1) * 100 : 0;
-		String sCost = Math.abs(dCost) < deviationYellow ? "ok"
+		String sCost = Math.abs(dCost) < deviationYellow && result.cost > 0 ? "ok"
 				: (result.cost > 0 ? String.format("%s%.2f%%", dCost > 0 ? "+" : "", dCost) : "zero");
-		String colorCost = deviationHtmlColor(dCost);
+		String colorCost = deviationHtmlColor(dCost, result.cost);
 
 		double dDistance = primary.distance > 0 ? (result.distance / primary.distance - 1) * 100 : 0;
-		String sDistance = Math.abs(dDistance) < deviationYellow ? "ok"
+		String sDistance = Math.abs(dDistance) < deviationYellow && result.distance > 0 ? "ok"
 				: (result.distance > 0 ? String.format("%s%.2f%%", dDistance > 0 ? "+" : "", dDistance) : "zero");
-		String colorDistance = deviationHtmlColor(dDistance);
+		String colorDistance = deviationHtmlColor(dDistance, result.distance);
 
 		html += "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, result.type) + // 1
@@ -280,7 +282,10 @@ class RandomRouteReport {
 		return n > 0 ? "green" : "red";
 	}
 
-	private String deviationHtmlColor(double percent) {
+	private String deviationHtmlColor(double percent, double value) {
+		if (value <= 0) {
+			return "red";
+		}
 		if (Math.abs(percent) >= deviationRed) {
 			return "red";
 		} else if (Math.abs(percent) >= deviationYellow) {
