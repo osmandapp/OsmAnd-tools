@@ -65,7 +65,7 @@ public class IndexWeatherData {
 			ImageInputStream iis = null;
 			while (readers.hasNext() && !readSuccess) {
 				ImageReader reader = readers.next();
-				if (!(reader instanceof com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReader)) {
+				if (reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader) {
 					try {
 						iis = ImageIO.createImageInputStream(file);
 						reader.setInput(iis, true);
