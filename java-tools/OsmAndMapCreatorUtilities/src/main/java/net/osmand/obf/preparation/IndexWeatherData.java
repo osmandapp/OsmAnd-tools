@@ -65,13 +65,12 @@ public class IndexWeatherData {
 			ImageInputStream iis = null;
 			while (readers.hasNext() && !readSuccess) {
 				ImageReader reader = readers.next();
-				if (!(reader instanceof com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReader)) {
+				if (reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader) {
 					try {
 						iis = ImageIO.createImageInputStream(file);
 						reader.setInput(iis, true);
 						img = reader.read(0);
 						readWeatherData(img);
-						log.info("Successfully read with reader: " + reader.getClass().getName());
 						readSuccess = true;
 					} catch (IOException e) {
 						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
