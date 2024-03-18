@@ -120,6 +120,7 @@ public class WeatherController {
 		List<GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
 		
 		Optional<GeocodingResult> nearestResult = list.stream()
+				.filter(result -> result.city != null)
 				.min(Comparator.comparingDouble(GeocodingResult::getDistance));
 		
 		if (nearestResult.isPresent()) {
