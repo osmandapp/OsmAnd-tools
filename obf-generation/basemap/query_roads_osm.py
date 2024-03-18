@@ -33,11 +33,23 @@ def process_roads(cond, filename, fields):
 	for nm in names:
 		array.append(nm)
 		selectFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
-	
+
 	for field in fields:
 		array.append(field)
 		if field == 'seamark:type':
 			field = "tags->'seamark:type' as \"seamark:type\""
+		if field == 'toll':
+			field = "tags->'toll' as \"toll\""
+		if field == 'toll:bicycle':
+			field = "tags->'toll:bicycle' as \"toll:bicycle\""
+		if field == 'toll:motorcar':
+			field = "tags->'toll:motorcar' as \"toll:motorcar\""
+		if field == 'motorroad':
+			field = "tags->'motorroad' as \"motorroad\""
+		if field == 'ice_road':
+			field = "tags->'ice_road' as \"ice_road\""
+		if field == 'winter_road':
+			field = "tags->'winter_road' as \"winter_road\""
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
@@ -96,8 +108,8 @@ def process_roads(cond, filename, fields):
 	f.write('</osm>')
 
 if __name__ == "__main__":
-	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route'])
-	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link' or highway='secondary' or highway='secondary_link' or highway='tertiary' or highway='tertiary_link'", "line_all_roads.osm", ['highway', 'junction', 'route'])
+	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route', 'toll', 'toll:bicycle', 'toll:motorcar', 'ice_road', 'winter_road', 'motorroad'])
+	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link' or highway='secondary' or highway='secondary_link' or highway='tertiary' or highway='tertiary_link'", "line_all_roads.osm", ['highway', 'junction', 'route', 'toll', 'toll:bicycle', 'toll:motorcar', 'ice_road', 'winter_road', 'motorroad'])
 	process_roads("railway='rail'", "line_railway.osm", ['railway'])
 	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "line_ferry.osm", ['route', 'seamark:type'])
 
