@@ -53,12 +53,7 @@ public class IndexWeatherData {
 		private BufferedImage readFile(File file) {
 			BufferedImage img = null;
 			if (file.exists()) {
-				try (FileInputStream fis = new FileInputStream(file)) {
-					img = ImageIO.read(fis);
-					readWeatherData(img);
-				} catch (Exception e) {
-					img = iterativeReadData(file);
-				}
+				img = iterativeReadData(file);
 			}
 			return img;
 		}
@@ -76,6 +71,7 @@ public class IndexWeatherData {
 						reader.setInput(iis, true);
 						img = reader.read(0);
 						readWeatherData(img);
+						log.info("Successfully read with reader: " + reader.getClass().getName());
 						readSuccess = true;
 					} catch (IOException e) {
 						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
