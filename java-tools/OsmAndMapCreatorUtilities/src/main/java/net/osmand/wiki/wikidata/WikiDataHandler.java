@@ -227,7 +227,7 @@ public class WikiDataHandler extends DefaultHandler {
 						if (article.getImage() != null) {
 							String image = StringEscapeUtils.unescapeJava(article.getImage());
 							wikidataPropPrep.setLong(1, id);
-							wikidataPropPrep.setString(2, ArticleMapper.PROP_IMAGE);
+							wikidataPropPrep.setString(2, article.getImageProp());
 							wikidataPropPrep.setString(3, image);
 							addBatch(wikidataPropPrep, wikidataPropBatch);
 						}
