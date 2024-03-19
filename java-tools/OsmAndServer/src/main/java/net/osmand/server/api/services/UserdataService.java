@@ -219,7 +219,7 @@ public class UserdataService {
     
     public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
-                name.endsWith(".obf") || name.endsWith(".sqlitedb"));
+                name.endsWith(".obf") || name.endsWith(".sqlitedb") || name.endsWith(".tif"));
         if (checkExistingServerMap) {
             return downloadService.getServerGlobalFile(name);
         }
