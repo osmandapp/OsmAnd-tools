@@ -1114,7 +1114,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(intermediates));
 					RouteCalcResult searchRoute = gpx ? getGpxAproximation(router, gctx, gpxPoints)
 							: router.searchRoute(ctx, start, end, intermediates, precalculatedRouteDirection);
-					throwExceptionIfRouteNotFound(ctx, searchRoute.getList());
+					throwExceptionIfRouteNotFound(ctx, searchRoute);
 					System.out.println("Routing time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
 						playPauseButton.setVisible(false);
@@ -1214,7 +1214,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		return new RouteCalcResult(rsr);
 	}
 
-	private void throwExceptionIfRouteNotFound(final RoutingContext ctx, List<RouteSegmentResult> searchRoute) {
+	private void throwExceptionIfRouteNotFound(final RoutingContext ctx, RouteCalcResult searchRoute) {
 		if (searchRoute == null) {
 			String reason = "unknown";
 			if (ctx.calculationProgress.segmentNotFound >= 0) {
@@ -1224,12 +1224,15 @@ public class MapRouterLayer implements MapPanelLayer {
 					reason = " target point " + ctx.calculationProgress.segmentNotFound + " is too far from road";
 				}
 			} else if (ctx.calculationProgress.directSegmentQueueSize == 0) {
-				reason = " route can not be found from start point (" + ctx.calculationProgress.distanceFromBegin / 1000.0f
-						+ " km)";
+				reason = " route can not be found from start point ("
+						+ ctx.calculationProgress.distanceFromBegin / 1000.0f + " km)";
 			} else if (ctx.calculationProgress.reverseSegmentQueueSize == 0) {
-				reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000.0f + " km)";
+				reason = " route can not be found from end point (" + ctx.calculationProgress.distanceFromEnd / 1000.0f
+						+ " km)";
 			}
 			throw new RuntimeException("Route not found : " + reason);
+		} else if (!searchRoute.isCorrect()) {
+			throw new RuntimeException("Route not found : " + searchRoute.getError());
 		}
 	}
 
