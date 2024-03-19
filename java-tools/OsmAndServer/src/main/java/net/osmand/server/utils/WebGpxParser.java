@@ -650,18 +650,18 @@ public class WebGpxParser {
             
             if (point.segment != null) {
                 GPXUtilities.RouteSegment seg = point.segment.ext;
-                int ind = Integer.parseInt(seg.startTrackPointIndex);
-                if (ind == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
+                int segStartInd = seg.startTrackPointIndex != null ? Integer.parseInt(seg.startTrackPointIndex) : points.indexOf(point);
+                if (segStartInd == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
                     int currentLength = Integer.parseInt(lastPointWithSeg.segment.ext.length);
                     //fix approximate results
                     int segmentLength = currentLength == 1 ? 1 : currentLength - 1;
-                    
-                    lastStartTrkptIdx = segmentLength + Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex);
+                    int lastPointWithSegStartInd = lastPointWithSeg.segment.ext.startTrackPointIndex != null ? Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex) : points.indexOf(lastPointWithSeg);
+                    lastStartTrkptIdx = segmentLength + lastPointWithSegStartInd;
                     prevTypesSize += lastPointWithSeg.segment.routeTypes.size();
                     segment.routeTypes.addAll(point.segment.routeTypes);
                 }
-                seg.startTrackPointIndex = Integer.toString(ind + lastStartTrkptIdx);
-    
+                seg.startTrackPointIndex = Integer.toString(segStartInd + lastStartTrkptIdx);
+                
                 seg.types = prepareTypes(seg.types, prevTypesSize);
                 seg.pointTypes = prepareTypes(seg.pointTypes, prevTypesSize);
                 seg.names = prepareTypes(seg.names, prevTypesSize);
