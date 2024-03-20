@@ -483,7 +483,7 @@ get_raw_ecmwf_files() {
                 local PREV_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$PREV_FILETIME"
                 if [ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "precip" ] && [ -n "$PREV_FILETIME" ] && [ -f "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" ]; then
                     echo "Calculate precipitation"
-                    gdal_calc.py -A "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" -B "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="(A-B)/10" --overwrite
+                    gdal_calc.py -A "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" -B "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="(A-B)" --overwrite
                 else
                     gdal_translate -outsize 1440 721 -r cubic "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats -colorinterp_1 undefined || echo "gdal_translate error"
                 fi
