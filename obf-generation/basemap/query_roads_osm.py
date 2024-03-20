@@ -110,7 +110,7 @@ def process_roads(cond, filename, fields):
 	with open(filename + '.way', 'r') as fway:
 		# Loop through each line in the source file
 		for line in fway:
-		f.write(line)
+			f.write(line)
 	f.write('</osm>')
 	f.close()
 	os.remove(filename + '.way')
