@@ -24,6 +24,7 @@ def process_roads(cond, filename, fields):
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 	f.write('<osm version="0.6">\n')
+	fway = open(filename+'.way','w')
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
@@ -100,12 +101,19 @@ def process_roads(cond, filename, fields):
 		if way_id > max_way_id_start:
 			extra_way_xml += way_xml
 		else:
-			f.write(way_xml)
+			fway.write(way_xml)
 
 	# if way_id != 0:
 	# 	way_xml += '</way>'
-	f.write(extra_way_xml)
+	fway.write(extra_way_xml)
+	fway.close()
+	with open(filename + '.way', 'r') as fway:
+		# Loop through each line in the source file
+		for line in fway:
+		f.write(line)
 	f.write('</osm>')
+	f.close()
+	os.remove(filename + '.way')
 
 if __name__ == "__main__":
 	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route', 'toll', 'toll:bicycle', 'toll:motorcar', 'ice_road', 'winter_road', 'motorroad'])
