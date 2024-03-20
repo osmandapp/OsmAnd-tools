@@ -385,10 +385,10 @@ public class NativeJavaRendering extends NativeLibrary {
 			int nextInd = 0;
 			@Override
 			public int read() {
-				if(nextInd >= generationResult.getBitmapBuffer().capacity()) {
+				if(nextInd >= generationResult.bitmapBuffer.capacity()) {
 					return -1;
 				}
-				byte b = generationResult.getBitmapBuffer().get(nextInd++) ;
+				byte b = generationResult.bitmapBuffer.get(nextInd++) ;
 				if(b < 0) {
 					return b + 256;
 				} else {
@@ -400,7 +400,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		ImageReader reader = readers.next();
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
-		AllocationUtil.freeDirectBuffer(generationResult.getBitmapBuffer());
+		AllocationUtil.freeDirectBuffer(generationResult.bitmapBuffer);
 		
 		return new RenderingImageResult(img, generationResult);
 	}
