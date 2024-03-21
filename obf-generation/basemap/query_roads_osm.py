@@ -24,6 +24,7 @@ def process_roads(cond, filename, fields):
 	f = open(filename,'w')
 	f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 	f.write('<osm version="0.6">\n')
+	fway = open(filename+'.way','w')
  
 	conn = psycopg2.connect(conn_string)
 	cursor = conn.cursor()
@@ -33,11 +34,23 @@ def process_roads(cond, filename, fields):
 	for nm in names:
 		array.append(nm)
 		selectFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
-	
+
 	for field in fields:
 		array.append(field)
 		if field == 'seamark:type':
 			field = "tags->'seamark:type' as \"seamark:type\""
+		if field == 'toll':
+			field = "tags->'toll' as \"toll\""
+		if field == 'toll:bicycle':
+			field = "tags->'toll:bicycle' as \"toll:bicycle\""
+		if field == 'toll:motorcar':
+			field = "tags->'toll:motorcar' as \"toll:motorcar\""
+		if field == 'motorroad':
+			field = "tags->'motorroad' as \"motorroad\""
+		if field == 'ice_road':
+			field = "tags->'ice_road' as \"ice_road\""
+		if field == 'winter_road':
+			field = "tags->'winter_road' as \"winter_road\""
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
@@ -48,8 +61,9 @@ def process_roads(cond, filename, fields):
 	#print sql
 	cursor.execute(sql)
  
-	node_id =-10000000000
-	max_way_id_start = 1000000000
+	node_id =-10000 #10 000 000 000 000
+	max_way_id_start = 10*1000*1000*1000
+
 	wd_id = max_way_id_start
 	way_id = 0
 	extra_way_xml = ""
@@ -75,7 +89,7 @@ def process_roads(cond, filename, fields):
 			raise Exception("Object " + row[0] + " has bad geometry" + row[1])
 		coordinates = LineString(row[1][len("LINESTRING("):-1])
 		for c in coordinates :
-			node_id = node_id + 1
+			node_id = node_id - 1
 			nid = node_id
 			if 'e' in c[1]:
 				c[1] = format(float(c[1]), '.12f')
@@ -88,16 +102,23 @@ def process_roads(cond, filename, fields):
 		if way_id > max_way_id_start:
 			extra_way_xml += way_xml
 		else:
-			f.write(way_xml)
+			fway.write(way_xml)
 
 	# if way_id != 0:
 	# 	way_xml += '</way>'
-	f.write(extra_way_xml)
+	fway.write(extra_way_xml)
+	fway.close()
+	with open(filename + '.way', 'r') as fway:
+		# Loop through each line in the source file
+		for line in fway:
+			f.write(line)
 	f.write('</osm>')
+	f.close()
+	os.remove(filename + '.way')
 
 if __name__ == "__main__":
-	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route'])
-	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link' or highway='secondary' or highway='secondary_link' or highway='tertiary' or highway='tertiary_link'", "line_all_roads.osm", ['highway', 'junction', 'route'])
+	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route', 'toll', 'toll:bicycle', 'toll:motorcar', 'ice_road', 'winter_road', 'motorroad'])
+	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link' or highway='secondary' or highway='secondary_link' or highway='tertiary' or highway='tertiary_link'", "line_all_roads.osm", ['highway', 'junction', 'route', 'toll', 'toll:bicycle', 'toll:motorcar', 'ice_road', 'winter_road', 'motorroad'])
 	process_roads("railway='rail'", "line_railway.osm", ['railway'])
 	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "line_ferry.osm", ['route', 'seamark:type'])
 

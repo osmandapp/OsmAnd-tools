@@ -76,13 +76,14 @@ public class WeatherController {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
 				if (fl.exists()) {
 					try {
-						Object[] data = new Object[7];
+						Object[] data = new Object[8];
 						data[0] = c.getTimeInMillis();
 						data[1] = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
 						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl);
 						for (int i = 0; i < wt.getBands() && i < 5; i++) {
 							data[2 + i] = wt.getValue(i, lat, lon);
 						}
+						data[7] = fl.lastModified();
 						dt.add(data);
 					} catch (IOException e) {
 						LOGGER.warn(String.format("Error reading %s: %s", fl.getName(), e.getMessage()), e);
@@ -120,6 +121,7 @@ public class WeatherController {
 		List<GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
 		
 		Optional<GeocodingResult> nearestResult = list.stream()
+				.filter(result -> result.city != null)
 				.min(Comparator.comparingDouble(GeocodingResult::getDistance));
 		
 		if (nearestResult.isPresent()) {

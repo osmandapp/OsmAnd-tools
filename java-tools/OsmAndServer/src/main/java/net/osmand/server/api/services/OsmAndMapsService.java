@@ -12,18 +12,8 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
@@ -952,7 +942,7 @@ public class OsmAndMapsService {
 		putResultProps(ctx, route, props);
 		return route;
 	}
-	
+
 
 	private static class RouteParameters {
 		String routeProfile;
@@ -960,17 +950,17 @@ public class OsmAndMapsService {
 		public RouteParameters(String p) {
 			this.routeProfile = p;
 		}
-		
+
 		boolean useOnlyHHRouting = false;
 		boolean useNativeApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
-		RouteCalculationMode calcMode = RouteCalculationMode.COMPLEX;
+		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
 
 	}
-	
+
 	private RouteParameters parseRouteParameters(String routeMode) {
 		String[] props = routeMode.split("\\,");
 		RouteParameters r = new RouteParameters(props[0]);
@@ -1013,7 +1003,7 @@ public class OsmAndMapsService {
 			r.routeProfile = entry.profile;
 			r.onlineRouting = entry;
 		}
-		
+
 		return r;
 	}
 
@@ -1116,6 +1106,7 @@ public class OsmAndMapsService {
 				super.handleError(response);
 			}
 		});
+		LOGGER.info("Online request: " + url.toString());
 		String gpx = restTemplate.getForObject(url.toString(), String.class);
 		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
@@ -1186,7 +1177,7 @@ public class OsmAndMapsService {
 		if (routeObfLocation == null || routeObfLocation.length() == 0) {
 			return null;
 		}
-		if (rp.useNativeLib || rp.useNativeApproximation || rp.noGlobalFile) {
+		if (rp.useNativeLib || rp.useNativeApproximation || rp.noGlobalFile || rp.calcMode != null) {
 			return null;
 		}
 		RoutingCacheContext cache = lockRoutingCache(router, rp);
@@ -1213,7 +1204,7 @@ public class OsmAndMapsService {
 			RoutingCacheContext best = null;
 			synchronized (routingCaches) {
 				for (RoutingCacheContext c : routingCaches) {
-					if (c.locked == 0 && rp.routeProfile.equals(c.profile) && c.rCtx.calculationMode == rp.calcMode) {
+					if (c.locked == 0 && rp.routeProfile.equals(c.profile)) {
 						if (c.routeParamsStr.equals(rp.routeParams.toString()) || best == null) {
 							best = c;
 						}
@@ -1249,7 +1240,7 @@ public class OsmAndMapsService {
 			}
 			Thread.sleep(1000);
 		}
-		
+
 		RoutingCacheContext cs = new RoutingCacheContext();
 		cs.locked = System.currentTimeMillis();
 		cs.created = System.currentTimeMillis();

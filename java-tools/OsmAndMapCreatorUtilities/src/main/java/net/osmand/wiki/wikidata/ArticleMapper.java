@@ -15,7 +15,7 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 	private static final long ERROR_BATCH_SIZE = 5000L;
 	private static int errorCount;
 	private static final Log log = PlatformUtil.getLog(ArticleMapper.class);
-	public static final String PROP_IMAGE = "P18";
+	public static final String[] PROP_IMAGE = {"P18", "P180"};
 	public static final String PROP_COMMON_CAT = "P373";
 	private final String PROP_COMMON_COORDS = "P625";
 
@@ -39,13 +39,18 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 						article.setLon(lon);
 					}
 				}
-				JsonArray propImage = claims.getAsJsonArray(PROP_IMAGE);
-				if (propImage != null) {
-					JsonObject imageDataValue = propImage.get(0).getAsJsonObject().getAsJsonObject("mainsnak")
-							.getAsJsonObject("datavalue");
-					if (imageDataValue != null) {
-						String image = imageDataValue.getAsJsonPrimitive("value").getAsString();
-						article.setImage(image);
+				JsonArray propImage = null;
+				for (String property : PROP_IMAGE) {
+					propImage = claims.getAsJsonArray(property);
+					if (propImage != null) {
+						JsonObject imageDataValue = propImage.get(0).getAsJsonObject().getAsJsonObject("mainsnak")
+								.getAsJsonObject("datavalue");
+						if (imageDataValue != null) {
+							String image = imageDataValue.getAsJsonPrimitive("value").getAsString();
+							article.setImage(image);
+							article.setImageProp(property);
+						}
+						break;
 					}
 				}
 				JsonArray propCommonCat = claims.getAsJsonArray(PROP_COMMON_CAT);
@@ -92,6 +97,7 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 		private double lat;
 		private double lon;
 		private String image;
+		private String imageProp;
 		private String commonCat;
 
 		public List<SiteLink> getSiteLinks() {
@@ -132,6 +138,14 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 
 		public void setCommonCat(String cc) {
 			this.commonCat = cc;
+		}
+
+		public String getImageProp() {
+			return imageProp;
+		}
+
+		public void setImageProp(String imageProp) {
+			this.imageProp = imageProp;
 		}
 	}
 

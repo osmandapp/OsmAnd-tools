@@ -219,7 +219,7 @@ public class UserdataService {
     
     public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
-                name.endsWith(".obf") || name.endsWith(".sqlitedb"));
+                name.endsWith(".obf") || name.endsWith(".sqlitedb") || name.endsWith(".tif"));
         if (checkExistingServerMap) {
             return downloadService.getServerGlobalFile(name);
         }
@@ -380,6 +380,7 @@ public class UserdataService {
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
                 - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
+            wearOutToken(pu);
             throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
         }
         if (pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
@@ -851,6 +852,7 @@ public class UserdataService {
         if (pu != null && pu.id == dev.userid) {
             boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
             boolean validToken = pu.token.equals(token) && !tokenExpired;
+            wearOutToken(pu);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmail(pu.email);
@@ -905,8 +907,8 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        wearOutToken(pu);
         if (pu.token.equals(code) && !tokenExpired) {
-            clearToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
@@ -922,17 +924,23 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        wearOutToken(pu);
         if (pu.token.equals(token) && !tokenExpired) {
-            clearToken(pu);
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
         }
     }
     
-    public void clearToken(PremiumUsersRepository.PremiumUser pu) {
-        pu.token = null;
-        pu.tokenTime = null;
+    public void wearOutToken(PremiumUsersRepository.PremiumUser pu) {
+        if (pu == null || pu.tokenTime == null) {
+            return;
+        }
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(pu.tokenTime);
+        cal.add(Calendar.HOUR_OF_DAY, -7);
+        pu.tokenTime = cal.getTime();
+        
         usersRepository.saveAndFlush(pu);
     }
     
