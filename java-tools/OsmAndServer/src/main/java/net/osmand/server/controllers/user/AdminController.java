@@ -122,6 +122,9 @@ public class AdminController {
 	private PromoCampaignRepository promoCampaignRepository;
 	
 	@Autowired
+	private PluginsService pluginsService;
+	
+	@Autowired
 	PromoService promoService;
 
 	@Autowired
@@ -447,7 +450,7 @@ public class AdminController {
 	
 	
 	@RequestMapping("/info")
-	public String index(Model model) throws SQLException {
+	public String index(Model model) throws SQLException, IOException {
 		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
 		model.addAttribute("server_commit", serverCommit);
 		String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
@@ -476,7 +479,7 @@ public class AdminController {
 		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, AdminGenericSubReport.MONTH));
 		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, AdminGenericSubReport.DAY));
 		
-		
+		model.addAttribute("plugins", pluginsService.getPluginsAdminInfo());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
 		model.addAttribute("emailsReport", emailService.getEmailsDBReport());
 		model.addAttribute("btc", getBitcoinReport());
