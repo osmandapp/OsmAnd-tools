@@ -176,9 +176,11 @@ public class PluginsService {
 			return res;
 		}
 		res = new PluginInfos();
-		for (File pluginFolder : folder.listFiles()) {
-			if (pluginFolder != null && pluginFolder.isDirectory()) {
-				parsePlugin(pluginFolder, res.plugins);
+		if (folder.exists()) {
+			for (File pluginFolder : folder.listFiles()) {
+				if (pluginFolder != null && pluginFolder.isDirectory()) {
+					parsePlugin(pluginFolder, res.plugins);
+				}
 			}
 		}
 		cache = res;
