@@ -1363,6 +1363,7 @@ public class OsmAndMapsService {
 		initObfReaders();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			if (ref.file.getName().contains("basemap")) {
+				LOGGER.info("Base map successfully found " + ref.file.getName());
 				return ref;
 			}
 		}
