@@ -255,7 +255,7 @@ public class PluginsService {
 				infoVersion.iconUrl = infoVersion.getIconUrl();
 				infoVersion.imageUrl = infoVersion.getImageUrl();
 				infoVersion.osfUrl = "/" + infoVersion.getPath() + "/" + infoVersion.getOsfName();
-				infoVersion.zipSize = fl == null ? new File(pathToRoot, UPLOADS_PLUGINS + infoVersion.osfUrl).length()
+				infoVersion.zipSize = fl == null ? new File(pathToRoot + infoVersion.osfUrl).length()
 						: fl.length();
 			}
 		}
