@@ -34,7 +34,6 @@ import net.osmand.util.Algorithms;
 @Service
 public class PluginsService {
 	
-	private static final String INFO_JSON = "info.json";
 	private static final String ITEMS_JSON = "items.json";
 	private static final String UPLOADS_PLUGINS = "uploads/plugins";
 	private static final String NIGHTLY = "nightly";
@@ -154,11 +153,11 @@ public class PluginsService {
 		cache = null;
 	}
 
-	public PluginInfos getPluginsInfo(String os, String version, boolean nighlty) throws IOException {
+	public PluginInfos getPluginsInfo(String os, String version, boolean nightly) throws IOException {
 		PluginInfos pi = getPluginsInfo();
 		PluginInfos res = new PluginInfos();
 		for (PluginInfoVersion p : pi.plugins) {
-			if (!nighlty ? p.active : p.activeNightly) {
+			if (!nightly ? p.active : p.activeNightly) {
 				res.plugins.add(p);
 			}
 		}
@@ -178,7 +177,7 @@ public class PluginsService {
 		}
 		res = new PluginInfos();
 		for (File pluginFolder : folder.listFiles()) {
-			if (pluginFolder.isDirectory()) {
+			if (pluginFolder != null && pluginFolder.isDirectory()) {
 				parsePlugin(pluginFolder, res.plugins);
 			}
 		}
