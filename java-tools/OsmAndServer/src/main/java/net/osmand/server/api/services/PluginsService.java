@@ -44,6 +44,8 @@ public class PluginsService {
 	
 	private Gson gson = new Gson();	 
 	
+	private PluginInfos cache = null;
+	
 	public static class PluginInfos {
 		List<PluginInfoVersion> plugins = new ArrayList<>();
 	}
@@ -149,9 +151,7 @@ public class PluginsService {
 	}
 	
 	private void recalculateCache() {
-		File folder = new File(pathToRoot, UPLOADS_PLUGINS);
-		File cache = new File(folder, INFO_JSON);
-		cache.delete();
+		cache = null;
 	}
 
 	public PluginInfos getPluginsInfo(String os, String version, boolean nighlty) throws IOException {
@@ -172,29 +172,18 @@ public class PluginsService {
 
 	private PluginInfos getPluginsInfo() throws IOException {
 		File folder = new File(pathToRoot, UPLOADS_PLUGINS);
-		File cache = new File(folder, INFO_JSON);
-		if (cache.exists() && System.currentTimeMillis() - cache.lastModified() > 1000 * 60 * 60 * 12) {
-			FileReader r = new FileReader(cache);
-			PluginInfos res = gson.fromJson(r, PluginInfos.class);
-			r.close();
-			if (res != null) {
-				return res;
-			}
+		PluginInfos res = cache;
+		if (res != null) {
+			return res;
 		}
-		PluginInfos infos = new PluginInfos();
+		res = new PluginInfos();
 		for (File pluginFolder : folder.listFiles()) {
 			if (pluginFolder.isDirectory()) {
-				parsePlugin(pluginFolder, infos.plugins);
+				parsePlugin(pluginFolder, res.plugins);
 			}
 		}
-		writeCache(cache, infos);
-		return infos;
-	}
-
-	private synchronized void writeCache(File cache, PluginInfos infos) throws IOException {
-		FileWriter rw = new FileWriter(cache);
-		gson.toJson(infos, rw);
-		rw.close();
+		cache = res;
+		return res;
 	}
 
 	private void parsePlugin(File pluginFolder, List<PluginInfoVersion> plugins) throws IOException {

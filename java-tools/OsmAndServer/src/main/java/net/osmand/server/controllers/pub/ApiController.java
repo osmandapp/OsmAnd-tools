@@ -614,7 +614,7 @@ public class ApiController {
 	@GetMapping(path = {"/plugins/list"}, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public String pluginsList(@RequestParam(required = false) String version, 
-			@RequestParam(required = false) boolean nighlty, @RequestParam(required = false) String os) throws IOException {
-		return gson.toJson(pluginsService.getPluginsInfo(os, version, nighlty));
+			@RequestParam(required = false) boolean nightly, @RequestParam(required = false) String os) throws IOException {
+		return gson.toJson(pluginsService.getPluginsInfo(os, version, nightly));
 	}
 }
