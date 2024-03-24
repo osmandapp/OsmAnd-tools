@@ -114,6 +114,9 @@ public class ApiController {
 	LotteryPlayService lotteryPlayService;
 	
 	@Autowired
+	PluginsService pluginsService;
+	
+	@Autowired
 	PromoService promoService;
 
 	Gson gson = new Gson();
@@ -607,4 +610,11 @@ public class ApiController {
 		}
 	}
     
+	
+	@GetMapping(path = {"/plugins/list"}, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public String pluginsList(@RequestParam(required = false) String version, 
+			@RequestParam(required = false) boolean nighlty, @RequestParam(required = false) String os) throws IOException {
+		return gson.toJson(pluginsService.getPluginsInfo(os, version, nighlty));
+	}
 }

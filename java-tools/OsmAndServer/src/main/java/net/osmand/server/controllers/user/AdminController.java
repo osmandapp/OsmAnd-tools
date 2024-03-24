@@ -10,6 +10,9 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
@@ -33,7 +36,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -120,6 +125,9 @@ public class AdminController {
 	
 	@Autowired
 	private PromoCampaignRepository promoCampaignRepository;
+	
+	@Autowired
+	private PluginsService pluginsService;
 	
 	@Autowired
 	PromoService promoService;
@@ -447,7 +455,7 @@ public class AdminController {
 	
 	
 	@RequestMapping("/info")
-	public String index(Model model) throws SQLException {
+	public String index(Model model) throws SQLException, IOException {
 		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
 		model.addAttribute("server_commit", serverCommit);
 		String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
@@ -476,7 +484,7 @@ public class AdminController {
 		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, AdminGenericSubReport.MONTH));
 		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, AdminGenericSubReport.DAY));
 		
-		
+		model.addAttribute("plugins", pluginsService.getPluginsAdminInfo());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
 		model.addAttribute("emailsReport", emailService.getEmailsDBReport());
 		model.addAttribute("btc", getBitcoinReport());
@@ -485,6 +493,13 @@ public class AdminController {
 		model.addAttribute("promoSku", PROMO_WEBSITE);
 		
 		return "admin/info";
+	}
+	
+	@PostMapping(path = { "/upload-plugin-file" }, produces = "application/json")
+	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file)
+			throws IOException {
+		Map<String, ?> res = pluginsService.uploadFile(file);
+		return ResponseEntity.ok().body(gson.toJson(res));
 	}
 	
 	private BtcTransactionReport getBitcoinReport() {
