@@ -10,6 +10,9 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
@@ -33,7 +36,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -488,6 +493,13 @@ public class AdminController {
 		model.addAttribute("promoSku", PROMO_WEBSITE);
 		
 		return "admin/info";
+	}
+	
+	@PostMapping(path = { "/upload-plugin-file" }, produces = "application/json")
+	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file)
+			throws IOException {
+		Map<String, ?> res = pluginsService.uploadFile(file);
+		return ResponseEntity.ok().body(gson.toJson(res));
 	}
 	
 	private BtcTransactionReport getBitcoinReport() {
