@@ -29,9 +29,9 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 
 	//private static final Log log = LogFactory.getLog(OsmDbAccessor.class);
 
-	private PreparedStatement pselectNode;
-	private PreparedStatement pselectWay;
-	private PreparedStatement pselectRelation;
+	protected PreparedStatement pselectNode;
+	protected PreparedStatement pselectWay;
+	protected PreparedStatement pselectRelation;
 	private int allRelations;
 	private int allWays;
 	private int allNodes;
