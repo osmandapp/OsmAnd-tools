@@ -1358,6 +1358,16 @@ public class OsmAndMapsService {
 		}
 		return prepareMaps(files, bbox, maxNumberMaps);
 	}
+	
+	public BinaryMapIndexReaderReference getBaseMap() throws IOException {
+		initObfReaders();
+		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
+			if (ref.file.getName().contains("basemap")) {
+				return ref;
+			}
+		}
+		return null;
+	}
 
 	private List<File> prepareMaps(List<File> files, List<LatLon> bbox, int maxNumberMaps) throws IOException {
 		List<File> filesToUse = filterMap(files);

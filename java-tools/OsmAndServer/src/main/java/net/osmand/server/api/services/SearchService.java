@@ -2,10 +2,7 @@ package net.osmand.server.api.services;
 
 import net.osmand.NativeLibrary;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.Amenity;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.QuadRect;
+import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
@@ -191,6 +188,62 @@ public class SearchService {
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
         
         return searchUICore.immediateSearch(text, null);
+    }
+    
+    public SearchUICore.SearchResultCollection searchCitiesByBbox(Set<String> types, QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
+        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+        MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
+        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
+        
+        SearchSettings settings = searchUICore.getPhrase().getSettings();
+        settings.setRegions(osmandRegions);
+        settings.setOfflineIndexes(mapList);
+        
+        SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
+        
+        int attempts = 0;
+        while ((res == null || res.getCurrentSearchResults().isEmpty()) && attempts < 10) {
+            searchBbox = doubleBboxSize(searchBbox);
+            res = searchWithBbox(searchUICore, settings, searchBbox, types);
+            attempts++;
+        }
+        
+        return res;
+    }
+    
+    private SearchUICore.SearchResultCollection searchWithBbox(SearchUICore searchUICore, SearchSettings settings, QuadRect searchBbox, Set<String> types) {
+        searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+        SearchUICore.SearchResultCollection res = null;
+        for (String type : types) {
+            if (res == null) {
+                res = searchUICore.immediateSearch(type, null);
+            } else {
+                SearchUICore.SearchResultCollection searchResults = searchUICore.immediateSearch(type, null);
+                res.addSearchResults(searchResults.getCurrentSearchResults(), false, true);
+            }
+        }
+        return res;
+    }
+    
+    private QuadRect doubleBboxSize(QuadRect bbox) {
+        double centerX = (bbox.left + bbox.right) / 2;
+        double centerY = (bbox.top + bbox.bottom) / 2;
+        double width = bbox.right - bbox.left;
+        double height = bbox.bottom - bbox.top;
+        
+        double newWidth = width * 2;
+        double newHeight = height * 2;
+        
+        return new QuadRect(
+                centerX - newWidth / 2,
+                centerY + newHeight / 2,
+                centerX + newWidth / 2,
+                centerY - newHeight / 2
+        );
     }
     
     public QuadRect getSearchBbox(List<LatLon> bbox) {

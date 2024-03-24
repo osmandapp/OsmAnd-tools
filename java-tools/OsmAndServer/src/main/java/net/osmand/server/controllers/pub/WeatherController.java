@@ -7,7 +7,15 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.GeocodingUtilities;
+import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
+import net.osmand.search.SearchUICore;
+import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.SearchService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +39,9 @@ public class WeatherController {
 	
 	protected static final Log LOGGER = LogFactory.getLog(WeatherController.class);
 	
+	@Autowired
+	SearchService searchService;
+	
 	// Initial increment value for the weather data time interval
 	private static final int INITIAL_INCREMENT = 1;
 	
@@ -49,6 +60,15 @@ public class WeatherController {
 	SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HH");
 	{
 		sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+	}
+	
+	protected static final Map<String, Integer> SETTLEMENT_TYPES;
+	
+	static {
+		SETTLEMENT_TYPES = new HashMap<>();
+		SETTLEMENT_TYPES.put("city", 100000);
+		SETTLEMENT_TYPES.put("town", 10000);
+		SETTLEMENT_TYPES.put("village", 0);
 	}
 
 	@Value("${osmand.weather.location}")
@@ -109,16 +129,30 @@ public class WeatherController {
 	
 	static class AddressInfo {
 		Map<String, String> cityLocalNames;
+		LatLon location;
 		
-		AddressInfo(Map<String, String> names) {
+		AddressInfo(Map<String, String> names, LatLon location) {
 			this.cityLocalNames = names;
+			this.location = location;
 		}
 	}
 	
 	@GetMapping(path = {"/get-address-by-latlon"})
 	@ResponseBody
-	public String getAddressByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException, InterruptedException {
-		List<GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
+	public String getAddressByLatlon(@RequestParam double lat, @RequestParam double lon, @RequestParam(required = false) String nw, @RequestParam(required = false) String se) throws IOException, InterruptedException {
+		QuadRect searchBbox;
+		if (nw == null && se == null) {
+			return getCityByLocation(lat, lon);
+		} else if (nw != null && se != null) {
+			searchBbox = getBbox(lat, lon, nw, se);
+		} else {
+			return gson.toJson(new AddressInfo(Collections.emptyMap(), new LatLon(lat, lon)));
+		}
+		return getCityByBbox(lat, lon, searchBbox);
+	}
+	
+	private String getCityByLocation(double lat, double lon) throws IOException, InterruptedException {
+		List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(lat, lon);
 		
 		Optional<GeocodingResult> nearestResult = list.stream()
 				.filter(result -> result.city != null)
@@ -126,10 +160,87 @@ public class WeatherController {
 		
 		if (nearestResult.isPresent()) {
 			GeocodingResult result = nearestResult.get();
-			return gson.toJson(new AddressInfo(result.city.getNamesMap(true)));
+			return gson.toJson(new AddressInfo(result.city.getNamesMap(true), new LatLon(lat, lon)));
 			
 		}
-		return gson.toJson(new AddressInfo(Collections.emptyMap()));
+		return gson.toJson(new AddressInfo(Collections.emptyMap(), new LatLon(lat, lon)));
 	}
 	
+	private String getCityByBbox(double lat, double lon, QuadRect searchBbox) throws IOException {
+		List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
+		mapList.add(osmAndMapsService.getBaseMap());
+		List<BinaryMapIndexReader> usedMapList = osmAndMapsService.getReaders(mapList, null);
+		
+		SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(SETTLEMENT_TYPES.keySet(), searchBbox, usedMapList);
+		
+		Amenity nearestPlace = getNearestPlace(resultCollection, lat, lon);
+		
+		if (nearestPlace != null) {
+			return gson.toJson(new AddressInfo(nearestPlace.getNamesMap(true), nearestPlace.getLocation()));
+		} else {
+			return gson.toJson(new AddressInfo(Collections.emptyMap(), new LatLon(lat, lon)));
+		}
+	}
+	
+	private QuadRect getBbox(double lat, double lon, String nw, String se) {
+		List<LatLon> bbox = getBbox(nw, se);
+		QuadRect searchBbox = bbox.size() == 2 ? osmAndMapsService.points(null, bbox.get(0), bbox.get(1)) : null;
+		if (searchBbox == null) {
+			return new QuadRect(lon, lat, lon, lat);
+		}
+		return searchBbox;
+	}
+	
+	private long getPopulation(Amenity a) {
+		String population = a.getAdditionalInfo("population");
+		if (population != null) {
+			population = population.replaceAll("\\D", "");
+			if (population.matches("\\d+")) {
+				return Long.parseLong(population);
+			}
+		}
+		return SETTLEMENT_TYPES.get(a.getSubType());
+	}
+	
+	private List<LatLon> getBbox(String nw, String se) {
+		List<LatLon> bbox = new ArrayList<>();
+		String[] nwParts = nw.split(",");
+		String[] seParts = se.split(",");
+		if (nwParts.length == 2 && seParts.length == 2) {
+			bbox.add(new LatLon(Double.parseDouble(nwParts[0]), Double.parseDouble(nwParts[1])));
+			bbox.add(new LatLon(Double.parseDouble(seParts[0]), Double.parseDouble(seParts[1])));
+		}
+		return bbox;
+	}
+	
+	private Amenity getNearestPlace(SearchUICore.SearchResultCollection resultCollection, double centerLat, double centerLon) {
+		List<SearchResult> foundedPlaces = resultCollection.getCurrentSearchResults();
+		List<SearchResult> modifiableFoundedPlaces = new ArrayList<>(foundedPlaces);
+		
+		modifiableFoundedPlaces.sort((o1, o2) -> {
+			if (o1.object instanceof Amenity && o2.object instanceof Amenity) {
+				
+				long population1 = getPopulation((Amenity) o1.object);
+				long population2 = getPopulation((Amenity) o2.object);
+				
+				double lat1 = o1.location.getLatitude();
+				double lon1 = o1.location.getLongitude();
+				double lat2 = o2.location.getLatitude();
+				double lon2 = o2.location.getLongitude();
+				
+				double distance1 = Math.sqrt(Math.pow(centerLat - lat1, 2) + Math.pow(centerLon - lon1, 2));
+				double distance2 = Math.sqrt(Math.pow(centerLat - lat2, 2) + Math.pow(centerLon - lon2, 2));
+				
+				double rating1 = Math.log10(population1 + 1.0) - distance1;
+				double rating2 = Math.log10(population2 + 1.0) - distance2;
+				
+				return Double.compare(rating2, rating1);
+			}
+			return 0;
+		});
+		if (!modifiableFoundedPlaces.isEmpty()) {
+			return (Amenity) modifiableFoundedPlaces.get(0).object;
+		}
+		return null;
+	}
 }
