@@ -74,6 +74,7 @@ public class PluginsService {
 		
 		public String name;
 		public String description;
+		public long zipSize;
 		
 		public String osfUrl;
 		public String imagePath;
@@ -193,7 +194,7 @@ public class PluginsService {
 			File itemsJson = new File(versionFolder, ITEMS_JSON);
 			if (itemsJson.exists()) {
 				FileReader reader = new FileReader(itemsJson);
-				PluginInfoVersion infoVersion = parseItemsJson(reader);
+				PluginInfoVersion infoVersion = parseItemsJson(reader, null);
 				reader.close();
 				String reason = null;
 				if (infoVersion.version == 0) {
@@ -238,7 +239,7 @@ public class PluginsService {
 		plugins.addAll(versions);
 	}
 
-	private PluginInfoVersion parseItemsJson(Reader reader) throws IOException {
+	private PluginInfoVersion parseItemsJson(Reader reader, File fl) throws IOException {
 		ItemsJson infos = gson.fromJson(reader, ItemsJson.class);
 		PluginInfoVersion infoVersion = new PluginInfoVersion();
 		
@@ -253,7 +254,9 @@ public class PluginsService {
 				infoVersion.iconPath = item.icon.get("");
 				infoVersion.iconUrl = infoVersion.getIconUrl();
 				infoVersion.imageUrl = infoVersion.getImageUrl();
-				infoVersion.osfUrl =  "/" + infoVersion.getPath() + "/" + infoVersion.getOsfName();
+				infoVersion.osfUrl = "/" + infoVersion.getPath() + "/" + infoVersion.getOsfName();
+				infoVersion.zipSize = fl == null ? new File(pathToRoot, UPLOADS_PLUGINS + infoVersion.osfUrl).length()
+						: fl.length();
 			}
 		}
 		return infoVersion;
@@ -273,7 +276,7 @@ public class PluginsService {
 			PluginInfoVersion version = null;
 			while ((entry = zis.getNextEntry()) != null) {
 				if (entry.getName().equals(ITEMS_JSON)) {
-					version = parseItemsJson(new InputStreamReader(zis));
+					version = parseItemsJson(new InputStreamReader(zis), fl);
 					break;
 				}
 			}
