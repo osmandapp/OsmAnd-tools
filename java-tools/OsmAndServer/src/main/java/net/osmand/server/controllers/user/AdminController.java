@@ -502,6 +502,18 @@ public class AdminController {
 		return ResponseEntity.ok().body(gson.toJson(res));
 	}
 	
+	@PostMapping(path = {"/delete-plugin-version"})
+	public String deletePlugin(@RequestParam String plugin, @RequestParam String version) throws IOException {
+		pluginsService.deletePluginVersion(plugin, version);
+		return "redirect:info#plugins";
+	}
+	
+	@PostMapping(path = {"/publish-plugin-version"})
+	public String publish(@RequestParam String plugin, @RequestParam String version) throws IOException {
+		pluginsService.publish(plugin, version);
+		return "redirect:info#plugins";
+	}
+	
 	private BtcTransactionReport getBitcoinReport() {
 //		new File(websiteLocation, BTC_REPORT);
 		return reports.getBitcoinTransactionReport();

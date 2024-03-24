@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -26,11 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 
 import net.osmand.util.Algorithms;
 
-// TODO cache json & recalculate
-// TODO publish button 
 @Service
 public class PluginsService {
 	
@@ -52,7 +52,6 @@ public class PluginsService {
 		String type;
 		String pluginId;
 		int version;
-		long publishedDate;
 		Map<String, String> icon;
 		Map<String, String> image;
 		Map<String, String> name;
@@ -61,11 +60,13 @@ public class PluginsService {
 	
 	public static class ItemsJson {
 		public List<ItemInfo> items = new ArrayList<>();
+		public long published;
 	}
 	
 	
 	public static class PluginInfoVersion {
 		public boolean active;
+		public boolean activeNightly;
 		public String pluginId;
 		public int version;
 		public String publishedDate;
@@ -115,11 +116,49 @@ public class PluginsService {
 
 	}
 	
+	public PluginInfoVersion getVersion(String plugin, String version) throws IOException {
+		for (PluginInfoVersion v : getPluginsInfo().plugins) {
+			if (v.pluginId.equals(plugin) && version.equals(v.version + "")) {
+				return v;
+			}
+		}
+		return null;
+	}
+	
+	public void publish(String plugin, String version) throws IOException {
+		PluginInfoVersion v = getVersion(plugin, version);
+		if (v != null && v.isNightly()) {
+			File itemsJson = new File(new File(pathToRoot, v.getPath()), ITEMS_JSON);
+			FileReader reader = new FileReader(itemsJson);
+			JsonElement element = gson.fromJson(reader, JsonElement.class);
+			reader.close();
+			element.getAsJsonObject().addProperty("published", System.currentTimeMillis());
+			FileWriter fw = new FileWriter(itemsJson);
+			gson.toJson(element, fw);
+			fw.close();
+			recalculateCache();
+		}
+	}
+
+	public void deletePluginVersion(String plugin, String version) throws IOException {
+		PluginInfoVersion v = getVersion(plugin, version);
+		if(v != null) {
+			Algorithms.removeAllFiles(new File(pathToRoot, v.getPath()));
+			recalculateCache();
+		}
+	}
+	
+	private void recalculateCache() {
+		File folder = new File(pathToRoot, UPLOADS_PLUGINS);
+		File cache = new File(folder, INFO_JSON);
+		cache.delete();
+	}
+
 	public PluginInfos getPluginsInfo(String os, String version, boolean nighlty) throws IOException {
 		PluginInfos pi = getPluginsInfo();
 		PluginInfos res = new PluginInfos();
-		for(PluginInfoVersion p : pi.plugins) {
-			if (p.isNightly() && p.active) {
+		for (PluginInfoVersion p : pi.plugins) {
+			if (!nighlty ? p.active : p.activeNightly) {
 				res.plugins.add(p);
 			}
 		}
@@ -132,25 +171,33 @@ public class PluginsService {
 	}
 
 	private PluginInfos getPluginsInfo() throws IOException {
+		File folder = new File(pathToRoot, UPLOADS_PLUGINS);
+		File cache = new File(folder, INFO_JSON);
+		if (cache.exists() && System.currentTimeMillis() - cache.lastModified() > 1000 * 60 * 60 * 12) {
+			FileReader r = new FileReader(cache);
+			PluginInfos res = gson.fromJson(r, PluginInfos.class);
+			r.close();
+			if (res != null) {
+				return res;
+			}
+		}
 		PluginInfos infos = new PluginInfos();
-		File file = new File(pathToRoot, UPLOADS_PLUGINS);
-		for (File pluginFolder : file.listFiles()) {
+		for (File pluginFolder : folder.listFiles()) {
 			if (pluginFolder.isDirectory()) {
 				parsePlugin(pluginFolder, infos.plugins);
 			}
 		}
+		writeCache(cache, infos);
 		return infos;
 	}
 
+	private synchronized void writeCache(File cache, PluginInfos infos) throws IOException {
+		FileWriter rw = new FileWriter(cache);
+		gson.toJson(infos, rw);
+		rw.close();
+	}
+
 	private void parsePlugin(File pluginFolder, List<PluginInfoVersion> plugins) throws IOException {
-		File pluginInfo = new File(pluginFolder, INFO_JSON);
-		if (pluginInfo.exists()) {
-			FileReader reader = new FileReader(pluginInfo);
-			PluginInfos infos = gson.fromJson(reader, PluginInfos.class);
-			plugins.addAll(infos.plugins);
-			reader.close();
-			return;
-		}
 		List<PluginInfoVersion> versions = new ArrayList<>();
 		for (File versionFolder : pluginFolder.listFiles()) {
 			File itemsJson = new File(versionFolder, ITEMS_JSON);
@@ -186,10 +233,11 @@ public class PluginsService {
 		for (int i = 0; i < versions.size(); i++) {
 			PluginInfoVersion v = versions.get(i);
 			if (i == 0) {
-				v.active = true;
+				v.activeNightly = true;
 				if (v.publishedDate == null) {
 					v.publishedDate = NIGHTLY;
 				} else {
+					v.active = true;
 					break;
 				}
 			} else if (v.publishedDate != null) {
@@ -203,12 +251,13 @@ public class PluginsService {
 	private PluginInfoVersion parseItemsJson(Reader reader) throws IOException {
 		ItemsJson infos = gson.fromJson(reader, ItemsJson.class);
 		PluginInfoVersion infoVersion = new PluginInfoVersion();
+		
 		for (ItemInfo item : infos.items) {
 			if (item.type.equals("PLUGIN")) {
 				infoVersion.pluginId = item.pluginId;
 				infoVersion.version = item.version;
 				infoVersion.name = item.name.get("");
-				infoVersion.publishedDate = item.publishedDate == 0 ? null : new Date(item.publishedDate).toString();
+				infoVersion.publishedDate = infos.published == 0 ? null : new Date(infos.published).toString();
 				infoVersion.description = item.description.get("");
 				infoVersion.imagePath = item.image.get("");
 				infoVersion.iconPath = item.icon.get("");
@@ -279,6 +328,7 @@ public class PluginsService {
 					fous.close();
 				}
 			}
+			recalculateCache();
 			return Map.of("status", "ok", "pluginid", version.pluginId, "version", version.version, "name",
 					version.name, "files", files);
 		} finally {
@@ -290,6 +340,7 @@ public class PluginsService {
 		
 		
 	}
+
 
 
 }
