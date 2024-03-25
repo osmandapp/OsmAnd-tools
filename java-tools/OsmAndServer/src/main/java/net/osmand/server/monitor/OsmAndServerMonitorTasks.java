@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.ParseException;
@@ -458,6 +457,17 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 
+	private String getRoutingStatus() {
+		try {
+			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/web-route-stats.txt").openStream()).toString();
+			res = prepareAccessStats(res);
+			return res;
+		} catch (Exception e) {
+			LOG.warn(e.getMessage(), e);
+			return "Error: " + e.getMessage();
+		}
+	}
+	
 	private String getTirexStatus() {
 		try {
 			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
@@ -479,8 +489,8 @@ public class OsmAndServerMonitorTasks {
 		String[] spl = lns.split("\n");
 		if (spl.length >= 2) {
 			String result = "\n";
-			String[] percents = spl[0].split("\\s+");
-			String[] timings = spl[1].split("\\s+");
+			String[] percents = spl[spl.length - 2].split("\\s+");
+			String[] timings = spl[spl.length - 1].split("\\s+");
 			for (int i = 1; i < timings.length && i < percents.length; i++) {
 				double d = Double.parseDouble(timings[i].trim());
 				result += String.format("%.2fs (%s) ", d, percents[i]);
@@ -588,9 +598,21 @@ public class OsmAndServerMonitorTasks {
 
 	private String getTileServerMessage() {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
-		return String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
+		String msg = String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
 				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec. %s",
 				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC), getTirexStatus());
+		String url ="https://maptile.osmand.net/routing/route?routeMode=car&points=51.063218,6.211030&points=51.179417,8.490871&maxDist=100";
+		String routingStatus = "OK";
+		long time = System.nanoTime();
+		try {
+			Algorithms.readFromInputStream(new URL(url).openStream()).toString();
+		} catch (Exception e) {
+			LOG.info(e.getMessage(), e);
+			routingStatus = "FAILED";
+		}
+		msg += String.format("\n<a href='" + url + "'>routing</a>: " + "<b>%s</b>. Response time: %.1f sec. %s",
+				routingStatus, (System.nanoTime() - time) / 1.0e9, getRoutingStatus());
+		return msg;
 	}
 
 	private DescriptiveStatistics readStats(String key, double hour) {

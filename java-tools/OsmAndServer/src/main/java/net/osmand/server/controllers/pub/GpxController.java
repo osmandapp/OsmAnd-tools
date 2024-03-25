@@ -1,7 +1,6 @@
 package net.osmand.server.controllers.pub;
 
 
-import static net.osmand.NativeJavaRendering.parseStorage;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,7 +8,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -17,11 +17,6 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.gson.GsonBuilder;
-import net.osmand.render.RenderingRulesStorage;
-import net.osmand.server.api.services.GpxService;
-import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,24 +38,20 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
-import org.xml.sax.SAXException;
-import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
-import net.osmand.gpx.GPXUtilities;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.IProgress;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXTrackAnalysis;
 import net.osmand.gpx.GPXUtilities;
-import net.osmand.render.RenderingRulesStorage;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
+import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 
 
