@@ -3,19 +3,16 @@ package net.osmand.server.api.services;
 import static net.osmand.util.MapUtils.rhumbDestinationPoint;
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -118,7 +115,9 @@ public class OsmAndMapsService {
 	private static final long MAX_SAME_PROFILE_WAIT_MS = 6000;
 
 
-	private static final String INTERACTIVE_KEY = "interactive";
+	private static final String INTERACTIVE_KEY = "int";
+	private static final String DEFAULT_INTERACTIVE_STYLE = "hd";
+	private static final String INTERACTIVE_STYLE_DELIMITER = "-";
 	
 	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
@@ -550,12 +549,14 @@ public class OsmAndMapsService {
 			if (tileInfo != null) {
 				return tileInfo;
 			}
-			File cf = getCacheFile(".json");
+			File cf = getCacheFile(".json.gz");
 			if (cf != null && cf.exists()) {
-				String jsonStr = new String(Files.readAllBytes(cf.toPath()));
-				JsonParser parser = new JsonParser();
-				tileInfo = parser.parse(jsonStr).getAsJsonObject();
-				return tileInfo;
+				try (GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(cf));
+				     Reader reader = new InputStreamReader(gzip, StandardCharsets.UTF_8)) {
+					JsonParser parser = new JsonParser();
+					tileInfo = parser.parse(reader).getAsJsonObject();
+					return tileInfo;
+				}
 			}
 			return null;
 		}
@@ -568,9 +569,9 @@ public class OsmAndMapsService {
 			int y = top >> (31 - z) >> metaSizeLog;
 			StringBuilder loc = new StringBuilder();
 			
-			if (ext.equals(".json")) {
-				loc.append("info").append("/");
-			}
+//			if (ext.equals(".json")) {
+//				loc.append("info").append("/");
+//			}
 			
 			loc.append(interactiveKey != null ? interactiveKey : style.key).append("/").append(z);
 			while (x >= MAX_FILES_PER_FOLDER) {
@@ -785,13 +786,16 @@ public class OsmAndMapsService {
 	}
 	
 	private void buildCacheFileInfo(VectorMetatile tile) throws IOException {
-		File cacheFileInfo = tile.getCacheFile(".json");
+		File cacheFileInfo = tile.getCacheFile(".json.gz");
 		if (cacheFileInfo != null) {
 			cacheFileInfo.getParentFile().mkdirs();
 			if (cacheFileInfo.getParentFile().exists()) {
 				JsonObject info = tile.getInfo();
 				if (info != null) {
-					Files.write(cacheFileInfo.toPath(), info.toString().getBytes());
+					try (GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(cacheFileInfo));
+					     Writer writer = new OutputStreamWriter(gzip, StandardCharsets.UTF_8)) {
+						writer.write(info.toString());
+					}
 				}
 			}
 		}
@@ -1627,10 +1631,13 @@ public class OsmAndMapsService {
 	}
 	
 	public String getInteractiveKeyMap(String style) {
-		return style.equals(INTERACTIVE_KEY) ? INTERACTIVE_KEY : null;
+		return style.startsWith(INTERACTIVE_KEY) ? style + INTERACTIVE_STYLE_DELIMITER + DEFAULT_INTERACTIVE_STYLE : null;
 	}
 	
 	public String getMapStyle(String style, String interactiveKey) {
-		return interactiveKey != null ? "hd" : style;
+		if (interactiveKey == null) {
+			return style;
+		}
+		return style.equals(INTERACTIVE_KEY) ? DEFAULT_INTERACTIVE_STYLE : style.split(INTERACTIVE_KEY + INTERACTIVE_STYLE_DELIMITER)[1];
 	}
 }
