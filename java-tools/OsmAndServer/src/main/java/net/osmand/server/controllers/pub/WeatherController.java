@@ -6,9 +6,9 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.GeocodingUtilities;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -167,14 +167,17 @@ public class WeatherController {
 	}
 	
 	private String getCityByBbox(double lat, double lon, QuadRect searchBbox) throws IOException {
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
-		mapList.add(osmAndMapsService.getBaseMap());
-		List<BinaryMapIndexReader> usedMapList = osmAndMapsService.getReaders(mapList, null);
-		
-		SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(SETTLEMENT_TYPES.keySet(), searchBbox, usedMapList);
-		
-		Amenity nearestPlace = getNearestPlace(resultCollection, lat, lon);
-		
+		Amenity nearestPlace;
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
+			mapList.add(osmAndMapsService.getBaseMap());
+			usedMapList = osmAndMapsService.getReaders(mapList, null);
+			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(SETTLEMENT_TYPES.keySet(), searchBbox, usedMapList);
+			nearestPlace = getNearestPlace(resultCollection, lat, lon);
+		} finally {
+			osmAndMapsService.unlockReaders(usedMapList);
+		}
 		if (nearestPlace != null) {
 			return gson.toJson(new AddressInfo(nearestPlace.getNamesMap(true), nearestPlace.getLocation()));
 		} else {
