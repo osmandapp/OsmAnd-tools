@@ -41,9 +41,6 @@ int main(int argc, char* argv[])
 #endif // defined(OSMAND_CORE_STATIC)
     OsmAnd::InitializeCore(coreResourcesEmbeddedBundle);
 
-    // Fix parsing SVG with SkParse
-    setlocale(LC_NUMERIC, "C");
-
     // Parse configuration
     OsmAndTools::EyePiece::Configuration configuration;
     QString error;
