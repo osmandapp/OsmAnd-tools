@@ -93,6 +93,7 @@ public class UserdataService {
     Gson gson = new Gson();
     
     public static final String ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE = "File is not available";
+    public static final String INFO_DEVICE_WEB = "OsmAnd @ Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PREMIUM_USERS = 100;
     private static final long MB = 1024 * 1024;
@@ -314,11 +315,11 @@ public class UserdataService {
         return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
     
-    public ResponseEntity<String> webUserActivate(String email, String token, String password) {
+    public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
         if (password.length() < 6) {
             throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
         }
-        return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
+        return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password), lang, INFO_DEVICE_WEB);
     }
 
 	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email,
@@ -371,8 +372,9 @@ public class UserdataService {
         }
         return hdName.toString() + email.substring(at);
     }
-    
-    public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken) {
+
+    public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken,
+                                                    String lang, String info) {
         email = email.toLowerCase().trim();
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
         if (pu == null) {
@@ -393,6 +395,8 @@ public class UserdataService {
                 deviceId)) != null) {
             devicesRepository.delete(sameDevice);
         }
+        device.lang = lang;
+        device.info = info;
         device.userid = pu.id;
         device.deviceid = deviceId;
         device.udpatetime = new Date();
@@ -983,5 +987,13 @@ public class UserdataService {
         request.logout();
         
         return ok();
+    }
+
+    public void updateDeviceLangInfo(PremiumUserDevicesRepository.PremiumUserDevice dev, String lang, String info) {
+        if (dev != null) {
+            dev.lang = (lang == null) ? dev.lang : lang;
+            dev.info = (info == null) ? dev.info : info;
+            devicesRepository.saveAndFlush(dev);
+        }
     }
 }

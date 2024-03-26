@@ -154,8 +154,6 @@ public class UserdataController {
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
 
-    
-
 	@PostMapping(value = "/user-update-orderid")
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
@@ -241,10 +239,15 @@ public class UserdataController {
 
 	@PostMapping(value = "/device-register")
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
-			@RequestParam(name = "token", required = true) String token,
-			@RequestParam(name = "deviceid", required = false) String deviceId) throws IOException {
+	                                             @RequestParam(name = "token", required = true) String token,
+	                                             @RequestParam(name = "deviceid", required = false) String deviceId,
+	                                             @RequestParam(name = "model", required = false) String model,
+	                                             @RequestParam(name = "lang", required = false) String lang,
+	                                             @RequestHeader("User-Agent") String userAgent
+	) throws IOException {
 		String accessToken = UUID.randomUUID().toString();
-		return userdataService.registerNewDevice(email, token, deviceId, accessToken);
+		String info = (userAgent == null ? "OsmAnd" : userAgent) + (model == null ? "" : (" @ " + model));
+		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, info);
 	}
 
 	@PostMapping(value = "/delete-file")

@@ -3,8 +3,7 @@ package net.osmand.server.controllers.user;
 import java.io.*;
 
 import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
-import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
-import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
+import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.ByteArrayInputStream;
@@ -80,56 +79,56 @@ public class MapApiController {
 	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
 
 	private static final String INFO_KEY = "info";
-											   
+
 
 	@Autowired
 	UserdataController userdataController;
-	
+
 	@Autowired
 	GpxController gpxController;
-	
+
 	@Autowired
 	PremiumUserFilesRepository userFilesRepository;
-	
+
 	@Autowired
 	AuthenticationManager authManager;
-	
+
 	@Autowired
 	PremiumUsersRepository usersRepository;
-	
+
 	@Autowired
 	UserdataService userdataService;
-	
+
 	@Autowired
 	protected StorageService storageService;
-	
+
 	@Autowired
 	protected PremiumUserFilesRepository filesRepository;
-	
+
 	@Autowired
 	protected GpxService gpxService;
-	
+
 	@Autowired
 	WebGpxParser webGpxParser;
-	
+
 	@Autowired
 	UserSessionResources session;
-	
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
-	
+
 	@Autowired
 	private EmailSenderService emailSender;
-	
+
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
-	
+
 	OsmandRegions osmandRegions;
-	
+
 	Gson gson = new Gson();
-	
+
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
-	
+
 	JsonParser jsonParser = new JsonParser();
 
 	public static class UserPasswordPost {
@@ -137,6 +136,7 @@ public class MapApiController {
 		public String username;
 		public String password;
 		public String token;
+		public String lang;
 	}
 
 	@GetMapping(path = { "/auth/loginForm" }, produces = "text/html;charset=UTF-8")
@@ -183,9 +183,13 @@ public class MapApiController {
 			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", username));
 		}
 		request.login(username, password);
+
+		PremiumUserDevice dev = checkUser();
+		userdataService.updateDeviceLangInfo(dev, credentials.lang, INFO_DEVICE_WEB);
+
 		return okStatus();
 	}
-	
+
 	@PostMapping(path = {"/auth/delete-account"})
 	public ResponseEntity<String> deleteAccount(@RequestParam String token, HttpServletRequest request)
 			throws ServletException {
@@ -195,7 +199,7 @@ public class MapApiController {
 		}
 		return userdataService.deleteAccount(token, dev, request);
 	}
-	
+
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
 		String username = credentials.username;
@@ -204,7 +208,7 @@ public class MapApiController {
 		if (username == null || password == null || token == null) {
 			return ResponseEntity.badRequest().body("Username, password and token are required");
 		}
-		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password);
+		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password, credentials.lang);
 		if (res.getStatusCodeValue() < 300) {
 			request.logout();
 			request.login(username, password);
@@ -227,7 +231,7 @@ public class MapApiController {
 		}
 		return userdataService.webUserRegister(username, lang);
 	}
-	
+
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
 		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 		if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
@@ -235,27 +239,27 @@ public class MapApiController {
 		}
 		return null;
 	}
-	
+
 	private ResponseEntity<String> tokenNotValid() {
 	    return new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
 
 	}
-	
+
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> uploadFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                     @RequestParam String name, @RequestParam String type) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
 		// probably it's better to support multiple file upload without these checks
 		PremiumUserDevice dev = checkUser();
-		
+
 		if (dev == null) {
 			return tokenNotValid();
 		}
 		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
-		
+
 		return okStatus();
 	}
-	
+
 	@PostMapping(value = "/delete-file")
 	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
 		PremiumUserDevice dev = checkUser();
@@ -265,7 +269,7 @@ public class MapApiController {
 		userdataService.deleteFile(name, type, null, null, dev);
 		return userdataService.ok();
 	}
-	
+
 	@PostMapping(value = "/delete-file-version")
 	public ResponseEntity<String> deleteFile(@RequestParam String name,
 	                                         @RequestParam String type,
@@ -277,7 +281,7 @@ public class MapApiController {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
 	}
-	
+
 	@GetMapping(value = "/rename-file")
 	public ResponseEntity<String> renameFile(@RequestParam String oldName,
 	                                         @RequestParam String newName,
@@ -292,7 +296,7 @@ public class MapApiController {
 		}
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
-	
+
 	@GetMapping(value = "/rename-folder")
 	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
 	                                           @RequestParam String type,
@@ -303,7 +307,7 @@ public class MapApiController {
 		}
 		return userdataService.renameFolder(folderName, newFolderName, type, dev);
 	}
-	
+
 	@GetMapping(value = "/delete-folder")
 	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
 	                                           @RequestParam String type) {
@@ -313,7 +317,7 @@ public class MapApiController {
 		}
 		return userdataService.deleteFolder(folderName, type, dev);
 	}
-	
+
 	@GetMapping(value = "/list-files")
 	public ResponseEntity<String> listFiles(
 			@RequestParam(name = "name", required = false) String name,
@@ -373,7 +377,7 @@ public class MapApiController {
 		}
 		return ResponseEntity.ok(gson.toJson(res));
 	}
-	
+
 	private boolean isHidden(WebGpxParser.PointsGroup group) {
 		for (WebGpxParser.Wpt wpt:  group.points) {
 			if (wpt.hidden != null && wpt.hidden.equals("true")) {
@@ -393,15 +397,15 @@ public class MapApiController {
 
 	private boolean analysisPresent(String tag, JsonObject details) {
 		return details != null && details.has(tag + DONE_SUFFIX)
-				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN 
+				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN
 				&& details.has(tag) && !details.get(tag).isJsonNull();
 	}
-	
+
 	private boolean analysisPresentFavorites(String tag, JsonObject details) {
 		return details != null && details.has(tag + DONE_SUFFIX)
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
-	
+
 	@GetMapping(value = "/download-file")
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
 			@RequestParam(name = "name", required = true) String name,
@@ -418,7 +422,7 @@ public class MapApiController {
 		}
 		userdataService.getFile(response, request, name, type, updatetime, dev);
 	}
-	
+
 	@GetMapping(value = "/get-gpx-info")
 	public ResponseEntity<String> getGpxInfo(HttpServletResponse response, HttpServletRequest request,
 			@RequestParam(name = "name", required = true) String name,
@@ -432,7 +436,7 @@ public class MapApiController {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
 			}
 			bin = userdataService.getInputStream(dev, userFile);
-			
+
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
 			if (gpxFile == null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
@@ -469,7 +473,7 @@ public class MapApiController {
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
 	}
-	
+
 
 	@GetMapping(path = {"/get-srtm-gpx-info"}, produces = "application/json")
 	public ResponseEntity<String> getSrtmGpx(HttpServletResponse response, HttpServletRequest request,
@@ -500,7 +504,7 @@ public class MapApiController {
 			}
 		}
 	}
-	
+
 	@PostMapping(value = "/download-backup")
 	public void createBackup(HttpServletResponse response,
 	                         @RequestParam(name = "updatetime", required = false) boolean includeDeleted,
@@ -517,7 +521,7 @@ public class MapApiController {
 		}
 		userdataService.getBackup(response, dev, Set.copyOf(data), includeDeleted, format);
 	}
-	
+
 	@PostMapping(value = "/download-backup-folder")
 	public void createBackupFolder(@RequestParam String format,
 	                               @RequestParam String folderName,
@@ -534,13 +538,13 @@ public class MapApiController {
 		}
 		userdataService.getBackupFolder(response, dev, folderName, format, type);
 	}
-	
+
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
 	public ResponseEntity<String> checkDownload(@RequestParam(value = "file_name", required = false) String fn,
 			@RequestParam(value = "file_size", required = false) String sz) throws IOException {
 		return okStatus();
 	}
-	
+
 	@RequestMapping(path = {"/download-obf"})
 	public ResponseEntity<Resource> downloadObf(HttpServletResponse response, @RequestBody List<String> names)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
@@ -561,12 +565,12 @@ public class MapApiController {
 			targetObf = osmAndMapsService.getObf(files);
 			fis = new FileInputStream(targetObf);
 			Algorithms.streamCopy(fis, os);
-			
+
 			HttpHeaders headers = new HttpHeaders();
 			headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + targetObf.getName());
 			headers.add(HttpHeaders.CONTENT_TYPE, "application/octet-binary");
 			headers.add(HttpHeaders.CONTENT_LENGTH, targetObf.length() + "");
-			
+
 			return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 		} finally {
 			if (is != null) {
@@ -580,7 +584,7 @@ public class MapApiController {
 			}
 		}
 	}
-	
+
 	@GetMapping(path = {"/get-account-info"})
 	public ResponseEntity<String> getAccountInfo() {
 		final String ACCOUNT_KEY = "account";
@@ -590,11 +594,11 @@ public class MapApiController {
 		final String START_TIME_KEY = "startTime";
 		final String EXPIRE_TIME_KEY = "expireTime";
 		final String MAX_ACCOUNT_SIZE = "maxAccSize";
-		
+
 		PremiumUserDevice dev = checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
 		Map<String, String> info = new HashMap<>();
-		
+
 		String orderId = pu.orderid;
 		if (orderId == null) {
 			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
@@ -617,7 +621,7 @@ public class MapApiController {
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
 	}
-	
+
 	@PostMapping(path = {"/auth/send-code"})
 	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang) {
 		PremiumUserDevice dev = checkUser();
@@ -630,7 +634,7 @@ public class MapApiController {
 		}
 		return userdataService.sendCode(action, lang, pu);
 	}
-	
+
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
 		if (emailSender.isEmail(email)) {
@@ -658,13 +662,13 @@ public class MapApiController {
 			pu.regTime = new Date();
 			pu.orderid = null;
 			usersRepository.saveAndFlush(pu);
-			
+
 			// send code to new email
 			return userdataService.sendCode(action, lang, pu);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
-	
+
 	@PostMapping(path = {"/auth/change-email"})
 	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
 		String username = credentials.username;
@@ -682,7 +686,7 @@ public class MapApiController {
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
-	
+
 	@GetMapping(path = {"/regions-by-latlon"})
 	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
 		List<String> regions = new ArrayList<>();
