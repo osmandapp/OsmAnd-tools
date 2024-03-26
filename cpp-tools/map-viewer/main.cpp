@@ -313,9 +313,6 @@ int main(int argc, char** argv)
 
     //OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
 
-    // Fix parsing SVG with SkParse
-    setlocale(LC_NUMERIC, "C");
-
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::ValueAnimator valueAnimator;
     valueAnimator.animateValueTo<float>(
