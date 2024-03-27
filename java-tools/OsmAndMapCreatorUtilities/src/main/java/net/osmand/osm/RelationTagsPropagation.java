@@ -158,7 +158,7 @@ public class RelationTagsPropagation {
 	                                         OsmDbAccessorContext ctx, EntityConvertApplyType at) throws SQLException {
 		Map<String, String> relationTags = relation.getTags();
 		relationTags = renderingTypes.transformTags(relationTags, EntityType.RELATION, at);
-		relationTags = replaceEmptyRouteName(relationTags, relation);
+		relationTags = addRelationIdForRoutes(relationTags, relation);
 		List<RelationRulePropagation> lst = processRelationTags(renderingTypes, relationTags, at);
 		if (lst != null) {
 			if (ctx != null) {
@@ -195,15 +195,10 @@ public class RelationTagsPropagation {
 		}
 	}
 
-	public Map<String, String> replaceEmptyRouteName(Map<String, String> tags, Relation relation) {
-		if (tags.containsKey(OSMSettings.OSMTagKey.ROUTE.getValue())
-				&& !tags.containsKey(OSMSettings.OSMTagKey.NAME.getValue())) {
+	public Map<String, String> addRelationIdForRoutes(Map<String, String> tags, Relation relation) {
+		if (tags.containsKey(OSMSettings.OSMTagKey.ROUTE.getValue())) {
 			tags = new LinkedHashMap<>(tags);
-			String newName = tags.get(OSMSettings.OSMTagKey.REF.getValue());
-			if (Algorithms.isEmpty(newName)) {
-				newName = "(" + relation.getId() + ")";
-			}
-			tags.put(OSMSettings.OSMTagKey.NAME.getValue(), newName);
+			tags.put(OSMSettings.OSMTagKey.RELATION_ID.getValue(), String.valueOf(relation.getId()));
 		}
 		return tags;
 	}
