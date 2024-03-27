@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.*;
 
+import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 
@@ -190,7 +191,7 @@ public class SearchService {
         return searchUICore.immediateSearch(text, null);
     }
     
-    public SearchUICore.SearchResultCollection searchCitiesByBbox(Set<String> types, QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
+    public SearchUICore.SearchResultCollection searchCitiesByBbox(QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
@@ -203,6 +204,7 @@ public class SearchService {
         settings.setRegions(osmandRegions);
         settings.setOfflineIndexes(mapList);
         
+        Set<String> types = getAllCityTypeStrings();
         SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
         
         int attempts = 0;

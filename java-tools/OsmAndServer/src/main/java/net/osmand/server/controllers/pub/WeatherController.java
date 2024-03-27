@@ -10,6 +10,7 @@ import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
+import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.search.SearchUICore;
@@ -32,6 +33,8 @@ import com.google.gson.Gson;
 import net.osmand.obf.preparation.IndexWeatherData;
 import net.osmand.obf.preparation.IndexWeatherData.WeatherTiff;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import static net.osmand.data.City.CityType.valueFromString;
 
 @Controller
 @RequestMapping("/weather-api")
@@ -60,15 +63,6 @@ public class WeatherController {
 	SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HH");
 	{
 		sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-	}
-	
-	protected static final Map<String, Integer> SETTLEMENT_TYPES;
-	
-	static {
-		SETTLEMENT_TYPES = new HashMap<>();
-		SETTLEMENT_TYPES.put("city", 100000);
-		SETTLEMENT_TYPES.put("town", 10000);
-		SETTLEMENT_TYPES.put("village", 0);
 	}
 
 	@Value("${osmand.weather.location}")
@@ -173,7 +167,7 @@ public class WeatherController {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
 			mapList.add(osmAndMapsService.getBaseMap());
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
-			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(SETTLEMENT_TYPES.keySet(), searchBbox, usedMapList);
+			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(searchBbox, usedMapList);
 			nearestPlace = getNearestPlace(resultCollection, lat, lon);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
@@ -202,7 +196,8 @@ public class WeatherController {
 				return Long.parseLong(population);
 			}
 		}
-		return SETTLEMENT_TYPES.get(a.getSubType());
+		City.CityType type = valueFromString(a.getSubType());
+		return type.getPopulation();
 	}
 	
 	private List<LatLon> getBbox(String nw, String se) {
