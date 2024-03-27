@@ -217,21 +217,8 @@ public class WeatherController {
 		
 		modifiableFoundedPlaces.sort((o1, o2) -> {
 			if (o1.object instanceof Amenity && o2.object instanceof Amenity) {
-				
-				long population1 = getPopulation((Amenity) o1.object);
-				long population2 = getPopulation((Amenity) o2.object);
-				
-				double lat1 = o1.location.getLatitude();
-				double lon1 = o1.location.getLongitude();
-				double lat2 = o2.location.getLatitude();
-				double lon2 = o2.location.getLongitude();
-				
-				double distance1 = Math.sqrt(Math.pow(centerLat - lat1, 2) + Math.pow(centerLon - lon1, 2));
-				double distance2 = Math.sqrt(Math.pow(centerLat - lat2, 2) + Math.pow(centerLon - lon2, 2));
-				
-				double rating1 = Math.log10(population1 + 1.0) - distance1;
-				double rating2 = Math.log10(population2 + 1.0) - distance2;
-				
+				double rating1 = getRating(o1, centerLat, centerLon);
+				double rating2 = getRating(o2, centerLat, centerLon);
 				return Double.compare(rating2, rating1);
 			}
 			return 0;
@@ -240,5 +227,14 @@ public class WeatherController {
 			return (Amenity) modifiableFoundedPlaces.get(0).object;
 		}
 		return null;
+	}
+	
+	private double getRating(SearchResult sr, double centerLat, double centerLon) {
+		long population = getPopulation((Amenity) sr.object);
+		double lat1 = sr.location.getLatitude();
+		double lon1 = sr.location.getLongitude();
+		double distance = Math.sqrt(Math.pow(centerLat - lat1, 2) + Math.pow(centerLon - lon1, 2));
+		
+		return Math.log10(population + 1.0) - distance;
 	}
 }
