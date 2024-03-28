@@ -3,25 +3,30 @@ package net.osmand.server.api.services;
 import static net.osmand.util.MapUtils.rhumbDestinationPoint;
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import net.osmand.IndexConstants;
+import net.osmand.NativeLibrary;
+import net.osmand.map.WorldRegion;
+import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.server.utils.WebGpxParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -110,6 +115,11 @@ public class OsmAndMapsService {
 	private static final long MAX_SAME_PROFILE_WAIT_MS = 6000;
 
 
+	private static final String INTERACTIVE_KEY = "int";
+	private static final String DEFAULT_INTERACTIVE_STYLE = "hd";
+	private static final String INTERACTIVE_STYLE_DELIMITER = "-";
+	
+	
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 
 	CachedOsmandIndexes cacheFiles = null;
@@ -476,9 +486,11 @@ public class OsmAndMapsService {
 		public final int tileSizeLog;
 		public final VectorStyle style;
 		private final VectorTileServerConfig cfg;
+		private JsonObject info;
+		private final String interactiveKey;
 
 		public VectorMetatile(VectorTileServerConfig cfg, String tileId, VectorStyle style, int z, int left, int top,
-				int metaSizeLog, int tileSizeLog) {
+				int metaSizeLog, int tileSizeLog, String interactiveKey) {
 			this.cfg = cfg;
 			this.style = style;
 			this.metaSizeLog = metaSizeLog;
@@ -487,7 +499,20 @@ public class OsmAndMapsService {
 			this.left = left;
 			this.top = top;
 			this.z = z;
+			this.interactiveKey = interactiveKey;
 			touch();
+		}
+		
+		public String getInteractiveKey() {
+			return interactiveKey;
+		}
+		
+		public void setInfo(JsonObject info) {
+			this.info = info;
+		}
+		
+		public JsonObject getInfo() {
+			return info;
 		}
 
 		public void touch() {
@@ -511,22 +536,44 @@ public class OsmAndMapsService {
 			if (img != null) {
 				return img;
 			}
-			File cf = getCacheFile();
+			File cf = getCacheFile(".png");
 			if (cf != null && cf.exists()) {
 				runtimeImage = ImageIO.read(cf);
 				return runtimeImage;
 			}
 			return null;
 		}
+		
+		public JsonObject getCacheRuntimeInfo() throws IOException {
+			JsonObject tileInfo = getInfo();
+			if (tileInfo != null) {
+				return tileInfo;
+			}
+			File cf = getCacheFile(".json.gz");
+			if (cf != null && cf.exists()) {
+				try (GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(cf));
+				     Reader reader = new InputStreamReader(gzip, StandardCharsets.UTF_8)) {
+					JsonParser parser = new JsonParser();
+					tileInfo = parser.parse(reader).getAsJsonObject();
+					return tileInfo;
+				}
+			}
+			return null;
+		}
 
-		public File getCacheFile() {
-			if (z > cfg.maxZoomCache || cfg.cacheLocation == null || cfg.cacheLocation.length() == 0) {
+		public File getCacheFile(String ext) {
+			if (z > cfg.maxZoomCache || cfg.cacheLocation == null || cfg.cacheLocation.isEmpty()) {
 				return null;
 			}
 			int x = left >> (31 - z) >> metaSizeLog;
 			int y = top >> (31 - z) >> metaSizeLog;
 			StringBuilder loc = new StringBuilder();
-			loc.append(style.key).append("/").append(z);
+			
+//			if (ext.equals(".json")) {
+//				loc.append("info").append("/");
+//			}
+			
+			loc.append(interactiveKey != null ? interactiveKey : style.key).append("/").append(z);
 			while (x >= MAX_FILES_PER_FOLDER) {
 				int nx = x % MAX_FILES_PER_FOLDER;
 				loc.append("/").append(nx);
@@ -539,7 +586,7 @@ public class OsmAndMapsService {
 				y = (y - ny) / MAX_FILES_PER_FOLDER;
 			}
 			loc.append("/").append(y);
-			loc.append("-").append(metaSizeLog).append("-").append(tileSizeLog).append(".png");
+			loc.append("-").append(metaSizeLog).append("-").append(tileSizeLog).append(ext);
 			return new File(cfg.cacheLocation, loc.toString());
 		}
 	}
@@ -596,7 +643,7 @@ public class OsmAndMapsService {
 		return config.style.get(style);
 	}
 
-	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y) {
+	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
 		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
 		int left = ((x >> metaSizeLog) << metaSizeLog) << (31 - z);
 		if (left < 0) {
@@ -606,11 +653,12 @@ public class OsmAndMapsService {
 		if (top < 0) {
 			top = 0;
 		}
-		String tileId = encode(vectorStyle.key, left >> (31 - z), top >> (31 - z), z, metaSizeLog,
+		String key = interactiveKey != null ? interactiveKey : vectorStyle.key;
+		String tileId = encode(key, left >> (31 - z), top >> (31 - z), z, metaSizeLog,
 				vectorStyle.tileSizeLog);
 		VectorMetatile tile = tileCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(config, tileId, vectorStyle, z, left, top, metaSizeLog, vectorStyle.tileSizeLog);
+			tile = new VectorMetatile(config, tileId, vectorStyle, z, left, top, metaSizeLog, vectorStyle.tileSizeLog, interactiveKey);
 			tileCache.put(tile.key, tile);
 		}
 		return tile;
@@ -667,9 +715,12 @@ public class OsmAndMapsService {
 			throws IOException, XmlPullParserException, SAXException {
 		// don't synchronize this to not block routing
 		synchronized (config) {
+			// for local debug :
+			// VectorMetatile rendered = null;
 			VectorMetatile rendered = tileCache.get(tile.key);
 			if (rendered != null && rendered.runtimeImage != null) {
 				tile.runtimeImage = rendered.runtimeImage;
+				tile.setInfo(rendered.getInfo());
 				return null;
 			}
 			int imgTileSize = (256 << tile.tileSizeLog) << Math.min(tile.z, tile.metaSizeLog);
@@ -699,6 +750,11 @@ public class OsmAndMapsService {
 				nativelib.setRenderingProps(props);
 			}
 			RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z);
+			
+			if (tile.getInteractiveKey() != null) {
+				ctx.saveTextTile = true;
+			}
+			
 			if (ctx.width > 8192) {
 				return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
 
@@ -707,13 +763,17 @@ public class OsmAndMapsService {
 				return ResponseEntity.badRequest().body(String.format("Metatile has wrong size (%d != %d)", imgTileSize,
 						ctx.width << tile.tileSizeLog));
 			}
-			tile.runtimeImage = nativelib.renderImage(ctx);
+			
+			NativeJavaRendering.RenderingImageResult result = nativelib.renderImage(ctx);
+			tile.runtimeImage = result.getImage();
 			if (tile.runtimeImage != null) {
-				File cacheFile = tile.getCacheFile();
+				tile.setInfo(result.getGenerationResult().getInfo());
+				File cacheFile = tile.getCacheFile(".png");
 				if (cacheFile != null) {
 					cacheFile.getParentFile().mkdirs();
 					if (cacheFile.getParentFile().exists()) {
 						ImageIO.write(tile.runtimeImage, "png", cacheFile);
+						buildCacheFileInfo(tile);
 					}
 				}
 			}
@@ -722,6 +782,22 @@ public class OsmAndMapsService {
 			System.out.println(msg);
 			// LOGGER.debug();
 			return null;
+		}
+	}
+	
+	private void buildCacheFileInfo(VectorMetatile tile) throws IOException {
+		File cacheFileInfo = tile.getCacheFile(".json.gz");
+		if (cacheFileInfo != null) {
+			cacheFileInfo.getParentFile().mkdirs();
+			if (cacheFileInfo.getParentFile().exists()) {
+				JsonObject info = tile.getInfo();
+				if (info != null) {
+					try (GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(cacheFileInfo));
+					     Writer writer = new OutputStreamWriter(gzip, StandardCharsets.UTF_8)) {
+						writer.write(info.toString());
+					}
+				}
+			}
 		}
 	}
 
@@ -1519,5 +1595,60 @@ public class OsmAndMapsService {
 		}
 
 		return targetObf;
+	}
+	
+	public JsonObject getTileInfo(JsonObject tileInfo, int x, int y, int z) {
+		JsonObject subInfo = new JsonObject();
+		JsonArray featuresArray = tileInfo.getAsJsonArray("features");
+		JsonArray newFeaturesArray = new JsonArray();
+		for (int i = 0; i < featuresArray.size(); i++) {
+			JsonObject featureObject = featuresArray.get(i).getAsJsonObject();
+			JsonObject geometryObject = featureObject.getAsJsonObject("geometry");
+			JsonArray coordinatesArray = geometryObject.getAsJsonArray("coordinates");
+			
+			for (int j = 0; j < coordinatesArray.size(); j++) {
+				JsonArray pointArray = coordinatesArray.get(j).getAsJsonArray();
+				double lat = pointArray.get(0).getAsDouble();
+				double lon = pointArray.get(1).getAsDouble();
+				
+				if (isPointInTile(lat, lon, x, y, z)) {
+					newFeaturesArray.add(featureObject);
+					break;
+				}
+			}
+		}
+		
+		subInfo.addProperty("type", "FeatureCollection");
+		subInfo.add("features", newFeaturesArray);
+		
+		return subInfo;
+	}
+	
+	private boolean isPointInTile(double lat, double lon, int tileX, int tileY, int zoom) {
+		
+		double xmin = MapUtils.getLongitudeFromTile(zoom, tileX);
+		double xmax = MapUtils.getLongitudeFromTile(zoom, tileX + 1);
+		double ymin = MapUtils.getLatitudeFromTile(zoom, tileY + 1);
+		double ymax = MapUtils.getLatitudeFromTile(zoom, tileY);
+		
+		if (lat < ymin || lat >= ymax) {
+			return false;
+		}
+		
+		if (lon < xmin || lon >= xmax) {
+			return false;
+		}
+		return true;
+	}
+	
+	public String getInteractiveKeyMap(String style) {
+		return style.startsWith(INTERACTIVE_KEY) ? style + INTERACTIVE_STYLE_DELIMITER + DEFAULT_INTERACTIVE_STYLE : null;
+	}
+	
+	public String getMapStyle(String style, String interactiveKey) {
+		if (interactiveKey == null) {
+			return style;
+		}
+		return style.equals(INTERACTIVE_KEY) ? DEFAULT_INTERACTIVE_STYLE : style.split(INTERACTIVE_KEY + INTERACTIVE_STYLE_DELIMITER)[1];
 	}
 }

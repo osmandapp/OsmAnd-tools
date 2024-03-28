@@ -61,6 +61,7 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
+import net.osmand.NativeLibrary;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -1184,7 +1185,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
 					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom);
-					nativeRenderingImg = nativeLibRendering.renderImage(lastContext);
+					NativeJavaRendering.RenderingImageResult result = nativeLibRendering.renderImage(lastContext);
+					nativeRenderingImg = result.getImage();
 					Rect rect = new Rect();
 					rect.left31 = sleft;
 					rect.top31 = stop;
