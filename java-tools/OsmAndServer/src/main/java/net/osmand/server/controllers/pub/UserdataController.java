@@ -243,15 +243,11 @@ public class UserdataController {
 												 @RequestParam(name = "deviceid", required = false) String deviceId,
 												 @RequestParam(name = "brand", required = false) String brand,
 												 @RequestParam(name = "model", required = false) String model,
-												 @RequestParam(name = "lang", required = false) String lang,
-												 @RequestHeader("User-Agent") String userAgent
+												 @RequestParam(name = "lang", required = false) String lang
 	) throws IOException {
 		String accessToken = UUID.randomUUID().toString();
-		StringBuilder info = new StringBuilder(userAgent == null ? "OsmAnd" : userAgent);
-		if (brand != null && model != null) {
-			info.append(" @ " + brand + " " + model);
-		}
-		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, info.toString());
+		String info = (brand != null && model != null) ? (brand + " " + model) : "OsmAnd";
+		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, info);
 	}
 
 	@PostMapping(value = "/delete-file")
