@@ -218,6 +218,15 @@ public class ApiController {
 		}
 		return gson.toJson(pollsService.getPoll(channel));
 	}
+	
+	
+	@RequestMapping(path = { "/purchase-complete" }, produces = "application/json")
+	@ResponseBody
+	public String purchaseComplete(@RequestParam(required = false) String purchaseId,
+			@RequestParam(required = false) String os, @RequestParam(required = false) String purchaseType) {
+		// here we could validate purchase in fiture
+		return "{\"status\":\"OK\"}";
+	}
     
     
     @PostMapping(path = {"/missing_search"}, produces = "application/json")
