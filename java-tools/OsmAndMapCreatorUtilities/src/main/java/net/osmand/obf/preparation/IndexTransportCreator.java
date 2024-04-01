@@ -1143,34 +1143,36 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		// walk through platforms  and verify names from the second:
 		for(Entity platform : platforms) {
 			Entity replaceStop = null;
-			LatLon loc = platform.getLatLon();
-			if(loc == null) {
-				platformsAndStopsToProcess.remove(platform);
-				continue;
-			}
+			LatLon platformLatLon = platform.getLatLon();
 			double dist = 300;
 			Relation rr = stopAreas.get(EntityId.valueOf(platform));
 			for (Entity stop : stops) {
-				if (stop.getLatLon() == null) {
-					continue;
-				}
 				if (rr != null && stopAreas.get(EntityId.valueOf(stop)) == rr) {
 					replaceStop = stop;
 				}
-				if (MapUtils.getDistance(stop.getLatLon(), loc) < dist) {
+				if (MapUtils.getDistance(stop.getLatLon(), platformLatLon) < dist) {
 					replaceStop = stop;
-					dist = MapUtils.getDistance(stop.getLatLon(), loc);
+					dist = MapUtils.getDistance(stop.getLatLon(), platformLatLon);
 				}
 			}
-			if(replaceStop != null) {
-				platformsAndStopsToProcess.remove(platform);
-				if(!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
-					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
-				}
+			if (replaceStop == null || !isNearestPlatform(platforms, replaceStop.getLatLon(), dist)) {
+				continue;
+			}
+			platformsAndStopsToProcess.remove(platform);
+			if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
+				nameReplacement.put(EntityId.valueOf(replaceStop), platform);
 			}
 		}
 	}
 
+	private static boolean isNearestPlatform(List<Entity> platforms, LatLon replaceStopLatLon, double dist) {
+		for (Entity platform : platforms) {
+			if (MapUtils.getDistance(replaceStopLatLon, platform.getLatLon()) < dist) {
+				return false;
+			}
+		}
+		return true;
+	}
 
 	private boolean processTransportRelationV1(Relation rel, TransportRoute directRoute, TransportRoute backwardRoute) {
 		final Map<TransportStop, Integer> forwardStops = new LinkedHashMap<TransportStop, Integer>();
