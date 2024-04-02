@@ -185,7 +185,7 @@ public class MapApiController {
 		request.login(username, password);
 
 		PremiumUserDevice dev = checkUser();
-		userdataService.updateDeviceLangInfo(dev, credentials.lang, INFO_DEVICE_WEB);
+		userdataService.updateDeviceLangInfo(dev, credentials.lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
 
 		return okStatus();
 	}
