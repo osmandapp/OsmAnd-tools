@@ -1165,7 +1165,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 			if(replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
-				if(!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
+				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
 				}
 			}

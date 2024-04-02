@@ -71,6 +71,7 @@ import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBoundsFilter;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.render.RenderingRulesTransformer;
+import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.SearchUICore.SearchResultCollection;
@@ -121,6 +122,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				}
 			}
 		});
+		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
 		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION_TO_TEST = false;
 		RouteResultPreparation.PRINT_TO_GPX_FILE = DataExtractionSettings.getSettings().getDefaultWorkingDir().getAbsolutePath() + "/route.gpx";
         MAIN_APP = new OsmExtractionUI();
