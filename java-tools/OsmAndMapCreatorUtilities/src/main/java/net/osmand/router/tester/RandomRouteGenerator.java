@@ -49,7 +49,7 @@ class RandomRouteGenerator {
 							double lat = Double.parseDouble(v.split(",")[0]);
 							double lon = Double.parseDouble(v.split(",")[1]);
 							entry.start = new LatLon(lat, lon);
-						} else if ("finish".equals(k) && v.contains(",")) { // finish=L,L
+						} else if (("finish".equals(k) || "end".equals(k)) && v.contains(",")) { // finish=L,L end=L,L
 							double lat = Double.parseDouble(v.split(",")[0]);
 							double lon = Double.parseDouble(v.split(",")[1]);
 							entry.finish = new LatLon(lat, lon);
