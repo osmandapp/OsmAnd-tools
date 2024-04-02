@@ -333,6 +333,13 @@ public class SvgMapLegendGenerator {
 						if (name.equals("svg")) {
 							parsedSvg.width = Double.parseDouble(parser.getAttributeValue("", "width"));
 							parsedSvg.height = Double.parseDouble(parser.getAttributeValue("", "height"));
+							String viewBoxStr = parser.getAttributeValue(null, "viewBox");
+							if (viewBoxStr != null) {
+								String[] parts = viewBoxStr.split(" ");
+								for (int i = 0; i < parts.length; i++) {
+									parsedSvg.viewBox[i] = Double.parseDouble(parts[i]);
+								}
+							}
 						}
 					}
 				}
@@ -393,14 +400,22 @@ public class SvgMapLegendGenerator {
 				throw new Exception("ERROR: getSvgInnerContent() failed to process file " + filePath);
 			}
 		}
-
+		
+		/**
+		 * Using viewBox for scaling calculations instead of the width and height attributes
+		 * ensures that the SVG content is scaled based on its intended visual representation. This approach
+		 * preserves the aspect ratio and relative positioning within the SVG, making it adaptable and
+		 * consistent across different container sizes, enhancing flexibility and scalability.
+		 */
 		private static String moveToCenterAndResize(SvgDTO svg, int newSize) {
-			double rescalingRatio = newSize / svg.width;
-			double xOffset = canvasWidth / 2 - newSize / 2;
-			double yOffset = canvasHeight / 2 - newSize / 2;
-			String resultContent = String.format(Locale.US, "\n<g transform=\"translate(%f, %f) scale(%f %f) \"> \n",
+			double originalMaxSize = Math.max(svg.viewBox[2], svg.viewBox[3]);
+			double rescalingRatio = newSize / originalMaxSize;
+			double xOffset = (double) canvasWidth / 2 - (double) newSize / 2;
+			double yOffset = (double) canvasHeight / 2 - (double) newSize / 2;
+			String resultContent = String.format(Locale.US, "%n<g transform=\"translate(%f, %f) scale(%f %f) \"> %n",
 					xOffset, yOffset, rescalingRatio, rescalingRatio);
-			resultContent += svg.content + "</g>\n\n";
+			resultContent += svg.content + "</g>%n%n";
+			
 			return resultContent;
 		}
 
@@ -423,6 +438,7 @@ public class SvgMapLegendGenerator {
 			String content = null;
 			double width = -1;
 			double height = -1;
+			double[] viewBox = new double[4]; // [minX, minY, width, height]
 		}
 	}
 
