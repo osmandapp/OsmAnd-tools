@@ -63,6 +63,7 @@ public class OsmAndGithubProjectMonitorTasks {
 	
 	public static class ProjectItem {
 		String timestamp;
+		int version;
 		boolean archived;
 		String id = "";
 		String repo = "";
@@ -128,8 +129,9 @@ public class OsmAndGithubProjectMonitorTasks {
 		for (ProjectItem it : items.values()) {
 			ProjectItem existing = dbItems.remove(it.id);
 			if (existing != null) {
-				// compare content
+				// compare only content
 				existing.timestamp = it.timestamp;
+				it.version = existing.version;
 				if (!Algorithms.stringsEqual(gson.toJson(existing), gson.toJson(it))) {
 					System.out.println("Update - " + it);
 					toUpd.add(it);
@@ -293,6 +295,7 @@ public class OsmAndGithubProjectMonitorTasks {
 			int start = ind;
 			while ((ind - start) < BATCH_SIZE && ind < lst.size()) {
 				ProjectItem it = lst.get(ind);
+				it.version++;
 				out.write((gson.toJson(it) + "\n").getBytes());
 				ind++;
 			}
