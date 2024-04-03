@@ -109,7 +109,7 @@ public class OsmAndGithubProjectMonitorTasks {
 	}
 	
 
-	@Scheduled(fixedRateString = "PT60M")
+	@Scheduled(fixedRateString = "PT30M")
 //	@Scheduled(fixedRateString = "PT5S")
 	public void syncGithubProject() throws IOException, ParseException {
 //		if (TOTAL_SYNC > 5 || TOTAL_SYNC++ > 10000) return; 
