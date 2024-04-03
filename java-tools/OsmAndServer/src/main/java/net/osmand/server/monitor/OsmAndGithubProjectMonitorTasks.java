@@ -1,15 +1,19 @@
 package net.osmand.server.monitor;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -38,7 +43,10 @@ public class OsmAndGithubProjectMonitorTasks {
 	private static final int BATCH_SIZE = 100; 
 	private static final String DB_TABLE_NAME = "main.githubProject";
 
-
+	static SimpleDateFormat githubDateTime = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");// 2022-06-01T06:17:04Z
+	static SimpleDateFormat githubDate = new SimpleDateFormat("yyyy-MM-dd");// 2022-06-01
+	static SimpleDateFormat dbDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");// 2021-12-03 14:04:46
+	
 	@Value("${monitoring.enabled}")
 	private boolean enabled;
 	
@@ -48,44 +56,49 @@ public class OsmAndGithubProjectMonitorTasks {
 	@Value("${monitoring.project.token}")
 	private String loginToken;
 	
-	Gson gson = new Gson();
+	Gson gson = new GsonBuilder().serializeNulls().create();
 
 	int TOTAL_SYNC;
 	
 	
 	public static class ProjectItem {
-		long timestamp;
+		String timestamp;
 		boolean archived;
-		String id;
-		String repo;
-		String num;
-		String githubId;
-		String title;
-		String statusName;
-		String statusId;
-		String iterationName;
-		String iterationId;
-		String iterationStartDate;
+		String id = "";
+		String repo = "";
+		String num = "";
+		String githubId = "";
+		String title = "";
+		String statusName = "";
+		String statusId = "";
+		String iterationName = "";
+		String iterationId = "";
+		String iterationStartDate = "1970-01-01 01:00:00";
 		String milestoneId;
 		String milestoneName;
 		double value;
 		double storyPoints;
 		double complexity;
-		String url;
-		String publishedAt;
-		String closedAt;
+		String url = "";
+		String publishedAt = "1970-01-01 01:00:00";
+		String closedAt = "1970-01-01 01:00:00";
 		boolean closed;
-		String author;
+		String author = "";
 		List<String> assignees = new ArrayList<>();
 		List<String> labels = new ArrayList<>();
 		List<String> labelIds = new ArrayList<>();
+
 		public ProjectItem(String repo, String num) {
-			this.timestamp = System.currentTimeMillis() / 1000;
+			setCurrentDate();
 			this.id = repo + "/" + num;
 			this.repo = repo;
 			this.num = num;
 		}
-		
+
+		private String setCurrentDate() {
+			return this.timestamp = dbDate.format(new Date());
+		}
+
 		@Override
 		public String toString() {
 			ProjectItem proj = this;
@@ -95,10 +108,11 @@ public class OsmAndGithubProjectMonitorTasks {
 	}
 	
 
-	//@Scheduled(fixedRateString = "PT30M")
-	@Scheduled(fixedRateString = "PT5S")
-	public void syncGithubProject() throws IOException {
-		if (Algorithms.isEmpty(projectdb) || ++TOTAL_SYNC > 1) {
+	@Scheduled(fixedRateString = "PT30M")
+//	@Scheduled(fixedRateString = "PT5S")
+	public void syncGithubProject() throws IOException, ParseException {
+//		if (TOTAL_SYNC > 5 || TOTAL_SYNC++ > 10000) return; // TODO
+		if (Algorithms.isEmpty(projectdb)) {
 			return;
 		}
 		long time = System.currentTimeMillis();
@@ -106,21 +120,50 @@ public class OsmAndGithubProjectMonitorTasks {
 		if (Algorithms.isEmpty(loginToken)) {
 			System.out.println("ERROR: Github token is not configured");
 		}
-
+		Map<String, ProjectItem> dbItems = loadItemsFromSQLQuery();
 		Map<String, ProjectItem> items = loadGithubProjectItems();
-		insertIntoProject(items);
-		LOG.info(String.format("SYNC Github project (%d items) - DONE in %.1f s", items.size(),
-				(System.currentTimeMillis() - time)/1.0e3));
+
+		List<ProjectItem> toUpd = new ArrayList<>();
+		int upd = 0, arch = 0;
+		for (ProjectItem it : items.values()) {
+			ProjectItem existing = dbItems.remove(it.id);
+			if (existing != null) {
+				// compare content
+				existing.timestamp = it.timestamp;
+				if (!Algorithms.stringsEqual(gson.toJson(existing), gson.toJson(it))) {
+					toUpd.add(it);
+					upd++;
+				}
+			} else {
+				System.out.println("Update - " + it);
+				toUpd.add(it);
+				upd++;
+			}
+		}
+		insertIntoProject(toUpd);
+		List<ProjectItem> toArch = new ArrayList<>();
+		for (ProjectItem it : dbItems.values()) {
+			System.out.println("Archive -  " + it);
+			it.setCurrentDate();
+			it.archived = true;
+			arch++;
+			toArch.add(it);
+		}
+		insertIntoProject(toArch);
+		LOG.info(String.format("SYNC Github project (%d items, %d updated, %d archived) - DONE in %.1f s", items.size(),
+				upd, arch, (System.currentTimeMillis() - time) / 1.0e3));
 	}
 
 
-	private Map<String, ProjectItem> loadGithubProjectItems() throws IOException, MalformedURLException {
+	private Map<String, ProjectItem> loadGithubProjectItems() throws IOException, MalformedURLException, ParseException {
 		int ind = 0, pages = 0;
 //		StringBuilder projFieldsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectFields.graphql"));
 		StringBuilder projItemsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectItems.graphql"));
 		boolean hasNext = true;
 		String nextCursor = "null";
 		Map<String, ProjectItem> items = new LinkedHashMap<>();
+		
+//		while (hasNext && pages++ < 1) {
 		while (hasNext && pages++ < MAX_PAGES) {
 			String graphQLQuery = projItemsQL.toString().replace("after: null", "after: \"" + nextCursor+"\" ");
 			HttpURLConnection graphQLConn = (HttpURLConnection) new URL("https://api.github.com/graphql")
@@ -150,29 +193,40 @@ public class OsmAndGithubProjectMonitorTasks {
 				proj.githubId = obj.get("id").getAsString();
 				proj.title = content.get("title").getAsString();
 				proj.url = getStringOrEmpty(content, "url");
-				proj.publishedAt = getStringOrEmpty(content, "publishedAt");
-				proj.closedAt = getStringOrEmpty(content, "closedAt");
+				if(!Algorithms.isEmpty(getStringOrEmpty(content, "publishedAt"))) {
+					proj.publishedAt = dbDate.format(githubDateTime.parse(getStringOrEmpty(content, "publishedAt")).getTime());
+				}
+				if(!Algorithms.isEmpty(getStringOrEmpty(content, "closedAt"))) {
+					proj.closedAt = dbDate.format(githubDateTime.parse(getStringOrEmpty(content, "closedAt")).getTime());
+				}
 				proj.closed = Boolean.parseBoolean(getStringOrEmpty(content, "closed"));
 				proj.author = getStringOrEmpty(content, "author", "login");
 				proj.milestoneName = getStringOrEmpty(content, "milestone", "title");
 				proj.milestoneId = getStringOrEmpty(content, "milestone", "id");
 				proj.assignees = new ArrayList<>();
-				JsonArray assignees = obj.getAsJsonObject("assignees").getAsJsonArray("nodes");
-				for (int j = 0; j < assignees.size(); j++) {
-					String as = getStringOrEmpty(assignees.get(j).getAsJsonObject(), "login");
-					if (!Algorithms.isEmpty(as)) {
-						proj.assignees.add(as);
+				if (content.getAsJsonObject("assignees") != null) {
+					JsonArray assignees = content.getAsJsonObject("assignees").getAsJsonArray("nodes");
+					for (int j = 0; j < assignees.size(); j++) {
+						String as = getStringOrEmpty(assignees.get(j).getAsJsonObject(), "login");
+						if (!Algorithms.isEmpty(as)) {
+							proj.assignees.add(as);
+						}
 					}
 				}
 				Collections.sort(proj.assignees);
-				JsonArray labels = obj.getAsJsonObject("labels").getAsJsonArray("nodes");
-				for (int j = 0; j < labels.size(); j++) {
-					String lb = getStringOrEmpty(labels.get(j).getAsJsonObject(), "name");
-					String lbId = getStringOrEmpty(labels.get(j).getAsJsonObject(), "id");
-					if (!Algorithms.isEmpty(lb)) {
-						proj.labels.add(lb);
-						proj.labelIds.add(lbId);
+				if (content.getAsJsonObject("labels") != null) {
+					JsonArray labels = content.getAsJsonObject("labels").getAsJsonArray("nodes");
+					for (int j = 0; j < labels.size(); j++) {
+						String lb = getStringOrEmpty(labels.get(j).getAsJsonObject(), "name");
+						String lbId = getStringOrEmpty(labels.get(j).getAsJsonObject(), "id");
+						if (!Algorithms.isEmpty(lb)) {
+							proj.labels.add(lb);
+							proj.labelIds.add(lbId);
+						}
 					}
+				}
+				if (obj.getAsJsonObject("fieldValues") == null) {
+					continue;
 				}
 				JsonArray fieldValues = obj.getAsJsonObject("fieldValues").getAsJsonArray("nodes");
 				for (int j = 0; j < fieldValues.size(); j++) {
@@ -182,12 +236,14 @@ public class OsmAndGithubProjectMonitorTasks {
 					}
 					String fldName = fldV.getAsJsonObject("field").get("name").getAsString();
 					if (fldName.equals("Status")) {
-						proj.statusId = fldV.get("optionId").getAsString();
-						proj.statusName = fldV.get("name").getAsString();
+						proj.statusId = getStringOrEmpty(fldV, "optionId");
+						proj.statusName = getStringOrEmpty(fldV, "name"); 
 					} else if (fldName.equals("Iteration")) {
-						proj.iterationId = fldV.get("iterationId").getAsString();
-						proj.iterationName = fldV.get("title").getAsString();
-						proj.iterationStartDate = fldV.get("startDate").getAsString();
+						proj.iterationId = getStringOrEmpty(fldV, "iterationId");
+						proj.iterationName = getStringOrEmpty(fldV, "title");
+						if (!Algorithms.isEmpty(getStringOrEmpty(content, "startDate"))) {
+							proj.iterationStartDate = dbDate.format(githubDate.parse(getStringOrEmpty(fldV, "startDate")).getTime());
+						}
 					} else if (fldName.equals("Complexity")) {
 						proj.complexity = fldV.get("number").getAsDouble();
 					} else if (fldName.equals("StoryPoints")) {
@@ -196,7 +252,7 @@ public class OsmAndGithubProjectMonitorTasks {
 						proj.value = fldV.get("number").getAsDouble();
 					}
 				}
-				System.out.println((ind++) + " " + proj.toString()); // debug
+//				System.out.println((ind++) + " " + proj.toString()); // debug
 			}
 			JsonObject info = projJson.getAsJsonObject("items").getAsJsonObject("pageInfo");
 			hasNext = info.get("hasNextPage").getAsBoolean();
@@ -207,26 +263,22 @@ public class OsmAndGithubProjectMonitorTasks {
 	}
 
 
-	private String getStringOrEmpty(JsonObject content, String... keys) {
-		if (content == null) {
-			return "";
-		}
-		for (int i = 0; i < keys.length - 1; i++) {
-			content = content.getAsJsonObject(keys[i]);
-			if (content == null) {
+	private String getStringOrEmpty(JsonObject c, String... keys) {
+		JsonElement content = c; 
+		for (int i = 0; i < keys.length; i++) {
+			if (content == null || content.isJsonNull()) {
 				return "";
 			}
+			content = content.getAsJsonObject().get(keys[i]);
 		}
-		JsonElement el = content.get(keys[keys.length - 1]);
-		if (el == null || el.getAsString() == null) {
+		if (content == null || content.isJsonNull()) {
 			return "";
 		}
-		return el.getAsString();
+		return content.getAsString();
 	}
 
 
-	private void insertIntoProject(Map<String, ProjectItem> items) throws IOException {
-		List<ProjectItem> lst = new ArrayList<>(items.values());
+	private void insertIntoProject(List<ProjectItem> lst) throws IOException {
 		for (int ind = 0; ind < lst.size();) {
 			String sql = "insert into " + DB_TABLE_NAME + " FORMAT JSONEachRow";
 			String[] dbConfig = projectdb.split("/");
@@ -244,13 +296,36 @@ public class OsmAndGithubProjectMonitorTasks {
 				ind++;
 			}
 			out.close();
-			StringBuilder res = Algorithms.readFromInputStream(http.getInputStream());
-			System.out.println(res.toString());
+//			System.out.println(http.getResponseCode() + " " + http.getResponseMessage());
+			Algorithms.readFromInputStream(http.getInputStream());
+//			System.out.println(res.toString());
 		}
 	}
 
+//		select * from main.githubProject M join (select max(timestamp) timestamp, id from main.githubProject group by id) S ON M.id = S.id where M.timestamp = S.timestamp limit 1 FORMAT JSON;
+	protected Map<String, ProjectItem> loadItemsFromSQLQuery() throws IOException {
+		String sql = "SELECT * from " + DB_TABLE_NAME + " M join ";
+		sql += " (SELECT max(timestamp) timestamp, id from " + DB_TABLE_NAME + " group by id) S ON M.id = S.id ";
+		sql += " WHERE M.timestamp = S.timestamp FORMAT JSONEachRow";
+		String[] dbConfig = projectdb.split("/");
+		Map<String, ProjectItem> mp = new LinkedHashMap<>();
+		URL url = new URL("http://" + dbConfig[0] + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+		HttpURLConnection http = (HttpURLConnection) url.openConnection();
+		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(dbConfig[1].getBytes()));
+		http.addRequestProperty("Authorization", basicAuth);
+		StringBuilder res = Algorithms.readFromInputStream(http.getInputStream());
+		BufferedReader br = new BufferedReader(new StringReader(res.toString()));
+		String line = null;
+		while ((line = br.readLine()) != null) {
+			ProjectItem pi = gson.fromJson(line, ProjectItem.class);
+			if (!pi.archived) {
+				mp.put(pi.id, pi);
+			}
+		}
+		return mp;
+	}
 		
-	protected void executeSimpleSQLQuery() throws MalformedURLException, UnsupportedEncodingException, IOException {
+	protected void executeSimpleSQLQuery() throws IOException {
 		String sql = "select * from system.mutations FORMAT JSON";
 		String[] dbConfig = projectdb.split("/");
 
