@@ -407,6 +407,7 @@ public class RandomRouteTester {
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		fe.setHHRoutingConfig(null); // hhoff=true
+		fe.CALCULATE_MISSING_MAPS = false;
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
@@ -453,6 +454,7 @@ public class RandomRouteTester {
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+		fe.CALCULATE_MISSING_MAPS = false;
 		fe.setDefaultHHRoutingConfig();
 		fe.setUseOnlyHHRouting(true);
 
