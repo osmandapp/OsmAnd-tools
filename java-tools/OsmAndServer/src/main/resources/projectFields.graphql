@@ -1,0 +1,24 @@
+query {
+  organization(login: "osmandapp") {
+    projectV2(number: 19) {
+      title
+      ... on ProjectV2 {
+        fields(first: 40) {
+          nodes {
+            ... on ProjectV2Field { id name }
+            ... on ProjectV2IterationField { id name
+              configuration { 
+                iterations { startDate id  } 
+                completedIterations { startDate id }
+              }
+
+            }
+            ... on ProjectV2SingleSelectField {
+              id name options { id name } 
+            }
+          }
+        }
+      }
+    }
+  }
+}

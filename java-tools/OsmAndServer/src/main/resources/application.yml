@@ -108,7 +108,9 @@ mapillary.accesstoken: ${MAPILLARY_ACCESS_TOKEN:}
 monitoring:
   enabled: false
   changes.feed: 
-  changes.publish.channel: 
+  changes.publish.channel:
+  project.db: 
+  project.token:  
 
 geoip.url: "http://localhost:8081/json/"
 
