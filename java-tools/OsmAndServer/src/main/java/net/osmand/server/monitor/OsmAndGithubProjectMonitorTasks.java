@@ -343,7 +343,7 @@ public class OsmAndGithubProjectMonitorTasks {
 
 	// DB SCCHEMA
 //	CREATE TABLE main.githubProject	(
-//			  `timestamp` DateTime,
+//			  `timestamp` DateTime, `version` UInt32,
 //		    `archived` Bool, `id` String, `repo` String, `num` String, `githubId` String, 
 //		    `title` String, `statusName` String, `statusId` String,
 //		    `iterationName` String, `iterationId` String, `iterationStartDate` DateTime, 
