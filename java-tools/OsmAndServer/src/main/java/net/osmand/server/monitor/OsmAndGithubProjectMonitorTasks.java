@@ -108,10 +108,10 @@ public class OsmAndGithubProjectMonitorTasks {
 	}
 	
 
-	@Scheduled(fixedRateString = "PT30M")
+	@Scheduled(fixedRateString = "PT60M")
 //	@Scheduled(fixedRateString = "PT5S")
 	public void syncGithubProject() throws IOException, ParseException {
-//		if (TOTAL_SYNC > 5 || TOTAL_SYNC++ > 10000) return; // TODO
+//		if (TOTAL_SYNC > 5 || TOTAL_SYNC++ > 10000) return; 
 		if (Algorithms.isEmpty(projectdb)) {
 			return;
 		}
@@ -131,11 +131,12 @@ public class OsmAndGithubProjectMonitorTasks {
 				// compare content
 				existing.timestamp = it.timestamp;
 				if (!Algorithms.stringsEqual(gson.toJson(existing), gson.toJson(it))) {
+					System.out.println("Update - " + it);
 					toUpd.add(it);
 					upd++;
 				}
 			} else {
-				System.out.println("Update - " + it);
+				System.out.println("Add - " + it);
 				toUpd.add(it);
 				upd++;
 			}
