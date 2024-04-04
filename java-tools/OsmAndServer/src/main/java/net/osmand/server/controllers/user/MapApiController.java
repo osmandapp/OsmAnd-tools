@@ -281,6 +281,17 @@ public class MapApiController {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
 	}
+	
+	@GetMapping(value = "/delete-file-all-versions")
+	public ResponseEntity<String> deleteFileAllVersions(@RequestParam String name,
+	                                         @RequestParam String type, @RequestParam Long updatetime, @RequestParam boolean isTrash) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValid();
+		} else {
+			return userdataService.deleteFileAllVersions(dev.userid, name, type, updatetime, isTrash);
+		}
+	}
 
 	@GetMapping(value = "/rename-file")
 	public ResponseEntity<String> renameFile(@RequestParam String oldName,
@@ -408,19 +419,62 @@ public class MapApiController {
 
 	@GetMapping(value = "/download-file")
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
+			@RequestParam String name,
+			@RequestParam String type,
+			@RequestParam(required = false) Long updatetime) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			ResponseEntity<String> error = tokenNotValid();
-			if (error != null) {
-				response.setStatus(error.getStatusCodeValue());
-				response.getWriter().write(error.getBody());
-				return;
-			}
+            response.setStatus(error.getStatusCodeValue());
+            response.getWriter().write(Objects.requireNonNull(error.getBody()));
+            return;
+        }
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+		if (userFile != null) {
+			userdataService.getFile(userFile, response, request, name, type, dev);
 		}
-		userdataService.getFile(response, request, name, type, updatetime, dev);
+	}
+	
+	@GetMapping(value = "/download-file-from-prev-version")
+	public void getFilePrevVersion(HttpServletResponse response, HttpServletRequest request,
+	                               @RequestParam String name,
+	                               @RequestParam String type,
+	                               @RequestParam Long updatetime) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			ResponseEntity<String> error = tokenNotValid();
+			response.setStatus(error.getStatusCodeValue());
+			response.getWriter().write(Objects.requireNonNull(error.getBody()));
+			return;
+		}
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getFilePrevVersion(name, type, updatetime, dev);
+		if (userFile != null) {
+			userdataService.getFile(userFile, response, request, name, type, dev);
+		}
+	}
+	
+	@GetMapping(value = "/restore-file")
+	public ResponseEntity<String> restoreFile(@RequestParam String name, @RequestParam String type, @RequestParam Long updatetime) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		return userdataService.restoreFile(name, type, updatetime, dev);
+	}
+	
+	public static class FileData {
+		public String name;
+		public String type;
+		public Long updatetime;
+	}
+	
+	@PostMapping(value = "/empty-trash")
+	public ResponseEntity<String> emptyTrash(@RequestBody List<FileData> files) {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		return userdataService.emptyTrash(files, dev);
 	}
 
 	@GetMapping(value = "/get-gpx-info")

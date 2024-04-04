@@ -30,6 +30,12 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
 	UserFile findTopByUseridAndNameAndTypeAndUpdatetime(int userid, String name, String type, Date updatetime);
 	
+	UserFile findTopByUseridAndNameAndTypeAndUpdatetimeLessThanOrderByUpdatetimeDesc(int userid, String name, String type, Date updatetime);
+	
+	UserFile findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(int userid, String name, String type, Date updatetime);
+	
+	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
+	
 	Iterable<UserFile> findAllByUserid(int userid);
 	
 	@Query("SELECT uf FROM UserFile uf " +

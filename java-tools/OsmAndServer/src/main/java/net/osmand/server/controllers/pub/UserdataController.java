@@ -349,13 +349,16 @@ public class UserdataController {
 
 	@GetMapping(value = "/download-file")
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = false) Long updatetime,
-			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
+	                    @RequestParam String name,
+	                    @RequestParam String type,
+	                    @RequestParam(required = false) Long updatetime,
+	                    @RequestParam(name = "deviceid") int deviceId,
+	                    @RequestParam String accessToken) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
-		userdataService.getFile(response, request, name, type, updatetime, dev);
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+		if (userFile != null) {
+			userdataService.getFile(userFile, response, request, name, type, dev);
+		}
 	}
 
 	@GetMapping(value = "/list-files")
