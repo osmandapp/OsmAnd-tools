@@ -789,10 +789,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			@Override
 			public void run() {
 				RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-				if (useGeometryBased) {
-					frontEnd.setUseGeometryBasedApproximation(true);
-					frontEnd.setUseNativeApproximation(false); // C++ geometry-based approximation is not exist now
-				}
+				frontEnd.setUseGeometryBasedApproximation(useGeometryBased);
 				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null,
 						frontEnd, RouteCalculationMode.NORMAL);
 				if (entities != null) {

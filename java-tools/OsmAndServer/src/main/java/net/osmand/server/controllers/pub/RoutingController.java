@@ -190,6 +190,8 @@ public class RoutingController {
 				"[Dev] Use C++ for routing", false);
 		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development",
 				"[Dev] Use C++ approximation", false);
+		RoutingParameter geoApprox = new RoutingParameter("geoapproximation", "Development",
+				"[Dev] Use geo-based approximation", false);
 		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development",
 				"[Dev] Use separate maps", false);
 
@@ -208,7 +210,7 @@ public class RoutingController {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
 				List<RoutingController.RoutingParameter> passParams =
-						new ArrayList<>(Arrays.asList(hhRouting, nativeRouting, nativeTrack, sepMaps));
+						new ArrayList<>(Arrays.asList(sepMaps, hhRouting, nativeRouting, nativeTrack, geoApprox));
 				if (derivedProfiles != null) {
 					if ("car".equals(e.getKey())) {
 						passParams.add(calcMode); // only for car & derived from car
