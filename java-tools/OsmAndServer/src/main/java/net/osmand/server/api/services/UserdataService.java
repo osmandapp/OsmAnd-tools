@@ -586,11 +586,11 @@ public class UserdataService {
     }
     
     public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
-        return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile), userFile);
     }
 
     public InputStream getInputStream(PremiumUserFilesRepository.UserFileNoData userFile) {
-        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime), null);
     }
 
     public ResponseEntity<String> tokenNotValid() {
