@@ -477,7 +477,7 @@ public class UserdataService {
 		}
     }
     
-    public ResponseEntity<String> restoreFile(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> restoreFile(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
         PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
         if (userFile == null) {
             return ResponseEntity.badRequest().body("File not found");
@@ -489,21 +489,30 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("File has already been restored from this version");
         }
         UserFile prevFile = getFilePrevVersion(name, type, userFile.updatetime.getTime(), dev);
-        if (prevFile == null) {
+        if (prevFile == null || prevFile.zipfilesize <= 0) {
             return ResponseEntity.badRequest().body("Previous version of file not found");
         }
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+        InternalZipFile zipFile = getZipFile(prevFile, prevFile.name);
+        if (zipFile == null) {
+            return ResponseEntity.badRequest().body("Error restore file");
+        }
+        try {
+            validateUserForUpload(dev, type, zipFile.getSize());
+        } catch (OsmAndPublicApiException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
         usf.name = prevFile.name;
         usf.type = type;
         usf.updatetime = new Date();
         usf.clienttime = prevFile.clienttime;
         usf.userid = dev.userid;
         usf.deviceid = dev.id;
-        usf.filesize = prevFile.filesize;
-        usf.zipfilesize = prevFile.zipfilesize;
-        usf.storage = prevFile.storage;
+        usf.filesize = zipFile.getContentSize();
+        usf.zipfilesize = zipFile.getSize();
+        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
         if (storageService.storeLocally()) {
-            usf.data = prevFile.data;
+            usf.data = zipFile.getBytes();
         }
         filesRepository.saveAndFlush(usf);
         return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));

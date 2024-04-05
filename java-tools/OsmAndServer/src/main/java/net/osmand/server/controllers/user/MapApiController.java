@@ -454,7 +454,7 @@ public class MapApiController {
 	}
 	
 	@GetMapping(value = "/restore-file")
-	public ResponseEntity<String> restoreFile(@RequestParam String name, @RequestParam String type, @RequestParam Long updatetime) {
+	public ResponseEntity<String> restoreFile(@RequestParam String name, @RequestParam String type, @RequestParam Long updatetime) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
