@@ -9,12 +9,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -49,10 +47,6 @@ public class StorageService {
 
 	@Value("${storage.default}")
 	private String defaultStorage;
-	
-	@Autowired
-	@Lazy
-	UserdataService userdataService;
 
 	@Autowired
 	private Environment env;
@@ -174,7 +168,7 @@ public class StorageService {
 		if (!Algorithms.isEmpty(storage) && is == null) {
 			for (String id : storage.split(",")) {
 				if (!storageId.equals(id)) {
-					is = getFileInputStream(id, fld, storageFileName, null);
+					is = getFileInputStream(id, fld, storageFileName);
 					if (is != null) {
 						break;
 					}
@@ -210,7 +204,7 @@ public class StorageService {
 		}
 	}
 	
-	public InputStream getFileInputStream(String storage, String fld, String filename, PremiumUserFilesRepository.UserFile userFile) {
+	public InputStream getFileInputStream(String storage, String fld, String filename) {
 		if (!Algorithms.isEmpty(storage)) {
 			for (String id : storage.split(",")) {
 				StorageType st = getStorageProviderById(id);
@@ -219,12 +213,8 @@ public class StorageService {
 						S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
 						return obj.getObjectContent();
 					} catch (RuntimeException e) {
-						LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename));
-						if (userFile != null) {
-							userdataService.deleteFileVersion(userFile.updatetime.getTime(), userFile.userid, userFile.name, userFile.type, null);
-						} else {
-							throw e;
-						}
+						LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename)); 
+						throw e;
 					}
 				}
 			}
