@@ -219,6 +219,7 @@ public class StorageService {
 						S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
 						return obj.getObjectContent();
 					} catch (RuntimeException e) {
+						// temp fix
 						LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename));
 						if (userFile != null) {
 							userdataService.deleteFileVersion(userFile.updatetime.getTime(), userFile.userid, userFile.name, userFile.type, null);
