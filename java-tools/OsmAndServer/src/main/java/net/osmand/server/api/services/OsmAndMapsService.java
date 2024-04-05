@@ -957,6 +957,7 @@ public class OsmAndMapsService {
 
 		boolean useOnlyHHRouting = false;
 		boolean useNativeApproximation = false;
+		boolean useGeometryBasedApproximation = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
 		RouteCalculationMode calcMode = null;
@@ -984,6 +985,8 @@ public class OsmAndMapsService {
 				r.useNativeLib = Boolean.parseBoolean(value);
 			} else if (key.equals("nativeapproximation")) {
 				r.useNativeApproximation = Boolean.parseBoolean(value);
+			} else if (key.equals("geoapproximation")) {
+				r.useGeometryBasedApproximation = Boolean.parseBoolean(value);
 			} else if (key.equals("hhoff")) {
 				if (Boolean.parseBoolean(value)) {
 					r.disableHHRouting = true;
@@ -1021,6 +1024,7 @@ public class OsmAndMapsService {
 		}
 		router.CALCULATE_MISSING_MAPS = false;
 		router.setUseNativeApproximation(rp.useNativeApproximation);
+		router.setUseGeometryBasedApproximation(rp.useGeometryBasedApproximation);
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		// setDirectionPoints(directionPointsFile).
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);

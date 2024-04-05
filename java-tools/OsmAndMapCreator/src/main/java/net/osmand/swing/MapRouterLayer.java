@@ -124,7 +124,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private HHRoutingContext<NetworkDBPoint> cacheHHCtx;
 	private RoutingContext cacheRctx;
 	private String cacheRouteParams;
-	
+
 	private MapPanel map;
 	private LatLon startRoute;
 	private LatLon endRoute;
@@ -138,7 +138,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton stopButton;
 	private GPXFile selectedGPXFile;
 	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
-	
+
 
 	private List<RouteSegmentResult> previousRoute;
 	public ActionListener setStartActionListener = new ActionListener(){
@@ -337,7 +337,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(selfBaseRoute);
-		
+
 		Action selfHHRoute = new AbstractAction("Build HH route (only)") {
 			private static final long serialVersionUID = 8049785829806139142L;
 
@@ -348,28 +348,27 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(selfHHRoute);
-		
-		
+
 		if (selectedGPXFile != null) {
-			Action recalculate = new AbstractAction("Calculate GPX route (OsmAnd)") {
+			Action approximateByRouting = new AbstractAction("Approximate GPX (by routing)") {
 				private static final long serialVersionUID = 507156107455281238L;
 
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					if (selectedGPXFile.hasTrkPt()) {
-						TrkSegment trkSegment = selectedGPXFile.tracks.get(0).segments.get(0);
-						startRoute = toLatLon(trkSegment.points.get(0));
-						endRoute = toLatLon(trkSegment.points.get(trkSegment.points.size() - 1));
-						List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-						for (WptPt p : trkSegment.points) {
-							polyline.add(toLatLon(p));
-						}
-						calcRouteGpx(polyline);
-					}
+					calcRouteGpx(selectedGPXFileToPolyline(), false);
 				}
-
 			};
-			directions.add(recalculate);
+			directions.add(approximateByRouting);
+
+			Action approximateByGeometry = new AbstractAction("Approximate GPX (by geometry)") {
+				private static final long serialVersionUID = 507156107455281238L;
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					calcRouteGpx(selectedGPXFileToPolyline(), true);
+				}
+			};
+			directions.add(approximateByGeometry);
 		}
 
 		if (previousRoute != null) {
@@ -537,7 +536,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 			};
 			menu.add(unselectGPXFile);
-			
+
 			AbstractAction calcAltitude = new AbstractAction("Recalculate altitude ") {
 				private static final long serialVersionUID = 507156107454181238L;
 
@@ -636,8 +635,8 @@ public class MapRouterLayer implements MapPanelLayer {
 		options[1] = "Red, yellow, green";
 		return JOptionPane.showOptionDialog(frame, "What color scheme to use?", "Color scheme", 0, JOptionPane.INFORMATION_MESSAGE, null, options, null);
 	}
-	
-	
+
+
 	protected GPXFile calculateAltitude(GPXFile gpxFile, File[] missingFile) {
 		File srtmFolder = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "srtm");
 		if (!srtmFolder.exists()) {
@@ -785,12 +784,14 @@ public class MapRouterLayer implements MapPanelLayer {
 		return new LatLon(wptPt.lat, wptPt.lon);
 	}
 
-	private void calcRouteGpx(List<LatLon> polyline) {
+	private void calcRouteGpx(List<LatLon> polyline, boolean useGeometryBased) {
 		new Thread() {
 			@Override
 			public void run() {
+				RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
+				frontEnd.setUseGeometryBasedApproximation(useGeometryBased);
 				List<Entity> entities = selfRoute(startRoute, endRoute, polyline, true, null,
-						new RoutePlannerFrontEnd(), RouteCalculationMode.NORMAL);
+						frontEnd, RouteCalculationMode.NORMAL);
 				if (entities != null) {
 					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 					for (Entity w : entities) {
@@ -812,7 +813,7 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private void calcRoute(final RouteCalculationMode m, boolean hh) {
 		new Thread() {
-			
+
 
 			@Override
 			public void run() {
@@ -993,7 +994,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		return res;
 	}
 
-	
+
 	protected Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute) {
 		// specialize testing
 		try {
@@ -1006,7 +1007,7 @@ public class MapRouterLayer implements MapPanelLayer {
 //			if (hhRoutePlanner == null) {
 				File hhFile = getHHFile(profile);
 				BinaryMapIndexReader[] readers = DataExtractionSettings.getSettings().getObfReaders();
-				final RoutingContext ctx = prepareRoutingContext(null, DataExtractionSettings.getSettings().getRouteMode(), 
+				final RoutingContext ctx = prepareRoutingContext(null, DataExtractionSettings.getSettings().getRouteMode(),
 						RouteCalculationMode.NORMAL, readers, new RoutePlannerFrontEnd());
 				if (hhFile.exists()) {
 					Connection conn = DBDialect.SQLITE.getDatabaseConnection(hhFile.getAbsolutePath(), log);
@@ -1077,7 +1078,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			playPauseButton.setText("Play");
 		}
 		stop = false;
-		
+
 		System.out.println("Self made route from " + start + " to " + end);
 		if (start != null && end != null) {
 			try {
@@ -1210,7 +1211,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		for (GpxPoint pnt : r.finalPoints) {
 			rsr.addAll(pnt.routeToTarget);
 		}
-		
+
 		return new RouteCalcResult(rsr);
 	}
 
@@ -1283,8 +1284,8 @@ public class MapRouterLayer implements MapPanelLayer {
 				pn.putTag("colour", "red");
 				res.add(pn);
 				System.out.println(String.format("Not connected road '%f m' (%.5f/%.5f -> %.5f/%.5f) [%d: %s -> %d: %s]",
-						MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()), 
-						pp.getLatLon().getLatitude(), pp.getLatLon().getLongitude(), pn.getLatLon().getLatitude(), pn.getLatLon().getLongitude(), 
+						MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()),
+						pp.getLatLon().getLatitude(), pp.getLatLon().getLongitude(), pn.getLatLon().getLatitude(), pn.getLatLon().getLongitude(),
 						segm.getStartPointIndex(), segm.getObject(), prevSegm.getStartPointIndex(), prevSegm.getObject() ));
 			}
 			boolean plus = segm.getStartPointIndex() < segm.getEndPointIndex();
@@ -1292,7 +1293,7 @@ public class MapRouterLayer implements MapPanelLayer {
 			while (true) {
 				LatLon l = segm.getPoint(ind);
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
-				
+
 				int[] pointTypes = segm.getObject().getPointTypes(ind);
 				if (pointTypes != null && pointTypes.length == 1 && segm.getObject().region.routeEncodingRules.size() > pointTypes[0]) {
 					RouteTypeRule rtr = segm.getObject().region.quickGetEncodingRule(pointTypes[0]);
@@ -1512,7 +1513,21 @@ public class MapRouterLayer implements MapPanelLayer {
 		return x;
 	}
 
-	@Override
+	private List<LatLon> selectedGPXFileToPolyline() {
+		if (selectedGPXFile.hasTrkPt()) {
+			TrkSegment trkSegment = selectedGPXFile.tracks.get(0).segments.get(0);
+			startRoute = toLatLon(trkSegment.points.get(0));
+			endRoute = toLatLon(trkSegment.points.get(trkSegment.points.size() - 1));
+			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
+			for (WptPt p : trkSegment.points) {
+				polyline.add(toLatLon(p));
+			}
+			return polyline;
+		}
+		return new ArrayList<LatLon>();
+	}
+
+    @Override
 	public void applySettings() {
 	}
 
