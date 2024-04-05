@@ -355,9 +355,11 @@ public class UserdataController {
 	                    @RequestParam(name = "deviceid") int deviceId,
 	                    @RequestParam String accessToken) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
-		if (userFile != null) {
-			userdataService.getFile(userFile, response, request, name, type, dev);
+		if (dev != null) {
+			PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+			if (userFile != null) {
+				userdataService.getFile(userFile, response, request, name, type, dev);
+			}
 		}
 	}
 
