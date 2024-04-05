@@ -46,8 +46,11 @@ public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserD
         @Column(name = "lang")
         public String lang;
 
-        @Column(name = "info")
-        public String info;
+        @Column(name = "brand")
+        public String brand;
+
+        @Column(name = "model")
+        public String model;
 
         // TYPO don't fix unless fixed on client side
         @Column(name = "udpatetime")

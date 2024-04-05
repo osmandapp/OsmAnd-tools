@@ -1,0 +1,41 @@
+query {
+  organization(login: "osmandapp") {
+    projectV2(number: 19) {
+      title
+      ... on ProjectV2 {
+        items(first: 100, after: null) {
+            nodes {
+                id
+                fieldValues(first: 15) { nodes {
+                    
+                    ... on ProjectV2ItemFieldValueCommon {
+                        field { ... on ProjectV2FieldCommon { id name } }
+                    }
+                   	... on ProjectV2ItemFieldSingleSelectValue { optionId id name }
+                    ... on ProjectV2ItemFieldNumberValue { number }
+                    ... on ProjectV2ItemFieldTextValue { text }
+                    ... on ProjectV2ItemFieldIterationValue { startDate title iterationId }
+                    
+                }}
+                content {
+                    ... on Issue {
+                        title url number
+                        publishedAt closedAt closed
+                        repository { name }
+                        author { login }
+                        assignees(first: 5) { nodes { login } }
+                        milestone { id title }
+                        labels(first: 10) { nodes { id name } }
+                        
+                    }
+                }
+            }
+            pageInfo {
+        		endCursor
+        		hasNextPage
+      		}
+        }
+      }
+    }
+  }
+}

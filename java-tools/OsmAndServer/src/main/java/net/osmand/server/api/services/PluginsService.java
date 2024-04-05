@@ -144,7 +144,7 @@ public class PluginsService {
 
 	public void deletePluginVersion(String plugin, String version) throws IOException {
 		PluginInfoVersion v = getVersion(plugin, version);
-		if(v != null) {
+		if (v != null) {
 			Algorithms.removeAllFiles(new File(pathToRoot, v.getPath()));
 			recalculateCache();
 		}

@@ -1019,6 +1019,7 @@ public class OsmAndMapsService {
 			router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
 			router.setDefaultHHRoutingConfig();
 		}
+		router.CALCULATE_MISSING_MAPS = false;
 		router.setUseNativeApproximation(rp.useNativeApproximation);
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		// setDirectionPoints(directionPointsFile).

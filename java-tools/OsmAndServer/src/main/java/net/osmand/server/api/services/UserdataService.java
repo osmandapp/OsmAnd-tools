@@ -93,7 +93,8 @@ public class UserdataService {
     Gson gson = new Gson();
 
     public static final String ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE = "File is not available";
-    public static final String INFO_DEVICE_WEB = "OsmAnd Web";
+    public static final String BRAND_DEVICE_WEB = "OsmAnd";
+    public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PREMIUM_USERS = 100;
     private static final long MB = 1024 * 1024;
@@ -319,7 +320,7 @@ public class UserdataService {
         if (password.length() < 6) {
             throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
         }
-        return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password), lang, INFO_DEVICE_WEB);
+        return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password), lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
     }
 
 	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email,
@@ -374,7 +375,7 @@ public class UserdataService {
     }
 
     public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken,
-                                                    String lang, String info) {
+                                                    String lang, String brand, String model) {
         email = email.toLowerCase().trim();
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
         if (pu == null) {
@@ -396,7 +397,8 @@ public class UserdataService {
             devicesRepository.delete(sameDevice);
         }
         device.lang = lang;
-        device.info = info;
+        device.brand = brand;
+        device.model = model;
         device.userid = pu.id;
         device.deviceid = deviceId;
         device.udpatetime = new Date();
@@ -1060,10 +1062,11 @@ public class UserdataService {
         return ok();
     }
 
-    public void updateDeviceLangInfo(PremiumUserDevicesRepository.PremiumUserDevice dev, String lang, String info) {
+    public void updateDeviceLangInfo(PremiumUserDevicesRepository.PremiumUserDevice dev, String lang, String brand, String model) {
         if (dev != null) {
             dev.lang = (lang == null) ? dev.lang : lang;
-            dev.info = (info == null) ? dev.info : info;
+            dev.brand = (brand == null) ? dev.brand : brand;
+            dev.model = (model == null) ? dev.model : model;
             devicesRepository.saveAndFlush(dev);
         }
     }

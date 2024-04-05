@@ -246,8 +246,7 @@ public class UserdataController {
 												 @RequestParam(name = "lang", required = false) String lang
 	) throws IOException {
 		String accessToken = UUID.randomUUID().toString();
-		String info = (brand != null && model != null) ? (brand + " " + model) : "OsmAnd";
-		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, info);
+		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, brand, model);
 	}
 
 	@PostMapping(value = "/delete-file")
