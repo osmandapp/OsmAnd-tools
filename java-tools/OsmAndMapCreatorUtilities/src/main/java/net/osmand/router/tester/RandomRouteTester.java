@@ -12,6 +12,7 @@ import java.util.*;
 
 import net.osmand.router.*;
 import net.osmand.NativeLibrary;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 
 import net.osmand.binary.BinaryMapIndexReader;
@@ -287,7 +288,7 @@ public class RandomRouteTester {
 		obfDirectory = new File(optMapsDir);
 
 		if (obfDirectory.isDirectory()) {
-			for (File f : obfDirectory.listFiles()) {
+			for (File f : Algorithms.getSortedFilesVersions(obfDirectory)) {
 				if (f.isFile() && f.getName().endsWith(".obf") && f.getName().startsWith(optObfPrefix)) {
 					obfFiles.add(f);
 				}
@@ -295,9 +296,6 @@ public class RandomRouteTester {
 		} else {
 			obfFiles.add(obfDirectory);
 		}
-
-		// sort files by name to improve pseudo-random reproducibility
-		obfFiles.sort((f1, f2) -> f1.getName().compareTo(f2.getName()));
 
 		for (File source : obfFiles) {
 			System.out.printf("Use OBF %s...\n", source.getName());
@@ -409,6 +407,7 @@ public class RandomRouteTester {
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		fe.setHHRoutingConfig(null); // hhoff=true
+		fe.CALCULATE_MISSING_MAPS = false;
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
@@ -455,6 +454,7 @@ public class RandomRouteTester {
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+		fe.CALCULATE_MISSING_MAPS = false;
 		fe.setDefaultHHRoutingConfig();
 		fe.setUseOnlyHHRouting(true);
 

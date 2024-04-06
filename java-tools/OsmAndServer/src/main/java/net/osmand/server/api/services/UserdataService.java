@@ -58,41 +58,43 @@ import net.osmand.util.Algorithms;
 
 @Service
 public class UserdataService {
-    
+
     @Autowired
     protected UserSubscriptionService userSubService;
-    
+
     @Autowired
     protected DownloadIndexesService downloadService;
-    
+
     @Autowired
     protected PremiumUserFilesRepository filesRepository;
-    
+
     @Autowired
     protected StorageService storageService;
-    
+
     @Autowired
     @Lazy
     PasswordEncoder encoder;
-    
+
     @Autowired
     protected PremiumUsersRepository usersRepository;
-    
+
     @Autowired
     EmailSenderService emailSender;
-    
+
     @Autowired
     protected PremiumUserDevicesRepository devicesRepository;
-    
+
     @Autowired
     WebGpxParser webGpxParser;
-    
+
     @Autowired
     protected GpxService gpxService;
-    
+
     Gson gson = new Gson();
-    
+
     public static final String ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE = "File is not available";
+    public static final String BRAND_DEVICE_WEB = "OsmAnd";
+    public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PREMIUM_USERS = 100;
     private static final long MB = 1024 * 1024;
@@ -100,8 +102,8 @@ public class UserdataService {
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
-    
-    
+
+
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
     public static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
@@ -112,7 +114,7 @@ public class UserdataService {
     private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
 //    private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
-    
+
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
@@ -125,9 +127,9 @@ public class UserdataService {
     public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
     public static final String EMPTY_FILE_NAME = "__folder__.info";
     public static final String INFO_EXT = ".info";
-    
+
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
-    
+
     public void validateUserForUpload(PremiumUserDevicesRepository.PremiumUserDevice dev, String type, long fileSize) {
     	PremiumUser user = usersRepository.findById(dev.userid);
         if (user == null) {
@@ -143,14 +145,14 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
             }
 		}
-        
+
         UserdataController.UserFilesResults res = generateFiles(user.id, null, false, false);
         if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
             throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
                     "Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
                             + " MB. Please contact support in order to investigate possible solutions.");
         }
-        
+
 		if (Algorithms.isEmpty(user.orderid)) {
 			if (res.totalFiles > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
 				throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
@@ -165,7 +167,7 @@ public class UserdataService {
             }
         }
     }
-    
+
     public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
         List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
         List<UserFileNoData> fl;
@@ -185,7 +187,7 @@ public class UserdataService {
         }
         return getUserFilesResults(allFiles, userId, allVersions);
     }
-    
+
     private UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
         PremiumUser user = usersRepository.findById(userId);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
@@ -211,12 +213,12 @@ public class UserdataService {
             }
             if (allVersions) {
                 res.allFiles.add(sf);
-                
+
             }
         }
         return res;
     }
-    
+
     public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb") || name.endsWith(".tif"));
@@ -225,7 +227,7 @@ public class UserdataService {
         }
         return null;
     }
-    
+
     public static class ResponseFileStatus {
     	protected long filesize;
     	protected long zipfilesize;
@@ -235,7 +237,7 @@ public class UserdataService {
     	protected String name;
     	protected JsonObject details;
     	protected String status = "ok";
-    	
+
     	public ResponseFileStatus(UserFile f) {
     		filesize = f.filesize;
     		zipfilesize = f.zipfilesize;
@@ -245,12 +247,12 @@ public class UserdataService {
     		type = f.type;
     		details = f.details;
     	}
-        
+
         public void setJsonObject(JsonObject details) {
             this.details = details;
         }
     }
-    
+
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
@@ -267,9 +269,9 @@ public class UserdataService {
 		validateUserForUpload(dev, type, zipfile.getSize());
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
-    
-    
-    
+
+
+
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
 		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
@@ -290,20 +292,20 @@ public class UserdataService {
 		filesRepository.saveAndFlush(usf);
 		return ResponseEntity.ok(gson.toJson(new ResponseFileStatus(usf)));
 	}
-    
-    
+
+
     public String userFolder(UserFile uf) {
         return userFolder(uf.userid);
     }
-    
+
     public String userFolder(int userid) {
         return USER_FOLDER_PREFIX + userid;
     }
-    
+
     public String storageFileName(UserFile uf) {
         return storageFileName(uf.type, uf.name, uf.updatetime);
     }
-    
+
     public String storageFileName(String type, String name, Date updatetime) {
         String fldName = type;
         if (name.indexOf('/') != -1) {
@@ -313,12 +315,12 @@ public class UserdataService {
         }
         return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
-    
-    public ResponseEntity<String> webUserActivate(String email, String token, String password) {
+
+    public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
         if (password.length() < 6) {
             throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
         }
-        return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password));
+        return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password), lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
     }
 
 	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email,
@@ -333,7 +335,7 @@ public class UserdataService {
 		if (pu == null) {
 			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		// we don't validate cause there are free users 
+		// we don't validate cause there are free users
 //		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
 //		if (errorMsg != null) {
 //			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
@@ -347,11 +349,11 @@ public class UserdataService {
 		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		return ok();
 	}
-    
+
     public ResponseEntity<String> ok() {
         return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
     }
-    
+
     public String hideEmail(String email) {
         if (email == null) {
             return "***";
@@ -371,8 +373,9 @@ public class UserdataService {
         }
         return hdName.toString() + email.substring(at);
     }
-    
-    public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken) {
+
+    public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken,
+                                                    String lang, String brand, String model) {
         email = email.toLowerCase().trim();
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
         if (pu == null) {
@@ -393,6 +396,9 @@ public class UserdataService {
                 deviceId)) != null) {
             devicesRepository.delete(sameDevice);
         }
+        device.lang = lang;
+        device.brand = brand;
+        device.model = model;
         device.userid = pu.id;
         device.deviceid = deviceId;
         device.udpatetime = new Date();
@@ -401,20 +407,19 @@ public class UserdataService {
         devicesRepository.saveAndFlush(device);
         return ResponseEntity.ok(gson.toJson(device));
     }
-    
+
     public String oldStorageFileName(PremiumUserFilesRepository.UserFile usf) {
         String fldName = usf.type;
         String name = usf.name;
         return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
-    
-    public void getFile(HttpServletResponse response, HttpServletRequest request, String name, String type,
-                        Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+
+    public void getFile(PremiumUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
+                        PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
         InputStream bin = null;
         File fileToDelete = null;
         try {
-			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
-			ServerCommonFile scf = checkThatObfFileisOnServer(name, type); 
+			ServerCommonFile scf = checkThatObfFileisOnServer(name, type);
 			boolean gzin = true, gzout;
 			if (scf != null) {
 				// file is not stored here
@@ -438,10 +443,10 @@ public class UserdataService {
 			} else {
 				bin = getInputStream(dev, userFile);
 			}
-            
+
             response.setHeader("Content-Disposition", "attachment; filename=" + userFile.name);
             // InputStream bin = fl.data.getBinaryStream();
-            
+
             String acceptEncoding = request.getHeader("Accept-Encoding");
             if (acceptEncoding != null && acceptEncoding.contains("gzip")) {
                 response.setHeader("Content-Encoding", "gzip");
@@ -472,6 +477,60 @@ public class UserdataService {
 		}
     }
     
+    public ResponseEntity<String> restoreFile(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+        PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
+        if (userFile == null) {
+            return ResponseEntity.badRequest().body("File not found");
+        }
+        if (userFile.zipfilesize >= 0) {
+            return ResponseEntity.badRequest().body("File is not deleted");
+        }
+        if (checkIfRestoredVersionExists(name, type, updatetime, dev)) {
+            return ResponseEntity.badRequest().body("File has already been restored from this version");
+        }
+        UserFile prevFile = getFilePrevVersion(name, type, userFile.updatetime.getTime(), dev);
+        if (prevFile == null || prevFile.zipfilesize <= 0) {
+            return ResponseEntity.badRequest().body("Previous version of file not found");
+        }
+        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+        InternalZipFile zipFile = getZipFile(prevFile, prevFile.name);
+        if (zipFile == null) {
+            return ResponseEntity.badRequest().body("Error restore file");
+        }
+        try {
+            validateUserForUpload(dev, type, zipFile.getSize());
+        } catch (OsmAndPublicApiException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+        usf.name = prevFile.name;
+        usf.type = type;
+        usf.updatetime = new Date();
+        usf.clienttime = prevFile.clienttime;
+        usf.userid = dev.userid;
+        usf.deviceid = dev.id;
+        usf.filesize = zipFile.getContentSize();
+        usf.zipfilesize = zipFile.getSize();
+        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
+        if (storageService.storeLocally()) {
+            usf.data = zipFile.getBytes();
+        }
+        filesRepository.saveAndFlush(usf);
+        return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
+    }
+    
+    public boolean checkIfRestoredVersionExists(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        UserFile file = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(dev.userid, name, type, new Date(updatetime));
+        return file != null;
+    }
+    
+    @Transactional
+    public ResponseEntity<String> emptyTrash(List<MapApiController.FileData> files, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        for (MapApiController.FileData file : files) {
+            deleteFileAllVersions(dev.userid, file.name, file.type, file.updatetime, true);
+        }
+        return ok();
+    }
+
     private InputStream getGzipInputStreamFromFile(File fp, String ext) throws IOException {
         if (fp.getName().endsWith(".zip")) {
             ZipInputStream zis = new ZipInputStream(new FileInputStream(fp));
@@ -485,8 +544,8 @@ public class UserdataService {
         }
         return new FileInputStream(fp);
     }
-    
-    
+
+
     public InputStream getInputStream(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile) {
         InputStream bin = null;
         if (dev == null) {
@@ -505,7 +564,7 @@ public class UserdataService {
         }
         return bin;
     }
-    
+
     public PremiumUserFilesRepository.UserFile getUserFile(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         if (dev == null) {
             return null;
@@ -518,18 +577,26 @@ public class UserdataService {
         }
     }
     
+    public PremiumUserFilesRepository.UserFile getFilePrevVersion(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        if (dev == null) {
+            return null;
+        }
+        return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeLessThanOrderByUpdatetimeDesc(dev.userid, name, type,
+                new Date(updatetime));
+    }
+    
     public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
     }
-    
+
     public InputStream getInputStream(PremiumUserFilesRepository.UserFileNoData userFile) {
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
     }
-    
+
     public ResponseEntity<String> tokenNotValid() {
         throw new OsmAndPublicApiException(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
     }
-    
+
     public void deleteFile(String name, String type, Integer deviceId, Long clienttime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
         usf.name = name;
@@ -545,7 +612,7 @@ public class UserdataService {
         }
         filesRepository.saveAndFlush(usf);
     }
-    
+
     //delete entry from database!
     public ResponseEntity<String> deleteFileVersion(Long updatetime, int userid, String fileName, String fileType, UserFile file) {
         UserFile userFile = file;
@@ -561,6 +628,25 @@ public class UserdataService {
         return ok();
     }
     
+    @Transactional
+    public ResponseEntity<String> deleteFileAllVersions(int userid, String fileName, String fileType, Long updatetime, boolean isTrash) {
+        List<UserFile> files = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(userid, fileName, fileType);
+        if (files.isEmpty()) {
+            return ResponseEntity.badRequest().body("File not found");
+        }
+        if (isTrash && files.get(0).zipfilesize > 0) {
+            return ResponseEntity.badRequest().body("This is not trash, the file is not deleted");
+        }
+        if (files.get(0).updatetime.getTime() != updatetime) {
+            return ResponseEntity.badRequest().body("File version was changed");
+        }
+        for (UserFile file : files) {
+            storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
+            filesRepository.delete(file);
+        }
+        return ok();
+    }
+
     @Transactional
     public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
         PremiumUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
@@ -588,7 +674,7 @@ public class UserdataService {
         }
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
     }
-    
+
     private InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
         InternalZipFile zipFile = null;
         File tmpGpx = File.createTempFile(newName, ".gpx");
@@ -607,7 +693,7 @@ public class UserdataService {
         }
         return zipFile;
     }
-    
+
     @Transactional
     public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
         Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
@@ -620,7 +706,7 @@ public class UserdataService {
         }
         return ok();
     }
-    
+
     @Transactional
     public ResponseEntity<String> deleteFolder(String folderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
@@ -631,11 +717,11 @@ public class UserdataService {
         }
         return ok();
     }
-    
+
     public PremiumUsersRepository.PremiumUser getUserById(int id) {
         return usersRepository.findById(id);
     }
-    
+
     public UserFile getLastFileVersion(int id, String fileName, String fileType) {
         return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(id, fileName, fileType);
     }
@@ -655,8 +741,8 @@ public class UserdataService {
 		filesRepository.saveAndFlush(uf);
 		uf = filesRepository.getById(ufnd.id);
 	}
-    
-    
+
+
     private boolean isSelectedType(Set<String> filterTypes, PremiumUserFilesRepository.UserFileNoData sf) {
         final String FILE_TYPE = "FILE";
         final String FILE_TYPE_MAPS = "FILE_MAPS";
@@ -680,16 +766,16 @@ public class UserdataService {
         }
         return false;
     }
-    
+
     public String toJson(String type, String name) throws JSONException {
         JSONObject json = new JSONObject();
         name = addName(json, type, name);
         json.put("type", type);
         json.put("subtype", FileSubtype.getSubtypeByFileName(name).getSubtypeName());
-        
+
         return json.toString();
     }
-    
+
     private String addName(JSONObject json, String type, String name) {
         if (type.equalsIgnoreCase(FILE_TYPE_GPX)) {
             name = "tracks" + File.separatorChar + name;
@@ -697,18 +783,18 @@ public class UserdataService {
         json.put("file", name);
         return name;
     }
-    
+
     protected JSONObject createItemsJson(JSONArray itemsJson) throws JSONException {
         final int VERSION = 1;
-        
+
         JSONObject json = new JSONObject();
         json.put("version", VERSION);
         json.put("items", itemsJson);
-        
+
         return json;
     }
-    
-    
+
+
     public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
@@ -788,7 +874,7 @@ public class UserdataService {
 			tmpFile.delete();
 		}
 	}
-    
+
     private boolean shouldSkipFile(Set<String> filterTypes, UserFileNoData userFileNoData, UserFile userFile) {
         if (userFileNoData != null) {
             // get backup for all files
@@ -804,7 +890,7 @@ public class UserdataService {
         }
         return false;
     }
-    
+
     @Transactional
     public void getBackupFolder(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
                                 String folderName, String format, String type) throws IOException {
@@ -844,8 +930,8 @@ public class UserdataService {
             Files.delete(tmpFile.toPath());
         }
     }
-    
-    
+
+
     @Transactional
     public ResponseEntity<String> deleteAccount(String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
@@ -872,18 +958,18 @@ public class UserdataService {
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
-    
+
     private boolean deleteAllFiles(PremiumUserDevicesRepository.PremiumUserDevice dev) {
         Iterable<UserFile> files = filesRepository.findAllByUserid(dev.userid);
         files.forEach(file -> {
             storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
             filesRepository.delete(file);
         });
-    
+
         files = filesRepository.findAllByUserid(dev.userid);
         return IterableUtils.size(files) == 0;
     }
-    
+
     @Transactional
     public ResponseEntity<String> sendCode(String action, String lang, PremiumUsersRepository.PremiumUser pu) {
         if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
@@ -897,10 +983,10 @@ public class UserdataService {
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
-        
+
         return ok();
     }
-    
+
     public ResponseEntity<String> confirmCode(String code, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
@@ -914,7 +1000,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
         }
     }
-    
+
     public ResponseEntity<String> confirmCode(String username, String token) {
         if (token == null) {
             return ResponseEntity.badRequest().body("Token is not valid");
@@ -931,7 +1017,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
         }
     }
-    
+
     public void wearOutToken(PremiumUsersRepository.PremiumUser pu) {
         if (pu == null || pu.tokenTime == null) {
             return;
@@ -940,11 +1026,11 @@ public class UserdataService {
         cal.setTime(pu.tokenTime);
         cal.add(Calendar.HOUR_OF_DAY, -7);
         pu.tokenTime = cal.getTime();
-        
+
         usersRepository.saveAndFlush(pu);
     }
-    
-    
+
+
     public ResponseEntity<String> changeEmail(String username, String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         // validate new email
         PremiumUsersRepository.PremiumUser tempUser = usersRepository.findByEmail(username);
@@ -981,7 +1067,16 @@ public class UserdataService {
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);
         request.logout();
-        
+
         return ok();
+    }
+
+    public void updateDeviceLangInfo(PremiumUserDevicesRepository.PremiumUserDevice dev, String lang, String brand, String model) {
+        if (dev != null) {
+            dev.lang = (lang == null) ? dev.lang : lang;
+            dev.brand = (brand == null) ? dev.brand : brand;
+            dev.model = (model == null) ? dev.model : model;
+            devicesRepository.saveAndFlush(dev);
+        }
     }
 }

@@ -20,7 +20,9 @@ public class IndexWeatherData {
 	public static final int NEAREST_NEIGHBOOR_INTERPOLATION = 0;
 	public static final int BILINEAR_INTERPOLATION = 1;
 	public static final int BICUBIC_INTERPOLATION = 2;
-	public static int INTERPOLATION = BICUBIC_INTERPOLATION;
+	// BILINEAR_INTERPOLATION is used instead of BICUBIC_INTERPOLATION for precipitation and cloud data
+	// to avoid the issue of negative values.
+	public static int INTERPOLATION = BILINEAR_INTERPOLATION;
 	public static final double INEXISTENT_VALUE = Double.MIN_VALUE;
 	// 1440, 721 - -180.125, 90.125 - 179.8750000, -90.1250000
 	public static final int REF_WIDTH = 1440;

@@ -53,7 +53,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
-	
+
 	// This is a permanent token for users who can't receive email but validated identity differently
 	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
@@ -77,25 +77,25 @@ public class UserdataController {
 
 	@Autowired
 	protected DownloadIndexesService downloadService;
-	
+
 	@Autowired
 	protected UserSubscriptionService userSubService;
 
 	@Autowired
 	EmailSenderService emailSender;
-	
+
 	@Autowired
 	UserdataService userdataService;
 
 	public static class TokenPost {
 		public String token;
 	}
-	
+
 	public static class EmailSenderInfo {
 		public String action;
 		public String lang;
 	}
-	
+
 	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
 		PremiumUserDevice d = devicesRepository.findById(deviceId);
 		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
@@ -103,7 +103,7 @@ public class UserdataController {
 		}
 		return null;
 	}
-	
+
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
 		UserFilesResults res = userdataService.generateFiles(userId, null, false, false);
 		Iterator<UserFileNoData> it = res.uniqueFiles.iterator();
@@ -131,7 +131,7 @@ public class UserdataController {
 				sb.append("<br>\n");
 			}
 		}
-		
+
 		return ResponseEntity.ok(sb.toString());
 	}
 
@@ -154,8 +154,6 @@ public class UserdataController {
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
 
-    
-
 	@PostMapping(value = "/user-update-orderid")
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam(name = "email", required = true) String email,
 			@RequestParam(name = "deviceid", required = false) String deviceId,
@@ -165,7 +163,7 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		// we allow to reset order id to null 
+		// we allow to reset order id to null
 		if (orderid != null) {
 			String errorMsg = userSubService.checkOrderIdPremium(orderid);
 			if (errorMsg != null) {
@@ -241,10 +239,14 @@ public class UserdataController {
 
 	@PostMapping(value = "/device-register")
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
-			@RequestParam(name = "token", required = true) String token,
-			@RequestParam(name = "deviceid", required = false) String deviceId) throws IOException {
+												 @RequestParam(name = "token", required = true) String token,
+												 @RequestParam(name = "deviceid", required = false) String deviceId,
+												 @RequestParam(name = "brand", required = false) String brand,
+												 @RequestParam(name = "model", required = false) String model,
+												 @RequestParam(name = "lang", required = false) String lang
+	) throws IOException {
 		String accessToken = UUID.randomUUID().toString();
-		return userdataService.registerNewDevice(email, token, deviceId, accessToken);
+		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, brand, model);
 	}
 
 	@PostMapping(value = "/delete-file")
@@ -260,7 +262,7 @@ public class UserdataController {
 		userdataService.deleteFile(name, type, deviceId, clienttime, dev);
 		return userdataService.ok();
 	}
-	
+
 	@PostMapping(value = "/delete-file-version")
 	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
 	                                         @RequestParam(name = "name", required = true) String name,
@@ -286,7 +288,7 @@ public class UserdataController {
 		// This could be slow series of checks (token, user, subscription, amount of space):
 		// probably it's better to support multiple file upload without these checks
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
-		
+
 		if (dev == null) {
 			return userdataService.tokenNotValid();
 		}
@@ -346,13 +348,18 @@ public class UserdataController {
 
 	@GetMapping(value = "/download-file")
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = false) Long updatetime,
-			@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
+	                    @RequestParam String name,
+	                    @RequestParam String type,
+	                    @RequestParam(required = false) Long updatetime,
+	                    @RequestParam(name = "deviceid") int deviceId,
+	                    @RequestParam String accessToken) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
-		userdataService.getFile(response, request, name, type, updatetime, dev);
+		if (dev != null) {
+			PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+			if (userFile != null) {
+				userdataService.getFile(userFile, response, request, name, type, dev);
+			}
+		}
 	}
 
 	@GetMapping(value = "/list-files")
@@ -369,7 +376,7 @@ public class UserdataController {
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, type);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
-	
+
 	// TokenPost for backward compatibility
 	@PostMapping(path = {"/delete-account"})
 	public ResponseEntity<String> deleteAccount(@RequestBody TokenPost token,
@@ -382,7 +389,7 @@ public class UserdataController {
 		}
 		return userdataService.deleteAccount(token.token, dev, request);
 	}
-	
+
 	@PostMapping(path = {"/send-code"})
 	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data,
 	                                       @RequestParam(name = "deviceid") int deviceId,
@@ -422,7 +429,7 @@ public class UserdataController {
 		LOG.error("URL:" + url + ", ip:" + ipAddress +  ", code:" + code + ", message:" + msg + m);
 		throw new OsmAndPublicApiException(code, msg);
 	}
-	
+
 	@PostMapping(path = {"/auth/confirm-code"})
 	public ResponseEntity<String> confirmCode(@RequestBody MapApiController.UserPasswordPost credentials) {
 		if (emailSender.isEmail(credentials.username)) {

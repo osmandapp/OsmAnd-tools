@@ -24,6 +24,9 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -220,7 +223,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		public final int height;
 		public long searchTime;
 		public long renderingTime;
-		public boolean saveTxt = false;
+		public boolean saveTextTile = false;
 		public RenderingContext context;
 
 		public RenderingImageContext(int sleft, int sright, int stop, int sbottom, int zoom) {
@@ -259,18 +262,20 @@ public class NativeJavaRendering extends NativeLibrary {
 		return storage;
 	}
 
-	public ByteBuffer render(RenderingImageContext ctx) throws IOException {
+	public RenderingGenerationResult render(RenderingImageContext renderingImageContext) throws IOException {
 		long time = -System.currentTimeMillis();
-		RenderingContext rctx = new RenderingContext() {
+		RenderingContext renderingContext = new RenderingContext() {
 			@Override
 			protected byte[] getIconRawData(String data) {
 				return _R.getIconData(data);
 			}
 		};
-		rctx.preferredLocale = renderingProps.get("lang") != null ? renderingProps.get("lang") : "";
-		rctx.nightMode = "true".equals(renderingProps.get("nightMode"));
+		renderingContext.preferredLocale = renderingProps.get("lang") != null ? renderingProps.get("lang") : "";
+		renderingContext.nightMode = "true".equals(renderingProps.get("nightMode"));
+		
 		RenderingRuleSearchRequest request = new RenderingRuleSearchRequest(storage);
-		request.setBooleanFilter(request.ALL.R_NIGHT_MODE, rctx.nightMode);
+		
+		request.setBooleanFilter(request.ALL.R_NIGHT_MODE, renderingContext.nightMode);
 		for (RenderingRuleProperty customProp : storage.PROPS.getCustomRules()) {
 			String res = renderingProps.get(customProp.getAttrName());
 			if(customProp.getAttrName().equals(RenderingRuleStorageProperties.A_ENGINE_V1)){
@@ -297,69 +302,93 @@ public class NativeJavaRendering extends NativeLibrary {
 				}
 			}
 		}
-		request.setIntFilter(request.ALL.R_MINZOOM, ctx.zoom);
+		request.setIntFilter(request.ALL.R_MINZOOM, renderingImageContext.zoom);
 		request.saveState();
-		NativeSearchResult res = searchObjectsForRendering(ctx.sleft, ctx.sright, ctx.stop, ctx.sbottom, ctx.zoom, request, true,
-					rctx, "Nothing found");
+		NativeSearchResult res = searchObjectsForRendering(renderingImageContext.sleft, renderingImageContext.sright, renderingImageContext.stop, renderingImageContext.sbottom, renderingImageContext.zoom, request, true,
+					renderingContext, "Nothing found");
 		// ctx.zoomDelta =  1;
 //		double scale = MapUtils.getPowZoom((float) ctx.zoomDelta);
 		float scale = 1;
 		if (renderingProps.get("density") != null) {
 			scale *= Float.parseFloat(renderingProps.get("density"));
 		}
-		rctx.leftX = ctx.leftX * scale;
-		rctx.topY = ctx.topY * scale;
-		rctx.width = (int) (ctx.width * scale);
-		rctx.height = (int) (ctx.height * scale);
+		renderingContext.leftX = renderingImageContext.leftX * scale;
+		renderingContext.topY = renderingImageContext.topY * scale;
+		renderingContext.width = (int) (renderingImageContext.width * scale);
+		renderingContext.height = (int) (renderingImageContext.height * scale);
+		renderingContext.renderingContextHandle = res.nativeHandler;
 		// map density scales corresponding to zoom delta
 		// (so the distance between the road is the same)
-		rctx.setDensityValue(scale);
+		renderingContext.setDensityValue(scale);
 		//rctx.textScale = 1f;//Text/icon scales according to mapDensity
-		rctx.textScale = 1 / scale; //Text/icon stays same for all sizes
+		renderingContext.textScale = 1 / scale; //Text/icon stays same for all sizes
 		if(renderingProps.get("textScale") != null ) {
-			rctx.textScale *= Float.parseFloat(renderingProps.get("textScale"));
+			renderingContext.textScale *= Float.parseFloat(renderingProps.get("textScale"));
 		}
-		rctx.screenDensityRatio = 1 / Math.max(1, 1f /*requestedBox.getDensity()*/);
-		final double tileDivisor = MapUtils.getPowZoom((float) (31 - ctx.zoom)) / scale;
+		renderingContext.screenDensityRatio = 1 / Math.max(1, 1f /*requestedBox.getDensity()*/);
+		final double tileDivisor = MapUtils.getPowZoom((float) (31 - renderingImageContext.zoom)) / scale;
 		request.clearState();
 
 		if(request.searchRenderingAttribute(RenderingRuleStorageProperties.A_DEFAULT_COLOR)) {
-			rctx.defaultColor = request.getIntPropertyValue(request.ALL.R_ATTR_COLOR_VALUE);
+			renderingContext.defaultColor = request.getIntPropertyValue(request.ALL.R_ATTR_COLOR_VALUE);
 		}
 		request.clearState();
-		request.setIntFilter(request.ALL.R_MINZOOM, ctx.zoom);
+		request.setIntFilter(request.ALL.R_MINZOOM, renderingImageContext.zoom);
 		if(request.searchRenderingAttribute(RenderingRuleStorageProperties.A_SHADOW_RENDERING)) {
-			rctx.shadowRenderingMode = request.getIntPropertyValue(request.ALL.R_ATTR_INT_VALUE);
-			rctx.shadowRenderingColor = request.getIntPropertyValue(request.ALL.R_SHADOW_COLOR);
+			renderingContext.shadowRenderingMode = request.getIntPropertyValue(request.ALL.R_ATTR_INT_VALUE);
+			renderingContext.shadowRenderingColor = request.getIntPropertyValue(request.ALL.R_SHADOW_COLOR);
 
 		}
-		rctx.zoom = ctx.zoom;
-		rctx.tileDivisor = tileDivisor;
-		rctx.saveTextTile = ctx.saveTxt;
+		renderingContext.zoom = renderingImageContext.zoom;
+		renderingContext.tileDivisor = tileDivisor;
+		renderingContext.saveTextTile = renderingImageContext.saveTextTile;
 		long search = time + System.currentTimeMillis();
-		final RenderingGenerationResult rres = NativeJavaRendering.generateRenderingIndirect(rctx, res.nativeHandler,
+		
+		RenderingGenerationResult generationResult = NativeLibrary.generateRenderingIndirect(renderingContext, res.nativeHandler,
 				false, request, true);
+		List<RenderableObject> renderableObjects = new Gson().fromJson(renderingContext.textTile,  new TypeToken<List<RenderableObject>>(){}.getType());
+		if (renderingContext.saveTextTile) {
+			generationResult.setInfo(RenderableObject.createGeoJson(renderableObjects));
+		}
+		
 		long rendering = time + System.currentTimeMillis() - search;
-		ctx.searchTime = search;
-		ctx.renderingTime = rendering;
-		ctx.context = rctx;
-//		long last = time + System.currentTimeMillis() - rendering;
-//		System.out.println(" TIMES search - " + search + " rendering - " + rendering + " unpack - " + last);
+		renderingImageContext.searchTime = search;
+		renderingImageContext.renderingTime = rendering;
+		renderingImageContext.context = renderingContext;
 		res.deleteNativeResult();
-		return rres.bitmapBuffer;
+		
+		return generationResult;
 	}
 	
+	public static class RenderingImageResult {
+		private final BufferedImage img;
+		private final RenderingGenerationResult generationResult;
+		
+		RenderingImageResult(BufferedImage img, RenderingGenerationResult result) {
+			this.img = img;
+			this.generationResult = result;
+		}
+		
+		public BufferedImage getImage() {
+			return img;
+		}
+		
+		public RenderingGenerationResult getGenerationResult() {
+			return generationResult;
+		}
+		
+	}
 	
-	public BufferedImage renderImage(RenderingImageContext ctx) throws IOException {
-		ByteBuffer bitmapBuffer = render(ctx);
+	public RenderingImageResult renderImage(RenderingImageContext renderingImageContext) throws IOException {
+		RenderingGenerationResult generationResult = render(renderingImageContext);
 		InputStream inputStream = new InputStream() {
 			int nextInd = 0;
 			@Override
-			public int read() throws IOException {
-				if(nextInd >= bitmapBuffer.capacity()) {
+			public int read() {
+				if(nextInd >= generationResult.bitmapBuffer.capacity()) {
 					return -1;
 				}
-				byte b = bitmapBuffer.get(nextInd++) ;
+				byte b = generationResult.bitmapBuffer.get(nextInd++) ;
 				if(b < 0) {
 					return b + 256;
 				} else {
@@ -371,8 +400,9 @@ public class NativeJavaRendering extends NativeLibrary {
 		ImageReader reader = readers.next();
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
-		AllocationUtil.freeDirectBuffer(bitmapBuffer);
-		return img;
+		AllocationUtil.freeDirectBuffer(generationResult.bitmapBuffer);
+		
+		return new RenderingImageResult(img, generationResult);
 	}
 
 	public void initFilesInDir(File filesDir) throws IOException {
@@ -535,7 +565,7 @@ public class NativeJavaRendering extends NativeLibrary {
 				File filesFolder = new File(obfFolder);
 				List<File> obfFiles = new ArrayList<>();
 				Map<String, FileIndex> map = defaultLoadedLibrary.initIndexesCache(filesFolder, obfFiles, true);
-				defaultLoadedLibrary.initCacheMapFile(new File(filesFolder, INDEXES_CACHE).getAbsolutePath());
+				//defaultLoadedLibrary.initCacheMapFile(new File(filesFolder, INDEXES_CACHE).getAbsolutePath());
 				defaultLoadedLibrary.initFilesInDir(obfFiles, map);
 			}
 			log.info(String.format("Init native library with maps: %d ms", System.currentTimeMillis() - now));

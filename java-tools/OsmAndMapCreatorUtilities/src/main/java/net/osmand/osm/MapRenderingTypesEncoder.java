@@ -1584,6 +1584,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if ("path".equals(highway)) {
 			if ("designated".equals(bicycle)) {
 				result = 0;
+				result_bicycle_routing = 0;
 			} else if ("designated".equals(foot)) {
 				result = 2;
 			}

@@ -519,7 +519,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				transStopsStat.setDouble(3, s.getLocation().getLongitude());
 				transStopsStat.setString(4, s.getName());
 				transStopsStat.setString(5, s.getEnName(false));
-				transStopsStat.setString(6, gson.toJson(s.getNamesMap(false)));
+				Map<String, String> namesMap = s.getNamesMap(false);
+				transStopsStat.setString(6, namesMap.size() > 0 ? gson.toJson(namesMap) : "{}");
 				transStopsStat.setString(7, gson.toJson(s.getDeletedRoutesIds()));
 				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
 				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());

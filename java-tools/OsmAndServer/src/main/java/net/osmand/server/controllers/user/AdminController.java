@@ -1391,7 +1391,8 @@ public class AdminController {
 			if (this.introCycles > 0) {
 				this.introPriceEurMillis = defPriceEurMillis / 2;
 			}
-			double rate = rts.getEurRate(pricecurrency, startPeriodTime); 
+			// TOO old
+			double rate = 0;//rts.getEurRate(pricecurrency, startPeriodTime); 
 			if (introPriceMillis >= 0 && priceMillis > 0 && rate == 0) {
 				rate = priceMillis * 1.0 / defPriceEurMillis;
 			}
