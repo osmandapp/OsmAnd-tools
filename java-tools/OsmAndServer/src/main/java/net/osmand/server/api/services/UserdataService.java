@@ -414,12 +414,11 @@ public class UserdataService {
         return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
 
-    public void getFile(HttpServletResponse response, HttpServletRequest request, String name, String type,
-                        Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+    public void getFile(PremiumUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
+                        PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
         InputStream bin = null;
         File fileToDelete = null;
         try {
-			PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
 			ServerCommonFile scf = checkThatObfFileisOnServer(name, type);
 			boolean gzin = true, gzout;
 			if (scf != null) {
@@ -477,6 +476,60 @@ public class UserdataService {
 			}
 		}
     }
+    
+    public ResponseEntity<String> restoreFile(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+        PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
+        if (userFile == null) {
+            return ResponseEntity.badRequest().body("File not found");
+        }
+        if (userFile.zipfilesize >= 0) {
+            return ResponseEntity.badRequest().body("File is not deleted");
+        }
+        if (checkIfRestoredVersionExists(name, type, updatetime, dev)) {
+            return ResponseEntity.badRequest().body("File has already been restored from this version");
+        }
+        UserFile prevFile = getFilePrevVersion(name, type, userFile.updatetime.getTime(), dev);
+        if (prevFile == null || prevFile.zipfilesize <= 0) {
+            return ResponseEntity.badRequest().body("Previous version of file not found");
+        }
+        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+        InternalZipFile zipFile = getZipFile(prevFile, prevFile.name);
+        if (zipFile == null) {
+            return ResponseEntity.badRequest().body("Error restore file");
+        }
+        try {
+            validateUserForUpload(dev, type, zipFile.getSize());
+        } catch (OsmAndPublicApiException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+        usf.name = prevFile.name;
+        usf.type = type;
+        usf.updatetime = new Date();
+        usf.clienttime = prevFile.clienttime;
+        usf.userid = dev.userid;
+        usf.deviceid = dev.id;
+        usf.filesize = zipFile.getContentSize();
+        usf.zipfilesize = zipFile.getSize();
+        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
+        if (storageService.storeLocally()) {
+            usf.data = zipFile.getBytes();
+        }
+        filesRepository.saveAndFlush(usf);
+        return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
+    }
+    
+    public boolean checkIfRestoredVersionExists(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        UserFile file = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(dev.userid, name, type, new Date(updatetime));
+        return file != null;
+    }
+    
+    @Transactional
+    public ResponseEntity<String> emptyTrash(List<MapApiController.FileData> files, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        for (MapApiController.FileData file : files) {
+            deleteFileAllVersions(dev.userid, file.name, file.type, file.updatetime, true);
+        }
+        return ok();
+    }
 
     private InputStream getGzipInputStreamFromFile(File fp, String ext) throws IOException {
         if (fp.getName().endsWith(".zip")) {
@@ -523,7 +576,15 @@ public class UserdataService {
             return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
         }
     }
-
+    
+    public PremiumUserFilesRepository.UserFile getFilePrevVersion(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+        if (dev == null) {
+            return null;
+        }
+        return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeLessThanOrderByUpdatetimeDesc(dev.userid, name, type,
+                new Date(updatetime));
+    }
+    
     public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
     }
@@ -564,6 +625,25 @@ public class UserdataService {
         }
         storageService.deleteFile(userFile.storage, userFolder(userFile), storageFileName(userFile));
         filesRepository.delete(userFile);
+        return ok();
+    }
+    
+    @Transactional
+    public ResponseEntity<String> deleteFileAllVersions(int userid, String fileName, String fileType, Long updatetime, boolean isTrash) {
+        List<UserFile> files = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(userid, fileName, fileType);
+        if (files.isEmpty()) {
+            return ResponseEntity.badRequest().body("File not found");
+        }
+        if (isTrash && files.get(0).zipfilesize > 0) {
+            return ResponseEntity.badRequest().body("This is not trash, the file is not deleted");
+        }
+        if (files.get(0).updatetime.getTime() != updatetime) {
+            return ResponseEntity.badRequest().body("File version was changed");
+        }
+        for (UserFile file : files) {
+            storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
+            filesRepository.delete(file);
+        }
         return ok();
     }
 
