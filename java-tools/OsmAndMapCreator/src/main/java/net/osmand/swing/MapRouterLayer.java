@@ -800,7 +800,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					map.fillPopupActions();
 				}
 
-				if (selectedGPXFile != null) {
+				if (selectedGPXFile != null && OsmExtractionUI.MAIN_APP != null) {
 					JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), "Check validity of GPX File",
 							"GPX route correction", JOptionPane.INFORMATION_MESSAGE);
 				}
@@ -1521,4 +1521,16 @@ public class MapRouterLayer implements MapPanelLayer {
 	public void applySettings() {
 	}
 
+	public void automatedEnvironment() {
+		// load data first
+		String gpx = System.getenv("LOAD_GPX");
+		if (gpx != null) {
+			selectedGPXFile = GPXUtilities.loadGPXFile(new File(gpx));
+			displayGpxFiles();
+		}
+		// do actions on loaded data
+		if (System.getenv("GPX_GEO") != null) {
+			calcRouteGpx(selectedGPXFileToPolyline(), true);
+		}
+	}
 }
