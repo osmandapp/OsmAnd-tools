@@ -1201,6 +1201,9 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
 			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
+		if (DataExtractionSettings.getSettings().useNativeRouting()) {
+			router.setUseNativeApproximation(true);
+		}
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
 		return new RouteCalcResult(r.result);
 	}
