@@ -929,7 +929,6 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 //		addLayer(new CoastlinesLayer());
 		mapInformationLayer.addSetStartActionListener(mapRouterLayer.setStartActionListener);
 		mapInformationLayer.addSetEndActionListener(mapRouterLayer.setEndActionListener);
-		mapRouterLayer.automatedEnvironment();
 		fillPopupActions();
 	}
 
