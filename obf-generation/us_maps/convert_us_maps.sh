@@ -79,13 +79,13 @@ function generate_osm_from_shp {
 }
 
 function generate_osm_private_lands {
-	echo -e "\033[95mGenerating osm $1\033[0m"
+	echo -e "\033[95mGenerating osm from $1\033[0m"
 	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --suppress-empty-tags "$1" -o $work_dir/$out_osm_dir/us_${2}_pl_northamerica.osm -t private_lands.py
 	osmconvert $work_dir/$out_osm_dir/us_${2}_pl_northamerica.osm --out-pbf > $work_dir/$out_osm_dir/us_${2}_pl_northamerica.pbf
 }
 
 function generate_obf {
-	echo -e "\033[95mGenerating obf $1\033[0m"
+	echo -e "\033[95mGenerating obf from $1\033[0m"
 	cd $work_dir/$out_obf_dir
 	time bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/$1 --poi-types=$poi_types_path --rendering-types=$rendering_types_path
 }
@@ -98,7 +98,7 @@ function run_alg_fixgeometries {
 		--distance_units=meters \
 		--area_units=m2 \
 		--INPUT="$1" \
-		--METHOD=1 \
+		--METHOD=0 \
 		--OUTPUT="$2/${filename}_fixed.gpkg"
 }
 
@@ -323,10 +323,10 @@ if [[ $process_private_lands_massachusets == true ]]; then
 # 		mkdir -p $work_dir/$tmp_dir/$state_name
 # 		unzip -f "$work_dir/$source_original_dir_name/$source_file_name.zip" -d $work_dir/$tmp_dir/$state_name/ > /dev/null
 # 		find $work_dir/$tmp_dir/$state_name -mindepth 2 -type f -exec mv -i '{}' -n $work_dir/$tmp_dir/$state_name ';'
-# 		time ogrmerge.py -single -overwrite_ds -f "GPKG" -o $work_dir/$source_dir_original_name/$source_file_name.gpkg $work_dir/$tmp_dir/$state_name/*.shp
-#		run_alg_fixgeometries $work_dir/$source_original_dir_name/$source_file_name.gpkg $work_dir/$source_dir_name
-		generate_osm_private_lands $work_dir/$source_dir_name/${source_file_name}_fixed.gpkg $state_name || exit 1
-		generate_obf us_${state_name}_pl_northamerica.pbf || exit 1
+		time ogrmerge.py -single -overwrite_ds -f "GPKG" -o $work_dir/$source_dir_original_name/$source_file_name.gpkg $work_dir/$tmp_dir/$state_name/*.shp || exit 1
+# 		run_alg_fixgeometries $work_dir/$source_original_dir_name/$source_file_name.gdb.zip $work_dir/$source_dir_name || exit 1
+# 		generate_osm_private_lands $work_dir/$source_dir_name/${source_file_name}_fixed.gpkg $state_name || exit 1
+# 		generate_obf us_${state_name}_pl_northamerica.pbf || exit 1
 	fi
 fi
 
