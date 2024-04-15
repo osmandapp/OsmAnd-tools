@@ -15,6 +15,7 @@ import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.wiki.OsmCoordinatesByTag;
+import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.logging.Log;
@@ -73,11 +74,11 @@ public class WikiDataHandler extends DefaultHandler {
 		this.lastProcessedId = lastProcessedId;
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id long, originalId text, lat double, lon double)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id long, originalId text, lat double, lon double, osmtype int, osmid long, osmtags text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id long, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id long, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id long, type text, value text)");
-		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon) VALUES (?, ?, ?, ?)");
+		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, osmtype, osmid, osmtags) VALUES (?, ?, ?, ?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
 		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
@@ -176,10 +177,11 @@ public class WikiDataHandler extends DefaultHandler {
 							return;
 						}
 						ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
+						OsmLatLonId osmCoordinates = null;
 						for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 							String articleTitle = siteLink.title;
 							String articleLang = siteLink.lang;
-							LatLon osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia:" + articleLang,
+							osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia:" + articleLang,
 									articleTitle);
 							if (osmCoordinates == null) {
 								osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia",
@@ -189,16 +191,16 @@ public class WikiDataHandler extends DefaultHandler {
 								osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia", articleTitle);
 							}
 							if (osmCoordinates != null) {
-								article.setLat(osmCoordinates.getLatitude());
-								article.setLon(osmCoordinates.getLongitude());
+								article.setLat(osmCoordinates.lat);
+								article.setLon(osmCoordinates.lon);
 								break;
 							}
 						}
 						if (article.getLat() == 0 && article.getLon() == 0) {
-							LatLon osmCoordinates = osmWikiCoordinates.getCoordinates("wikidata", title.toString());
+							osmCoordinates = osmWikiCoordinates.getCoordinates("wikidata", title.toString());
 							if (osmCoordinates != null) {
-								article.setLat(osmCoordinates.getLatitude());
-								article.setLon(osmCoordinates.getLongitude());
+								article.setLat(osmCoordinates.lat);
+								article.setLon(osmCoordinates.lon);
 							}
 						}
 
@@ -210,6 +212,9 @@ public class WikiDataHandler extends DefaultHandler {
 							coordsPrep.setString(2, title.toString());
 							coordsPrep.setDouble(3, article.getLat());
 							coordsPrep.setDouble(4, article.getLon());
+							coordsPrep.setInt(5, osmCoordinates != null?(osmCoordinates.type+1) :0);
+							coordsPrep.setLong(6, osmCoordinates != null?(osmCoordinates.id) :0);
+							coordsPrep.setString(6, osmCoordinates != null? osmCoordinates.tags :null);
 							addBatch(coordsPrep, coordsBatch);
 							List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
 							for (String reg : rgs) {

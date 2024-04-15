@@ -47,13 +47,21 @@ public class OsmCoordinatesByTag {
 	private static final Log log = PlatformUtil.getLog(OsmCoordinatesByTag.class);
 	private final Set<String> filterExactTags;
 	private final String[] filterStartsWithTags;
-	private final Map<String, LatLon> coordinates = new HashMap<>();
+	private final Map<String, OsmLatLonId> coordinates = new HashMap<>();
 	private int registeredNodes = 0;
 	private int registeredWays = 0;
 	private int registeredRelations = 0;
 	private PreparedStatement selectCoordsByID;
 	private Connection commonsWikiConn;
 
+	public static class OsmLatLonId {
+		public double lat;
+		public double lon;
+		public long id; // 
+		public int type; // 0 - node
+		public String tags;
+	}
+	
 	public OsmCoordinatesByTag(File wikidataSqlite, String[] filterExactTags, String[] filterStartsWithTags, boolean initFromOsm) throws SQLException {
 
 		this.filterExactTags = new TreeSet<>(Arrays.asList(filterExactTags));
@@ -95,7 +103,7 @@ public class OsmCoordinatesByTag {
 		return tag + "___" + value;
 	}
 	
-	public LatLon getCoordinates(String tag, String value) {
+	public OsmLatLonId getCoordinates(String tag, String value) {
 		return coordinates.get(combineTagValue(tag, value));
 	}
 
@@ -133,6 +141,9 @@ public class OsmCoordinatesByTag {
 
 	private void registerEntity(Entity entity) {
 		LatLon center = OsmMapUtils.getCenter(entity);
+		if(center == null) {
+			return;
+		}
 		for (String t : entity.getTagKeySet()) {
 			if (checkTagSuitable(t)) {
 				if (entity instanceof Node) {
@@ -143,7 +154,15 @@ public class OsmCoordinatesByTag {
 					registeredRelations++;
 				}
 				String key = combineTagValue(t, entity.getTag(t));
-				LatLon oldValue = coordinates.put(key, center);
+				OsmLatLonId osmLatLonId = new OsmLatLonId();
+				osmLatLonId.lat = center.getLatitude();
+				osmLatLonId.lon = center.getLongitude();
+				osmLatLonId.id = entity.getId();
+				osmLatLonId.type = EntityType.valueOf(entity).ordinal();
+				if (entity.getTag("place") != null || entity.getTag("admin_level") != null) {
+					osmLatLonId.tags = "admin";
+				}
+				OsmLatLonId oldValue = coordinates.put(key, osmLatLonId);
 				if (oldValue != null) {
 //					log.debug("For " + key + " old coordinates " + oldValue + " replaced by " + center);
 				}
