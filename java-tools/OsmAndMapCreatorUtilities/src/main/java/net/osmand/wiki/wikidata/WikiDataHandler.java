@@ -214,7 +214,7 @@ public class WikiDataHandler extends DefaultHandler {
 							coordsPrep.setDouble(4, article.getLon());
 							coordsPrep.setInt(5, osmCoordinates != null?(osmCoordinates.type+1) :0);
 							coordsPrep.setLong(6, osmCoordinates != null?(osmCoordinates.id) :0);
-							coordsPrep.setString(6, osmCoordinates != null? osmCoordinates.tags :null);
+							coordsPrep.setString(7, osmCoordinates != null? osmCoordinates.tags :null);
 							addBatch(coordsPrep, coordsBatch);
 							List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
 							for (String reg : rgs) {
