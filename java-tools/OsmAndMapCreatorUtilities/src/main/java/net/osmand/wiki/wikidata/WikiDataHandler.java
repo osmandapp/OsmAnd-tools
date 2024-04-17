@@ -74,11 +74,12 @@ public class WikiDataHandler extends DefaultHandler {
 		this.lastProcessedId = lastProcessedId;
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id long, originalId text, lat double, lon double, osmtype int, osmid long, osmtags text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id long, originalId text, lat double, lon double, wlat double, wlon double,  "
+				+ " osmtype int, osmid long, osmtags text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id long, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id long, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id long, type text, value text)");
-		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, osmtype, osmid, osmtags) VALUES (?, ?, ?, ?, ?, ?, ?)");
+		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, osmtags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
 		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
@@ -178,6 +179,8 @@ public class WikiDataHandler extends DefaultHandler {
 						}
 						ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
 						OsmLatLonId osmCoordinates = null;
+						double wlat = article.getLat();
+						double wlon = article.getLon();
 						for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 							String articleTitle = siteLink.title;
 							String articleLang = siteLink.lang;
@@ -208,13 +211,16 @@ public class WikiDataHandler extends DefaultHandler {
 							if (++count % ARTICLE_BATCH_SIZE == 0) {
 								log.info(String.format("Article accepted %s (%d)", title, count));
 							}
-							coordsPrep.setLong(1, id);
-							coordsPrep.setString(2, title.toString());
-							coordsPrep.setDouble(3, article.getLat());
-							coordsPrep.setDouble(4, article.getLon());
-							coordsPrep.setInt(5, osmCoordinates != null?(osmCoordinates.type+1) :0);
-							coordsPrep.setLong(6, osmCoordinates != null?(osmCoordinates.id) :0);
-							coordsPrep.setString(7, osmCoordinates != null? osmCoordinates.tags :null);
+							int ind = 0;
+							coordsPrep.setLong(++ind, id);
+							coordsPrep.setString(++ind, title.toString());
+							coordsPrep.setDouble(++ind, article.getLat());
+							coordsPrep.setDouble(++ind, article.getLon());
+							coordsPrep.setDouble(++ind, wlat);
+							coordsPrep.setDouble(++ind, wlon);
+							coordsPrep.setInt(++ind, osmCoordinates != null ? (osmCoordinates.type + 1) : 0);
+							coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
+							coordsPrep.setString(++ind, osmCoordinates != null ? osmCoordinates.tags : null);
 							addBatch(coordsPrep, coordsBatch);
 							List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
 							for (String reg : rgs) {

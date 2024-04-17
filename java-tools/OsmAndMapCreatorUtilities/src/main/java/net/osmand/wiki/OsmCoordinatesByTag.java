@@ -70,7 +70,7 @@ public class OsmCoordinatesByTag {
 			initCoordinates(wikidataSqlite.getParentFile());
 		} else {
 			commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-			selectCoordsByID = commonsWikiConn.prepareStatement("SELECT * FROM wiki_coords where originalId = ?");
+			selectCoordsByID = commonsWikiConn.prepareStatement("SELECT lat, lon FROM wiki_coords where originalId = ?");
 		}
 	}
 
@@ -112,7 +112,10 @@ public class OsmCoordinatesByTag {
 			selectCoordsByID.setString(1, wikidataQId);
 			ResultSet rs = selectCoordsByID.executeQuery();
 			if (rs.next()) {
-				return new LatLon(Double.parseDouble(rs.getString(3)), Double.parseDouble(rs.getString(4)));
+				LatLon l = new LatLon(rs.getDouble(1), rs.getDouble(2));
+				if (l.getLatitude() != 0 || l.getLongitude() != 0) {
+					return l;
+				}
 			}
 		}
 		return null;
