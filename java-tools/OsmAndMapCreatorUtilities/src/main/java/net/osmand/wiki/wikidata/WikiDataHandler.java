@@ -181,30 +181,10 @@ public class WikiDataHandler extends DefaultHandler {
 						OsmLatLonId osmCoordinates = null;
 						double wlat = article.getLat();
 						double wlon = article.getLon();
-						for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
-							String articleTitle = siteLink.title;
-							String articleLang = siteLink.lang;
-							osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia:" + articleLang,
-									articleTitle);
-							if (osmCoordinates == null) {
-								osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia",
-										articleLang + ":" + articleTitle);
-							}
-							if (osmCoordinates == null) {
-								osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia", articleTitle);
-							}
-							if (osmCoordinates != null) {
-								article.setLat(osmCoordinates.lat);
-								article.setLon(osmCoordinates.lon);
-								break;
-							}
-						}
-						if (article.getLat() == 0 && article.getLon() == 0) {
-							osmCoordinates = osmWikiCoordinates.getCoordinates("wikidata", title.toString());
-							if (osmCoordinates != null) {
-								article.setLat(osmCoordinates.lat);
-								article.setLon(osmCoordinates.lon);
-							}
+						osmCoordinates = getOsmCoordinates(article, osmCoordinates);
+						if (osmCoordinates != null) {
+							article.setLat(osmCoordinates.lat);
+							article.setLon(osmCoordinates.lon);
 						}
 
 						if (article.getLat() != 0 && article.getLon() != 0) {
@@ -262,6 +242,26 @@ public class WikiDataHandler extends DefaultHandler {
 					break;
 			}
 		}
+	}
+
+
+
+	private OsmLatLonId getOsmCoordinates(ArticleMapper.Article article, OsmLatLonId osmCoordinates) {
+		for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
+			String articleTitle = siteLink.title;
+			String articleLang = siteLink.lang;
+			osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia:" + articleLang, articleTitle);
+			if (osmCoordinates == null) {
+				osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia", articleLang + ":" + articleTitle);
+			}
+			if (osmCoordinates == null) {
+				osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia", articleTitle);
+			}
+			if (osmCoordinates != null) {
+				return osmCoordinates;
+			}
+		}
+		return osmWikiCoordinates.getCoordinates("wikidata", title.toString());
 	}
 }
 

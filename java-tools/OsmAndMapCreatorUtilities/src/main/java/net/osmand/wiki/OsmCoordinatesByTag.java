@@ -9,16 +9,21 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
 import net.osmand.data.LatLon;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
+
+import com.google.gson.Gson;
 
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -53,25 +58,33 @@ public class OsmCoordinatesByTag {
 	private int registeredRelations = 0;
 	private PreparedStatement selectCoordsByID;
 	private Connection commonsWikiConn;
+	private Gson gson;
 
 	public static class OsmLatLonId {
 		public double lat;
 		public double lon;
 		public long id; // 
 		public int type; // 0 - node
+		public long wikidataId;
 		public String tags;
+		public String tagsJson;
+		public OsmLatLonId next;
 	}
 	
-	public OsmCoordinatesByTag(File wikidataSqlite, String[] filterExactTags, String[] filterStartsWithTags, boolean initFromOsm) throws SQLException {
-
+	public OsmCoordinatesByTag(String[] filterExactTags, String[] filterStartsWithTags) {
+		gson = new Gson();
 		this.filterExactTags = new TreeSet<>(Arrays.asList(filterExactTags));
 		this.filterStartsWithTags = filterStartsWithTags;
+	}
+	
+	public OsmCoordinatesByTag parse(File wikidataSqlite, boolean initFromOsm) throws SQLException {
 		if (!wikidataSqlite.exists() || initFromOsm) {
 			initCoordinates(wikidataSqlite.getParentFile());
 		} else {
 			commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 			selectCoordsByID = commonsWikiConn.prepareStatement("SELECT lat, lon FROM wiki_coords where originalId = ?");
 		}
+		return this;
 	}
 
 	private void initCoordinates(File wikiFolder) {
@@ -95,8 +108,53 @@ public class OsmCoordinatesByTag {
 	public static void main(String[] args) throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_waynodes.osm.gz");
 //		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_buildings_multipolygon.osm.gz");
-		OsmCoordinatesByTag o = new OsmCoordinatesByTag(osmGz.getParentFile(), new String[]{"wikipedia", "wikidata"},
-				new String[] { "wikipedia:" }, false);
+		OsmCoordinatesByTag o = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
+				new String[] { "wikipedia:" }).parse(osmGz.getParentFile(), false);
+	}
+	
+	
+	public void createOSMWikidataTable(File wikidataSqlite) throws SQLException {
+		commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
+		Statement st = commonsWikiConn.createStatement();
+		ResultSet rs = st.executeQuery("SELECT id,lang,title FROM wiki_mapping ");
+		Map<Long, OsmLatLonId> res = new TreeMap<>();
+		while(rs.next()) {
+			long wid = rs.getLong(1);
+			String articleLang = rs.getString(2);
+			String articleTitle = rs.getString(3);
+			setWikidataId(res, getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
+			setWikidataId(res, getCoordinates("wikipedia" + articleLang, articleLang + ":" + articleTitle), wid);
+			setWikidataId(res, getCoordinates("wikipedia", articleTitle), wid);
+			setWikidataId(res, getCoordinates("wikidata", "Q" + wid), wid);
+		}
+		st.executeQuery("DROP TABLE osm_wikidata");
+		st.executeQuery("CREATE TABLE osm_wikidata(osmid long, osmtype int, wikidataid long,  lat double, long double, tags string, tag string)");
+		st.close();
+		PreparedStatement ps = commonsWikiConn.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?)");
+		int batch = 0;
+		for (OsmLatLonId o : res.values()) {
+			ps.setLong(1, o.id);
+			ps.setInt(2, o.type);
+			ps.setLong(3, o.wikidataId);
+			ps.setDouble(4, o.lat);
+			ps.setDouble(5, o.lon);
+			ps.setString(6, o.tagsJson);
+			ps.setString(7, o.tags);
+			ps.addBatch();
+			if (batch++ >= 1000) {
+				ps.executeBatch();
+			}
+		}
+		ps.executeBatch();
+		ps.close();
+	}
+	
+	private void setWikidataId(Map<Long, OsmLatLonId> mp, OsmLatLonId c, long wid) {
+		if (c != null) {
+			c.wikidataId = wid;
+			setWikidataId(mp, c.next, wid);
+			mp.put(c.type + (c.id << 2), c);
+		}
 	}
 	
 	private static String combineTagValue(String tag, String value) {
@@ -123,7 +181,7 @@ public class OsmCoordinatesByTag {
 
 	private boolean checkIfTagsSuitable(Entity entity) {
 		for (String t : entity.getTagKeySet()) {
-			if(checkTagSuitable(t)) {
+			if (checkTagSuitable(t)) {
 				return true;
 			}
 		}
@@ -162,13 +220,22 @@ public class OsmCoordinatesByTag {
 				osmLatLonId.lon = center.getLongitude();
 				osmLatLonId.id = entity.getId();
 				osmLatLonId.type = EntityType.valueOf(entity).ordinal();
+				osmLatLonId.tagsJson = gson.toJson(entity.getTags());
 				if (entity.getTag("place") != null || entity.getTag("admin_level") != null) {
-					osmLatLonId.tags = "admin";
+					osmLatLonId.tags = "administrative";
+				} else if (entity.getTag("office") != null) {
+					osmLatLonId.tags = "office";
+				} else {
+					String[] lst = { "tourism", "amenity", "historic", "natural", "aeroway", "waterway" };
+					for (String l : lst) {
+						if (entity.getTag(l) != null) {
+							osmLatLonId.tags = entity.getTag(l);
+							break;
+						}
+					}
 				}
 				OsmLatLonId oldValue = coordinates.put(key, osmLatLonId);
-				if (oldValue != null) {
-//					log.debug("For " + key + " old coordinates " + oldValue + " replaced by " + center);
-				}
+				osmLatLonId.next = oldValue;
 //				System.out.println(OsmMapUtils.getCenter(entity) + " " + entity.getTags());
 			}
 		}

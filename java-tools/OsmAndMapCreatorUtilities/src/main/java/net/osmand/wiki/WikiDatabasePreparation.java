@@ -783,7 +783,8 @@ public class WikiDatabasePreparation {
 		}
 
 		final String pathToWikiData = wikidataFolder + WIKIDATA_ARTICLES_GZ;
-		OsmCoordinatesByTag osmCoordinates;
+		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
+				new String[] { "wikipedia:" });
 		File wikidataDB;
 
 		switch (mode) {
@@ -801,16 +802,21 @@ public class WikiDatabasePreparation {
 				String wikidataFile = wikidataFolder + WIKIDATA_ARTICLES_GZ;
 				wikidataDB = new File(wikidataSqliteName);
 				log.info("Process OSM coordinates...");
-				osmCoordinates = new OsmCoordinatesByTag(wikidataDB, new String[]{"wikipedia", "wikidata"},
-						new String[] { "wikipedia:" }, true);
+				osmCoordinates.parse(wikidataDB, true);
 				log.info("Create wikidata...");
 				processWikidata(wikidataDB, wikidataFile, osmCoordinates,0);
+				break;
+			case "create-osm-wikidata":
+				wikidataDB = new File(wikidataSqliteName);
+				log.info("Process OSM coordinates...");
+				osmCoordinates.parse(wikidataDB, true);
+				log.info("Create table mapping osm to wikidata...");
+				osmCoordinates.createOSMWikidataTable(wikidataDB);
 				break;
 			case "update-wikidata":
 				wikidataDB = new File(wikidataSqliteName);
 				log.info("Process OSM coordinates...");
-				osmCoordinates = new OsmCoordinatesByTag(wikidataDB, new String[]{"wikipedia", "wikidata"},
-						new String[] { "wikipedia:" }, true);
+				osmCoordinates.parse(wikidataDB, true);
 				WikiDatabaseUpdater wdu = new WikiDatabaseUpdater(wikidataDB);
 				List<String> downloadedPages = wdu.getDownloadedPages();
 				long maxQId = wdu.getMaxQId();
