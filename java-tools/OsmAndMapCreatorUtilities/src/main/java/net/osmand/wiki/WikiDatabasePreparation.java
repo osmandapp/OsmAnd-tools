@@ -772,7 +772,8 @@ public class WikiDatabasePreparation {
 			}
 			wikipediaSqliteName = resultDB.isEmpty() ? wikipediaFolder + WIKIPEDIA_SQLITE : resultDB;
 		}
-		if (mode.equals("create-wikidata") || mode.equals("update-wikidata")) {
+		if (mode.equals("create-wikidata") || mode.equals("update-wikidata") || 
+				mode.equals("create-osm-wikidata")) {
 			if (resultDB.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
 			}
