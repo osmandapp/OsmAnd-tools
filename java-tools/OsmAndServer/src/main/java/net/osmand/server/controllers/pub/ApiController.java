@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -290,20 +292,21 @@ public class ApiController {
 		return "<pre>" + refreshAll + "</pre>";
 	}
     
-    @GetMapping(path = {"/cm_place.php", "/cm_place"})
+    @GetMapping(path = {"/cm_place", "/cm_place"})
 	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
 		placesService.processPlacesAround(headers, request, response, gson, lat, lon);
 	}
 
-	@GetMapping(path = {"/wiki_place.php", "/wiki_place"})
-	public void geWikiPlace(@RequestParam(required = false) String article,
-	                        @RequestParam(required = false) String category,
-	                        @RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
-		wikiService.processWikiImages(request, response, gson);
+	@GetMapping(path = {"/wiki_place"})
+	@ResponseBody
+	public String geWikiPlace(@RequestParam(required = false) String article,
+	                        @RequestParam(required = false) String category) {
+		Set<String> images = wikiService.processWikiImages(article, category);
+		return gson.toJson(Collections.singletonMap("features", images));
 	}
 
-    @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
+    @GetMapping(path = {"/mapillary/get_photo"})
     @ResponseBody
     public void getPhoto(@RequestParam("photo_id") String photoId,
                          @RequestParam(value = "hires", required = false) boolean hires,
@@ -322,7 +325,7 @@ public class ApiController {
 		}
     }
 
-    @GetMapping(path = {"/mapillary/photo-viewer.php", "/mapillary/photo-viewer"})
+    @GetMapping(path = {"/mapillary/photo-viewer"})
     public String getPhotoViewer(@RequestParam("photo_id") String photoId, Model model) {
         model.addAttribute("photoId", photoId);
         return "mapillary/photo-viewer";

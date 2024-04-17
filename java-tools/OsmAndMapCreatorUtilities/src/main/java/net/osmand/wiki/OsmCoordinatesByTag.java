@@ -127,7 +127,12 @@ public class OsmCoordinatesByTag {
 			setWikidataId(res, getCoordinates("wikipedia", articleTitle), wid);
 			setWikidataId(res, getCoordinates("wikidata", "Q" + wid), wid);
 		}
-		st.executeQuery("DROP TABLE osm_wikidata");
+		try {
+			commonsWikiConn.createStatement().executeQuery("DROP TABLE osm_wikidata");
+		} catch (SQLException e) {
+			// ignore
+			System.err.println("Table osm_wikidata doesn't exist");
+		}
 		st.executeQuery("CREATE TABLE osm_wikidata(osmid long, osmtype int, wikidataid long,  lat double, long double, tags string, tag string)");
 		st.close();
 		PreparedStatement ps = commonsWikiConn.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?)");
