@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.*;
 
+import static net.osmand.data.Amenity.*;
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
@@ -332,18 +333,18 @@ public class SearchService {
                 RoutingController.Feature feature;
                 if (poiType != null) {
                     feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
-                            .prop("name", amenity.getName())
-                            .prop("color", amenity.getColor())
-                            .prop("iconKeyName", poiType.getIconKeyName())
-                            .prop("typeOsmTag", poiType.getOsmTag())
-                            .prop("typeOsmValue", poiType.getOsmValue())
-                            .prop("iconName", getIconName(poiType))
-                            .prop("type", amenity.getType().getKeyName())
-                            .prop("subType", amenity.getSubType())
-                            .prop("osmUrl", getOsmUrl(result));
-                    
-                    for (String e : amenity.getAdditionalInfoKeys()) {
-                        feature.prop(e, amenity.getAdditionalInfo(e));
+                            .prop("poi_name", amenity.getName())
+                            .prop("poi_color", amenity.getColor())
+                            .prop("poi_iconKeyName", poiType.getIconKeyName())
+                            .prop("poi_typeOsmTag", poiType.getOsmTag())
+                            .prop("poi_typeOsmValue", poiType.getOsmValue())
+                            .prop("poi_iconName", getIconName(poiType))
+                            .prop("poi_type", amenity.getType().getKeyName())
+                            .prop("poi_subType", amenity.getSubType())
+                            .prop("poi_osmUrl", getOsmUrl(result));
+                    Map<String, String> tags = amenity.getAmenityExtensions();
+                    for (Map.Entry<String, String> entry : tags.entrySet()) {
+                        feature.prop(entry.getKey(), entry.getValue());
                     }
                     features.add(feature);
                 }
