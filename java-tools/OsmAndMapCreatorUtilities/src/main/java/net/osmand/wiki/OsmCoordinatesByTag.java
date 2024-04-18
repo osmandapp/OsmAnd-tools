@@ -91,7 +91,7 @@ public class OsmCoordinatesByTag {
 		File[] listFiles = wikiFolder.listFiles();
 		if (listFiles != null) {
 			for (File f : listFiles) {
-				if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX)) {
+				if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX) && !f.getName().endsWith(".db")) {
 					boolean parseRelations = f.getName().contains("multi");
 					try {
 						parseOSMCoordinates(f, null, parseRelations);
