@@ -133,7 +133,7 @@ public class OsmCoordinatesByTag {
 			// ignore
 			System.err.println("Table osm_wikidata doesn't exist");
 		}
-		st.executeQuery("CREATE TABLE osm_wikidata(osmid long, osmtype int, wikidataid long,  lat double, long double, tags string, tag string)");
+		st.execute("CREATE TABLE osm_wikidata(osmid long, osmtype int, wikidataid long,  lat double, long double, tags string, tag string)");
 		st.close();
 		PreparedStatement ps = commonsWikiConn.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?)");
 		int batch = 0;
