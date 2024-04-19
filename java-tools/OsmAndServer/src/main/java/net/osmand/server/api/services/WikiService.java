@@ -7,6 +7,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -26,30 +27,27 @@ public class WikiService {
 	@Value("${osmand.wiki.location}")
 	private String pathToWikiSqlite;
 
-	public void processWikiImages(HttpServletRequest request, HttpServletResponse response, Gson gson) {
+	public Set<String> processWikiImages(String articleId, String categoryName) {
 		try {
 			DBDialect osmDBdialect = DBDialect.SQLITE;
 			Set<String> images = new LinkedHashSet<>();
 			File sqliteFile = new File(pathToWikiSqlite);
 			if (sqliteFile.exists()) {
 				Connection conn = osmDBdialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-				String articleId = request.getParameter("article");
 				if (articleId != null) {
 					articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
 					addImage(conn, articleId, images);
 					addImagesFromCategory(conn, articleId, images);
 					addImagesFromDepict(conn, articleId, images);
 				}
-				String categoryName = request.getParameter("category");
 				if (categoryName != null) {
 					addImagesFromCategoryByName(conn, categoryName, images);
 				}
-				response.setCharacterEncoding("UTF-8");
-				response.getWriter().println(gson.toJson(Collections.singletonMap("features", images)));
 			} else {
 				log.error("commonswiki.sqlite file doesn't exist");
 			}
-		} catch (IOException | SQLException e) {
+			return images;
+		} catch (SQLException e) {
 			throw new RuntimeException(e);
 		}
 	}

@@ -84,7 +84,7 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-//					"-vmap", "-vmapobjects",
+					"-vmap",// "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -96,9 +96,7 @@ public class BinaryInspector {
 //					"-latlon=50.868332,15.24471",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					"-c",
-					"/Users/victorshcherb/Desktop/hh-routing_pedestrian.obf",
-					"/Users/victorshcherb/osmand/maps/hh-routing_pedestrian.obf",
+//					"-c",
 //					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
 //					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -609,8 +607,12 @@ public class BinaryInspector {
 
 	}
 
+	/**
+	 * @param ri
+	 */
 	private void printRouteEncodingRules(RouteRegion ri) {
 		Map<String, Integer> mp = new HashMap<String, Integer>();
+		int ind = 0;
 		for (RouteTypeRule rtr : ri.routeEncodingRules) {
 			if (rtr == null) {
 				continue;
@@ -619,6 +621,7 @@ public class BinaryInspector {
 			if (t.contains(":")) {
 				t = t.substring(0, t.indexOf(":"));
 			}
+			t += "-" + ind++;
 			if (mp.containsKey(t)) {
 				mp.put(t, mp.get(t) + 1);
 			} else {
@@ -641,7 +644,11 @@ public class BinaryInspector {
 	
 	private void printMapEncodingRules(MapIndex ri) {
 		Map<String, Integer> mp = new HashMap<String, Integer>();
-		for (TagValuePair rtr : ri.decodingRules.valueCollection()) {
+		TIntObjectIterator<TagValuePair> it = ri.decodingRules.iterator();
+		while(it.hasNext()) {
+//		for (TagValuePair rtr : ri.decodingRules.valueCollection()) {
+			it.advance();
+			TagValuePair rtr = it.value();
 			if (rtr == null) {
 				continue;
 			}
@@ -649,6 +656,7 @@ public class BinaryInspector {
 			if (t.contains(":")) {
 				t = t.substring(0, t.indexOf(":"));
 			}
+			t += "-" + it.key();
 			if (mp.containsKey(t)) {
 				mp.put(t, mp.get(t) + 1);
 			} else {

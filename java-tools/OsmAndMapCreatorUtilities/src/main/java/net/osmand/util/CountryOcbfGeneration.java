@@ -486,6 +486,10 @@ public class CountryOcbfGeneration {
 				line += " map=yes";
 				addTag(serializer, "region_map", "yes");
 			}
+			if(r.jointMap) {
+				line += " join_map_files=yes";
+				addTag(serializer, "region_join_map", "yes");
+			}
 			if (r.wiki) {
 				line += " wiki=yes";
 				addTag(serializer, "region_wiki", "yes");
@@ -493,6 +497,10 @@ public class CountryOcbfGeneration {
 			if (r.roads) {
 				line += " roads=yes";
 				addTag(serializer, "region_roads", "yes");
+			}
+			if(r.jointRoads) {
+				line += " join_road_files=yes";
+				addTag(serializer, "region_join_roads", "yes");
 			}
 			if (r.srtm) {
 				line += " srtm=yes";
