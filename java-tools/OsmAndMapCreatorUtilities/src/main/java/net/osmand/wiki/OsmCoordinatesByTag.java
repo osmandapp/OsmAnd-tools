@@ -10,15 +10,18 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
+import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
@@ -32,7 +35,12 @@ import net.osmand.obf.preparation.OsmDbAccessor;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.obf.preparation.OsmDbAccessorContext;
 import net.osmand.obf.preparation.OsmDbCreator;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
@@ -59,6 +67,8 @@ public class OsmCoordinatesByTag {
 	private PreparedStatement selectCoordsByID;
 	private Connection commonsWikiConn;
 	private Gson gson;
+	private MapRenderingTypesEncoder renderingTypes;
+	private MapPoiTypes poiTypes;
 
 	public static class OsmLatLonId {
 		public double lat;
@@ -66,15 +76,18 @@ public class OsmCoordinatesByTag {
 		public long id; // 
 		public int type; // 0 - node
 		public long wikidataId;
-		public String tags;
 		public String tagsJson;
 		public OsmLatLonId next;
+		public Amenity amenity;
 	}
 	
 	public OsmCoordinatesByTag(String[] filterExactTags, String[] filterStartsWithTags) {
 		gson = new Gson();
 		this.filterExactTags = new TreeSet<>(Arrays.asList(filterExactTags));
 		this.filterStartsWithTags = filterStartsWithTags;
+		renderingTypes = new MapRenderingTypesEncoder("basemap");
+		poiTypes = MapPoiTypes.getDefault();
+		
 	}
 	
 	public OsmCoordinatesByTag parse(File wikidataSqlite, boolean initFromOsm) throws SQLException {
@@ -113,54 +126,6 @@ public class OsmCoordinatesByTag {
 	}
 	
 	
-	public void createOSMWikidataTable(File wikidataSqlite) throws SQLException {
-		commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-		Statement st = commonsWikiConn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT id,lang,title FROM wiki_mapping ");
-		Map<Long, OsmLatLonId> res = new TreeMap<>();
-		while(rs.next()) {
-			long wid = rs.getLong(1);
-			String articleLang = rs.getString(2);
-			String articleTitle = rs.getString(3);
-			setWikidataId(res, getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
-			setWikidataId(res, getCoordinates("wikipedia" + articleLang, articleLang + ":" + articleTitle), wid);
-			setWikidataId(res, getCoordinates("wikipedia", articleTitle), wid);
-			setWikidataId(res, getCoordinates("wikidata", "Q" + wid), wid);
-		}
-		try {
-			commonsWikiConn.createStatement().executeQuery("DROP TABLE osm_wikidata");
-		} catch (SQLException e) {
-			// ignore
-			System.err.println("Table osm_wikidata doesn't exist");
-		}
-		st.execute("CREATE TABLE osm_wikidata(osmid long, osmtype int, wikidataid long,  lat double, long double, tags string, tag string)");
-		st.close();
-		PreparedStatement ps = commonsWikiConn.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?)");
-		int batch = 0;
-		for (OsmLatLonId o : res.values()) {
-			ps.setLong(1, o.id);
-			ps.setInt(2, o.type);
-			ps.setLong(3, o.wikidataId);
-			ps.setDouble(4, o.lat);
-			ps.setDouble(5, o.lon);
-			ps.setString(6, o.tagsJson);
-			ps.setString(7, o.tags);
-			ps.addBatch();
-			if (batch++ >= 1000) {
-				ps.executeBatch();
-			}
-		}
-		ps.executeBatch();
-		ps.close();
-	}
-	
-	private void setWikidataId(Map<Long, OsmLatLonId> mp, OsmLatLonId c, long wid) {
-		if (c != null) {
-			c.wikidataId = wid;
-			setWikidataId(mp, c.next, wid);
-			mp.put(c.type + (c.id << 2), c);
-		}
-	}
 	
 	private static String combineTagValue(String tag, String value) {
 		return tag + "___" + value;
@@ -210,6 +175,7 @@ public class OsmCoordinatesByTag {
 		if(center == null) {
 			return;
 		}
+		List<Amenity> alist = new ArrayList<>(); 
 		for (String t : entity.getTagKeySet()) {
 			if (checkTagSuitable(t)) {
 				if (entity instanceof Node) {
@@ -225,19 +191,12 @@ public class OsmCoordinatesByTag {
 				osmLatLonId.lon = center.getLongitude();
 				osmLatLonId.id = entity.getId();
 				osmLatLonId.type = EntityType.valueOf(entity).ordinal();
-				osmLatLonId.tagsJson = gson.toJson(entity.getTags());
-				if (entity.getTag("place") != null || entity.getTag("admin_level") != null) {
-					osmLatLonId.tags = "administrative";
-				} else if (entity.getTag("office") != null) {
-					osmLatLonId.tags = "office";
-				} else {
-					String[] lst = { "tourism", "amenity", "historic", "natural", "aeroway", "waterway" };
-					for (String l : lst) {
-						if (entity.getTag(l) != null) {
-							osmLatLonId.tags = entity.getTag(l);
-							break;
-						}
-					}
+				Map<String, String> etags = renderingTypes.transformTags(entity.getTags(), EntityType.valueOf(entity), EntityConvertApplyType.POI);
+				osmLatLonId.tagsJson = gson.toJson(etags);
+				alist.clear();
+				alist = EntityParser.parseAmenities(poiTypes, entity, etags, alist);
+				if (alist.size() > 0) {
+					osmLatLonId.amenity = alist.get(0);
 				}
 				OsmLatLonId oldValue = coordinates.put(key, osmLatLonId);
 				osmLatLonId.next = oldValue;

@@ -20,6 +20,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -68,6 +70,7 @@ import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
+import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
 import net.osmand.wiki.wikidata.WikiDataHandler;
 
 public class WikiDatabasePreparation {
@@ -806,13 +809,14 @@ public class WikiDatabasePreparation {
 				osmCoordinates.parse(wikidataDB, true);
 				log.info("Create wikidata...");
 				processWikidata(wikidataDB, wikidataFile, osmCoordinates,0);
+				createOSMWikidataTable(wikidataDB, osmCoordinates);
 				break;
 			case "create-osm-wikidata":
 				wikidataDB = new File(wikidataSqliteName);
 				log.info("Process OSM coordinates...");
 				osmCoordinates.parse(wikidataDB, true);
 				log.info("Create table mapping osm to wikidata...");
-				osmCoordinates.createOSMWikidataTable(wikidataDB);
+				createOSMWikidataTable(wikidataDB, osmCoordinates);
 				break;
 			case "update-wikidata":
 				wikidataDB = new File(wikidataSqliteName);
@@ -827,6 +831,7 @@ public class WikiDatabasePreparation {
 					processWikidata(wikidataDB, f, osmCoordinates, maxQId);
 				}
 				wdu.removeDownloadedPages();
+				createOSMWikidataTable(wikidataDB, osmCoordinates);
 				break;
 			case "process-wikipedia":
 				log.info("Processing wikipedia...");
@@ -901,6 +906,58 @@ public class WikiDatabasePreparation {
 		}
 	}
 
+	
+	public static void createOSMWikidataTable(File wikidataDB, OsmCoordinatesByTag c) throws SQLException {
+		Connection commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataDB.getAbsolutePath(), log);
+		Statement st = commonsWikiConn.createStatement();
+		ResultSet rs = st.executeQuery("SELECT id,lang,title FROM wiki_mapping ");
+		Map<Long, OsmLatLonId> res = new TreeMap<>();
+		while(rs.next()) {
+			long wid = rs.getLong(1);
+			String articleLang = rs.getString(2);
+			String articleTitle = rs.getString(3);
+			setWikidataId(res, c.getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
+			setWikidataId(res, c.getCoordinates("wikipedia" + articleLang, articleLang + ":" + articleTitle), wid);
+			setWikidataId(res, c.getCoordinates("wikipedia", articleTitle), wid);
+			setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
+		}
+		try {
+			commonsWikiConn.createStatement().executeQuery("DROP TABLE osm_wikidata");
+		} catch (SQLException e) {
+			// ignore
+			System.err.println("Table osm_wikidata doesn't exist");
+		}
+		st.execute("CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, tags string, poitype string, poisubtype string)");
+		st.close();
+		PreparedStatement ps = commonsWikiConn.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?)");
+		int batch = 0;
+		for (OsmLatLonId o : res.values()) {
+			ps.setLong(1, o.id);
+			ps.setInt(2, o.type);
+			ps.setLong(3, o.wikidataId);
+			ps.setDouble(4, o.lat);
+			ps.setDouble(5, o.lon);
+			ps.setString(6, o.tagsJson);
+			ps.setString(7, o.amenity == null ? null : o.amenity.getType().getKeyName());
+			ps.setString(8, o.amenity == null ? null : o.amenity.getSubType());
+			ps.addBatch();
+			if (batch++ >= 1000) {
+				ps.executeBatch();
+			}
+		}
+		ps.executeBatch();
+		ps.close();
+		commonsWikiConn.close();
+	}
+	
+	private static void setWikidataId(Map<Long, OsmLatLonId> mp, OsmLatLonId c, long wid) {
+		if (c != null) {
+			c.wikidataId = wid;
+			setWikidataId(mp, c.next, wid);
+			mp.put(c.type + (c.id << 2), c);
+		}
+	}
+	
 	public static void processWikipedia(final String wikipediaFolder, final String wikipediaSqliteFileName, String lang, long testArticleId)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		File wikipediaSqlite = new File(wikipediaSqliteFileName);
