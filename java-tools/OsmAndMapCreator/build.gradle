@@ -24,13 +24,21 @@ task downloadCoreJni(type: Download)  {
 // https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCoreWithJNI_standalone.so lib-native/
 // https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCore_ResourcesBundle_shared.so lib-native/
 
+
 task buildDistribution(type: Zip) {
 	dependsOn jar
-	from(configurations.runtimeClasspath.allArtifacts.files) {
-		rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
-	//	into '.'
-	}
-
+	// from(configurations.runtimeClasspath.allArtifacts.files) {
+	// 	rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
+	// //	into '.'
+	// }
+	from(configurations.runtimeClasspath) {
+        allArtifacts.files.each { file ->
+            if (file.name.contains("OsmAnd")) {
+                def newName = file.name.replace("-master-snapshot", '')
+                file.renameTo(new File(file.parent, newName))
+            }
+        }
+    }
 	from('lib-native') {
 		into 'lib'
 	}
