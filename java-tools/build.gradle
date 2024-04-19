@@ -46,6 +46,7 @@ subprojects {
 
 		manifest.from jar.manifest
 		dependsOn configurations.runtimeClasspath
+		duplicatesStrategy  DuplicatesStrategy.EXCLUDE
 		if(project.hasProperty('mainClassAttribute')) {
 			manifest.attributes 'Main-Class': project.getProperty('mainClassAttribute');
 		}
