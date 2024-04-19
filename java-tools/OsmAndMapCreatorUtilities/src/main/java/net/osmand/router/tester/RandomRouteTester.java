@@ -453,6 +453,10 @@ public class RandomRouteTester {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
+		HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1;
+		HHRouteDataStructure.HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
+		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
+
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		fe.CALCULATE_MISSING_MAPS = false;
 		fe.setDefaultHHRoutingConfig();
