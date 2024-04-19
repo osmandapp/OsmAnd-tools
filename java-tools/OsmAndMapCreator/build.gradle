@@ -31,13 +31,10 @@ task buildDistribution(type: Zip) {
 	// 	rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
 	// //	into '.'
 	// }
-	from(configurations.runtimeClasspath) {
-		eachFile { FileCopyDetails fcd ->
-			if (fcd.name.contains("OsmAnd")) {
-				fcd.name = fcd.name.replace("-master-snapshot", '')
-			}
-		}
-		include '**/*.jar' // Adjust this pattern as needed to include the correct files
+	from('build/libs/OsmAndMapCreator-master-snapshot.jar') {
+		into '.'
+		rename { 'OsmAndMapCreator.jar' }
+		// rename 'OsmAndMapCreator-master-snapshot.jar' 'OsmAndMapCreator.jar'
 	}
 	
 	from('lib-native') {
