@@ -16,9 +16,9 @@ task collectFonts(type: Sync) {
 
 
 task downloadCoreJni(type: Download)  {
-        src 'https://creator.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
-        dest 'lib-gl/OsmAndCore_jni.jar'
-        onlyIfModified true
+		src 'https://creator.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
+		dest 'lib-gl/OsmAndCore_jni.jar'
+		onlyIfModified true
 }
 
 // https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCoreWithJNI_standalone.so lib-native/
@@ -32,13 +32,14 @@ task buildDistribution(type: Zip) {
 	// //	into '.'
 	// }
 	from(configurations.runtimeClasspath) {
-        allArtifacts.files.each { file ->
-            if (file.name.contains("OsmAnd")) {
-                def newName = file.name.replace("-master-snapshot", '')
-                file.renameTo(new File(file.parent, newName))
-            }
-        }
-    }
+		eachFile { FileCopyDetails fcd ->
+			if (fcd.name.contains("OsmAnd")) {
+				fcd.name = fcd.name.replace("-master-snapshot", '')
+			}
+		}
+		include '**/*.jar' // Adjust this pattern as needed to include the correct files
+	}
+	
 	from('lib-native') {
 		into 'lib'
 	}
