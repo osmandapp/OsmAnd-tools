@@ -929,7 +929,7 @@ public class WikiDatabasePreparation {
 		}
 		st.execute("CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, tags string, poitype string, poisubtype string)");
 		st.close();
-		PreparedStatement ps = commonsWikiConn.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?)");
+		PreparedStatement ps = commonsWikiConn.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
 		int batch = 0;
 		for (OsmLatLonId o : res.values()) {
 			ps.setLong(1, o.id);
