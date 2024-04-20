@@ -144,10 +144,14 @@ public class WikiDatabasePreparation {
 					String wikiDataQId = poiFields.get(PoiFieldType.WIKIDATA);
 					long wikidataId = 0;
 					if (!Algorithms.isEmpty(wikiDataQId)) {
-						if (wikiDataQId.indexOf(' ') > 0) {
-							wikidataId = Long.parseLong(wikiDataQId.substring(1, wikiDataQId.indexOf(' ')));
-						} else {
-							wikidataId = Long.parseLong(wikiDataQId.substring(1));
+						try {
+							if (wikiDataQId.indexOf(' ') > 0) {
+								wikidataId = Long.parseLong(wikiDataQId.substring(1, wikiDataQId.indexOf(' ')));
+							} else {
+								wikidataId = Long.parseLong(wikiDataQId.substring(1));
+							}
+						} catch (NumberFormatException e) {
+							System.err.println("Error wid - " + wikiDataQId);
 						}
 					}
 					if (Algorithms.isEmpty(wikiLink) && wikidataId > 0 && browser != null) {
