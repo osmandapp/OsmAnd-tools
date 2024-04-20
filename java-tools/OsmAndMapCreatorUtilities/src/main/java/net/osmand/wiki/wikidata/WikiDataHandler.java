@@ -1,6 +1,7 @@
 package net.osmand.wiki.wikidata;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -9,14 +10,6 @@ import java.util.List;
 
 import javax.xml.parsers.SAXParser;
 
-import net.osmand.PlatformUtil;
-import net.osmand.data.LatLon;
-import net.osmand.impl.FileProgressImplementation;
-import net.osmand.map.OsmandRegions;
-import net.osmand.obf.preparation.DBDialect;
-import net.osmand.wiki.OsmCoordinatesByTag;
-import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
-
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -24,6 +17,13 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
+import net.osmand.PlatformUtil;
+import net.osmand.impl.FileProgressImplementation;
+import net.osmand.map.OsmandRegions;
+import net.osmand.obf.preparation.DBDialect;
+import net.osmand.wiki.OsmCoordinatesByTag;
+import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
 
 public class WikiDataHandler extends DefaultHandler {
 
@@ -178,60 +178,7 @@ public class WikiDataHandler extends DefaultHandler {
 						if (id < lastProcessedId) {
 							return;
 						}
-						ArticleMapper.Article article = gson.fromJson(ctext.toString(), ArticleMapper.Article.class);
-						OsmLatLonId osmCoordinates = null;
-						double wlat = article.getLat();
-						double wlon = article.getLon();
-						osmCoordinates = getOsmCoordinates(article, osmCoordinates);
-						if (osmCoordinates != null) {
-							article.setLat(osmCoordinates.lat);
-							article.setLon(osmCoordinates.lon);
-						}
-
-						if (article.getLat() != 0 && article.getLon() != 0) {
-							if (++count % ARTICLE_BATCH_SIZE == 0) {
-								log.info(String.format("Article accepted %s (%d)", title, count));
-							}
-							int ind = 0;
-							coordsPrep.setLong(++ind, id);
-							coordsPrep.setString(++ind, title.toString());
-							coordsPrep.setDouble(++ind, article.getLat());
-							coordsPrep.setDouble(++ind, article.getLon());
-							coordsPrep.setDouble(++ind, wlat);
-							coordsPrep.setDouble(++ind, wlon);
-							coordsPrep.setInt(++ind, osmCoordinates != null ? (osmCoordinates.type + 1) : 0);
-							coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
-							coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null);
-							coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
-
-							addBatch(coordsPrep, coordsBatch);
-							List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
-							for (String reg : rgs) {
-								wikiRegionPrep.setLong(1, id);
-								wikiRegionPrep.setString(2, reg);
-								addBatch(wikiRegionPrep, regionBatch);
-							}
-							for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
-								mappingPrep.setLong(1, id);
-								mappingPrep.setString(2, siteLink.lang);
-								mappingPrep.setString(3, siteLink.title);
-								addBatch(mappingPrep, mappingBatch);
-							}
-						}
-						if (article.getImage() != null) {
-							String image = StringEscapeUtils.unescapeJava(article.getImage());
-							wikidataPropPrep.setLong(1, id);
-							wikidataPropPrep.setString(2, article.getImageProp());
-							wikidataPropPrep.setString(3, image);
-							addBatch(wikidataPropPrep, wikidataPropBatch);
-						}
-						if (article.getCommonCat() != null) {
-							String commonCat = StringEscapeUtils.unescapeJava(article.getCommonCat());
-							wikidataPropPrep.setLong(1, id);
-							wikidataPropPrep.setString(2, ArticleMapper.PROP_COMMON_CAT);
-							wikidataPropPrep.setString(3, commonCat);
-							addBatch(wikidataPropPrep, wikidataPropBatch);
-						}
+						processJsonPage(id, ctext.toString());
 					} catch (Exception e) {
 						// Generally means that the field is missing in the json or the incorrect data is supplied
 						errorCount++;
@@ -249,7 +196,66 @@ public class WikiDataHandler extends DefaultHandler {
 
 
 
-	private OsmLatLonId getOsmCoordinates(ArticleMapper.Article article, OsmLatLonId osmCoordinates) {
+	public void processJsonPage(long id, String json) throws SQLException, IOException {
+		ArticleMapper.Article article = gson.fromJson(json, ArticleMapper.Article.class);
+		OsmLatLonId osmCoordinates = null;
+		double wlat = article.getLat();
+		double wlon = article.getLon();
+		osmCoordinates = getOsmCoordinates(id, article, osmCoordinates);
+		if (osmCoordinates != null) {
+			article.setLat(osmCoordinates.lat);
+			article.setLon(osmCoordinates.lon);
+		}
+
+		if (article.getLat() != 0 || article.getLon() != 0) {
+			if (++count % ARTICLE_BATCH_SIZE == 0) {
+				log.info(String.format("Article accepted %s (%d)", title, count));
+			}
+			int ind = 0;
+			coordsPrep.setLong(++ind, id);
+			coordsPrep.setString(++ind, title.toString());
+			coordsPrep.setDouble(++ind, article.getLat());
+			coordsPrep.setDouble(++ind, article.getLon());
+			coordsPrep.setDouble(++ind, wlat);
+			coordsPrep.setDouble(++ind, wlon);
+			coordsPrep.setInt(++ind, osmCoordinates != null ? (osmCoordinates.type + 1) : 0);
+			coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
+			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null);
+			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
+
+			addBatch(coordsPrep, coordsBatch);
+			List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
+			for (String reg : rgs) {
+				wikiRegionPrep.setLong(1, id);
+				wikiRegionPrep.setString(2, reg);
+				addBatch(wikiRegionPrep, regionBatch);
+			}
+			for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
+				mappingPrep.setLong(1, id);
+				mappingPrep.setString(2, siteLink.lang);
+				mappingPrep.setString(3, siteLink.title);
+				addBatch(mappingPrep, mappingBatch);
+			}
+			if (article.getImage() != null) {
+				String image = StringEscapeUtils.unescapeJava(article.getImage());
+				wikidataPropPrep.setLong(1, id);
+				wikidataPropPrep.setString(2, article.getImageProp());
+				wikidataPropPrep.setString(3, image);
+				addBatch(wikidataPropPrep, wikidataPropBatch);
+			}
+			if (article.getCommonCat() != null) {
+				String commonCat = StringEscapeUtils.unescapeJava(article.getCommonCat());
+				wikidataPropPrep.setLong(1, id);
+				wikidataPropPrep.setString(2, ArticleMapper.PROP_COMMON_CAT);
+				wikidataPropPrep.setString(3, commonCat);
+				addBatch(wikidataPropPrep, wikidataPropBatch);
+			}
+		}
+	}
+
+
+
+	private OsmLatLonId getOsmCoordinates(long wid, ArticleMapper.Article article, OsmLatLonId osmCoordinates) {
 		for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 			String articleTitle = siteLink.title;
 			String articleLang = siteLink.lang;
@@ -264,7 +270,7 @@ public class WikiDataHandler extends DefaultHandler {
 				return osmCoordinates;
 			}
 		}
-		return osmWikiCoordinates.getCoordinates("wikidata", title.toString());
+		return osmWikiCoordinates.getCoordinates("wikidata", "Q"+wid);
 	}
 }
 

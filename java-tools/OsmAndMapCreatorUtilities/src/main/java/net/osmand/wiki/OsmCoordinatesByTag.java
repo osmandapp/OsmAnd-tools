@@ -32,6 +32,7 @@ import com.google.gson.Gson;
 
 import net.osmand.PlatformUtil;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.OsmDbAccessor;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
@@ -52,6 +53,9 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
+import net.osmand.util.Algorithms;
+import net.osmand.wiki.wikidata.WikiDataHandler;
+
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 
 import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
@@ -140,7 +144,15 @@ public class OsmCoordinatesByTag {
 			Entry<String, OsmLatLonId> e = it.next();
 			System.out.println(e.getValue().toString(e.getKey()));
 		}
-		WikiDatabasePreparation.createOSMWikidataTable(new File(osmGz.getParentFile(), "wikidata_osm.sqlitedb"), o);
+		File wikidataDb = new File(osmGz.getParentFile(), "wikidata_osm.sqlitedb");
+		OsmandRegions or = new OsmandRegions();
+		or.prepareFile();
+//		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, o, or, 0);
+//		long testwid = 2051638;
+//		StringBuilder sb = Algorithms.readFromInputStream(OsmCoordinatesByTag.class.getResourceAsStream("/Q"+testwid+".json"));
+//		wdh.processJsonPage(testwid, sb.toString());
+//		wdh.finish();
+//		WikiDatabasePreparation.createOSMWikidataTable(wikidataDb, o);
 
 	}
 	
