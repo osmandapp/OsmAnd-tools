@@ -210,8 +210,8 @@ public class WikivoyageLangPreparation {
 		articlesSource.setEncoding("UTF-8");
 		Connection wikidataConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 		final PreparedStatement selectCoordsByID = wikidataConn.prepareStatement("SELECT lat, lon FROM wiki_coords where id = ?");
-		final PreparedStatement selectTitle = wikidataConn.prepareStatement("select title from wiki.wiki_mapping where id = ? and lang = '?'");
-		final PreparedStatement selectWid = wikidataConn.prepareStatement("select id from wiki.wiki_mapping where title = ? and lang = '?'");
+		final PreparedStatement selectTitle = wikidataConn.prepareStatement("select title from wiki_mapping where id = ? and lang = '?'");
+		final PreparedStatement selectWid = wikidataConn.prepareStatement("select id from wiki_mapping where title = ? and lang = '?'");
 		WikiDBBrowser browser = new WikiDBBrowser() {
 			
 			@Override
