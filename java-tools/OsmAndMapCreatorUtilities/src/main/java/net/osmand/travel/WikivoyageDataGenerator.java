@@ -170,16 +170,17 @@ public class WikivoyageDataGenerator {
 			if (valuesToUpdate.containsKey(imageTitle)) {
 				continue;
 			}
-			if(sourceImages.contains(imageTitle)) {
+			if (sourceImages.contains(imageTitle)) {
 				// processed before
 				continue;
 			}
 			if (imagesProcessed++ % 5000 == 0) {
 				System.out.println("Images metadata processed: " + imagesProcessed);
 			}
-			if(!existingImagesMapping.containsKey(imageTitle)) {
+			if (!existingImagesMapping.containsKey(imageTitle)) {
 				existingImagesMapping.put(imageTitle, null);
-				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + Encoder.encodeUrl(imageTitle) + "&action=raw";
+				// Encoder.encodeUrl(imageTitle)
+				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + imageTitle + "&action=raw";
 				try {
 					URL url = new URL(metadataUrl);
 					BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));

@@ -226,16 +226,16 @@ public class WikivoyageGenOSM {
 			}
 		});
 		int total = 0;
-		for(String s : l) {
+		for (String s : l) {
 			total += categories.get(s);
 		}
-		for(String s : l) {
+		for (String s : l) {
 			int cnt = categories.get(s);
-			System.out.println(String.format("%#.2f%% %s  %d %s", cnt * 100.0 / total, s,  cnt, 
-					categoriesExample.get(s)));
+			System.out.println(String.format("%#.2f%% %s  %d %s", cnt * 100.0 / total, s, cnt, categoriesExample.get(s)));
 		}
 		System.out.println(String.format("Total saved articles: %d", totalArticles));
-		System.out.println(String.format("Empty article: %d no points in article + %d no location page articles (total %d) ", emptyContent, emptyLocation, total));
+		System.out.println(String.format("Empty article (no gpx): %d no points in article + %d no location page articles (total points %d) ",
+				emptyContent, emptyLocation, total));
 	}
 	
 	private static void tagValue(XmlSerializer serializer, String tag, String value) throws IOException {
