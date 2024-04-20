@@ -173,7 +173,7 @@ public class WikiDatabasePreparation {
 							val += "|long=" + newLon;
 						}
 					}
-					if (!wikiLink.isEmpty()) {
+					if (!Algorithms.isEmpty(wikiLink)) {
 						poiShortDescription.append(addWikiLink(lang, wikiLink, latLon));
 						poiShortDescription.append(" ");
 					}

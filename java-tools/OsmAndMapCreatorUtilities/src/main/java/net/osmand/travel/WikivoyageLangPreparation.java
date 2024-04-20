@@ -234,7 +234,7 @@ public class WikivoyageLangPreparation {
 				if (r != null) {
 					return r;
 				}
-				if (wikidataId > 0) {
+				if (!Algorithms.isEmpty(wikiLink)) {
 					selectWid.setString(1, wikiLink);
 					selectWid.setString(2, lang);
 					ResultSet rs = selectWid.executeQuery();
