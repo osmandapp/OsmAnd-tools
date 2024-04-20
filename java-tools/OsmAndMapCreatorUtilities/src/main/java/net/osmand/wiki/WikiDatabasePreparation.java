@@ -143,7 +143,7 @@ public class WikiDatabasePreparation {
 					String wikiLink = poiFields.get(PoiFieldType.WIKIPEDIA);
 					String wikiDataQId = poiFields.get(PoiFieldType.WIKIDATA);
 					long wikidataId = 0;
-					if (!wikiDataQId.isEmpty()) {
+					if (!Algorithms.isEmpty(wikiDataQId)) {
 						wikidataId = Long.parseLong(wikiDataQId.substring(1));
 					}
 					if (Algorithms.isEmpty(wikiLink) && wikidataId > 0 && browser != null) {
