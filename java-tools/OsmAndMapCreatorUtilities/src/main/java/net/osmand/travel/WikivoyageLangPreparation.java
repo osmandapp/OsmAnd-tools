@@ -367,14 +367,7 @@ public class WikivoyageLangPreparation {
 				} else if (name.equals("text")) {
 					ctext = null;
 					if (cns == 0 && cid > 0) {
-						if (cInfo == null) {
-							System.err.printf("Error with page %d %s - empty info\n", cid, title);
-						} else if (cInfo.wikidataId == 0) {
-							System.err.printf("Error with page %d %s - no wikidata id \n", cid, title,
-									cInfo.wikidataId);
-						} else {
-							ctext = new StringBuilder();
-						}
+						ctext = new StringBuilder();
 					}
 				} else if (name.equals("revision")) {
 					revision = true;
@@ -418,7 +411,16 @@ public class WikivoyageLangPreparation {
 						ctext = null;
 					} else if (name.equals("text")) {
 						if (ctext != null) {
-							parseText(ctext.toString());
+							if (cInfo == null) {
+								if (!ctext.toString().startsWith("#")) {
+									System.err.printf("Error with page %d %s - empty info\n", cid, title);
+								}
+							} else if (cInfo.wikidataId == 0) {
+								System.err.printf("Error with page %d %s - no wikidata id \n", cid, title,
+										cInfo.wikidataId);
+							} else {
+								parseText(ctext.toString());
+							}
 						}
 						ctext = null;
 					}

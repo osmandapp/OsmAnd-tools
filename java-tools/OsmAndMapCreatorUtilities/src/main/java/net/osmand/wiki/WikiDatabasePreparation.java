@@ -144,7 +144,11 @@ public class WikiDatabasePreparation {
 					String wikiDataQId = poiFields.get(PoiFieldType.WIKIDATA);
 					long wikidataId = 0;
 					if (!Algorithms.isEmpty(wikiDataQId)) {
-						wikidataId = Long.parseLong(wikiDataQId.substring(1));
+						if (wikiDataQId.indexOf(' ') > 0) {
+							wikidataId = Long.parseLong(wikiDataQId.substring(1, wikiDataQId.indexOf(' ')));
+						} else {
+							wikidataId = Long.parseLong(wikiDataQId.substring(1));
+						}
 					}
 					if (Algorithms.isEmpty(wikiLink) && wikidataId > 0 && browser != null) {
 						wikiLink = browser.getWikipediaTitleByWid(lang, wikidataId);
