@@ -20,6 +20,8 @@ import com.google.gson.JsonSyntaxException;
 import net.osmand.PlatformUtil;
 import net.osmand.obf.preparation.DBDialect;
 
+
+@Deprecated()
 public class WikidataConnection {
 	private static final Log log = PlatformUtil.getLog(WikidataConnection.class);
 	private final Connection conn;
