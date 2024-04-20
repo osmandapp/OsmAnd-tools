@@ -13,9 +13,11 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -79,6 +81,17 @@ public class OsmCoordinatesByTag {
 		public String tagsJson;
 		public OsmLatLonId next;
 		public Amenity amenity;
+		
+		public String toString(String key) {
+			OsmLatLonId ol = this;
+			return String.format("osmid=%d %d wikidataid=%d key=%s amenity(%s)",
+					ol.type, ol.id, ol.wikidataId, key, ol.amenity);
+		}
+		
+		@Override
+		public String toString() {
+			return toString("");
+		}
 	}
 	
 	public OsmCoordinatesByTag(String[] filterExactTags, String[] filterStartsWithTags) {
@@ -119,10 +132,16 @@ public class OsmCoordinatesByTag {
 	}
 
 	public static void main(String[] args) throws IOException, SQLException, XmlPullParserException, InterruptedException {
-		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_waynodes.osm.gz");
-//		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_buildings_multipolygon.osm.gz");
+		File osmGz = new File("/Users/victorshcherb/Desktop/map.osm");
 		OsmCoordinatesByTag o = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
-				new String[] { "wikipedia:" }).parse(osmGz.getParentFile(), false);
+				new String[] { "wikipedia:" }).parse(new File(osmGz.getParentFile(), "1.sqlite"), false);
+		Iterator<Entry<String, OsmLatLonId>> it = o.coordinates.entrySet().iterator();
+		while(it.hasNext()) {
+			Entry<String, OsmLatLonId> e = it.next();
+			System.out.println(e.getValue().toString(e.getKey()));
+		}
+		WikiDatabasePreparation.createOSMWikidataTable(new File(osmGz.getParentFile(), "wikidata_osm.sqlitedb"), o);
+
 	}
 	
 	

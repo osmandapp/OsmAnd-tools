@@ -910,15 +910,24 @@ public class WikiDatabasePreparation {
 	public static void createOSMWikidataTable(File wikidataDB, OsmCoordinatesByTag c) throws SQLException {
 		Connection commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataDB.getAbsolutePath(), log);
 		Statement st = commonsWikiConn.createStatement();
-		ResultSet rs = st.executeQuery("SELECT id,lang,title FROM wiki_mapping ");
+		ResultSet rs = st.executeQuery("SELECT C.id,M.lang,M.title FROM wiki_coords C LEFT JOIN wiki_mapping M ON M.id=C.id");
 		Map<Long, OsmLatLonId> res = new TreeMap<>();
-		while(rs.next()) {
+		int scan = 0;
+		long time = System.currentTimeMillis();
+		while (rs.next()) {
 			long wid = rs.getLong(1);
 			String articleLang = rs.getString(2);
 			String articleTitle = rs.getString(3);
-			setWikidataId(res, c.getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
-			setWikidataId(res, c.getCoordinates("wikipedia" + articleLang, articleLang + ":" + articleTitle), wid);
-			setWikidataId(res, c.getCoordinates("wikipedia", articleTitle), wid);
+			if (++scan % 500000 == 0) {
+				System.out.println("Scanning wiki to merge with OSM... " + scan + " " + (System.currentTimeMillis() - time) + " ms");
+				time = System.currentTimeMillis();
+			}
+			if (articleLang != null) {
+				setWikidataId(res, c.getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
+				setWikidataId(res, c.getCoordinates("wikipedia", articleLang + ":" + articleTitle), wid);
+				setWikidataId(res, c.getCoordinates("wikipedia", articleTitle), wid);
+				setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
+			}
 			setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
 		}
 		try {
@@ -954,7 +963,7 @@ public class WikiDatabasePreparation {
 		if (c != null) {
 			c.wikidataId = wid;
 			setWikidataId(mp, c.next, wid);
-			mp.put(c.type + (c.id << 2), c);
+			mp.put(c.type + (c.id << 2l), c);
 		}
 	}
 	
