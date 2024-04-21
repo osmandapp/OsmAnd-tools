@@ -22,19 +22,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
-
-import net.osmand.data.LatLon;
-import net.osmand.util.Algorithms;
-import net.osmand.util.LocationParser;
-import net.osmand.wiki.*;
-import net.osmand.wiki.WikiDatabasePreparation.WikiDBBrowser;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
@@ -42,18 +34,24 @@ import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import org.xmlpull.v1.XmlPullParserException;
 
-import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
 import net.osmand.PlatformUtil;
+import net.osmand.data.LatLon;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.util.Algorithms;
+import net.osmand.util.LocationParser;
 import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
-import org.xmlpull.v1.XmlPullParserException;
+import net.osmand.wiki.CustomWikiModel;
+import net.osmand.wiki.WikiDatabasePreparation;
+import net.osmand.wiki.WikiDatabasePreparation.WikiDBBrowser;
+import net.osmand.wiki.WikiImageUrlStorage;
 
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
@@ -101,7 +99,9 @@ public class WikivoyageLangPreparation {
 		TWO_PART ("two"),
 		STATION ("station"),
 		METRIC_DATA("metric"),
-		TRANSLATION("translation");
+		TRANSLATION("translation"),
+		DISAMB("disamb");
+		
 
 		private final String type;
 		WikivoyageTemplates(String s) {
@@ -350,7 +350,7 @@ public class WikivoyageLangPreparation {
 			wikiVoyageConn.close();
 			for (Entry<String, String> e : parentStructure.entrySet()) {
 				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(e.getValue())) {
-					System.out.printf("Error parent structure %s %s -> %s", e.getKey(), e.getValue());
+					System.out.printf("Error parent structure %s %s -> %s\n", lang, e.getKey(), e.getValue());
 				}
 			}
 		}
@@ -443,6 +443,10 @@ public class WikivoyageLangPreparation {
 		private void parseText(StringBuilder cont) throws IOException, SQLException, SAXException {
 			Map<String, List<String>> macroBlocks = new HashMap<>();
 			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, dbBrowser);
+			if (macroBlocks.containsKey("disambiguation") || macroBlocks.containsKey("disamb")) {
+				System.out.println("Skip disambiguation " + title); // todo delete
+				return;
+			}
 			try {
 				if (!macroBlocks.isEmpty()) {
 					LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);

@@ -497,17 +497,17 @@ public class WikivoyageDataGenerator {
 		while(rs.next()) {
 			String title = rs.getString(1).toLowerCase();
 			Long tripId = rs.getLong(2);
-			if(title.equals("main page") || title.contains("disambiguation") 
+			if (title.equals("main page") || title.contains("disambiguation") 
 					|| title.contains("значения")) {
 				excludeTripIds.add(tripId);
 			}
-			if(title.contains("itineraries") || title.contains("unesco")) {
+			if (title.contains("itineraries") || title.contains("unesco")) {
 				tripIds.add(tripId);
 			}
-			if(popularArticleIds.contains(title)) {
+			if (popularArticleIds.contains(title)) {
 				tripIds.add(tripId);
 			}
-			if(rs.getLong(3) > POPULATION_LIMIT) {
+			if (rs.getLong(3) > POPULATION_LIMIT) {
 				tripIds.add(tripId);
 			}
 		}
