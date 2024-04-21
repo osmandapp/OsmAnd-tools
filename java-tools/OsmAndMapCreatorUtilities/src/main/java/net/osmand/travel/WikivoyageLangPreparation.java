@@ -420,7 +420,7 @@ public class WikivoyageLangPreparation {
 //								System.err.printf("Error with page %d %s - no wikidata id \n", cid, title,
 //										cInfo.wikidataId);
 							} else {
-								parseText(ctext.toString());
+								parseText(ctext);
 							}
 						}
 						ctext = null;
@@ -431,7 +431,7 @@ public class WikivoyageLangPreparation {
 			}
 		}
 
-		private void parseText(String cont) throws IOException, SQLException, SAXException {
+		private void parseText(StringBuilder cont) throws IOException, SQLException, SAXException {
 			Map<String, List<String>> macroBlocks = new HashMap<>();
 			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, dbBrowser);
 			try {
@@ -440,11 +440,11 @@ public class WikivoyageLangPreparation {
 					if (ll == null) {
 						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 					}
+					
 					boolean accepted = true;// filtered by namespace !title.toString().contains(":");
 					if (accepted) {
 						int column = 1;
 						String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
-						filename = filename.startsWith("<!--") ? "" : filename;
 						if (id++ % 500 == 0) {
 							log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude() + " "
 									+ ll.getLongitude() + " free: "
@@ -497,7 +497,7 @@ public class WikivoyageLangPreparation {
 
 						// gpx_gz
 						String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()), title.toString(),
-								lang, getShortDescr(plainStr));
+								lang, getShortDescr(plainStr), ll);
 						prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 						if (uncompressed) {
 							prep.setString(column++, gpx);
@@ -552,7 +552,7 @@ public class WikivoyageLangPreparation {
 			}
 		}
 		
-		private String generateGpx(List<String> list, String title, String lang, String descr) {
+		private String generateGpx(List<String> list, String title, String lang, String descr, LatLon ll) {
 			if (list != null && !list.isEmpty()) {
 				GPXFile f = new GPXFile(title, lang, descr);
 				List<WptPt> points = new ArrayList<>(); 
@@ -639,6 +639,11 @@ public class WikivoyageLangPreparation {
 							value = areaCode + " " + value;
 						}
 						point.desc += key + ": " + value; // ". " backward compatible
+					}
+					if (!point.hasLocation() && ll != null) {
+						// coordinates of article
+						point.lat = ll.getLatitude();
+						point.lon = ll.getLongitude();
 					}
 					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
 						if (point.category != null) {

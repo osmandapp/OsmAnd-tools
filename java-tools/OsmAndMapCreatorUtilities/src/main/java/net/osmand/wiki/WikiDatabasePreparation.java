@@ -63,6 +63,8 @@ import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
 import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
 
+import com.google.protobuf.DescriptorProtos.SourceCodeInfo.Location;
+
 import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.model.WikiModel;
@@ -72,6 +74,7 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.util.Algorithms;
+import net.osmand.util.LocationParser;
 import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
 import net.osmand.wiki.wikidata.WikiDataHandler;
 
@@ -95,8 +98,29 @@ public class WikiDatabasePreparation {
 
 		public String getWikipediaTitleByWid(String lang, long wikiDataQId) throws SQLException;
 	}
+	
+	public static LatLon parseLatLon(String lat, String lon) {
+		if (lat.equals("") || lat.equals("NA")) {
+			return null;
+		}
+		if (lon.equals("") || lon.equals("NA")) {
+			return null;
+		}
+		try {
+			LatLon res = LocationParser.parseLocation(lat + " " + lon);
+			if (res != null) {
+				return res;
+			}
+			return new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+		} catch (RuntimeException e) {
+			System.err.printf("Error parsing lat=%s lon=%s (%s)\n", lat, lon,
+					//LocationParser.parseLocation(lat + " " + lon), 
+					e.getMessage());
+			return null;
+		}
+	}
 
-	public static String removeMacroBlocks(String text, Map<String, List<String>> blockResults, String lang,
+	public static String removeMacroBlocks(StringBuilder text, Map<String, List<String>> blockResults, String lang,
 			WikiDBBrowser browser) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -104,19 +128,24 @@ public class WikiDatabasePreparation {
 		int endInd = 0;
 		int headerCount = 0;
 		Map<PoiFieldType, String> poiFields = new HashMap<>();
-		for (int i = 0; i < text.length(); i++) {
-			int nt = text.length() - i - 1;
-			if (isCommentOpen(text, nt, i)) {
-				i = skipComment(text, i + 3);
-				continue;
+		for (int i = 0; i < text.length();) {
+			int leftChars = text.length() - i - 1;
+			if (isCommentOpen(text, leftChars, i)) {
+				int endI = skipComment(text, i + 3);
+				text.replace(i, endI + 1, "");
+			} else {
+				i++;
 			}
-			if ((nt > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{')
-					|| (nt > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a'
+		}
+		for (int i = 0; i < text.length(); i++) {
+			int leftChars = text.length() - i - 1;
+			if ((leftChars > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{')
+					|| (leftChars > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a'
 					&& text.charAt(i + 3) == 'p' && text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')) {
 				beginInd = beginInd == 0 ? i + 2 : beginInd;
 				openCnt++;
 				i++;
-			} else if (nt > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}')
+			} else if (leftChars > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}')
 					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n'
 					&& text.charAt(i - 3) == 'i' && text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p'))) {
 				if (openCnt == 0) {
@@ -157,15 +186,12 @@ public class WikiDatabasePreparation {
 					if (Algorithms.isEmpty(wikiLink) && wikidataId > 0 && browser != null) {
 						wikiLink = browser.getWikipediaTitleByWid(lang, wikidataId);
 					}
-					LatLon latLon = browser.getLocation(lang, wikiLink, wikidataId);
+					LatLon latLon = browser == null ? null : browser.getLocation(lang, wikiLink, wikidataId);
 					if (latLon == null && poiFields.containsKey(PoiFieldType.LAT)
 							&& poiFields.containsKey(PoiFieldType.LON)) {
-						try {
-							latLon = new LatLon(Double.parseDouble(poiFields.get(PoiFieldType.LAT)),
-									Double.parseDouble(poiFields.get(PoiFieldType.LON)));
-						} catch (RuntimeException e) {
-							System.err.println(e.getMessage());
-						}
+							latLon= parseLatLon(poiFields.get(PoiFieldType.LAT), poiFields.get(PoiFieldType.LON));
+							
+						
 					}
 					if (latLon != null) {
 						String newLat = String.valueOf(latLon.getLatitude());
@@ -217,10 +243,10 @@ public class WikiDatabasePreparation {
 					i--;
 				}
 				i++;
-			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'r' && text.charAt(i + 2) == 'e'
+			} else if (leftChars > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'r' && text.charAt(i + 2) == 'e'
 					&& text.charAt(i + 3) == 'f' && openCnt == 0) {
 				i = parseRef(text, bld, i);
-			} else if (nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l') {
+			} else if (leftChars > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l') {
 				i = parseGallery(text, bld, i);
 			} else {
 				if (openCnt == 0) {
@@ -271,22 +297,22 @@ public class WikiDatabasePreparation {
 				+ URLEncoder.encode(value.trim().replaceAll(" ", "_"), "UTF-8") + attr + " Wikipedia]";
 	}
 	
-	private static int skipComment(String text, int i) {
+	private static int skipComment(StringBuilder text, int i) {
 		while (i < text.length() && !isCommentClosed(text, i)) {
 			i++;
 		}
 		return i;
 	}
 
-	private static boolean isCommentClosed(String text, int i) {
+	private static boolean isCommentClosed(StringBuilder text, int i) {
 		return i > 1 && text.charAt(i - 2) == '-' && text.charAt(i - 1) == '-' && text.charAt(i) == '>';
 	}
 
-	private static boolean isCommentOpen(String text, int nt, int i) {
+	private static boolean isCommentOpen(StringBuilder text, int nt, int i) {
 		return nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-';
 	}
 
-	private static int parseGallery(String text, StringBuilder bld, int i) {
+	private static int parseGallery(StringBuilder text, StringBuilder bld, int i) {
 		int closeTag = text.indexOf("</gallery>", i);
 		int endInd = closeTag + "</gallery>".length();
 		if (endInd > text.length() - 1 || closeTag < i) {
@@ -417,7 +443,7 @@ public class WikiDatabasePreparation {
 		return null;
 	}
 
-	private static int parseRef(String text, StringBuilder bld, int i) {
+	private static int parseRef(StringBuilder text, StringBuilder bld, int i) {
 		int closingTag = text.indexOf("</", i);
 		int selfClosed = text.indexOf("/>", i);
 		closingTag = closingTag < 0 ? Integer.MAX_VALUE : closingTag;
@@ -485,7 +511,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 	
-	private static int calculateHeaderLevel(String s, int index) {
+	private static int calculateHeaderLevel(StringBuilder s, int index) {
 		int res = 0;
 		while (index < s.length() - 1 && s.charAt(index) == '=') {
 			index++;
@@ -741,23 +767,23 @@ public class WikiDatabasePreparation {
 		cm.initialize(WikiDatabasePreparation.class.getClassLoader());
 		Parser parser = cm.getInstance(Parser.class, Syntax.MEDIAWIKI_1_0.toIdString());
 		FileReader fr = new FileReader(new File("/Users/victorshcherb/Documents/b.src.html"));
-		String content = "";
+		StringBuilder content = new StringBuilder();
 		String s;
 		BufferedReader br = new BufferedReader(fr);
 		while((s = br.readLine()) != null) {
-			content += s;
+			content.append(s);
 		}
 		br.close();
 		//content = removeMacroBlocks(content, null, "en", null);
 		//for testing file.html after removeMacroBlocks and generating new file.html
-		content = generateHtmlArticle(content, "en", null);
+		String resContent = generateHtmlArticle(content, "en", null);
 		String savePath = "/Users/plotva/Documents";
 		File myFile = new File(savePath, "page.html");
 		BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
-		htmlFileWriter.write(content);
+		htmlFileWriter.write(resContent);
         htmlFileWriter.close();
 		
-		XDOM xdom = parser.parse(new StringReader(content));
+		XDOM xdom = parser.parse(new StringReader(content.toString()));
 		        
 		// Find all links and make them italic
 		for (Block block : xdom.getBlocks(new ClassBlockMatcher(LinkBlock.class), Block.Axes.DESCENDANT)) {
@@ -790,6 +816,13 @@ public class WikiDatabasePreparation {
 //		downloadPage("https://be.m.wikipedia.org/wiki/%D0%93%D0%BE%D1%80%D0%B0%D0%B4_%D0%9C%D1%96%D0%BD%D1%81%D0%BA",
 //		"/Users/victorshcherb/Documents/a.wiki.html");
 
+	}
+	
+	public static void mainTestPage(String[] args) throws IOException, SQLException {
+		StringBuilder rs = Algorithms
+				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
+		String text = WikiDatabasePreparation.removeMacroBlocks(rs, new TreeMap<String, List<String>>(), null, null);
+		System.out.println(text);
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
@@ -1218,7 +1251,7 @@ public class WikiDatabasePreparation {
 						}
 						if (wikiId != 0) {
 							try {
-								plainStr = generateHtmlArticle(ctext.toString(), lang, imageUrlStorage);
+								plainStr = generateHtmlArticle(ctext, lang, imageUrlStorage);
 							} catch (RuntimeException e) {
 								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
 							}
@@ -1251,7 +1284,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static String generateHtmlArticle(String contentText, String lang, WikiImageUrlStorage imageUrlStorage)
+	private static String generateHtmlArticle(StringBuilder contentText, String lang, WikiImageUrlStorage imageUrlStorage)
 			throws IOException, SQLException {
 		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
 		final HTMLConverter converter = new HTMLConverter(false);
