@@ -16,6 +16,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -451,7 +452,7 @@ public class WikivoyageLangPreparation {
 				if (!macroBlocks.isEmpty()) {
 					LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
 					if (ll == null) {
-						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
+						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()), lang, title);
 					}
 					boolean accepted = true;// filtered by namespace !title.toString().contains(":");
 					if (accepted) {
@@ -749,9 +750,9 @@ public class WikivoyageLangPreparation {
 			return "";
 		}
 		
-		private LatLon getLatLonFromGeoBlock(List<String> list) {
+		private static LatLon getLatLonFromGeoBlock(List<String> list, String lang, String title) {
 			if (list != null && !list.isEmpty()) {
-				String location = list.get(0);
+				String location = list.get(0) + " "; // to parse "geo||"
 				String[] parts = location.split("\\|");
 				LatLon ll = null;
 				if (parts.length >= 3) {

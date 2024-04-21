@@ -827,6 +827,7 @@ public class WikiDatabasePreparation {
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
+//		mainTestPage(args);  if(true) return;
 		String lang = "";
 		String wikipediaFolder = "";
 		String wikidataFolder = "";
