@@ -488,9 +488,10 @@ public class WikivoyageLangPreparation {
 						}
 						if (cInfo.banner != null) {
 							prep.setString(column++, cInfo.banner);
+						} else if (cInfo.image != null) {
+							prep.setString(column++, cInfo.image);
 						} else {
-							prep.setString(column++,
-									Encoder.encodeUrl(filename).replaceAll("\\(", "%28").replaceAll("\\)", "%29"));
+							prep.setString(column++, filename);
 						}
 
 						// gpx_gz

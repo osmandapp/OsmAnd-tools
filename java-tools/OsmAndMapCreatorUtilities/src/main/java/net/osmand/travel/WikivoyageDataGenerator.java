@@ -131,11 +131,11 @@ public class WikivoyageDataGenerator {
 		Map<String, String> existingImagesMapping = new LinkedHashMap<String, String>();
 		TreeSet<String> sourceImages = new TreeSet<String>();
 		ResultSet rs1 = imagesConn.createStatement().executeQuery("SELECT file, sourcefile FROM images");
-		while(rs1.next()) {
+		while (rs1.next()) {
 			String sourceFile = rs1.getString(2);
 			sourceFile = stripImageName(sourceFile);
 			existingImagesMapping.put(rs1.getString(1), sourceFile);
-			if(sourceFile != null) {
+			if (sourceFile != null) {
 				sourceImages.add(rs1.getString(2));
 			}
 		}
@@ -164,7 +164,7 @@ public class WikivoyageDataGenerator {
 			String imageTitle = rs.getString(1);
 			String name = rs.getString(2);
 			String lang = rs.getString(3);
-			if(imageTitle == null || imageTitle.length() == 0) {
+			if (imageTitle == null || imageTitle.length() == 0) {
 				continue;
 			}
 			if (valuesToUpdate.containsKey(imageTitle)) {
@@ -174,13 +174,14 @@ public class WikivoyageDataGenerator {
 				// processed before
 				continue;
 			}
-			if (imagesProcessed++ % 5000 == 0) {
+			if (++imagesProcessed % 5000 == 0) {
 				System.out.println("Images metadata processed: " + imagesProcessed);
 			}
 			if (!existingImagesMapping.containsKey(imageTitle)) {
 				existingImagesMapping.put(imageTitle, null);
 				// Encoder.encodeUrl(imageTitle)
-				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + imageTitle + "&action=raw";
+				String param = Encoder.encodeUrl(imageTitle).replaceAll("\\(", "%28").replaceAll("\\)", "%29");
+				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + param + "&action=raw";
 				try {
 					URL url = new URL(metadataUrl);
 					BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
@@ -200,8 +201,8 @@ public class WikivoyageDataGenerator {
 					pInsert.setString(4, sourceFile);
 					pInsert.executeUpdate();
 					existingImagesMapping.put(imageTitle, sourceFile);
-					if (imagesFetched++ % 100 == 0) {
-						System.out.println("Images metadata fetched: " + imagesFetched);
+					if (++imagesFetched % 100 == 0) {
+						System.out.printf("Images metadata fetched: %d %s -> %s \n ", imagesFetched, imageTitle, sourceFile);
 					}
 				} catch (IOException e) {
 					System.err.println("Error fetching image " + imageTitle + " " + lang + ":" + name + " "
@@ -219,7 +220,7 @@ public class WikivoyageDataGenerator {
 			}
 		}
 		rs.close();
-		System.out.println("Updating images " + imagesToUpdate + ".");
+		System.out.printf("Updating images %d (from %d).\n", imagesToUpdate, imagesProcessed);
 		int updated = wikivoyageConn.createStatement().executeUpdate("UPDATE travel_articles SET " + imageColumn + " = "
 				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles." + imageColumn
 				+ ") " + " WHERE " + imageColumn + " IN (SELECT distinct banner_image from source_image)");
