@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -129,26 +130,21 @@ public class WikivoyageDataGenerator {
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_source_image ON source_image(banner_image);");
 		
 		Map<String, String> existingImagesMapping = new LinkedHashMap<String, String>();
-		TreeSet<String> sourceImages = new TreeSet<String>();
 		ResultSet rs1 = imagesConn.createStatement().executeQuery("SELECT file, sourcefile FROM images");
 		while (rs1.next()) {
 			String sourceFile = rs1.getString(2);
 			sourceFile = stripImageName(sourceFile);
 			existingImagesMapping.put(rs1.getString(1), sourceFile);
-			if (sourceFile != null) {
-				sourceImages.add(rs1.getString(2));
-			}
 		}
 		rs1.close();
-		updateImagesToSource(conn, imagesConn, existingImagesMapping, sourceImages, "banner_title");
-//		updateImagesToSource(conn, imagesConn, existingImagesMapping, sourceImages, "image_title");
+		updateImagesToSource(conn, imagesConn, existingImagesMapping, "banner_title");
+//		updateImagesToSource(conn, imagesConn, existingImagesMapping, "image_title");
 		
 		imagesConn.close();
 		
 	}
 
-	private void updateImagesToSource(Connection wikivoyageConn, Connection imagesConn, Map<String, String> existingImagesMapping,
-			TreeSet<String> sourceImages, String imageColumn) throws SQLException {
+	private void updateImagesToSource(Connection wikivoyageConn, Connection imagesConn, Map<String, String> existingImagesMapping, String imageColumn) throws SQLException {
 		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
 //		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
 		//PreparedStatement pDelete = imagesConn.prepareStatement("DELETE FROM images WHERE file = ?");
@@ -170,36 +166,19 @@ public class WikivoyageDataGenerator {
 			if (valuesToUpdate.containsKey(imageTitle)) {
 				continue;
 			}
-			if (sourceImages.contains(imageTitle)) {
-				// processed before
-				continue;
-			}
 			if (++imagesProcessed % 5000 == 0) {
 				System.out.println("Images metadata processed: " + imagesProcessed);
 			}
 			if (!existingImagesMapping.containsKey(imageTitle)) {
 				existingImagesMapping.put(imageTitle, null);
 				// Encoder.encodeUrl(imageTitle)
-				String param = Encoder.encodeUrl(imageTitle).replaceAll("\\(", "%28").replaceAll("\\)", "%29");
-				String metadataUrl = "https://commons.wikimedia.org/w/index.php?title=File:" + param + "&action=raw";
 				try {
-					URL url = new URL(metadataUrl);
-					BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
-					StringBuilder metadata = new StringBuilder();
-					String s;
-					String sourceFile = null;
-					while ((s = reader.readLine()) != null) {
-						if (s.contains("source=") && s.contains("File:")) {
-							sourceFile = s.substring(s.indexOf("File:") + "File:".length());
-							sourceFile = stripImageName(sourceFile);
-						}
-						metadata.append(s).append("\n");
+					String sourceFile;
+					try {
+						sourceFile = retrieveSourcePage(pInsert, "commons.wikimedia.org", imageTitle);
+					} catch (IOException e) {
+						sourceFile = retrieveSourcePage(pInsert, lang + ".wikivoyage.org", imageTitle);
 					}
-					pInsert.setString(1, imageTitle);
-					pInsert.setString(2, metadataUrl);
-					pInsert.setString(3, metadata.toString());
-					pInsert.setString(4, sourceFile);
-					pInsert.executeUpdate();
 					existingImagesMapping.put(imageTitle, sourceFile);
 					if (++imagesFetched % 100 == 0) {
 						System.out.printf("Images metadata fetched: %d %s -> %s \n ", imagesFetched, imageTitle, sourceFile);
@@ -210,7 +189,6 @@ public class WikivoyageDataGenerator {
 				}
 			}
 			String sourceFile = existingImagesMapping.get(imageTitle);
-			
 			valuesToUpdate.put(imageTitle, sourceFile);
 			if (sourceFile != null && sourceFile.trim().length() > 0) {
 				pInsertSource.setString(1, imageTitle);
@@ -227,8 +205,32 @@ public class WikivoyageDataGenerator {
 		System.out.println("Update to full size images finished, updated: " + updated);
 	}
 
+	private String retrieveSourcePage(PreparedStatement pInsert, String website, String imageTitle)
+			throws MalformedURLException, IOException, SQLException {
+		StringBuilder metadata = new StringBuilder();
+		String param = Encoder.encodeUrl(imageTitle).replaceAll("\\(", "%28").replaceAll("\\)", "%29");
+		String metadataUrl = "https://" + website + "/w/index.php?title=File:" + param + "&action=raw";
+		URL url = new URL(metadataUrl);
+		BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+		String s;
+		String sourceFile = null;
+		while ((s = reader.readLine()) != null) {
+			if (s.contains("source=") && s.contains("File:")) {
+				sourceFile = s.substring(s.indexOf("File:") + "File:".length());
+				sourceFile = stripImageName(sourceFile);
+			}
+			metadata.append(s).append("\n");
+		}
+		pInsert.setString(1, imageTitle);
+		pInsert.setString(2, metadataUrl);
+		pInsert.setString(3, metadata.toString());
+		pInsert.setString(4, sourceFile);
+		pInsert.executeUpdate();
+		return sourceFile;
+	}
+
 	private String stripImageName(String sourceFile) {
-		if(sourceFile == null) {
+		if (sourceFile == null) {
 			return null;
 		}
 		if (sourceFile.contains("]")) {
@@ -237,7 +239,7 @@ public class WikivoyageDataGenerator {
 		if (sourceFile.contains("}")) {
 			sourceFile = sourceFile.substring(0, sourceFile.indexOf('}'));
 		}
-		if(sourceFile.contains("[[") || sourceFile.contains("|")) {
+		if (sourceFile.contains("[[") || sourceFile.contains("|")) {
 			return null;
 		}
 		return sourceFile;
