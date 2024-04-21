@@ -350,7 +350,7 @@ public class WikivoyageLangPreparation {
 			wikiVoyageConn.close();
 			for (Entry<String, String> e : parentStructure.entrySet()) {
 				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(e.getValue())) {
-					System.out.printf("Error parent structure %s %s -> %s\n", lang, e.getKey(), e.getValue());
+					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), e.getValue());
 				}
 			}
 		}
@@ -407,7 +407,7 @@ public class WikivoyageLangPreparation {
 						page = false;
 						progress.remaining(progIS.available());
 					} else if (name.equals("title")) {
-						title = ctext.toString();
+						title = ctext.toString().trim();
 						ctext = null;
 					} else if (name.equals("revision")) {
 						revision = false;
@@ -444,7 +444,7 @@ public class WikivoyageLangPreparation {
 			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
 			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, dbBrowser);
 			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB)) {
-				System.out.println("Skip disambiguation " + title); // todo delete
+//				System.out.println("Skip disambiguation " + title); 
 				return;
 			}
 			try {
@@ -484,7 +484,7 @@ public class WikivoyageLangPreparation {
 							prep.setString(column++, plainStr);
 						}
 						// part_of
-						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
+						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF)).trim();
 						prep.setString(column++, partOf);
 						if (Algorithms.isEmpty(partOf)) {
 							System.out.println("Root article: " + lang + " " + title);
