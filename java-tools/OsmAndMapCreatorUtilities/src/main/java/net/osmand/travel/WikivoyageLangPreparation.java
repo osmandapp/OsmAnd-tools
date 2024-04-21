@@ -16,7 +16,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -442,9 +441,9 @@ public class WikivoyageLangPreparation {
 		}
 
 		private void parseText(StringBuilder cont) throws IOException, SQLException, SAXException {
-			Map<String, List<String>> macroBlocks = new HashMap<>();
+			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
 			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, dbBrowser);
-			if (macroBlocks.containsKey("disambiguation") || macroBlocks.containsKey("disamb")) {
+			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB)) {
 				System.out.println("Skip disambiguation " + title); // todo delete
 				return;
 			}
@@ -452,12 +451,12 @@ public class WikivoyageLangPreparation {
 				if (!macroBlocks.isEmpty()) {
 					LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
 					if (ll == null) {
-						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()), lang, title);
+						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION), lang, title);
 					}
 					boolean accepted = true;// filtered by namespace !title.toString().contains(":");
 					if (accepted) {
 						int column = 1;
-						String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
+						String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER));
 						if (id++ % 500 == 0) {
 							log.debug(String.format("Article accepted %d %s %s free: %s\n", cid, title, ll,
 									Runtime.getRuntime().freeMemory() / (1024 * 1024)));
@@ -485,13 +484,12 @@ public class WikivoyageLangPreparation {
 							prep.setString(column++, plainStr);
 						}
 						// part_of
-						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType()));
+						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
 						prep.setString(column++, partOf);
 						if (Algorithms.isEmpty(partOf)) {
 							System.out.println("Root article: " + lang + " " + title);
-						} else {
-							parentStructure.put(title, partOf);
 						}
+						parentStructure.put(title, partOf);
 						if (ll == null) {
 							prep.setNull(column++, Types.DOUBLE);
 							prep.setNull(column++, Types.DOUBLE);
@@ -514,7 +512,7 @@ public class WikivoyageLangPreparation {
 						}
 
 						// gpx_gz
-						String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI.getType()), title.toString(),
+						String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI), title.toString(),
 								lang, getShortDescr(plainStr), ll);
 						prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 						if (uncompressed) {
@@ -758,11 +756,11 @@ public class WikivoyageLangPreparation {
 				if (parts.length >= 3) {
 					String lat = null;
 					String lon = null;
-					if(parts[0].trim().equalsIgnoreCase("geo")) {
+					if (parts[0].trim().equalsIgnoreCase("geo")) {
 						lat = parts[1];
 						lon = parts[2];
-					} else if(parts[0].trim().equalsIgnoreCase("geodata")) {
-						for(String part : parts) {
+					} else {// if(parts[0].trim().equalsIgnoreCase("geodata")) {
+						for (String part : parts) {
 							String p = part.trim();
 							if (p.startsWith("lat=")) {
 								lat = p.substring("lat=".length());

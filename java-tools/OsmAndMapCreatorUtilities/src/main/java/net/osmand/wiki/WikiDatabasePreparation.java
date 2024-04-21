@@ -1,5 +1,6 @@
 package net.osmand.wiki;
 
+import static java.util.EnumSet.of;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -25,6 +26,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -39,7 +41,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import net.osmand.data.LatLon;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -63,12 +64,10 @@ import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
 import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
 
-import com.google.protobuf.DescriptorProtos.SourceCodeInfo.Location;
-
 import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
-import info.bliki.wiki.model.WikiModel;
 import net.osmand.PlatformUtil;
+import net.osmand.data.LatLon;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
@@ -120,7 +119,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	public static String removeMacroBlocks(StringBuilder text, Map<String, List<String>> blockResults, String lang,
+	public static String removeMacroBlocks(StringBuilder text, Map<WikivoyageTemplates, List<String>> blockResults, String lang,
 			WikiDBBrowser browser) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -165,8 +164,8 @@ public class WikiDatabasePreparation {
 				} else if (val.startsWith("wide image") || val.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
 				}
-				String key = getKey(val.toLowerCase());
-				if (key.equals(WikivoyageTemplates.POI.getType())) {
+				EnumSet<WikivoyageTemplates> key = getKey(val.toLowerCase());
+				if (key.contains(WikivoyageTemplates.POI)) {
 					val = val.replaceAll("\\{\\{.*}}", "");
 					StringBuilder poiShortDescription = parsePoiWithAddLatLon(val, poiFields);
 					String wikiLink = poiFields.get(PoiFieldType.WIKIPEDIA);
@@ -215,28 +214,24 @@ public class WikiDatabasePreparation {
 						poiShortDescription.append(String.format(" geo:%.5f,%.5f,", latLon.getLatitude(), latLon.getLongitude()));
 					}
 					bld.append(poiShortDescription);
-				} else if (key.equals(WikivoyageTemplates.REGION_LIST.getType())) {
+				} else if (key.contains(WikivoyageTemplates.REGION_LIST)) {
 					bld.append((parseRegionList(val)));
-				} else if (key.equals(WikivoyageTemplates.WARNING.getType())) {
+				} else if (key.contains(WikivoyageTemplates.WARNING)) {
 					appendWarning(bld, val);
-				} else if (key.equals(WikivoyageTemplates.CITATION.getType())) {
+				} else if (key.contains(WikivoyageTemplates.CITATION)) {
 					parseAndAppendCitation(val, bld);
-				} else if (key.equals(WikivoyageTemplates.TWO_PART.getType())) {
+				} else if (key.contains(WikivoyageTemplates.TWO_PART)) {
 					parseAndAppendTwoPartFormat(val, bld);
-				} else if (key.equals(WikivoyageTemplates.STATION.getType())) {
+				} else if (key.contains(WikivoyageTemplates.STATION)) {
 					parseAndAppendStation(val, bld);
-				} else if (key.equals(WikivoyageTemplates.METRIC_DATA.getType())) {
+				} else if (key.contains(WikivoyageTemplates.METRIC_DATA)) {
 					parseAndAppendMetricData(val, bld);
-				} else if (key.equals(WikivoyageTemplates.TRANSLATION.getType())) {
+				} else if (key.contains(WikivoyageTemplates.TRANSLATION)) {
 					parseAndAppendTranslation(val, bld);
 				}
 				if (!key.isEmpty() && blockResults != null) {
-					if (key.contains("|")) {
-						for (String str : key.split("\\|")) {
-							addToMap(blockResults, str, val);
-						}
-					} else {
-						addToMap(blockResults, key, val);
+					for (WikivoyageTemplates w : key) {
+						addToMap(blockResults, w, val);
 					}
 				}
 				if (text.charAt(i + 1) != ' ' && text.charAt(i) != '}') {
@@ -596,7 +591,7 @@ public class WikiDatabasePreparation {
 		return bld.toString();
 	}
 
-	private static void addToMap(Map<String, List<String>> blocksMap, String key, String val) {
+	private static void addToMap(Map<WikivoyageTemplates, List<String>> blocksMap, WikivoyageTemplates key, String val) {
 		if (blocksMap.containsKey(key)) {
 			blocksMap.get(key).add(val);
 		} else {
@@ -707,9 +702,9 @@ public class WikiDatabasePreparation {
 	}
 
 	
-	private static String getKey(String str) {
+	private static EnumSet<WikivoyageTemplates> getKey(String str) {
 		if (str.startsWith("geo|") || str.startsWith("geodata")) {
-			return WikivoyageTemplates.LOCATION.getType();
+			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof|") || str.startsWith("partofitinerary|") || str.startsWith("istinkat") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
@@ -718,7 +713,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("jest w")
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی")) {
-			return WikivoyageTemplates.PART_OF.getType();
+			return of(WikivoyageTemplates.PART_OF);
 		} else if (str.startsWith("do") || str.startsWith("see") || str.startsWith("go")
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
@@ -730,38 +725,40 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("marker") || str.startsWith("خوابیدن") || str.startsWith("دیدن")
 				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")
 				|| str.startsWith("event")) {
-			return WikivoyageTemplates.POI.getType();
+			return of(WikivoyageTemplates.POI);
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
 				|| str.startsWith("سرصفحه")) {
-			return WikivoyageTemplates.BANNER.getType();
+			return of(WikivoyageTemplates.BANNER);
 		} else if ((str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
 				|| str.contains("longitude=")))
 				|| str.startsWith("info ")) {
-			return "geo|pagebanner";
+			return of(WikivoyageTemplates.LOCATION, WikivoyageTemplates.BANNER);
 		} else if (str.startsWith("regionlist")) {
-			return WikivoyageTemplates.REGION_LIST.getType();
+			return of(WikivoyageTemplates.REGION_LIST);
 		} else if (str.startsWith("warningbox")) {
-			return WikivoyageTemplates.WARNING.getType();
+			return of(WikivoyageTemplates.WARNING);
 		} else if (str.startsWith("cite")) {
-			return WikivoyageTemplates.CITATION.getType();
+			return of(WikivoyageTemplates.CITATION);
 		} else if (str.startsWith("iata")|| str.startsWith("formatnum")) {
-			return WikivoyageTemplates.TWO_PART.getType();
+			return of(WikivoyageTemplates.TWO_PART);
 		} else if (str.startsWith("station") || str.startsWith("rint")) {
-			return WikivoyageTemplates.STATION.getType();
+			return of(WikivoyageTemplates.STATION);
 		} else if (str.startsWith("ipa") || str.startsWith("lang-")) {
-			return WikivoyageTemplates.TRANSLATION.getType();
+			return of(WikivoyageTemplates.TRANSLATION);
+		} else if (str.startsWith("disamb") || str.startsWith("disambiguation")) {
+			return of(WikivoyageTemplates.DISAMB);
 		} else {
 			Set<String> parts = new HashSet<>(Arrays.asList(str.split("\\|")));
 			if (parts.contains("convert") || parts.contains("unité")) {
-				return WikivoyageTemplates.METRIC_DATA.getType();
+				return of(WikivoyageTemplates.METRIC_DATA);
 			} else {
 				parts.retainAll(unitsOfDistance);
 				if (!parts.isEmpty())
-					return WikivoyageTemplates.METRIC_DATA.getType();
+					return of(WikivoyageTemplates.METRIC_DATA);
 			}
 		}
-		return "";
+		return EnumSet.noneOf(WikivoyageTemplates.class);
 	}
 
 	public static void mainTest(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException, SQLException {
@@ -810,9 +807,9 @@ public class WikiDatabasePreparation {
 
 		System.out.println(printer.toString());
 		
-		final HTMLConverter nconverter = new HTMLConverter(false);
-		String lang = "be";
-		WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
+//		final HTMLConverter nconverter = new HTMLConverter(false);
+//		String lang = "be";
+//		WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
 //		String plainStr = wikiModel.render(nconverter, content);
 //		System.out.println(plainStr);
 //		downloadPage("https://be.m.wikipedia.org/wiki/%D0%93%D0%BE%D1%80%D0%B0%D0%B4_%D0%9C%D1%96%D0%BD%D1%81%D0%BA",
@@ -822,8 +819,10 @@ public class WikiDatabasePreparation {
 	public static void mainTestPage(String[] args) throws IOException, SQLException {
 		StringBuilder rs = Algorithms
 				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
-		String text = WikiDatabasePreparation.removeMacroBlocks(rs, new TreeMap<String, List<String>>(), null, null);
+		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
+		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null);
 		System.out.println(text);
+		System.out.println(macros);
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
