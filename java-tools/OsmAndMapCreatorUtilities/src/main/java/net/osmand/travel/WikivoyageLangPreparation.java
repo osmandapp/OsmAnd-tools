@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
@@ -175,7 +177,7 @@ public class WikivoyageLangPreparation {
 	                                        File wikivoyageSqlite, File wikidataSqlite)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 
-		Map<Long, PageInfo> pageInfos = new LinkedHashMap<Long, WikivoyageLangPreparation.PageInfo>();
+		Map<Long, PageInfo> pageInfos = new HashMap<Long, WikivoyageLangPreparation.PageInfo>();
 		SqlInsertValuesReader.readInsertValuesFile(wikiProps.getAbsolutePath(), new InsertValueProcessor() {
 			
 			@Override
@@ -315,6 +317,7 @@ public class WikivoyageLangPreparation {
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		private Map<Long, PageInfo> pageInfos;
+		private Map<String, String> parentStructure = new TreeMap<String, String>();
 
 		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, Map<Long, PageInfo> pageInfos, 
 				WikiDBBrowser dbBrowser) throws IOException, SQLException {
@@ -345,6 +348,11 @@ public class WikivoyageLangPreparation {
 			}
 			prep.close();
 			wikiVoyageConn.close();
+			for (Entry<String, String> e : parentStructure.entrySet()) {
+				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(e.getValue())) {
+					System.out.printf("Error parent structure %s %s -> %s", e.getKey(), e.getValue());
+				}
+			}
 		}
 
 		public int getCount() {
@@ -472,7 +480,13 @@ public class WikivoyageLangPreparation {
 							prep.setString(column++, plainStr);
 						}
 						// part_of
-						prep.setString(column++, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
+						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType()));
+						prep.setString(column++, partOf);
+						if (Algorithms.isEmpty(partOf)) {
+							System.out.println("Root article: " + lang + " " + title);
+						} else {
+							parentStructure.put(title, partOf);
+						}
 						if (ll == null) {
 							prep.setNull(column++, Types.DOUBLE);
 							prep.setNull(column++, Types.DOUBLE);
@@ -624,7 +638,7 @@ public class WikivoyageLangPreparation {
 									extraValues.put(DIRECTIONS, value);
 									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
 								}
-								if ("".equals(lat) || "NA".equals(lat) || "".equals(lon) || "NA".equals(lon)) {
+								if (isEmpty(lat) || isEmpty(lon)) {
 									// skip empty
 								} else {
 									LatLon loct = LocationParser.parseLocation(lat + " " + lon);
@@ -744,17 +758,22 @@ public class WikivoyageLangPreparation {
 						lon = parts[2];
 					} else if(parts[0].trim().equalsIgnoreCase("geodata")) {
 						for(String part : parts) {
-							if(part.trim().startsWith("lat=")) {
-								lat = part.trim().substring("lat=".length());
-							} else if(part.trim().startsWith("long=")) {
-								lon = part.trim().substring("long=".length());
+							String p = part.trim();
+							if (p.startsWith("lat=")) {
+								lat = p.substring("lat=".length());
+							} else if (p.startsWith("long=")) {
+								lon = p.substring("long=".length());
+							} else if (p.startsWith("latitude=")) {
+								lat = p.substring("latitude=".length());
+							} else if (p.startsWith("longitude=")) {
+								lon = p.substring("longitude=".length());
 							}
 						}
 					}
-					if ("".equals(lat) || "NA".equals(lat) || "".equals(lon) || "NA".equals(lon)) {
+					if (isEmpty(lat) || isEmpty(lon)) {
 						return null;
 					}
-					if(lat != null && lon != null) {
+					if (lat != null && lon != null) {
 						ll = LocationParser.parseLocation(lat + " " + lon);
 					}
 				}
@@ -809,5 +828,9 @@ public class WikivoyageLangPreparation {
 			}
 			return region;
 		}
+	}
+
+	public static boolean isEmpty(String lat) {
+		return "".equals(lat) || "NA".equals(lat)  || "N/A".equals(lat) ;
 	}
 }

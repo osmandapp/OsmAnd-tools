@@ -713,7 +713,9 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("ispartof|") || str.startsWith("partofitinerary|") || str.startsWith("istinkat") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
-				|| str.startsWith("είναιΤμήμαΤου") || str.startsWith("commonscat") || str.startsWith("jest w")
+				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
+				//|| str.startsWith("commonscat") 
+				|| str.startsWith("jest w")
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی")) {
 			return WikivoyageTemplates.PART_OF.getType();
@@ -815,7 +817,6 @@ public class WikiDatabasePreparation {
 //		System.out.println(plainStr);
 //		downloadPage("https://be.m.wikipedia.org/wiki/%D0%93%D0%BE%D1%80%D0%B0%D0%B4_%D0%9C%D1%96%D0%BD%D1%81%D0%BA",
 //		"/Users/victorshcherb/Documents/a.wiki.html");
-
 	}
 	
 	public static void mainTestPage(String[] args) throws IOException, SQLException {
