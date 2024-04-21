@@ -30,6 +30,7 @@ import javax.xml.parsers.SAXParserFactory;
 
 import net.osmand.data.LatLon;
 import net.osmand.util.Algorithms;
+import net.osmand.util.LocationParser;
 import net.osmand.wiki.*;
 import net.osmand.wiki.WikiDatabasePreparation.WikiDBBrowser;
 
@@ -440,15 +441,13 @@ public class WikivoyageLangPreparation {
 					if (ll == null) {
 						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 					}
-					
 					boolean accepted = true;// filtered by namespace !title.toString().contains(":");
 					if (accepted) {
 						int column = 1;
 						String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
 						if (id++ % 500 == 0) {
-							log.debug("Article accepted " + cid + " " + title.toString() + " " + ll.getLatitude() + " "
-									+ ll.getLongitude() + " free: "
-									+ (Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+							log.debug(String.format("Article accepted %d %s %s free: %s\n", cid, title, ll,
+									Runtime.getRuntime().freeMemory() / (1024 * 1024)));
 						}
 						final HTMLConverter converter = new HTMLConverter(false);
 						CustomWikiModel wikiModel = new CustomWikiModel(
@@ -474,7 +473,7 @@ public class WikivoyageLangPreparation {
 						}
 						// part_of
 						prep.setString(column++, parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF.getType())));
-						if (ll.getLongitude() == 0 && ll.getLatitude() == 0) {
+						if (ll == null) {
 							prep.setNull(column++, Types.DOUBLE);
 							prep.setNull(column++, Types.DOUBLE);
 						} else {
@@ -580,6 +579,8 @@ public class WikivoyageLangPreparation {
 						}
 						
 						if (!value.isEmpty() && !value.contains("{{")) {
+							String lat = "";
+							String lon = "";
 							try {
 								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
 										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
@@ -590,9 +591,9 @@ public class WikivoyageLangPreparation {
 								} else if (field.equalsIgnoreCase("intl-area-code")) {
 									areaCode = value;
 								} else if (field.equalsIgnoreCase("lat") || field.equalsIgnoreCase("latitude") || field.equalsIgnoreCase("عرض جغرافیایی")) {
-									point.lat = Double.valueOf(value);
+									lat = value.trim();
 								} else if (field.equalsIgnoreCase("long") || field.equalsIgnoreCase("longitude") || field.equalsIgnoreCase("طول جغرافیایی")) {
-									point.lon = Double.valueOf(value);
+									lon = value.trim();
 								} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione") 
 										|| field.equalsIgnoreCase("description") || field.equalsIgnoreCase("sobre") || field.equalsIgnoreCase("תיאור")
 										|| field.equalsIgnoreCase("متن")) {
@@ -622,6 +623,17 @@ public class WikivoyageLangPreparation {
 										|| field.equalsIgnoreCase("مسیرها") || field.equalsIgnoreCase("address")) {
 									extraValues.put(DIRECTIONS, value);
 									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
+								}
+								if ("".equals(lat) || "NA".equals(lat) || "".equals(lon) || "NA".equals(lon)) {
+									// skip empty
+								} else {
+									LatLon loct = LocationParser.parseLocation(lat + " " + lon);
+									if (loct == null) {
+										System.out.printf("Error parsing (%s %s): %s %s\n", lang, title, lat, lon);
+									} else {
+										point.lat = loct.getLatitude();
+										point.lon = loct.getLongitude();
+									}
 								}
 							} catch (RuntimeException e) {
 								System.out.printf("Error parsing (%s %s): %s\n", lang, title, e.getMessage());
@@ -720,88 +732,38 @@ public class WikivoyageLangPreparation {
 		}
 		
 		private LatLon getLatLonFromGeoBlock(List<String> list) {
-			
 			if (list != null && !list.isEmpty()) {
 				String location = list.get(0);
-				LatLon ll = parseLatLon(location);
-				if (ll.getLatitude() == 0 && ll.getLongitude() == 0) {
-					System.out.printf("Couldn't parse geo (%s %s): %s \n", lang, title, location);
+				String[] parts = location.split("\\|");
+				LatLon ll = null;
+				if (parts.length >= 3) {
+					String lat = null;
+					String lon = null;
+					if(parts[0].trim().equalsIgnoreCase("geo")) {
+						lat = parts[1];
+						lon = parts[2];
+					} else if(parts[0].trim().equalsIgnoreCase("geodata")) {
+						for(String part : parts) {
+							if(part.trim().startsWith("lat=")) {
+								lat = part.trim().substring("lat=".length());
+							} else if(part.trim().startsWith("long=")) {
+								lon = part.trim().substring("long=".length());
+							}
+						}
+					}
+					if ("".equals(lat) || "NA".equals(lat) || "".equals(lon) || "NA".equals(lon)) {
+						return null;
+					}
+					if(lat != null && lon != null) {
+						ll = LocationParser.parseLocation(lat + " " + lon);
+					}
+				}
+				if (ll == null) {
+					System.err.printf("Couldn't parse geo (%s %s): %s \n", lang, title, location);
 				}
 				return ll;
 			}
-			return new LatLon(0, 0);
-		}
-
-		private static LatLon parseLatLon(String location) {
-			double lat = 0d;
-			double lon = 0d;
-			String[] parts = location.split("\\|");
-			// skip malformed location blocks
-			String regex_pl = "(\\d+)°.+?(\\d+).+?(\\d*).*?";
-			if (location.toLowerCase().contains("geo|")) {
-				if (parts.length >= 3) {
-					if (parts[1].matches(regex_pl) && parts[2].matches(regex_pl)) {
-						lat = toDecimalDegrees(parts[1], regex_pl);
-						lon = toDecimalDegrees(parts[2], regex_pl);
-					} else {
-						try {
-							lat = Double.valueOf(parts[1]);
-							lon = Double.valueOf(parts[2]);
-						} catch (Exception e) {	
-//							System.err.println("Couldn't parse geo: "+ location);
-						}
-					}
-				}
-			} else {
-				String latStr = "";
-				String lonStr = "";
-				String regex = "(\\d+).+?(\\d+).+?(\\d*).*?([N|E|W|S|n|e|w|s]+)";
-				for (String part : parts) {
-					part = part.replaceAll(" ", "").toLowerCase();
-					if (part.startsWith("lat=") || part.startsWith("latitude=")) {
-						latStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
-					} else if (part.startsWith("lon=") || part.startsWith("long=") || part.startsWith("longitude=")) {
-						lonStr = part.substring(part.indexOf("=") + 1, part.length()).replaceAll("\n", "");
-					}
-				}
-				if (latStr.matches(regex) && lonStr.matches(regex)) {
-					lat = toDecimalDegrees(latStr, regex);
-					lon = toDecimalDegrees(lonStr, regex);
-				} else {
-					try {
-						lat = Double.valueOf(latStr.replaceAll("°", ""));
-						lon = Double.valueOf(lonStr.replaceAll("°", ""));
-					} catch (Exception e) {
-//						System.err.println("Couldn't parse geo: "+ location);
-					}
-				}
-			}
-			return new LatLon(lat, lon);
-		}
-
-		private static double toDecimalDegrees(String str, String regex) {
-			Pattern p = Pattern.compile(regex);
-			Matcher m = p.matcher(str);
-			m.find();
-			double res = 0;
-			double signe = 1.0;
-			double degrees = 0;
-			double minutes = 0;
-			double seconds = 0;
-			String hemisphereOUmeridien = "";
-			try {
-				degrees = Double.parseDouble(m.group(1));
-				minutes = Double.parseDouble(m.group(2));
-				seconds = m.group(3).isEmpty() ? 0 : Double.parseDouble(m.group(3));
-				hemisphereOUmeridien = m.group(4);
-			} catch (Exception e) {
-				// Skip malformed strings
-			}
-			if ((hemisphereOUmeridien.equalsIgnoreCase("W")) || (hemisphereOUmeridien.equalsIgnoreCase("S"))) {
-				signe = -1.0;
-			}
-			res = signe * (Math.floor(degrees) + Math.floor(minutes) / 60.0 + seconds / 3600.0);
-			return res;
+			return null;
 		}
 
 		private String parsePartOf(List<String> list) {
