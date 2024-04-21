@@ -415,9 +415,10 @@ public class WikivoyageLangPreparation {
 								if (!ctext.toString().startsWith("#")) {
 									System.err.printf("Error with page %d %s - empty info\n", cid, title);
 								}
-							} else if (cInfo.wikidataId == 0) {
-								System.err.printf("Error with page %d %s - no wikidata id \n", cid, title,
-										cInfo.wikidataId);
+							// 0 wikidata means article without translation
+//							} else if (cInfo.wikidataId == 0) {
+//								System.err.printf("Error with page %d %s - no wikidata id \n", cid, title,
+//										cInfo.wikidataId);
 							} else {
 								parseText(ctext.toString());
 							}
@@ -439,7 +440,7 @@ public class WikivoyageLangPreparation {
 					if (ll == null) {
 						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION.getType()));
 					}
-					boolean accepted = !title.toString().contains(":");
+					boolean accepted = true;// filtered by namespace !title.toString().contains(":");
 					if (accepted) {
 						int column = 1;
 						String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER.getType()));
@@ -622,7 +623,9 @@ public class WikivoyageLangPreparation {
 									extraValues.put(DIRECTIONS, value);
 									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
 								}
-							} catch (Exception e) {}
+							} catch (RuntimeException e) {
+								System.out.printf("Error parsing (%s %s): %s\n", lang, title, e.getMessage());
+							}
 						}
 					}
 					for (String key : extraValues.keySet()) {
@@ -715,7 +718,11 @@ public class WikivoyageLangPreparation {
 			
 			if (list != null && !list.isEmpty()) {
 				String location = list.get(0);
-				return parseLatLon(location);
+				LatLon ll = parseLatLon(location);
+				if (ll.getLatitude() == 0 && ll.getLongitude() == 0) {
+					System.out.printf("Couldn't parse geo (%s %s): %s \n", lang, title, location);
+				}
+				return ll;
 			}
 			return new LatLon(0, 0);
 		}
@@ -723,8 +730,6 @@ public class WikivoyageLangPreparation {
 		private static LatLon parseLatLon(String location) {
 			double lat = 0d;
 			double lon = 0d;
-			
-
 			String[] parts = location.split("\\|");
 			// skip malformed location blocks
 			String regex_pl = "(\\d+)°.+?(\\d+).+?(\\d*).*?";
@@ -737,7 +742,9 @@ public class WikivoyageLangPreparation {
 						try {
 							lat = Double.valueOf(parts[1]);
 							lon = Double.valueOf(parts[2]);
-						} catch (Exception e) {	}
+						} catch (Exception e) {	
+//							System.err.println("Couldn't parse geo: "+ location);
+						}
 					}
 				}
 			} else {
@@ -759,7 +766,9 @@ public class WikivoyageLangPreparation {
 					try {
 						lat = Double.valueOf(latStr.replaceAll("°", ""));
 						lon = Double.valueOf(lonStr.replaceAll("°", ""));
-					} catch (Exception e) {}
+					} catch (Exception e) {
+//						System.err.println("Couldn't parse geo: "+ location);
+					}
 				}
 			}
 			return new LatLon(lat, lon);
