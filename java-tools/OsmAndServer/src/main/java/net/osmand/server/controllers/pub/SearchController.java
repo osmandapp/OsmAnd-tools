@@ -1,7 +1,9 @@
 package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
+import net.osmand.Location;
 import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
 import net.osmand.data.Street;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
@@ -117,5 +119,16 @@ public class SearchController {
     public ResponseEntity<String> searchPoiCategories(@RequestParam String search) throws IOException {
         Map<String, Map<String, String>> res = searchService.searchPoiCategories(search);
         return ResponseEntity.ok(gson.toJson(res));
+    }
+    
+    @GetMapping(path = {"/get-poi-address"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getPoiAddress(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
+        String address = searchService.getPoiAddress(new LatLon(lat, lon));
+        if (address != null) {
+            return ResponseEntity.ok(gson.toJson(address));
+        } else {
+            return ResponseEntity.badRequest().body("Error get poi address!");
+        }
     }
 }

@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import net.osmand.NativeLibrary;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.GeocodingUtilities;
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapPoiTypes;
@@ -114,7 +115,7 @@ public class SearchService {
         return res != null ? res.getCurrentSearchResults() : Collections.emptyList();
     }
     
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException, InterruptedException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -325,7 +326,7 @@ public class SearchService {
         return tags;
     }
     
-    private void saveSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) {
+    private void saveSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) throws IOException, InterruptedException {
         for (SearchResult result : res) {
             if (result.objectType == ObjectType.POI) {
                 Amenity amenity = (Amenity) result.object;
@@ -351,6 +352,18 @@ public class SearchService {
                 }
             }
         }
+    }
+    
+    public String getPoiAddress(LatLon location) throws IOException, InterruptedException {
+        if (location != null) {
+            List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(location.getLatitude(), location.getLongitude());
+            Optional<GeocodingUtilities.GeocodingResult> nearestResult = list.stream()
+                    .min(Comparator.comparingDouble(GeocodingUtilities.GeocodingResult::getDistance));
+            if (nearestResult.isPresent()) {
+                return nearestResult.get().toString();
+            }
+        }
+        return null;
     }
     
     private String getOsmUrl(SearchResult result) {
