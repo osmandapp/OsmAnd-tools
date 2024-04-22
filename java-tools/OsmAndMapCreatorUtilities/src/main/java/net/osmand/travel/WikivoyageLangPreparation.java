@@ -21,7 +21,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.TreeMap;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -58,7 +57,6 @@ public class WikivoyageLangPreparation {
 	private static boolean uncompressed;
 	
 	private static final boolean DEBUG = false;
-	
 	public enum WikivoyageOSMTags {
 		TAG_WIKIDATA ("wikidata"),
 		TAG_WIKIPEDIA ("wikipedia"),
@@ -80,13 +78,11 @@ public class WikivoyageLangPreparation {
 		}
 	}
 	
-	
 	public static final String EMAIL = "Email";
 	public static final String DIRECTIONS = "Directions";
 	public static final String WORKING_HOURS = "Working hours";
 	public static final String PRICE = "Price";
 	public static final String PHONE = "Phone";
-	
 	
 	public enum WikivoyageTemplates {
 		LOCATION("geo"),
@@ -103,7 +99,6 @@ public class WikivoyageLangPreparation {
 		PHRASEBOOK("phrasebook"),
 		DISAMB("disamb");
 		
-
 		private final String type;
 		WikivoyageTemplates(String s) {
 			type = s;
@@ -169,6 +164,7 @@ public class WikivoyageLangPreparation {
 	
 	protected static class PageInfo {
 		public long id;
+		public String title;
 		public String banner;
 		public String image;
 		public long wikidataId;
@@ -318,14 +314,20 @@ public class WikivoyageLangPreparation {
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		private Map<Long, PageInfo> pageInfos;
-		private Map<String, String> parentStructure = new TreeMap<String, String>();
-
+		private Map<Long, PageInfo> pageInfoByWId = new HashMap<Long, PageInfo>();
+		private Map<String, String> parentStructure = new HashMap<String, String>();
+		
 		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, Map<Long, PageInfo> pageInfos, 
 				WikiDBBrowser dbBrowser) throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
 			this.pageInfos = pageInfos;
+			for (PageInfo p : pageInfos.values()) {
+				if (p.wikidataId > 0) {
+					pageInfoByWId.put(p.wikidataId, p);
+				}
+			}
 			this.dbBrowser = dbBrowser;
 			progress.startTask("Parse wikivoyage xml", progIS.available());
 			wikiVoyageConn = dialect.getDatabaseConnection(wikivoyageSqlite.getAbsolutePath(), log);
@@ -349,11 +351,34 @@ public class WikivoyageLangPreparation {
 			}
 			prep.close();
 			wikiVoyageConn.close();
+			assignDefaultPartOfAndValidate();
+			
+		}
+
+		private void assignDefaultPartOfAndValidate() {
+			// Q1599788 -- Phrasebooks
+			// TODO reassing missing wid
 			for (Entry<String, String> e : parentStructure.entrySet()) {
 				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(e.getValue())) {
 					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), e.getValue());
 				}
 			}
+		}
+		
+		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks) {
+			long wid = 0;
+			if (macroBlocks.containsKey(WikivoyageTemplates.PHRASEBOOK)) {
+				wid = 1599788; 	// Q1599788 -- Phrasebooks
+			}
+			PageInfo p = pageInfoByWId.get(wid);
+			if (wid > 0 && p != null) {
+				if(p.title != null) {
+					return p.title;
+				} else {
+					System.out.printf("Missing parent article wid=Q%s for %s\n", wid, title);
+				}
+			}
+			return "";
 		}
 
 		public int getCount() {
@@ -443,6 +468,7 @@ public class WikivoyageLangPreparation {
 
 		private void parseText(StringBuilder cont) throws IOException, SQLException, SAXException {
 			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
+			cInfo.title = title;
 			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, dbBrowser);
 			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB)) {
 //				System.out.println("Skip disambiguation " + title); 
@@ -486,8 +512,8 @@ public class WikivoyageLangPreparation {
 						}
 						// part_of
 						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF)).trim();
-						if(partOf.length() == 0) {
-							partOf = getStandardPartOf(lang, macroBlocks).trim();
+						if (partOf.length() == 0) {
+							partOf = getStandardPartOf(macroBlocks).trim();
 						}
 						prep.setString(column++, partOf);
 						if (Algorithms.isEmpty(partOf)) {
@@ -841,26 +867,5 @@ public class WikivoyageLangPreparation {
 		return "".equals(lat) || "NA".equals(lat)  || "N/A".equals(lat) ;
 	}
 
-	public static String getStandardPartOf(String lang, Map<WikivoyageTemplates, List<String>> macroBlocks) {
-		if( macroBlocks.containsKey(WikivoyageTemplates.PHRASEBOOK)) {
-			// TODO combine by Wikidata id
-			switch (lang) {
-				case "es": return "Guías_de_conversación";
-				case "nl": return "Taalgidsen";
-				case "pl": return "Rozmówki";
-				case "pt": return "Lista_de_guias_de_conversação";
-				case "ro": return "Wikivoyage:Ghiduri_de_conversație";
-				case "ru": return "Wikivoyage:Все_разговорники";
-				case "tr": return "Konuşma_kılavuzları";
-				case "ua": return "Розмовники";
-				case "zh": return "会话手册";
-				case "fi": return "Wikimatkat:Luettelo_matkasanakirjoista";
-				case "sv": return "Wikivoyage:Parlörer";
-				case "he": return "שיחונים";
-				case "vi": return "Sổ_tay_ngôn_ngữ";
-				default: return "Phrasebooks";
-			}
-		}
-		return "";
-	}
+	
 }

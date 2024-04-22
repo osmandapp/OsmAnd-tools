@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -124,7 +125,6 @@ public class WikiDatabasePreparation {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
-		int endInd = 0;
 		int headerCount = 0;
 		Map<PoiFieldType, String> poiFields = new HashMap<>();
 		for (int i = 0; i < text.length();) {
@@ -136,17 +136,33 @@ public class WikiDatabasePreparation {
 				i++;
 			}
 		}
-		for (int i = 0; i < text.length(); i++) {
+		Set<Integer> errorBracesCnt = new TreeSet<Integer>();
+		for (int i = 0; ; i++) {
+			if(i == text.length()) {
+				if (openCnt > 0) {
+					System.out.println(
+							"Error braces {{ }}: " + text.substring(0, Math.min(50, text.length() - 1)));
+					// start over again
+					errorBracesCnt.add(beginInd);
+					beginInd = openCnt = i = 0;
+					blockResults.clear();
+				} else {
+					break;
+				}
+			}
 			int leftChars = text.length() - i - 1;
 			if ((leftChars > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{')
 					|| (leftChars > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a'
 					&& text.charAt(i + 3) == 'p' && text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')) {
-				beginInd = beginInd == 0 ? i + 2 : beginInd;
-				openCnt++;
+				if (!errorBracesCnt.contains(i + 2)) {
+					beginInd = beginInd == 0 ? i + 2 : beginInd;
+					openCnt++;	
+				}
 				i++;
 			} else if (leftChars > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}')
 					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n'
 					&& text.charAt(i - 3) == 'i' && text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p'))) {
+				// Macroblock
 				if (openCnt == 0) {
 					continue;
 				}
@@ -155,8 +171,9 @@ public class WikiDatabasePreparation {
 					continue;
 				}
 				openCnt--;
-				endInd = i;
+				int endInd = i;
 				String val = text.substring(beginInd, endInd);
+				beginInd = 0;
 				if (val.startsWith("gallery")) {
 					bld.append(parseGalleryString(val));
 				} else if (val.toLowerCase().startsWith("weather box")) {
@@ -167,53 +184,7 @@ public class WikiDatabasePreparation {
 				EnumSet<WikivoyageTemplates> key = getKey(val.toLowerCase());
 				if (key.contains(WikivoyageTemplates.POI)) {
 					val = val.replaceAll("\\{\\{.*}}", "");
-					StringBuilder poiShortDescription = parsePoiWithAddLatLon(val, poiFields);
-					String wikiLink = poiFields.get(PoiFieldType.WIKIPEDIA);
-					String wikiDataQId = poiFields.get(PoiFieldType.WIKIDATA);
-					long wikidataId = 0;
-					if (!Algorithms.isEmpty(wikiDataQId)) {
-						try {
-							if (wikiDataQId.indexOf(' ') > 0) {
-								wikidataId = Long.parseLong(wikiDataQId.substring(1, wikiDataQId.indexOf(' ')));
-							} else {
-								wikidataId = Long.parseLong(wikiDataQId.substring(1));
-							}
-						} catch (NumberFormatException e) {
-							System.err.println("Error wid - " + wikiDataQId);
-						}
-					}
-					if (Algorithms.isEmpty(wikiLink) && wikidataId > 0 && browser != null) {
-						wikiLink = browser.getWikipediaTitleByWid(lang, wikidataId);
-					}
-					LatLon latLon = browser == null ? null : browser.getLocation(lang, wikiLink, wikidataId);
-					if (latLon == null && poiFields.containsKey(PoiFieldType.LAT)
-							&& poiFields.containsKey(PoiFieldType.LON)) {
-							latLon= parseLatLon(poiFields.get(PoiFieldType.LAT), poiFields.get(PoiFieldType.LON));
-							
-						
-					}
-					if (latLon != null) {
-						String newLat = String.valueOf(latLon.getLatitude());
-						String newLon = String.valueOf(latLon.getLongitude());
-						if (poiFields.get(PoiFieldType.LAT) != null) {
-							val = val.replace(poiFields.get(PoiFieldType.LAT), newLat);
-						} else {
-							val += "|lat=" + newLat;
-						}
-						if (poiFields.get(PoiFieldType.LON) != null) {
-							val = val.replace(poiFields.get(PoiFieldType.LON), newLon);
-						} else {
-							val += "|long=" + newLon;
-						}
-					}
-					if (!Algorithms.isEmpty(wikiLink)) {
-						poiShortDescription.append(addWikiLink(lang, wikiLink, latLon));
-						poiShortDescription.append(" ");
-					}
-					if (latLon != null) {
-						poiShortDescription.append(String.format(" geo:%.5f,%.5f,", latLon.getLatitude(), latLon.getLongitude()));
-					}
-					bld.append(poiShortDescription);
+					bld.append(getWikivoyagePoiHtmlDescription(lang, browser, poiFields, val));
 				} else if (key.contains(WikivoyageTemplates.REGION_LIST)) {
 					bld.append((parseRegionList(val)));
 				} else if (key.contains(WikivoyageTemplates.WARNING)) {
@@ -243,44 +214,76 @@ public class WikiDatabasePreparation {
 				i = parseRef(text, bld, i);
 			} else if (leftChars > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l') {
 				i = parseGallery(text, bld, i);
-			} else {
-				if (openCnt == 0) {
-					int headerLvl = 0;
-					int indexCopy = i;
-					if (i > 0 && text.charAt(i - 1) != '=') {
-						headerLvl = calculateHeaderLevel(text, i);
-						indexCopy = indexCopy + headerLvl;
-					}
-					if (text.charAt(indexCopy) != '\n' && headerLvl > 1) {
-						int indEnd = text.indexOf("=", indexCopy);
-						if (indEnd != -1) {
-							indEnd = indEnd + calculateHeaderLevel(text, indEnd);
-							char ch = indEnd < text.length() - 2 ? text.charAt(indEnd + 1) : text.charAt(indEnd);
-							int nextHeader = calculateHeaderLevel(text, ch == '\n' ? indEnd + 2 : indEnd + 1);
-							if (nextHeader > 1 && headerLvl >= nextHeader) {
-								i = indEnd;
-								continue;
-							} else if (headerLvl == 2) {
-								if (headerCount != 0) {
-									bld.append("\n/div\n");
-								}
-								bld.append(text.substring(i, indEnd));
-								bld.append("\ndiv class=\"content\"\n");
-								headerCount++;
-								i = indEnd;
-							} else {
-								bld.append(text.charAt(i));
+			} else if (openCnt == 0) {
+				int headerLvl = 0;
+				int indexCopy = i;
+				if (i > 0 && text.charAt(i - 1) != '=') {
+					headerLvl = calculateHeaderLevel(text, i);
+					indexCopy = indexCopy + headerLvl;
+				}
+				if (text.charAt(indexCopy) != '\n' && headerLvl > 1) {
+					int indEnd = text.indexOf("=", indexCopy);
+					if (indEnd != -1) {
+						indEnd = indEnd + calculateHeaderLevel(text, indEnd);
+						char ch = indEnd < text.length() - 2 ? text.charAt(indEnd + 1) : text.charAt(indEnd);
+						int nextHeader = calculateHeaderLevel(text, ch == '\n' ? indEnd + 2 : indEnd + 1);
+						if (nextHeader > 1 && headerLvl >= nextHeader) {
+							i = indEnd;
+							continue;
+						} else if (headerLvl == 2) {
+							if (headerCount != 0) {
+								bld.append("\n/div\n");
 							}
+							bld.append(text.substring(i, indEnd));
+							bld.append("\ndiv class=\"content\"\n");
+							headerCount++;
+							i = indEnd;
+						} else {
+							bld.append(text.charAt(i));
 						}
-					} else {
-						bld.append(text.charAt(i));
 					}
-					beginInd = 0;
-					endInd = 0;
+				} else {
+					bld.append(text.charAt(i));
 				}
 			}
 		}
 		return bld.toString();
+	}
+
+	private static StringBuilder getWikivoyagePoiHtmlDescription(String lang, WikiDBBrowser browser,
+			Map<PoiFieldType, String> poiFields, String val)
+			throws IOException, SQLException, UnsupportedEncodingException {
+		StringBuilder poiShortDescription = parsePoiWithAddLatLon(val, poiFields);
+		String wikiLink = poiFields.get(PoiFieldType.WIKIPEDIA);
+		String wikiDataQId = poiFields.get(PoiFieldType.WIKIDATA);
+		long wikidataId = 0;
+		if (!Algorithms.isEmpty(wikiDataQId)) {
+			try {
+				if (wikiDataQId.indexOf(' ') > 0) {
+					wikidataId = Long.parseLong(wikiDataQId.substring(1, wikiDataQId.indexOf(' ')));
+				} else {
+					wikidataId = Long.parseLong(wikiDataQId.substring(1));
+				}
+			} catch (NumberFormatException e) {
+				System.err.println("Error wid - " + wikiDataQId);
+			}
+		}
+		if (Algorithms.isEmpty(wikiLink) && wikidataId > 0 && browser != null) {
+			wikiLink = browser.getWikipediaTitleByWid(lang, wikidataId);
+		}
+		LatLon latLon = browser == null ? null : browser.getLocation(lang, wikiLink, wikidataId);
+		if (latLon == null && poiFields.containsKey(PoiFieldType.LAT)
+				&& poiFields.containsKey(PoiFieldType.LON)) {
+			latLon = parseLatLon(poiFields.get(PoiFieldType.LAT), poiFields.get(PoiFieldType.LON));
+		}
+		if (!Algorithms.isEmpty(wikiLink)) {
+			poiShortDescription.append(addWikiLink(lang, wikiLink, latLon));
+			poiShortDescription.append(" ");
+		}
+		if (latLon != null) {
+			poiShortDescription.append(String.format(" geo:%.5f,%.5f,", latLon.getLatitude(), latLon.getLongitude()));
+		}
+		return poiShortDescription;
 	}
 
 	private static String addWikiLink(String lang, String value, LatLon latLon) throws UnsupportedEncodingException {
@@ -827,7 +830,7 @@ public class WikiDatabasePreparation {
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null);
 		System.out.println(text);
-		System.out.println(macros);
+		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
