@@ -137,6 +137,7 @@ public class WikiDatabasePreparation {
 			}
 		}
 		Set<Integer> errorBracesCnt = new TreeSet<Integer>();
+		String[] tagsRetrieve = {"maplink", "ref", "gallery"};
 		for (int i = 0; ; i++) {
 			if(i == text.length()) {
 				if (openCnt > 0) {
@@ -151,17 +152,34 @@ public class WikiDatabasePreparation {
 				}
 			}
 			int leftChars = text.length() - i - 1;
-			if ((leftChars > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{')
-					|| (leftChars > 4 && text.charAt(i) == '<' && text.charAt(i + 1) == 'm' && text.charAt(i + 2) == 'a'
-					&& text.charAt(i + 3) == 'p' && text.charAt(i + 4) == 'l' && text.charAt(i + 5) == 'i')) {
+			
+			if (openCnt == 0 && text.charAt(i) == '<') {
+				boolean found = false;
+				for (String tag : tagsRetrieve) {
+					if (leftChars > tag.length() && text.substring(i + 1, i + 1 + tag.length()).equals(tag)) {
+						found = true;
+						StringBuilder val = new StringBuilder();
+						i = parseTag(text, val, tag, i);
+						if (tag.equals("ref")) {
+							parseAndAppendCitation(val.toString(), bld);
+						} else if (tag.equals("gallery")) {
+							String res = parseGalleryString(val.toString());
+							bld.append(res);
+						}
+						break;
+					}
+				}
+				if (found) {
+					continue;
+				}
+			}
+			if ((leftChars > 0 && text.charAt(i) == '{' && text.charAt(i + 1) == '{')) {
 				if (!errorBracesCnt.contains(i + 2)) {
 					beginInd = beginInd == 0 ? i + 2 : beginInd;
 					openCnt++;	
 				}
 				i++;
-			} else if (leftChars > 0 && ((text.charAt(i) == '}' && text.charAt(i + 1) == '}')
-					|| (i > 4 && text.charAt(i) == '>' && text.charAt(i - 1) == 'k' && text.charAt(i - 2) == 'n'
-					&& text.charAt(i - 3) == 'i' && text.charAt(i - 4) == 'l' && text.charAt(i - 5) == 'p'))) {
+			} else if (leftChars > 0 && text.charAt(i) == '}' && text.charAt(i + 1) == '}') {
 				// Macroblock
 				if (openCnt == 0) {
 					continue;
@@ -209,11 +227,6 @@ public class WikiDatabasePreparation {
 					i--;
 				}
 				i++;
-			} else if (leftChars > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'r' && text.charAt(i + 2) == 'e'
-					&& text.charAt(i + 3) == 'f' && openCnt == 0) {
-				i = parseRef(text, bld, i);
-			} else if (leftChars > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == 'g' && text.charAt(i + 2) == 'a' && text.charAt(i + 3) == 'l') {
-				i = parseGallery(text, bld, i);
 			} else if (openCnt == 0) {
 				int headerLvl = 0;
 				int indexCopy = i;
@@ -310,16 +323,6 @@ public class WikiDatabasePreparation {
 		return nt > 2 && text.charAt(i) == '<' && text.charAt(i + 1) == '!' && text.charAt(i + 2) == '-' && text.charAt(i + 3) == '-';
 	}
 
-	private static int parseGallery(StringBuilder text, StringBuilder bld, int i) {
-		int closeTag = text.indexOf("</gallery>", i);
-		int endInd = closeTag + "</gallery>".length();
-		if (endInd > text.length() - 1 || closeTag < i) {
-			return i;
-		}
-		String val = text.substring(i, closeTag);
-		bld.append(parseGalleryString(val));
-		return --endInd;
-	}
 	
 	private static void parseAndAppendWeatherTable(String val, StringBuilder bld) {
 		String[] parts = val.split("\\|");
@@ -441,19 +444,25 @@ public class WikiDatabasePreparation {
 		return null;
 	}
 
-	private static int parseRef(StringBuilder text, StringBuilder bld, int i) {
-		int closingTag = text.indexOf("</", i);
-		int selfClosed = text.indexOf("/>", i);
-		closingTag = closingTag < 0 ? Integer.MAX_VALUE : closingTag;
-		selfClosed = selfClosed < 0 ? Integer.MAX_VALUE : selfClosed;
-		int endInd = Math.min(closingTag, selfClosed);
-		endInd = endInd == closingTag ? endInd + "</ref>".length() : endInd + "/>".length();
-		if (endInd > text.length() - 1 || endInd < 0) {
-			return i;
+	
+	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen) {
+		int selfClosed = text.indexOf("/>", indOpen);
+		if (selfClosed > 0 && selfClosed < text.indexOf("<", indOpen)) {
+			bld.append(text.substring(indOpen + 1, selfClosed));
+			return selfClosed + 1;
 		}
-		parseAndAppendCitation(text.substring(i, endInd), bld);
-		// return index of the last char in the reference
-		return --endInd;
+		int ind = text.indexOf("</" +tag);
+		int l2 = text.indexOf("</ " +tag);
+		if(l2 > 0) {
+			ind = ind == -1 ? l2 : Math.min(l2, ind);
+		} else if(ind == -1) {
+			return indOpen + 1;
+		}
+		
+		int lastChar = text.indexOf(">", ind);
+		bld.append(text.substring(indOpen + 1, ind));
+		System.out.println(" ...." + bld + "....");
+		return lastChar;
 	}
 
 	private static void parseAndAppendCitation(String ref, StringBuilder bld) {
@@ -830,7 +839,7 @@ public class WikiDatabasePreparation {
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
 		System.out.println(text);
-		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
+//		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {

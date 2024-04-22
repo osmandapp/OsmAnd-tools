@@ -462,14 +462,11 @@ public class WikivoyageLangPreparation {
 						ctext = null;
 					} else if (name.equals("text")) {
 						if (ctext != null) {
-							if (cInfo == null) {
-								if (!ctext.toString().startsWith("#")) {
-									System.err.printf("Error with page %d %s - empty info\n", cid, title);
-								}
-							// 0 wikidata means article without translation
-//							} else if (cInfo.wikidataId == 0) {
-//								System.err.printf("Error with page %d %s - no wikidata id \n", cid, title,
-//										cInfo.wikidataId);
+							String textStr = ctext.toString().toLowerCase();
+							if (textStr.startsWith("#redirect")) {
+								// redirect
+							} else if (cInfo == null) {
+								System.err.printf("Error with page %d %s - empty info\n", cid, title);
 							} else {
 								parseText(ctext);
 							}
