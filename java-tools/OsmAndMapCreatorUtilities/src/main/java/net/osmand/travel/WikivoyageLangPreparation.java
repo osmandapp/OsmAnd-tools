@@ -374,16 +374,16 @@ public class WikivoyageLangPreparation {
 			TreeSet<String> valueLinks = new TreeSet<>(parentStructure.values());
 			for (String valueParent : valueLinks) {
 				if (redirects.containsKey(valueParent)) {
-					String target = redirects.get(valueParent);
-					ps.setString(1, valueParent);
-					ps.setString(2, target);
+					String actualTarget = redirects.get(valueParent);
+					ps.setString(1, actualTarget);
+					ps.setString(2, valueParent);
 					ps.execute();
+//					System.out.println("Redirect from " + valueParent+ " to " + actualTarget);
 				}
 			}
 			for (Entry<String, String> e : parentStructure.entrySet()) {
 				String parent = e.getValue();
 				if (redirects.containsKey(parent)) {
-					System.out.println("Error test redirect to  " + parent + " " + redirects.get(parent));
 					parent = redirects.get(parent);
 				}
 				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(parent)) {
@@ -549,7 +549,8 @@ public class WikivoyageLangPreparation {
 						partOf = trim(partOf);
 						prepInsert.setString(column++, partOf);
 						if (Algorithms.isEmpty(partOf)) {
-							System.out.println("Root article: " + lang + " " + title);
+							long wid = cInfo == null ? 0 : cInfo.wikidataId; 
+							System.out.println("Root article: Q" + wid + " " + lang + " " + title);
 						}
 						parentStructure.put(title, partOf);
 						if (ll == null) {
