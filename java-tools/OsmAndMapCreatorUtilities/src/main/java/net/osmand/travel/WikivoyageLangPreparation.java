@@ -846,7 +846,7 @@ public class WikivoyageLangPreparation {
 					}
 				}
 				if (ll == null) {
-					System.err.printf("Couldn't parse geo (%s %s): %s \n", lang, title, location);
+					System.err.printf("Error geo (%s %s): %s \n", lang, title, location);
 				}
 				return ll;
 			}
