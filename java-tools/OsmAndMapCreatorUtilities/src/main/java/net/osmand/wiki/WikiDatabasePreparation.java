@@ -727,7 +727,7 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ") 
-				|| str.startsWith("navigation ") //de
+				// || str.startsWith("navigation ") -- incorect
 				 
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
