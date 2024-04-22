@@ -347,7 +347,6 @@ public class WikivoyageLangPreparation {
 		private Map<String, String> parentStructure = new HashMap<>();
 		
 		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, Map<Long, PageInfo> pageInfosById,
-				Map<Long, PageInfo> pageEnInfosById,
 				WikiDBBrowser dbBrowser) throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
@@ -356,11 +355,6 @@ public class WikivoyageLangPreparation {
 			for (PageInfo p : pageInfosById.values()) {
 				if (p.wikidataId > 0) {
 					pageInfoByWId.put(p.wikidataId, p);
-				}
-			}
-			for (PageInfo p : pageEnInfosById.values()) {
-				if (p.wikidataId > 0) {
-					pageEnInfoByWId.put(p.wikidataId, p);
 				}
 			}
 			this.dbBrowser = dbBrowser;
