@@ -573,7 +573,7 @@ public class WikivoyageLangPreparation {
 					// part_of
 					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
 					if(partOf == null) {
-						// this disamb or 
+						// this disamb or redirection 
 						return;
 					}
 					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
@@ -910,25 +910,24 @@ public class WikivoyageLangPreparation {
 					String[] splitPartOf = partOf.split("\\|");
 					for (String s : splitPartOf) {
 						String[] vls = s.split("=");
-						if (vls.length > 1 && vls[0].trim().toLowerCase().equals("ispartof")) {
+						String key = vls[0].trim().toLowerCase();
+						if (vls.length > 1 && key.equals("ispartof")) {
 							part = vls[1].trim();
 							break;
-						} else if (vls.length > 1 && vls[0].trim().toLowerCase().equals("type")) {
+						} else if (vls.length > 1 && key.equals("type")) {
 							type = vls[1].trim();
-							
 						}
 					}
-					
 					if (part.length() == 0) {
 						if (type.equalsIgnoreCase("маршрут")) {
 							return "Q1322323";
 						} else if (type.equalsIgnoreCase("континент")) {
 							return "Q1200957";
 						} else if (type.equalsIgnoreCase("сводная") || type.equalsIgnoreCase("природа")
-								|| type.equalsIgnoreCase("наследние")) {
+								|| type.equalsIgnoreCase("наследие")) {
 							return null;
 						} else {
-							System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+							System.out.printf("Error parsing the partof: %s (%s) in the article: %s\n", partOf, type, title);
 						}
 					}
 					return trim(part).replaceAll("_", " ");
@@ -939,7 +938,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return trim(splitPartOf[1]).replaceAll("_", " ");
 					} else {
-						System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+						System.out.println("Error parsing the partof (else): " + partOf + " in the article: " + title);
 						return "";
 					}
 				}
