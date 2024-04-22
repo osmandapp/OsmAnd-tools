@@ -58,13 +58,21 @@ import net.osmand.wiki.WikiImageUrlStorage;
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
 	private static boolean uncompressed;
-	private final static Set<Long> KNOWN_WIKIVOYAGE_MAIN = new HashSet<Long>();
+	private final static Map<Long, Long> KNOWN_WIKIVOYAGE_MAIN = new HashMap<Long, Long>();
 	static {
-		KNOWN_WIKIVOYAGE_MAIN.add(14199938l); // Travel topics
-		KNOWN_WIKIVOYAGE_MAIN.add(1200957l); // Destinations
-		KNOWN_WIKIVOYAGE_MAIN.add(1599788l); // Phrasebooks
-		KNOWN_WIKIVOYAGE_MAIN.add(14208553l); // Discover
-		KNOWN_WIKIVOYAGE_MAIN.add(1322323l); // Itineraries
+		KNOWN_WIKIVOYAGE_MAIN.put(14199938l, 0l); // Travel topics
+		KNOWN_WIKIVOYAGE_MAIN.put(1200957l, 0l); // Destinations
+		KNOWN_WIKIVOYAGE_MAIN.put(1599788l, 14199938l); // Phrasebooks
+		KNOWN_WIKIVOYAGE_MAIN.put(14208553l, 14199938l); // Discover
+		KNOWN_WIKIVOYAGE_MAIN.put(1322323l, 14199938l); // Itineraries
+		KNOWN_WIKIVOYAGE_MAIN.put(15l, 1200957l); // Africa
+		KNOWN_WIKIVOYAGE_MAIN.put(51l, 1200957l); // Antarctica
+		KNOWN_WIKIVOYAGE_MAIN.put(48l, 1200957l); // Asia
+		KNOWN_WIKIVOYAGE_MAIN.put(49l, 1200957l); // North America
+		KNOWN_WIKIVOYAGE_MAIN.put(55643l, 1200957l); // Oceania
+		KNOWN_WIKIVOYAGE_MAIN.put(14201351l, 1200957l); // Other destinations
+		KNOWN_WIKIVOYAGE_MAIN.put(18l, 1200957l); // South America
+		KNOWN_WIKIVOYAGE_MAIN.put(46l, 1200957l); // Europe
 	}
 	private static final boolean DEBUG = false;
 	public enum WikivoyageOSMTags {
@@ -408,7 +416,10 @@ public class WikivoyageLangPreparation {
 		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks) {
 			long wid = 0;
 			if (macroBlocks.containsKey(WikivoyageTemplates.PHRASEBOOK)) {
-				wid = 1599788; 	// Q1599788 -- Phrasebooks
+				wid = 1599788; // Q1599788 -- Phrasebooks
+			}
+			if (cInfo != null && KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
+				wid = KNOWN_WIKIVOYAGE_MAIN.get(cInfo.wikidataId);
 			}
 			PageInfo p = pageInfoByWId.get(wid);
 			if (wid > 0 && p != null) {
@@ -444,7 +455,7 @@ public class WikivoyageLangPreparation {
 				} else if (name.equals("text")) {
 					ctext = null;
 					if (cid > 0) {
-						if (cns == 0 || (cInfo != null && KNOWN_WIKIVOYAGE_MAIN.contains(cInfo.wikidataId))) {
+						if (cns == 0 || (cInfo != null && KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId))) {
 							ctext = new StringBuilder();
 						}
 					}
