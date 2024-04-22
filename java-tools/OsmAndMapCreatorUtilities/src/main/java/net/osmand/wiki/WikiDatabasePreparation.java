@@ -724,8 +724,9 @@ public class WikiDatabasePreparation {
 	private static EnumSet<WikivoyageTemplates> getKey(String str) {
 		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return of(WikivoyageTemplates.LOCATION);
-		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("istinkat") || str.startsWith("isin")
+		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
+				|| str.startsWith("istinkat") || str.startsWith("istin|") //de
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 

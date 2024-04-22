@@ -476,7 +476,8 @@ public class WikivoyageLangPreparation {
 					} else if (name.equals("text")) {
 						if (ctext != null) {
 							String textStr = ctext.toString().trim().toLowerCase();
-							if (textStr.startsWith("#redirect")) {
+							if (textStr.startsWith("#redirect") || 
+									textStr.startsWith("#weiterleitung".toLowerCase())) {
 								// redirect
 								int l = textStr.indexOf("[[");
 								int e = textStr.indexOf("]]");
