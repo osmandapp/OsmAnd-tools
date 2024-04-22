@@ -306,7 +306,7 @@ public class WikivoyageLangPreparation {
 		private Connection wikiVoyageConn;
 		private final WikiImageUrlStorage imageUrlStorage;
 		private WikiDBBrowser dbBrowser;
-		private PreparedStatement prep;
+		private PreparedStatement prepInsert;
 		private int batch = 0;
 		private final static int BATCH_SIZE = 500;
 		private static final String P_OPENED = "<p>";
@@ -314,8 +314,9 @@ public class WikivoyageLangPreparation {
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		private Map<Long, PageInfo> pageInfos;
-		private Map<Long, PageInfo> pageInfoByWId = new HashMap<Long, PageInfo>();
-		private Map<String, String> parentStructure = new HashMap<String, String>();
+		private Map<Long, PageInfo> pageInfoByWId = new HashMap<>();
+		private Map<Long, List<String>> missingParent = new HashMap<>();
+		private Map<String, String> parentStructure = new HashMap<>();
 		
 		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, Map<Long, PageInfo> pageInfos, 
 				WikiDBBrowser dbBrowser) throws IOException, SQLException {
@@ -333,31 +334,42 @@ public class WikivoyageLangPreparation {
 			wikiVoyageConn = dialect.getDatabaseConnection(wikivoyageSqlite.getAbsolutePath(), log);
 			imageUrlStorage = new WikiImageUrlStorage(wikiVoyageConn, wikivoyageSqlite.getParent(), lang);
 			createInitialDbStructure(wikiVoyageConn, uncompressed);
-			prep = generateInsertPrep(wikiVoyageConn, uncompressed);
+			prepInsert = generateInsertPrep(wikiVoyageConn, uncompressed);
 		}
 
 		public void addBatch() throws SQLException {
-			prep.addBatch();
+			prepInsert.addBatch();
 			if(batch++ > BATCH_SIZE) {
-				prep.executeBatch();
+				prepInsert.executeBatch();
 				batch = 0;
 			}
 		}
 
 		public void finish() throws SQLException {
-			prep.executeBatch();
-			if(!wikiVoyageConn.getAutoCommit()) {
+			prepInsert.executeBatch();
+			if (!wikiVoyageConn.getAutoCommit()) {
 				wikiVoyageConn.commit();
 			}
-			prep.close();
-			wikiVoyageConn.close();
+			prepInsert.close();
 			assignDefaultPartOfAndValidate();
+			wikiVoyageConn.close();
 			
 		}
 
-		private void assignDefaultPartOfAndValidate() {
-			// Q1599788 -- Phrasebooks
-			// TODO reassing missing wid
+		private void assignDefaultPartOfAndValidate() throws SQLException {
+			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE  travel_articles SET is_part_of = ? WHERE is_part_of =  ?");
+			for(Entry<Long, List<String>> wid : missingParent.entrySet()) {
+				PageInfo parentPagee = pageInfoByWId.get(wid.getKey());
+				if (parentPagee != null && parentPagee.title != null) {
+					ps.setString(1, parentPagee.title);
+					ps.setString(2, "Q" + wid.getKey());
+					ps.execute();
+					for (String title : wid.getValue()) {
+						parentStructure.put(title, parentPagee.title);
+					}
+				}
+			}
+			
 			for (Entry<String, String> e : parentStructure.entrySet()) {
 				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(e.getValue())) {
 					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), e.getValue());
@@ -372,10 +384,14 @@ public class WikivoyageLangPreparation {
 			}
 			PageInfo p = pageInfoByWId.get(wid);
 			if (wid > 0 && p != null) {
-				if(p.title != null) {
+				if (p.title != null) {
 					return p.title;
 				} else {
-					System.out.printf("Missing parent article wid=Q%s for %s\n", wid, title);
+					if(!missingParent.containsKey(wid)) {
+						missingParent.put(wid, new ArrayList<String>());
+					}
+					missingParent.get(wid).add(title);
+					return "Q" + wid;
 				}
 			}
 			return "";
@@ -469,7 +485,7 @@ public class WikivoyageLangPreparation {
 		private void parseText(StringBuilder cont) throws IOException, SQLException, SAXException {
 			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
 			cInfo.title = title;
-			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, dbBrowser);
+			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, title, dbBrowser);
 			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB)) {
 //				System.out.println("Skip disambiguation " + title); 
 				return;
@@ -505,54 +521,54 @@ public class WikivoyageLangPreparation {
 						}
 						
 						// prep.setString(column++, Encoder.encodeUrl(title.toString()));
-						prep.setString(column++, title.toString());
-						prep.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
+						prepInsert.setString(column++, title.toString());
+						prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
 						if (uncompressed) {
-							prep.setString(column++, plainStr);
+							prepInsert.setString(column++, plainStr);
 						}
 						// part_of
 						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF)).trim();
 						if (partOf.length() == 0) {
 							partOf = getStandardPartOf(macroBlocks).trim();
 						}
-						prep.setString(column++, partOf);
+						prepInsert.setString(column++, partOf);
 						if (Algorithms.isEmpty(partOf)) {
 							System.out.println("Root article: " + lang + " " + title);
 						}
 						parentStructure.put(title, partOf);
 						if (ll == null) {
-							prep.setNull(column++, Types.DOUBLE);
-							prep.setNull(column++, Types.DOUBLE);
+							prepInsert.setNull(column++, Types.DOUBLE);
+							prepInsert.setNull(column++, Types.DOUBLE);
 						} else {
-							prep.setDouble(column++, ll.getLatitude());
-							prep.setDouble(column++, ll.getLongitude());
+							prepInsert.setDouble(column++, ll.getLatitude());
+							prepInsert.setDouble(column++, ll.getLongitude());
 						}
 						// banner
 						if (cInfo.image != null) {
-							prep.setString(column++, cInfo.image);
+							prepInsert.setString(column++, cInfo.image);
 						} else {
 							column++;
 						}
 						if (cInfo.banner != null) {
-							prep.setString(column++, cInfo.banner);
+							prepInsert.setString(column++, cInfo.banner);
 						} else if (cInfo.image != null) {
-							prep.setString(column++, cInfo.image);
+							prepInsert.setString(column++, cInfo.image);
 						} else {
-							prep.setString(column++, filename);
+							prepInsert.setString(column++, filename);
 						}
 
 						// gpx_gz
 						String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI), title.toString(),
 								lang, getShortDescr(plainStr), ll);
-						prep.setBytes(column++, stringToCompressedByteArray(bous, gpx));
+						prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 						if (uncompressed) {
-							prep.setString(column++, gpx);
+							prepInsert.setString(column++, gpx);
 						}
 						// trip id equals to wikidata id
-						prep.setLong(column++, cInfo.wikidataId);
-						prep.setLong(column++, cid);
-						prep.setString(column++, lang);
-						prep.setString(column++, wikiModel.getContentsJson());
+						prepInsert.setLong(column++, cInfo.wikidataId);
+						prepInsert.setLong(column++, cid);
+						prepInsert.setString(column++, lang);
+						prepInsert.setString(column++, wikiModel.getContentsJson());
 						addBatch();
 
 					}

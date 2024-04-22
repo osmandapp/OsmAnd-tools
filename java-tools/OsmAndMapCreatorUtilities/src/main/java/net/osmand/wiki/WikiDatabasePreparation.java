@@ -120,7 +120,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	public static String removeMacroBlocks(StringBuilder text, Map<WikivoyageTemplates, List<String>> blockResults, String lang,
+	public static String removeMacroBlocks(StringBuilder text, Map<WikivoyageTemplates, List<String>> blockResults, String lang, String title,
 			WikiDBBrowser browser) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -140,8 +140,8 @@ public class WikiDatabasePreparation {
 		for (int i = 0; ; i++) {
 			if(i == text.length()) {
 				if (openCnt > 0) {
-					System.out.println(
-							"Error braces {{ }}: " + text.substring(0, Math.min(50, text.length() - 1)));
+					System.out.println("Error braces {{ }}: " + lang + " " + title + " ..."
+							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 10)));
 					// start over again
 					errorBracesCnt.add(beginInd);
 					beginInd = openCnt = i = 0;
@@ -783,7 +783,7 @@ public class WikiDatabasePreparation {
 		br.close();
 		//content = removeMacroBlocks(content, null, "en", null);
 		//for testing file.html after removeMacroBlocks and generating new file.html
-		String resContent = generateHtmlArticle(content, "en", null);
+		String resContent = generateHtmlArticle(content, "en", "b", null);
 		String savePath = "/Users/plotva/Documents";
 		File myFile = new File(savePath, "page.html");
 		BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
@@ -828,7 +828,7 @@ public class WikiDatabasePreparation {
 		StringBuilder rs = Algorithms
 				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
-		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null);
+		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
 		System.out.println(text);
 		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
 	}
@@ -1260,7 +1260,7 @@ public class WikiDatabasePreparation {
 						}
 						if (wikiId != 0) {
 							try {
-								plainStr = generateHtmlArticle(ctext, lang, imageUrlStorage);
+								plainStr = generateHtmlArticle(ctext, lang, title.toString(), imageUrlStorage);
 							} catch (RuntimeException e) {
 								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
 							}
@@ -1293,9 +1293,9 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static String generateHtmlArticle(StringBuilder contentText, String lang, WikiImageUrlStorage imageUrlStorage)
+	private static String generateHtmlArticle(StringBuilder contentText, String lang, String title, WikiImageUrlStorage imageUrlStorage)
 			throws IOException, SQLException {
-		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, null);
+		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, title, null);
 		final HTMLConverter converter = new HTMLConverter(false);
 		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
 				"http://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);
