@@ -451,17 +451,18 @@ public class WikiDatabasePreparation {
 			bld.append(text.substring(indOpen + 1, selfClosed));
 			return selfClosed + 1;
 		}
-		int ind = text.indexOf("</" +tag);
-		int l2 = text.indexOf("</ " +tag);
-		if(l2 > 0) {
+		int ind = text.indexOf("</" +tag, indOpen);
+		int l2 = text.indexOf("</ " +tag, indOpen);
+		if (l2 > 0) {
 			ind = ind == -1 ? l2 : Math.min(l2, ind);
-		} else if(ind == -1) {
+		} else if (ind == -1) {
+			System.out.println("Error tag (not closed) %: " + text.substring(indOpen + 1));
 			return indOpen + 1;
 		}
 		
 		int lastChar = text.indexOf(">", ind);
 		bld.append(text.substring(indOpen + 1, ind));
-		System.out.println(" ...." + bld + "....");
+//		System.out.println(" ...." + bld + "....");
 		return lastChar;
 	}
 
