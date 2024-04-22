@@ -553,6 +553,9 @@ public class WikivoyageLangPreparation {
 					}
 					final HTMLConverter converter = new HTMLConverter(false);
 					CustomWikiModel wikiModel = new CustomWikiModel(
+							// Images could be different compare... 
+							// https://upload.wikimedia.org/wikivoyage/de/thumb/d/d4/Museo_in_San_Juan_verkl.jpg/600px-Museo_in_San_Juan_verkl.jpg
+							// https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Percys_and_Kruis2.png/1300px-Percys_and_Kruis2.png
 							"https://upload.wikimedia.org/wikipedia/commons/${image}",
 							"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
 					String plainStr = wikiModel.render(converter, text);
@@ -567,22 +570,27 @@ public class WikivoyageLangPreparation {
 						htmlFileWriter.close();
 					}
 
+					// part_of
+					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
+					if(partOf == null) {
+						// this disamb or 
+						return;
+					}
+					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
+						partOf = getStandardPartOf(macroBlocks).trim();
+					}
+					partOf = trim(partOf);
+
 					// prep.setString(column++, Encoder.encodeUrl(title.toString()));
 					prepInsert.setString(column++, title.toString());
 					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
 					if (uncompressed) {
 						prepInsert.setString(column++, plainStr);
 					}
-					// part_of
-					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
-					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
-						partOf = getStandardPartOf(macroBlocks).trim();
-					}
-					partOf = trim(partOf);
 					prepInsert.setString(column++, partOf);
 					if (Algorithms.isEmpty(partOf)) {
 						long wid = cInfo == null ? 0 : cInfo.wikidataId;
-						System.out.println("Root article: Q" + wid + " " + lang + " " + title);
+						System.out.println("Root article: " + lang + " Q" + wid + " " + " " + title);
 					}
 					parentStructure.put(title, partOf);
 					if (ll == null) {
@@ -898,16 +906,30 @@ public class WikivoyageLangPreparation {
 					}
 				} else if (lowerCasePartOf.startsWith("footer|")) {
 					String part = "";
+					String type = "";
 					String[] splitPartOf = partOf.split("\\|");
 					for (String s : splitPartOf) {
 						String[] vls = s.split("=");
 						if (vls.length > 1 && vls[0].trim().toLowerCase().equals("ispartof")) {
 							part = vls[1].trim();
 							break;
+						} else if (vls.length > 1 && vls[0].trim().toLowerCase().equals("type")) {
+							type = vls[1].trim();
+							
 						}
 					}
+					
 					if (part.length() == 0) {
-						System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+						if (type.equalsIgnoreCase("маршрут")) {
+							return "Q1322323";
+						} else if (type.equalsIgnoreCase("континент")) {
+							return "Q1200957";
+						} else if (type.equalsIgnoreCase("сводная") || type.equalsIgnoreCase("природа")
+								|| type.equalsIgnoreCase("наследние")) {
+							return null;
+						} else {
+							System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+						}
 					}
 					return trim(part).replaceAll("_", " ");
 				} else if (lowerCasePartOf.contains("קטגוריה")) {
