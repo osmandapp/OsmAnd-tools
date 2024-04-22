@@ -705,7 +705,7 @@ public class WikiDatabasePreparation {
 	private static EnumSet<WikivoyageTemplates> getKey(String str) {
 		if (str.startsWith("geo|") || str.startsWith("geodata")) {
 			return of(WikivoyageTemplates.LOCATION);
-		} else if (str.startsWith("ispartof|") || str.startsWith("partofitinerary|") || str.startsWith("istinkat") || str.startsWith("isin")
+		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("istinkat") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
@@ -748,6 +748,11 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.TRANSLATION);
 		} else if (str.startsWith("disamb") || str.startsWith("disambiguation")) {
 			return of(WikivoyageTemplates.DISAMB);
+		} else if (str.startsWith("guidephrasebook") || str.startsWith("partofphrasebook") || 
+				str.startsWith("phrasebookguide")) {
+			return of(WikivoyageTemplates.PHRASEBOOK);
+		} else if (str.startsWith("geo") ) {
+			return of(WikivoyageTemplates.LOCATION);
 		} else {
 			Set<String> parts = new HashSet<>(Arrays.asList(str.split("\\|")));
 			if (parts.contains("convert") || parts.contains("unité")) {

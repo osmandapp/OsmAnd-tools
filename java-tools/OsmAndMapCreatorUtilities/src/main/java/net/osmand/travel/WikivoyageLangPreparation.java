@@ -100,6 +100,7 @@ public class WikivoyageLangPreparation {
 		STATION ("station"),
 		METRIC_DATA("metric"),
 		TRANSLATION("translation"),
+		PHRASEBOOK("phrasebook"),
 		DISAMB("disamb");
 		
 
@@ -485,6 +486,9 @@ public class WikivoyageLangPreparation {
 						}
 						// part_of
 						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF)).trim();
+						if(partOf.length() == 0) {
+							partOf = getStandardPartOf(lang, macroBlocks).trim();
+						}
 						prep.setString(column++, partOf);
 						if (Algorithms.isEmpty(partOf)) {
 							System.out.println("Root article: " + lang + " " + title);
@@ -835,5 +839,28 @@ public class WikivoyageLangPreparation {
 
 	public static boolean isEmpty(String lat) {
 		return "".equals(lat) || "NA".equals(lat)  || "N/A".equals(lat) ;
+	}
+
+	public static String getStandardPartOf(String lang, Map<WikivoyageTemplates, List<String>> macroBlocks) {
+		if( macroBlocks.containsKey(WikivoyageTemplates.PHRASEBOOK)) {
+			// TODO combine by Wikidata id
+			switch (lang) {
+				case "es": return "Guías_de_conversación";
+				case "nl": return "Taalgidsen";
+				case "pl": return "Rozmówki";
+				case "pt": return "Lista_de_guias_de_conversação";
+				case "ro": return "Wikivoyage:Ghiduri_de_conversație";
+				case "ru": return "Wikivoyage:Все_разговорники";
+				case "tr": return "Konuşma_kılavuzları";
+				case "ua": return "Розмовники";
+				case "zh": return "会话手册";
+				case "fi": return "Wikimatkat:Luettelo_matkasanakirjoista";
+				case "sv": return "Wikivoyage:Parlörer";
+				case "he": return "שיחונים";
+				case "vi": return "Sổ_tay_ngôn_ngữ";
+				default: return "Phrasebooks";
+			}
+		}
+		return "";
 	}
 }
