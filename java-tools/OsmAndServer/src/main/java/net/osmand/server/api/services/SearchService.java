@@ -333,15 +333,16 @@ public class SearchService {
                 RoutingController.Feature feature;
                 if (poiType != null) {
                     feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
-                            .prop("poi_name", amenity.getName())
-                            .prop("poi_color", amenity.getColor())
-                            .prop("poi_iconKeyName", poiType.getIconKeyName())
-                            .prop("poi_typeOsmTag", poiType.getOsmTag())
-                            .prop("poi_typeOsmValue", poiType.getOsmValue())
-                            .prop("poi_iconName", getIconName(poiType))
-                            .prop("poi_type", amenity.getType().getKeyName())
-                            .prop("poi_subType", amenity.getSubType())
-                            .prop("poi_osmUrl", getOsmUrl(result));
+                            .prop("web_poi_id", amenity.getId())
+                            .prop("web_poi_name", amenity.getName())
+                            .prop("web_poi_color", amenity.getColor())
+                            .prop("web_poi_iconKeyName", poiType.getIconKeyName())
+                            .prop("web_poi_typeOsmTag", poiType.getOsmTag())
+                            .prop("web_poi_typeOsmValue", poiType.getOsmValue())
+                            .prop("web_poi_iconName", getIconName(poiType))
+                            .prop("web_poi_type", amenity.getType().getKeyName())
+                            .prop("web_poi_subType", amenity.getSubType())
+                            .prop("web_poi_osmUrl", getOsmUrl(result));
                     Map<String, String> tags = amenity.getAmenityExtensions();
                     for (Map.Entry<String, String> entry : tags.entrySet()) {
                         feature.prop(entry.getKey(), entry.getValue());
