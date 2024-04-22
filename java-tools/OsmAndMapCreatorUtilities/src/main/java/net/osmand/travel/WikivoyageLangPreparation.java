@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -315,7 +316,7 @@ public class WikivoyageLangPreparation {
 		private String lang;
 		private Map<Long, PageInfo> pageInfos;
 		private Map<Long, PageInfo> pageInfoByWId = new HashMap<>();
-		private Map<Long, List<String>> missingParent = new HashMap<>();
+		private Map<String, String> redirects = new HashMap<>();
 		private Map<String, String> parentStructure = new HashMap<>();
 		
 		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, Map<Long, PageInfo> pageInfos, 
@@ -357,23 +358,36 @@ public class WikivoyageLangPreparation {
 		}
 
 		private void assignDefaultPartOfAndValidate() throws SQLException {
-			System.out.println("Parent: " + parentStructure.keySet());
+//			System.out.println("Parent: " + parentStructure.keySet());
 			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE  travel_articles SET is_part_of = ? WHERE is_part_of =  ?");
-			for(Entry<Long, List<String>> wid : missingParent.entrySet()) {
-				PageInfo parentPagee = pageInfoByWId.get(wid.getKey());
-				if (parentPagee != null && parentPagee.title != null) {
-					ps.setString(1, parentPagee.title);
-					ps.setString(2, "Q" + wid.getKey());
-					ps.execute();
-					for (String title : wid.getValue()) {
-						parentStructure.put(title, parentPagee.title);
+			
+			ArrayList<String> redirectKeys = new ArrayList<String>(redirects.keySet());
+			// update wikidata redirects
+			for (String s : redirectKeys) {
+				if(s.startsWith("Q") && redirects.get(s).isEmpty()) {
+					PageInfo parentPage = pageInfoByWId.get(Long.parseLong(s.substring(1)));
+					if (parentPage != null && parentPage.title != null) {
+						redirects.put(s, parentPage.title);
 					}
 				}
 			}
-			
+			TreeSet<String> valueLinks = new TreeSet<>(parentStructure.values());
+			for (String valueParent : valueLinks) {
+				if (redirects.containsKey(valueParent)) {
+					String target = redirects.get(valueParent);
+					ps.setString(1, valueParent);
+					ps.setString(2, target);
+					ps.execute();
+				}
+			}
 			for (Entry<String, String> e : parentStructure.entrySet()) {
-				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(e.getValue())) {
-					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), e.getValue());
+				String parent = e.getValue();
+				if (redirects.containsKey(parent)) {
+					System.out.println("Error test redirect to  " + parent + " " + redirects.get(parent));
+					parent = redirects.get(parent);
+				}
+				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(parent)) {
+					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), parent);
 				}
 			}
 		}
@@ -388,11 +402,9 @@ public class WikivoyageLangPreparation {
 				if (p.title != null) {
 					return p.title;
 				} else {
-					if(!missingParent.containsKey(wid)) {
-						missingParent.put(wid, new ArrayList<String>());
-					}
-					missingParent.get(wid).add(title);
-					return "Q" + wid;
+					String parent = "Q" + wid;
+					redirects.put(parent, "");
+					return parent;
 				}
 			}
 			return "";
@@ -463,9 +475,14 @@ public class WikivoyageLangPreparation {
 						ctext = null;
 					} else if (name.equals("text")) {
 						if (ctext != null) {
-							String textStr = ctext.toString().toLowerCase();
+							String textStr = ctext.toString().trim().toLowerCase();
 							if (textStr.startsWith("#redirect")) {
 								// redirect
+								int l = textStr.indexOf("[[");
+								int e = textStr.indexOf("]]");
+								if (l > 0 && e > 0) {
+									redirects.put(title, trim(textStr.substring(l + 2, e)));
+								}
 							} else if (cInfo == null) {
 								System.err.printf("Error with page %d %s - empty info\n", cid, title);
 							} else {
