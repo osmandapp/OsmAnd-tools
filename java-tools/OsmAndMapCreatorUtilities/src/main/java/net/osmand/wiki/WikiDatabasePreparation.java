@@ -726,7 +726,8 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
-				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ") || str.startsWith("navigation")//de
+				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ") 
+				|| str.startsWith("navigation ") //de
 				 
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
@@ -849,7 +850,7 @@ public class WikiDatabasePreparation {
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
 		System.out.println(text);
-		System.out.println(macros.keySet());
+		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
