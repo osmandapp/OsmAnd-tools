@@ -98,6 +98,9 @@ public class WikivoyageLangPreparation {
 		METRIC_DATA("metric"),
 		TRANSLATION("translation"),
 		PHRASEBOOK("phrasebook"),
+		MONUMENT_TITLE("monument-title"),
+		
+		
 		DISAMB("disamb");
 		
 		private final String type;
@@ -479,7 +482,7 @@ public class WikivoyageLangPreparation {
 							String textStr = ctext.toString().trim().toLowerCase();
 							if (textStr.startsWith("#redirect") || textStr.startsWith("#weiterleitung") ||
 									textStr.startsWith("#перенаправление") || textStr.startsWith("#patrz") ||
-									textStr.startsWith("#перенаправлення") || textStr.startsWith("#patrz")
+									textStr.startsWith("#перенаправлення") || textStr.startsWith("#doorverwijzing")
 									) {
 								// redirect
 								int l = textStr.indexOf("[[");
@@ -507,7 +510,8 @@ public class WikivoyageLangPreparation {
 			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
 			cInfo.title = title;
 			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, title, dbBrowser);
-			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB)) {
+			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB) || 
+					macroBlocks.containsKey(WikivoyageTemplates.MONUMENT_TITLE)) {
 //				System.out.println("Skip disambiguation " + title); 
 				return;
 			}
