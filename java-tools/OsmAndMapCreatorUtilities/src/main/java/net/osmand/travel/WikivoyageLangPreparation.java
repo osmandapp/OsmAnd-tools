@@ -65,6 +65,7 @@ public class WikivoyageLangPreparation {
 		KNOWN_WIKIVOYAGE_MAIN.put(1599788l, 14199938l); // Phrasebooks
 		KNOWN_WIKIVOYAGE_MAIN.put(14208553l, 14199938l); // Discover
 		KNOWN_WIKIVOYAGE_MAIN.put(1322323l, 14199938l); // Itineraries
+		KNOWN_WIKIVOYAGE_MAIN.put(5056668l, 14199938l); // Sleep
 		KNOWN_WIKIVOYAGE_MAIN.put(15l, 1200957l); // Africa
 		KNOWN_WIKIVOYAGE_MAIN.put(51l, 1200957l); // Antarctica
 		KNOWN_WIKIVOYAGE_MAIN.put(48l, 1200957l); // Asia
@@ -418,7 +419,7 @@ public class WikivoyageLangPreparation {
 			if (macroBlocks.containsKey(WikivoyageTemplates.PHRASEBOOK)) {
 				wid = 1599788; // Q1599788 -- Phrasebooks
 			}
-			if (cInfo != null && KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
+			if (KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
 				wid = KNOWN_WIKIVOYAGE_MAIN.get(cInfo.wikidataId);
 			}
 			PageInfo p = pageInfoByWId.get(wid);
@@ -574,7 +575,7 @@ public class WikivoyageLangPreparation {
 					}
 					// part_of
 					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
-					if (partOf.length() == 0) {
+					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
 						partOf = getStandardPartOf(macroBlocks).trim();
 					}
 					partOf = trim(partOf);
@@ -897,20 +898,24 @@ public class WikivoyageLangPreparation {
 					}
 				} else if (lowerCasePartOf.startsWith("footer|")) {
 					String part = "";
-					try {
-						int index = partOf.indexOf('|', partOf.indexOf('|') + 1);
-						part = partOf.substring(partOf.indexOf("=") + 1, 
-								index == -1 ? partOf.length() : index);
-					} catch (Exception e) {
-						System.out.println("Error parsing the partof: " + partOf  + " in the article: " + title);
+					String[] splitPartOf = partOf.split("\\|");
+					for (String s : splitPartOf) {
+						String[] vls = s.split("=");
+						if (vls.length > 1 && vls[0].trim().toLowerCase().equals("ispartof")) {
+							part = vls[1].trim();
+							break;
+						}
 					}
-					return part.trim().replaceAll("_", " ");
+					if (part.length() == 0) {
+						System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+					}
+					return trim(part).replaceAll("_", " ");
 				} else if (lowerCasePartOf.contains("קטגוריה")) {
 					return partOf.substring(partOf.indexOf(":") + 1).trim().replaceAll("[_\\|\\*]", "");
 				} else {
 					String[] splitPartOf = partOf.split("\\|");
 					if (splitPartOf.length > 1) {
-						return splitPartOf[1].trim().replaceAll("_", " ");
+						return trim(splitPartOf[1]).replaceAll("_", " ");
 					} else {
 						System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
 						return "";
