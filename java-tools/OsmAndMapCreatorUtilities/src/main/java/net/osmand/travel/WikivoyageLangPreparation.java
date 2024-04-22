@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -315,7 +316,7 @@ public class WikivoyageLangPreparation {
 		private String lang;
 		private Map<Long, PageInfo> pageInfos;
 		private Map<Long, PageInfo> pageInfoByWId = new HashMap<>();
-		private Map<Long, List<String>> missingParent = new HashMap<>();
+		private Map<String, String> redirects = new HashMap<>();
 		private Map<String, String> parentStructure = new HashMap<>();
 		
 		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, Map<Long, PageInfo> pageInfos, 
@@ -357,22 +358,36 @@ public class WikivoyageLangPreparation {
 		}
 
 		private void assignDefaultPartOfAndValidate() throws SQLException {
+//			System.out.println("Parent: " + parentStructure.keySet());
 			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE  travel_articles SET is_part_of = ? WHERE is_part_of =  ?");
-			for(Entry<Long, List<String>> wid : missingParent.entrySet()) {
-				PageInfo parentPagee = pageInfoByWId.get(wid.getKey());
-				if (parentPagee != null && parentPagee.title != null) {
-					ps.setString(1, parentPagee.title);
-					ps.setString(2, "Q" + wid.getKey());
-					ps.execute();
-					for (String title : wid.getValue()) {
-						parentStructure.put(title, parentPagee.title);
+			
+			ArrayList<String> redirectKeys = new ArrayList<String>(redirects.keySet());
+			// update wikidata redirects
+			for (String s : redirectKeys) {
+				if(s.startsWith("Q") && redirects.get(s).isEmpty()) {
+					PageInfo parentPage = pageInfoByWId.get(Long.parseLong(s.substring(1)));
+					if (parentPage != null && parentPage.title != null) {
+						redirects.put(s, parentPage.title);
 					}
 				}
 			}
-			
+			TreeSet<String> valueLinks = new TreeSet<>(parentStructure.values());
+			for (String valueParent : valueLinks) {
+				if (redirects.containsKey(valueParent)) {
+					String actualTarget = redirects.get(valueParent);
+					ps.setString(1, actualTarget);
+					ps.setString(2, valueParent);
+					ps.execute();
+//					System.out.println("Redirect from " + valueParent+ " to " + actualTarget);
+				}
+			}
 			for (Entry<String, String> e : parentStructure.entrySet()) {
-				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(e.getValue())) {
-					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), e.getValue());
+				String parent = e.getValue();
+				if (redirects.containsKey(parent)) {
+					parent = redirects.get(parent);
+				}
+				if (!Algorithms.isEmpty(e.getValue()) && !parentStructure.containsKey(parent)) {
+					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), parent);
 				}
 			}
 		}
@@ -387,11 +402,9 @@ public class WikivoyageLangPreparation {
 				if (p.title != null) {
 					return p.title;
 				} else {
-					if(!missingParent.containsKey(wid)) {
-						missingParent.put(wid, new ArrayList<String>());
-					}
-					missingParent.get(wid).add(title);
-					return "Q" + wid;
+					String parent = "Q" + wid;
+					redirects.put(parent, "");
+					return parent;
 				}
 			}
 			return "";
@@ -449,7 +462,7 @@ public class WikivoyageLangPreparation {
 						page = false;
 						progress.remaining(progIS.available());
 					} else if (name.equals("title")) {
-						title = ctext.toString().trim();
+						title = trim(ctext.toString());
 						ctext = null;
 					} else if (name.equals("revision")) {
 						revision = false;
@@ -462,9 +475,15 @@ public class WikivoyageLangPreparation {
 						ctext = null;
 					} else if (name.equals("text")) {
 						if (ctext != null) {
-							String textStr = ctext.toString().toLowerCase();
-							if (textStr.startsWith("#redirect")) {
+							String textStr = ctext.toString().trim().toLowerCase();
+							if (textStr.startsWith("#redirect") || 
+									textStr.startsWith("#weiterleitung".toLowerCase())) {
 								// redirect
+								int l = textStr.indexOf("[[");
+								int e = textStr.indexOf("]]");
+								if (l > 0 && e > 0) {
+									redirects.put(title, trim(textStr.substring(l + 2, e)));
+								}
 							} else if (cInfo == null) {
 								System.err.printf("Error with page %d %s - empty info\n", cid, title);
 							} else {
@@ -488,87 +507,87 @@ public class WikivoyageLangPreparation {
 				return;
 			}
 			try {
-				if (!macroBlocks.isEmpty()) {
-					LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
+				LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
+				if (ll == null) {
+					ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION), lang, title);
+				}
+				boolean accepted = true;// filtered by namespace !title.toString().contains(":");
+				if (accepted) {
+					int column = 1;
+					String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER));
+					if (id++ % 500 == 0) {
+						log.debug(String.format("Article accepted %d %s %s free: %s\n", cid, title, ll,
+								Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+					}
+					final HTMLConverter converter = new HTMLConverter(false);
+					CustomWikiModel wikiModel = new CustomWikiModel(
+							"https://upload.wikimedia.org/wikipedia/commons/${image}",
+							"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
+					String plainStr = wikiModel.render(converter, text);
+					plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
+							.replaceAll("<p>/div\n</p>", "</div>");
+
+					if (DEBUG) {
+						String savePath = "/Users/plotva/Documents";
+						File myFile = new File(savePath, "page.html");
+						BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
+						htmlFileWriter.write(plainStr);
+						htmlFileWriter.close();
+					}
+
+					// prep.setString(column++, Encoder.encodeUrl(title.toString()));
+					prepInsert.setString(column++, title.toString());
+					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
+					if (uncompressed) {
+						prepInsert.setString(column++, plainStr);
+					}
+					// part_of
+					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
+					if (partOf.length() == 0) {
+						partOf = getStandardPartOf(macroBlocks).trim();
+					}
+					partOf = trim(partOf);
+					prepInsert.setString(column++, partOf);
+					if (Algorithms.isEmpty(partOf)) {
+						long wid = cInfo == null ? 0 : cInfo.wikidataId;
+						System.out.println("Root article: Q" + wid + " " + lang + " " + title);
+					}
+					parentStructure.put(title, partOf);
 					if (ll == null) {
-						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION), lang, title);
+						prepInsert.setNull(column++, Types.DOUBLE);
+						prepInsert.setNull(column++, Types.DOUBLE);
+					} else {
+						prepInsert.setDouble(column++, ll.getLatitude());
+						prepInsert.setDouble(column++, ll.getLongitude());
 					}
-					boolean accepted = true;// filtered by namespace !title.toString().contains(":");
-					if (accepted) {
-						int column = 1;
-						String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER));
-						if (id++ % 500 == 0) {
-							log.debug(String.format("Article accepted %d %s %s free: %s\n", cid, title, ll,
-									Runtime.getRuntime().freeMemory() / (1024 * 1024)));
-						}
-						final HTMLConverter converter = new HTMLConverter(false);
-						CustomWikiModel wikiModel = new CustomWikiModel(
-								"https://upload.wikimedia.org/wikipedia/commons/${image}",
-								"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
-						String plainStr = wikiModel.render(converter, text);
-						plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
-								.replaceAll("<p>/div\n</p>", "</div>");
-
-						if (DEBUG) {
-							String savePath = "/Users/plotva/Documents";
-							File myFile = new File(savePath, "page.html");
-							BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
-							htmlFileWriter.write(plainStr);
-							htmlFileWriter.close();
-						}
-						
-						// prep.setString(column++, Encoder.encodeUrl(title.toString()));
-						prepInsert.setString(column++, title.toString());
-						prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
-						if (uncompressed) {
-							prepInsert.setString(column++, plainStr);
-						}
-						// part_of
-						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF)).trim();
-						if (partOf.length() == 0) {
-							partOf = getStandardPartOf(macroBlocks).trim();
-						}
-						prepInsert.setString(column++, partOf);
-						if (Algorithms.isEmpty(partOf)) {
-							System.out.println("Root article: " + lang + " " + title);
-						}
-						parentStructure.put(title, partOf);
-						if (ll == null) {
-							prepInsert.setNull(column++, Types.DOUBLE);
-							prepInsert.setNull(column++, Types.DOUBLE);
-						} else {
-							prepInsert.setDouble(column++, ll.getLatitude());
-							prepInsert.setDouble(column++, ll.getLongitude());
-						}
-						// banner
-						if (cInfo.image != null) {
-							prepInsert.setString(column++, cInfo.image);
-						} else {
-							column++;
-						}
-						if (cInfo.banner != null) {
-							prepInsert.setString(column++, cInfo.banner);
-						} else if (cInfo.image != null) {
-							prepInsert.setString(column++, cInfo.image);
-						} else {
-							prepInsert.setString(column++, filename);
-						}
-
-						// gpx_gz
-						String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI), title.toString(),
-								lang, getShortDescr(plainStr), ll);
-						prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
-						if (uncompressed) {
-							prepInsert.setString(column++, gpx);
-						}
-						// trip id equals to wikidata id
-						prepInsert.setLong(column++, cInfo.wikidataId);
-						prepInsert.setLong(column++, cid);
-						prepInsert.setString(column++, lang);
-						prepInsert.setString(column++, wikiModel.getContentsJson());
-						addBatch();
-
+					// banner
+					if (cInfo.image != null) {
+						prepInsert.setString(column++, cInfo.image);
+					} else {
+						column++;
 					}
+					if (cInfo.banner != null) {
+						prepInsert.setString(column++, cInfo.banner);
+					} else if (cInfo.image != null) {
+						prepInsert.setString(column++, cInfo.image);
+					} else {
+						prepInsert.setString(column++, filename);
+					}
+
+					// gpx_gz
+					String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI), title.toString(), lang,
+							getShortDescr(plainStr), ll);
+					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
+					if (uncompressed) {
+						prepInsert.setString(column++, gpx);
+					}
+					// trip id equals to wikidata id
+					prepInsert.setLong(column++, cInfo.wikidataId);
+					prepInsert.setLong(column++, cid);
+					prepInsert.setString(column++, lang);
+					prepInsert.setString(column++, wikiModel.getContentsJson());
+					addBatch();
+
 				}
 			} catch (SQLException e) {
 				throw new SAXException(e);
@@ -618,18 +637,18 @@ public class WikivoyageLangPreparation {
 				for (String s : list) {
 					String[] info = s.split("\\|");
 					WptPt point = new WptPt();
-					String category = info[0].replaceAll("\n", "").trim();
+					String category = trim(info[0].replaceAll("\n", ""));
 					point.category = category;
 					if (category.equalsIgnoreCase("vcard") || category.equalsIgnoreCase("listing")) {
 						point.category = transformCategory(info);
 					}
 					if (!Algorithms.isEmpty(point.category)) {
-						point.category = capitalizeFirstLetterAndLowercase(point.category.trim());
+						point.category = capitalizeFirstLetterAndLowercase(trim(point.category));
 					}
 					String areaCode = "";
 					Map<String, String> extraValues = new LinkedHashMap<String, String>();
 					for (int i = 1; i < info.length; i++) {
-						String field = info[i].trim();
+						String field = trim(info[i]);
 						String value = "";
 						int index = field.indexOf("=");
 						if (index != -1) {
@@ -687,7 +706,7 @@ public class WikivoyageLangPreparation {
 								if (isEmpty(lat) || isEmpty(lon)) {
 									// skip empty
 								} else {
-									LatLon loct = LocationParser.parseLocation(lat + " " + lon);
+									LatLon loct = parseLocation(lat, lon);
 									if (loct == null) {
 										System.out.printf("Error parsing (%s %s): %s %s\n", lang, title, lat, lon);
 									} else {
@@ -820,7 +839,7 @@ public class WikivoyageLangPreparation {
 						return null;
 					}
 					if (lat != null && lon != null) {
-						ll = LocationParser.parseLocation(lat + " " + lon);
+						ll = parseLocation(lat, lon);
 					}
 				}
 				if (ll == null) {
@@ -880,5 +899,15 @@ public class WikivoyageLangPreparation {
 		return "".equals(lat) || "NA".equals(lat)  || "N/A".equals(lat) ;
 	}
 
-	
+	public static LatLon parseLocation(String lat, String lon) {
+		String loc = lat + " " + lon;
+		if (!loc.contains(".") && loc.contains(",")) {
+			loc = loc.replace(',', '.');
+		}
+		return LocationParser.parseLocation(loc);
+	}
+
+	private static String trim(String s) {
+		return s.trim().replaceAll("[\\p{Cf}]", "");
+	}	
 }
