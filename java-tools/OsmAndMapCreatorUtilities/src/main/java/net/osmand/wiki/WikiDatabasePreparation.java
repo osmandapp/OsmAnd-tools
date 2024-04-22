@@ -845,8 +845,8 @@ public class WikiDatabasePreparation {
 				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
-//		System.out.println(text);
-		System.out.println(macros.get(WikivoyageTemplates.DISAMB));
+		System.out.println(text);
+		System.out.println(macros.keySet());
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {

@@ -506,89 +506,87 @@ public class WikivoyageLangPreparation {
 				return;
 			}
 			try {
-				if (!macroBlocks.isEmpty()) {
-					LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
+				LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
+				if (ll == null) {
+					ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION), lang, title);
+				}
+				boolean accepted = true;// filtered by namespace !title.toString().contains(":");
+				if (accepted) {
+					int column = 1;
+					String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER));
+					if (id++ % 500 == 0) {
+						log.debug(String.format("Article accepted %d %s %s free: %s\n", cid, title, ll,
+								Runtime.getRuntime().freeMemory() / (1024 * 1024)));
+					}
+					final HTMLConverter converter = new HTMLConverter(false);
+					CustomWikiModel wikiModel = new CustomWikiModel(
+							"https://upload.wikimedia.org/wikipedia/commons/${image}",
+							"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
+					String plainStr = wikiModel.render(converter, text);
+					plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
+							.replaceAll("<p>/div\n</p>", "</div>");
+
+					if (DEBUG) {
+						String savePath = "/Users/plotva/Documents";
+						File myFile = new File(savePath, "page.html");
+						BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
+						htmlFileWriter.write(plainStr);
+						htmlFileWriter.close();
+					}
+
+					// prep.setString(column++, Encoder.encodeUrl(title.toString()));
+					prepInsert.setString(column++, title.toString());
+					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
+					if (uncompressed) {
+						prepInsert.setString(column++, plainStr);
+					}
+					// part_of
+					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
+					if (partOf.length() == 0) {
+						partOf = getStandardPartOf(macroBlocks).trim();
+					}
+					partOf = trim(partOf);
+					prepInsert.setString(column++, partOf);
+					if (Algorithms.isEmpty(partOf)) {
+						long wid = cInfo == null ? 0 : cInfo.wikidataId;
+						System.out.println("Root article: Q" + wid + " " + lang + " " + title);
+					}
+					parentStructure.put(title, partOf);
 					if (ll == null) {
-						ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION), lang, title);
+						prepInsert.setNull(column++, Types.DOUBLE);
+						prepInsert.setNull(column++, Types.DOUBLE);
+					} else {
+						prepInsert.setDouble(column++, ll.getLatitude());
+						prepInsert.setDouble(column++, ll.getLongitude());
 					}
-					boolean accepted = true;// filtered by namespace !title.toString().contains(":");
-					if (accepted) {
-						int column = 1;
-						String filename = getFileName(macroBlocks.get(WikivoyageTemplates.BANNER));
-						if (id++ % 500 == 0) {
-							log.debug(String.format("Article accepted %d %s %s free: %s\n", cid, title, ll,
-									Runtime.getRuntime().freeMemory() / (1024 * 1024)));
-						}
-						final HTMLConverter converter = new HTMLConverter(false);
-						CustomWikiModel wikiModel = new CustomWikiModel(
-								"https://upload.wikimedia.org/wikipedia/commons/${image}",
-								"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
-						String plainStr = wikiModel.render(converter, text);
-						plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
-								.replaceAll("<p>/div\n</p>", "</div>");
-
-						if (DEBUG) {
-							String savePath = "/Users/plotva/Documents";
-							File myFile = new File(savePath, "page.html");
-							BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
-							htmlFileWriter.write(plainStr);
-							htmlFileWriter.close();
-						}
-						
-						// prep.setString(column++, Encoder.encodeUrl(title.toString()));
-						prepInsert.setString(column++, title.toString());
-						prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
-						if (uncompressed) {
-							prepInsert.setString(column++, plainStr);
-						}
-						// part_of
-						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
-						if (partOf.length() == 0) {
-							partOf = getStandardPartOf(macroBlocks).trim();
-						}
-						partOf = trim(partOf);
-						prepInsert.setString(column++, partOf);
-						if (Algorithms.isEmpty(partOf)) {
-							long wid = cInfo == null ? 0 : cInfo.wikidataId; 
-							System.out.println("Root article: Q" + wid + " " + lang + " " + title);
-						}
-						parentStructure.put(title, partOf);
-						if (ll == null) {
-							prepInsert.setNull(column++, Types.DOUBLE);
-							prepInsert.setNull(column++, Types.DOUBLE);
-						} else {
-							prepInsert.setDouble(column++, ll.getLatitude());
-							prepInsert.setDouble(column++, ll.getLongitude());
-						}
-						// banner
-						if (cInfo.image != null) {
-							prepInsert.setString(column++, cInfo.image);
-						} else {
-							column++;
-						}
-						if (cInfo.banner != null) {
-							prepInsert.setString(column++, cInfo.banner);
-						} else if (cInfo.image != null) {
-							prepInsert.setString(column++, cInfo.image);
-						} else {
-							prepInsert.setString(column++, filename);
-						}
-
-						// gpx_gz
-						String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI), title.toString(),
-								lang, getShortDescr(plainStr), ll);
-						prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
-						if (uncompressed) {
-							prepInsert.setString(column++, gpx);
-						}
-						// trip id equals to wikidata id
-						prepInsert.setLong(column++, cInfo.wikidataId);
-						prepInsert.setLong(column++, cid);
-						prepInsert.setString(column++, lang);
-						prepInsert.setString(column++, wikiModel.getContentsJson());
-						addBatch();
-
+					// banner
+					if (cInfo.image != null) {
+						prepInsert.setString(column++, cInfo.image);
+					} else {
+						column++;
 					}
+					if (cInfo.banner != null) {
+						prepInsert.setString(column++, cInfo.banner);
+					} else if (cInfo.image != null) {
+						prepInsert.setString(column++, cInfo.image);
+					} else {
+						prepInsert.setString(column++, filename);
+					}
+
+					// gpx_gz
+					String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI), title.toString(), lang,
+							getShortDescr(plainStr), ll);
+					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
+					if (uncompressed) {
+						prepInsert.setString(column++, gpx);
+					}
+					// trip id equals to wikidata id
+					prepInsert.setLong(column++, cInfo.wikidataId);
+					prepInsert.setLong(column++, cid);
+					prepInsert.setString(column++, lang);
+					prepInsert.setString(column++, wikiModel.getContentsJson());
+					addBatch();
+
 				}
 			} catch (SQLException e) {
 				throw new SAXException(e);
