@@ -357,6 +357,7 @@ public class WikivoyageLangPreparation {
 		}
 
 		private void assignDefaultPartOfAndValidate() throws SQLException {
+			System.out.println("Parent: " + parentStructure.keySet());
 			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE  travel_articles SET is_part_of = ? WHERE is_part_of =  ?");
 			for(Entry<Long, List<String>> wid : missingParent.entrySet()) {
 				PageInfo parentPagee = pageInfoByWId.get(wid.getKey());
@@ -449,7 +450,7 @@ public class WikivoyageLangPreparation {
 						page = false;
 						progress.remaining(progIS.available());
 					} else if (name.equals("title")) {
-						title = ctext.toString().trim();
+						title = trim(ctext.toString());
 						ctext = null;
 					} else if (name.equals("revision")) {
 						revision = false;
@@ -524,10 +525,11 @@ public class WikivoyageLangPreparation {
 							prepInsert.setString(column++, plainStr);
 						}
 						// part_of
-						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF)).trim();
+						String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
 						if (partOf.length() == 0) {
 							partOf = getStandardPartOf(macroBlocks).trim();
 						}
+						partOf = trim(partOf);
 						prepInsert.setString(column++, partOf);
 						if (Algorithms.isEmpty(partOf)) {
 							System.out.println("Root article: " + lang + " " + title);
@@ -618,18 +620,18 @@ public class WikivoyageLangPreparation {
 				for (String s : list) {
 					String[] info = s.split("\\|");
 					WptPt point = new WptPt();
-					String category = info[0].replaceAll("\n", "").trim();
+					String category = trim(info[0].replaceAll("\n", ""));
 					point.category = category;
 					if (category.equalsIgnoreCase("vcard") || category.equalsIgnoreCase("listing")) {
 						point.category = transformCategory(info);
 					}
 					if (!Algorithms.isEmpty(point.category)) {
-						point.category = capitalizeFirstLetterAndLowercase(point.category.trim());
+						point.category = capitalizeFirstLetterAndLowercase(trim(point.category));
 					}
 					String areaCode = "";
 					Map<String, String> extraValues = new LinkedHashMap<String, String>();
 					for (int i = 1; i < info.length; i++) {
-						String field = info[i].trim();
+						String field = trim(info[i]);
 						String value = "";
 						int index = field.indexOf("=");
 						if (index != -1) {
@@ -687,7 +689,7 @@ public class WikivoyageLangPreparation {
 								if (isEmpty(lat) || isEmpty(lon)) {
 									// skip empty
 								} else {
-									LatLon loct = LocationParser.parseLocation(lat + " " + lon);
+									LatLon loct = parseLocation(lat, lon);
 									if (loct == null) {
 										System.out.printf("Error parsing (%s %s): %s %s\n", lang, title, lat, lon);
 									} else {
@@ -820,7 +822,7 @@ public class WikivoyageLangPreparation {
 						return null;
 					}
 					if (lat != null && lon != null) {
-						ll = LocationParser.parseLocation(lat + " " + lon);
+						ll = parseLocation(lat, lon);
 					}
 				}
 				if (ll == null) {
@@ -880,5 +882,15 @@ public class WikivoyageLangPreparation {
 		return "".equals(lat) || "NA".equals(lat)  || "N/A".equals(lat) ;
 	}
 
-	
+	public static LatLon parseLocation(String lat, String lon) {
+		String loc = lat + " " + lon;
+		if (!loc.contains(".") && loc.contains(",")) {
+			loc = loc.replace(',', '.');
+		}
+		return LocationParser.parseLocation(loc);
+	}
+
+	private static String trim(String s) {
+		return s.trim().replaceAll("[\\p{Cf}]", "");
+	}	
 }

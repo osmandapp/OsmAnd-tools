@@ -100,14 +100,18 @@ public class WikiDatabasePreparation {
 	}
 	
 	public static LatLon parseLatLon(String lat, String lon) {
-		if (lat.equals("") || lat.equals("NA")) {
+		if (lat.equals("") || lat.equals("NA") || lat.equals("N/A")) {
 			return null;
 		}
-		if (lon.equals("") || lon.equals("NA")) {
+		if (lon.equals("") || lon.equals("NA") || lon.equals("N/A")) {
 			return null;
 		}
 		try {
-			LatLon res = LocationParser.parseLocation(lat + " " + lon);
+			String loc = lat + " " + lon;
+			if (!loc.contains(".") && loc.contains(",")) {
+				loc = loc.replace(',', '.');
+			}
+			LatLon res = LocationParser.parseLocation(loc);
 			if (res != null) {
 				return res;
 			}
@@ -159,7 +163,7 @@ public class WikiDatabasePreparation {
 					if (leftChars > tag.length() && text.substring(i + 1, i + 1 + tag.length()).equals(tag)) {
 						found = true;
 						StringBuilder val = new StringBuilder();
-						i = parseTag(text, val, tag, i);
+						i = parseTag(text, val, tag, i, lang, title);
 						if (tag.equals("ref")) {
 							parseAndAppendCitation(val.toString(), bld);
 						} else if (tag.equals("gallery")) {
@@ -445,9 +449,10 @@ public class WikiDatabasePreparation {
 	}
 
 	
-	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen) {
+	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen, String lang, String title) {
 		int selfClosed = text.indexOf("/>", indOpen);
-		if (selfClosed > 0 && selfClosed < text.indexOf("<", indOpen)) {
+		int nextTag = text.indexOf("<", indOpen+1);
+		if (selfClosed > 0 && (selfClosed < nextTag || nextTag == -1)) {
 			bld.append(text.substring(indOpen + 1, selfClosed));
 			return selfClosed + 1;
 		}
@@ -456,7 +461,8 @@ public class WikiDatabasePreparation {
 		if (l2 > 0) {
 			ind = ind == -1 ? l2 : Math.min(l2, ind);
 		} else if (ind == -1) {
-			System.out.println("Error tag (not closed) %: " + text.substring(indOpen + 1));
+			System.out.printf("Error tag (not closed) %s %s: %s\n", lang, title,
+					text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10)));
 			return indOpen + 1;
 		}
 		
@@ -844,7 +850,10 @@ public class WikiDatabasePreparation {
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
-//		mainTestPage(args);  if(true) return;
+		if (args.length == 1 && args[0].equals("testRun")) {
+			mainTestPage(args);
+			return;
+		}
 		String lang = "";
 		String wikipediaFolder = "";
 		String wikidataFolder = "";

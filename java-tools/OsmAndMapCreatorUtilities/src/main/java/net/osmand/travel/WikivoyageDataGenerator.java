@@ -190,7 +190,7 @@ public class WikivoyageDataGenerator {
 			}
 			String sourceFile = existingImagesMapping.get(imageTitle);
 			valuesToUpdate.put(imageTitle, sourceFile);
-			if (sourceFile != null && sourceFile.trim().length() > 0) {
+			if (sourceFile != null && trim(sourceFile).length() > 0) {
 				pInsertSource.setString(1, imageTitle);
 				pInsertSource.setString(2, sourceFile);
 				pInsertSource.executeUpdate();
@@ -203,6 +203,10 @@ public class WikivoyageDataGenerator {
 				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles." + imageColumn
 				+ ") " + " WHERE " + imageColumn + " IN (SELECT distinct banner_image from source_image)");
 		System.out.println("Update to full size images finished, updated: " + updated);
+	}
+
+	private static String trim(String s) {
+		return s.trim().replaceAll("[\\p{Cf}]", "");
 	}
 
 	private String retrieveSourcePage(PreparedStatement pInsert, String website, String imageTitle)
