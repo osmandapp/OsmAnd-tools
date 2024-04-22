@@ -444,7 +444,7 @@ public class WikivoyageLangPreparation {
 				} else if (name.equals("text")) {
 					ctext = null;
 					if (cid > 0) {
-						if (cns == 0 || (cInfo != null && KNOWN_WIKIVOYAGE_MAIN.add(cInfo.wikidataId))) {
+						if (cns == 0 || (cInfo != null && KNOWN_WIKIVOYAGE_MAIN.contains(cInfo.wikidataId))) {
 							ctext = new StringBuilder();
 						}
 					}
