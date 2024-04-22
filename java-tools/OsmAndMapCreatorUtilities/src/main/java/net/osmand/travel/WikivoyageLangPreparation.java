@@ -17,10 +17,12 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
@@ -56,7 +58,14 @@ import net.osmand.wiki.WikiImageUrlStorage;
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
 	private static boolean uncompressed;
-	
+	private final static Set<Long> KNOWN_WIKIVOYAGE_MAIN = new HashSet<Long>();
+	static {
+		KNOWN_WIKIVOYAGE_MAIN.add(14199938l); // Travel topics
+		KNOWN_WIKIVOYAGE_MAIN.add(1200957l); // Destinations
+		KNOWN_WIKIVOYAGE_MAIN.add(1599788l); // Phrasebooks
+		KNOWN_WIKIVOYAGE_MAIN.add(14208553l); // Discover
+		KNOWN_WIKIVOYAGE_MAIN.add(1322323l); // Itineraries
+	}
 	private static final boolean DEBUG = false;
 	public enum WikivoyageOSMTags {
 		TAG_WIKIDATA ("wikidata"),
@@ -434,8 +443,10 @@ public class WikivoyageLangPreparation {
 					ctext = new StringBuilder();
 				} else if (name.equals("text")) {
 					ctext = null;
-					if (cns == 0 && cid > 0) {
-						ctext = new StringBuilder();
+					if (cid > 0) {
+						if (cns == 0 || (cInfo != null && KNOWN_WIKIVOYAGE_MAIN.add(cInfo.wikidataId))) {
+							ctext = new StringBuilder();
+						}
 					}
 				} else if (name.equals("revision")) {
 					revision = true;
@@ -485,10 +496,10 @@ public class WikivoyageLangPreparation {
 									textStr.startsWith("#перенаправлення") || textStr.startsWith("#doorverwijzing")
 									) {
 								// redirect
-								int l = textStr.indexOf("[[");
-								int e = textStr.indexOf("]]");
+								int l = ctext.indexOf("[[");
+								int e = ctext.indexOf("]]");
 								if (l > 0 && e > 0) {
-									redirects.put(title, trim(textStr.substring(l + 2, e)));
+									redirects.put(title, trim(ctext.substring(l + 2, e)));
 								}
 							} else if (cInfo == null) {
 								// debug https://de.wikivoyage.org/wiki/Special:Export/Frankfurt_am_Main/Nordwesten

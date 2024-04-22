@@ -853,7 +853,7 @@ public class WikiDatabasePreparation {
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
 		System.out.println(text);
-		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
+		System.out.println(macros);
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
