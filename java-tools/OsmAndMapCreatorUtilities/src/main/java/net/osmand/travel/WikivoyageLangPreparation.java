@@ -859,6 +859,14 @@ public class WikivoyageLangPreparation {
 				String lowerCasePartOf = partOf.toLowerCase();
 				if (lowerCasePartOf.contains("quickfooter")) {
 					return parsePartOfFromQuickBar(partOf);
+				} if (lowerCasePartOf.startsWith("navigation")) {
+					String[] splitPartOf = partOf.split(" ");
+					if (splitPartOf.length > 1) {
+						return splitPartOf[1];
+					} else {
+						System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+						return "";
+					}
 				} else if (lowerCasePartOf.startsWith("footer|")) {
 					String part = "";
 					try {

@@ -726,7 +726,8 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
-				|| str.startsWith("istinkat") || str.startsWith("istin|") //de
+				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ") || str.startsWith("navigation")//de
+				 
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 
@@ -767,7 +768,7 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("ipa") || str.startsWith("lang-")) {
 			return of(WikivoyageTemplates.TRANSLATION);
 		} else if (str.startsWith("disamb") || str.startsWith("disambiguation") ||
-				str.startsWith("msg:disamb") || str.startsWith("wegweiser")) {
+				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);
 		} else if (str.startsWith("guidephrasebook") || str.startsWith("partofphrasebook") || 
 				str.startsWith("phrasebookguide")) {
