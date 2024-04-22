@@ -183,12 +183,13 @@ public class WikivoyageLangPreparation {
 				long pageId = Long.parseLong(vs.get(0));
 				String property = vs.get(1);
 				String value = vs.get(2);
+				PageInfo pi = getPageInfo(pageId);
 				if(property.equals("wpb_banner")) {
-					getPageInfo(pageId).banner = value;
+					pi.banner = value;
 				} else if(property.equals("wikibase_item")) {
-					getPageInfo(pageId).wikidataId = Long.parseLong(value.substring(1));
+					pi.wikidataId = Long.parseLong(value.substring(1));
 				} else if(property.equals("page_image_free")) {
-					getPageInfo(pageId).image = value;
+					pi.image = value;
 					
 				}
 			}
@@ -485,6 +486,8 @@ public class WikivoyageLangPreparation {
 									redirects.put(title, trim(textStr.substring(l + 2, e)));
 								}
 							} else if (cInfo == null) {
+								// debug https://de.wikivoyage.org/wiki/Special:Export/Frankfurt_am_Main/Nordwesten
+								// possibly no wikidata id, no banner (so no properties) - de 116081
 								System.err.printf("Error with page %d %s - empty info\n", cid, title);
 							} else {
 								parseText(ctext);

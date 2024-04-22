@@ -766,7 +766,8 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.STATION);
 		} else if (str.startsWith("ipa") || str.startsWith("lang-")) {
 			return of(WikivoyageTemplates.TRANSLATION);
-		} else if (str.startsWith("disamb") || str.startsWith("disambiguation")) {
+		} else if (str.startsWith("disamb") || str.startsWith("disambiguation") ||
+				str.startsWith("msg:disamb") || str.startsWith("wegweiser")) {
 			return of(WikivoyageTemplates.DISAMB);
 		} else if (str.startsWith("guidephrasebook") || str.startsWith("partofphrasebook") || 
 				str.startsWith("phrasebookguide")) {
