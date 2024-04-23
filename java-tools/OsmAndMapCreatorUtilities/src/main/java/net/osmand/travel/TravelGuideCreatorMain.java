@@ -92,7 +92,7 @@ public class TravelGuideCreatorMain {
     }
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
-    	WikivoyageLangPreparation.createInitialDbStructure(conn, false);
+    	WikivoyageLangPreparation.createInitialDbStructure(conn, "en", false);
         try {
             conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
             conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN is_parent_of");
