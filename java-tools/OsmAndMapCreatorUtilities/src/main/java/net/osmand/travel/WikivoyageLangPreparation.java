@@ -304,15 +304,17 @@ public class WikivoyageLangPreparation {
 	}
 	
 
-	public static void createInitialDbStructure(Connection conn, boolean uncompressed) throws SQLException {
+	public static void createInitialDbStructure(Connection conn, String lang, boolean uncompressed) throws SQLException {
 		conn.createStatement()
 				.execute("CREATE TABLE IF NOT EXISTS travel_articles(title text, content_gz blob"
 						+ (uncompressed ? ", content text" : "") + ", is_part_of text, is_part_of_wid bigint, lat double, lon double, image_title text, banner_title text, gpx_gz blob"
 						+ (uncompressed ? ", gpx text" : "") + ", trip_id bigint, original_id bigint, lang text, contents_json text)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_local_id ON travel_articles(lang, original_id);");
 		conn.createStatement()
 				.execute("CREATE INDEX IF NOT EXISTS index_part_of ON travel_articles(is_part_of);");
+		conn.createStatement().execute("DELETE FROM travel_articles WHERE lang = '" + lang + "';");
 	}
 
 	public static PreparedStatement generateInsertPrep(Connection conn, boolean uncompressed) throws SQLException {
@@ -365,7 +367,7 @@ public class WikivoyageLangPreparation {
 			progress.startTask("Parse wikivoyage xml", progIS.available());
 			wikiVoyageConn = dialect.getDatabaseConnection(wikivoyageSqlite.getAbsolutePath(), log);
 			imageUrlStorage = new WikiImageUrlStorage(wikiVoyageConn, wikivoyageSqlite.getParent(), lang);
-			createInitialDbStructure(wikiVoyageConn, uncompressed);
+			createInitialDbStructure(wikiVoyageConn, lang, uncompressed);
 			prepInsert = generateInsertPrep(wikiVoyageConn, uncompressed);
 			enPageInfos = readEnPageInfo(wikiVoyageConn);
 		}
@@ -413,6 +415,7 @@ public class WikivoyageLangPreparation {
 			// fix non existing parent to english
 			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ?, is_part_of_wid = ? WHERE original_id =  ? and lang = ?");
 			int batch = 0;
+			int articles = 0, articlesParentWid = 0;
 			for (PageInfo p : pageInfos.byId.values()) {
 				String partOf = p.partOf;
 				long partOfWid = 0;
@@ -465,7 +468,10 @@ public class WikivoyageLangPreparation {
 						System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, p.title, partOf);
 					}
 				}
-								
+				articles++;
+				if(partOfWid > 0) {
+					articlesParentWid++;
+				}
 				/// update redirects in tables
 				ps.setString(1, partOf);
 				ps.setLong(2, partOfWid);
@@ -473,26 +479,12 @@ public class WikivoyageLangPreparation {
 				ps.setString(4, lang);
 				ps.addBatch();
 				if (++batch % 100 == 0) {
+					System.out.println("Update parent wikidata id batch: " + batch);
 					ps.executeBatch();
 				}
 			}
 			ps.executeBatch();
-			
-			TreeSet<String> redirectKey = new TreeSet<>(redirects.keySet());
-			for (String redirectFrom : redirectKey) {
-				String redirectTo = redirects.get(redirectFrom);
-				ps.setString(1, redirectTo);
-				
-//				System.out.println("Redirect from " + valueParent+ " to " + actualTarget);
-			}
-			for (PageInfo p : pageInfos.byId.values()) {
-				String partOf = p.partOf;
-				
-				if (redirects.containsKey(partOf)) {
-					partOf = redirects.get(partOf);
-				}
-				
-			}
+			System.out.printf("Processed articles %d of which %d articles with parent wikidata\n");
 		}
 		
 		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks, PageInfo enPage) {
