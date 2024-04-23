@@ -414,7 +414,7 @@ public class WikivoyageLangPreparation {
 		private void assignDefaultPartOfAndValidate() throws SQLException {
 			// fix non existing parent to english
 			PreparedStatement upd = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ?, is_part_of_wid = ? WHERE original_id =  ? and lang = ?");
-			PreparedStatement del = wikiVoyageConn.prepareStatement("DELETE travel_articles WHERE original_id =  ? and lang = ?");
+			PreparedStatement del = wikiVoyageConn.prepareStatement("DELETE FROM travel_articles WHERE original_id =  ? and lang = ?");
 			int batch = 0;
 			int articles = 0, articlesParentWid = 0;
 			for (PageInfo p : pageInfos.byId.values()) {
@@ -863,14 +863,14 @@ public class WikivoyageLangPreparation {
 								} else {
 									LatLon loct = parseLocation(lat, lon);
 									if (loct == null) {
-										System.out.printf("Error parsing (%s %s): %s %s\n", lang, title, lat, lon);
+										System.out.printf("Error point parsing (%s %s): %s %s\n", lang, title, lat, lon);
 									} else {
 										point.lat = loct.getLatitude();
 										point.lon = loct.getLongitude();
 									}
 								}
 							} catch (RuntimeException e) {
-								System.out.printf("Error parsing (%s %s): %s\n", lang, title, e.getMessage());
+								System.out.printf("Error point parsing (%s %s): %s\n", lang, title, e.getMessage());
 							}
 						}
 					}
@@ -998,7 +998,7 @@ public class WikivoyageLangPreparation {
 					}
 				}
 				if (ll == null) {
-					System.err.printf("Error geo (%s %s): %s \n", lang, title, location);
+					System.err.printf("Error structure geo (%s %s): %s \n", lang, title, location);
 				}
 				return ll;
 			}
@@ -1016,7 +1016,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return splitPartOf[1];
 					} else {
-						System.out.println("Error parsing the partof: " + partOf + " in the article: " + title);
+						System.out.println("Error structure the partof: " + partOf + " in the article: " + title);
 						return "";
 					}
 				} else if (lowerCasePartOf.startsWith("footer|")) {
@@ -1044,7 +1044,7 @@ public class WikivoyageLangPreparation {
 								|| type.equalsIgnoreCase("наследие")) {
 							return null;
 						} else {
-							System.out.printf("Error parsing the partof: %s (%s) in the article: %s\n", partOf, type, title);
+							System.out.printf("Error structure the partof: %s (%s) in the article: %s\n", partOf, type, title);
 						}
 					}
 					return trim(part).replaceAll("_", " ");
@@ -1055,7 +1055,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return trim(splitPartOf[1]).replaceAll("_", " ");
 					} else {
-						System.out.println("Error parsing the partof (else): " + partOf + " in the article: " + title);
+						System.out.println("Error structure the partof (else): " + partOf + " in the article: " + title);
 						return "";
 					}
 				}
