@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
@@ -75,6 +74,7 @@ public class WikivoyageLangPreparation {
 		KNOWN_WIKIVOYAGE_MAIN.put(46l, 1200957l); // Europe
 	}
 	private static final boolean DEBUG = false;
+	private static final String SUFFIX_EN_REDIRECT = "en:";
 	public enum WikivoyageOSMTags {
 		TAG_WIKIDATA ("wikidata"),
 		TAG_WIKIPEDIA ("wikipedia"),
@@ -116,8 +116,6 @@ public class WikivoyageLangPreparation {
 		TRANSLATION("translation"),
 		PHRASEBOOK("phrasebook"),
 		MONUMENT_TITLE("monument-title"),
-		
-		
 		DISAMB("disamb");
 		
 		private final String type;
@@ -185,18 +183,24 @@ public class WikivoyageLangPreparation {
 	
 	protected static class PageInfo {
 		public long id;
-		public String title;
 		public String banner;
 		public String image;
 		public long wikidataId;
+		
+		public String title; // only for calculated
+		public String partOf; // only for calculated 
+	}
+	
+	private static class PageInfos {
+		private Map<Long, PageInfo> byId = new HashMap<Long, PageInfo>();
+		private Map<Long, PageInfo> byWikidataId = new HashMap<Long, PageInfo>();
+		private Map<String, PageInfo> byTitle = new HashMap<String, PageInfo>(); // only published pages
 	}
 
 	protected static void processWikivoyage(final File wikiArticles, final File wikiProps, 
 			String lang, File wikivoyageSqlite, File wikidataSqlite)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
-
-		
-		Map<Long, PageInfo> pageInfos = readPageInfos(wikiProps);
+		PageInfos pageInfos = readPageInfos(wikiProps);
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream articlesStream = new BufferedInputStream(new FileInputStream(wikiArticles), 8192 * 4);
 		BZip2CompressorInputStream zis = new BZip2CompressorInputStream(articlesStream);
@@ -264,8 +268,8 @@ public class WikivoyageLangPreparation {
 		wikidataConn.close();
 	}
 
-	private static Map<Long, PageInfo> readPageInfos(final File wikiProps) throws IOException {
-		Map<Long, PageInfo> pageInfos = new HashMap<Long, WikivoyageLangPreparation.PageInfo>();
+	private static PageInfos readPageInfos(final File wikiProps) throws IOException {
+		PageInfos pageInfos = new PageInfos();
 		SqlInsertValuesReader.readInsertValuesFile(wikiProps.getAbsolutePath(), new InsertValueProcessor() {
 			
 			@Override
@@ -278,17 +282,18 @@ public class WikivoyageLangPreparation {
 					pi.banner = value;
 				} else if(property.equals("wikibase_item")) {
 					pi.wikidataId = Long.parseLong(value.substring(1));
+					pageInfos.byWikidataId.put(pi.wikidataId, pi);
 				} else if(property.equals("page_image_free")) {
 					pi.image = value;
 					
 				}
 			}
 			private PageInfo getPageInfo(long pageId) {
-				PageInfo p = pageInfos.get(pageId);
+				PageInfo p = pageInfos.byId.get(pageId);
 				if (p == null) {
 					p = new PageInfo();
 					p.id = pageId;
-					pageInfos.put(pageId, p);
+					pageInfos.byId.put(pageId, p);
 				}
 				return p;
 			}
@@ -314,6 +319,8 @@ public class WikivoyageLangPreparation {
 				+ (uncompressed ? ", gpx" : "") + ", trip_id , original_id , lang, contents_json)"
 				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (uncompressed ? ", ?, ?": "") + ")");
 	}
+	
+	
 
 	public static class WikivoyageHandler extends DefaultHandler {
 		long id = 1;
@@ -340,44 +347,45 @@ public class WikivoyageLangPreparation {
 		private static final String P_CLOSED = "</p>";
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
-		private Map<Long, PageInfo> pageInfos;
-		private Map<Long, PageInfo> pageInfoByWId = new HashMap<>();
-		private Map<Long, PageInfo> pageEnInfoByWId = new HashMap<>();
-		private Map<String, String> redirects = new HashMap<>();
-		private Map<String, String> parentStructure = new HashMap<>();
 		
-		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, Map<Long, PageInfo> pageInfosById,
+		private PageInfos pageInfos;
+		private PageInfos enPageInfos;
+		private Map<String, String> redirects = new HashMap<>();
+//		private Map<String, String> parentStructure = new HashMap<>();
+		
+		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, PageInfos pageInfos,
 				WikiDBBrowser dbBrowser) throws IOException, SQLException {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
-			this.pageInfos = pageInfosById;
-			for (PageInfo p : pageInfosById.values()) {
-				if (p.wikidataId > 0) {
-					pageInfoByWId.put(p.wikidataId, p);
-				}
-			}
+			this.pageInfos = pageInfos;
 			this.dbBrowser = dbBrowser;
 			progress.startTask("Parse wikivoyage xml", progIS.available());
 			wikiVoyageConn = dialect.getDatabaseConnection(wikivoyageSqlite.getAbsolutePath(), log);
 			imageUrlStorage = new WikiImageUrlStorage(wikiVoyageConn, wikivoyageSqlite.getParent(), lang);
 			createInitialDbStructure(wikiVoyageConn, uncompressed);
 			prepInsert = generateInsertPrep(wikiVoyageConn, uncompressed);
-			readEnPageInfo(wikiVoyageConn);
+			enPageInfos = readEnPageInfo(wikiVoyageConn);
 		}
 
-		private void readEnPageInfo(Connection c) throws SQLException {
+		private PageInfos readEnPageInfo(Connection c) throws SQLException {
 			Statement s = c.createStatement();
-			ResultSet rs = s.executeQuery("select lang, title, trip_id,original_id from travel_articles where lang='en' ");
+			PageInfos en = new PageInfos();
+			ResultSet rs = s.executeQuery("select lang, title, trip_id, original_id, is_part_of, image_title, banner_title from travel_articles where lang='en' ");
 			while (rs.next()) {
 				PageInfo pi = new PageInfo();
 //				pi.lang = rs.getString(1);
 				pi.id = rs.getLong(4);
 				pi.wikidataId = rs.getLong(3);
 				pi.title = rs.getString(2);
-				pageEnInfoByWId.put(pi.wikidataId, pi);
+				pi.partOf = rs.getString(5);
+				pi.image = rs.getString(6);
+				pi.banner = rs.getString(7);
+				en.byWikidataId.put(pi.wikidataId, pi);
+				en.byTitle.put(pi.title, pi);
+				en.byId.put(pi.id, pi);
 			}
-						
+			return en;
 		}
 
 		public void addBatch() throws SQLException {
@@ -401,50 +409,80 @@ public class WikivoyageLangPreparation {
 
 		private void assignDefaultPartOfAndValidate() throws SQLException {
 //			System.out.println("Parent: " + parentStructure.keySet());
-			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ? WHERE is_part_of =  ?");
-			
 			ArrayList<String> redirectKeys = new ArrayList<String>(redirects.keySet());
-			// update wikidata redirects
+			// 1. update wikidata to titles
 			for (String s : redirectKeys) {
 				if (s.startsWith("Q") && redirects.get(s).isEmpty()) {
-					PageInfo parentPage = pageInfoByWId.get(Long.parseLong(s.substring(1)));
+					long wid = Long.parseLong(s.substring(1));
+					PageInfo parentPage = pageInfos.byWikidataId.get(wid);
+					PageInfo enPage = enPageInfos.byWikidataId.get(wid);
 					if (parentPage != null && parentPage.title != null) {
 						redirects.put(s, parentPage.title);
+					} else if (enPage != null && enPage.title != null) {
+						redirects.put(s, SUFFIX_EN_REDIRECT + parentPage.title);
+					} else {
+						System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
+
+					}
+				} else if(redirects.get(s).isEmpty()) {
+					System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
+				}
+			}
+			// fix non existing parent to en
+			for (PageInfo p : pageInfos.byId.values()) {
+				String partOf = p.partOf;
+				if (redirects.containsKey(partOf)) {
+					partOf = redirects.get(partOf);
+				}
+				if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf)) {
+					PageInfo enPage = enPageInfos.byWikidataId.get(p.wikidataId);
+					if(enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null){
+						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
+						String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
+						System.out.printf("Warning parent structure %s '%s' -> '%s' redirect to \n", lang, p.title, partOf, enPartOf);
+						redirects.put(p.partOf, enPartOf);
 					}
 				}
 			}
-			TreeSet<String> valueLinks = new TreeSet<>(parentStructure.values());
-			for (String valueParent : valueLinks) {
-				if (redirects.containsKey(valueParent)) {
-					String actualTarget = redirects.get(valueParent);
-					ps.setString(1, actualTarget);
-					ps.setString(2, valueParent);
-					ps.execute();
-//					System.out.println("Redirect from " + valueParent+ " to " + actualTarget);
-				}
+			/// update redirects in tables
+			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ? WHERE lang = ? and is_part_of =  ?");
+			TreeSet<String> redirectKey = new TreeSet<>(redirects.keySet());
+			for (String redirectFrom : redirectKey) {
+				String redirectTo = redirects.get(redirectFrom);
+				ps.setString(1, redirectTo);
+				ps.setString(2, lang);
+				ps.setString(3, redirectFrom);
+				ps.execute();
+//				System.out.println("Redirect from " + valueParent+ " to " + actualTarget);
 			}
-			for (Entry<String, String> e : parentStructure.entrySet()) {
-				String parent = e.getValue();
-				if (redirects.containsKey(parent)) {
-					parent = redirects.get(parent);
+			for (PageInfo p : pageInfos.byId.values()) {
+				String partOf = p.partOf;
+				if (redirects.containsKey(partOf)) {
+					partOf = redirects.get(partOf);
 				}
-				if (parent.startsWith("en:")) {
+				if (partOf.startsWith(SUFFIX_EN_REDIRECT)) {
 					// skip redirect
-				} else if (!Algorithms.isEmpty(parent) && !parentStructure.containsKey(parent)) {
-					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, e.getKey(), parent);
+					if (!enPageInfos.byTitle.containsKey(partOf.substring(SUFFIX_EN_REDIRECT.length()))) {
+						System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, p.title, partOf);
+					}
+				} else if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf)) {
+					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, p.title, partOf);
 				}
 			}
 		}
 		
-		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks) {
+		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks, PageInfo enPage) {
 			long wid = 0;
 			if (macroBlocks.containsKey(WikivoyageTemplates.PHRASEBOOK)) {
 				wid = 1599788; // Q1599788 -- Phrasebooks
 			}
 			if (KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
 				wid = KNOWN_WIKIVOYAGE_MAIN.get(cInfo.wikidataId);
+			} else if(enPage != null && enPageInfos.byTitle.containsKey(enPage.partOf)){
+				PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
+				wid = enParent.wikidataId;
 			}
-			PageInfo p = pageInfoByWId.get(wid);
+			PageInfo p = pageInfos.byWikidataId.get(wid);
 			if (wid > 0 && p != null) {
 				if (p.title != null) {
 					return p.title;
@@ -453,8 +491,6 @@ public class WikivoyageLangPreparation {
 					redirects.put(parent, "");
 					return parent;
 				}
-			} else if(wid > 0 && pageEnInfoByWId.get(wid) != null) {
-				return "en:" + pageEnInfoByWId.get(wid).title;
 			}
 			return "";
 		}
@@ -522,7 +558,7 @@ public class WikivoyageLangPreparation {
 						ctext = null;
 					} else if (name.equals("id") && !revision) {
 						cid = Long.parseLong(ctext.toString());
-						cInfo = pageInfos.get(cid);
+						cInfo = pageInfos.byId.get(cid);
 						ctext = null;
 					} else if (name.equals("text")) {
 						if (ctext != null) {
@@ -562,6 +598,10 @@ public class WikivoyageLangPreparation {
 //				System.out.println("Skip disambiguation " + title); 
 				return;
 			}
+			PageInfo enPage = null;
+			if (cInfo.wikidataId > 0) {
+				enPage = enPageInfos.byWikidataId.get(cInfo.wikidataId);
+			}
 			try {
 				LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
 				if (ll == null) {
@@ -596,12 +636,13 @@ public class WikivoyageLangPreparation {
 
 					// part_of
 					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
-					if(partOf == null) {
-						// this disamb or redirection 
+					if (partOf == null) {
+						// this disamb or redirection
 						return;
 					}
+					
 					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
-						partOf = getStandardPartOf(macroBlocks).trim();
+						partOf = getStandardPartOf(macroBlocks, enPage).trim();
 					}
 					partOf = trim(partOf);
 
@@ -616,7 +657,9 @@ public class WikivoyageLangPreparation {
 						long wid = cInfo == null ? 0 : cInfo.wikidataId;
 						System.out.println("Root article: " + lang + " Q" + wid + " " + " " + title);
 					}
-					parentStructure.put(title, partOf);
+					
+					cInfo.partOf = partOf; 
+					pageInfos.byTitle.put(title, cInfo); // Publish by title
 					if (ll == null) {
 						prepInsert.setNull(column++, Types.DOUBLE);
 						prepInsert.setNull(column++, Types.DOUBLE);
@@ -625,10 +668,16 @@ public class WikivoyageLangPreparation {
 						prepInsert.setDouble(column++, ll.getLongitude());
 					}
 					// banner
+					if (cInfo.image == null && enPage != null) {
+						cInfo.image = enPage.image;
+					}
 					if (cInfo.image != null) {
 						prepInsert.setString(column++, cInfo.image);
 					} else {
 						column++;
+					}
+					if (cInfo.banner == null && enPage != null) {
+						cInfo.banner = enPage.banner;
 					}
 					if (cInfo.banner != null) {
 						prepInsert.setString(column++, cInfo.banner);
