@@ -117,7 +117,7 @@ public class WikiDatabasePreparation {
 			}
 			return new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
 		} catch (RuntimeException e) {
-			System.err.printf("Error parsing lat=%s lon=%s (%s)\n", lat, lon,
+			System.err.printf("Error point lat=%s lon=%s (%s)\n", lat, lon,
 					//LocationParser.parseLocation(lat + " " + lon), 
 					e.getMessage());
 			return null;
@@ -145,7 +145,7 @@ public class WikiDatabasePreparation {
 		for (int i = 0; ; i++) {
 			if(i == text.length()) {
 				if (openCnt > 0) {
-					System.out.println("Error braces {{ }}: " + lang + " " + title + " ..."
+					System.out.println("Error content braces {{ }}: " + lang + " " + title + " ..."
 							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 10)));
 					// start over again
 					errorBracesCnt.add(beginInd);
@@ -282,7 +282,7 @@ public class WikiDatabasePreparation {
 					wikidataId = Long.parseLong(wikiDataQId.substring(1));
 				}
 			} catch (NumberFormatException e) {
-				System.err.println("Error wid - " + wikiDataQId);
+				System.err.println("Error point wid - " + wikiDataQId);
 			}
 		}
 		if (Algorithms.isEmpty(wikiLink) && wikidataId > 0 && browser != null) {
@@ -461,7 +461,7 @@ public class WikiDatabasePreparation {
 		if (l2 > 0) {
 			ind = ind == -1 ? l2 : Math.min(l2, ind);
 		} else if (ind == -1) {
-			System.out.printf("Error tag (not closed) %s %s: %s\n", lang, title,
+			System.out.printf("Error content tag (not closed) %s %s: %s\n", lang, title,
 					text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10)));
 			return indOpen + 1;
 		}

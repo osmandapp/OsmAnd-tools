@@ -413,7 +413,8 @@ public class WikivoyageLangPreparation {
 
 		private void assignDefaultPartOfAndValidate() throws SQLException {
 			// fix non existing parent to english
-			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ?, is_part_of_wid = ? WHERE original_id =  ? and lang = ?");
+			PreparedStatement upd = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ?, is_part_of_wid = ? WHERE original_id =  ? and lang = ?");
+			PreparedStatement del = wikiVoyageConn.prepareStatement("DELETE travel_articles WHERE original_id =  ? and lang = ?");
 			int batch = 0;
 			int articles = 0, articlesParentWid = 0;
 			for (PageInfo p : pageInfos.byId.values()) {
@@ -422,6 +423,7 @@ public class WikivoyageLangPreparation {
 				if (partOf == null) {
 					continue;
 				}
+				boolean delete = false;
 				if (redirects.containsKey(partOf)) {
 					String target = redirects.get(partOf);
 					// Calculate redirects (by wikidata id)
@@ -435,7 +437,8 @@ public class WikivoyageLangPreparation {
 							System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", lang, partOf, SUFFIX_EN_REDIRECT + enPage.title);
 							partOf = SUFFIX_EN_REDIRECT + enPage.title;
 						} else {
-							System.out.printf("Error parent redirect %s to %s -> %s is not \n", lang, partOf, target);
+							System.out.printf("Error parent redirect %s to %s -> %s is not existing \n", lang, partOf, target);
+							delete = true;
 						}
 					} else {
 						partOf = target;
@@ -459,32 +462,48 @@ public class WikivoyageLangPreparation {
 					if (parentEnPage != null) {
 						partOfWid = parentEnPage.wikidataId;
 					} else {
-						System.out.printf("Error parent en %s '%s' -> '%s' \n", lang, p.title, partOf);
+						System.out.printf("Error parent en doesn't exist %s '%s' -> '%s' \n", lang, p.title, partOf);
+						delete = true;
 					}
 				} else if (!Algorithms.isEmpty(partOf)) {
 					PageInfo parentPage = pageInfos.byTitle.get(partOf);
 					if (parentPage != null) {
 						partOfWid = parentPage.wikidataId;
 					} else {
-						System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, p.title, partOf);
+						System.out.printf("Error parent doesn't exist %s '%s' -> '%s' \n", lang, p.title, partOf);
+						delete = true;
+					}
+				} else {
+					if (p.wikidataId != WID_DESTINATIONS && p.wikidataId != WID_TRAVEL_TOPICS) {
+						System.out.printf("Error parent (root) doesn't exist %s '%s' \n", lang, p.title, partOf);
+						delete = true;
 					}
 				}
-				articles++;
-				if (partOfWid > 0) {
-					articlesParentWid++;
-				}
-				/// update redirects in tables
-				ps.setString(1, partOf);
-				ps.setLong(2, partOfWid);
-				ps.setLong(3, p.id);
-				ps.setString(4, lang);
-				ps.addBatch();
-				if (++batch % 500 == 0) {
-					System.out.println("Update parent wikidata id batch: " + batch);
-					ps.executeBatch();
+				if (delete) {
+					del.setLong(1, p.id);
+					del.setString(2, lang);
+					del.addBatch();
+				} else {
+					articles++;
+					if (partOfWid > 0) {
+						articlesParentWid++;
+					} else {
+						System.out.printf("Warning parent no wid %s '%s' -> '%s' \n", lang, p.title, partOf);
+					}
+					/// update redirects in tables
+					upd.setString(1, partOf);
+					upd.setLong(2, partOfWid);
+					upd.setLong(3, p.id);
+					upd.setString(4, lang);
+					upd.addBatch();
+					if (++batch % 500 == 0) {
+						System.out.println("Update parent wikidata id batch: " + batch);
+						upd.executeBatch();
+					}
 				}
 			}
-			ps.executeBatch();
+			upd.executeBatch();
+			del.executeBatch();
 			System.out.printf("Processed articles %d of which %d articles with parent wikidata\n", articles, articlesParentWid);
 		}
 		
@@ -596,7 +615,7 @@ public class WikivoyageLangPreparation {
 							} else if (cInfo == null) {
 								// debug https://de.wikivoyage.org/wiki/Special:Export/Frankfurt_am_Main/Nordwesten
 								// possibly no wikidata id, no banner (so no properties) - de 116081
-								System.err.printf("Error with page %d %s - empty info\n", cid, title);
+								System.err.printf("Error page %d %s - empty info\n", cid, title);
 							} else {
 								parseText(ctext);
 							}
@@ -668,7 +687,7 @@ public class WikivoyageLangPreparation {
 					if (Algorithms.isEmpty(partOf)) {
 						long wid = cInfo == null ? 0 : cInfo.wikidataId;
 						if (wid != WID_DESTINATIONS && wid != WID_TRAVEL_TOPICS) {
-							System.out.println("Warning ignore root article: " + lang + " Q" + wid + " " + " " + title);
+							System.out.println("Error parent skip article (no parent): " + lang + " Q" + wid + " " + " " + title);
 							return;
 						}
 					}
