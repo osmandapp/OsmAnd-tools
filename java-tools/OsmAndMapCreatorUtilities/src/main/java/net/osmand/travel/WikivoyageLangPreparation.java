@@ -411,7 +411,7 @@ public class WikivoyageLangPreparation {
 
 		private void assignDefaultPartOfAndValidate() throws SQLException {
 			// fix non existing parent to english
-			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ?, is_part_of_wid = ? WHERE id =  ?, lang = ?");
+			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ?, is_part_of_wid = ? WHERE id =  ? and lang = ?");
 			int batch = 0;
 			for (PageInfo p : pageInfos.byId.values()) {
 				String partOf = p.partOf;
