@@ -419,6 +419,7 @@ public class WikivoyageLangPreparation {
 					if (parentPage != null && parentPage.title != null) {
 						redirects.put(s, parentPage.title);
 					} else if (enPage != null && enPage.title != null) {
+						System.out.printf("Warning redirect to en %s '%s' -> '%s' redirect to %s \n", lang, s, SUFFIX_EN_REDIRECT + parentPage.title);
 						redirects.put(s, SUFFIX_EN_REDIRECT + parentPage.title);
 					} else {
 						System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
@@ -439,7 +440,7 @@ public class WikivoyageLangPreparation {
 					if(enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null){
 						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
 						String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
-						System.out.printf("Warning parent structure %s '%s' -> '%s' redirect to \n", lang, p.title, partOf, enPartOf);
+						System.out.printf("Warning parent structure %s '%s' -> '%s' redirect to %s \n", lang, p.title, partOf, enPartOf);
 						redirects.put(p.partOf, enPartOf);
 					}
 				}
