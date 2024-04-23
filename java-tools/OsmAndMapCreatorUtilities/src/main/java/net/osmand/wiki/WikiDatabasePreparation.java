@@ -726,7 +726,9 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
-				|| str.startsWith("istinkat") || str.startsWith("istin|") //de
+				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ") 
+				// || str.startsWith("navigation ") -- incorect
+				 
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 
@@ -766,11 +768,16 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.STATION);
 		} else if (str.startsWith("ipa") || str.startsWith("lang-")) {
 			return of(WikivoyageTemplates.TRANSLATION);
-		} else if (str.startsWith("disamb") || str.startsWith("disambiguation")) {
+		} else if (str.startsWith("disamb") || str.startsWith("disambiguation") ||
+				str.startsWith("неоднозначность") ||
+				str.startsWith("ujednoznacznienie") ||
+				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);
 		} else if (str.startsWith("guidephrasebook") || str.startsWith("partofphrasebook") || 
 				str.startsWith("phrasebookguide")) {
 			return of(WikivoyageTemplates.PHRASEBOOK);
+		} else if (str.startsWith("monument-title")) {
+			return of(WikivoyageTemplates.MONUMENT_TITLE);
 		} else if (str.startsWith("geo") ) {
 			return of(WikivoyageTemplates.LOCATION);
 		} else {
@@ -847,7 +854,7 @@ public class WikiDatabasePreparation {
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
 		System.out.println(text);
-		System.out.println(macros.keySet());
+		System.out.println(macros);
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
