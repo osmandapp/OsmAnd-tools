@@ -416,13 +416,14 @@ public class WikivoyageLangPreparation {
 			for (String s : redirectKeys) {
 				if (s.startsWith("Q") && redirects.get(s).isEmpty()) {
 					long wid = Long.parseLong(s.substring(1));
-					PageInfo parentPage = pageInfos.byWikidataId.get(wid);
+					PageInfo page = pageInfos.byWikidataId.get(wid);
 					PageInfo enPage = enPageInfos.byWikidataId.get(wid);
-					if (parentPage != null && parentPage.title != null) {
-						redirects.put(s, parentPage.title);
+					if (page != null && page.title != null) {
+						redirects.put(s, page.title);
 					} else if (enPage != null && enPage.title != null) {
-						System.out.printf("Warning redirect to en %s '%s' -> '%s' redirect to %s \n", lang, s, SUFFIX_EN_REDIRECT + parentPage.title);
-						redirects.put(s, SUFFIX_EN_REDIRECT + parentPage.title);
+						System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", 
+								lang, s, SUFFIX_EN_REDIRECT + enPage.title);
+						redirects.put(s, SUFFIX_EN_REDIRECT + enPage.title);
 					} else {
 						System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
 
@@ -439,10 +440,10 @@ public class WikivoyageLangPreparation {
 				}
 				if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf)) {
 					PageInfo enPage = enPageInfos.byWikidataId.get(p.wikidataId);
-					if(enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null){
+					if (enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null) {
 						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
 						String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
-						System.out.printf("Warning parent structure %s '%s' -> '%s' redirect to %s \n", lang, p.title, partOf, enPartOf);
+						System.out.printf("Warning redirect parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, enPartOf);
 						redirects.put(p.partOf, enPartOf);
 					}
 				}
