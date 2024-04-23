@@ -432,7 +432,7 @@ public class WikivoyageLangPreparation {
 						if (page != null && page.title != null) {
 							partOf = page.title;
 						} else if (enPage != null && enPage.title != null) {
-							System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", lang, target, SUFFIX_EN_REDIRECT + enPage.title);
+							System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", lang, partOf, SUFFIX_EN_REDIRECT + enPage.title);
 							partOf = SUFFIX_EN_REDIRECT + enPage.title;
 						} else {
 							System.out.printf("Error parent redirect %s to %s -> %s is not \n", lang, partOf, target);
@@ -1014,9 +1014,11 @@ public class WikivoyageLangPreparation {
 					}
 					if (part.length() == 0) {
 						if (type.equalsIgnoreCase("маршрут")) {
-							return "Q1322323";
+							redirects.put("Q1322323", "");
+							return "Q1322323"; // Itineraries
 						} else if (type.equalsIgnoreCase("континент")) {
-							return "Q1200957";
+							redirects.put("Q1200957", "");
+							return "Q1200957"; // Destinations
 						} else if (type.equalsIgnoreCase("сводная") || type.equalsIgnoreCase("природа")
 								|| type.equalsIgnoreCase("наследие")) {
 							return null;
