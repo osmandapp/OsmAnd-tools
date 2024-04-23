@@ -307,8 +307,8 @@ public class WikivoyageLangPreparation {
 	public static void createInitialDbStructure(Connection conn, boolean uncompressed) throws SQLException {
 		conn.createStatement()
 				.execute("CREATE TABLE IF NOT EXISTS travel_articles(title text, content_gz blob"
-						+ (uncompressed ? ", content text" : "") + ", is_part_of text, lat double, lon double, image_title text, banner_title text, gpx_gz blob"
-						+ (uncompressed ? ", gpx text" : "") + ", trip_id long, original_id long, lang text, contents_json text)");
+						+ (uncompressed ? ", content text" : "") + ", is_part_of text, is_part_of_wid bigint, lat double, lon double, image_title text, banner_title text, gpx_gz blob"
+						+ (uncompressed ? ", gpx text" : "") + ", trip_id bigint, original_id bigint, lang text, contents_json text)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title ON travel_articles(title);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_id ON travel_articles(trip_id);");
 		conn.createStatement()
