@@ -652,7 +652,13 @@ public class WikivoyageLangPreparation {
 						partOf = getStandardPartOf(macroBlocks, enPage).trim();
 					}
 					partOf = trim(partOf);
-
+					if (Algorithms.isEmpty(partOf)) {
+						long wid = cInfo == null ? 0 : cInfo.wikidataId;
+						if (wid != WID_DESTINATIONS && wid != WID_TRAVEL_TOPICS) {
+							System.out.println("Warning ignore root article: " + lang + " Q" + wid + " " + " " + title);
+							return;
+						}
+					}
 					// prep.setString(column++, Encoder.encodeUrl(title.toString()));
 					prepInsert.setString(column++, title.toString());
 					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));
@@ -660,12 +666,7 @@ public class WikivoyageLangPreparation {
 						prepInsert.setString(column++, plainStr);
 					}
 					prepInsert.setString(column++, partOf);
-					if (Algorithms.isEmpty(partOf)) {
-						long wid = cInfo == null ? 0 : cInfo.wikidataId;
-						if (wid != WID_DESTINATIONS && wid != WID_TRAVEL_TOPICS) {
-							System.out.println("Warning ignore root article: " + lang + " Q" + wid + " " + " " + title);
-						}
-					}
+					
 					
 					cInfo.partOf = partOf; 
 					pageInfos.byTitle.put(title, cInfo); // Publish by title
