@@ -457,6 +457,9 @@ public class WikivoyageLangPreparation {
 			}
 			for (PageInfo p : pageInfos.byId.values()) {
 				String partOf = p.partOf;
+				if (partOf == null) {
+					continue;
+				}
 				if (redirects.containsKey(partOf)) {
 					partOf = redirects.get(partOf);
 				}
