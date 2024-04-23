@@ -426,7 +426,7 @@ public class WikivoyageLangPreparation {
 					String target = redirects.get(partOf);
 					// Calculate redirects (by wikidata id)
 					if (partOf.startsWith("Q") && target.isEmpty()) {
-						long wid = Long.parseLong(target.substring(1));
+						long wid = Long.parseLong(partOf.substring(1));
 						PageInfo page = pageInfos.byWikidataId.get(wid);
 						PageInfo enPage = enPageInfos.byWikidataId.get(wid);
 						if (page != null && page.title != null) {
