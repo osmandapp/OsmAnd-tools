@@ -469,7 +469,7 @@ public class WikivoyageLangPreparation {
 					}
 				}
 				articles++;
-				if(partOfWid > 0) {
+				if (partOfWid > 0) {
 					articlesParentWid++;
 				}
 				/// update redirects in tables
@@ -478,7 +478,7 @@ public class WikivoyageLangPreparation {
 				ps.setLong(3, p.id);
 				ps.setString(4, lang);
 				ps.addBatch();
-				if (++batch % 100 == 0) {
+				if (++batch % 500 == 0) {
 					System.out.println("Update parent wikidata id batch: " + batch);
 					ps.executeBatch();
 				}
