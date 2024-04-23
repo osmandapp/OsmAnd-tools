@@ -769,7 +769,7 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("ipa") || str.startsWith("lang-")) {
 			return of(WikivoyageTemplates.TRANSLATION);
 		} else if (str.startsWith("disamb") || str.startsWith("disambiguation") ||
-				str.startsWith("неоднозначность") ||
+				str.trim().equals("dp") || str.startsWith("неоднозначность") ||
 				str.startsWith("ujednoznacznienie") ||
 				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);

@@ -410,35 +410,36 @@ public class WikivoyageLangPreparation {
 		}
 
 		private void assignDefaultPartOfAndValidate() throws SQLException {
-//			System.out.println("Parent: " + parentStructure.keySet());
-			ArrayList<String> redirectKeys = new ArrayList<String>(redirects.keySet());
-			// 1. update wikidata to titles
-			for (String s : redirectKeys) {
-				if (s.startsWith("Q") && redirects.get(s).isEmpty()) {
-					long wid = Long.parseLong(s.substring(1));
-					PageInfo page = pageInfos.byWikidataId.get(wid);
-					PageInfo enPage = enPageInfos.byWikidataId.get(wid);
-					if (page != null && page.title != null) {
-						redirects.put(s, page.title);
-					} else if (enPage != null && enPage.title != null) {
-						System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", 
-								lang, s, SUFFIX_EN_REDIRECT + enPage.title);
-						redirects.put(s, SUFFIX_EN_REDIRECT + enPage.title);
-					} else {
-						System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
-
-					}
-				} else if(redirects.get(s).isEmpty()) {
-					System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
-				}
-			}
-			// fix non existing parent to en
+			// fix non existing parent to english
+			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ?, is_part_of_wid = ? WHERE id =  ?, lang = ?");
+			int batch = 0;
 			for (PageInfo p : pageInfos.byId.values()) {
 				String partOf = p.partOf;
-				if (redirects.containsKey(partOf)) {
-					partOf = redirects.get(partOf);
+				long partOfWid = 0;
+				if (partOf == null) {
+					continue;
 				}
-				if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf)) {
+				if (redirects.containsKey(partOf)) {
+					String s = redirects.get(partOf);
+					partOf = s;
+					// Calculate redirects (by wikidata id)
+					if (s.startsWith("Q") && redirects.get(s).isEmpty()) {
+						long wid = Long.parseLong(s.substring(1));
+						PageInfo page = pageInfos.byWikidataId.get(wid);
+						PageInfo enPage = enPageInfos.byWikidataId.get(wid);
+						if (page != null && page.title != null) {
+							partOf = page.title;
+						} else if (enPage != null && enPage.title != null) {
+							System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", lang, s, SUFFIX_EN_REDIRECT + enPage.title);
+							partOf = SUFFIX_EN_REDIRECT + enPage.title;
+						} else {
+							System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
+						}
+					}
+				}
+				
+				// if part of doesn't exist check partOf of english wikipedia
+				if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf) && !partOf.startsWith(SUFFIX_EN_REDIRECT)) {
 					PageInfo enPage = enPageInfos.byWikidataId.get(p.wikidataId);
 					if (enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null) {
 						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
@@ -447,34 +448,50 @@ public class WikivoyageLangPreparation {
 						redirects.put(p.partOf, enPartOf);
 					}
 				}
+				
+				if (partOf.startsWith(SUFFIX_EN_REDIRECT)) {
+					// skip redirect
+					PageInfo parentEnPage = enPageInfos.byTitle.get(partOf.substring(SUFFIX_EN_REDIRECT.length()));
+					if (parentEnPage != null) {
+						partOfWid = parentEnPage.wikidataId;
+					} else {
+						System.out.printf("Error parent en %s '%s' -> '%s' \n", lang, p.title, partOf);
+					}
+				} else if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf)) {
+					PageInfo parentPage = pageInfos.byTitle.get(partOf);
+					if (parentPage != null) {
+						partOfWid = parentPage.wikidataId;
+					} else {
+						System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, p.title, partOf);
+					}
+				}
+								
+				/// update redirects in tables
+				ps.setString(1, partOf);
+				ps.setLong(2, partOfWid);
+				ps.setLong(3, p.id);
+				ps.setString(4, lang);
+				ps.addBatch();
+				if (++batch % 100 == 0) {
+					ps.executeBatch();
+				}
 			}
-			/// update redirects in tables
-			PreparedStatement ps = wikiVoyageConn.prepareStatement("UPDATE travel_articles SET is_part_of = ? WHERE lang = ? and is_part_of =  ?");
+			ps.executeBatch();
+			
 			TreeSet<String> redirectKey = new TreeSet<>(redirects.keySet());
 			for (String redirectFrom : redirectKey) {
 				String redirectTo = redirects.get(redirectFrom);
 				ps.setString(1, redirectTo);
-				ps.setString(2, lang);
-				ps.setString(3, redirectFrom);
-				ps.execute();
+				
 //				System.out.println("Redirect from " + valueParent+ " to " + actualTarget);
 			}
 			for (PageInfo p : pageInfos.byId.values()) {
 				String partOf = p.partOf;
-				if (partOf == null) {
-					continue;
-				}
+				
 				if (redirects.containsKey(partOf)) {
 					partOf = redirects.get(partOf);
 				}
-				if (partOf.startsWith(SUFFIX_EN_REDIRECT)) {
-					// skip redirect
-					if (!enPageInfos.byTitle.containsKey(partOf.substring(SUFFIX_EN_REDIRECT.length()))) {
-						System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, p.title, partOf);
-					}
-				} else if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf)) {
-					System.out.printf("Error parent structure %s '%s' -> '%s' \n", lang, p.title, partOf);
-				}
+				
 			}
 		}
 		
@@ -573,6 +590,7 @@ public class WikivoyageLangPreparation {
 							if (textStr.startsWith("#redirect") || textStr.startsWith("#weiterleitung") ||
 									textStr.startsWith("#перенаправление") || textStr.startsWith("#patrz") ||
 									textStr.startsWith("#перенаправлення") || textStr.startsWith("#doorverwijzing")
+									|| textStr.startsWith("__disambig_")
 									) {
 								// redirect
 								int l = ctext.indexOf("[[");
