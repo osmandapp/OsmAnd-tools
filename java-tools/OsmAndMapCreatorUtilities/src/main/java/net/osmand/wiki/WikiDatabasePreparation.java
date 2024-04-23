@@ -775,7 +775,7 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.TRANSLATION);
 		} else if (str.startsWith("disamb") || str.startsWith("disambiguation") ||
 				str.trim().equals("dp") || str.startsWith("неоднозначность") ||
-				str.startsWith("ujednoznacznienie") ||
+				str.startsWith("ujednoznacznienie") || str.startsWith("homonymie") ||
 				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);
 		} else if (str.startsWith("guidephrasebook") || str.startsWith("partofphrasebook") || 
