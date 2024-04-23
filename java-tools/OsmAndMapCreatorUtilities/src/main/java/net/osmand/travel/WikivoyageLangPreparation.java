@@ -583,7 +583,9 @@ public class WikivoyageLangPreparation {
 							if (textStr.startsWith("#redirect") || textStr.startsWith("#weiterleitung") ||
 									textStr.startsWith("#перенаправление") || textStr.startsWith("#patrz") ||
 									textStr.startsWith("#перенаправлення") || textStr.startsWith("#doorverwijzing")
-									|| textStr.startsWith("__disambig_")
+									|| textStr.startsWith("__disambig_") || textStr.startsWith("#redirecionamento")
+									|| textStr.startsWith("#rinvia") || textStr.startsWith("#uudelleenohjaus")
+									|| textStr.startsWith("#redirección") || textStr.startsWith("#omdirigering")
 									) {
 								// redirect
 								int l = ctext.indexOf("[[");

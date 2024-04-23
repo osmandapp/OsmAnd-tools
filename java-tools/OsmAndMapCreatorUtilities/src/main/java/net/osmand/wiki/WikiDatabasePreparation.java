@@ -752,6 +752,8 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
 				|| str.startsWith("سرصفحه")) {
 			return of(WikivoyageTemplates.BANNER);
+		} else if (str.startsWith("info guide linguistique")) {
+			return of(WikivoyageTemplates.PHRASEBOOK);
 		} else if ((str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
 				|| str.contains("longitude=")))
 				|| str.startsWith("info ")) {
