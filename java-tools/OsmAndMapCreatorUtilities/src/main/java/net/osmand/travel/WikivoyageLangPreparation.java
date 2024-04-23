@@ -57,21 +57,23 @@ public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	
 	private static boolean uncompressed;
 	private final static Map<Long, Long> KNOWN_WIKIVOYAGE_MAIN = new HashMap<Long, Long>();
+	private static final long WID_TRAVEL_TOPICS = 14199938l;
+	private static final long WID_DESTINATIONS = 1200957l;
 	static {
-		KNOWN_WIKIVOYAGE_MAIN.put(14199938l, 0l); // Travel topics
-		KNOWN_WIKIVOYAGE_MAIN.put(1200957l, 0l); // Destinations
-		KNOWN_WIKIVOYAGE_MAIN.put(1599788l, 14199938l); // Phrasebooks
-		KNOWN_WIKIVOYAGE_MAIN.put(14208553l, 14199938l); // Discover
-		KNOWN_WIKIVOYAGE_MAIN.put(1322323l, 14199938l); // Itineraries
-		KNOWN_WIKIVOYAGE_MAIN.put(5056668l, 14199938l); // Sleep
-		KNOWN_WIKIVOYAGE_MAIN.put(15l, 1200957l); // Africa
-		KNOWN_WIKIVOYAGE_MAIN.put(51l, 1200957l); // Antarctica
-		KNOWN_WIKIVOYAGE_MAIN.put(48l, 1200957l); // Asia
-		KNOWN_WIKIVOYAGE_MAIN.put(49l, 1200957l); // North America
-		KNOWN_WIKIVOYAGE_MAIN.put(55643l, 1200957l); // Oceania
-		KNOWN_WIKIVOYAGE_MAIN.put(14201351l, 1200957l); // Other destinations
-		KNOWN_WIKIVOYAGE_MAIN.put(18l, 1200957l); // South America
-		KNOWN_WIKIVOYAGE_MAIN.put(46l, 1200957l); // Europe
+		KNOWN_WIKIVOYAGE_MAIN.put(WID_DESTINATIONS, 0l); // Travel topics
+		KNOWN_WIKIVOYAGE_MAIN.put(WID_TRAVEL_TOPICS, 0l); // Destinations
+		KNOWN_WIKIVOYAGE_MAIN.put(1599788l, WID_TRAVEL_TOPICS); // Phrasebooks
+		KNOWN_WIKIVOYAGE_MAIN.put(14208553l, WID_TRAVEL_TOPICS); // Discover
+		KNOWN_WIKIVOYAGE_MAIN.put(1322323l, WID_TRAVEL_TOPICS); // Itineraries
+		KNOWN_WIKIVOYAGE_MAIN.put(5056668l, WID_TRAVEL_TOPICS); // Sleep
+		KNOWN_WIKIVOYAGE_MAIN.put(15l, WID_DESTINATIONS); // Africa
+		KNOWN_WIKIVOYAGE_MAIN.put(51l, WID_DESTINATIONS); // Antarctica
+		KNOWN_WIKIVOYAGE_MAIN.put(48l, WID_DESTINATIONS); // Asia
+		KNOWN_WIKIVOYAGE_MAIN.put(49l, WID_DESTINATIONS); // North America
+		KNOWN_WIKIVOYAGE_MAIN.put(55643l, WID_DESTINATIONS); // Oceania
+		KNOWN_WIKIVOYAGE_MAIN.put(14201351l, WID_DESTINATIONS); // Other destinations
+		KNOWN_WIKIVOYAGE_MAIN.put(18l, WID_DESTINATIONS); // South America
+		KNOWN_WIKIVOYAGE_MAIN.put(46l, WID_DESTINATIONS); // Europe
 	}
 	private static final boolean DEBUG = false;
 	private static final String SUFFIX_EN_REDIRECT = "en:";
@@ -487,8 +489,8 @@ public class WikivoyageLangPreparation {
 				wid = enParent.wikidataId;
 			}
 			PageInfo p = pageInfos.byWikidataId.get(wid);
-			if (wid > 0 && p != null) {
-				if (p.title != null) {
+			if (wid > 0) {
+				if (p != null && p.title != null) {
 					return p.title;
 				} else {
 					String parent = "Q" + wid;
@@ -659,7 +661,9 @@ public class WikivoyageLangPreparation {
 					prepInsert.setString(column++, partOf);
 					if (Algorithms.isEmpty(partOf)) {
 						long wid = cInfo == null ? 0 : cInfo.wikidataId;
-						System.out.println("Root article: " + lang + " Q" + wid + " " + " " + title);
+						if (wid != WID_DESTINATIONS && wid != WID_TRAVEL_TOPICS) {
+							System.out.println("Warning ignore root article: " + lang + " Q" + wid + " " + " " + title);
+						}
 					}
 					
 					cInfo.partOf = partOf; 
