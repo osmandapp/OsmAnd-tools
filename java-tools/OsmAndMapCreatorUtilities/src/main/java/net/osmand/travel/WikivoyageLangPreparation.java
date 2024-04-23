@@ -434,7 +434,7 @@ public class WikivoyageLangPreparation {
 						if (page != null && page.title != null) {
 							partOf = page.title;
 						} else if (enPage != null && enPage.title != null) {
-							System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", lang, partOf, SUFFIX_EN_REDIRECT + enPage.title);
+							System.out.printf("Warning redirect to 'en' from '%s' (not exist) '%s'  -> '%s'\n", lang, partOf, SUFFIX_EN_REDIRECT + enPage.title);
 							partOf = SUFFIX_EN_REDIRECT + enPage.title;
 						} else {
 							System.out.printf("Skip article (n) %s %s: parent no redirect to %s\n", lang, p.title, partOf);
