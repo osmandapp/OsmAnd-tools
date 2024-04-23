@@ -423,21 +423,22 @@ public class WikivoyageLangPreparation {
 					continue;
 				}
 				if (redirects.containsKey(partOf)) {
-					String s = redirects.get(partOf);
-					partOf = s;
+					String target = redirects.get(partOf);
 					// Calculate redirects (by wikidata id)
-					if (s.startsWith("Q") && redirects.get(s).isEmpty()) {
-						long wid = Long.parseLong(s.substring(1));
+					if (partOf.startsWith("Q") && target.isEmpty()) {
+						long wid = Long.parseLong(target.substring(1));
 						PageInfo page = pageInfos.byWikidataId.get(wid);
 						PageInfo enPage = enPageInfos.byWikidataId.get(wid);
 						if (page != null && page.title != null) {
 							partOf = page.title;
 						} else if (enPage != null && enPage.title != null) {
-							System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", lang, s, SUFFIX_EN_REDIRECT + enPage.title);
+							System.out.printf("Warning redirect to en %s (not exist) '%s'  -> '%s'\n", lang, target, SUFFIX_EN_REDIRECT + enPage.title);
 							partOf = SUFFIX_EN_REDIRECT + enPage.title;
 						} else {
-							System.out.printf("Error parent redirect %s to %s is not \n", lang, s);
+							System.out.printf("Error parent redirect %s to %s -> %s is not \n", lang, partOf, target);
 						}
+					} else {
+						partOf = target;
 					}
 				}
 				
@@ -448,7 +449,7 @@ public class WikivoyageLangPreparation {
 						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
 						String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
 						System.out.printf("Warning redirect parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, enPartOf);
-						redirects.put(p.partOf, enPartOf);
+						partOf = enPartOf;
 					}
 				}
 				
@@ -460,7 +461,7 @@ public class WikivoyageLangPreparation {
 					} else {
 						System.out.printf("Error parent en %s '%s' -> '%s' \n", lang, p.title, partOf);
 					}
-				} else if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf)) {
+				} else if (!Algorithms.isEmpty(partOf)) {
 					PageInfo parentPage = pageInfos.byTitle.get(partOf);
 					if (parentPage != null) {
 						partOfWid = parentPage.wikidataId;
