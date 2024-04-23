@@ -726,7 +726,8 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
-				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ") 
+				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ")
+				|| str.startsWith("thème|") || str.startsWith("thème ")
 				// || str.startsWith("navigation ") -- incorect
 				 
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
@@ -754,6 +755,8 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.BANNER);
 		} else if (str.startsWith("info guide linguistique")) {
 			return of(WikivoyageTemplates.PHRASEBOOK);
+		} else if (str.startsWith("info maladie")) {
+			return EnumSet.noneOf(WikivoyageTemplates.class);
 		} else if ((str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
 				|| str.contains("longitude=")))
 				|| str.startsWith("info ")) {

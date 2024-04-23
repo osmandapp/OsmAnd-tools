@@ -999,7 +999,8 @@ public class WikivoyageLangPreparation {
 					}
 				}
 				if (ll == null) {
-					System.err.printf("Error structure geo (%s %s): %s \n", lang, title, location);
+					System.err.printf("Error structure geo (%s %s): %s \n", lang, title,
+							location.substring(0, Math.min(location.length(), 10)));
 				}
 				return ll;
 			}
