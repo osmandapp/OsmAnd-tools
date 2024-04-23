@@ -484,7 +484,7 @@ public class WikivoyageLangPreparation {
 				}
 			}
 			ps.executeBatch();
-			System.out.printf("Processed articles %d of which %d articles with parent wikidata\n");
+			System.out.printf("Processed articles %d of which %d articles with parent wikidata\n", articles, articlesParentWid);
 		}
 		
 		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks, PageInfo enPage) {
