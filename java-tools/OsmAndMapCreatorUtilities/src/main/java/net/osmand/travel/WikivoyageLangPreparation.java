@@ -450,9 +450,15 @@ public class WikivoyageLangPreparation {
 					PageInfo enPage = enPageInfos.byWikidataId.get(p.wikidataId);
 					if (enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null) {
 						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
-						String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
-						System.out.printf("Warning redirect parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, enPartOf);
-						partOf = enPartOf;
+						PageInfo locParent = pageInfos.byWikidataId.get(enParent.wikidataId);
+						if (locParent != null) {
+							System.out.printf("Info correct parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, locParent.title);
+							partOf = locParent.title;
+						} else {
+							String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
+							System.out.printf("Warning redirect parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, enPartOf);
+							partOf = enPartOf;
+						}
 					}
 				}
 				
@@ -483,6 +489,7 @@ public class WikivoyageLangPreparation {
 					del.setLong(1, p.id);
 					del.setString(2, lang);
 					del.addBatch();
+					// here we should delete all siblings recursively in theory
 				} else {
 					articles++;
 					if (partOfWid > 0) {
@@ -862,6 +869,7 @@ public class WikivoyageLangPreparation {
 									extraValues.put(DIRECTIONS, value);
 									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
 								}
+								// TODO location of wikidata wikipedia or copy from listing
 								if (isEmpty(lat) || isEmpty(lon)) {
 									// skip empty
 								} else {
