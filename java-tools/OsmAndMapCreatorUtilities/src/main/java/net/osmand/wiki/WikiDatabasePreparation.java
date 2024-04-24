@@ -797,18 +797,19 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")
 				|| str.startsWith("event")) {
 			return of(WikivoyageTemplates.POI);
-		} else if ((str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
-				|| str.contains("longitude=")))
-				|| str.startsWith("info ")) {
+		} else if (str.startsWith("info guide linguistique")) {
+			return of(WikivoyageTemplates.PHRASEBOOK);
+		} else if (str.startsWith("info maladie")) {
+			return EnumSet.noneOf(WikivoyageTemplates.class);
+		} else if (str.startsWith("info ")) {
+			return of(WikivoyageTemplates.LOCATION, WikivoyageTemplates.BANNER);
+		} else if (str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
+				|| str.contains("longitude="))) {
 			return of(WikivoyageTemplates.LOCATION, WikivoyageTemplates.BANNER);
 		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
 				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
 				|| str.startsWith("سرصفحه")) {
 			return of(WikivoyageTemplates.BANNER);
-		} else if (str.startsWith("info guide linguistique")) {
-			return of(WikivoyageTemplates.PHRASEBOOK);
-		} else if (str.startsWith("info maladie")) {
-			return EnumSet.noneOf(WikivoyageTemplates.class);
 		} else if (str.startsWith("regionlist")) {
 			return of(WikivoyageTemplates.REGION_LIST);
 		} else if (str.startsWith("warningbox")) {
