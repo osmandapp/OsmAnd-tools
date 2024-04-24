@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -45,7 +44,6 @@ import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.util.Algorithms;
-import net.osmand.util.LocationParser;
 import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 import net.osmand.wiki.CustomWikiModel;
@@ -191,6 +189,8 @@ public class WikivoyageLangPreparation {
 		
 		public String title; // only for calculated
 		public String partOf; // only for calculated 
+		public double lat;
+		public double lon;
 	}
 	
 	private static class PageInfos {
@@ -375,7 +375,7 @@ public class WikivoyageLangPreparation {
 		private PageInfos readEnPageInfo(Connection c) throws SQLException {
 			Statement s = c.createStatement();
 			PageInfos en = new PageInfos();
-			ResultSet rs = s.executeQuery("select lang, title, trip_id, original_id, is_part_of, image_title, banner_title from travel_articles where lang='en' ");
+			ResultSet rs = s.executeQuery("select lang, title, trip_id, original_id, is_part_of, image_title, banner_title, lat, lon from travel_articles where lang='en' ");
 			while (rs.next()) {
 				PageInfo pi = new PageInfo();
 //				pi.lang = rs.getString(1);
@@ -385,6 +385,8 @@ public class WikivoyageLangPreparation {
 				pi.partOf = rs.getString(5);
 				pi.image = rs.getString(6);
 				pi.banner = rs.getString(7);
+				pi.lat = rs.getDouble(8);
+				pi.lon = rs.getDouble(9);
 				en.byWikidataId.put(pi.wikidataId, pi);
 				en.byTitle.put(pi.title, pi);
 				en.byId.put(pi.id, pi);
@@ -450,9 +452,15 @@ public class WikivoyageLangPreparation {
 					PageInfo enPage = enPageInfos.byWikidataId.get(p.wikidataId);
 					if (enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null) {
 						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
-						String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
-						System.out.printf("Warning redirect parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, enPartOf);
-						partOf = enPartOf;
+						PageInfo locParent = pageInfos.byWikidataId.get(enParent.wikidataId);
+						if (locParent != null) {
+							System.out.printf("Info correct parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, locParent.title);
+							partOf = locParent.title;
+						} else {
+							String enPartOf = SUFFIX_EN_REDIRECT + enParent.title;
+							System.out.printf("Warning redirect parent %s '%s': '%s' -> '%s' \n", lang, p.title, partOf, enPartOf);
+							partOf = enPartOf;
+						}
 					}
 				}
 				
@@ -483,6 +491,7 @@ public class WikivoyageLangPreparation {
 					del.setLong(1, p.id);
 					del.setString(2, lang);
 					del.addBatch();
+					// here we should delete all siblings recursively in theory
 				} else {
 					articles++;
 					if (partOfWid > 0) {
@@ -607,8 +616,9 @@ public class WikivoyageLangPreparation {
 									|| textStr.startsWith("#redirección") || textStr.startsWith("#omdirigering")
 									|| textStr.startsWith("#ohjaus") || textStr.startsWith("#ανακατευθυνση")
 									|| textStr.startsWith("#تغییر_مسیر") || textStr.startsWith("#הפניה")
-									|| textStr.startsWith("#đổi") || textStr.startsWith("#重定向")
-									|| textStr.startsWith("#पुनर्प्रेषित")) {
+									|| textStr.startsWith("#تغییرمسیر")  || textStr.startsWith("#đổi") || textStr.startsWith("#重定向")
+									|| textStr.startsWith("#पुनर्प्रेषित") || textStr.startsWith("#अनुप्रेषित")) {
+								
 								// redirect
 								int l = ctext.indexOf("[[");
 								int e = ctext.indexOf("]]");
@@ -646,9 +656,15 @@ public class WikivoyageLangPreparation {
 			}
 			try {
 				LatLon ll = dbBrowser.getLocation(lang, null, cInfo.wikidataId);
+				// keep same coordinates
 				if (ll == null) {
-					ll = getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION), lang, title);
-				}
+					if (enPage != null && enPage.lat != 0) {
+						ll = new LatLon(enPage.lat, enPage.lon);
+					} else {
+						ll = WikiDatabasePreparation.getLatLonFromGeoBlock(macroBlocks.get(WikivoyageTemplates.LOCATION), lang, title);
+					}
+				} 
+				
 				boolean accepted = true;// filtered by namespace !title.toString().contains(":");
 				if (accepted) {
 					int column = 1;
@@ -862,10 +878,11 @@ public class WikivoyageLangPreparation {
 									extraValues.put(DIRECTIONS, value);
 									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
 								}
-								if (isEmpty(lat) || isEmpty(lon)) {
+								// TODO location of wikidata wikipedia or copy from listing
+								if (WikiDatabasePreparation.isEmpty(lat) || WikiDatabasePreparation.isEmpty(lon)) {
 									// skip empty
 								} else {
-									LatLon loct = parseLocation(lat, lon);
+									LatLon loct = WikiDatabasePreparation.parseLocation(lat, lon);
 									if (loct == null) {
 										System.out.printf("Error point parsing (%s %s): %s %s\n", lang, title, lat, lon);
 									} else {
@@ -969,47 +986,6 @@ public class WikivoyageLangPreparation {
 			return "";
 		}
 		
-		private static LatLon getLatLonFromGeoBlock(List<String> list, String lang, String title) {
-			if (list != null && !list.isEmpty()) {
-				String location = list.get(0) + " "; // to parse "geo||"
-				String[] parts = location.split("\\|");
-				LatLon ll = null;
-				if (parts.length >= 3) {
-					String lat = null;
-					String lon = null;
-					if (parts[0].trim().equalsIgnoreCase("geo")) {
-						lat = parts[1];
-						lon = parts[2];
-					} else {// if(parts[0].trim().equalsIgnoreCase("geodata")) {
-						for (String part : parts) {
-							String p = part.trim();
-							if (p.startsWith("lat=")) {
-								lat = p.substring("lat=".length());
-							} else if (p.startsWith("long=")) {
-								lon = p.substring("long=".length());
-							} else if (p.startsWith("latitude=")) {
-								lat = p.substring("latitude=".length());
-							} else if (p.startsWith("longitude=")) {
-								lon = p.substring("longitude=".length());
-							}
-						}
-					}
-					if (isEmpty(lat) || isEmpty(lon)) {
-						return null;
-					}
-					if (lat != null && lon != null) {
-						ll = parseLocation(lat, lon);
-					}
-				}
-				if (ll == null) {
-					System.err.printf("Error structure geo (%s %s): %s \n", lang, title,
-							location.substring(0, Math.min(location.length(), 10)));
-				}
-				return ll;
-			}
-			return null;
-		}
-
 		private String parsePartOf(List<String> list) {
 			if (list != null && !list.isEmpty()) {
 				String partOf = list.get(0);
@@ -1021,7 +997,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return splitPartOf[1];
 					} else {
-						System.out.println("Error structure the partof: " + partOf + " in the article: " + title);
+						System.out.printf("Error structure the partof: %s (%s %s)", partOf, lang, title);
 						return "";
 					}
 				} else if (lowerCasePartOf.startsWith("footer|")) {
@@ -1049,7 +1025,7 @@ public class WikivoyageLangPreparation {
 								|| type.equalsIgnoreCase("наследие")) {
 							return null;
 						} else {
-							System.out.printf("Error structure the partof: %s (%s) in the article: %s\n", partOf, type, title);
+							System.out.printf("Error structure the partof: %s (%s) in the article: %s %s\n", partOf, type, lang, title);
 						}
 					}
 					return trim(part).replaceAll("_", " ");
@@ -1060,7 +1036,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return trim(splitPartOf[1]).replaceAll("_", " ");
 					} else {
-						System.out.println("Error structure the partof (else): " + partOf + " in the article: " + title);
+						System.out.println("	 " + partOf + " in the article: " + title);
 						return "";
 					}
 				}
@@ -1080,18 +1056,6 @@ public class WikivoyageLangPreparation {
 			}
 			return region;
 		}
-	}
-
-	public static boolean isEmpty(String lat) {
-		return "".equals(lat) || "NA".equals(lat)  || "N/A".equals(lat) ;
-	}
-
-	public static LatLon parseLocation(String lat, String lon) {
-		String loc = lat + " " + lon;
-		if (!loc.contains(".") && loc.contains(",")) {
-			loc = loc.replace(',', '.');
-		}
-		return LocationParser.parseLocation(loc);
 	}
 
 	private static String trim(String s) {

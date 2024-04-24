@@ -99,19 +99,67 @@ public class WikiDatabasePreparation {
 		public String getWikipediaTitleByWid(String lang, long wikiDataQId) throws SQLException;
 	}
 	
-	public static LatLon parseLatLon(String lat, String lon) {
-		if (lat.equals("") || lat.equals("NA") || lat.equals("N/A")) {
-			return null;
+	public static LatLon getLatLonFromGeoBlock(List<String> list, String lang, String title) {
+		if (list != null && !list.isEmpty()) {
+			String location = list.get(0) + " "; // to parse "geo||"
+			String[] parts = location.split("\\|");
+			LatLon ll = null;
+			if (parts.length >= 3) {
+				String lat = null;
+				String lon = null;
+				if (parts[0].trim().equalsIgnoreCase("geo")) {
+					lat = parts[1];
+					lon = parts[2];
+				} else {// if(parts[0].trim().equalsIgnoreCase("geodata")) {
+					for (String part : parts) {
+						int eq = part.indexOf('=');
+						if(eq == -1) {
+							continue;
+						}
+						String key = part.substring(0, eq).trim().toLowerCase();
+						String val = part.substring(eq + 1).trim();
+						if (key.equals("lat") || key.equals("latitude")) {
+							lat = val;
+						} else if (key.equals("long") || key.equals("longitude")) {
+							lon = val;
+						}
+					}
+				}
+				if (isEmpty(lat) || isEmpty(lon)) {
+					return null;
+				}
+				if (lat != null && lon != null) {
+					ll = parseLocation(lat, lon);
+				}
+			}
+			if (ll == null) {
+				System.err.printf("Error structure geo (%s %s): %s \n", lang, title,
+						location.substring(0, Math.min(location.length(), 10)));
+			}
+			return ll;
 		}
-		if (lon.equals("") || lon.equals("NA") || lon.equals("N/A")) {
+		return null;
+	}
+	
+	public static boolean isEmpty(String lat) {
+		return "".equals(lat) || "NA".equals(lat)  || "N/A".equals(lat) ;
+	}
+
+	public static LatLon parseLocation(String lat, String lon) {
+		String loc = lat + " " + lon;
+		if (!loc.contains(".") && loc.contains(",")) {
+			loc = loc.replace(',', '.');
+		}
+		return LocationParser.parseLocation(loc);
+	}
+
+
+	public static LatLon parseLatLon(String lat, String lon) {
+		if (isEmpty(lat) || isEmpty(lon)) {
 			return null;
 		}
 		try {
-			String loc = lat + " " + lon;
-			if (!loc.contains(".") && loc.contains(",")) {
-				loc = loc.replace(',', '.');
-			}
-			LatLon res = LocationParser.parseLocation(loc);
+			LatLon res = parseLocation(lat, lon);
 			if (res != null) {
 				return res;
 			}
@@ -143,7 +191,7 @@ public class WikiDatabasePreparation {
 		Set<Integer> errorBracesCnt = new TreeSet<Integer>();
 		String[] tagsRetrieve = {"maplink", "ref", "gallery"};
 		for (int i = 0; ; i++) {
-			if(i == text.length()) {
+			if (i == text.length()) {
 				if (openCnt > 0) {
 					System.out.println("Error content braces {{ }}: " + lang + " " + title + " ..."
 							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 10)));
@@ -160,7 +208,7 @@ public class WikiDatabasePreparation {
 			if (openCnt == 0 && text.charAt(i) == '<') {
 				boolean found = false;
 				for (String tag : tagsRetrieve) {
-					if (leftChars > tag.length() && text.substring(i + 1, i + 1 + tag.length()).equals(tag)) {
+					if (leftChars > tag.length() && text.substring(i + 1, i + 1 + tag.length()).toLowerCase().equals(tag)) {
 						found = true;
 						StringBuilder val = new StringBuilder();
 						i = parseTag(text, val, tag, i, lang, title);
@@ -203,7 +251,7 @@ public class WikiDatabasePreparation {
 				} else if (val.startsWith("wide image") || val.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
 				}
-				EnumSet<WikivoyageTemplates> key = getKey(val.toLowerCase());
+				EnumSet<WikivoyageTemplates> key = getKey(val.toLowerCase(), lang);
 				if (key.contains(WikivoyageTemplates.POI)) {
 					val = val.replaceAll("\\{\\{.*}}", "");
 					bld.append(getWikivoyagePoiHtmlDescription(lang, browser, poiFields, val));
@@ -452,12 +500,14 @@ public class WikiDatabasePreparation {
 	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen, String lang, String title) {
 		int selfClosed = text.indexOf("/>", indOpen);
 		int nextTag = text.indexOf("<", indOpen+1);
+		String lc = text.toString().toLowerCase();
 		if (selfClosed > 0 && (selfClosed < nextTag || nextTag == -1)) {
 			bld.append(text.substring(indOpen + 1, selfClosed));
 			return selfClosed + 1;
 		}
-		int ind = text.indexOf("</" +tag, indOpen);
-		int l2 = text.indexOf("</ " +tag, indOpen);
+		
+		int ind = lc.indexOf("</" + tag, indOpen);
+		int l2 = lc.indexOf("</ " + tag, indOpen);
 		if (l2 > 0) {
 			ind = ind == -1 ? l2 : Math.min(l2, ind);
 		} else if (ind == -1) {
@@ -632,7 +682,7 @@ public class WikiDatabasePreparation {
 			String value = "";
 			int index = field.indexOf("=");
 			if (index != -1) {
-				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim()).replaceAll("\n", "");
+				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim()).replaceAll("\n", " ").trim();
 				field = field.substring(0, index).trim();
 			}
 			if (!value.isEmpty() && !value.contains("{{")) {
@@ -721,15 +771,14 @@ public class WikiDatabasePreparation {
 	}
 
 	
-	private static EnumSet<WikivoyageTemplates> getKey(String str) {
-		if (str.startsWith("geo|") || str.startsWith("geodata")) {
+	private static EnumSet<WikivoyageTemplates> getKey(String str, String lang) {
+		if (str.startsWith("geo|") || str.startsWith("geo ") || str.startsWith("geodata")) {
 			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ")
 				|| str.startsWith("thème|") || str.startsWith("thème ")
-				// || str.startsWith("navigation ") -- incorect
-				 
+				|| (str.startsWith("navigation ") && lang.equals("de"))// -- incorrect
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 
@@ -749,18 +798,19 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")
 				|| str.startsWith("event")) {
 			return of(WikivoyageTemplates.POI);
-		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
-				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
-				|| str.startsWith("سرصفحه")) {
-			return of(WikivoyageTemplates.BANNER);
 		} else if (str.startsWith("info guide linguistique")) {
 			return of(WikivoyageTemplates.PHRASEBOOK);
 		} else if (str.startsWith("info maladie")) {
 			return EnumSet.noneOf(WikivoyageTemplates.class);
-		} else if ((str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
-				|| str.contains("longitude=")))
-				|| str.startsWith("info ")) {
+		} else if (str.startsWith("info ")) {
 			return of(WikivoyageTemplates.LOCATION, WikivoyageTemplates.BANNER);
+		} else if (str.startsWith("quickbar") && (str.contains("lat=") || str.contains("lon=") || str.contains("long=")
+				|| str.contains("longitude="))) {
+			return of(WikivoyageTemplates.LOCATION, WikivoyageTemplates.BANNER);
+		} else if (str.startsWith("pagebanner") || str.startsWith("citybar") 
+				|| str.startsWith("quickbar ") || str.startsWith("banner") || str.startsWith("באנר")
+				|| str.startsWith("سرصفحه")) {
+			return of(WikivoyageTemplates.BANNER);
 		} else if (str.startsWith("regionlist")) {
 			return of(WikivoyageTemplates.REGION_LIST);
 		} else if (str.startsWith("warningbox")) {
@@ -774,7 +824,7 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("ipa") || str.startsWith("lang-")) {
 			return of(WikivoyageTemplates.TRANSLATION);
 		} else if (str.startsWith("disamb") || str.startsWith("disambiguation") ||
-				str.trim().equals("dp") || str.startsWith("неоднозначность") ||
+				str.trim().equals("dp") || str.startsWith("неоднозначность") || str.startsWith("desambiguación") || 
 				str.startsWith("ujednoznacznienie") || str.startsWith("homonymie") ||
 				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);
@@ -783,8 +833,6 @@ public class WikiDatabasePreparation {
 			return of(WikivoyageTemplates.PHRASEBOOK);
 		} else if (str.startsWith("monument-title")) {
 			return of(WikivoyageTemplates.MONUMENT_TITLE);
-		} else if (str.startsWith("geo") ) {
-			return of(WikivoyageTemplates.LOCATION);
 		} else {
 			Set<String> parts = new HashSet<>(Arrays.asList(str.split("\\|")));
 			if (parts.contains("convert") || parts.contains("unité")) {
@@ -857,9 +905,10 @@ public class WikiDatabasePreparation {
 		StringBuilder rs = Algorithms
 				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
-		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
-		System.out.println(text);
-		System.out.println(macros);
+		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, "de", null, null);
+//		System.out.println(text);
+		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
+		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
