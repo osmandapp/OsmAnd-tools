@@ -500,16 +500,19 @@ public class WikiDatabasePreparation {
 	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen, String lang, String title) {
 		int selfClosed = text.indexOf("/>", indOpen);
 		int nextTag = text.indexOf("<", indOpen+1);
-		String lc = text.toString().toLowerCase();
 		if (selfClosed > 0 && (selfClosed < nextTag || nextTag == -1)) {
 			bld.append(text.substring(indOpen + 1, selfClosed));
 			return selfClosed + 1;
 		}
-		
-		int ind = lc.indexOf("</" + tag, indOpen);
-		int l2 = lc.indexOf("</ " + tag, indOpen);
-		if (l2 > 0) {
-			ind = ind == -1 ? l2 : Math.min(l2, ind);
+		int ind = text.indexOf("</" + tag, indOpen);
+		int ind2 = text.indexOf("</ " + tag, indOpen);
+		if(ind == -1 && ind2 == -1) {
+			String lc = text.toString().toLowerCase();
+			ind = lc.indexOf("</" + tag, indOpen);
+			ind2 = lc.indexOf("</ " + tag, indOpen);
+		}
+		if (ind2 > 0) {
+			ind = ind == -1 ? ind2 : Math.min(ind2, ind);
 		} else if (ind == -1) {
 			System.out.printf("Error content tag (not closed) %s %s: %s\n", lang, title,
 					text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10)));
