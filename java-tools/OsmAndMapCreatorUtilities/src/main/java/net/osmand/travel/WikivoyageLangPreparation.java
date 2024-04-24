@@ -997,7 +997,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return splitPartOf[1];
 					} else {
-						System.out.println("Error structure the partof: " + partOf + " in the article: " + title);
+						System.out.printf("Error structure the partof: %s (%s %s)", partOf, lang, title);
 						return "";
 					}
 				} else if (lowerCasePartOf.startsWith("footer|")) {
@@ -1025,7 +1025,7 @@ public class WikivoyageLangPreparation {
 								|| type.equalsIgnoreCase("наследие")) {
 							return null;
 						} else {
-							System.out.printf("Error structure the partof: %s (%s) in the article: %s\n", partOf, type, title);
+							System.out.printf("Error structure the partof: %s (%s) in the article: %s %s\n", partOf, type, lang, title);
 						}
 					}
 					return trim(part).replaceAll("_", " ");
@@ -1036,7 +1036,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return trim(splitPartOf[1]).replaceAll("_", " ");
 					} else {
-						System.out.println("Error structure the partof (else): " + partOf + " in the article: " + title);
+						System.out.println("	 " + partOf + " in the article: " + title);
 						return "";
 					}
 				}
