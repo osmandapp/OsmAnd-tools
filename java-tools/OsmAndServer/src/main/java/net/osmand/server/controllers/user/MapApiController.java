@@ -95,6 +95,9 @@ public class MapApiController {
 
 	@Autowired
 	PremiumUsersRepository usersRepository;
+	
+	@Autowired
+	PremiumUserDevicesRepository userDevicesRepository;
 
 	@Autowired
 	UserdataService userdataService;
@@ -330,10 +333,10 @@ public class MapApiController {
 	}
 
 	@GetMapping(value = "/list-files")
-	public ResponseEntity<String> listFiles(
-			@RequestParam(name = "name", required = false) String name,
-			@RequestParam(name = "type", required = false) String type,
-			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions) throws IOException, SQLException {
+	public ResponseEntity<String> listFiles(@RequestParam(required = false) String name,
+	                                        @RequestParam(required = false) String type,
+	                                        @RequestParam(required = false, defaultValue = "false")  boolean addDevices,
+	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
@@ -386,7 +389,19 @@ public class MapApiController {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
 		}
+		if (addDevices && res.allFiles != null) {
+			for (UserFileNoData nd : res.allFiles) {
+				addDeviceInformation(nd);
+			}
+		}
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+	
+	private void addDeviceInformation(UserFileNoData file) {
+		PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
+		if (device != null) {
+			file.setDeviceInfo(device.brand + " " + device.model);
+		}
 	}
 
 	private boolean isHidden(WebGpxParser.PointsGroup group) {
