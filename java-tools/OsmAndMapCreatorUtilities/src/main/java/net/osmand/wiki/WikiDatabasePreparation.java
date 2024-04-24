@@ -116,7 +116,7 @@ public class WikiDatabasePreparation {
 						if(eq == -1) {
 							continue;
 						}
-						String key = part.substring(0, eq).trim();
+						String key = part.substring(0, eq).trim().toLowerCase();
 						String val = part.substring(eq + 1).trim();
 						if (key.equals("lat") || key.equals("latitude")) {
 							lat = val;
@@ -208,7 +208,7 @@ public class WikiDatabasePreparation {
 			if (openCnt == 0 && text.charAt(i) == '<') {
 				boolean found = false;
 				for (String tag : tagsRetrieve) {
-					if (leftChars > tag.length() && text.substring(i + 1, i + 1 + tag.length()).equals(tag)) {
+					if (leftChars > tag.length() && text.substring(i + 1, i + 1 + tag.length()).toLowerCase().equals(tag)) {
 						found = true;
 						StringBuilder val = new StringBuilder();
 						i = parseTag(text, val, tag, i, lang, title);
@@ -500,12 +500,14 @@ public class WikiDatabasePreparation {
 	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen, String lang, String title) {
 		int selfClosed = text.indexOf("/>", indOpen);
 		int nextTag = text.indexOf("<", indOpen+1);
+		String lc = text.toString().toLowerCase();
 		if (selfClosed > 0 && (selfClosed < nextTag || nextTag == -1)) {
 			bld.append(text.substring(indOpen + 1, selfClosed));
 			return selfClosed + 1;
 		}
-		int ind = text.indexOf("</" +tag, indOpen);
-		int l2 = text.indexOf("</ " +tag, indOpen);
+		
+		int ind = lc.indexOf("</" + tag, indOpen);
+		int l2 = lc.indexOf("</ " + tag, indOpen);
 		if (l2 > 0) {
 			ind = ind == -1 ? l2 : Math.min(l2, ind);
 		} else if (ind == -1) {
