@@ -780,6 +780,7 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ")
+				|| str.startsWith("sijainti|") || str.startsWith("sijainti ")
 				|| str.startsWith("thème|") || str.startsWith("thème ")
 				|| (str.startsWith("navigation ") && lang.equals("de"))// -- incorrect
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 

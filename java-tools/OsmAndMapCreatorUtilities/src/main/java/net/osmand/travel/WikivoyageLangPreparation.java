@@ -1036,7 +1036,7 @@ public class WikivoyageLangPreparation {
 					if (splitPartOf.length > 1) {
 						return trim(splitPartOf[1]).replaceAll("_", " ");
 					} else {
-						System.out.println("	 " + partOf + " in the article: " + title);
+						System.out.printf("Error structure the partof: %s in the article: %s %s\n", partOf, lang, title);
 						return "";
 					}
 				}
