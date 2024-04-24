@@ -16,21 +16,27 @@ task collectFonts(type: Sync) {
 
 
 task downloadCoreJni(type: Download)  {
-        src 'https://creator.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
-        dest 'lib-gl/OsmAndCore_jni.jar'
-        onlyIfModified true
+		src 'https://creator.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
+		dest 'lib-gl/OsmAndCore_jni.jar'
+		onlyIfModified true
 }
 
 // https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCoreWithJNI_standalone.so lib-native/
 // https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCore_ResourcesBundle_shared.so lib-native/
 
+
 task buildDistribution(type: Zip) {
 	dependsOn jar
-	from(configurations.runtimeClasspath.allArtifacts.files) {
-		rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
-	//	into '.'
+	// from(configurations.runtimeClasspath.allArtifacts.files) {
+	// 	rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
+	// //	into '.'
+	// }
+	from('build/libs/OsmAndMapCreator-master-snapshot.jar') {
+		into '.'
+		rename { 'OsmAndMapCreator.jar' }
+		// rename 'OsmAndMapCreator-master-snapshot.jar' 'OsmAndMapCreator.jar'
 	}
-
+	
 	from('lib-native') {
 		into 'lib'
 	}

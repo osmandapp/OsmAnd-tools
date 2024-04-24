@@ -1,48 +1,48 @@
 package net.osmand.wiki;
 
+import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
-import net.osmand.data.Amenity;
-import net.osmand.data.LatLon;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.Gson;
 
 import net.osmand.PlatformUtil;
+import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.OsmDbAccessor;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.obf.preparation.OsmDbAccessorContext;
 import net.osmand.obf.preparation.OsmDbCreator;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
@@ -50,9 +50,8 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
-
-import static net.osmand.wiki.WikiDatabasePreparation.OSM_WIKI_FILE_PREFIX;
+import net.osmand.util.Algorithms;
+import net.osmand.wiki.wikidata.WikiDataHandler;
 
 public class OsmCoordinatesByTag {
 
@@ -64,8 +63,6 @@ public class OsmCoordinatesByTag {
 	private int registeredNodes = 0;
 	private int registeredWays = 0;
 	private int registeredRelations = 0;
-	private PreparedStatement selectCoordsByID;
-	private Connection commonsWikiConn;
 	private Gson gson;
 	private MapRenderingTypesEncoder renderingTypes;
 	private MapPoiTypes poiTypes;
@@ -79,6 +76,17 @@ public class OsmCoordinatesByTag {
 		public String tagsJson;
 		public OsmLatLonId next;
 		public Amenity amenity;
+		
+		public String toString(String key) {
+			OsmLatLonId ol = this;
+			return String.format("osmid=%d %d wikidataid=%d key=%s amenity(%s)",
+					ol.type, ol.id, ol.wikidataId, key, ol.amenity);
+		}
+		
+		@Override
+		public String toString() {
+			return toString("");
+		}
 	}
 	
 	public OsmCoordinatesByTag(String[] filterExactTags, String[] filterStartsWithTags) {
@@ -90,18 +98,8 @@ public class OsmCoordinatesByTag {
 		
 	}
 	
-	public OsmCoordinatesByTag parse(File wikidataSqlite, boolean initFromOsm) throws SQLException {
-		if (!wikidataSqlite.exists() || initFromOsm) {
-			initCoordinates(wikidataSqlite.getParentFile());
-		} else {
-			commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-			selectCoordsByID = commonsWikiConn.prepareStatement("SELECT lat, lon FROM wiki_coords where originalId = ?");
-		}
-		return this;
-	}
-
-	private void initCoordinates(File wikiFolder) {
-		File[] listFiles = wikiFolder.listFiles();
+	public OsmCoordinatesByTag parse(File folderWithSql) throws SQLException {
+		File[] listFiles = folderWithSql.listFiles();
 		if (listFiles != null) {
 			for (File f : listFiles) {
 				if (f.getName().startsWith(OSM_WIKI_FILE_PREFIX) && !f.getName().endsWith(".db")) {
@@ -116,13 +114,28 @@ public class OsmCoordinatesByTag {
 		} else {
 			log.error("osm_wiki_*.gz files is absent");
 		}
+		return this;
 	}
 
 	public static void main(String[] args) throws IOException, SQLException, XmlPullParserException, InterruptedException {
-		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_waynodes.osm.gz");
-//		File osmGz = new File("/Users/victorshcherb/Desktop/osm_wiki_buildings_multipolygon.osm.gz");
+		File osmGz = new File("/Users/victorshcherb/Desktop/map.osm");
 		OsmCoordinatesByTag o = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
-				new String[] { "wikipedia:" }).parse(osmGz.getParentFile(), false);
+				new String[] { "wikipedia:" }).parse(osmGz.getParentFile());
+		Iterator<Entry<String, OsmLatLonId>> it = o.coordinates.entrySet().iterator();
+		while(it.hasNext()) {
+			Entry<String, OsmLatLonId> e = it.next();
+			System.out.println(e.getValue().toString(e.getKey()));
+		}
+		File wikidataDb = new File(osmGz.getParentFile(), "wikidata_osm.sqlitedb");
+		OsmandRegions or = new OsmandRegions();
+		or.prepareFile();
+		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, o, or, 0);
+		long testwid = 2051638;
+		StringBuilder sb = Algorithms.readFromInputStream(OsmCoordinatesByTag.class.getResourceAsStream("/Q"+testwid+".json"));
+		wdh.processJsonPage(testwid, sb.toString());
+		wdh.finish();
+		WikiDatabasePreparation.createOSMWikidataTable(wikidataDb, o);
+
 	}
 	
 	
@@ -133,20 +146,6 @@ public class OsmCoordinatesByTag {
 	
 	public OsmLatLonId getCoordinates(String tag, String value) {
 		return coordinates.get(combineTagValue(tag, value));
-	}
-
-	public LatLon getCoordinatesFromCommonsWikiDB(String wikidataQId) throws SQLException {
-		if (selectCoordsByID != null) {
-			selectCoordsByID.setString(1, wikidataQId);
-			ResultSet rs = selectCoordsByID.executeQuery();
-			if (rs.next()) {
-				LatLon l = new LatLon(rs.getDouble(1), rs.getDouble(2));
-				if (l.getLatitude() != 0 || l.getLongitude() != 0) {
-					return l;
-				}
-			}
-		}
-		return null;
 	}
 
 	private boolean checkIfTagsSuitable(Entity entity) {
@@ -322,8 +321,5 @@ public class OsmCoordinatesByTag {
 	}
 
 	public void closeConnection() throws SQLException {
-		if (commonsWikiConn != null) {
-			commonsWikiConn.close();
-		}
 	}
 }

@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import net.osmand.NativeLibrary;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.GeocodingUtilities;
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapPoiTypes;
@@ -114,7 +115,7 @@ public class SearchService {
         return res != null ? res.getCurrentSearchResults() : Collections.emptyList();
     }
     
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException, InterruptedException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -325,7 +326,7 @@ public class SearchService {
         return tags;
     }
     
-    private void saveSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) {
+    private void saveSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) throws IOException, InterruptedException {
         for (SearchResult result : res) {
             if (result.objectType == ObjectType.POI) {
                 Amenity amenity = (Amenity) result.object;
@@ -333,15 +334,16 @@ public class SearchService {
                 RoutingController.Feature feature;
                 if (poiType != null) {
                     feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
-                            .prop("poi_name", amenity.getName())
-                            .prop("poi_color", amenity.getColor())
-                            .prop("poi_iconKeyName", poiType.getIconKeyName())
-                            .prop("poi_typeOsmTag", poiType.getOsmTag())
-                            .prop("poi_typeOsmValue", poiType.getOsmValue())
-                            .prop("poi_iconName", getIconName(poiType))
-                            .prop("poi_type", amenity.getType().getKeyName())
-                            .prop("poi_subType", amenity.getSubType())
-                            .prop("poi_osmUrl", getOsmUrl(result));
+                            .prop("web_poi_id", amenity.getId())
+                            .prop("web_poi_name", amenity.getName())
+                            .prop("web_poi_color", amenity.getColor())
+                            .prop("web_poi_iconKeyName", poiType.getIconKeyName())
+                            .prop("web_poi_typeOsmTag", poiType.getOsmTag())
+                            .prop("web_poi_typeOsmValue", poiType.getOsmValue())
+                            .prop("web_poi_iconName", getIconName(poiType))
+                            .prop("web_poi_type", amenity.getType().getKeyName())
+                            .prop("web_poi_subType", amenity.getSubType())
+                            .prop("web_poi_osmUrl", getOsmUrl(result));
                     Map<String, String> tags = amenity.getAmenityExtensions();
                     for (Map.Entry<String, String> entry : tags.entrySet()) {
                         feature.prop(entry.getKey(), entry.getValue());
@@ -350,6 +352,18 @@ public class SearchService {
                 }
             }
         }
+    }
+    
+    public String getPoiAddress(LatLon location) throws IOException, InterruptedException {
+        if (location != null) {
+            List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(location.getLatitude(), location.getLongitude());
+            Optional<GeocodingUtilities.GeocodingResult> nearestResult = list.stream()
+                    .min(Comparator.comparingDouble(GeocodingUtilities.GeocodingResult::getDistance));
+            if (nearestResult.isPresent()) {
+                return nearestResult.get().toString();
+            }
+        }
+        return null;
     }
     
     private String getOsmUrl(SearchResult result) {
