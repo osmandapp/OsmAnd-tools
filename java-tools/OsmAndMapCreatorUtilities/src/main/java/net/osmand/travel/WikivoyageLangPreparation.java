@@ -617,7 +617,8 @@ public class WikivoyageLangPreparation {
 									|| textStr.startsWith("#ohjaus") || textStr.startsWith("#ανακατευθυνση")
 									|| textStr.startsWith("#تغییر_مسیر") || textStr.startsWith("#הפניה")
 									|| textStr.startsWith("#تغییرمسیر")  || textStr.startsWith("#đổi") || textStr.startsWith("#重定向")
-									|| textStr.startsWith("#पुनर्प्रेषित")) {
+									|| textStr.startsWith("#पुनर्प्रेषित") || textStr.startsWith("#अनुप्रेषित")) {
+								
 								// redirect
 								int l = ctext.indexOf("[[");
 								int e = ctext.indexOf("]]");

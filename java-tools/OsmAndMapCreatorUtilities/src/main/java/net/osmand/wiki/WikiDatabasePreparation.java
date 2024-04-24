@@ -112,15 +112,16 @@ public class WikiDatabasePreparation {
 					lon = parts[2];
 				} else {// if(parts[0].trim().equalsIgnoreCase("geodata")) {
 					for (String part : parts) {
-						String[] ls = part.trim().split("=");
-						if (ls.length != 2) {
+						int eq = part.indexOf('=');
+						if(eq == -1) {
 							continue;
 						}
-						String key = ls[0].trim().toLowerCase();
+						String key = part.substring(0, eq).trim();
+						String val = part.substring(eq + 1).trim();
 						if (key.equals("lat") || key.equals("latitude")) {
-							lat = ls[1].trim();
+							lat = val;
 						} else if (key.equals("long") || key.equals("longitude")) {
-							lon = ls[1].trim();
+							lon = val;
 						}
 					}
 				}
