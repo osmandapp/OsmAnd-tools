@@ -514,7 +514,7 @@ public class WikivoyageLangPreparation {
 			}
 			upd.executeBatch();
 			del.executeBatch();
-			System.out.printf("Total %s: %d articles (%d - no parent wikidata, %d - skipped)\n",
+			System.out.printf("Total %s: %d articles (%d - parent wikidata, %d - skipped)\n",
 					lang, articles, articlesParentWid, skippedArticle);
 		}
 		

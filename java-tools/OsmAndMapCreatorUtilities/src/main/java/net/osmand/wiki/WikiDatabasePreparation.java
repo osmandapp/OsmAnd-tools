@@ -834,6 +834,7 @@ public class WikiDatabasePreparation {
 				str.trim().equals("dp") || str.startsWith("неоднозначность") || str.startsWith("desambiguación") || 
 				str.startsWith("ujednoznacznienie") || str.startsWith("homonymie") ||
 				str.startsWith("desamb") ||
+				str.startsWith("täsmennys") || str.startsWith("förgrening") ||
 				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);
 		} else if (str.startsWith("guidephrasebook") || str.startsWith("partofphrasebook") || 
@@ -915,7 +916,7 @@ public class WikiDatabasePreparation {
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, "de", null, null);
 //		System.out.println(text);
-		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
+		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
 	}
 
