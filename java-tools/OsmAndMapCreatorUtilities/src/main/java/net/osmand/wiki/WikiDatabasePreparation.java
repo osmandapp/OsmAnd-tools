@@ -251,7 +251,7 @@ public class WikiDatabasePreparation {
 				} else if (val.startsWith("wide image") || val.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
 				}
-				EnumSet<WikivoyageTemplates> key = getKey(val.toLowerCase());
+				EnumSet<WikivoyageTemplates> key = getKey(val.toLowerCase(), lang);
 				if (key.contains(WikivoyageTemplates.POI)) {
 					val = val.replaceAll("\\{\\{.*}}", "");
 					bld.append(getWikivoyagePoiHtmlDescription(lang, browser, poiFields, val));
@@ -771,15 +771,14 @@ public class WikiDatabasePreparation {
 	}
 
 	
-	private static EnumSet<WikivoyageTemplates> getKey(String str) {
+	private static EnumSet<WikivoyageTemplates> getKey(String str, String lang) {
 		if (str.startsWith("geo|") || str.startsWith("geo ") || str.startsWith("geodata")) {
 			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
 				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ")
 				|| str.startsWith("thème|") || str.startsWith("thème ")
-				// || str.startsWith("navigation ") -- incorect
-				 
+				|| (str.startsWith("navigation ") && lang.equals("de"))// -- incorrect
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 
@@ -906,8 +905,9 @@ public class WikiDatabasePreparation {
 		StringBuilder rs = Algorithms
 				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
-		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, null, null, null);
+		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, "de", null, null);
 //		System.out.println(text);
+		System.out.println(macros.get(WikivoyageTemplates.PART_OF));
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
 	}
 
