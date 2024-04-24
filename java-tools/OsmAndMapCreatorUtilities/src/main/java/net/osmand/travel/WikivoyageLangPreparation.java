@@ -439,7 +439,7 @@ public class WikivoyageLangPreparation {
 							System.out.printf("Warning redirect to 'en' from '%s' (not exist) '%s'  -> '%s'\n", lang, partOf, SUFFIX_EN_REDIRECT + enPage.title);
 							partOf = SUFFIX_EN_REDIRECT + enPage.title;
 						} else {
-							System.out.printf("Skip article (n) %s %s: parent no redirect to %s\n", lang, p.title, partOf);
+							System.out.printf("Skip article -n- %s https://%s.wikivoyage.org/wiki/%s: parent no redirect to %s\n", lang, lang, p.title, partOf);
 							delete = true;
 						}
 					} else {
@@ -470,7 +470,8 @@ public class WikivoyageLangPreparation {
 					if (parentEnPage != null) {
 						partOfWid = parentEnPage.wikidataId;
 					} else {
-						System.out.printf("Skip article (e) %s %s: en parent doesn't exist '%s' \n", lang, p.title, partOf);
+						System.out.printf("Skip article -e- %s https://%s.wikivoyage.org/wiki/%s: en parent doesn't exist '%s' \n", 
+								lang, lang, p.title, partOf);
 						delete = true;
 					}
 				} else if (!Algorithms.isEmpty(partOf)) {
@@ -478,12 +479,13 @@ public class WikivoyageLangPreparation {
 					if (parentPage != null) {
 						partOfWid = parentPage.wikidataId;
 					} else {
-						System.out.printf("Skip article (p) %s %s: parent doesn't exist '%s' \n", lang, p.title, partOf);
+						System.out.printf("Skip article -p- %s https://%s.wikivoyage.org/wiki/%s: parent doesn't exist '%s' \n",
+								lang, lang, p.title, partOf);
 						delete = true;
 					}
 				} else {
 					if (p.wikidataId != WID_DESTINATIONS && p.wikidataId != WID_TRAVEL_TOPICS) {
-						System.out.printf("Skip article (r) %s %s: no parent \n", lang, p.title);
+						System.out.printf("Skip article -r- %s https://%s.wikivoyage.org/wiki/%s: no parent \n", lang, lang, p.title);
 						delete = true;
 					}
 				}
@@ -706,8 +708,8 @@ public class WikivoyageLangPreparation {
 					if (Algorithms.isEmpty(partOf)) {
 						long wid = cInfo == null ? 0 : cInfo.wikidataId;
 						if (wid != WID_DESTINATIONS && wid != WID_TRAVEL_TOPICS) {
-							System.out.printf("Skip article (s) %s %s: wid=%s no parent attached \n", lang, title,
-									"Q" + wid);
+							System.out.printf("Skip article -s- %s https://%s.wikivoyage.org/wiki/%s: wid=%s no parent attached \n", 
+									lang, lang, title, "Q" + wid);
 							return;
 						}
 					}
