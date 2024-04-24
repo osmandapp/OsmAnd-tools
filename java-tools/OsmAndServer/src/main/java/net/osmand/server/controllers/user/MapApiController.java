@@ -399,7 +399,7 @@ public class MapApiController {
 	
 	private void addDeviceInformation(UserFileNoData file) {
 		PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
-		if (device != null) {
+		if (device != null && device.brand != null && device.model != null) {
 			file.setDeviceInfo(device.brand + " " + device.model);
 		}
 	}
