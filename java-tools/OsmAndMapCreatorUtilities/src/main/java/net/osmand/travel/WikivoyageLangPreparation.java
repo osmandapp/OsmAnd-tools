@@ -355,6 +355,7 @@ public class WikivoyageLangPreparation {
 		private PageInfos pageInfos;
 		private PageInfos enPageInfos;
 		private Map<String, String> redirects = new HashMap<>();
+		private int skippedArticle;
 //		private Map<String, String> parentStructure = new HashMap<>();
 		
 		WikivoyageHandler(SAXParser saxParser, InputStream progIS, String lang, File wikivoyageSqlite, PageInfos pageInfos,
@@ -439,7 +440,7 @@ public class WikivoyageLangPreparation {
 							System.out.printf("Warning redirect to 'en' from '%s' (not exist) '%s'  -> '%s'\n", lang, partOf, SUFFIX_EN_REDIRECT + enPage.title);
 							partOf = SUFFIX_EN_REDIRECT + enPage.title;
 						} else {
-							System.out.printf("Skip article -n- %s https://%s.wikivoyage.org/wiki/%s: parent no redirect to %s\n", lang, lang, p.title, partOf);
+							skipArticle(lang, p.title, "n", "parent no redirect to " + partOf);
 							delete = true;
 						}
 					} else {
@@ -470,8 +471,7 @@ public class WikivoyageLangPreparation {
 					if (parentEnPage != null) {
 						partOfWid = parentEnPage.wikidataId;
 					} else {
-						System.out.printf("Skip article -e- %s https://%s.wikivoyage.org/wiki/%s: en parent doesn't exist '%s' \n", 
-								lang, lang, p.title, partOf);
+						skipArticle(lang, p.title, "e", "en parent doesn't exist " + partOf);
 						delete = true;
 					}
 				} else if (!Algorithms.isEmpty(partOf)) {
@@ -479,13 +479,12 @@ public class WikivoyageLangPreparation {
 					if (parentPage != null) {
 						partOfWid = parentPage.wikidataId;
 					} else {
-						System.out.printf("Skip article -p- %s https://%s.wikivoyage.org/wiki/%s: parent doesn't exist '%s' \n",
-								lang, lang, p.title, partOf);
+						skipArticle(lang, p.title, "p", "parent doesn't exist " + partOf);
 						delete = true;
 					}
 				} else {
 					if (p.wikidataId != WID_DESTINATIONS && p.wikidataId != WID_TRAVEL_TOPICS) {
-						System.out.printf("Skip article -r- %s https://%s.wikivoyage.org/wiki/%s: no parent \n", lang, lang, p.title);
+						skipArticle(lang, p.title, "r", "no parent");
 						delete = true;
 					}
 				}
@@ -515,7 +514,8 @@ public class WikivoyageLangPreparation {
 			}
 			upd.executeBatch();
 			del.executeBatch();
-			System.out.printf("Processed articles %d of which %d articles with parent wikidata\n", articles, articlesParentWid);
+			System.out.printf("Total %s: %d articles (%d - no parent wikidata, %d - skipped)\n",
+					lang, articles, articlesParentWid, skippedArticle);
 		}
 		
 		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks, PageInfo enPage) {
@@ -708,8 +708,7 @@ public class WikivoyageLangPreparation {
 					if (Algorithms.isEmpty(partOf)) {
 						long wid = cInfo == null ? 0 : cInfo.wikidataId;
 						if (wid != WID_DESTINATIONS && wid != WID_TRAVEL_TOPICS) {
-							System.out.printf("Skip article -s- %s https://%s.wikivoyage.org/wiki/%s: wid=%s no parent attached \n", 
-									lang, lang, title, "Q" + wid);
+							skipArticle(lang, title, "s", String.format("wid=%s no parent attached", "Q" + wid));
 							return;
 						}
 					}
@@ -772,6 +771,13 @@ public class WikivoyageLangPreparation {
 		}
 		
 		
+		private void skipArticle(String lang, String title, String sh, String msg) {
+			skippedArticle++;
+			String titleUrl = title.replace(" ", "%20");
+			System.out.printf("Skip article -%s- %s https://%s.wikivoyage.org/wiki/%s: %s \n", sh, lang, lang, titleUrl,
+					msg);
+		}
+
 		private String getShortDescr(String content) {
 			if (content == null) {
 				return null;
