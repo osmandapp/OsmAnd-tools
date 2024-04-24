@@ -782,7 +782,6 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ")
 				|| str.startsWith("sijainti|") || str.startsWith("sijainti ")
 				|| str.startsWith("thème|") || str.startsWith("thème ")
-				|| (str.startsWith("navigation ") && lang.equals("de"))// -- incorrect
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 
@@ -790,6 +789,10 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی")) {
 			return of(WikivoyageTemplates.PART_OF);
+		} else if (str.startsWith("navigation ") && lang.equals("de")) {
+			// -- incorrect istinkat correct version comparing to https://de.wikivoyage.org/wiki/Kurtinig?action=raw
+			// + navigation doesn't space
+			return EnumSet.noneOf(WikivoyageTemplates.class);
 		} else if (str.startsWith("do") || str.startsWith("see") || str.startsWith("go")
 				|| str.startsWith("eat") || str.startsWith("drink") 
 				|| str.startsWith("sleep") || str.startsWith("buy") 
