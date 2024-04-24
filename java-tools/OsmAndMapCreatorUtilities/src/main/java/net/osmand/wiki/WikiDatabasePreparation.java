@@ -787,7 +787,7 @@ public class WikiDatabasePreparation {
 				//|| str.startsWith("commonscat") 
 				|| str.startsWith("jest w")
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
-				|| str.startsWith("بخشی")) {
+				|| str.startsWith("بخشی") || str.startsWith("位于|") || str.startsWith("位于 ")) {
 			return of(WikivoyageTemplates.PART_OF);
 		} else if (str.startsWith("navigation ") && lang.equals("de")) {
 			// -- incorrect istinkat correct version comparing to https://de.wikivoyage.org/wiki/Kurtinig?action=raw
@@ -834,6 +834,7 @@ public class WikiDatabasePreparation {
 				str.trim().equals("dp") || str.startsWith("неоднозначность") || str.startsWith("desambiguación") || 
 				str.startsWith("ujednoznacznienie") || str.startsWith("homonymie") ||
 				str.startsWith("desamb") || str.startsWith("ابهام زدایی") || str.startsWith("消歧义") ||
+				str.startsWith("消歧義") ||
 				str.startsWith("täsmennys") || str.startsWith("förgrening") ||
 				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);
