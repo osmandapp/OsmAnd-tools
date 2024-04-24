@@ -830,6 +830,7 @@ public class WikiDatabasePreparation {
 		} else if (str.startsWith("disamb") || str.startsWith("disambiguation") ||
 				str.trim().equals("dp") || str.startsWith("неоднозначность") || str.startsWith("desambiguación") || 
 				str.startsWith("ujednoznacznienie") || str.startsWith("homonymie") ||
+				str.startsWith("desamb") ||
 				str.startsWith("msg:disamb") || str.startsWith("wegweiser") || str.startsWith("begriffsklärung")) {
 			return of(WikivoyageTemplates.DISAMB);
 		} else if (str.startsWith("guidephrasebook") || str.startsWith("partofphrasebook") || 
