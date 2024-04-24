@@ -143,7 +143,7 @@ public class WikiDatabasePreparation {
 		Set<Integer> errorBracesCnt = new TreeSet<Integer>();
 		String[] tagsRetrieve = {"maplink", "ref", "gallery"};
 		for (int i = 0; ; i++) {
-			if(i == text.length()) {
+			if (i == text.length()) {
 				if (openCnt > 0) {
 					System.out.println("Error content braces {{ }}: " + lang + " " + title + " ..."
 							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 10)));
