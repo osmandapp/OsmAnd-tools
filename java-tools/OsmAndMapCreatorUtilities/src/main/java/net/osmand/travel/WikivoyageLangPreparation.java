@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -930,15 +931,16 @@ public class WikivoyageLangPreparation {
 				LatLon ll) throws SQLException {
 			GPXFile f = new GPXFile(title, lang, descr);
 			List<WptPt> points = new ArrayList<>();
+			Map<INS_POI_COLUMN, Object> insParams = new TreeMap<>();
 			for (Map<PoiFieldType, Object> s : list) {
+				insParams.clear();
 				WptPt point = new WptPt();
-				prepInsertPOI.clearParameters();
 				Iterator<Entry<PoiFieldType, Object>> tags = s.entrySet().iterator();
 				Map<String, String> extraValues = new LinkedHashMap<String, String>();
-				setPoiField(prepInsertPOI, INS_POI_COLUMN.TITLE, title);
-				setPoiField(prepInsertPOI, INS_POI_COLUMN.LANG, lang);
-				prepInsertPOI.setLong(INS_POI_COLUMN.ORIGINAL_ID.ordinal() + 1, id);
-				prepInsertPOI.setLong(INS_POI_COLUMN.TRIP_ID.ordinal() + 1, tripId);
+				insParams.put(INS_POI_COLUMN.TITLE, title);
+				insParams.put(INS_POI_COLUMN.LANG, lang);
+				insParams.put(INS_POI_COLUMN.ORIGINAL_ID, id);
+				insParams.put(INS_POI_COLUMN.TRIP_ID, tripId);
 				while (tags.hasNext()) {
 					Entry<PoiFieldType, Object> e = tags.next();
 					PoiFieldType fieldType = e.getKey();
@@ -950,31 +952,31 @@ public class WikivoyageLangPreparation {
 						if (!Algorithms.isEmpty(cat.icon)) {
 							point.setIconName(cat.icon);
 						}
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.CATEGORY, cat.name().toLowerCase());
+						insParams.put(INS_POI_COLUMN.CATEGORY, cat.name().toLowerCase());
 					} else if (fieldType == PoiFieldType.PHONE) {
 						extraValues.put(PHONE, value);
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_PHONE.tag(), value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.PHONE, value);
+						insParams.put(INS_POI_COLUMN.PHONE, value);
 					} else if (fieldType == PoiFieldType.WORK_HOURS) {
 						extraValues.put(WORKING_HOURS, value);
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_OPENING_HOURS.tag(), value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.OPENING_HOURS, value);
+						insParams.put(INS_POI_COLUMN.OPENING_HOURS, value);
 					} else if (fieldType == PoiFieldType.PRICE) {
 						extraValues.put(PRICE, value);
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_PRICE.tag(), value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.PRICE, value);
+						insParams.put(INS_POI_COLUMN.PRICE, value);
 					} else if (fieldType == PoiFieldType.DIRECTIONS) {
 						extraValues.put(DIRECTIONS, value);
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.DIRECTIONS, value);
+						insParams.put(INS_POI_COLUMN.DIRECTIONS, value);
 					} else if (fieldType == PoiFieldType.ADDRESS) {
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_ADDRESS.tag(), value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.ADDRESS, value);
+						insParams.put(INS_POI_COLUMN.ADDRESS, value);
 					} else if (fieldType == PoiFieldType.WIKIDATA) {
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_WIKIDATA.tag(), value);
 						if (value.length() > 1) {
 							try {
-								prepInsertPOI.setLong(INS_POI_COLUMN.WIKIDATA_ID.ordinal() + 1,
+								insParams.put(INS_POI_COLUMN.WIKIDATA_ID,
 										Long.parseLong(value.substring(1)));
 							} catch (NumberFormatException e1) {
 								System.out.println("Parsing wikidata long: '" + value + "'");
@@ -982,28 +984,28 @@ public class WikivoyageLangPreparation {
 						}
 					} else if (fieldType == PoiFieldType.WIKIPEDIA) {
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_WIKIPEDIA.tag(), value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.WIKIPEDIA, value);
+						insParams.put(INS_POI_COLUMN.WIKIPEDIA, value);
 					} else if (fieldType == PoiFieldType.EMAIL) {
 						extraValues.put(EMAIL, value);
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_EMAIL.tag(), value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.EMAIL, value);
+						insParams.put(INS_POI_COLUMN.EMAIL, value);
 					} else if (fieldType == PoiFieldType.FAX) {
 						extraValues.put("Fax", value);
 						point.getExtensionsToWrite().put("fax", value);
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.FAX, value);
+						insParams.put( INS_POI_COLUMN.FAX, value);
 					} else if (fieldType == PoiFieldType.NAME) {
 						point.name = value;
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.NAME, value);
+						insParams.put(INS_POI_COLUMN.NAME, value);
 					} else if (fieldType == PoiFieldType.WEBSITE) {
 						point.link = value;
-						setPoiField(prepInsertPOI, INS_POI_COLUMN.WEBSITE, value);
+						insParams.put(INS_POI_COLUMN.WEBSITE, value);
 					} else if (fieldType == PoiFieldType.DESCRIPTION) {
 						point.desc = value;
 					} else if (fieldType == PoiFieldType.LATLON) {
 						point.lat = ((LatLon) e.getValue()).getLatitude();
 						point.lon = ((LatLon) e.getValue()).getLongitude();
-						prepInsertPOI.setDouble(INS_POI_COLUMN.LAT.ordinal() + 1, point.lat);
-						prepInsertPOI.setDouble(INS_POI_COLUMN.LON.ordinal() + 1, point.lon);
+						insParams.put(INS_POI_COLUMN.LAT, point.lat);
+						insParams.put(INS_POI_COLUMN.LON, point.lon);
 					}
 				}
 				for (String key : extraValues.keySet()) {
@@ -1014,12 +1016,23 @@ public class WikivoyageLangPreparation {
 					}
 					point.desc += key + ": " + extraValues.get(key); // ". " backward compatible
 				}
-				setPoiField(prepInsertPOI, INS_POI_COLUMN.DESCRIPTION, point.desc);
-
-				System.out.println("Add point " + point.hasLocation() + " " + point);
+				insParams.put(INS_POI_COLUMN.DESCRIPTION, point.desc);
 				if (point.hasLocation() && !Algorithms.isEmpty(point.name)) {
+					Iterator<Entry<INS_POI_COLUMN, Object>> it = insParams.entrySet().iterator();
+					while(it.hasNext()) {
+						Entry<INS_POI_COLUMN, Object> e = it.next();
+						if (e.getValue() instanceof Long) {
+							prepInsertPOI.setLong(e.getKey().ordinal() + 1, (long) e.getValue());
+						} else if (e.getValue() instanceof Double) {
+							prepInsertPOI.setDouble(e.getKey().ordinal() + 1, (double) e.getValue());
+						} else {
+							prepInsertPOI.setString(e.getKey().ordinal() + 1, String.valueOf(e.getValue()));
+						}
+					}
 					prepInsertPOI.addBatch();
 					points.add(point);
+				} else {
+					System.out.printf("Missing point loc %s %s in %s:%s", point.name, point.link, lang, title);	
 				}
 			}	
 			if (!points.isEmpty()) {
@@ -1029,12 +1042,6 @@ public class WikivoyageLangPreparation {
 			return "";
 		}
 		
-		
-		private void setPoiField(PreparedStatement ins, INS_POI_COLUMN col, String val) throws SQLException {
-			ins.setString(col.ordinal() + 1, val);
-		}
-
-
 		private byte[] stringToCompressedByteArray(ByteArrayOutputStream baos, String toCompress) {
 			baos.reset();
 			try {
