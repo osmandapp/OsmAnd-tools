@@ -401,6 +401,7 @@ public class WikivoyageLangPreparation {
 			redirects.put("Q" + WID_TRAVEL_TOPICS, "");
 			redirects.put("Q" + WID_ITINERARIES, "");
 			redirects.put("Q" + WID_DESTINATIONS, "");
+			redirects.put("Q9259", "");
 		}
 
 		private PageInfos readEnPageInfo(Connection c) throws SQLException {
