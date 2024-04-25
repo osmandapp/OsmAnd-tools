@@ -58,10 +58,11 @@ public class WikivoyageLangPreparation {
 	private static final long WID_TRAVEL_TOPICS = 14199938l;
 	private static final long WID_DESTINATIONS = 1200957l;
 	private static final long WID_ITINERARIES = 1322323l;
+	private static final long WID_PHRASEBOOKS = 1599788l;
 	static {
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_DESTINATIONS, 0l); // Travel topics
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_TRAVEL_TOPICS, 0l); // Destinations
-		KNOWN_WIKIVOYAGE_MAIN.put(1599788l, WID_TRAVEL_TOPICS); // Phrasebooks
+		KNOWN_WIKIVOYAGE_MAIN.put(WID_PHRASEBOOKS, WID_TRAVEL_TOPICS); // Phrasebooks
 		KNOWN_WIKIVOYAGE_MAIN.put(14208553l, WID_TRAVEL_TOPICS); // Discover
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_ITINERARIES, WID_TRAVEL_TOPICS); // Itineraries
 		KNOWN_WIKIVOYAGE_MAIN.put(5056668l, WID_TRAVEL_TOPICS); // Sleep
@@ -526,7 +527,7 @@ public class WikivoyageLangPreparation {
 		public String getStandardPartOf(Map<WikivoyageTemplates, List<String>> macroBlocks, PageInfo enPage) {
 			long wid = 0;
 			if (macroBlocks.containsKey(WikivoyageTemplates.PHRASEBOOK)) {
-				wid = 1599788; // Q1599788 -- Phrasebooks
+				wid = WID_PHRASEBOOKS; // Q1599788 -- Phrasebooks
 			}
 			if (KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
 				wid = KNOWN_WIKIVOYAGE_MAIN.get(cInfo.wikidataId);
@@ -700,12 +701,24 @@ public class WikivoyageLangPreparation {
 					}
 
 					// part_of
-					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang);
+					String partOf = null;
+					List<String> possiblePartOf = parsePartOfFromQuickFooter(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang); // for it
+					if (possiblePartOf != null) {
+						for (String s : possiblePartOf) {
+							// if the order is not correct then by title will produce wrong results
+							if (pageInfos.byTitle.containsKey(s)) {
+								partOf = s;
+								break;
+							}
+						}
+					}
+					if (partOf == null) {
+						partOf= parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang);
+					}
 					if (partOf == null) {
 						// this disamb or redirection
 						return;
 					}
-					
 					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
 						partOf = getStandardPartOf(macroBlocks, enPage).trim();
 					}
@@ -1003,9 +1016,8 @@ public class WikivoyageLangPreparation {
 			if (list != null && !list.isEmpty()) {
 				String partOf = list.get(0);
 				String lowerCasePartOf = partOf.toLowerCase();
-				if (lowerCasePartOf.contains("quickfooter")) {
-					return parsePartOfFromQuickFooter(partOf); // it
-				} if (lowerCasePartOf.startsWith("navigation")) {
+				if (lowerCasePartOf.startsWith("navigation")) {
+					// to fix it's incorrect for many languagues 
 					String[] splitPartOf = partOf.split(" ");
 					if (splitPartOf.length > 1) {
 						return splitPartOf[1];
@@ -1029,9 +1041,9 @@ public class WikivoyageLangPreparation {
 					}
 					if (part.length() == 0) {
 						if (type.equalsIgnoreCase("маршрут")) {
-							return "Q1322323"; // Itineraries
+							return "Q" + WID_ITINERARIES; // Itineraries
 						} else if (type.equalsIgnoreCase("континент")) {
-							return "Q1200957"; // Destinations
+							return "Q" + WID_DESTINATIONS; // Destinations
 						} else if (type.equalsIgnoreCase("сводная") || type.equalsIgnoreCase("природа")
 								|| type.equalsIgnoreCase("наследие")) {
 							return null;
@@ -1055,20 +1067,29 @@ public class WikivoyageLangPreparation {
 			return "";
 		}
 
-		public static String parsePartOfFromQuickFooter(String partOf) {
-			String[] info = partOf.split("\\|");
-			String region = "";
-			for (String s : info) {
-				int i = s.indexOf("=");
-				if (i > 0) {
-					String key = s.substring(0, i).trim().toLowerCase();
-					String value = s.substring(i + 1).trim();
-					if (!key.equals("livello") && value.length() > 0) {
-						region = value;
+		public static List<String> parsePartOfFromQuickFooter(List<String> list, String lang, String title) {
+			List<String> l = null;
+			if (list != null && !list.isEmpty()) {
+				String partOf = list.get(0);
+				String lowerCasePartOf = partOf.toLowerCase();
+				if (lowerCasePartOf.contains("quickfooter")) {
+					String[] info = partOf.split("\\|");
+					for (String s : info) {
+						int i = s.indexOf("=");
+						if (i > 0) {
+							String key = s.substring(0, i).trim().toLowerCase();
+							String value = s.substring(i + 1).trim();
+							if (!key.equals("livello") && value.length() > 0) {
+								if (l == null) {
+									l = new ArrayList<String>();
+								}
+								l.add(0, value);
+							}
+						}
 					}
 				}
 			}
-			return region;
+			return l;
 		}
 	}
 
