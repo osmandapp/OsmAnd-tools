@@ -403,7 +403,7 @@ public class MapApiController {
 		if (deviceInfo == null) {
 			PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
 			if (device != null && device.brand != null && device.model != null) {
-				deviceInfo = device.brand + " " + device.model;
+				deviceInfo = device.brand + "__model__" + device.model;
 				devices.put(file.deviceid, deviceInfo);
 			}
 		}
