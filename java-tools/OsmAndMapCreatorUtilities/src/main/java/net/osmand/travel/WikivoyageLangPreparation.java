@@ -108,6 +108,7 @@ public class WikivoyageLangPreparation {
 		LOCATION("geo"),
 		POI("poi"),
 		PART_OF("part_of"),
+		QUICK_FOOTER("quickfooter"),
 		BANNER("pagebanner"),
 		REGION_LIST("regionlist"), 
 		WARNING("warningbox"),
@@ -702,7 +703,7 @@ public class WikivoyageLangPreparation {
 
 					// part_of
 					String partOf = null;
-					List<String> possiblePartOf = parsePartOfFromQuickFooter(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang); // for it
+					List<String> possiblePartOf = parsePartOfFromQuickFooter(macroBlocks.get(WikivoyageTemplates.QUICK_FOOTER), title, lang); // for it
 					if (possiblePartOf != null) {
 						for (String s : possiblePartOf) {
 							// if the order is not correct then by title will produce wrong results
@@ -1071,20 +1072,17 @@ public class WikivoyageLangPreparation {
 			List<String> l = null;
 			if (list != null && !list.isEmpty()) {
 				String partOf = list.get(0);
-				String lowerCasePartOf = partOf.toLowerCase();
-				if (lowerCasePartOf.contains("quickfooter")) {
-					String[] info = partOf.split("\\|");
-					for (String s : info) {
-						int i = s.indexOf("=");
-						if (i > 0) {
-							String key = s.substring(0, i).trim().toLowerCase();
-							String value = s.substring(i + 1).trim();
-							if (!key.equals("livello") && value.length() > 0) {
-								if (l == null) {
-									l = new ArrayList<String>();
-								}
-								l.add(0, value);
+				String[] info = partOf.split("\\|");
+				for (String s : info) {
+					int i = s.indexOf("=");
+					if (i > 0) {
+						String key = s.substring(0, i).trim().toLowerCase();
+						String value = s.substring(i + 1).trim();
+						if (!key.equals("livello") && value.length() > 0) {
+							if (l == null) {
+								l = new ArrayList<String>();
 							}
+							l.add(0, value);
 						}
 					}
 				}

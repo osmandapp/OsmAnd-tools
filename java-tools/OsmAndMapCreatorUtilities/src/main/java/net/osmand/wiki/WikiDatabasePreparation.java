@@ -72,6 +72,7 @@ import net.osmand.data.LatLon;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.travel.WikivoyageLangPreparation.WikivoyageHandler;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
@@ -778,7 +779,7 @@ public class WikiDatabasePreparation {
 		if (str.startsWith("geo|") || str.startsWith("geo ") || str.startsWith("geodata")) {
 			return of(WikivoyageTemplates.LOCATION);
 		} else if (str.startsWith("ispartof") || str.startsWith("partofitinerary") || str.startsWith("isin")
-				|| str.startsWith("quickfooter") || str.startsWith("dans") || str.startsWith("footer|")
+			    || str.startsWith("dans") || str.startsWith("footer|")
 				|| str.startsWith("istinkat") || str.startsWith("istin|") || str.startsWith("istin ")
 				|| str.startsWith("estaen") || str.startsWith("estáen") 
 				|| str.startsWith("sijainti|") || str.startsWith("sijainti ")
@@ -790,6 +791,8 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی") || str.startsWith("位于|") || str.startsWith("位于 ")) {
 			return of(WikivoyageTemplates.PART_OF);
+		} else if (str.startsWith("quickfooter") && lang.equals("it")) {
+			return of(WikivoyageTemplates.QUICK_FOOTER);
 		} else if (str.startsWith("navigation ") && lang.equals("de")) {
 			// -- incorrect istinkat correct version comparing to https://de.wikivoyage.org/wiki/Kurtinig?action=raw
 			// + navigation doesn't space
@@ -921,7 +924,7 @@ public class WikiDatabasePreparation {
 //		System.out.println(text);
 		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
-//		System.out.println(WikivoyageHandler.parsePartOf(macros.get(WikivoyageTemplates.PART_OF), "", ""));
+		System.out.println(WikivoyageHandler.parsePartOf(macros.get(WikivoyageTemplates.PART_OF), "", ""));
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
