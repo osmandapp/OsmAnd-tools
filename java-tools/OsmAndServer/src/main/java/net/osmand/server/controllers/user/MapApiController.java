@@ -335,7 +335,7 @@ public class MapApiController {
 	@GetMapping(value = "/list-files")
 	public ResponseEntity<String> listFiles(@RequestParam(required = false) String name,
 	                                        @RequestParam(required = false) String type,
-	                                        @RequestParam(required = false, defaultValue = "false")  boolean addDevices,
+	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
@@ -390,18 +390,24 @@ public class MapApiController {
 			}
 		}
 		if (addDevices && res.allFiles != null) {
+			Map<Integer, String> devices = new HashMap<>();
 			for (UserFileNoData nd : res.allFiles) {
-				addDeviceInformation(nd);
+				addDeviceInformation(nd, devices);
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 	
-	private void addDeviceInformation(UserFileNoData file) {
-		PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
-		if (device != null && device.brand != null && device.model != null) {
-			file.setDeviceInfo(device.brand + " " + device.model);
+	private void addDeviceInformation(UserFileNoData file, Map<Integer, String> devices) {
+		String deviceInfo = devices.get(file.userid);
+		if (deviceInfo == null) {
+			PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
+			if (device != null && device.brand != null && device.model != null) {
+				deviceInfo = device.brand + " " + device.model;
+				devices.put(file.userid, deviceInfo);
+			}
 		}
+		file.setDeviceInfo(deviceInfo);
 	}
 
 	private boolean isHidden(WebGpxParser.PointsGroup group) {
