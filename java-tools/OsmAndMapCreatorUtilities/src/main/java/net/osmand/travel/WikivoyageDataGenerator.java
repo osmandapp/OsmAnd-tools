@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import org.apache.commons.logging.Log;
 import info.bliki.wiki.filter.Encoder;
 import net.osmand.PlatformUtil;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.util.Algorithms;
 
 public class WikivoyageDataGenerator {
 
@@ -200,10 +202,12 @@ public class WikivoyageDataGenerator {
 
 	private void copyImagesBetweenArticles(Connection conn, String imageColumn) throws SQLException {
 		Statement statement = conn.createStatement();
-		boolean update = statement.execute("update or ignore travel_articles set " + imageColumn + "=(SELECT "
-				+ imageColumn + " FROM travel_articles t "
-				+ "WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en')" + " where (travel_articles."
-				+ imageColumn + " is null or travel_articles." + imageColumn + " ) and travel_articles.lang <>'en'");
+		String sql = String.format(
+				"UPDATE or IGNORE travel_articles set %s = "
+				+ "(SELECT %s FROM travel_articles t WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en') "
+				+ "WHERE (travel_articles.%s is null or travel_articles.%s = '') and travel_articles.lang <>'en'",
+				imageColumn, imageColumn, imageColumn, imageColumn);
+		boolean update = statement.execute(sql);
 		System.out.println("Copy headers from english language to others: " + update);
         statement.close();
         statement = conn.createStatement();
@@ -211,13 +215,20 @@ public class WikivoyageDataGenerator {
 		ResultSet rs = statement.executeQuery(
 				"select count(*), lang from travel_articles where " + imageColumn + " = '' or " + imageColumn
 						+ " is null group by lang");
-        while(rs.next()) {
-        	System.out.println("\t" + rs.getString(2) + " " + rs.getInt(1));
-        }
+		while (rs.next()) {
+			System.out.println("\t" + rs.getString(2) + " " + rs.getInt(1));
+		}
 		rs.close();
 		statement.close();
 	}
 
+	private static class AggArticle {
+		String title;
+		String lang;
+		long wid;
+		String partOf;
+//		long partOfWid;
+	}
 	private void generateAggPartOf(Connection conn) throws SQLException {
 		try {
 			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
@@ -225,25 +236,75 @@ public class WikivoyageDataGenerator {
 			System.err.println("Column aggregated_part_of already exists");
 		}
 		PreparedStatement updatePartOf = conn
-				.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ? WHERE title = ? AND lang = ?");
-		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of FROM travel_articles");
+					.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ? WHERE title = ? AND lang = ?");
+		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of, is_part_of_wid FROM travel_articles");
 		ResultSet rs = data.executeQuery();
 		int batch = 0;
+		Map<String, AggArticle> articles = new HashMap<>();
+		Map<String, AggArticle> articlesWid = new HashMap<>();
 		while (rs.next()) {
-			String title = rs.getString("title");
-			String lang = rs.getString("lang");
-			updatePartOf.setString(1, getAggregatedPartOf(conn, rs.getString("is_part_of"), lang));
-			updatePartOf.setString(2, title);
-			updatePartOf.setString(3, lang);
+			AggArticle art = new AggArticle();
+			art.title = rs.getString("title");
+			art.lang = rs.getString("lang");
+			art.partOf = rs.getString("is_part_of");
+//			art.partOfWid = rs.getLong("is_part_of_wid");
+			art.wid = rs.getLong("trip_id");
+			articles.put(art.lang + ":" + art.title, art);
+			articlesWid.put(art.lang + ":" + art.wid, art);
+		}
+		for (AggArticle a : articles.values()) {
+			StringBuilder agg = new StringBuilder();
+			String lang = a.lang;
+			String partOf = a.partOf;
+			AggArticle parent = getParent(articles, lang, partOf);
+			int iterations = 0;
+			while (parent != null) {
+				if (agg.length() > 0) {
+					agg.append(",");
+				}
+				if (articlesWid.containsKey(lang + ":" + parent.wid)) {
+					// switch back to local
+					parent = articlesWid.get(lang + ":" + parent.wid);
+				}
+				if (parent.lang.equals(lang)) {
+					agg.append(parent.title);
+				} else {
+					agg.append(parent.lang + ":" + parent.title);
+				}
+				partOf = parent.partOf;
+				parent = getParent(articles, parent.lang, partOf);
+				if(iterations++ > 30) {
+					System.out.println(parent.title + " " + parent.lang);
+					if(iterations > 40) {
+						System.out.println("! ERROR LOOP DETECTED ERROR !");
+						break;
+					}
+				}
+			}
+			if (!Algorithms.isEmpty(partOf) && parent == null) {
+				System.out.printf("Error parent not reached: %s from %s %s", partOf, a.lang, a.title);
+			}
+			updatePartOf.setString(1, agg.toString());
+			updatePartOf.setString(2, a.title);
+			updatePartOf.setString(3, a.lang);
 			updatePartOf.addBatch();
-			if (batch++ > BATCH_SIZE) {
+			if (++batch% BATCH_SIZE == 0) {
+				System.out.printf("Processsed %d ...", batch);
 				updatePartOf.executeBatch();
-				batch = 0;
 			}
 		}
+		updatePartOf.executeBatch();
 		finishPrep(updatePartOf);
 		data.close();
 		rs.close();
+	}
+
+	private AggArticle getParent(Map<String, AggArticle> articles, String lang, String partOf) {
+		AggArticle parent = articles.get(lang + ":" + partOf);
+		if (parent == null) {
+			parent = articles.get(partOf); // en case
+		}
+		return parent;
 	}
 
 	public void generateIsParentOf(Connection conn) throws SQLException {
@@ -275,44 +336,10 @@ public class WikivoyageDataGenerator {
 	}
 
 	
-	
-
 	public void finishPrep(PreparedStatement ps) throws SQLException {
 		ps.addBatch();
 		ps.executeBatch();
 		ps.close();
-	}
-
-	private String getAggregatedPartOf(Connection conn, String partOf, String lang) throws SQLException {
-		if (partOf.isEmpty()) {
-			return "";
-		}
-		StringBuilder res = new StringBuilder();
-		res.append(partOf);
-		res.append(",");
-		PreparedStatement ps = conn
-				.prepareStatement("SELECT is_part_of FROM travel_articles WHERE title = ? AND lang = '" + lang + "'");
-		String prev = "";
-		while (true) {
-			ps.setString(1, partOf);
-			ResultSet rs = ps.executeQuery();
-			String buf = "";
-			while (rs.next()) {
-				buf = rs.getString(1);
-			}
-			if (buf.equals("") || buf.equals(partOf) || buf.equals(prev)) {
-				ps.close();
-				rs.close();
-				return res.toString().substring(0, res.length() - 1);
-			} else {
-				rs.close();
-				ps.clearParameters();
-				res.append(buf);
-				res.append(',');
-				prev = partOf;
-				partOf = buf;
-			}
-		}
 	}
 
 
