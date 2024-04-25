@@ -1,6 +1,5 @@
 #!/bin/bash -e
 
-FORCE=$1
 RESULT_DIR="/home/osmlive"
 OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator
 export JAVA_OPTS="-Xms512M -Xmx24014M"
@@ -90,7 +89,7 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
             echo "ERROR. One of file:${AFTER_OBF} ${BEFORE_OBF} ${AFTER_REL_M_OBF} ${BEFORE_REL_OBF} did not generated!"
             exit 1;
         fi
-        
+
         if [ "$1" != "--force" ]; then
             echo "Check sizes of OBFs"
             AFTER_OBF_SIZE=$(ls -l $AFTER_OBF | awk '{print $5}')
