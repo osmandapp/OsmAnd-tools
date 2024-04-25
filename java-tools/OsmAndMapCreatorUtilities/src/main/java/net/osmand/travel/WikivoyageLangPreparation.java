@@ -207,6 +207,7 @@ public class WikivoyageLangPreparation {
 		private Map<Long, PageInfo> byWikidataId = new HashMap<Long, PageInfo>();
 		private Map<String, PageInfo> byTitle = new HashMap<String, PageInfo>(); // only published pages
 		private Set<String> titles = new HashSet<>();
+		public Set<String> missingParentsInfo = new HashSet<>();
 	}
 
 	protected static void processWikivoyage(final File wikiArticles, final File wikiProps, 
@@ -741,7 +742,7 @@ public class WikivoyageLangPreparation {
 								if (pageInfos.titles.contains(s)) {
 									partOf = s;
 									break;
-								} else {
+								} else if (pageInfos.missingParentsInfo.add(s)) {
 									System.out.printf("Info missing parent '%s' in %s '%s' \n", s, lang, title);
 								}
 							}
@@ -1098,16 +1099,22 @@ public class WikivoyageLangPreparation {
 				String partOf = list.get(0);
 				String[] info = partOf.split("\\|");
 				for (String s : info) {
+					String value = null;
 					int i = s.indexOf("=");
 					if (i > 0) {
 						String key = s.substring(0, i).trim().toLowerCase();
-						String value = s.substring(i + 1).trim();
-						if (!key.equals("livello") && value.length() > 0) {
-							if (l == null) {
-								l = new ArrayList<String>();
-							}
-							l.add(0, value);
+						String v = s.substring(i + 1).trim();
+						if (!key.equals("livello") && v.length() > 0) {
+							value = v;
 						}
+					} else if (s.trim().toUpperCase().equals("UNESCO")) {
+						value = "Q9259";
+					}
+					if (value != null) {
+						if (l == null) {
+							l = new ArrayList<String>();
+						}
+						l.add(0, value);
 					}
 				}
 			}
