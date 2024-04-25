@@ -483,7 +483,7 @@ public class WikivoyageLangPreparation {
 
 		public void addBatch() throws SQLException {
 			prepInsert.addBatch();
-			if(batch++ > BATCH_SIZE) {
+			if (batch++ > BATCH_SIZE) {
 				prepInsert.executeBatch();
 				prepInsertPOI.executeBatch();
 				batch = 0;
@@ -491,6 +491,7 @@ public class WikivoyageLangPreparation {
 		}
 
 		public void finish() throws SQLException {
+			prepInsertPOI.executeBatch();
 			prepInsert.executeBatch();
 			if (!wikiVoyageConn.getAutoCommit()) {
 				wikiVoyageConn.commit();
@@ -999,8 +1000,8 @@ public class WikivoyageLangPreparation {
 					} else if (fieldType == PoiFieldType.DESCRIPTION) {
 						point.desc = value;
 					} else if (fieldType == PoiFieldType.LATLON) {
-						point.lat = ((LatLon)e.getValue()).getLatitude();
-						point.lon = ((LatLon)e.getValue()).getLongitude();
+						point.lat = ((LatLon) e.getValue()).getLatitude();
+						point.lon = ((LatLon) e.getValue()).getLongitude();
 						prepInsertPOI.setDouble(INS_POI_COLUMN.LAT.ordinal() + 1, point.lat);
 						prepInsertPOI.setDouble(INS_POI_COLUMN.LON.ordinal() + 1, point.lon);
 					}
@@ -1015,6 +1016,7 @@ public class WikivoyageLangPreparation {
 				}
 				setPoiField(prepInsertPOI, INS_POI_COLUMN.DESCRIPTION, point.desc);
 
+				System.out.println("Add point " + point.hasLocation() + " " + point);
 				if (point.hasLocation() && !Algorithms.isEmpty(point.name)) {
 					prepInsertPOI.addBatch();
 					points.add(point);
