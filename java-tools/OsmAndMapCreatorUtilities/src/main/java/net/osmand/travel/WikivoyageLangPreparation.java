@@ -710,6 +710,8 @@ public class WikivoyageLangPreparation {
 							if (pageInfos.byTitle.containsKey(s)) {
 								partOf = s;
 								break;
+							} else {
+								System.out.printf("Info missing parent %s in %s %s \n", s, lang, title);
 							}
 						}
 					}
