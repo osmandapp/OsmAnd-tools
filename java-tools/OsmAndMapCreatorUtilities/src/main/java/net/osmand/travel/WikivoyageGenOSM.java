@@ -154,7 +154,7 @@ public class WikivoyageGenOSM {
 		// travel_articles: 	
 		// 						population, country, region, city_type, osm_i,
 		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, "
-				+ "gpx_gz, image_title, banner_title, is_part_of, is_parent_of, aggregated_part_of, contents_json from travel_articles order by trip_id asc");
+				+ "gpx_gz, image_title, banner_title, src_banner_title, is_part_of, is_parent_of, aggregated_part_of, contents_json from travel_articles order by trip_id asc");
 		int count = 0, totalArticles = 0, emptyLocation = 0, emptyContent = 0;
 		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
 		XmlSerializer serializer = null;
@@ -193,11 +193,13 @@ public class WikivoyageGenOSM {
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(bytesStream);
 			String imageTitle = rs.getString(rind++);
 			String bannerTitle = rs.getString(rind++);
+			String srcBannerTitle = rs.getString(rind++);
 			String isPartOf = rs.getString(rind++);
 			String isParentOf = rs.getString(rind++);
 			String isAggrPartOf = rs.getString(rind++);
 			String contentJson = rs.getString(rind);
-			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle, bannerTitle, isPartOf,
+			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle,
+					Algorithms.isEmpty(srcBannerTitle) ? bannerTitle : srcBannerTitle, isPartOf,
 					isParentOf, isAggrPartOf, contentJson);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
 				if (lat == 0 && lon == 0) {

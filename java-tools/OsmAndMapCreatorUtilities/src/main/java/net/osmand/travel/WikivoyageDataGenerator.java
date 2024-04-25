@@ -51,10 +51,11 @@ public class WikivoyageDataGenerator {
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_banner_title ON travel_articles(banner_title);");
 
 		printStep("Download/Copy proper headers for articles");
-		generator.updateProperHeaderForArticles(conn, workingDir);
+		generator.updateSourceImageForArticles(conn, workingDir);
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_srcbanner_title ON travel_articles(src_banner_title);");
 		printStep("Copy headers between lang");
 		generator.copyImagesBetweenArticles(conn, "image_title");
-		generator.copyImagesBetweenArticles(conn, "banner_title");
+		generator.copyImagesBetweenArticles(conn, "src_banner_title");
 		printStep("Generate agg part of");
 		generator.generateAggPartOf(conn);
 		printStep("Generate is parent of");
@@ -62,6 +63,7 @@ public class WikivoyageDataGenerator {
 
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_banner_title ");
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_srcbanner_title ");
 		conn.close();
 	}
 
@@ -69,7 +71,7 @@ public class WikivoyageDataGenerator {
 		System.out.println("########## " + step + " ##########");
 	}
 
-	private void updateProperHeaderForArticles(Connection conn, File workingDir) throws SQLException {
+	private void updateSourceImageForArticles(Connection conn, File workingDir) throws SQLException {
 		final File imagesMetadata = new File(workingDir, "images.sqlite");
 		// delete images to fully recreate db
 		// imagesMetadata.delete();
@@ -77,8 +79,8 @@ public class WikivoyageDataGenerator {
 		imagesConn.createStatement()
 				.execute("CREATE TABLE IF NOT EXISTS images(file text, url text, metadata text, sourcefile text)");
 		conn.createStatement().execute("DROP TABLE IF EXISTS source_image;");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS source_image(banner_image text, source_image text)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_source_image ON source_image(banner_image);");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS source_image(img text, source_image text)");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_source_image ON source_image(img);");
 		
 		Map<String, String> existingImagesMapping = new LinkedHashMap<String, String>();
 		ResultSet rs1 = imagesConn.createStatement().executeQuery("SELECT file, sourcefile FROM images");
@@ -96,13 +98,19 @@ public class WikivoyageDataGenerator {
 	}
 
 	private void updateImagesToSource(Connection wikivoyageConn, Connection imagesConn, Map<String, String> existingImagesMapping, String imageColumn) throws SQLException {
+		try {
+			wikivoyageConn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN src_"+imageColumn);
+		} catch (Exception e) {
+			System.err.println("Column src_"+imageColumn+" already exists");
+		}
+		wikivoyageConn.createStatement().executeUpdate(String.format("UPDATE travel_articles SET src_%s = %s", imageColumn, imageColumn));
 		Map<String, String> valuesToUpdate = new LinkedHashMap<String, String>();
 //		PreparedStatement pSelect = imagesConn.prepareStatement("SELECT file, url, metadata, sourcefile FROM images WHERE file = ?");
 		//PreparedStatement pDelete = imagesConn.prepareStatement("DELETE FROM images WHERE file = ?");
 		PreparedStatement pInsert = imagesConn.prepareStatement("INSERT INTO images(file, url, metadata, sourcefile) VALUES (?, ?, ?, ?)");
 		ResultSet rs = wikivoyageConn.createStatement().executeQuery("SELECT distinct " + imageColumn
 				+ ", title, lang FROM travel_articles where " + imageColumn + " <> ''");
-		PreparedStatement pInsertSource = wikivoyageConn.prepareStatement("INSERT INTO source_image(banner_image, source_image) VALUES(?, ?)");
+		PreparedStatement pInsertSource = wikivoyageConn.prepareStatement("INSERT INTO source_image(img, source_image) VALUES(?, ?)");
 		
 		int imagesFetched = 0;
 		int imagesProcessed = 0;
@@ -149,10 +157,12 @@ public class WikivoyageDataGenerator {
 			}
 		}
 		rs.close();
-		System.out.printf("Updating images %d (from %d).\n", imagesToUpdate, imagesProcessed);
-		int updated = wikivoyageConn.createStatement().executeUpdate("UPDATE travel_articles SET " + imageColumn + " = "
-				+ " (SELECT source_image from source_image s where s.banner_image = travel_articles." + imageColumn
-				+ ") " + " WHERE " + imageColumn + " IN (SELECT distinct banner_image from source_image)");
+		System.out.printf("Updating images %d (from %d) - fetched %d.\n", imagesToUpdate, imagesProcessed, imagesFetched);
+		String sql = String.format("UPDATE travel_articles SET src_%s = " + 
+						" (SELECT img from source_image s where s.img = travel_articles.%s) " + 
+						" WHERE %s IN (SELECT distinct img from source_image)",
+						imageColumn, imageColumn, imageColumn);
+		int updated = wikivoyageConn.createStatement().executeUpdate(sql);
 		System.out.println("Update to full size images finished, updated: " + updated);
 	}
 
