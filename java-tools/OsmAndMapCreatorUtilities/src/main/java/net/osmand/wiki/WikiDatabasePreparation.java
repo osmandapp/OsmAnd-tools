@@ -806,7 +806,8 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")
 				|| str.startsWith("event")) {
 			return of(WikivoyageTemplates.POI);
-		} else if (str.startsWith("info guide linguistique") || str.startsWith("conversação")) {
+		} else if (str.startsWith("info guide linguistique") || str.startsWith("conversação")
+				|| str.startsWith("frasario")) {
 			return of(WikivoyageTemplates.PHRASEBOOK);
 		} else if (str.startsWith("info maladie")) {
 			return EnumSet.noneOf(WikivoyageTemplates.class);
@@ -920,6 +921,7 @@ public class WikiDatabasePreparation {
 //		System.out.println(text);
 		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
+//		System.out.println(WikivoyageHandler.parsePartOf(macros.get(WikivoyageTemplates.PART_OF), "", ""));
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {

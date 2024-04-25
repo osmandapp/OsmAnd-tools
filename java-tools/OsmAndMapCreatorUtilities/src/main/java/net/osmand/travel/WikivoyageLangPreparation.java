@@ -57,12 +57,13 @@ public class WikivoyageLangPreparation {
 	private final static Map<Long, Long> KNOWN_WIKIVOYAGE_MAIN = new HashMap<Long, Long>();
 	private static final long WID_TRAVEL_TOPICS = 14199938l;
 	private static final long WID_DESTINATIONS = 1200957l;
+	private static final long WID_ITINERARIES = 1322323l;
 	static {
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_DESTINATIONS, 0l); // Travel topics
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_TRAVEL_TOPICS, 0l); // Destinations
 		KNOWN_WIKIVOYAGE_MAIN.put(1599788l, WID_TRAVEL_TOPICS); // Phrasebooks
 		KNOWN_WIKIVOYAGE_MAIN.put(14208553l, WID_TRAVEL_TOPICS); // Discover
-		KNOWN_WIKIVOYAGE_MAIN.put(1322323l, WID_TRAVEL_TOPICS); // Itineraries
+		KNOWN_WIKIVOYAGE_MAIN.put(WID_ITINERARIES, WID_TRAVEL_TOPICS); // Itineraries
 		KNOWN_WIKIVOYAGE_MAIN.put(5056668l, WID_TRAVEL_TOPICS); // Sleep
 		KNOWN_WIKIVOYAGE_MAIN.put(15l, WID_DESTINATIONS); // Africa
 		KNOWN_WIKIVOYAGE_MAIN.put(51l, WID_DESTINATIONS); // Antarctica
@@ -371,6 +372,9 @@ public class WikivoyageLangPreparation {
 			createInitialDbStructure(wikiVoyageConn, lang, uncompressed);
 			prepInsert = generateInsertPrep(wikiVoyageConn, uncompressed);
 			enPageInfos = readEnPageInfo(wikiVoyageConn);
+			redirects.put("Q" + WID_TRAVEL_TOPICS, "");
+			redirects.put("Q" + WID_ITINERARIES, "");
+			redirects.put("Q" + WID_DESTINATIONS, "");
 		}
 
 		private PageInfos readEnPageInfo(Connection c) throws SQLException {
@@ -696,7 +700,7 @@ public class WikivoyageLangPreparation {
 					}
 
 					// part_of
-					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF));
+					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang);
 					if (partOf == null) {
 						// this disamb or redirection
 						return;
@@ -995,12 +999,12 @@ public class WikivoyageLangPreparation {
 			return "";
 		}
 		
-		private String parsePartOf(List<String> list) {
+		public static String parsePartOf(List<String> list, String lang, String title) {
 			if (list != null && !list.isEmpty()) {
 				String partOf = list.get(0);
 				String lowerCasePartOf = partOf.toLowerCase();
 				if (lowerCasePartOf.contains("quickfooter")) {
-					return parsePartOfFromQuickBar(partOf);
+					return parsePartOfFromQuickFooter(partOf); // it
 				} if (lowerCasePartOf.startsWith("navigation")) {
 					String[] splitPartOf = partOf.split(" ");
 					if (splitPartOf.length > 1) {
@@ -1025,10 +1029,8 @@ public class WikivoyageLangPreparation {
 					}
 					if (part.length() == 0) {
 						if (type.equalsIgnoreCase("маршрут")) {
-							redirects.put("Q1322323", "");
 							return "Q1322323"; // Itineraries
 						} else if (type.equalsIgnoreCase("континент")) {
-							redirects.put("Q1200957", "");
 							return "Q1200957"; // Destinations
 						} else if (type.equalsIgnoreCase("сводная") || type.equalsIgnoreCase("природа")
 								|| type.equalsIgnoreCase("наследие")) {
@@ -1053,13 +1055,16 @@ public class WikivoyageLangPreparation {
 			return "";
 		}
 
-		private String parsePartOfFromQuickBar(String partOf) {
+		public static String parsePartOfFromQuickFooter(String partOf) {
 			String[] info = partOf.split("\\|");
 			String region = "";
 			for (String s : info) {
-				if (s.contains("=")) {
-					if (!s.toLowerCase().contains("livello")) {
-						region = s.substring(s.indexOf("=") + 1).trim();
+				int i = s.indexOf("=");
+				if (i > 0) {
+					String key = s.substring(0, i).trim().toLowerCase();
+					String value = s.substring(i + 1).trim();
+					if (!key.equals("livello") && value.length() > 0) {
+						region = value;
 					}
 				}
 			}
