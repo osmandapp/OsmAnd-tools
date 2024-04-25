@@ -289,10 +289,22 @@ public class SvgMapLegendGenerator {
 			content += "</svg>";
 			return content;
 		}
-
-		private static String getIconPath(String iconName) {
-			return System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/map-icons-svg/" + "mx_"
-					+ iconName + ".svg";
+		
+		private static String getIconPath(String iconName) throws Exception {
+			String basePath = System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/map-icons-svg/";
+			String filePath = basePath + "mx_" + iconName + ".svg";
+			
+			File file = new File(filePath);
+			if (file.exists()) {
+				return filePath;
+			}
+			String coloredIconFilePath = basePath + "c_mx_" + iconName + ".svg";
+			file = new File(coloredIconFilePath);
+			if (file.exists()) {
+				return coloredIconFilePath;
+			} else {
+				throw new Exception("File not found " + filePath);
+			}
 		}
 
 		private static String geBackgroundRect(String color, float opacity) {
