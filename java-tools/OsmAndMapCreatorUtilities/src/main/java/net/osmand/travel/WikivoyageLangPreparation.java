@@ -700,30 +700,29 @@ public class WikivoyageLangPreparation {
 						htmlFileWriter.write(plainStr);
 						htmlFileWriter.close();
 					}
-
 					// part_of
-					String partOf = null;
-					List<String> possiblePartOf = parsePartOfFromQuickFooter(macroBlocks.get(WikivoyageTemplates.QUICK_FOOTER), title, lang); // for it
-					if (possiblePartOf != null) {
-						for (String s : possiblePartOf) {
-							// if the order is not correct then by title will produce wrong results
-							if (pageInfos.byTitle.containsKey(s)) {
-								partOf = s;
-								break;
-							} else {
-								System.out.printf("Info missing parent %s in %s %s \n", s, lang, title);
-							}
-						}
-					}
-					if (partOf == null) {
-						partOf= parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang);
-					}
+					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang);
 					if (partOf == null) {
 						// this disamb or redirection
 						return;
 					}
 					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
 						partOf = getStandardPartOf(macroBlocks, enPage).trim();
+					}
+					if (partOf.length() == 0) {
+						List<String> possiblePartOf = parsePartOfFromQuickFooter(macroBlocks.get(WikivoyageTemplates.QUICK_FOOTER), title, lang); // for it
+						if (possiblePartOf != null) {
+							for (String s : possiblePartOf) {
+								// if the order is not correct then by title will produce wrong results
+								// (it's slightly corrected by english hierarchy)
+								if (pageInfos.byTitle.containsKey(s)) {
+									partOf = s;
+									break;
+								} else {
+									System.out.printf("Info missing parent '%s' in %s '%s' \n", s, lang, title);
+								}
+							}
+						}
 					}
 					partOf = trim(partOf);
 					if (Algorithms.isEmpty(partOf)) {
