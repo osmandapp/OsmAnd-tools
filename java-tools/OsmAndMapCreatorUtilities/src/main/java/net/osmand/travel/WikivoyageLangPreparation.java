@@ -289,10 +289,10 @@ public class WikivoyageLangPreparation {
 		}		
 		BufferedReader r = new BufferedReader(new InputStreamReader(fis));
 		String s = null;
-		while((s = r.readLine())!= null) {
+		while ((s = r.readLine()) != null) {
 			int i = s.indexOf('\t');
-			if(i > 0) {
-				pageInfos.titles.add(s.substring(i+1).trim());
+			if (i > 0) {
+				pageInfos.titles.add(s.substring(i + 1).trim().replace('_', ' '));
 			}
 		}
 		System.out.printf("Read %d page info titles\n", pageInfos.titles.size());
