@@ -718,8 +718,6 @@ public class WikiDatabasePreparation {
 		StringBuilder poiShortDescription = new StringBuilder();
 		String[] parts = val.split("\\|");
 		String areaCode = "";
-		poiFields.clear();
-		
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
