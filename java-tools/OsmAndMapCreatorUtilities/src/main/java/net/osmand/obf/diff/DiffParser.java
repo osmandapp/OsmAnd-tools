@@ -19,10 +19,31 @@ public class DiffParser {
     private static final String TYPE_WAY = "way";
     private static final String TYPE_NODE = "node";
     private static final String TYPE_ACTION = "action";
+    private static final String ATTR_ACTION_TYPE = "type";
+
+    private enum ActionType {
+        CREATE("create"),
+        DELETE("delete"),
+        MODIFY("modify");
+        final String type;
+
+        ActionType(String type) {
+            this.type = type;
+        }
+
+        static ActionType getType(String typeStr) {
+            for (ActionType at : values()) {
+                if (at.type.equals(typeStr)) {
+                    return at;
+                }
+            }
+            return null;
+        }
+    }
 
     public static void fetchModifiedIds(File diff, Set<Entity.EntityId> all, Set<Entity.EntityId> deleted) throws IOException, XmlPullParserException {
-        InputStream fis ;
-        if(diff.getName().endsWith(".gz")) {
+        InputStream fis;
+        if (diff.getName().endsWith(".gz")) {
             fis = new GZIPInputStream(new FileInputStream(diff));
         } else {
             fis = new FileInputStream(diff);
@@ -30,17 +51,17 @@ public class DiffParser {
         XmlPullParser parser = PlatformUtil.newXMLPullParser();
         parser.setInput(fis, "UTF-8");
         int tok;
-        boolean deleteAction = false;
+        ActionType actionType = null;
         while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-            if (tok == XmlPullParser.START_TAG ) {
+            if (tok == XmlPullParser.START_TAG) {
                 String name = parser.getName();
                 if (TYPE_ACTION.equals(name)) {
-                    deleteAction = true;
+                    actionType = ActionType.getType(parser.getAttributeValue("", ATTR_ACTION_TYPE));
                 }
                 Entity.EntityId entityId = null;
                 if (TYPE_NODE.equals(name)) {
                     entityId = new Entity.EntityId(Entity.EntityType.NODE, parseLong(parser, ATTR_ID, -1));
-                } else if (TYPE_WAY.equals(name) ) {
+                } else if (TYPE_WAY.equals(name)) {
                     entityId = new Entity.EntityId(Entity.EntityType.WAY, parseLong(parser, ATTR_ID, -1));
                 } else if (TYPE_RELATION.equals(name)) {
                     entityId = new Entity.EntityId(Entity.EntityType.RELATION, parseLong(parser, ATTR_ID, -1));
@@ -49,27 +70,27 @@ public class DiffParser {
                     if (all != null) {
                         all.add(entityId);
                     }
-                    if (deleted != null && deleteAction) {
+                    if (deleted != null && actionType != null && actionType != ActionType.MODIFY) {
                         deleted.add(entityId);
                     }
                 }
             } else if (tok == XmlPullParser.END_TAG) {
-                if (TYPE_ACTION.equals(parser.getName()) && deleteAction) {
-                    deleteAction = false;
+                if (TYPE_ACTION.equals(parser.getName()) && actionType != null) {
+                    actionType = null;
                 }
             }
         }
     }
 
-    protected static long parseLong(XmlPullParser parser, String name, long defVal){
+    protected static long parseLong(XmlPullParser parser, String name, long defVal) {
         long ret = defVal;
         String value = parser.getAttributeValue("", name);
-        if(value == null) {
+        if (value == null) {
             return defVal;
         }
         try {
             ret = Long.parseLong(value);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException ignored) {
         }
         return ret;
     }
