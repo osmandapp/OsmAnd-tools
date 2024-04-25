@@ -786,7 +786,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("fica em") || str.startsWith("estáen") || str.startsWith("קטגוריה") 
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 
-				|| str.startsWith("jest w")
+				|| str.startsWith("jest w") || str.startsWith("itinerário em") 
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی") || str.startsWith("位于|") || str.startsWith("位于 ")) {
 			return of(WikivoyageTemplates.PART_OF);
@@ -806,7 +806,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")
 				|| str.startsWith("event")) {
 			return of(WikivoyageTemplates.POI);
-		} else if (str.startsWith("info guide linguistique")) {
+		} else if (str.startsWith("info guide linguistique") || str.startsWith("conversação")) {
 			return of(WikivoyageTemplates.PHRASEBOOK);
 		} else if (str.startsWith("info maladie")) {
 			return EnumSet.noneOf(WikivoyageTemplates.class);
