@@ -1,6 +1,7 @@
 package net.osmand.wiki;
 
 import static java.util.EnumSet.of;
+import static net.osmand.util.Algorithms.stringsEqual;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -117,11 +118,6 @@ public class WikiDatabasePreparation {
 		}
 		
 	}
-	//forestgreen
-//	0.04% region  298 de Wales Nordwales
-//	0.04% bridge  316 de San Francisco Golden Gate Bridge
-//	0.07% island  536 de Schottland Skye
-//	0.12% landscape  1000 de Schottland Cairngorms
 	
 	public interface WikiDBBrowser {
 		
@@ -374,6 +370,12 @@ public class WikiDatabasePreparation {
 			wikiLink = browser.getWikipediaTitleByWid(lang, wikidataId);
 		}
 		LatLon latLon = browser == null ? null : browser.getLocation(lang, wikiLink, wikidataId);
+		if (!Algorithms.isEmpty(wikiLink) && !stringsEqual((String) poiFields.get(PoiFieldType.WIKIPEDIA), wikiLink)) {
+			poiFields.put(PoiFieldType.WIKIPEDIA, wikiLink);
+		}
+		if (wikidataId > 0 && !stringsEqual((String) poiFields.get(PoiFieldType.WIKIDATA), "Q" + wikidataId)) {
+			poiFields.put(PoiFieldType.WIKIDATA, "Q" + wikidataId);
+		}
 		if (latLon == null && poiFields.containsKey(PoiFieldType.LAT)
 				&& poiFields.containsKey(PoiFieldType.LON)) {
 			latLon = parseLatLon((String) poiFields.get(PoiFieldType.LAT), (String) poiFields.get(PoiFieldType.LON));
