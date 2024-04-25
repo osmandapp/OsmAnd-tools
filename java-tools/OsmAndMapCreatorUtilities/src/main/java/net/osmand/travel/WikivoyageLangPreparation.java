@@ -502,13 +502,13 @@ public class WikivoyageLangPreparation {
 			prepInsert.close();
 			assignDefaultPartOfAndValidate();
 			wikiVoyageConn.close();
-			Map<String, Integer> mp = WikiDatabasePreparation.POI_OTHER_TYPES;
+			final Map<String, Integer> mp = WikiDatabasePreparation.POI_OTHER_TYPES;
 			List<String> keys = new ArrayList<>(mp.keySet());
 			Collections.sort(keys, new Comparator<String>() {
 
 				@Override
 				public int compare(String o1, String o2) {
-					return -Integer.compare(mp.get(o1), mp.get(o1));
+					return -Integer.compare(mp.get(o1), mp.get(o2));
 				}
 			});
 			System.out.println("-----------------");

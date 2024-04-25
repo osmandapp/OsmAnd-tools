@@ -98,13 +98,14 @@ public class WikiDatabasePreparation {
 
 	public enum PoiFieldCategory {
 		SEE("special_photo_camera", 0xCC10A37E, new String[]{"see", "voir", "veja", "מוקדי", "دیدن"},
-				"church", "mosque", "square"),
+				"church", "mosque", "square", "town_hall", "building"),
 		DO("special_photo_camera", 0xCC10A37E, new String[]{"do", "event", "פעילויות", "انجام‌دادن"},
 				"museum", "zoo", "theater", "fair", "cinema", "disco", "sauna"), 
 		EAT("restaurants", 0xCCCA2D1D, new String[]{"eat", "manger", "coma","אוכל","خوردن"},
-				"restaurant"), 
+				"restaurant", "cafe"), 
 		DRINK("restaurants", 0xCCCA2D1D, new String[]{"drink", "boire", "beba", "שתייה", "نوشیدن"}, "bar"), 
-		SLEEP("tourism_hotel", 0xCC0E53C9, new String[]{"sleep", "se loger", "durma", "לינה", "خوابیدن"}, "hotel", "hostel"),
+		SLEEP("tourism_hotel", 0xCC0E53C9, new String[]{"sleep", "se loger", "durma", "לינה", "خوابیدن"}, 
+				"hotel", "hostel", "habitat"),
 		BUY("shop_department_store", 0xCC8F2BAB, new String[]{"buy", "קניות", "فهرست‌بندی"},
 				"shop", "market", "mall"),
 		GO("public_transport_stop_position", 0xCC0F5FFF, new String[]{"go", "destination", "aller", "circuler", "sortir", "רשימה"},
