@@ -399,12 +399,12 @@ public class MapApiController {
 	}
 	
 	private void addDeviceInformation(UserFileNoData file, Map<Integer, String> devices) {
-		String deviceInfo = devices.get(file.userid);
+		String deviceInfo = devices.get(file.deviceid);
 		if (deviceInfo == null) {
 			PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
 			if (device != null && device.brand != null && device.model != null) {
 				deviceInfo = device.brand + " " + device.model;
-				devices.put(file.userid, deviceInfo);
+				devices.put(file.deviceid, deviceInfo);
 			}
 		}
 		file.setDeviceInfo(deviceInfo);
