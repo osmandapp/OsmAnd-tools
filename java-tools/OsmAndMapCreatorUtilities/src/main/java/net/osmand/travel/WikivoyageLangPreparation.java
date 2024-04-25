@@ -18,6 +18,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -42,6 +44,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
 
+import gnu.trove.map.hash.TObjectIntHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
@@ -500,6 +503,21 @@ public class WikivoyageLangPreparation {
 			prepInsert.close();
 			assignDefaultPartOfAndValidate();
 			wikiVoyageConn.close();
+			TObjectIntHashMap<String> mp = WikiDatabasePreparation.POI_OTHER_TYPES;
+			List<String> keys = new ArrayList<>(mp.keySet());
+			Collections.sort(keys, new Comparator<String>() {
+
+				@Override
+				public int compare(String o1, String o2) {
+					return -Integer.compare(mp.get(o1), mp.get(o1));
+				}
+			});
+			System.out.println("-----------------");
+			System.out.println("Other category types (sorted) could be assigned to default categories:");
+			for (int i = 0; i < 25 && i < keys.size(); i++) {
+				System.out.printf("Key: %s - %d\n", keys.get(i), mp.get(keys.get(i)));
+			}
+			mp.clear();
 			
 		}
 

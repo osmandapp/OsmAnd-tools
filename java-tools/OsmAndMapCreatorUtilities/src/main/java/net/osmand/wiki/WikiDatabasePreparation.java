@@ -67,6 +67,7 @@ import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
@@ -97,24 +98,32 @@ public class WikiDatabasePreparation {
 	}
 
 	public enum PoiFieldCategory {
-		SEE("special_photo_camera", 0xCC10A37E, "see", "voir", "veja", "מוקדי", "دیدن"),
-		DO("special_photo_camera", 0xCC10A37E, "do", "event", "פעילויות", "انجام‌دادن"), 
-		EAT("restaurants", 0xCCCA2D1D, "eat", "manger", "coma","אוכל","خوردن"), 
-		DRINK("restaurants", 0xCCCA2D1D, "drink", "boire", "beba", "שתייה", "نوشیدن"), 
-		SLEEP("tourism_hotel", 0xCC0E53C9, "sleep", "se loger", "durma", "לינה", "خوابیدن"),
-		BUY("shop_department_store", 0xCC8F2BAB, "buy", "קניות", "فهرست‌بندی"),
-		GO("public_transport_stop_position", 0xCC0F5FFF, "go", "destination", "aller", "circuler", "sortir", "רשימה"),
-		NATURAL("special_photo_camera", 0xCC10A37E, "landscape", "island", "nature", "island"), 
-		OTHER("", 0xCC0F5FFF, "other", "marker", "item","רשימה", "دیدن");
+		SEE("special_photo_camera", 0xCC10A37E, new String[]{"see", "voir", "veja", "מוקדי", "دیدن"},
+				"church", "mosque", "square"),
+		DO("special_photo_camera", 0xCC10A37E, new String[]{"do", "event", "פעילויות", "انجام‌دادن"},
+				"museum", "zoo", "theater", "fair", "cinema", "disco", "sauna"), 
+		EAT("restaurants", 0xCCCA2D1D, new String[]{"eat", "manger", "coma","אוכל","خوردن"},
+				"restaurant"), 
+		DRINK("restaurants", 0xCCCA2D1D, new String[]{"drink", "boire", "beba", "שתייה", "نوشیدن"}, "bar"), 
+		SLEEP("tourism_hotel", 0xCC0E53C9, new String[]{"sleep", "se loger", "durma", "לינה", "خوابیدن"}, "hotel", "hostel"),
+		BUY("shop_department_store", 0xCC8F2BAB, new String[]{"buy", "קניות", "فهرست‌بندی"},
+				"shop", "market", "mall"),
+		GO("public_transport_stop_position", 0xCC0F5FFF, new String[]{"go", "destination", "aller", "circuler", "sortir", "רשימה"},
+				"airport", "train", "station", "bus"),
+		NATURAL("special_photo_camera", 0xCC10A37E, new String[]{"landscape", "island", "nature", "island"},
+				"park", "cemetery","garden"), 
+		OTHER("", 0xCC0F5FFF, new String[]{"other", "marker", "item","רשימה", "دیدن"});
 		
 		public final String[] names;
+		public final String[] types;
 		public final String icon;
 		public final int color;
 
-		private PoiFieldCategory(String icon, int color, String... names)  {
+		private PoiFieldCategory(String icon, int color, String[] names, String... types)  {
 			this.icon = icon;
 			this.color = color;
 			this.names = names;
+			this.types = types;
 		}
 		
 	}
@@ -811,6 +820,7 @@ public class WikiDatabasePreparation {
 		return value;
 	}
 
+	public static TObjectIntHashMap<String> POI_OTHER_TYPES = new TObjectIntHashMap<>();
 	private static PoiFieldCategory transformCategory(String[] info) {
 		// {{listing | type=go}
 		// en: type, pt: tipo, fr: group,
@@ -820,17 +830,25 @@ public class WikiDatabasePreparation {
 			if (ind >= 0) {
 				String key = info[i].substring(0, ind).trim();
 				if (key.equals("type") || key.equals("tipo") || key.equals("group")) {
-					String val = info[i].substring(ind + 1).trim();
+					String val = info[i].substring(ind + 1).toLowerCase().trim();
 					for (PoiFieldCategory p : PoiFieldCategory.values()) {
 						for (String s : p.names) {
-							if (s.equals(val)) {
+							if (val.contains(s)) {
 								res = p;
+								break;
+							}
+						}
+						for (String s : p.types) {
+							if (val.contains(s)) {
+								res = p;
+								break;
 							}
 						}
 					}
 					if (res != PoiFieldCategory.OTHER) {
 						return res;
-					}
+					} 
+					POI_OTHER_TYPES.adjustOrPutValue(val, 1, 1);
 				}
 			}
 		}
