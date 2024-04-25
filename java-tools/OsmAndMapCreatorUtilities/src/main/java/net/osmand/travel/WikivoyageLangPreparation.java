@@ -936,8 +936,8 @@ public class WikivoyageLangPreparation {
 				Map<String, String> extraValues = new LinkedHashMap<String, String>();
 				setPoiField(prepInsertPOI, INS_POI_COLUMN.TITLE, title);
 				setPoiField(prepInsertPOI, INS_POI_COLUMN.LANG, lang);
-				prepInsertPOI.setLong(INS_POI_COLUMN.ORIGINAL_ID.ordinal(), id);
-				prepInsertPOI.setLong(INS_POI_COLUMN.TRIP_ID.ordinal(), tripId);
+				prepInsertPOI.setLong(INS_POI_COLUMN.ORIGINAL_ID.ordinal() + 1, id);
+				prepInsertPOI.setLong(INS_POI_COLUMN.TRIP_ID.ordinal() + 1, tripId);
 				while (tags.hasNext()) {
 					Entry<PoiFieldType, Object> e = tags.next();
 					PoiFieldType fieldType = e.getKey();
@@ -973,7 +973,7 @@ public class WikivoyageLangPreparation {
 						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_WIKIDATA.tag(), value);
 						if (value.length() > 1) {
 							try {
-								prepInsertPOI.setLong(INS_POI_COLUMN.WIKIDATA_ID.ordinal(),
+								prepInsertPOI.setLong(INS_POI_COLUMN.WIKIDATA_ID.ordinal() + 1,
 										Long.parseLong(value.substring(1)));
 							} catch (NumberFormatException e1) {
 								System.out.println("Parsing wikidata long: '" + value + "'");
@@ -1001,8 +1001,8 @@ public class WikivoyageLangPreparation {
 					} else if (fieldType == PoiFieldType.LATLON) {
 						point.lat = ((LatLon)e.getValue()).getLatitude();
 						point.lon = ((LatLon)e.getValue()).getLongitude();
-						prepInsertPOI.setDouble(INS_POI_COLUMN.LAT.ordinal(), point.lat);
-						prepInsertPOI.setDouble(INS_POI_COLUMN.LON.ordinal(), point.lon);
+						prepInsertPOI.setDouble(INS_POI_COLUMN.LAT.ordinal() + 1, point.lat);
+						prepInsertPOI.setDouble(INS_POI_COLUMN.LON.ordinal() + 1, point.lon);
 					}
 				}
 				for (String key : extraValues.keySet()) {
@@ -1029,7 +1029,7 @@ public class WikivoyageLangPreparation {
 		
 		
 		private void setPoiField(PreparedStatement ins, INS_POI_COLUMN col, String val) throws SQLException {
-			ins.setString(col.ordinal(), val);
+			ins.setString(col.ordinal() + 1, val);
 		}
 
 
