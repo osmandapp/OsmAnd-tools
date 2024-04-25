@@ -91,7 +91,37 @@ public class WikiDatabasePreparation {
 	
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT, ADDRESS, AREA_CODE,
+		// Object categories
+		CATEGORY, LATLON
 	}
+
+	public enum PoiFieldCategory {
+		SEE("special_photo_camera", 0xCC10A37E, "see", "voir", "veja", "מוקדי", "دیدن"),
+		DO("special_photo_camera", 0xCC10A37E, "do", "event", "פעילויות", "انجام‌دادن"), 
+		EAT("restaurants", 0xCCCA2D1D, "eat", "manger", "coma","אוכל","خوردن"), 
+		DRINK("restaurants", 0xCCCA2D1D, "drink", "boire", "beba", "שתייה", "نوشیدن"), 
+		SLEEP("tourism_hotel", 0xCC0E53C9, "sleep", "se loger", "durma", "לינה", "خوابیدن"),
+		BUY("shop_department_store", 0xCC8F2BAB, "buy", "קניות", "فهرست‌بندی"),
+		GO("public_transport_stop_position", 0xCC0F5FFF, "go", "destination", "aller", "circuler", "sortir", "רשימה"),
+		NATURAL("special_photo_camera", 0xCC10A37E, "landscape", "island", "nature", "island"), 
+		OTHER("", 0xCC0F5FFF, "other", "marker", "item","רשימה", "دیدن");
+		
+		public final String[] names;
+		public final String icon;
+		public final int color;
+
+		private PoiFieldCategory(String icon, int color, String... names)  {
+			this.icon = icon;
+			this.color = color;
+			this.names = names;
+		}
+		
+	}
+	//forestgreen
+//	0.04% region  298 de Wales Nordwales
+//	0.04% bridge  316 de San Francisco Golden Gate Bridge
+//	0.07% island  536 de Schottland Skye
+//	0.12% landscape  1000 de Schottland Cairngorms
 	
 	public interface WikiDBBrowser {
 		
@@ -173,13 +203,12 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	public static String removeMacroBlocks(StringBuilder text, Map<WikivoyageTemplates, List<String>> blockResults, String lang, String title,
-			WikiDBBrowser browser) throws IOException, SQLException {
+	public static String removeMacroBlocks(StringBuilder text, Map<WikivoyageTemplates, List<String>> blockResults,
+			List<Map<PoiFieldType, Object>> pois, String lang, String title, WikiDBBrowser browser) throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
 		int headerCount = 0;
-		Map<PoiFieldType, String> poiFields = new HashMap<>();
 		for (int i = 0; i < text.length();) {
 			int leftChars = text.length() - i - 1;
 			if (isCommentOpen(text, leftChars, i)) {
@@ -245,17 +274,24 @@ public class WikiDatabasePreparation {
 				int endInd = i;
 				String val = text.substring(beginInd, endInd);
 				beginInd = 0;
+				String vallc = val.toLowerCase();
 				if (val.startsWith("gallery")) {
 					bld.append(parseGalleryString(val));
-				} else if (val.toLowerCase().startsWith("weather box")) {
+				} else if (vallc.startsWith("weather box")) {
 					parseAndAppendWeatherTable(val, bld);
-				} else if (val.startsWith("wide image") || val.startsWith("תמונה רחבה")) {
+				} else if (vallc.startsWith("wide image") || vallc.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
 				}
-				EnumSet<WikivoyageTemplates> key = getKey(val.toLowerCase(), lang);
-				if (key.contains(WikivoyageTemplates.POI)) {
+				PoiFieldCategory pc = isPOIKey(vallc, lang);
+				EnumSet<WikivoyageTemplates> key = pc != null ? of(WikivoyageTemplates.POI) : getKey(vallc, lang);
+				if (pc != null) {
 					val = val.replaceAll("\\{\\{.*}}", "");
+					Map<PoiFieldType, Object> poiFields = new HashMap<>();
+					poiFields.put(PoiFieldType.CATEGORY, pc);
 					bld.append(getWikivoyagePoiHtmlDescription(lang, browser, poiFields, val));
+					if (pois != null && !poiFields.isEmpty()) {
+						pois.add(poiFields);
+					}
 				} else if (key.contains(WikivoyageTemplates.REGION_LIST)) {
 					bld.append((parseRegionList(val)));
 				} else if (key.contains(WikivoyageTemplates.WARNING)) {
@@ -317,11 +353,11 @@ public class WikiDatabasePreparation {
 	}
 
 	private static StringBuilder getWikivoyagePoiHtmlDescription(String lang, WikiDBBrowser browser,
-			Map<PoiFieldType, String> poiFields, String val)
+			Map<PoiFieldType, Object> poiFields, String val)
 			throws IOException, SQLException, UnsupportedEncodingException {
 		StringBuilder poiShortDescription = parsePoiWithAddLatLon(val, poiFields);
-		String wikiLink = poiFields.get(PoiFieldType.WIKIPEDIA);
-		String wikiDataQId = poiFields.get(PoiFieldType.WIKIDATA);
+		String wikiLink = (String) poiFields.get(PoiFieldType.WIKIPEDIA);
+		String wikiDataQId = (String) poiFields.get(PoiFieldType.WIKIDATA);
 		long wikidataId = 0;
 		if (!Algorithms.isEmpty(wikiDataQId)) {
 			try {
@@ -340,13 +376,14 @@ public class WikiDatabasePreparation {
 		LatLon latLon = browser == null ? null : browser.getLocation(lang, wikiLink, wikidataId);
 		if (latLon == null && poiFields.containsKey(PoiFieldType.LAT)
 				&& poiFields.containsKey(PoiFieldType.LON)) {
-			latLon = parseLatLon(poiFields.get(PoiFieldType.LAT), poiFields.get(PoiFieldType.LON));
+			latLon = parseLatLon((String) poiFields.get(PoiFieldType.LAT), (String) poiFields.get(PoiFieldType.LON));
 		}
 		if (!Algorithms.isEmpty(wikiLink)) {
 			poiShortDescription.append(addWikiLink(lang, wikiLink, latLon));
 			poiShortDescription.append(" ");
 		}
 		if (latLon != null) {
+			poiFields.put(PoiFieldType.LATLON, latLon);
 			poiShortDescription.append(String.format(" geo:%.5f,%.5f,", latLon.getLatitude(), latLon.getLongitude()));
 		}
 		return poiShortDescription;
@@ -674,7 +711,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static StringBuilder parsePoiWithAddLatLon(String val, Map<PoiFieldType, String> poiFields)
+	private static StringBuilder parsePoiWithAddLatLon(String val, Map<PoiFieldType, Object> poiFields)
 			throws IOException, SQLException {
 		StringBuilder poiShortDescription = new StringBuilder();
 		String[] parts = val.split("\\|");
@@ -774,6 +811,45 @@ public class WikiDatabasePreparation {
 		return value;
 	}
 
+	private static PoiFieldCategory transformCategory(String[] info) {
+		// {{listing | type=go}
+		// en: type, pt: tipo, fr: group,
+		PoiFieldCategory res = PoiFieldCategory.OTHER;
+		for (int i = 0; i < info.length; i++) {
+			int ind = info[i].indexOf('=');
+			if (ind >= 0) {
+				String key = info[i].substring(0, ind).trim();
+				if (key.equals("type") || key.equals("tipo") || key.equals("group")) {
+					String val = info[i].substring(ind + 1).trim();
+					for (PoiFieldCategory p : PoiFieldCategory.values()) {
+						for (String s : p.names) {
+							if (s.equals(val)) {
+								res = p;
+							}
+						}
+					}
+					if (res != PoiFieldCategory.OTHER) {
+						return res;
+					}
+				}
+			}
+		}
+		return res;
+	}
+	
+	private static PoiFieldCategory isPOIKey(String str, String lang) {
+		if (str.startsWith("listing") || str.startsWith("vcard")) {
+			return transformCategory(str.split("\\|"));
+		}
+		for (PoiFieldCategory p : PoiFieldCategory.values()) {
+			for (String s : p.names) {
+				if (str.startsWith(s)) {
+					return p;
+				}
+			}
+		}
+		return null;
+	}
 	
 	private static EnumSet<WikivoyageTemplates> getKey(String str, String lang) {
 		if (str.startsWith("geo|") || str.startsWith("geo ") || str.startsWith("geodata")) {
@@ -797,18 +873,6 @@ public class WikiDatabasePreparation {
 			// -- incorrect istinkat correct version comparing to https://de.wikivoyage.org/wiki/Kurtinig?action=raw
 			// + navigation doesn't space
 			return EnumSet.noneOf(WikivoyageTemplates.class);
-		} else if (str.startsWith("do") || str.startsWith("see") || str.startsWith("go")
-				|| str.startsWith("eat") || str.startsWith("drink") 
-				|| str.startsWith("sleep") || str.startsWith("buy") 
-				|| str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("se loger") 
-				|| str.startsWith("destination") || str.startsWith("voir") || str.startsWith("aller") 
-				|| str.startsWith("manger") || str.startsWith("durma") || str.startsWith("veja") 
-				|| str.startsWith("coma") || str.startsWith("אוכל") || str.startsWith("שתייה") 
-				|| str.startsWith("לינה") || str.startsWith("מוקדי") || str.startsWith("רשימה")
-				|| str.startsWith("marker") || str.startsWith("خوابیدن") || str.startsWith("دیدن")
-				|| str.startsWith("انجام‌دادن") || str.startsWith("نوشیدن")
-				|| str.startsWith("event")) {
-			return of(WikivoyageTemplates.POI);
 		} else if (str.startsWith("info guide linguistique") || str.startsWith("conversação")
 				|| str.startsWith("frasario")) {
 			return of(WikivoyageTemplates.PHRASEBOOK);
@@ -920,7 +984,8 @@ public class WikiDatabasePreparation {
 		StringBuilder rs = Algorithms
 				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
-		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, "de", null, null);
+		List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
+		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, pois, "de",  null, null);
 //		System.out.println(text);
 		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
@@ -1392,7 +1457,7 @@ public class WikiDatabasePreparation {
 
 	private static String generateHtmlArticle(StringBuilder contentText, String lang, String title, WikiImageUrlStorage imageUrlStorage)
 			throws IOException, SQLException {
-		String text = removeMacroBlocks(contentText, new HashMap<>(), lang, title, null);
+		String text = removeMacroBlocks(contentText, new HashMap<>(), null, lang, title, null);
 		final HTMLConverter converter = new HTMLConverter(false);
 		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
 				"http://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);

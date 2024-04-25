@@ -20,9 +20,11 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -52,6 +54,8 @@ import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 import net.osmand.wiki.CustomWikiModel;
 import net.osmand.wiki.WikiDatabasePreparation;
+import net.osmand.wiki.WikiDatabasePreparation.PoiFieldCategory;
+import net.osmand.wiki.WikiDatabasePreparation.PoiFieldType;
 import net.osmand.wiki.WikiDatabasePreparation.WikiDBBrowser;
 import net.osmand.wiki.WikiImageUrlStorage;
 
@@ -677,8 +681,9 @@ public class WikivoyageLangPreparation {
 
 		private void parseText(StringBuilder cont) throws IOException, SQLException, SAXException {
 			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
+			List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
 			cInfo.title = title;
-			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, lang, title, dbBrowser);
+			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, pois, lang, title, dbBrowser);
 			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB) || 
 					macroBlocks.containsKey(WikivoyageTemplates.MONUMENT_TITLE)) {
 //				System.out.println("Skip disambiguation " + title); 
@@ -805,8 +810,7 @@ public class WikivoyageLangPreparation {
 					}
 
 					// gpx_gz
-					String gpx = generateGpx(macroBlocks.get(WikivoyageTemplates.POI), title.toString(), lang,
-							getShortDescr(plainStr), ll);
+					String gpx = generateGpx(pois, title.toString(), lang, getShortDescr(plainStr), ll);
 					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 					if (uncompressed) {
 						prepInsert.setString(column++, gpx);
@@ -867,152 +871,79 @@ public class WikivoyageLangPreparation {
 			}
 		}
 		
-		private String generateGpx(List<String> list, String title, String lang, String descr, LatLon ll) {
-			if (list != null && !list.isEmpty()) {
-				GPXFile f = new GPXFile(title, lang, descr);
-				List<WptPt> points = new ArrayList<>(); 
-				for (String s : list) {
-					String[] info = s.split("\\|");
-					WptPt point = new WptPt();
-					String category = trim(info[0].replaceAll("\n", ""));
-					point.category = category;
-					if (category.equalsIgnoreCase("vcard") || category.equalsIgnoreCase("listing")) {
-						point.category = transformCategory(info);
-					}
-					if (!Algorithms.isEmpty(point.category)) {
-						point.category = capitalizeFirstLetterAndLowercase(trim(point.category));
-					}
-					String areaCode = "";
-					Map<String, String> extraValues = new LinkedHashMap<String, String>();
-					for (int i = 1; i < info.length; i++) {
-						String field = trim(info[i]);
-						String value = "";
-						int index = field.indexOf("=");
-						if (index != -1) {
-							value = WikiDatabasePreparation.appendSqareBracketsIfNeeded(i, info, field.substring(index + 1, field.length()).trim());
-							value = value.replaceAll("[\\]\\[]", "");
-							field = field.substring(0, index).trim();
+		private String generateGpx(List<Map<PoiFieldType, Object>> list, String title, String lang, String descr,
+				LatLon ll) {
+			GPXFile f = new GPXFile(title, lang, descr);
+			List<WptPt> points = new ArrayList<>();
+			for (Map<PoiFieldType, Object> s : list) {
+				WptPt point = new WptPt();
+				Iterator<Entry<PoiFieldType, Object>> tags = s.entrySet().iterator();
+				Map<String, String> extraValues = new LinkedHashMap<String, String>();
+				while (tags.hasNext()) {
+					Entry<PoiFieldType, Object> e = tags.next();
+					PoiFieldType fieldType = e.getKey();
+					String value = String.valueOf(e.getValue());
+					if (fieldType == PoiFieldType.CATEGORY) {
+						PoiFieldCategory cat = (PoiFieldCategory) e.getValue();
+						point.category = cat.name().toLowerCase();
+						point.setColor(cat.color);
+						if (!Algorithms.isEmpty(cat.icon)) {
+							point.setIconName(cat.icon);
 						}
-						
-						if (!value.isEmpty() && !value.contains("{{")) {
-							String lat = "";
-							String lon = "";
-							try {
-								if (field.equalsIgnoreCase("name") || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom")
-										|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
-									point.name = value;
-								} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
-										|| field.equalsIgnoreCase("نشانی اینترنتی")) {
-									point.link = value;
-								} else if (field.equalsIgnoreCase("intl-area-code")) {
-									areaCode = value;
-								} else if (field.equalsIgnoreCase("lat") || field.equalsIgnoreCase("latitude") || field.equalsIgnoreCase("عرض جغرافیایی")) {
-									lat = value.trim();
-								} else if (field.equalsIgnoreCase("long") || field.equalsIgnoreCase("longitude") || field.equalsIgnoreCase("طول جغرافیایی")) {
-									lon = value.trim();
-								} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione") 
-										|| field.equalsIgnoreCase("description") || field.equalsIgnoreCase("sobre") || field.equalsIgnoreCase("תיאור")
-										|| field.equalsIgnoreCase("متن")) {
-									point.desc = value;
-								} else if (field.equalsIgnoreCase("wikidata")) {
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_WIKIDATA.tag(), value);
-								} else if (field.equalsIgnoreCase("wikipedia")) {
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_WIKIPEDIA.tag(), value);
-								} else if (field.equalsIgnoreCase("address")) {
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_ADDRESS.tag(), value);
-								} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל") || field.equalsIgnoreCase("پست الکترونیکی")) {
-									extraValues.put(EMAIL, value);
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_EMAIL.tag(), value);
-								} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel") || field.equalsIgnoreCase("téléphone")
-										|| field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
-									extraValues.put(PHONE, value);
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_PHONE.tag(), value);
-								} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo") || field.equalsIgnoreCase("prix") 
-										|| field.equalsIgnoreCase("מחיר") || field.equalsIgnoreCase("بها")) {
-									extraValues.put(PRICE, value);
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_PRICE.tag(), value);
-								} else if (field.equalsIgnoreCase("hours") || field.equalsIgnoreCase("orari") || field.equalsIgnoreCase("horaire") 
-										|| field.equalsIgnoreCase("funcionamento") || field.equalsIgnoreCase("שעות") || field.equalsIgnoreCase("ساعت‌ها")) {
-									extraValues.put(WORKING_HOURS, value);
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_OPENING_HOURS.tag(), value);
-								} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction") || field.equalsIgnoreCase("הוראות")
-										|| field.equalsIgnoreCase("مسیرها") || field.equalsIgnoreCase("address")) {
-									extraValues.put(DIRECTIONS, value);
-									point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
-								}
-								// TODO location of wikidata wikipedia or copy from listing
-								if (WikiDatabasePreparation.isEmpty(lat) || WikiDatabasePreparation.isEmpty(lon)) {
-									// skip empty
-								} else {
-									LatLon loct = WikiDatabasePreparation.parseLocation(lat, lon);
-									if (loct == null) {
-										System.out.printf("Error point parsing (%s %s): %s %s\n", lang, title, lat, lon);
-									} else {
-										point.lat = loct.getLatitude();
-										point.lon = loct.getLongitude();
-									}
-								}
-							} catch (RuntimeException e) {
-								System.out.printf("Error point parsing (%s %s): %s\n", lang, title, e.getMessage());
-							}
-						}
-					}
-					for (String key : extraValues.keySet()) {
-						if (point.desc == null) {
-							point.desc = "";
-						} else {
-							point.desc += "\n\r";
-						}
-						String value = extraValues.get(key);
-						if (areaCode.length() > 0 && key.equals(PHONE)) {
-							value = areaCode + " " + value;
-						}
-						point.desc += key + ": " + value; // ". " backward compatible
-					}
-					if (!point.hasLocation() && ll != null) {
-						// coordinates of article
-						point.lat = ll.getLatitude();
-						point.lon = ll.getLongitude();
-					}
-					if (point.hasLocation() && point.name != null && !point.name.isEmpty()) {
-						if (point.category != null) {
-							if (point.category.equalsIgnoreCase("see") || point.category.equalsIgnoreCase("do")) {
-								point.setColor(0xCC10A37E);
-								point.setIconName("special_photo_camera");
-							} else if (point.category.equalsIgnoreCase("eat") || point.category.equalsIgnoreCase("drink")) {
-								point.setColor(0xCCCA2D1D);
-								point.setIconName("restaurants");
-							} else if (point.category.equalsIgnoreCase("sleep")) {
-								point.setColor(0xCC0E53C9);
-								point.setIconName("tourism_hotel");
-							} else if (point.category.equalsIgnoreCase("buy") || point.category.equalsIgnoreCase("listing")) {
-								point.setColor(0xCC8F2BAB);
-								point.setIconName("shop_department_store");
-							} else if (point.category.equalsIgnoreCase("go")) {
-								point.setColor(0xCC0F5FFF);
-								point.setIconName("public_transport_stop_position");
-							}
-						}
-						points.add(point);
+					} else if (fieldType == PoiFieldType.PHONE) {
+						extraValues.put(PHONE, value);
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_PHONE.tag(), value);
+					} else if (fieldType == PoiFieldType.WORK_HOURS) {
+						extraValues.put(WORKING_HOURS, value);
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_OPENING_HOURS.tag(), value);
+					} else if (fieldType == PoiFieldType.PRICE) {
+						extraValues.put(PRICE, value);
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_PRICE.tag(), value);
+					} else if (fieldType == PoiFieldType.DIRECTIONS) {
+						extraValues.put(DIRECTIONS, value);
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_DIRECTIONS.tag(), value);
+					} else if (fieldType == PoiFieldType.ADDRESS) {
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_ADDRESS.tag(), value);
+					} else if (fieldType == PoiFieldType.WIKIDATA) {
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_WIKIDATA.tag(), value);
+					} else if (fieldType == PoiFieldType.WIKIPEDIA) {
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_WIKIPEDIA.tag(), value);
+					} else if (fieldType == PoiFieldType.EMAIL) {
+						extraValues.put(EMAIL, value);
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_EMAIL.tag(), value);
+					} else if (fieldType == PoiFieldType.FAX) {
+						extraValues.put("Fax", value);
+						point.getExtensionsToWrite().put("fax", value);
+					} else if (fieldType == PoiFieldType.NAME) {
+						point.name = value;
+					} else if (fieldType == PoiFieldType.WEBSITE) {
+						point.link = value;
+					} else if (fieldType == PoiFieldType.DESCRIPTION) {
+						point.desc = value;
+					} else if (fieldType == PoiFieldType.LATLON) {
+						point.lat = ((LatLon)e.getValue()).getLatitude();
+						point.lon = ((LatLon)e.getValue()).getLongitude();
 					}
 				}
-				if (!points.isEmpty()) {
-					f.addPoints(points);
-					return GPXUtilities.asString(f);
+				for (String key : extraValues.keySet()) {
+					if (point.desc == null) {
+						point.desc = "";
+					} else {
+						point.desc += "\n\r";
+					}
+					point.desc += key + ": " + extraValues.get(key); // ". " backward compatible
 				}
+				if (point.hasLocation() && !Algorithms.isEmpty(point.name)) {
+					points.add(point);
+				}
+			}	
+			if (!points.isEmpty()) {
+				f.addPoints(points);
+				return GPXUtilities.asString(f);
 			}
 			return "";
 		}
 		
-		private String transformCategory(String[] info) {
-			String type = "";
-			for (int i = 1; i < info.length; i++) {
-				if (info[i].trim().startsWith("type")) {
-					type = info[i].substring(info[i].indexOf("=") + 1, info[i].length()).trim();
-				}
-			}
-			return type;
-		}
 		
 		private byte[] stringToCompressedByteArray(ByteArrayOutputStream baos, String toCompress) {
 			baos.reset();
