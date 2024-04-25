@@ -1032,7 +1032,7 @@ public class WikivoyageLangPreparation {
 					prepInsertPOI.addBatch();
 					points.add(point);
 				} else {
-					System.out.printf("Missing point loc %s %s in %s:%s\n", point.name, point.link, lang, title);	
+//					System.out.printf("Missing point loc %s %s in %s:%s\n", point.name, point.link, lang, title);	
 				}
 			}	
 			if (!points.isEmpty()) {
