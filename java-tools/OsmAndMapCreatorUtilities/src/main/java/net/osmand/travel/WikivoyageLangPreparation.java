@@ -1,6 +1,7 @@
 package net.osmand.travel;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -18,9 +19,12 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -157,6 +161,8 @@ public class WikivoyageLangPreparation {
 		}
 		final File wikiArticles = new File(wikivoyageFolderName, lang + "wikivoyage-latest-pages-articles.xml.bz2");
 		final File wikiProps = new File(wikivoyageFolderName, lang + "wikivoyage-latest-page_props.sql.gz");
+		final File wikiTitles = new File(wikivoyageFolderName, lang + "wikivoyage-latest-all-titles.gz");
+		
 		if (!wikiArticles.exists()) {
 			System.out.println("Wikivoyage dump for " + lang + " doesn't exist" + wikiArticles.getName());
 			return;
@@ -167,7 +173,7 @@ public class WikivoyageLangPreparation {
 		}
 		File wikivoyageSqlite = new File(wikivoyageFolderName, (uncompressed ? "full_" : "") + "wikivoyage.sqlite");
 		File wikidataDB = new File(wikidataSqliteName);
-		processWikivoyage(wikiArticles, wikiProps, lang, wikivoyageSqlite, wikidataDB);
+		processWikivoyage(wikiArticles, wikiProps, wikiTitles, lang, wikivoyageSqlite, wikidataDB);
 		System.out.println("Successfully generated.");
 	}
 
@@ -200,12 +206,13 @@ public class WikivoyageLangPreparation {
 		private Map<Long, PageInfo> byId = new HashMap<Long, PageInfo>();
 		private Map<Long, PageInfo> byWikidataId = new HashMap<Long, PageInfo>();
 		private Map<String, PageInfo> byTitle = new HashMap<String, PageInfo>(); // only published pages
+		private Set<String> titles = new HashSet<>();
 	}
 
 	protected static void processWikivoyage(final File wikiArticles, final File wikiProps, 
-			String lang, File wikivoyageSqlite, File wikidataSqlite)
+			final File wikiTitles, String lang, File wikivoyageSqlite, File wikidataSqlite)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
-		PageInfos pageInfos = readPageInfos(wikiProps);
+		PageInfos pageInfos = readPageInfos(wikiProps, wikiTitles);
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		InputStream articlesStream = new BufferedInputStream(new FileInputStream(wikiArticles), 8192 * 4);
 		BZip2CompressorInputStream zis = new BZip2CompressorInputStream(articlesStream);
@@ -273,8 +280,24 @@ public class WikivoyageLangPreparation {
 		wikidataConn.close();
 	}
 
-	private static PageInfos readPageInfos(final File wikiProps) throws IOException {
+	private static PageInfos readPageInfos(final File wikiProps, File wikiTitles) throws IOException {
 		PageInfos pageInfos = new PageInfos();
+		InputStream fis = new FileInputStream(wikiTitles);
+		if (wikiTitles.getName().endsWith("gz")) {
+			fis = new GZIPInputStream(fis);
+		}		
+		BufferedReader r = new BufferedReader(new InputStreamReader(fis));
+		String s = null;
+		while((s = r.readLine())!= null) {
+			int i = s.indexOf('\t');
+			if(i > 0) {
+				pageInfos.titles.add(s.substring(i+1).trim());
+			}
+		}
+		System.out.printf("Read %d page info titles\n", pageInfos.titles.size());
+		fis.close();
+		
+		
 		SqlInsertValuesReader.readInsertValuesFile(wikiProps.getAbsolutePath(), new InsertValueProcessor() {
 			
 			@Override
@@ -715,7 +738,7 @@ public class WikivoyageLangPreparation {
 							for (String s : possiblePartOf) {
 								// if the order is not correct then by title will produce wrong results
 								// (it's slightly corrected by english hierarchy)
-								if (pageInfos.byTitle.containsKey(s)) {
+								if (pageInfos.titles.contains(s)) {
 									partOf = s;
 									break;
 								} else {
