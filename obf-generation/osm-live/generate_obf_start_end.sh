@@ -1,5 +1,6 @@
 #!/bin/bash -e
 
+FORCE=$1
 RESULT_DIR="/home/osmlive"
 OSMAND_MAP_CREATOR_PATH=OsmAndMapCreator
 export JAVA_OPTS="-Xms512M -Xmx24014M"
@@ -88,7 +89,35 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         else
             echo "ERROR. One of file:${AFTER_OBF} ${BEFORE_OBF} ${AFTER_REL_M_OBF} ${BEFORE_REL_OBF} did not generated!"
             exit 1;
-        fi        
+        fi
+        
+        if [ "$1" != "--force" ]; then
+            echo "Check sizes of OBFs"
+            AFTER_OBF_SIZE=$(ls -l $AFTER_OBF | awk '{print $5}')
+            BEFORE_OBF_SIZE=$(ls -l $BEFORE_OBF | awk '{print $5}')
+            AFTER_REL_M_OBF_SIZE=$(ls -l $AFTER_REL_M_OBF | awk '{print $5}')
+            BEFORE_REL_OBF_SIZE=$(ls -l $BEFORE_REL_OBF | awk '{print $5}')
+            K1=1
+            if [ AFTER_OBF_SIZE > BEFORE_OBF_SIZE ]; then
+                K1=$(($AFTER_OBF_SIZE/$BEFORE_OBF_SIZE));
+            else
+                K1=$(($BEFORE_OBF_SIZE/$AFTER_OBF_SIZE));
+            fi
+            if [ "$K1" -ge 2 ]; then
+                echo "ERROR. Size is too different ${AFTER_OBF} !≈ ${BEFORE_OBF} [ ${AFTER_OBF_SIZE} !≈ ${BEFORE_OBF_SIZE} ] bytes !"
+                exit 1;
+            fi
+            K2=1
+            if [ AFTER_REL_M_OBF_SIZE > BEFORE_REL_OBF_SIZE ]; then
+                K2=$(($AFTER_REL_M_OBF_SIZE/$BEFORE_REL_OBF_SIZE));
+            else
+                K2=$(($BEFORE_REL_OBF_SIZE/$AFTER_REL_M_OBF_SIZE));
+            fi
+            if [ "$K2" -ge 2 ]; then
+                echo "ERROR. Size is too different ${AFTER_REL_M_OBF} !≈ ${BEFORE_REL_OBF} [ ${AFTER_REL_M_OBF_SIZE} !≈ ${BEFORE_REL_OBF_SIZE} ] bytes !"
+                exit 1;
+            fi
+        fi
         rm *.osm.gz || true
         rm *.osm || true
         rm *.rtree* || true
