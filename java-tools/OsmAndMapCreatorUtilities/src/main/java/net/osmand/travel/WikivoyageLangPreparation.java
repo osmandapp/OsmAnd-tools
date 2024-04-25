@@ -739,13 +739,22 @@ public class WikivoyageLangPreparation {
 							for (String s : possiblePartOf) {
 								// if the order is not correct then by title will produce wrong results
 								// (it's slightly corrected by english hierarchy)
-								if (pageInfos.titles.contains(s)) {
+								if(s.startsWith("WIKIDATAQ")) {
+									partOf = s.substring("WIKIDATA".length());
+									break;	
+								} else if (pageInfos.titles.contains(s)) {
 									partOf = s;
 									break;
 								} else if (pageInfos.missingParentsInfo.add(s)) {
 									System.out.printf("Info missing parent '%s' in %s '%s' \n", s, lang, title);
 								}
 							}
+						}
+					}
+					if (partOf.length() == 0 && title.contains("/")) {
+						String parent = title.substring(0, title.lastIndexOf('/'));
+						if (pageInfos.titles.contains(parent)) {
+							partOf = parent;
 						}
 					}
 					partOf = trim(partOf);
@@ -1108,7 +1117,7 @@ public class WikivoyageLangPreparation {
 							value = v;
 						}
 					} else if (s.trim().toUpperCase().equals("UNESCO")) {
-						value = "Q9259";
+						value = "WIKIDATAQ9259";
 					}
 					if (value != null) {
 						if (l == null) {

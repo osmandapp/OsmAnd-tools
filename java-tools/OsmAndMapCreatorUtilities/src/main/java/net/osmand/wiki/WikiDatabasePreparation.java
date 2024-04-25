@@ -791,7 +791,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
 				|| str.startsWith("بخشی") || str.startsWith("位于|") || str.startsWith("位于 ")) {
 			return of(WikivoyageTemplates.PART_OF);
-		} else if (str.startsWith("quickfooter") && lang.equals("it")) {
+		} else if (str.startsWith("quickfooter")) {
 			return of(WikivoyageTemplates.QUICK_FOOTER);
 		} else if (str.startsWith("navigation ") && lang.equals("de")) {
 			// -- incorrect istinkat correct version comparing to https://de.wikivoyage.org/wiki/Kurtinig?action=raw
@@ -924,7 +924,7 @@ public class WikiDatabasePreparation {
 //		System.out.println(text);
 		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
-		System.out.println(WikivoyageHandler.parsePartOf(macros.get(WikivoyageTemplates.PART_OF), "", ""));
+		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
