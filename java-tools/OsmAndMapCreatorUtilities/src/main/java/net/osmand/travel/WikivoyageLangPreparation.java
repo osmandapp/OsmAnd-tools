@@ -512,8 +512,8 @@ public class WikivoyageLangPreparation {
 				}
 			});
 			System.out.println("-----------------");
-			System.out.println("Other category types (sorted) could be assigned to default categories:");
-			for (int i = 0; i < 25 && i < keys.size(); i++) {
+			System.out.println("Other category types (top 15) could be assigned to default categories:");
+			for (int i = 0; i < 15 && i < keys.size(); i++) {
 				System.out.printf("Key: %s - %d\n", keys.get(i), mp.get(keys.get(i)));
 			}
 			mp.clear();

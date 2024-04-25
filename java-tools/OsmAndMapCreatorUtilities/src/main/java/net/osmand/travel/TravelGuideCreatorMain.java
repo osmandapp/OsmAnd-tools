@@ -80,7 +80,6 @@ public class TravelGuideCreatorMain {
         ic.generateIndexes(osmFile, new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types, LOG);
         osmFile.delete();
         sqliteFile.delete();
-        new File("regions.ocbf").delete();
     }
 
 

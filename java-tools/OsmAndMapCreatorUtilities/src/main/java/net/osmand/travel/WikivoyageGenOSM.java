@@ -39,6 +39,7 @@ import net.osmand.util.MapUtils;
 
 public class WikivoyageGenOSM {
 	public static final String CAT_SEE = "see"; // 27%
+	public static final String CAT_NATURAL = "natural"; // new
 	public static final String CAT_MARKER = "marker"; // 20%
 	public static final String CAT_SLEEP = "sleep"; // 15%
 	public static final String CAT_EAT = "eat"; // 12%
@@ -495,7 +496,8 @@ public class WikivoyageGenOSM {
 		categories.put("supermarket", CAT_BUY);
 		categories.put(CAT_BUY, CAT_BUY);
 
-			
+		categories.put(CAT_NATURAL, CAT_NATURAL);
+		
 		categories.put("veja", CAT_SEE);
 		categories.put("voir", CAT_SEE);
 		categories.put("zoo", CAT_SEE);
