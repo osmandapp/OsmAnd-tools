@@ -67,7 +67,6 @@ import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
@@ -820,7 +819,7 @@ public class WikiDatabasePreparation {
 		return value;
 	}
 
-	public static TObjectIntHashMap<String> POI_OTHER_TYPES = new TObjectIntHashMap<>();
+	public static Map<String,Integer> POI_OTHER_TYPES = new HashMap<>();
 	private static PoiFieldCategory transformCategory(String[] info) {
 		// {{listing | type=go}
 		// en: type, pt: tipo, fr: group,
@@ -848,7 +847,8 @@ public class WikiDatabasePreparation {
 					if (res != PoiFieldCategory.OTHER) {
 						return res;
 					} 
-					POI_OTHER_TYPES.adjustOrPutValue(val, 1, 1);
+					Integer it = POI_OTHER_TYPES.get(val);
+					POI_OTHER_TYPES.put(val, it == null ? 1 : it.intValue() + 1);
 				}
 			}
 		}

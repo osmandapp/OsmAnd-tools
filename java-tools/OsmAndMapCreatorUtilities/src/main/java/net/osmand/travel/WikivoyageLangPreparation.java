@@ -44,7 +44,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
 
-import gnu.trove.map.hash.TObjectIntHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
@@ -503,7 +502,7 @@ public class WikivoyageLangPreparation {
 			prepInsert.close();
 			assignDefaultPartOfAndValidate();
 			wikiVoyageConn.close();
-			TObjectIntHashMap<String> mp = WikiDatabasePreparation.POI_OTHER_TYPES;
+			Map<String, Integer> mp = WikiDatabasePreparation.POI_OTHER_TYPES;
 			List<String> keys = new ArrayList<>(mp.keySet());
 			Collections.sort(keys, new Comparator<String>() {
 
