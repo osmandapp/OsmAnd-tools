@@ -449,7 +449,8 @@ public class WikivoyageLangPreparation {
 				}
 				
 				// if part of doesn't exist check partOf of english wikipedia
-				if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf) && !partOf.startsWith(SUFFIX_EN_REDIRECT)) {
+				if (!Algorithms.isEmpty(partOf) && !pageInfos.byTitle.containsKey(partOf) && !partOf.startsWith(SUFFIX_EN_REDIRECT) && 
+						p.wikidataId > 0) {
 					PageInfo enPage = enPageInfos.byWikidataId.get(p.wikidataId);
 					if (enPage != null && enPageInfos.byTitle.get(enPage.partOf) != null) {
 						PageInfo enParent = enPageInfos.byTitle.get(enPage.partOf);
