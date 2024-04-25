@@ -6,7 +6,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.Connection;
@@ -14,22 +13,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 import org.apache.commons.logging.Log;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 
 import info.bliki.wiki.filter.Encoder;
 import net.osmand.PlatformUtil;
@@ -41,8 +31,6 @@ import net.osmand.data.LatLon;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.osm.io.NetworkUtils;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 public class WikivoyageDataGenerator {
@@ -52,8 +40,6 @@ public class WikivoyageDataGenerator {
 	
 	private static final String[] columns = new String[] {"osm_id long", "city_type text", "population long", "country text", "region text"};
 	private static final double DISTANCE_THRESHOLD = 3000000;
-	private static final int POPULATION_LIMIT = 1000000;
-	private static final int BATCH_INSERT_INTO_SIZE = 100;
 	
 	private int sleft = MapUtils.get31TileNumberX(-179.9);
 	private int sright = MapUtils.get31TileNumberX(179.9);
@@ -100,14 +86,10 @@ public class WikivoyageDataGenerator {
 		generator.generateAggPartOf(conn);
 		printStep("Generate is parent of");
 		generator.generateIsParentOf(conn);
-		printStep("Generate search table");
-		generator.generateSearchTable(conn);
 		if (citiesObfFile != null) {
 			printStep("Add osm city data");
 		}
 		generator.addCitiesData(citiesObfFile, conn);
-		printStep("Populate popular articles");
-		generator.createPopularArticlesTable(conn);
 
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_banner_title ");
@@ -325,40 +307,7 @@ public class WikivoyageDataGenerator {
 		rs.close();
 	}
 
-	public void generateSearchTable(Connection conn) throws SQLException {
-		conn.createStatement().execute("DROP TABLE IF EXISTS travel_search;");
-		conn.createStatement()
-				.execute("CREATE TABLE travel_search(search_term text, trip_id long, article_title text, lang text)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_term ON travel_search(search_term);");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_search_city ON travel_search(trip_id)");
-
-		PreparedStatement insertSearch = conn.prepareStatement("INSERT INTO travel_search VALUES (?, ?, ?, ?)");
-		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of FROM travel_articles");
-
-		ResultSet rs = data.executeQuery();
-		int batch = 0;
-		while (rs.next()) {
-			String title = rs.getString("title");
-			String titleToSplit = title.replaceAll("[/\\)\\(-]", " ").replaceAll(" +", " ");
-			String lang = rs.getString("lang");
-			long id = rs.getLong("trip_id");
-			for (String s : titleToSplit.split(" ")) {
-				insertSearch.setString(1, s.toLowerCase());
-				insertSearch.setLong(2, id);
-				insertSearch.setString(3, title);
-				insertSearch.setString(4, lang);
-				insertSearch.addBatch();
-				if (batch++ > 500) {
-					insertSearch.executeBatch();
-					batch = 0;
-				}
-			}
-		}
-		finishPrep(insertSearch);
-		data.close();
-		rs.close();
-	}
-
+	
 	
 
 	public void finishPrep(PreparedStatement ps) throws SQLException {
@@ -454,91 +403,6 @@ public class WikivoyageDataGenerator {
 		}
 	}
 	
-	private TreeSet<String> readMostPopularArticlesFromWikivoyage(TreeSet<String> langs, int limit) throws IOException, JSONException {
-		TreeSet<String> articleIds = new TreeSet<>();
-		String date = new SimpleDateFormat("yyyy/MM").format(new Date(System.currentTimeMillis() - 24*60*60*1000*30l));// previous month
-		for (String lang : langs) {
-			String url = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/" + lang + ".wikivoyage/all-access/"
-					+ date + "/all-days";
-			System.out.println("Loading " + url);
-			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
-			StringBuilder sb = Algorithms.readFromInputStream(conn.getInputStream());
-			// System.out.println("Debug Data " + sb);
-			JSONObject object = new JSONObject(new JSONTokener(sb.toString()));
-			TreeSet<String> list = new TreeSet<String>();
-			JSONArray articles = object.getJSONArray("items").getJSONObject(0).getJSONArray("articles");
-			for (int i = 0; i < articles.length() && i < limit; i++) {
-				String title = articles.getJSONObject(i).getString("article").toLowerCase();
-				list.add(title);
-				articleIds.add(title);
-			}
-		}
-		return articleIds;
-	}
-	
-
-	private void createPopularArticlesTable(Connection conn) throws SQLException, IOException, JSONException {
-		conn.createStatement().execute("DROP TABLE IF EXISTS popular_articles;");
-		// Itineraries UNESCO
-		System.out.println("Create popular articles");
-		conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
-				+ " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
-		ResultSet rs = conn.createStatement().executeQuery("SELECT DISTINCT lang from travel_articles");
-		TreeSet<String> langs = new TreeSet<String>();
-		while(rs.next()) {
-			langs.add(rs.getString(1));
-		}
-		rs.close();
-		Set<Long> tripIds = new TreeSet<Long>();
-		Set<Long> excludeTripIds = new TreeSet<Long>();
-		
-		System.out.println("Read most popular articles for " + langs);
-		TreeSet<String> popularArticleIds = readMostPopularArticlesFromWikivoyage(langs, 100);
-		
-		System.out.println("Scan articles for big cities");
-		rs = conn.createStatement().executeQuery("SELECT title, trip_id, population, lat, lon, lang FROM travel_articles ");
-		
-		while(rs.next()) {
-			String title = rs.getString(1).toLowerCase();
-			Long tripId = rs.getLong(2);
-			if (title.equals("main page") || title.contains("disambiguation") 
-					|| title.contains("значения")) {
-				excludeTripIds.add(tripId);
-			}
-			if (title.contains("itineraries") || title.contains("unesco")) {
-				tripIds.add(tripId);
-			}
-			if (popularArticleIds.contains(title)) {
-				tripIds.add(tripId);
-			}
-			if (rs.getLong(3) > POPULATION_LIMIT) {
-				tripIds.add(tripId);
-			}
-		}
-		rs.close();
-		tripIds.removeAll(excludeTripIds);
-		
-		System.out.println("Create popular article refs");
-		while(!tripIds.isEmpty()) {
-			int batchSize = BATCH_INSERT_INTO_SIZE;
-			StringBuilder tripIdsInStr = new StringBuilder();
-			Iterator<Long> it = tripIds.iterator();
-			while(it.hasNext() && batchSize -- > 0) {
-				if(tripIdsInStr.length() > 0) {
-					tripIdsInStr.append(", ");
-				}
-				tripIdsInStr.append(it.next());
-				it.remove();
-			}
-			
-			conn.createStatement().execute("INSERT INTO popular_articles(title, trip_id, population, lat, lon, lang) " + 
-				"SELECT title, trip_id, population, lat, lon, lang FROM travel_articles WHERE trip_id IN ("+tripIdsInStr+")");
-		}
-		
-		
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_lang_ind ON popular_articles(lang);");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS popular_city_id_ind ON popular_articles(trip_id);");
-	}
 
 	private void insertData(Connection conn, String title, Amenity acceptedResult, LatLon fromDB)
 			throws SQLException, IOException {

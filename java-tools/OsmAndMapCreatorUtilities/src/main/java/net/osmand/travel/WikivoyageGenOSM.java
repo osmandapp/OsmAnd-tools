@@ -150,7 +150,6 @@ public class WikivoyageGenOSM {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection connection = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getCanonicalPath(), log );
 		Statement statement = connection.createStatement();
-		// popular_articles : trip_id, popularity_index, order_index, population, title, lat, lon, lang
 		// travel_articles: 	
 		// 						population, country, region, city_type, osm_i,
 		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, "

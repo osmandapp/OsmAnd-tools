@@ -68,10 +68,7 @@ public class TravelGuideCreatorMain {
             System.exit(1);
         }
         Map<String, List<File>> mapping = getFileMapping(files);
-        WikivoyageDataGenerator dataGenerator = new WikivoyageDataGenerator();
         generateTravelSqlite(mapping, conn);
-        dataGenerator.generateSearchTable(conn);
-        createPopularArticlesTable(conn);
         conn.close();
         File osmFile = new File(directory, TRAVEL_GUIDE_NAME + OSM_GZ_EXT);
         WikivoyageGenOSM.genWikivoyageOsm(sqliteFile, osmFile, -1);
@@ -86,10 +83,6 @@ public class TravelGuideCreatorMain {
         new File("regions.ocbf").delete();
     }
 
-    private void createPopularArticlesTable(Connection conn) throws SQLException {
-        conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
-                + " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
-    }
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
     	WikivoyageLangPreparation.createInitialDbStructure(conn, "en", false);
