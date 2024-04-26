@@ -49,6 +49,7 @@ public class WikivoyageDataGenerator {
 		Connection conn = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getAbsolutePath(), log);
 		WikivoyageDataGenerator generator = new WikivoyageDataGenerator();
 		printStep("Preparing indexes");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_title_lang ON travel_articles(title,lang);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_tripid_lang ON travel_articles(trip_id,lang);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_partof_lang ON travel_articles(is_part_of,lang);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
@@ -68,6 +69,7 @@ public class WikivoyageDataGenerator {
 		printStep("Generate is parent of");
 		generator.generateIsParentOf(conn);
 		
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_title_lang ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_partof_lang ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_banner_title ");
