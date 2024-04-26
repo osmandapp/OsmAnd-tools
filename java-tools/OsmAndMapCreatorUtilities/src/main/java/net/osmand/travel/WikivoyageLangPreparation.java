@@ -843,6 +843,10 @@ public class WikivoyageLangPreparation {
 							return;
 						}
 					}
+					if(partOf.equalsIgnoreCase(title)) {
+						skipArticle(lang, title, "l", String.format("Loop reference is detected!"));
+						return;
+					}
 					// prep.setString(column++, Encoder.encodeUrl(title.toString()));
 					prepInsert.setString(column++, title.toString());
 					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, plainStr));

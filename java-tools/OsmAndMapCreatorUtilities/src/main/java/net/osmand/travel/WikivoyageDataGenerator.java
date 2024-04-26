@@ -47,20 +47,24 @@ public class WikivoyageDataGenerator {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getAbsolutePath(), log);
 		WikivoyageDataGenerator generator = new WikivoyageDataGenerator();
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_tripid_lang ON travel_articles(trip_id,lang);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_banner_title ON travel_articles(banner_title);");
 
 		printStep("Download/Copy proper headers for articles");
 		generator.updateSourceImageForArticles(conn, workingDir);
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_srcbanner_title ON travel_articles(src_banner_title);");
+		
 		printStep("Copy headers between lang");
 		generator.copyImagesBetweenArticles(conn, "image_title");
 		generator.copyImagesBetweenArticles(conn, "src_banner_title");
+		
 		printStep("Generate agg part of");
 		generator.generateAggPartOf(conn);
+		
 		printStep("Generate is parent of");
 		generator.generateIsParentOf(conn);
-
+		
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_banner_title ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_srcbanner_title ");
@@ -212,13 +216,14 @@ public class WikivoyageDataGenerator {
 
 	private void copyImagesBetweenArticles(Connection conn, String imageColumn) throws SQLException {
 		Statement statement = conn.createStatement();
+		System.out.println("Copying headers from english language to others... " + imageColumn);
 		String sql = String.format(
 				"UPDATE or IGNORE travel_articles set %s = "
 				+ "(SELECT %s FROM travel_articles t WHERE t.trip_id = travel_articles.trip_id and t.lang = 'en') "
 				+ "WHERE (travel_articles.%s is null or travel_articles.%s = '') and travel_articles.lang <>'en'",
 				imageColumn, imageColumn, imageColumn, imageColumn);
 		boolean update = statement.execute(sql);
-		System.out.println("Copy headers from english language to others: " + update);
+		System.out.println("Copied headers from english language to others: " + update);
         statement.close();
         statement = conn.createStatement();
 		System.out.println("Articles without image (" + imageColumn + "):");
@@ -239,6 +244,7 @@ public class WikivoyageDataGenerator {
 		String partOf;
 //		long partOfWid;
 	}
+	
 	private void generateAggPartOf(Connection conn) throws SQLException {
 		try {
 			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
@@ -292,14 +298,14 @@ public class WikivoyageDataGenerator {
 				}
 			}
 			if (!Algorithms.isEmpty(partOf) && parent == null) {
-				System.out.printf("Error parent not reached: %s from %s %s", partOf, a.lang, a.title);
+				System.out.printf("Error parent not reached: %s from %s %s\n", partOf, a.lang, a.title);
 			}
 			updatePartOf.setString(1, agg.toString());
 			updatePartOf.setString(2, a.title);
 			updatePartOf.setString(3, a.lang);
 			updatePartOf.addBatch();
 			if (++batch% BATCH_SIZE == 0) {
-				System.out.printf("Processsed %d ...", batch);
+				System.out.printf("Processsed %d ...\n", batch);
 				updatePartOf.executeBatch();
 			}
 		}

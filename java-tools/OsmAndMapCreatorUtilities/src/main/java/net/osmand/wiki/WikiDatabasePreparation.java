@@ -886,7 +886,7 @@ public class WikiDatabasePreparation {
 				|| str.startsWith("είναιτμήματου") || str.startsWith("είναιτμήματης")
 				//|| str.startsWith("commonscat") 
 				|| str.startsWith("jest w") || str.startsWith("itinerário em") 
-				|| str.startsWith("partoftopic") || str.startsWith("theme") || str.startsWith("categoría")
+				|| str.startsWith("partoftopic") || str.startsWith("theme ") || str.startsWith("theme|") || str.startsWith("categoría")
 				|| str.startsWith("بخشی") || str.startsWith("位于|") || str.startsWith("位于 ")) {
 			return of(WikivoyageTemplates.PART_OF);
 		} else if (str.startsWith("quickfooter")) {
