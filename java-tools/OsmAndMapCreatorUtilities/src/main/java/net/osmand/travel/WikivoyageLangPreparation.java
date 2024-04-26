@@ -16,6 +16,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLType;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
@@ -1082,15 +1083,16 @@ public class WikivoyageLangPreparation {
 				}
 				insParams.put(INS_POI_COLUMN.DESCRIPTION, point.desc);
 				if (point.hasLocation() && !Algorithms.isEmpty(point.name)) {
-					Iterator<Entry<INS_POI_COLUMN, Object>> it = insParams.entrySet().iterator();
-					while(it.hasNext()) {
-						Entry<INS_POI_COLUMN, Object> e = it.next();
-						if (e.getValue() instanceof Long) {
-							prepInsertPOI.setLong(e.getKey().ordinal() + 1, (long) e.getValue());
-						} else if (e.getValue() instanceof Double) {
-							prepInsertPOI.setDouble(e.getKey().ordinal() + 1, (double) e.getValue());
+					for (INS_POI_COLUMN i : INS_POI_COLUMN.values()) {
+						Object obj = insParams.get(i);
+						if (obj instanceof Long) {
+							prepInsertPOI.setLong(i.ordinal() + 1, (long) obj);
+						} else if (obj instanceof Double) {
+							prepInsertPOI.setDouble(i.ordinal() + 1, (double) obj);
+						} else if (obj != null) {
+							prepInsertPOI.setString(i.ordinal() + 1, String.valueOf(obj));
 						} else {
-							prepInsertPOI.setString(e.getKey().ordinal() + 1, String.valueOf(e.getValue()));
+							prepInsertPOI.setObject(i.ordinal() + 1, null);
 						}
 					}
 					prepInsertPOI.addBatch();

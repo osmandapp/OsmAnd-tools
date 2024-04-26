@@ -115,7 +115,7 @@ public class WikiDatabasePreparation {
 				"airport", "train", "station", "bus"),
 		NATURAL("special_photo_camera", 0xCC10A37E, new String[] { "landscape", "island", "nature", "island" }, "park",
 				"cemetery", "garden", "lake", "beach", "landmark", "cemetery","cave", "garden", "waterfall", "viewpoint", "mountain"), 
-		OTHER("", 0xCC0F5FFF, new String[]{"other", "marker", "item","רשימה", "دیدن"});
+		OTHER("", 0xCC0F5FFF, new String[]{"other", "marker", "ville", "item","רשימה", "دیدن"});
 		
 		public final String[] names;
 		public final String[] types;
@@ -772,7 +772,7 @@ public class WikiDatabasePreparation {
 							|| field.equalsIgnoreCase("دورنگار")) {
 						poiFields.put(PoiFieldType.FAX, value);
 						poiShortDescription.append("fax: ").append(value).append(", ");
-					} else if (field.equalsIgnoreCase("wdid") || field.equalsIgnoreCase("wikidata")) {
+					} else if (field.equalsIgnoreCase("wdid") || field.equalsIgnoreCase("wikidata") || field.equalsIgnoreCase("ויקינתונים")) {
 //						wikiDataQId = value;
 						poiFields.put(PoiFieldType.WIKIDATA, value);
 					} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel")
