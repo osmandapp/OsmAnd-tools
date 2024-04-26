@@ -83,12 +83,12 @@ public class TravelGuideCreatorMain {
     }
     
     private void addColumn(Connection conn, String col) {
-    	 try {
-             conn.createStatement().execute(String.format("ALTER TABLE travel_articles ADD COLUMN %s"));
-         } catch (Exception e) {
-             System.err.printf("Column %s already exists\n");
-         }
-    }
+      	 try {
+               conn.createStatement().execute(String.format("ALTER TABLE travel_articles ADD COLUMN %s", col));
+           } catch (Exception e) {
+               System.err.printf("Column %s already exists\n", col);
+           }
+      }
 
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {

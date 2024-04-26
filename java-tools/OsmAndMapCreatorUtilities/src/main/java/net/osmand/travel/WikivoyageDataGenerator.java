@@ -251,9 +251,9 @@ public class WikivoyageDataGenerator {
 	
 	private void addColumn(Connection conn, String col) {
    	 try {
-            conn.createStatement().execute(String.format("ALTER TABLE travel_articles ADD COLUMN %s"));
+            conn.createStatement().execute(String.format("ALTER TABLE travel_articles ADD COLUMN %s", col));
         } catch (Exception e) {
-            System.err.printf("Column %s already exists\n");
+            System.err.printf("Column %s already exists\n", col);
         }
    }
 	private void generateAggPartOf(Connection conn) throws SQLException {
