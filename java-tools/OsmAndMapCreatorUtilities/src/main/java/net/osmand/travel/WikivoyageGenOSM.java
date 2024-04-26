@@ -62,7 +62,7 @@ public class WikivoyageGenOSM {
 	
 
 	// FUTURE:
-	// - Combine point languages and extra tags (merge points possibly by wikidata id) 
+	// TODO - Combine point languages and extra tags (merge points possibly by wikidata id) 
 	// 	 NOTE: do not duplicate description:* (they are all  visible in context menu)
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");

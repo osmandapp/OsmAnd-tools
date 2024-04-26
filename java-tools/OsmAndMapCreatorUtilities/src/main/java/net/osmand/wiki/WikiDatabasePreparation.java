@@ -115,7 +115,7 @@ public class WikiDatabasePreparation {
 				"airport", "train", "station", "bus"),
 		NATURAL("special_photo_camera", 0xCC10A37E, new String[] { "landscape", "island", "nature", "island" }, "park",
 				"cemetery", "garden", "lake", "beach", "landmark", "cemetery","cave", "garden", "waterfall", "viewpoint", "mountain"), 
-		OTHER("", 0xCC0F5FFF, new String[]{"other", "marker", "ville", "item","רשימה", "دیدن"});
+		OTHER("", 0xCC0F5FFF, new String[]{"other", "marker", "ville", "item","רשימה", "دیدن","יעד מרכזי","יישוב מרכזי"});
 		
 		public final String[] names;
 		public final String[] types;
@@ -1012,6 +1012,12 @@ public class WikiDatabasePreparation {
 		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
 		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
+		List<String> lst = macros.get(WikivoyageTemplates.POI);
+		if(lst != null) {
+			for (String l : lst) {
+				System.out.println(l);
+			}
+		}
 	}
 
 	public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, SQLException, ComponentLookupException, XmlPullParserException, InterruptedException {
