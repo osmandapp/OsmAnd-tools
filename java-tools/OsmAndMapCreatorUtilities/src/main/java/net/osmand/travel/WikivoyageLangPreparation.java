@@ -808,7 +808,7 @@ public class WikivoyageLangPreparation {
 						// this disamb or redirection
 						return;
 					}
-					if (partOf.length() == 0 || KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
+					if (partOf.length() == 0) {
 						partOf = getStandardPartOf(macroBlocks, enPage).trim();
 					}
 					if (partOf.length() == 0) {
@@ -834,6 +834,9 @@ public class WikivoyageLangPreparation {
 						if (pageInfos.titles.contains(parent)) {
 							partOf = parent;
 						}
+					}
+					if (KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
+						partOf = getStandardPartOf(macroBlocks, enPage).trim();
 					}
 					partOf = trim(partOf);
 					if (Algorithms.isEmpty(partOf)) {
