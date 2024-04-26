@@ -70,6 +70,8 @@ public class WikivoyageLangPreparation {
 	private static final long WID_DESTINATIONS = 1200957l;
 	private static final long WID_ITINERARIES = 1322323l;
 	private static final long WID_PHRASEBOOKS = 1599788l;
+	private static final long WID_CULTURAL_ATTRACTIONS = 11042l;
+	private static final long WID_WORLD_HERITAGE_SITE = 9259l;
 	static {
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_DESTINATIONS, 0l); // Travel topics
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_TRAVEL_TOPICS, 0l); // Destinations
@@ -228,6 +230,9 @@ public class WikivoyageLangPreparation {
 			}
 			lc = lc.replace('_', ' ');
 			if (titlesLc.containsKey(lc)) {
+				return titlesLc.get(lc);
+			}
+			if (titlesLc.containsKey(lc.replace("  ", " "))) {
 				return titlesLc.get(lc);
 			}
 			lc = lc.replaceAll("%28", "\\(").replaceAll("%29", "\\)");
@@ -452,7 +457,8 @@ public class WikivoyageLangPreparation {
 			redirects.put("Q" + WID_TRAVEL_TOPICS, "");
 			redirects.put("Q" + WID_ITINERARIES, "");
 			redirects.put("Q" + WID_DESTINATIONS, "");
-			redirects.put("Q9259", "");
+			redirects.put("Q" + WID_CULTURAL_ATTRACTIONS, "");
+			redirects.put("Q" + WID_WORLD_HERITAGE_SITE, ""); 
 			prepInsertPOI = prepareInsertPoi();
 		}
 
@@ -822,6 +828,9 @@ public class WikivoyageLangPreparation {
 					}
 					// part_of
 					String partOf = parsePartOf(macroBlocks.get(WikivoyageTemplates.PART_OF), title, lang);
+					if ("Voyages culturels".equals(partOf)) {
+						partOf = "Q" + WID_CULTURAL_ATTRACTIONS;
+					}
 					if (partOf == null) {
 						// this disamb or redirection
 						return;
@@ -1190,7 +1199,7 @@ public class WikivoyageLangPreparation {
 							value = v;
 						}
 					} else if (s.trim().toUpperCase().equals("UNESCO")) {
-						value = "WIKIDATAQ9259";
+						value = "WIKIDATAQ" + WID_WORLD_HERITAGE_SITE;
 					}
 					if (value != null) {
 						if (l == null) {
