@@ -234,7 +234,7 @@ public class WikivoyageLangPreparation {
 			if (titlesLc.containsKey(lc)) {
 				return titlesLc.get(lc);
 			}
-			if (titlesLc.containsKey(lc.replace("  ", " "))) {
+			if (titlesLc.containsKey(lc.replace("__", "_"))) {
 				return titlesLc.get(lc);
 			}
 			if (lc.contains("%")) {
