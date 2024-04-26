@@ -314,8 +314,8 @@ public class WikivoyageDataGenerator {
 			}
 			if (!Algorithms.isEmpty(partOf) && parent == null) {
 				System.out.printf("Error parent not reached (delete): %s from %s %s\n", partOf, a.lang, a.title);
-				deleteOf.setString(1, a.lang);
-				deleteOf.setString(2, a.title);
+				deleteOf.setString(1, a.title);
+				deleteOf.setString(2, a.lang);
 				deleteOf.execute();
 				continue;
 			}
