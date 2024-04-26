@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -235,7 +237,13 @@ public class WikivoyageLangPreparation {
 			if (titlesLc.containsKey(lc.replace("  ", " "))) {
 				return titlesLc.get(lc);
 			}
-			lc = lc.replaceAll("%28", "\\(").replaceAll("%29", "\\)");
+			if (lc.contains("%")) {
+				try {
+					lc = URLDecoder.decode(lc, "UTF-8");
+				} catch (Exception e) {
+					// ignore
+				}
+			}
 			if (titlesLc.containsKey(lc)) {
 				return titlesLc.get(lc);
 			}
