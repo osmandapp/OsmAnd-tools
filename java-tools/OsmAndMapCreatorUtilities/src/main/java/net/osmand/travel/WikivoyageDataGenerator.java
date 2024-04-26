@@ -263,6 +263,7 @@ public class WikivoyageDataGenerator {
 		addColumn(conn, "agg_part_of_wid");
 		PreparedStatement updatePartOf = conn
 					.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ?, agg_part_of_wid = ? WHERE title = ? AND lang = ?");
+		PreparedStatement deleteOf = conn.prepareStatement("DELETE FROM travel_articles WHERE title = ? AND lang = ?");
 		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of, is_part_of_wid FROM travel_articles");
 		ResultSet rs = data.executeQuery();
 		int batch = 0;
@@ -312,7 +313,11 @@ public class WikivoyageDataGenerator {
 				}
 			}
 			if (!Algorithms.isEmpty(partOf) && parent == null) {
-				System.out.printf("Error parent not reached: %s from %s %s\n", partOf, a.lang, a.title);
+				System.out.printf("Error parent not reached (delete): %s from %s %s\n", partOf, a.lang, a.title);
+				deleteOf.setString(1, a.lang);
+				deleteOf.setString(2, a.title);
+				deleteOf.execute();
+				continue;
 			}
 			updatePartOf.setString(1, agg.toString());
 			updatePartOf.setString(2, aggWid.toString());
