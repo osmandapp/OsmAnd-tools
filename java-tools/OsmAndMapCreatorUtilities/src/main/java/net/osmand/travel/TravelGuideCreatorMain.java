@@ -81,16 +81,21 @@ public class TravelGuideCreatorMain {
         osmFile.delete();
         sqliteFile.delete();
     }
+    
+    private void addColumn(Connection conn, String col) {
+    	 try {
+             conn.createStatement().execute(String.format("ALTER TABLE travel_articles ADD COLUMN %s"));
+         } catch (Exception e) {
+             System.err.printf("Column %s already exists\n");
+         }
+    }
 
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
-    	WikivoyageLangPreparation.createInitialDbStructure(conn, "en", false);
-        try {
-            conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
-            conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN is_parent_of");
-        } catch (Exception e) {
-            System.err.println("Column aggregated_part_of already exists");
-        }
+		WikivoyageLangPreparation.createInitialDbStructure(conn, "en", false);
+		addColumn(conn, "aggregated_part_of");
+		addColumn(conn, "agg_part_of_wid");
+		addColumn(conn, "is_parent_of");
         PreparedStatement prep = WikivoyageLangPreparation.generateInsertPrep(conn, false);
         int count = 0;
         int batch = 0;

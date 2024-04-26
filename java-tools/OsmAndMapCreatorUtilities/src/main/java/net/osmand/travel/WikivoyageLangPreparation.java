@@ -303,7 +303,7 @@ public class WikivoyageLangPreparation {
 		String s = null;
 		while ((s = r.readLine()) != null) {
 			int i = s.indexOf('\t');
-			if (i > 0) {
+			if (i > 0 && s.substring(0, i).trim().equals("0")) {
 				pageInfos.titles.add(s.substring(i + 1).trim().replace('_', ' '));
 			}
 		}
@@ -573,7 +573,10 @@ public class WikivoyageLangPreparation {
 					}
 				}
 				
-				if (partOf.startsWith(SUFFIX_EN_REDIRECT)) {
+				if (partOf.equalsIgnoreCase(title)) {
+					skipArticle(lang, title, "l", String.format("Loop reference is detected!"));
+					delete = true;
+				} else if (partOf.startsWith(SUFFIX_EN_REDIRECT)) {
 					// skip redirect
 					PageInfo parentEnPage = enPageInfos.byTitle.get(partOf.substring(SUFFIX_EN_REDIRECT.length()));
 					if (parentEnPage != null) {
@@ -590,11 +593,9 @@ public class WikivoyageLangPreparation {
 						skipArticle(lang, p.title, "p", "parent doesn't exist " + partOf);
 						delete = true;
 					}
-				} else {
-					if (p.wikidataId != WID_DESTINATIONS && p.wikidataId != WID_TRAVEL_TOPICS) {
-						skipArticle(lang, p.title, "r", "no parent");
-						delete = true;
-					}
+				} else if (p.wikidataId != WID_DESTINATIONS && p.wikidataId != WID_TRAVEL_TOPICS) {
+					skipArticle(lang, p.title, "r", "no parent");
+					delete = true;
 				}
 				if (delete) {
 					del.setLong(1, p.id);
@@ -817,9 +818,9 @@ public class WikivoyageLangPreparation {
 							for (String s : possiblePartOf) {
 								// if the order is not correct then by title will produce wrong results
 								// (it's slightly corrected by english hierarchy)
-								if(s.startsWith("WIKIDATAQ")) {
+								if (s.startsWith("WIKIDATAQ")) {
 									partOf = s.substring("WIKIDATA".length());
-									break;	
+									break;
 								} else if (pageInfos.titles.contains(s)) {
 									partOf = s;
 									break;
@@ -846,7 +847,7 @@ public class WikivoyageLangPreparation {
 							return;
 						}
 					}
-					if(partOf.equalsIgnoreCase(title)) {
+					if (partOf.equalsIgnoreCase(title)) {
 						skipArticle(lang, title, "l", String.format("Loop reference is detected!"));
 						return;
 					}
@@ -1167,7 +1168,8 @@ public class WikivoyageLangPreparation {
 					if (i > 0) {
 						String key = s.substring(0, i).trim().toLowerCase();
 						String v = s.substring(i + 1).trim();
-						if (!key.equals("livello") && v.length() > 0) {
+						if (!key.equals("livello") && !key.equals("w") && 
+								!key.equals("commons") && v.length() > 0) {
 							value = v;
 						}
 					} else if (s.trim().toUpperCase().equals("UNESCO")) {

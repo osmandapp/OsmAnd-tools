@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -47,7 +48,9 @@ public class WikivoyageDataGenerator {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getAbsolutePath(), log);
 		WikivoyageDataGenerator generator = new WikivoyageDataGenerator();
+		printStep("Preparing indexes");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_tripid_lang ON travel_articles(trip_id,lang);");
+		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_partof_lang ON travel_articles(is_part_of,lang);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_image_title ON travel_articles(image_title);");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS index_banner_title ON travel_articles(banner_title);");
 
@@ -66,13 +69,14 @@ public class WikivoyageDataGenerator {
 		generator.generateIsParentOf(conn);
 		
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_image_title ");
+		conn.createStatement().execute("DROP INDEX IF EXISTS index_partof_lang ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_banner_title ");
 		conn.createStatement().execute("DROP INDEX IF EXISTS index_srcbanner_title ");
 		conn.close();
 	}
 
 	private static void printStep(String step) {
-		System.out.println("########## " + step + " ##########");
+		System.out.println("########## " + step + " ########## " + new Date());
 	}
 
 	private void updateSourceImageForArticles(Connection conn, File workingDir) throws SQLException {
@@ -245,14 +249,18 @@ public class WikivoyageDataGenerator {
 //		long partOfWid;
 	}
 	
+	private void addColumn(Connection conn, String col) {
+   	 try {
+            conn.createStatement().execute(String.format("ALTER TABLE travel_articles ADD COLUMN %s"));
+        } catch (Exception e) {
+            System.err.printf("Column %s already exists\n");
+        }
+   }
 	private void generateAggPartOf(Connection conn) throws SQLException {
-		try {
-			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
-		} catch (Exception e) {
-			System.err.println("Column aggregated_part_of already exists");
-		}
+		addColumn(conn, "aggregated_part_of");
+		addColumn(conn, "agg_part_of_wid");
 		PreparedStatement updatePartOf = conn
-					.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ? WHERE title = ? AND lang = ?");
+					.prepareStatement("UPDATE travel_articles SET aggregated_part_of = ?, agg_part_of_wid = ? WHERE title = ? AND lang = ?");
 		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang, is_part_of, is_part_of_wid FROM travel_articles");
 		ResultSet rs = data.executeQuery();
 		int batch = 0;
@@ -268,8 +276,10 @@ public class WikivoyageDataGenerator {
 			articles.put(art.lang + ":" + art.title, art);
 			articlesWid.put(art.lang + ":" + art.wid, art);
 		}
+		long time = System.currentTimeMillis();
 		for (AggArticle a : articles.values()) {
 			StringBuilder agg = new StringBuilder();
+			StringBuilder aggWid = new StringBuilder();
 			String lang = a.lang;
 			String partOf = a.partOf;
 			AggArticle parent = getParent(articles, lang, partOf);
@@ -277,6 +287,7 @@ public class WikivoyageDataGenerator {
 			while (parent != null) {
 				if (agg.length() > 0) {
 					agg.append(",");
+					aggWid.append(",");
 				}
 				if (articlesWid.containsKey(lang + ":" + parent.wid)) {
 					// switch back to local
@@ -287,11 +298,12 @@ public class WikivoyageDataGenerator {
 				} else {
 					agg.append(parent.lang + ":" + parent.title);
 				}
+				aggWid.append(parent.wid == 0 ? "" : parent.wid);
 				partOf = parent.partOf;
 				parent = getParent(articles, parent.lang, partOf);
-				if(iterations++ > 30) {
+				if(iterations++ > 25) {
 					System.out.println(parent.title + " " + parent.lang);
-					if(iterations > 40) {
+					if(iterations > 30) {
 						System.out.println("! ERROR LOOP DETECTED ERROR !");
 						break;
 					}
@@ -301,11 +313,13 @@ public class WikivoyageDataGenerator {
 				System.out.printf("Error parent not reached: %s from %s %s\n", partOf, a.lang, a.title);
 			}
 			updatePartOf.setString(1, agg.toString());
-			updatePartOf.setString(2, a.title);
-			updatePartOf.setString(3, a.lang);
+			updatePartOf.setString(2, aggWid.toString());
+			updatePartOf.setString(3, a.title);
+			updatePartOf.setString(4, a.lang);
 			updatePartOf.addBatch();
 			if (++batch% BATCH_SIZE == 0) {
-				System.out.printf("Processsed %d ...\n", batch);
+				System.out.printf("Processsed %d %d ms...\n", batch, System.currentTimeMillis() - time);
+				time = System.currentTimeMillis();
 				updatePartOf.executeBatch();
 			}
 		}
@@ -324,11 +338,7 @@ public class WikivoyageDataGenerator {
 	}
 
 	public void generateIsParentOf(Connection conn) throws SQLException {
-		try {
-			conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN is_parent_of");
-		} catch (Exception e) {
-			System.err.println("Column is_parent_of already exists");
-		}
+		addColumn(conn, "is_parent_of");
 		PreparedStatement updateIsParentOf = conn
 				.prepareStatement("UPDATE travel_articles SET is_parent_of = ? WHERE title = ? AND lang = ?");
 		PreparedStatement data = conn.prepareStatement("SELECT trip_id, title, lang FROM travel_articles");
@@ -377,8 +387,5 @@ public class WikivoyageDataGenerator {
 		}
 		return res.length() > 0 ? res.substring(0, res.length() - 1) : "";
 	}
-
-
-
 	
 }
