@@ -218,8 +218,24 @@ public class WikivoyageLangPreparation {
 		private Map<Long, PageInfo> byId = new HashMap<Long, PageInfo>();
 		private Map<Long, PageInfo> byWikidataId = new HashMap<Long, PageInfo>();
 		private Map<String, PageInfo> byTitle = new HashMap<String, PageInfo>(); // only published pages
-		private Set<String> titles = new HashSet<>();
+		private Map<String, String> titlesLc = new HashMap<String, String>();
 		public Set<String> missingParentsInfo = new HashSet<>();
+		
+		public String getCorrectTitle(String titleRef) {
+			String lc = titleRef.toLowerCase();
+			if (titlesLc.containsKey(lc)) {
+				return titlesLc.get(lc);
+			}
+			lc = lc.replace('_', ' ');
+			if (titlesLc.containsKey(lc)) {
+				return titlesLc.get(lc);
+			}
+			lc = lc.replaceAll("%28", "\\(").replaceAll("%29", "\\)");
+			if (titlesLc.containsKey(lc)) {
+				return titlesLc.get(lc);
+			}
+			return null;
+		}
 	}
 
 	protected static void processWikivoyage(final File wikiArticles, final File wikiProps, 
@@ -304,10 +320,11 @@ public class WikivoyageLangPreparation {
 		while ((s = r.readLine()) != null) {
 			int i = s.indexOf('\t');
 			if (i > 0 && s.substring(0, i).trim().equals("0")) {
-				pageInfos.titles.add(s.substring(i + 1).trim().replace('_', ' '));
+				String title = s.substring(i + 1).trim().replace('_', ' ');
+				pageInfos.titlesLc.put(title.toLowerCase(), title);
 			}
 		}
-		System.out.printf("Read %d page info titles\n", pageInfos.titles.size());
+		System.out.printf("Read %d page info titles\n", pageInfos.titlesLc.size());
 		fis.close();
 		
 		
@@ -821,8 +838,8 @@ public class WikivoyageLangPreparation {
 								if (s.startsWith("WIKIDATAQ")) {
 									partOf = s.substring("WIKIDATA".length());
 									break;
-								} else if (pageInfos.titles.contains(s)) {
-									partOf = s;
+								} else if (pageInfos.getCorrectTitle(s) != null) {
+									partOf = pageInfos.getCorrectTitle(s);
 									break;
 								} else if (pageInfos.missingParentsInfo.add(s)) {
 									System.out.printf("Info missing parent '%s' in %s '%s' \n", s, lang, title);
@@ -831,8 +848,8 @@ public class WikivoyageLangPreparation {
 						}
 					}
 					if (partOf.length() == 0 && title.contains("/")) {
-						String parent = title.substring(0, title.lastIndexOf('/'));
-						if (pageInfos.titles.contains(parent)) {
+						String parent = pageInfos.getCorrectTitle(title.substring(0, title.lastIndexOf('/')));
+						if (parent != null) {
 							partOf = parent;
 						}
 					}
