@@ -102,7 +102,7 @@ public class WikiDatabasePreparation {
 				"monastery", "palace", "château", "memorial", "archaeological", "fort", "monument", "castle", "دیدن",
 				"tower", "cathedral", "arts centre", "mill", "house", "ruins"),
 		DO("special_photo_camera", 0xCC10A37E, new String[] { "do", "event", "פעילויות", "انجام‌دادن" }, "museum",
-				"zoo", "theater", "fair", "cinema", "disco", "sauna", "aquarium", "swimming", "amusement",
+				"zoo", "theater", "fair", "faire", "cinema", "disco", "sauna", "aquarium", "swimming", "amusement",
 				"golf", "club", "sports", "music", "spa", "انجام‌دادن", "festival"), 
 		EAT("restaurants", 0xCCCA2D1D, new String[]{"eat", "manger", "coma","אוכל","خوردن"},
 				"restaurant", "cafe", "bistro"), 
@@ -282,7 +282,7 @@ public class WikiDatabasePreparation {
 				int endInd = i;
 				String val = text.substring(beginInd, endInd);
 				beginInd = 0;
-				String vallc = val.toLowerCase();
+				String vallc = val.toLowerCase().trim();
 				if (val.startsWith("gallery")) {
 					bld.append(parseGalleryString(val));
 				} else if (vallc.startsWith("weather box")) {
