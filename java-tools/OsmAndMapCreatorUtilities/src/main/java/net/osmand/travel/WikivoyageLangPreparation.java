@@ -862,6 +862,11 @@ public class WikivoyageLangPreparation {
 							partOf = parent;
 						}
 					}
+					String corrPartOf = pageInfos.getCorrectTitle(partOf);
+					if (!partOf.equals(corrPartOf) && corrPartOf != null) {
+						System.out.printf("Info correct parent %s '%s': '%s' -> '%s' \n", lang, title, partOf, corrPartOf);
+						partOf = corrPartOf;
+					}
 					if (KNOWN_WIKIVOYAGE_MAIN.containsKey(cInfo.wikidataId)) {
 						partOf = getStandardPartOf(macroBlocks, enPage).trim();
 					}
