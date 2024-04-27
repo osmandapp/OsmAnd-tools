@@ -188,10 +188,10 @@ public class WikivoyageGenOSM {
 					}
 				}
 			}
-			for(String aggWid : combinedArticle.aggrPartsOfWid) {
+			for (String aggWid : combinedArticle.aggrPartsOfWid) {
 				String[] wids = aggWid.split(",");
 				boolean match = false;
-				// compare all parent wikidata ids with 
+				// compare all parent wikidata ids with
 				loop: for (int tp = 0; tp < qids.size() && !match; tp++) {
 					for (int i = 0; i < wids.length && !match; i++) {
 						if (qids.get(tp).equals(wids[i])) {
@@ -229,20 +229,21 @@ public class WikivoyageGenOSM {
 				String[] keys = s.substring(0, t).split(",");
 				out.filter = true;
 				for (String k : keys) {
-					if(k.startsWith("Q")) {
+					if (k.startsWith("Q")) {
 						int type = 0;
 						String id = k.substring(1);
 						if (id.endsWith("%")) {
-							id.substring(0, id.length() - 1);
+							id = id.substring(0, id.length() - 1);
 							type = -1;
 						} else if (id.endsWith(".")) {
-							id.substring(0, id.length() - 1);
+							id = id.substring(0, id.length() - 1);
 							type = 1;
 						}
 						out.qids.add(id);
 						out.qidsType.add(type);
 					}
 				}
+				System.out.printf("Write to %s : %s - %s\n", out.outputFile.getName(), out.qids, out.qidsType);
 			}
 			outs.add(out);
 		}
