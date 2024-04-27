@@ -743,7 +743,13 @@ public class WikiDatabasePreparation {
 					if (field.equalsIgnoreCase(("name")) || field.equalsIgnoreCase("nome") || field.equalsIgnoreCase("nom") 
 							|| field.equalsIgnoreCase("שם") || field.equalsIgnoreCase("نام")) {
 						poiShortDescription.append("'''").append(value).append("'''").append(", ");
-						poiFields.put(PoiFieldType.NAME, value);
+						int l = value.indexOf("[[");
+						int e = value.indexOf("]]");
+						if (l >= 0 && e >= 0) {
+							poiFields.put(PoiFieldType.NAME, value.substring(l + 2, e).trim());
+						} else {
+							poiFields.put(PoiFieldType.NAME, value);
+						}
 					} else if (field.equalsIgnoreCase("url") || field.equalsIgnoreCase("sito") || field.equalsIgnoreCase("האתר הרשמי")
 							|| field.equalsIgnoreCase("نشانی اینترنتی")) {
 						poiShortDescription.append("Website: ").append(value).append(". ");
@@ -781,7 +787,7 @@ public class WikiDatabasePreparation {
 //							.replaceAll("[^\\d\\+\\)\\(,]", "");
 //						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
 						poiFields.put(PoiFieldType.PHONE, value);
-						poiShortDescription.append("☎ " + "tel:").append(tel).append(". ");
+						poiShortDescription.append("☎ " + "tel:").append(value).append(". ");
 					} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo") || field.equalsIgnoreCase("מחיר")
 							|| field.equalsIgnoreCase("prix") || field.equalsIgnoreCase("بها")) {
 						poiFields.put(PoiFieldType.PRICE, value);
