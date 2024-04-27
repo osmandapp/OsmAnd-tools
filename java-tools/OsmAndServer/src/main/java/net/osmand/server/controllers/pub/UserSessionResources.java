@@ -46,9 +46,9 @@ public class UserSessionResources implements HttpSessionListener {
 	
 	public RouteCalculationProgress getRoutingProgress(HttpSession session) {
 		if (session.getAttribute(SESSION_ROUTING) instanceof RouteCalculationProgress) {
-			System.err.printf("DEBUG: cancel previous progress, last isCancelled (%d)\n",
+			System.out.printf("DEBUG: cancel previous progress, last isCancelled (%d)\n",
 					((RouteCalculationProgress) session.getAttribute(SESSION_ROUTING)).isCancelled == true ? 1 : 0);
-			System.err.printf("DEBUG: previous progress: %s\n",
+			System.out.printf("DEBUG: previous progress: %s\n",
 					((RouteCalculationProgress) session.getAttribute(SESSION_ROUTING)).getInfo(null));
 			((RouteCalculationProgress) session.getAttribute(SESSION_ROUTING)).isCancelled = true;
 		}
