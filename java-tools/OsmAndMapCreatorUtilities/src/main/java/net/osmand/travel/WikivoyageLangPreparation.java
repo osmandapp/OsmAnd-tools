@@ -99,6 +99,7 @@ public class WikivoyageLangPreparation {
 		TAG_OPENING_HOURS ("opening_hours"),
 		TAG_ADDRESS ("address"),
 		TAG_EMAIL ("email"),
+		TAG_FAX ("fax"),
 		TAG_DIRECTIONS ("directions"),
 		TAG_PRICE ("price"),
 		TAG_PHONE ("phone");
@@ -1066,8 +1067,8 @@ public class WikivoyageLangPreparation {
 						insParams.put(INS_POI_COLUMN.EMAIL, value);
 					} else if (fieldType == PoiFieldType.FAX) {
 						extraValues.put("Fax", value);
-						point.getExtensionsToWrite().put("fax", value);
-						insParams.put( INS_POI_COLUMN.FAX, value);
+						point.getExtensionsToWrite().put(WikivoyageOSMTags.TAG_FAX.tag(), value);
+						insParams.put(INS_POI_COLUMN.FAX, value);
 					} else if (fieldType == PoiFieldType.NAME) {
 						point.name = value;
 						insParams.put(INS_POI_COLUMN.NAME, value);

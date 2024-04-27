@@ -361,7 +361,6 @@ public class WikivoyageGenOSM {
 		long idStart = NODE_ID ;
 		LatLon mainArticlePoint = article.latlons.get(0);
 		List<WptPt> points = new ArrayList<GPXUtilities.WptPt>();
-		// TODO Combine - Combine point languages and extra tags (merge points possibly by wikidata id)
 		for(int i = 0; i < article.size(); i++) {
 			String lng = article.langs.get(i);
 			GPXFile file = article.points.get(i);
@@ -403,7 +402,8 @@ public class WikivoyageGenOSM {
 		addArticleTags(article, serializer, true);
 		serializer.endTag(null, "node");
 		
-		
+		// points could combined across TAG_WIKIDATA on UI 
+		// so better to duplicate points with unique route_id (instead of array)
 		for (WptPt p : points) {
 			String category = simplifyWptCategory(p.category, CAT_OTHER);
 			serializer.startTag(null, "node");
