@@ -638,7 +638,7 @@ public class WikivoyageLangPreparation {
 					del.addBatch();
 					// here we should delete all siblings recursively in theory
 				} else {
-					if (partOfWid == WID_DESTINATIONS && !KNOWN_WIKIVOYAGE_MAIN.containsKey(partOfWid)) {
+					if (partOfWid == WID_DESTINATIONS && !KNOWN_WIKIVOYAGE_MAIN.containsKey(p.wikidataId)) {
 						// reassign to other destinations (oceans, ...)
 						partOfWid = WID_OTHER_DESTINATIONS;
 						partOf = otherDestTitle;

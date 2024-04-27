@@ -455,10 +455,10 @@ public class WikivoyageGenOSM {
 	}
 	
 	private static String formatLat(double lat) {
-		if(lat < MapUtils.MIN_LATITUDE) {
+		if (lat < MapUtils.MIN_LATITUDE) {
 			lat = MapUtils.MIN_LATITUDE + 0.5;
 		}
-		if(lat > MapUtils.MAX_LATITUDE) {
+		if (lat > MapUtils.MAX_LATITUDE) {
 			lat = MapUtils.MAX_LATITUDE - 0.5;
 		}
 		return latLonFormat.format(lat);
