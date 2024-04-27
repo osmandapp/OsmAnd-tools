@@ -197,13 +197,17 @@ public class MainUtilities {
 			} else if (utl.equals("generate-wikivoyage-raw-lang")) {
 				WikivoyageLangPreparation.main(subArgsArray);
 			} else if (utl.equals("process-wikivoyage")) {
+				List<String> genOsm = new ArrayList<String>();
 				for (String s : subArgsArray) {
 					if (s.startsWith("--generate-osm=")) {
-						WikivoyageGenOSM.genWikivoyageOsm(new File(subArgsArray[0]), new File(s.substring("--generate-osm=".length())), -1);
-						return;
+						genOsm.add(s.substring("--generate-osm=".length()));
 					}
 				}
-				WikivoyageDataGenerator.main(subArgsArray);
+				if(genOsm.size() > 0) {
+					WikivoyageGenOSM.genWikivoyageOsm(new File(subArgsArray[0]), genOsm);
+				} else {
+					WikivoyageDataGenerator.main(subArgsArray);
+				}
 			} else if (utl.equals("generate-obf-extract-script")) {
 				GenerateExtractScript.main(subArgsArray);
 			} else if (utl.equals("generate-address")) {

@@ -20,12 +20,14 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlSerializer;
 
+import gnu.trove.list.array.TIntArrayList;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.gpx.GPXFile;
@@ -48,6 +50,10 @@ public class WikivoyageGenOSM {
 	public static final String CAT_DRINK = "drink"; // 5%
 	public static final String CAT_BUY = "buy"; // 4%
 	public static final String CAT_OTHER = "other"; // 10%
+	
+	private static final double ARTICLE_NO_COORDS_LAT = 0;
+	private static final double ARTICLE_NO_COORDS_LON = 0;
+	private static final double ARTICLE_NO_COORDS_DELTA = 1;
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
@@ -61,8 +67,6 @@ public class WikivoyageGenOSM {
 	private static Map<String, String> wptCategories;
 	
 
-	// FUTURE:
-	// TODO - Combine point languages and extra tags (merge points possibly by wikidata id) 
 	// 	 NOTE: do not duplicate description:* (they are all  visible in context menu)
 	public static void main(String[] args) throws SQLException, IOException {
 		File f = new File("/Users/victorshcherb/osmand/maps/wikivoyage/wikivoyage.sqlite");
@@ -82,11 +86,12 @@ public class WikivoyageGenOSM {
 		List<String> partsOf = new ArrayList<>();
 		List<String> parentOf = new ArrayList<>();
 		List<String> aggrPartsOf = new ArrayList<>();
+		List<String> aggrPartsOfWid = new ArrayList<>();
 		List<String> jsonContents = new ArrayList<>();
 
 		public void addArticle(String lang, String title, GPXFile gpxFile, double lat, double lon, String content,
 							   String imageTitle, String bannerTitle, String partOf, String isParentOf,
-							   String aggrPartOf, String jsonContent) {
+							   String aggrPartOf, String aggrPartOfWid, String contentJson) {
 			int ind = size();
 			if (lang.equals("en")) {
 				ind = 0;
@@ -104,7 +109,8 @@ public class WikivoyageGenOSM {
 			partsOf.add(ind, partOf);
 			parentOf.add(ind, isParentOf);
 			aggrPartsOf.add(ind, aggrPartOf);
-			jsonContents.add(jsonContent);
+			aggrPartsOfWid.add(ind, aggrPartOfWid);
+			jsonContents.add(ind, contentJson);
 		}
 		
 		public void clear() {
@@ -116,6 +122,7 @@ public class WikivoyageGenOSM {
 			imageTitles.clear();
 			partsOf.clear();
 			aggrPartsOf.clear();
+			aggrPartsOfWid.clear();
 			parentOf.clear();
 			jsonContents.clear();
 		}
@@ -146,22 +153,19 @@ public class WikivoyageGenOSM {
 			}
 		}
 	}
-
-	public static void genWikivoyageOsm(File wikivoyageFile, File outputFile, int LIMIT) throws SQLException, IOException {
-		DBDialect dialect = DBDialect.SQLITE;
-		Connection connection = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getCanonicalPath(), log );
-		Statement statement = connection.createStatement();
-		// travel_articles: 	
-		// 						population, country, region, city_type, osm_i,
-		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, "
-				+ "gpx_gz, image_title, banner_title, src_banner_title, is_part_of, is_parent_of, aggregated_part_of, contents_json from travel_articles order by trip_id asc");
-		int count = 0, totalArticles = 0, emptyLocation = 0, emptyContent = 0;
-		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
-		XmlSerializer serializer = null;
+	
+	private static class WikivoyageOutputFile {
+		File outputFile;
+		boolean filter = false;
+		List<String> qids = new ArrayList<String>();
+		TIntArrayList qidsType = new TIntArrayList();
+		XmlSerializer serializer;
 		OutputStream outputStream = null;
-		if(outputFile != null) {
+		
+		public WikivoyageOutputFile(File outFile) throws IllegalArgumentException, IllegalStateException, IOException {
+			this.outputFile = outFile;
 			outputStream = new FileOutputStream(outputFile);
-			if(outputFile.getName().endsWith(".gz")) {
+			if (outputFile.getName().endsWith(".gz")) {
 				outputStream = new GZIPOutputStream(outputStream);
 			}
 			serializer = PlatformUtil.newSerializer();
@@ -172,11 +176,109 @@ public class WikivoyageGenOSM {
 			serializer.attribute(null, "version", "0.6"); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 		
+		public boolean accept(CombinedWikivoyageArticle combinedArticle) {
+			if(!filter) {
+				return true;
+			}
+			// exact match
+			if (combinedArticle.tripId > 0) {
+				for (int tp = 0; tp < qids.size(); tp++) {
+					if (qids.get(tp).equals(combinedArticle.tripId + "")) {
+						return true;
+					}
+				}
+			}
+			for(String aggWid : combinedArticle.aggrPartsOfWid) {
+				String[] wids = aggWid.split(",");
+				boolean match = false;
+				// compare all parent wikidata ids with 
+				loop: for (int tp = 0; tp < qids.size() && !match; tp++) {
+					for (int i = 0; i < wids.length && !match; i++) {
+						if (qids.get(tp).equals(wids[i])) {
+							int tpMatch = qidsType.get(tp);
+							if (tpMatch < 0) {
+								match = true; // Q1111%
+							} else if (tpMatch > 0 && i == 0) {
+								match = true; // Q1111.
+							}
+							break loop;
+						}
+					}
+				}
+				if (match) {
+					return true;
+				}
+			}
+			return true;
+		}
+
+		public void close() throws IOException {
+			serializer.endTag(null, "osm");
+			serializer.flush();
+			outputStream.close();
+		}
+		
+	}
+
+	public static void genWikivoyageOsm(File wikivoyageFile, List<String> genOsm) throws SQLException, IOException {
+		List<WikivoyageOutputFile> outs = new ArrayList<>();
+		for(String s : genOsm) {
+			int t = s.indexOf(':');
+			WikivoyageOutputFile out = new WikivoyageOutputFile(new File(s.substring(t + 1)));
+			if (t > 0) {
+				String[] keys = s.substring(0, t).split(",");
+				for (String k : keys) {
+					if(k.startsWith("Q")) {
+						int type = 0;
+						String id = k.substring(1);
+						if (id.endsWith("%")) {
+							id.substring(0, id.length() - 1);
+							type = -1;
+						} else if (id.endsWith(".")) {
+							id.substring(0, id.length() - 1);
+							type = 1;
+						}
+						out.qids.add(id);
+						out.qidsType.add(type);
+					}
+				}
+			}
+			outs.add(out);
+		}
+		genWikivoyageOsm(wikivoyageFile, outs, -1);
+	}
+	public static void genWikivoyageOsm(File wikivoyageFile, File outFile, int LIMIT) throws SQLException, IOException {
+		List<WikivoyageOutputFile> outs = new ArrayList<>();
+		if (outFile != null) {
+			outs.add(new WikivoyageOutputFile(outFile));
+		}
+		genWikivoyageOsm(wikivoyageFile, outs, LIMIT);
+	}
+			
+	public static void genWikivoyageOsm(File wikivoyageFile, List<WikivoyageOutputFile> outs, int LIMIT) throws SQLException, IOException {
+		DBDialect dialect = DBDialect.SQLITE;
+		Connection connection = (Connection) dialect.getDatabaseConnection(wikivoyageFile.getCanonicalPath(), log );
+		Statement statement = connection.createStatement();
+		// travel_articles: 	
+		// 						population, country, region, city_type, osm_i,
+		ResultSet rs = statement.executeQuery("select trip_id, title, lang, lat, lon, content_gz, "
+				+ "gpx_gz, image_title, banner_title, src_banner_title, is_part_of, is_parent_of, "
+				+ "aggregated_part_of, agg_part_of_wid, contents_json "
+				+ "from travel_articles order by trip_id asc");
+		int count = 0, totalArticles = 0, emptyLocation = 0, emptyContent = 0;
+		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
+		
 		while (rs.next()) {
 			int rind = 1;
 			long tripId = rs.getLong(rind++);
-			if (tripId != combinedArticle.tripId && combinedArticle.tripId != -1) {
-				boolean res = combineAndSave(combinedArticle, serializer);
+			if ((tripId != combinedArticle.tripId || combinedArticle.tripId == 0) && 
+					combinedArticle.tripId != -1) {
+				boolean res = false;
+				for (WikivoyageOutputFile out : outs) {
+					if (out.accept(combinedArticle)) {
+						res |= combineAndSave(combinedArticle, out.serializer);
+					}
+				}
 				if (res) {
 					totalArticles++;
 				}
@@ -197,10 +299,11 @@ public class WikivoyageGenOSM {
 			String isPartOf = rs.getString(rind++);
 			String isParentOf = rs.getString(rind++);
 			String isAggrPartOf = rs.getString(rind++);
+			String isAggrPartOfWid = rs.getString(rind++);
 			String contentJson = rs.getString(rind);
 			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle,
 					Algorithms.isEmpty(srcBannerTitle) ? bannerTitle : srcBannerTitle, isPartOf,
-					isParentOf, isAggrPartOf, contentJson);
+					isParentOf, isAggrPartOf, isAggrPartOfWid, contentJson);
 			if (gpxFile == null || gpxFile.isPointsEmpty()) {
 				if (lat == 0 && lon == 0) {
 					emptyLocation++;
@@ -213,13 +316,13 @@ public class WikivoyageGenOSM {
 			}
 			count++;
 		}
-		combineAndSave(combinedArticle, serializer);
-		if(serializer != null) {
-			serializer.endTag(null, "osm");
-			serializer.flush();
-			outputStream.close();
+		for (WikivoyageOutputFile out : outs) {
+			if (out.accept(combinedArticle)) {
+				combineAndSave(combinedArticle, out.serializer);
+			}
+			out.close();
 		}
-		List<String > l = new ArrayList<String>(categories.keySet());
+		List<String> l = new ArrayList<String>(categories.keySet());
 		Collections.sort(l, new Comparator<String>() {
 
 			@Override
@@ -255,6 +358,7 @@ public class WikivoyageGenOSM {
 		long idStart = NODE_ID ;
 		LatLon mainArticlePoint = article.latlons.get(0);
 		List<WptPt> points = new ArrayList<GPXUtilities.WptPt>();
+		// TODO Combine - Combine point languages and extra tags (merge points possibly by wikidata id)
 		for(int i = 0; i < article.size(); i++) {
 			String lng = article.langs.get(i);
 			GPXFile file = article.points.get(i);
@@ -275,25 +379,27 @@ public class WikivoyageGenOSM {
 				}
 			}
 		}
-		if (mainArticlePoint == null && Algorithms.isEmpty(article.partsOf)) {
-			// System.out.println(String.format("Skip article as it has no points: %s", article.titles));
-			return false;
+		if (mainArticlePoint == null) {
+			Random rnd = new Random();
+			double lat = ARTICLE_NO_COORDS_LAT + (rnd.nextDouble() - 0.5) * ARTICLE_NO_COORDS_DELTA;
+			double lon = ARTICLE_NO_COORDS_LON + (rnd.nextDouble() - 0.5) * ARTICLE_NO_COORDS_DELTA;
+			mainArticlePoint = new LatLon(lat, lon);
+//			 System.out.println(String.format("Skip article as it has no points: %s", article.titles));
 		}
 
-		if (mainArticlePoint != null) {
-			points = sortPoints(mainArticlePoint, points);
-			serializer.startTag(null, "node");
-			long mainArticleid = NODE_ID--;
-			serializer.attribute(null, "id", mainArticleid + "");
-			serializer.attribute(null, "action", "modify");
-			serializer.attribute(null, "version", "1");
-			serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
-			serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
-			tagValue(serializer, "route", "point");
-			tagValue(serializer, "route_type", "article");
-			addArticleTags(article, serializer, true);
-			serializer.endTag(null, "node");
-		}
+		points = sortPoints(mainArticlePoint, points);
+		serializer.startTag(null, "node");
+		long mainArticleid = NODE_ID--;
+		serializer.attribute(null, "id", mainArticleid + "");
+		serializer.attribute(null, "action", "modify");
+		serializer.attribute(null, "version", "1");
+		serializer.attribute(null, "lat", latLonFormat.format(mainArticlePoint.getLatitude()));
+		serializer.attribute(null, "lon", latLonFormat.format(mainArticlePoint.getLongitude()));
+		tagValue(serializer, "route", "point");
+		tagValue(serializer, "route_type", "article");
+		addArticleTags(article, serializer, true);
+		serializer.endTag(null, "node");
+		
 		
 		for (WptPt p : points) {
 			String category = simplifyWptCategory(p.category, CAT_OTHER);
@@ -314,7 +420,7 @@ public class WikivoyageGenOSM {
 			addPointTags(article, serializer, p, "");
 			
 			tagValue(serializer, "route_source", "wikivoyage");
-			tagValue(serializer, "route_id", "Q"+article.tripId);
+			tagValue(serializer, "route_id", "Q" + article.tripId);
 			serializer.endTag(null, "node");
 		}
 		
@@ -594,4 +700,5 @@ public class WikivoyageGenOSM {
 		categories.put("town", CAT_MARKER);
 		return categories;
 	}
+
 }

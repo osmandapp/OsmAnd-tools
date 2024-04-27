@@ -115,7 +115,8 @@ public class WikiDatabasePreparation {
 				"airport", "train", "station", "bus"),
 		NATURAL("special_photo_camera", 0xCC10A37E, new String[] { "landscape", "island", "nature", "island" }, "park",
 				"cemetery", "garden", "lake", "beach", "landmark", "cemetery","cave", "garden", "waterfall", "viewpoint", "mountain"), 
-		OTHER("", 0xCC0F5FFF, new String[]{"other", "marker", "ville", "item","רשימה", "دیدن","יעד מרכזי","יישוב מרכזי"});
+		OTHER("", 0xCC0F5FFF, new String[]{"other", "marker", "ville", "item","רשימה", "دیدن","יעד מרכזי","יישוב מרכזי",
+				"représentation diplomatique"});
 		
 		public final String[] names;
 		public final String[] types;
@@ -725,8 +726,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static StringBuilder parsePoiWithAddLatLon(String val, Map<PoiFieldType, Object> poiFields)
-			throws IOException, SQLException {
+	private static StringBuilder parsePoiWithAddLatLon(String val, Map<PoiFieldType, Object> poiFields) throws IOException, SQLException {
 		StringBuilder poiShortDescription = new StringBuilder();
 		String[] parts = val.split("\\|");
 		String areaCode = "";
@@ -1009,14 +1009,21 @@ public class WikiDatabasePreparation {
 		List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, pois, "de",  null, null);
 //		System.out.println(text);
-		System.out.println(macros);
+//		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
 		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
 		List<String> lst = macros.get(WikivoyageTemplates.POI);
+		for(Map<PoiFieldType, Object> poi : pois) {
+			System.out.println(poi);
+		}
 		if(lst != null) {
-			for (String l : lst) {
-				System.out.println(l);
-			}
+//			for (String l : lst) {
+//				System.out.println(l.trim());
+//				Map<PoiFieldType, Object> poiFields  = new LinkedHashMap<>();
+//				parsePoiWithAddLatLon(l, poiFields);
+//				System.out.println(poiFields);
+//			}
+			
 		}
 	}
 
