@@ -73,21 +73,23 @@ public class WikivoyageLangPreparation {
 	private static final long WID_PHRASEBOOKS = 1599788l;
 	private static final long WID_CULTURAL_ATTRACTIONS = 11042l;
 	private static final long WID_WORLD_HERITAGE_SITE = 9259l;
+	private static final long WID_OTHER_DESTINATIONS = 14201351l;
 	static {
-		KNOWN_WIKIVOYAGE_MAIN.put(WID_DESTINATIONS, 0l); // Travel topics
-		KNOWN_WIKIVOYAGE_MAIN.put(WID_TRAVEL_TOPICS, 0l); // Destinations
+		KNOWN_WIKIVOYAGE_MAIN.put(WID_TRAVEL_TOPICS, 0l); // Travel topics
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_PHRASEBOOKS, WID_TRAVEL_TOPICS); // Phrasebooks
 		KNOWN_WIKIVOYAGE_MAIN.put(14208553l, WID_TRAVEL_TOPICS); // Discover
 		KNOWN_WIKIVOYAGE_MAIN.put(WID_ITINERARIES, WID_TRAVEL_TOPICS); // Itineraries
 		KNOWN_WIKIVOYAGE_MAIN.put(5056668l, WID_TRAVEL_TOPICS); // Sleep
+		///  
+		KNOWN_WIKIVOYAGE_MAIN.put(WID_DESTINATIONS, 0l); // Destinations
 		KNOWN_WIKIVOYAGE_MAIN.put(15l, WID_DESTINATIONS); // Africa
 		KNOWN_WIKIVOYAGE_MAIN.put(51l, WID_DESTINATIONS); // Antarctica
 		KNOWN_WIKIVOYAGE_MAIN.put(48l, WID_DESTINATIONS); // Asia
 		KNOWN_WIKIVOYAGE_MAIN.put(49l, WID_DESTINATIONS); // North America
 		KNOWN_WIKIVOYAGE_MAIN.put(55643l, WID_DESTINATIONS); // Oceania
-		KNOWN_WIKIVOYAGE_MAIN.put(14201351l, WID_DESTINATIONS); // Other destinations
 		KNOWN_WIKIVOYAGE_MAIN.put(18l, WID_DESTINATIONS); // South America
 		KNOWN_WIKIVOYAGE_MAIN.put(46l, WID_DESTINATIONS); // Europe
+		KNOWN_WIKIVOYAGE_MAIN.put(WID_OTHER_DESTINATIONS, WID_DESTINATIONS); // Other destinations
 	}
 	private static final boolean DEBUG = false;
 	private static final String SUFFIX_EN_REDIRECT = "en:";
@@ -557,6 +559,9 @@ public class WikivoyageLangPreparation {
 			PreparedStatement del = wikiVoyageConn.prepareStatement("DELETE FROM travel_articles WHERE original_id =  ? and lang = ?");
 			int batch = 0;
 			int articles = 0, articlesParentWid = 0;
+			PageInfo otherDest = pageInfos.byWikidataId.get(WID_OTHER_DESTINATIONS);
+			PageInfo enOtherDest = enPageInfos.byWikidataId.get(WID_OTHER_DESTINATIONS);
+			String otherDestTitle = otherDest == null ? (SUFFIX_EN_REDIRECT + enOtherDest.title) : otherDest.title;
 			for (PageInfo p : pageInfos.byId.values()) {
 				String partOf = p.partOf;
 				long partOfWid = 0;
@@ -569,15 +574,15 @@ public class WikivoyageLangPreparation {
 					// Calculate redirects (by wikidata id)
 					if (partOf.startsWith("Q") && target.isEmpty()) {
 						long wid = Long.parseLong(partOf.substring(1));
-						PageInfo page = pageInfos.byWikidataId.get(wid);
+						PageInfo pageRedirect = pageInfos.byWikidataId.get(wid);
 						PageInfo enPage = enPageInfos.byWikidataId.get(wid);
-						if (page != null && page.title != null) {
-							partOf = page.title;
+						if (pageRedirect != null && pageRedirect.title != null) {
+							partOf = pageRedirect.title;
 						} else if (enPage != null && enPage.title != null) {
 							System.out.printf("Warning redirect to 'en' from '%s' (not exist) '%s'  -> '%s'\n", lang, partOf, SUFFIX_EN_REDIRECT + enPage.title);
 							partOf = SUFFIX_EN_REDIRECT + enPage.title;
 						} else {
-							skipArticle(lang, p.title, "n", "parent no redirect to " + partOf);
+							skipArticle(lang, pageRedirect.title, "n", "parent no redirect to " + partOf);
 							delete = true;
 						}
 					} else {
@@ -633,6 +638,12 @@ public class WikivoyageLangPreparation {
 					del.addBatch();
 					// here we should delete all siblings recursively in theory
 				} else {
+					if (partOfWid == WID_DESTINATIONS && !KNOWN_WIKIVOYAGE_MAIN.containsKey(partOfWid)) {
+						// reassign to other destinations (oceans, ...)
+						partOfWid = WID_OTHER_DESTINATIONS;
+						partOf = otherDestTitle;
+					} 
+						
 					articles++;
 					if (partOfWid > 0) {
 						articlesParentWid++;
