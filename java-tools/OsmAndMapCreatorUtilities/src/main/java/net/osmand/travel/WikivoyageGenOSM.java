@@ -177,7 +177,7 @@ public class WikivoyageGenOSM {
 		}
 		
 		public boolean accept(CombinedWikivoyageArticle combinedArticle) {
-			if(!filter) {
+			if (!filter) {
 				return true;
 			}
 			// exact match
@@ -227,6 +227,7 @@ public class WikivoyageGenOSM {
 			WikivoyageOutputFile out = new WikivoyageOutputFile(new File(s.substring(t + 1)));
 			if (t > 0) {
 				String[] keys = s.substring(0, t).split(",");
+				out.filter = true;
 				for (String k : keys) {
 					if(k.startsWith("Q")) {
 						int type = 0;
