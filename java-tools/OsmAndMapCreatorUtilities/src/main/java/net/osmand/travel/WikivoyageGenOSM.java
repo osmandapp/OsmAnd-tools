@@ -209,7 +209,7 @@ public class WikivoyageGenOSM {
 					return true;
 				}
 			}
-			return true;
+			return false;
 		}
 
 		public void close() throws IOException {
