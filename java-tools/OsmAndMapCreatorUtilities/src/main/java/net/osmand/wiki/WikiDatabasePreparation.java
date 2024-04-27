@@ -777,10 +777,10 @@ public class WikiDatabasePreparation {
 						poiFields.put(PoiFieldType.WIKIDATA, value);
 					} else if (field.equalsIgnoreCase("phone") || field.equalsIgnoreCase("tel")
 							|| field.equalsIgnoreCase("téléphone") || field.equalsIgnoreCase("טלפון") || field.equalsIgnoreCase("تلفن")) {
-						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/")
-							.replaceAll("[^\\d\\+\\)\\(,]", "");
-						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
-						poiFields.put(PoiFieldType.PHONE, tel);
+//						String tel = areaCode.replaceAll("[ -]", "/") + "/" + value.replaceAll("[ -]", "/")
+//							.replaceAll("[^\\d\\+\\)\\(,]", "");
+//						tel = tel.replaceAll("\\(", "o").replaceAll("\\)", "c");
+						poiFields.put(PoiFieldType.PHONE, value);
 						poiShortDescription.append("☎ " + "tel:").append(tel).append(". ");
 					} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo") || field.equalsIgnoreCase("מחיר")
 							|| field.equalsIgnoreCase("prix") || field.equalsIgnoreCase("بها")) {
@@ -1014,7 +1014,8 @@ public class WikiDatabasePreparation {
 		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
 		List<String> lst = macros.get(WikivoyageTemplates.POI);
 		for(Map<PoiFieldType, Object> poi : pois) {
-			System.out.println(poi);
+			System.out.println(poi.get(PoiFieldType.PHONE));
+//			System.out.println(poi);
 		}
 		if(lst != null) {
 //			for (String l : lst) {

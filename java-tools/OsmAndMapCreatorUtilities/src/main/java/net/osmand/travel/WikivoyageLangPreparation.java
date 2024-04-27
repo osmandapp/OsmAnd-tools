@@ -1088,7 +1088,7 @@ public class WikivoyageLangPreparation {
 					if (point.desc == null) {
 						point.desc = "";
 					} else {
-						point.desc += "\n\r";
+						point.desc += "\n ";
 					}
 					point.desc += key + ": " + extraValues.get(key); // ". " backward compatible
 				}
