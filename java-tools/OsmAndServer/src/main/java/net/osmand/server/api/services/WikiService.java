@@ -40,6 +40,7 @@ public class WikiService {
 	public static final String WIKIMEDIA_COMMON_SPECIAL_FILE_PATH = "https://commons.wikimedia.org/wiki/Special:FilePath/";
 	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String THUMB_PREFIX = "320px-";
+	protected static final boolean FILENAME = true;
 
 	private static final int LIMIT_QUERY = 100;
 	private static final int LIMITI_QUERY = 25;
@@ -126,18 +127,21 @@ public class WikiService {
 
 				@Override
 				public void processRow(ResultSet rs) throws SQLException {
-//					images.add(WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + rs.getString(1));
-					String imageTitle = rs.getString(1);
-					try {
-						imageTitle = URLDecoder.decode(imageTitle, "UTF-8");
-						String[] hash = getHash(imageTitle);
-						imageTitle = URLEncoder.encode(imageTitle, "UTF-8");
-						String prefix = THUMB_PREFIX;
-						String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
-						images.add(IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/" + prefix
-								+ imageTitle + suffix);
-					} catch (UnsupportedEncodingException e) {
-						System.err.println(e.getMessage());
+					if (FILENAME) {
+						images.add(WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + rs.getString(1));
+					} else {
+						String imageTitle = rs.getString(1);
+						try {
+							imageTitle = URLDecoder.decode(imageTitle, "UTF-8");
+							String[] hash = getHash(imageTitle);
+							imageTitle = URLEncoder.encode(imageTitle, "UTF-8");
+							String prefix = THUMB_PREFIX;
+							String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
+							images.add(IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/"
+									+ prefix + imageTitle + suffix);
+						} catch (UnsupportedEncodingException e) {
+							System.err.println(e.getMessage());
+						}
 					}
 				}
 			};
