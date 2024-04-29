@@ -92,24 +92,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	@Autowired
 	UserdataService userdataService;
     
-	@Bean
-	@Primary
-	@ConfigurationProperties(prefix="spring.datasource")
-	public DataSource primaryDataSource() {
-	    return DataSourceBuilder.create().build();
-	}
 
-	@Bean
-	@ConfigurationProperties(prefix="spring.wikidatasource")
-	public DataSource wikiDataSource() {
-	    return DataSourceBuilder.create().build();
-	}
-    
-	@Bean
-	public JdbcTemplate wikiJdbcTemplate(@Qualifier("wikiDataSource") DataSource dataSource) {
-	    return new JdbcTemplate(dataSource);
-	}
-	
 	public static class OsmAndProUser extends User {
 
 		private static final long serialVersionUID = -881322456618342435L;
