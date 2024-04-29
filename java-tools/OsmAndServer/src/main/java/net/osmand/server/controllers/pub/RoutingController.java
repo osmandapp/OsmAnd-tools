@@ -326,7 +326,6 @@ public class RoutingController {
 						osmAndMapsService.routing(disableOldRouting, routeMode, props, list.get(0),
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
 								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress);
-				System.out.printf("DEBUG: isCancelled (%d) after routing\n", progress.isCancelled == true ? 1 : 0);
 				if (res != null) {
 					routingService.convertResultsWithElevation(resListElevation, features, res);
 				}
