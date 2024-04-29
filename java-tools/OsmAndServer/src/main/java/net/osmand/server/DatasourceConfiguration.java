@@ -1,5 +1,9 @@
 package net.osmand.server;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
 import javax.sql.DataSource;
 
 import org.apache.commons.logging.Log;
@@ -7,11 +11,12 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import com.clickhouse.jdbc.ClickHouseDriver;
 
 @Configuration
 public class DatasourceConfiguration {
@@ -40,7 +45,14 @@ public class DatasourceConfiguration {
 
 	@Bean
 	public DataSource wikiDataSource() {
-		return wikiDataSourceProperties().initializeDataSourceBuilder().build();
+		System.out.println("Load Clickhouse class: " + ClickHouseDriver.class);
+		try {
+			DataSource ds = wikiDataSourceProperties().initializeDataSourceBuilder().build();
+			return ds;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
     
 	@Bean

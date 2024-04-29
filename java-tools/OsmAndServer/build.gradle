@@ -120,4 +120,7 @@ dependencies {
     implementation 'it.geosolutions.imageio-ext:imageio-ext-tiff:1.4.9'
 
     implementation 'com.clickhouse:clickhouse-jdbc:0.6.0'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.3.1'
+//    implementation 'com.clickhouse:clickhouse-http-client:0.6.0'
+
 }
