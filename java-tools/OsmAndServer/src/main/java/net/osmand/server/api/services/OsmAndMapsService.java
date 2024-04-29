@@ -1154,15 +1154,6 @@ public class OsmAndMapsService {
 					return Collections.emptyList();
 				}
 				ctx = prepareRouterContext(rp, router, usedMapList);
-			} else {
-				LOGGER.info(String.format(
-						"DEBUG: cached ctx/router for %s: %s -> %s (%s) " +
-								"is-hh (%d) calc-mode (%s) native-lib (%s)",
-						profile, start, end, routeMode,
-						router.isHHRoutingConfigured() ? 1 : 0,
-						ctx.calculationMode,
-						ctx.nativeLib
-				));
 			}
 			HashSet<Long> impassableRoads = new HashSet<>();
 			for (String s : avoidRoadsIds) {
@@ -1238,7 +1229,6 @@ public class OsmAndMapsService {
 				best.rCtx.unloadAllData();
 				if (!best.routeParamsStr.equals(rp.routeParams.toString())) {
 					best.routeParamsStr = rp.routeParams.toString();
-					LOGGER.info("DEBUG: best cache is found but params reset: " + best.routeParamsStr);
 					GeneralRouter oldRouter = best.rCtx.config.router;
 					oldRouter.clearCaches();
 					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
@@ -1249,22 +1239,16 @@ public class OsmAndMapsService {
 					}
 				}
 				if (rp.disableHHRouting) {
-					LOGGER.info("DEBUG: best cache is found but HH disabled");
 					router.disableHHRoutingConfig();
 				} else {
 					router.setHHRouteCpp(rp.useNativeLib);
 					router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
 					router.setHHRoutingConfig(best.hhConfig); // after prepare
-					LOGGER.info(String.format("DEBUG: best cache is found, setup HH: " +
-									"use-native-lib (%d) hh-only (%d) is-hh-configured (%d)",
-							rp.useNativeLib ? 1 : 0, rp.useOnlyHHRouting ? 1 : 0, best.hhConfig != null ? 1 : 0
-					));
 				}
 				return best;
 			}
 			Thread.sleep(1000);
 		}
-		LOGGER.info("DEBUG: best cache is NOT found");
 
 		RoutingCacheContext cs = new RoutingCacheContext();
 		cs.locked = System.currentTimeMillis();
