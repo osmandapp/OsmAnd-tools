@@ -13,5 +13,5 @@ build/
 .idea
 *.iml
 regions.ocbf
-
+.attach_*
 OsmAndMapCreatorUtilities/src/main/resources/page.txt

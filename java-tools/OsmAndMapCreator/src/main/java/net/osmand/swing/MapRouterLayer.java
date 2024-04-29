@@ -118,8 +118,6 @@ public class MapRouterLayer implements MapPanelLayer {
 	private static final double MIN_STRAIGHT_DIST = 50000;
 	private static final double ANGLE_TO_DECLINE = 15;
 
-	private static boolean TEST_INTERMEDIATE_POINTS = false;
-
 	private static boolean USE_CACHE_CONTEXT = false;
 	private HHRoutingContext<NetworkDBPoint> cacheHHCtx;
 	private RoutingContext cacheRctx;
@@ -1203,16 +1201,11 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private RouteCalcResult getGpxAproximation(RoutePlannerFrontEnd router, GpxRouteApproximation gctx,
 			List<GpxPoint> gpxPoints) throws IOException, InterruptedException {
+		if (DataExtractionSettings.getSettings().useNativeRouting()) {
+			router.setUseNativeApproximation(true);
+		}
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
-		if (TEST_INTERMEDIATE_POINTS) {
-			return new RouteCalcResult(r.result);
-		}
-		List<RouteSegmentResult> rsr = new ArrayList<RouteSegmentResult>();
-		for (GpxPoint pnt : r.finalPoints) {
-			rsr.addAll(pnt.routeToTarget);
-		}
-
-		return new RouteCalcResult(rsr);
+		return new RouteCalcResult(r.result);
 	}
 
 	private void throwExceptionIfRouteNotFound(final RoutingContext ctx, RouteCalcResult searchRoute) {

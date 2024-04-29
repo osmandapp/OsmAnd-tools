@@ -934,10 +934,7 @@ public class OsmAndMapsService {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
-		List<RouteSegmentResult> route = new ArrayList<RouteSegmentResult>();
-		for (GpxPoint pnt : r.finalPoints) {
-			route.addAll(pnt.routeToTarget);
-		}
+		List<RouteSegmentResult> route = r.result;
 		if (router.isUseNativeApproximation()) {
 			RouteResultPreparation preparation = new RouteResultPreparation();
 			// preparation.prepareTurnResults(gctx.ctx, route);
