@@ -1,35 +1,37 @@
 package net.osmand.server.controllers.pub;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import net.osmand.Location;
-import net.osmand.data.Amenity;
-import net.osmand.data.LatLon;
-import net.osmand.data.Street;
-import net.osmand.search.SearchUICore;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchResult;
-import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.api.services.SearchService;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static net.osmand.server.utils.WikiConnection.getPoiData;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
+import com.google.gson.Gson;
+
+import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
+import net.osmand.data.Street;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchResult;
+import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.SearchService;
+import net.osmand.server.api.services.WikiService;
+import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
+import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Controller
 @RequestMapping("/routing/search")
 public class SearchController {
@@ -41,6 +43,9 @@ public class SearchController {
     OsmAndMapsService osmAndMapsService;
     
     @Autowired
+    WikiService wikiService;
+    
+    @Autowired
     SearchService searchService;
     
     @RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
@@ -50,7 +55,7 @@ public class SearchController {
         }
         try {
             List<SearchResult> res = searchService.search(lat, lon, search);
-            List<RoutingController.Feature> features = new ArrayList<>();
+            List<Feature> features = new ArrayList<>();
             int pos = 0;
             int posLoc = 0;
             for (SearchResult sr : res) {
@@ -80,11 +85,11 @@ public class SearchController {
                     }
                     String r = String.format("%d. %s %s [%.2f km, %d, %s, %.2f] ", pos, sr.localeName, typeString, loc,
                             sr.getFoundWordCount(), sr.objectType, sr.getUnknownPhraseMatchWeight());
-                    features.add(new RoutingController.Feature(RoutingController.Geometry.point(sr.location)).prop("description", r).
+                    features.add(new Feature(Geometry.point(sr.location)).prop("description", r).
                             prop("index", pos).prop("locindex", posLoc).prop("distance", loc).prop("type", sr.objectType));
                 }
             }
-            return ResponseEntity.ok(gson.toJson(new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0]))));
+            return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
         } catch (IOException | RuntimeException e) {
             LOGGER.error(e.getMessage(), e);
             throw e;
@@ -141,8 +146,7 @@ public class SearchController {
     @GetMapping(path = {"/get-wiki-data"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getWikiData(@RequestParam String northWest, @RequestParam String southEast, @RequestParam boolean useCommonsGeoTags) {
-        List<String> geoJsonFeatures = getPoiData(northWest, southEast, useCommonsGeoTags);
-        
-        return ResponseEntity.ok(gson.toJson(geoJsonFeatures));
+        FeatureCollection collection = wikiService.getPoiData(northWest, southEast, useCommonsGeoTags);
+        return ResponseEntity.ok(gson.toJson(collection));
     }
 }

@@ -123,6 +123,7 @@ public class PlacesService {
 					return;
 				}
 
+				// TODO Replacew ith database
 				CameraPlace wikimediaPrimaryCameraPlace = processWikimediaData(lat, lon, osmImage);
 				List<CameraPlace> visibile = processMapillaryData(lat, lon, osmMapillaryKey, host, proto);
 				if (!visibile.isEmpty()) {

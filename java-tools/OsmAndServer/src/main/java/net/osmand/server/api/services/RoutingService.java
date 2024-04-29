@@ -25,7 +25,7 @@ import net.osmand.util.MapUtils;
 
 import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
-
+import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Service
 public class RoutingService {
 
@@ -183,7 +183,7 @@ public class RoutingService {
     }
 
     public void convertResultsWithElevation(List<LatLonEle> resListEle,
-                                            List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+                                            List<Feature> features, List<RouteSegmentResult> res) {
         for (int i = 0; i < res.size(); i++) {
             RouteSegmentResult r = res.get(i);
 
@@ -213,18 +213,18 @@ public class RoutingService {
             // process (segment/turn) description
             String description = r.getDescription(true);
             if (description != null && description.length() > 0) {
-                RoutingController.Geometry point;
+                Geometry point;
 
                 if (isHeightsValid) {
                     float ele = heightArray[start * 2 + 1];
                     double lat = r.getStartPoint().getLatitude();
                     double lon = r.getStartPoint().getLongitude();
-                    point = RoutingController.Geometry.pointElevation(new LatLonEle(lat, lon, ele));
+                    point = Geometry.pointElevation(new LatLonEle(lat, lon, ele));
                 } else {
-                    point = RoutingController.Geometry.point(r.getStartPoint());
+                    point = Geometry.point(r.getStartPoint());
                 }
 
-                RoutingController.Feature f = new RoutingController.Feature(point);
+                Feature f = new Feature(point);
                 f.prop("description", description).prop("routingTime", r.getRoutingTime())
                         .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
                         .prop("roadId", r.getObject().getId());
@@ -233,14 +233,14 @@ public class RoutingService {
         }
     }
 
-    public void convertResults(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+    public void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
         LatLon last = null;
         for (RouteSegmentResult r : res) {
             int i;
             int dir = r.isForwardDirection() ? 1 : -1;
             String description = r.getDescription(true);
             if (!Algorithms.isEmpty(description)) {
-                RoutingController.Feature f = new RoutingController.Feature(RoutingController.Geometry.point(r.getStartPoint()));
+                Feature f = new Feature(Geometry.point(r.getStartPoint()));
                 f.prop("description", description).prop("routingTime", r.getRoutingTime())
                         .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
                         .prop("roadId", r.getObject().getId());

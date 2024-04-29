@@ -26,7 +26,7 @@ import static net.osmand.data.Amenity.*;
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
-
+import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Service
 public class SearchService {
     
@@ -50,7 +50,7 @@ public class SearchService {
     
     public static class PoiSearchResult {
         
-        public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound, RoutingController.FeatureCollection features) {
+        public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound, FeatureCollection features) {
             this.useLimit = useLimit;
             this.mapLimitExceeded = mapLimitExceeded;
             this.alreadyFound = alreadyFound;
@@ -60,7 +60,7 @@ public class SearchService {
         public boolean useLimit;
         public boolean mapLimitExceeded;
         public boolean alreadyFound;
-        public RoutingController.FeatureCollection features;
+        public FeatureCollection features;
     }
     
     public static class PoiSearchData {
@@ -120,7 +120,7 @@ public class SearchService {
             return new PoiSearchResult(false, false, true, null);
         }
         
-        List<RoutingController.Feature> features = new ArrayList<>();
+        List<Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
         int limit = TOTAL_LIMIT_POI / data.categories.size();
         boolean useLimit = false;
@@ -151,7 +151,7 @@ public class SearchService {
             osmAndMapsService.unlockReaders(usedMapList);
         }
         if (!features.isEmpty()) {
-            return new PoiSearchResult(useLimit, false, false, new RoutingController.FeatureCollection(features.toArray(new RoutingController.Feature[0])));
+            return new PoiSearchResult(useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
         } else {
             return null;
         }
@@ -326,14 +326,14 @@ public class SearchService {
         return tags;
     }
     
-    private void saveSearchResult(List<SearchResult> res, List<RoutingController.Feature> features) throws IOException, InterruptedException {
+    private void saveSearchResult(List<SearchResult> res, List<Feature> features) throws IOException, InterruptedException {
         for (SearchResult result : res) {
             if (result.objectType == ObjectType.POI) {
                 Amenity amenity = (Amenity) result.object;
                 PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-                RoutingController.Feature feature;
+                Feature feature;
                 if (poiType != null) {
-                    feature = new RoutingController.Feature(RoutingController.Geometry.point(amenity.getLocation()))
+                    feature = new Feature(Geometry.point(amenity.getLocation()))
                             .prop("web_poi_id", amenity.getId())
                             .prop("web_poi_name", amenity.getName())
                             .prop("web_poi_color", amenity.getColor())

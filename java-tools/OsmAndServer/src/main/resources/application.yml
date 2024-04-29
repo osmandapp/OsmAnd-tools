@@ -86,6 +86,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/changeset}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
+  wikidatasource:
+    url: ${WIKI_DB_URL:jdbc:postgresql://localhost:5432/changeset}
+    username: ${WIKI_DB_USER:test}
+    password: ${WIKI_DB_PWD:test}
   web.resources.static-locations: file:${osmand.web.location}
   thymeleaf:
     prefix: file:${osmand.web.location}/templates/
