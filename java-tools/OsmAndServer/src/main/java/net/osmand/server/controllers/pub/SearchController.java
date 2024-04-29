@@ -145,8 +145,15 @@ public class SearchController {
     
     @GetMapping(path = {"/get-wiki-data"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getWikiData(@RequestParam String northWest, @RequestParam String southEast, @RequestParam boolean useCommonsGeoTags) {
-        FeatureCollection collection = wikiService.getPoiData(northWest, southEast, useCommonsGeoTags);
+    public ResponseEntity<String> getWikiData(@RequestParam String northWest, @RequestParam String southEast) {
+        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast);
+        return ResponseEntity.ok(gson.toJson(collection));
+    }
+    
+    @GetMapping(path = {"/get-wiki-images"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getWikiImages(@RequestParam String northWest, @RequestParam String southEast) {
+        FeatureCollection collection = wikiService.getImages(northWest, southEast);
         return ResponseEntity.ok(gson.toJson(collection));
     }
 }

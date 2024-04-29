@@ -48,9 +48,20 @@ public class WikiService {
 	DatasourceConfiguration config;
 	
     
+	public FeatureCollection getImages(String northWest, String southEast) {
+		return getPoiData(northWest, southEast, " SELECT id, mediaId, type, namespace, imageTitle, imgLat, imgLon "
+				+ " FROM wikiimages WHERE imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
+				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon");
+	}
+	
+	public FeatureCollection getWikidataData(String northWest, String southEast) {
+		return getPoiData(northWest, southEast, " SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, lat, lon  "
+				+ " FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
+				+ " ORDER BY qrank desc LIMIT " + LIMIT_QUERY, "lat", "lon");
+	}
 	//  String northWest = "50.5900, 30.2200";
 	//  String southEast = "50.2130, 30.8950";
-	public FeatureCollection getPoiData(String northWest, String southEast, boolean useCommonsGeoTags) {
+	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon) {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
@@ -63,7 +74,7 @@ public class WikiService {
 
 			@Override
 			public Feature mapRow(ResultSet rs, int rowNum) throws SQLException {
-				Feature f = new Feature(Geometry.point(new LatLon(rs.getDouble("lat"), rs.getDouble("lon"))));
+				Feature f = new Feature(Geometry.point(new LatLon(rs.getDouble(lat), rs.getDouble(lon))));
 				f.properties.put("rowNum", rowNum);
 				if (columnNames == null) {
 					columnNames = new ArrayList<String>();
@@ -74,7 +85,7 @@ public class WikiService {
 				}
 				for (int i = 1; i <= columnNames.size(); i++) {
 					String col = columnNames.get(i - 1);
-					if (col.equals("lat") || col.equals("lon")) {
+					if (col.equals(lat) || col.equals(lon)) {
 						continue;
 					}
 					f.properties.put(columnNames.get(i - 1), rs.getString(i));
@@ -83,10 +94,7 @@ public class WikiService {
 				return f;
 			}
 		};
-		List<Feature> stream = jdbcTemplate.query(
-				" SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, lat, lon  "
-				+ " FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
-				+ " ORDER BY qrank desc LIMIT " + LIMIT_QUERY,
+		List<Feature> stream = jdbcTemplate.query(query,
 	            new PreparedStatementSetter() {
 
 					@Override
