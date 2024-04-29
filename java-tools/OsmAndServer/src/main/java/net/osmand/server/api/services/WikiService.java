@@ -63,7 +63,7 @@ public class WikiService {
 
 			@Override
 			public Feature mapRow(ResultSet rs, int rowNum) throws SQLException {
-				Feature f = new Feature(Geometry.point(new LatLon(rs.getDouble(1), rs.getDouble(2))));
+				Feature f = new Feature(Geometry.point(new LatLon(rs.getDouble("lat"), rs.getDouble("lon"))));
 				f.properties.put("rowNum", rowNum);
 				if (columnNames == null) {
 					columnNames = new ArrayList<String>();
@@ -73,15 +73,18 @@ public class WikiService {
 					}
 				}
 				for (int i = 1; i <= columnNames.size(); i++) {
+					String col = columnNames.get(i - 1);
+					if (col.equals("lat") || col.equals("lon")) {
+						continue;
+					}
 					f.properties.put(columnNames.get(i - 1), rs.getString(i));
-
 				}
 
 				return f;
 			}
 		};
 		List<Feature> stream = jdbcTemplate.query(
-				" SELECT id, photoId, wikiTitle, wikiLang, osmid, osmtype  "
+				" SELECT id, photoId, wikiTitle, wikiLang, osmid, osmtype, lat, lon  "
 				+ " FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ " ORDER BY qrank desc LIMIT " + LIMIT_QUERY,
 	            new PreparedStatementSetter() {
