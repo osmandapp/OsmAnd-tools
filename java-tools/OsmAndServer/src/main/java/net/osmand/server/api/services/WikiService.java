@@ -4,7 +4,9 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -57,29 +59,41 @@ public class WikiService {
 	    double south = Double.parseDouble(southEast.split(",")[0]);
 	    double east = Double.parseDouble(southEast.split(",")[1]);
 	    RowMapper<Feature> rowMapper = new RowMapper<GeojsonClasses.Feature>() {
-			
+	    	List<String> columnNames = null;
+
 			@Override
 			public Feature mapRow(ResultSet rs, int rowNum) throws SQLException {
 				Feature f = new Feature(Geometry.point(new LatLon(rs.getDouble(1), rs.getDouble(2))));
 				f.properties.put("rowNum", rowNum);
+				if (columnNames == null) {
+					columnNames = new ArrayList<String>();
+					ResultSetMetaData rsmd = rs.getMetaData();
+					for (int i = 1; i <= rsmd.getColumnCount(); i++) {
+						columnNames.add(rsmd.getColumnName(i));
+					}
+				}
+				for (int i = 1; i <= columnNames.size(); i++) {
+					f.properties.put(columnNames.get(i - 1), rs.getString(i));
+
+				}
+
 				return f;
 			}
 		};
 		List<Feature> stream = jdbcTemplate.query(
-				" SELECT wd.lat, wd.lon, wd.photoId, wd.wikiTitle  "
-				+ " FROM wikidata wd WHERE wd.lat BETWEEN ? AND ? AND wd.lon BETWEEN ? AND ? "
-				+ " ORDER BY wd.qrank desc LIMIT " + LIMIT_QUERY,
+				" SELECT id, photoId, wikiTitle, wikiLang, osmid, osmtype  "
+				+ " FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
+				+ " ORDER BY qrank desc LIMIT " + LIMIT_QUERY,
 	            new PreparedStatementSetter() {
 
 					@Override
 					public void setValues(PreparedStatement ps) throws SQLException {
 						ps.setDouble(1, south);
 						ps.setDouble(2, north);
-						ps.setDouble(3, east);
-						ps.setDouble(4, west);
+						ps.setDouble(3, west);
+						ps.setDouble(4, east);
 					}
 		}, rowMapper);
-//		System.out.println("Count " + );
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
 	}
 	
