@@ -84,7 +84,7 @@ public class WikiService {
 			}
 		};
 		List<Feature> stream = jdbcTemplate.query(
-				" SELECT id, photoId, wikiTitle, wikiLang, osmid, osmtype, lat, lon  "
+				" SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, lat, lon  "
 				+ " FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ " ORDER BY qrank desc LIMIT " + LIMIT_QUERY,
 	            new PreparedStatementSetter() {
