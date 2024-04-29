@@ -45,7 +45,6 @@ public class DatasourceConfiguration {
 
 	@Bean
 	public DataSource wikiDataSource() {
-		System.out.println("Load Clickhouse class: " + ClickHouseDriver.class);
 		try {
 			DataSource ds = wikiDataSourceProperties().initializeDataSourceBuilder().build();
 			return ds;
