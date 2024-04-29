@@ -61,7 +61,7 @@ public class WikiService {
 		List<Feature> stream = jdbcTemplate.query(
 				" SELECT wd.lat, wd.lon, wd.photoId, wd.title  "
 				+ " FROM wikidata wd WHERE wd.lat BETWEEN ? AND ? AND wd.lon BETWEEN ? AND ? "
-				+ " BETWEEN ? AND ?  ORDER BY wd.qrank desc LIMIT " + LIMIT_QUERY,
+				+ " ORDER BY wd.qrank desc LIMIT " + LIMIT_QUERY,
 	            new PreparedStatementSetter() {
 
 					@Override
