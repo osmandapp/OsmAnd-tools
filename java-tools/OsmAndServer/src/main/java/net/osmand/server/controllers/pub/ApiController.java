@@ -298,6 +298,8 @@ public class ApiController {
 		placesService.processPlacesAround(headers, request, response, gson, lat, lon);
 	}
 
+    // /api/wiki_place?category=Sora%20(Italy)
+    // /api/wiki_place?article=Q51838 
 	@GetMapping(path = {"/wiki_place"})
 	@ResponseBody
 	public String geWikiPlace(@RequestParam(required = false) String article,

@@ -1,7 +1,8 @@
 package net.osmand.server.api.services;
 
-import java.io.File;
-import java.sql.Connection;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -11,6 +12,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,13 +21,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
-import com.google.gson.Gson;
-
 import net.osmand.data.LatLon;
-import net.osmand.obf.preparation.DBDialect;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
@@ -33,10 +34,15 @@ import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.Algorithms;
 @Service
 public class WikiService {
+	
 	protected static final Log log = LogFactory.getLog(WikiService.class);
+	// String url = WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + fileName;
 	public static final String WIKIMEDIA_COMMON_SPECIAL_FILE_PATH = "https://commons.wikimedia.org/wiki/Special:FilePath/";
+	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
+	private static final String THUMB_PREFIX = "320px-";
 
 	private static final int LIMIT_QUERY = 100;
+	private static final int LIMITI_QUERY = 25;
 	@Value("${osmand.wiki.location}")
 	private String pathToWikiSqlite;
 	
@@ -108,127 +114,60 @@ public class WikiService {
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
 	}
 	
-	static class GeoFeature {
-		long id;
-		long osmid;
-		double lat;
-		double lon;
-		String poitype;
-		String poisubtype;
-		long qrank;
-		long mediaId;
-		String imageTitle;
-		String wikiLang;
-		String wikiTitle;
-		long wikiViews;
-
-		public String toGeoJSON() {
-			Gson gson = new Gson();
-			String json = gson.toJson(this);
-			return String.format(
-					"{\"type\": \"Feature\", \"properties\": %s, \"geometry\": {\"type\": \"Point\", \"coordinates\": [%f, %f]}}",
-					json, lon, lat);
-		}
+	private static String[] getHash(String s) {
+		String md5 = new String(Hex.encodeHex(DigestUtils.md5(s)));
+		return new String[]{md5.substring(0, 1), md5.substring(0, 2)};
 	}
-    
-	  private static String generateQuery(boolean useCommonsGeoTags) {
-	        if (useCommonsGeoTags) {
-	            return "SELECT * FROM (" +
-	                    "SELECT cgt.gt_page_id as id, wi.mediaId, wi.imageTitle, wi.views, " +
-	                    "ROW_NUMBER() OVER(PARTITION BY cgt.gt_page_id ORDER BY wi.views DESC) as rn " +
-	                    "FROM commons_geo_tags cgt " +
-	                    "JOIN wikiimages wi ON cgt.gt_page_id = wi.mediaId " +
-	                    "WHERE cgt.gt_lat BETWEEN ? AND ? AND cgt.gt_lon BETWEEN ? AND ? " +
-	                    ") t WHERE rn = 1 " +
-	                    "ORDER BY views DESC " +
-	                    "LIMIT 50";
-	        } else {
-	            return "SELECT * FROM (" +
-	                    "SELECT wd.id, wd.osmid, wd.lat, wd.lon, wd.poitype, wd.poisubtype, wd.qrank, wi.mediaId, wi.imageTitle, wi.views, wd.wikiLang, wd.wikiTitle, wd.wikiViews, " +
-	                    "ROW_NUMBER() OVER(PARTITION BY wd.id ORDER BY wd.qrank DESC) as rn " +
-	                    "FROM wikidata wd " +
-	                    "JOIN wikiimages wi ON wd.photoId = wi.mediaId " +
-	                    "WHERE wd.lat BETWEEN ? AND ? AND wd.lon BETWEEN ? AND ? " +
-	                    ") t WHERE rn = 1 " +
-	                    "ORDER BY qrank DESC " +
-	                    "LIMIT 50";
-	        }
-	    }
-	  
+	
 	public Set<String> processWikiImages(String articleId, String categoryName) {
 		Set<String> images = new LinkedHashSet<>();
+		if (config.wikiInitialized()) {
+			RowCallbackHandler h = new RowCallbackHandler() {
+
+				@Override
+				public void processRow(ResultSet rs) throws SQLException {
+//					images.add(WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + rs.getString(1));
+					String imageTitle = rs.getString(1);
+					try {
+						imageTitle = URLDecoder.decode(imageTitle, "UTF-8");
+						String[] hash = getHash(imageTitle);
+						imageTitle = URLEncoder.encode(imageTitle, "UTF-8");
+						String prefix = THUMB_PREFIX;
+						String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
+						images.add(IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/" + prefix
+								+ imageTitle + suffix);
+					} catch (UnsupportedEncodingException e) {
+						System.err.println(e.getMessage());
+					}
+				}
+			};
+			if (!Algorithms.isEmpty(articleId) && articleId.startsWith("Q")) {
+				jdbcTemplate.query(
+						"SELECT imageTitle from wiki.wikiimages where id = ? and namespace = 6 "
+								+ " order by type='P18' ? 0 : 1/(1+views) desc limit " + LIMITI_QUERY,
+						new PreparedStatementSetter() {
+
+							@Override
+							public void setValues(PreparedStatement ps) throws SQLException {
+								ps.setString(1, articleId.substring(1));
+							}
+						}, h);
+			}
+			if (!Algorithms.isEmpty(categoryName)) {
+				jdbcTemplate.query("SELECT imageTitle from wiki.wikiimages where id = "
+						+ " (select any(id) from wiki.wikiimages where imageTitle = ? and namespace = 14) "
+						+ " and type='P373' and namespace = 6 order by views asc limit " + LIMITI_QUERY,
+						new PreparedStatementSetter() {
+
+							@Override
+							public void setValues(PreparedStatement ps) throws SQLException {
+								ps.setString(1, categoryName.replace(' ', '_'));
+							}
+						}, h);
+			}
+		}
 		
 		return images;
-	}
-	
-	@Deprecated
-	public Set<String> processWikiImagesDelete(String articleId, String categoryName) {
-		try {
-			DBDialect osmDBdialect = DBDialect.SQLITE;
-			Set<String> images = new LinkedHashSet<>();
-			File sqliteFile = new File(pathToWikiSqlite);
-			if (sqliteFile.exists()) {
-				Connection conn = osmDBdialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-				if (articleId != null) {
-					articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
-					addImage(conn, articleId, images);
-					addImagesFromCategory(conn, articleId, images);
-					addImagesFromDepict(conn, articleId, images);
-				}
-				if (categoryName != null) {
-					addImagesFromCategoryByName(conn, categoryName, images);
-				}
-			} else {
-				log.error("commonswiki.sqlite file doesn't exist");
-			}
-			return images;
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	@Deprecated
-	private void addImage(Connection conn, String articleId, Set<String> images) throws SQLException {
-		String selectQuery = "SELECT value FROM wikidata_properties where id=? and type='P18'";
-		addImagesFromQuery(conn, articleId, images, selectQuery);
-	}
-	
-	@Deprecated
-	private void addImagesFromDepict(Connection conn, String articleId, Set<String> images) throws SQLException {
-		String selectQuery = "SELECT name FROM common_content " +
-				"INNER JOIN common_depict ON common_depict.id = common_content.id " +
-				"WHERE common_depict.depict_qid = ?";
-		addImagesFromQuery(conn, articleId, images, selectQuery);
-	}
-	@Deprecated
-	private void addImagesFromCategory(Connection conn, String articleId, Set<String> images) throws SQLException {
-		String selectQuery = "SELECT common_content_1.name FROM common_content " +
-				"INNER JOIN wikidata_properties ON common_content.name = value " +
-				"INNER JOIN common_category_links ON category_id = common_content.id " +
-				"INNER JOIN common_content common_content_1 ON common_category_links.id = common_content_1.id " +
-				"WHERE wikidata_properties.id = ? AND type = 'P373'";
-		addImagesFromQuery(conn, articleId, images, selectQuery);
-	}
-	@Deprecated
-	private void addImagesFromCategoryByName(Connection conn, String categoryName, Set<String> images) throws SQLException {
-		String selectQuery = "SELECT common_content_1.name FROM common_content " +
-				"JOIN common_category_links ON common_category_links.category_id = common_content.id AND common_content.name = ? " +
-				"JOIN common_content common_content_1 ON common_category_links.id = common_content_1.id";
-		addImagesFromQuery(conn, categoryName, images, selectQuery);
-	}
-	
-	@Deprecated
-	private void addImagesFromQuery(Connection conn, String param, Set<String> images, String selectQuery) throws SQLException {
-		PreparedStatement selectImageFileNames = conn.prepareStatement(selectQuery);
-		selectImageFileNames.setString(1, param);
-		ResultSet rs = selectImageFileNames.executeQuery();
-		while (rs.next()) {
-			String fileName = rs.getString(1);
-			if (!Algorithms.isEmpty(fileName)) {
-				String url = WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + fileName;
-				images.add(url);
-			}
-		}
 	}
 
 }
