@@ -24,7 +24,7 @@ public class WikiConnection {
         getBaseInfo();
         String northWest = "50.5900, 30.2200";
         String southEast = "50.2130, 30.8950";
-        List<String> geoJsonFeatures = getPoiData(northWest, southEast);
+        List<String> geoJsonFeatures = getPoiData(northWest, southEast, true);
         geoJsonFeatures.forEach(System.out::println);
     }
     
@@ -81,15 +81,14 @@ public class WikiConnection {
         double lon;
         String poitype;
         String poisubtype;
-        int qrank;
+        long qrank;
         long mediaId;
         String imageTitle;
-        int views;
         String wikiLang;
         String wikiTitle;
         long wikiViews;
         
-        public GeoFeature(long id, long osmid, double lat, double lon, String poitype, String poisubtype, int qrank, long mediaId, String imageTitle, int views, String wikiLang, String wikiTitle, long wikiViews) {
+        public GeoFeature(long id, long osmid, double lat, double lon, String poitype, String poisubtype, long qrank, long mediaId, String imageTitle, String wikiLang, String wikiTitle, long wikiViews) {
             this.id = id;
             this.osmid = osmid;
             this.lat = lat;
@@ -99,7 +98,6 @@ public class WikiConnection {
             this.qrank = qrank;
             this.mediaId = mediaId;
             this.imageTitle = imageTitle;
-            this.views = views;
             this.wikiLang = wikiLang;
             this.wikiTitle = wikiTitle;
             this.wikiViews = wikiViews;
@@ -112,20 +110,14 @@ public class WikiConnection {
         }
     }
     
-    public static List<String> getPoiData(String northWest, String southEast) {
+    public static List<String> getPoiData(String northWest, String southEast, boolean useCommonsGeoTags) {
         
         double north = Double.parseDouble(northWest.split(",")[0]);
         double west = Double.parseDouble(northWest.split(",")[1]);
         double south = Double.parseDouble(southEast.split(",")[0]);
         double east = Double.parseDouble(southEast.split(",")[1]);
         
-        String query = "SELECT wd.id, wd.osmid, wd.lat, wd.lon, wd.poitype, wd.poisubtype, wd.qrank, wi.mediaId, wi.imageTitle, wi.views, wd.wikiLang, wd.wikiTitle, wd.wikiViews " +
-                "FROM wikidata wd " +
-                "JOIN wikiimages wi ON wd.photoId = wi.mediaId " +
-                "WHERE wd.lat BETWEEN ? AND ? AND wd.lon BETWEEN ? AND ? " +
-                "ORDER BY wd.qrank DESC " +
-                "LIMIT 50";
-        
+        String query = generateQuery(useCommonsGeoTags);
         
         List<String> features = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
@@ -139,19 +131,18 @@ public class WikiConnection {
             try (ResultSet rs = pst.executeQuery()) {
                 while (rs.next()) {
                     GeoFeature feature = new GeoFeature(
-                            rs.getLong("id"),
-                            rs.getLong("osmid"),
-                            rs.getDouble("lat"),
-                            rs.getDouble("lon"),
-                            rs.getString("poitype"),
-                            rs.getString("poisubtype"),
-                            rs.getInt("qrank"),
-                            rs.getLong("mediaId"),
-                            rs.getString("imageTitle"),
-                            rs.getInt("views"),
-                            rs.getString("wikiLang"),
-                            rs.getString("wikiTitle"),
-                            rs.getLong("wikiViews")
+                            (Long) getColumnValue(rs, "id", 0L),
+                            (Long) getColumnValue(rs, "osmid", 0L),
+                            (Double) getColumnValue(rs, "lat", 0.0),
+                            (Double) getColumnValue(rs, "lon", 0.0),
+                            (String) getColumnValue(rs, "poitype", ""),
+                            (String) getColumnValue(rs, "poisubtype", ""),
+                            (Long) getColumnValue(rs, "qrank", 0L),
+                            (Long) getColumnValue(rs, "mediaId", 0L),
+                            (String) getColumnValue(rs, "imageTitle", ""),
+                            (String) getColumnValue(rs, "wikiLang", ""),
+                            (String) getColumnValue(rs, "wikiTitle", ""),
+                            (Long) getColumnValue(rs, "wikiViews", 0L)
                     );
                     features.add(feature.toGeoJSON());
                 }
@@ -161,5 +152,41 @@ public class WikiConnection {
             e.printStackTrace();
         }
         return features;
+    }
+    
+    public static Object getColumnValue(ResultSet rs, String columnName, Object defaultValue) throws SQLException {
+        ResultSetMetaData rsmd = rs.getMetaData();
+        int columns = rsmd.getColumnCount();
+        for (int x = 1; x <= columns; x++) {
+            if (columnName.equals(rsmd.getColumnName(x))) {
+                Object value = rs.getObject(columnName);
+                return value != null ? value : defaultValue;
+            }
+        }
+        return defaultValue;
+    }
+    
+    private static String generateQuery(boolean useCommonsGeoTags) {
+        if (useCommonsGeoTags) {
+            return "SELECT * FROM (" +
+                    "SELECT cgt.gt_page_id as id, wi.mediaId, wi.imageTitle, wi.views, " +
+                    "ROW_NUMBER() OVER(PARTITION BY cgt.gt_page_id ORDER BY wi.views DESC) as rn " +
+                    "FROM commons_geo_tags cgt " +
+                    "JOIN wikiimages wi ON cgt.gt_page_id = wi.mediaId " +
+                    "WHERE cgt.gt_lat BETWEEN ? AND ? AND cgt.gt_lon BETWEEN ? AND ? " +
+                    ") t WHERE rn = 1 " +
+                    "ORDER BY views DESC " +
+                    "LIMIT 50";
+        } else {
+            return "SELECT * FROM (" +
+                    "SELECT wd.id, wd.osmid, wd.lat, wd.lon, wd.poitype, wd.poisubtype, wd.qrank, wi.mediaId, wi.imageTitle, wi.views, wd.wikiLang, wd.wikiTitle, wd.wikiViews, " +
+                    "ROW_NUMBER() OVER(PARTITION BY wd.id ORDER BY wd.qrank DESC) as rn " +
+                    "FROM wikidata wd " +
+                    "JOIN wikiimages wi ON wd.photoId = wi.mediaId " +
+                    "WHERE wd.lat BETWEEN ? AND ? AND wd.lon BETWEEN ? AND ? " +
+                    ") t WHERE rn = 1 " +
+                    "ORDER BY qrank DESC " +
+                    "LIMIT 50";
+        }
     }
 }

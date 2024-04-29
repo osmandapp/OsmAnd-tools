@@ -1,10 +1,14 @@
 package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.osmand.Location;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.Street;
+import net.osmand.search.SearchUICore;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -23,6 +27,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static net.osmand.server.utils.WikiConnection.getPoiData;
 
 @Controller
 @RequestMapping("/routing/search")
@@ -130,5 +136,13 @@ public class SearchController {
         } else {
             return ResponseEntity.badRequest().body("Error get poi address!");
         }
+    }
+    
+    @GetMapping(path = {"/get-wiki-data"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getWikiData(@RequestParam String northWest, @RequestParam String southEast, @RequestParam boolean useCommonsGeoTags) {
+        List<String> geoJsonFeatures = getPoiData(northWest, southEast, useCommonsGeoTags);
+        
+        return ResponseEntity.ok(gson.toJson(geoJsonFeatures));
     }
 }
