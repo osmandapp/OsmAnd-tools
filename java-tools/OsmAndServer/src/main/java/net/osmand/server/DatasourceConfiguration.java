@@ -5,6 +5,7 @@ import javax.sql.DataSource;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
@@ -17,18 +18,29 @@ public class DatasourceConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
 	
+	
+    @Bean
+	@ConfigurationProperties(prefix="spring.datasource")
+    public DataSourceProperties primaryDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+    
+    
+    @Bean
+	@ConfigurationProperties(prefix="spring.wikidatasource")
+    public DataSourceProperties wikiDataSourceProperties() {
+        return new DataSourceProperties();
+    }
     
 	@Bean
 	@Primary
-	@ConfigurationProperties(prefix="spring.datasource")
 	public DataSource primaryDataSource() {
-	    return DataSourceBuilder.create().build();
+		return primaryDataSourceProperties().initializeDataSourceBuilder().build();
 	}
 
 	@Bean
-	@ConfigurationProperties(prefix="spring.wikidatasource")
 	public DataSource wikiDataSource() {
-	    return DataSourceBuilder.create().build();
+		return wikiDataSourceProperties().initializeDataSourceBuilder().build();
 	}
     
 	@Bean
