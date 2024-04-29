@@ -23,6 +23,7 @@ import com.google.gson.Gson;
 
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
@@ -41,10 +42,16 @@ public class WikiService {
 	@Qualifier("wikiJdbcTemplate")
 	JdbcTemplate jdbcTemplate;
 	
+	@Autowired
+	DatasourceConfiguration config;
+	
     
 	//  String northWest = "50.5900, 30.2200";
 	//  String southEast = "50.2130, 30.8950";
 	public FeatureCollection getPoiData(String northWest, String southEast, boolean useCommonsGeoTags) {
+		if (!config.wikiInitialized()) {
+			return new FeatureCollection();
+		}
 	    double north = Double.parseDouble(northWest.split(",")[0]);
 	    double west = Double.parseDouble(northWest.split(",")[1]);
 	    double south = Double.parseDouble(southEast.split(",")[0]);

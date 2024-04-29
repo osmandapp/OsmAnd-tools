@@ -1,7 +1,6 @@
 package net.osmand.server;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 
 import javax.sql.DataSource;
@@ -15,13 +14,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-
-import com.clickhouse.jdbc.ClickHouseDriver;
+import org.springframework.jdbc.datasource.AbstractDataSource;
 
 @Configuration
 public class DatasourceConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
+	private boolean wikiInitialzed;
 	
 	
     @Bean
@@ -43,20 +42,38 @@ public class DatasourceConfiguration {
 		return primaryDataSourceProperties().initializeDataSourceBuilder().build();
 	}
 
+	public boolean wikiInitialized() {
+		return wikiInitialzed;
+	}
 	@Bean
 	public DataSource wikiDataSource() {
 		try {
 			DataSource ds = wikiDataSourceProperties().initializeDataSourceBuilder().build();
+			wikiInitialzed = true;
 			return ds;
 		} catch (Exception e) {
-			e.printStackTrace();
-			return null;
+			LOG.warn("Warning - Wiki database not configured: " + e.getMessage());
 		}
+		return new AbstractDataSource() {
+			
+			@Override
+			public Connection getConnection(String username, String password) throws SQLException {
+				return null;
+			}
+			
+			@Override
+			public Connection getConnection() throws SQLException {
+				return null;
+			}
+		};
 	}
     
 	@Bean
 	public JdbcTemplate wikiJdbcTemplate(@Qualifier("wikiDataSource") DataSource dataSource) {
-	    return new JdbcTemplate(dataSource);
+		if (dataSource == null) {
+			return null;
+		}
+		return new JdbcTemplate(dataSource);
 	}
 	
 }
