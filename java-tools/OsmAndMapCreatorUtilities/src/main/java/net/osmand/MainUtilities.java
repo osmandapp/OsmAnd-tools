@@ -254,8 +254,6 @@ public class MainUtilities {
 				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
 			} else if (utl.equals("add-owner-to-obf")) {
 				BinaryMerger.signObfFile(subArgsArray);
-			} else if (utl.equals("parse-commonswiki")) {
-				CommonsWikimediaPreparation.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}

@@ -88,7 +88,8 @@ public class WikiDatabasePreparation {
 	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
-	
+	private static final String P_OPENED = "<p>";
+	private static final String P_CLOSED = "</p>";
 	
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT, ADDRESS, AREA_CODE,
@@ -729,7 +730,6 @@ public class WikiDatabasePreparation {
 	private static StringBuilder parsePoiWithAddLatLon(String val, Map<PoiFieldType, Object> poiFields) throws IOException, SQLException {
 		StringBuilder poiShortDescription = new StringBuilder();
 		String[] parts = val.split("\\|");
-		String areaCode = "";
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -755,7 +755,6 @@ public class WikiDatabasePreparation {
 						poiShortDescription.append("Website: ").append(value).append(". ");
 						poiFields.put(PoiFieldType.WEBSITE, value);
 					} else if (field.equalsIgnoreCase("intl-area-code")) {
-						areaCode = value;
 						poiFields.put(PoiFieldType.AREA_CODE, value);
 					} else if (field.equalsIgnoreCase("address") || field.equalsIgnoreCase("addresse") || field.equalsIgnoreCase("כתובת")
 							|| field.equalsIgnoreCase("نشانی")) {
@@ -1309,6 +1308,7 @@ public class WikiDatabasePreparation {
 		private final SAXParser saxParser;
 		private boolean page = false;
 		private boolean revision = false;
+		private long namespace = 0;
 		private StringBuilder ctext = null;
 
 		private StringBuilder title = new StringBuilder();
@@ -1327,25 +1327,6 @@ public class WikiDatabasePreparation {
 
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
-		final String[] wikiJunkArray = new String[] { ".jpg", ".JPG", ".jpeg", ".png", ".gif", ".svg", "/doc", "틀:",
-				"위키프로젝트:", "แม่แบบ:", "위키백과:", "แม่แบบ:", "Àdàkọ:", "Aide:", "Aiuto:", "Andoza:", "Anexo:", "Bản:",
-				"mẫu:", "Batakan:", "Categoría:", "Categoria:", "Catégorie:", "Category:", "Cithakan:", "Datei:",
-				"Draft:", "Endrika:", "Fájl:", "Fichier:", "File:", "Format:", "Formula:", "Help:", "Hjælp:",
-				"Kategori:", "Kategoria:", "Kategorie:", "Kigezo:", "モジュール:", "Mal:", "Mall:", "Malline:", "Modèle:",
-				"Modèl:", "Modello:", "Modelo:", "Modèl:", "Moduł:", "Module:", "Modulis:", "Modul:", "Mô:", "đun:",
-				"Nodyn:", "Padron:", "Patrom:", "Pilt:", "Plantía:", "Plantilla:", "Plantilya:", "Portaal:", "Portail:",
-				"Portal:", "Portál:", "Predefinição:", "Predloga:", "Predložak:", "Progetto:", "Proiect:", "Projet:",
-				"Sablon:", "Šablon:", "Şablon:", "Šablona:", "Šablóna:", "Šablonas:", "Ŝablono:", "Sjabloon:",
-				"Schabloun:", "Skabelon:", "Snið:", "Stampa:", "Szablon:", "Templat:", "Txantiloi:", "Veidne:",
-				"Vikipedio:", "Vikipediya:", "Vikipeedia:", "Viquipèdia:", "Viquiprojecte:", "Viquiprojecte:",
-				"Vörlaag:", "Vorlage:", "Vorlog:", "วิกิพีเดีย:", "Wikipedia:", "Wikipedie:", "Wikipedija:",
-				"Wîkîpediya:", "Wikipédia:", "Wikiproiektu:", "Wikiprojekt:", "Wikiproyecto:", "الگو:", "سانچ:",
-				"قالب:", "وکیپیڈیا:", "ויקיפדיה:", "תבנית", "Βικιπαίδεια:", "Πρότυπο:", "Википедиа:", "Википедија:",
-				"Википедия:", "Вікіпедія:", "Довідка:", "Загвар:", "Инкубатор:", "Калып:", "Ҡалып:", "Кеп:",
-				"Категорія:", "Портал:", "Проект:", "Уикипедия:", "Үлгі:", "Файл:", "Хуызæг:", "Шаблон:", "Կաղապար:",
-				"Մոդուլ:", "Վիքիպեդիա:", "ვიკიპედია:", "თარგი:", "ढाँचा:", "विकिपीडिया:", "साचा:", "साँचा:", "ઢાંચો:",
-				"વિકિપીડિયા:", "మూస:", "வார்ப்புரு:", "ഫലകം:", "വിക്കിപീഡിയ:", "টেমপ্লেট:", "プロジェクト:", "উইকিপিডিয়া:",
-				"মডেল:", "پرونده:", "模块:", "ماڈیول:" };
 		private FileProgressImplementation progIS;
 		private long cid;
 
@@ -1357,11 +1338,11 @@ public class WikiDatabasePreparation {
 			this.testArticleId = testArticleId;
 			conn = dialect.getDatabaseConnection(wikipediaSqlite.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
-			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipContent blob)");
+			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipShortDesc blob, zipContent blob)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
 			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
-			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, zipContent) VALUES (?, ?, ?, ?)");
+			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, zipShortDesc, zipContent) VALUES (?, ?, ?, ?, ?)");
 			if (this.testArticleId == 0) {
 				selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
 			}
@@ -1405,6 +1386,8 @@ public class WikiDatabasePreparation {
 				} else if (name.equals("text")) {
 					text.setLength(0);
 					ctext = text;
+				} else if (name.equals("ns")) {
+					ctext = new StringBuilder();
 				} else if (name.equals("revision")) {
 					revision = true;
 				} else if (name.equals("id") && !revision) {
@@ -1435,21 +1418,17 @@ public class WikiDatabasePreparation {
 						ctext = null;
 					} else if (name.equals("revision")) {
 						revision = false;
+					} else if (name.equals("ns")) {
+						namespace = Long.parseLong(ctext.toString());
+						ctext = null;
 					} else if (name.equals("id") && !revision) {
 						ctext = null;
 						cid = Long.parseLong(pageId.toString());
 					} else if (name.equals("text")) {
-						boolean isJunk = false;
 						long wikiId = 0;
 						String plainStr = null;
-						for (String wikiJunk : wikiJunkArray) {
-							if (title.toString().contains(wikiJunk)) {
-								isJunk = true;
-								break;
-							}
-						}
 						if (testArticleId == 0) {
-							if (!isJunk) {
+							if (namespace == 0) {
 								selectPrep.setString(1, title.toString());
 								selectPrep.setString(2, lang);
 								ResultSet rs = selectPrep.executeQuery();
@@ -1477,12 +1456,8 @@ public class WikiDatabasePreparation {
 								insertPrep.setLong(1, wikiId);
 								insertPrep.setString(2, title.toString());
 								insertPrep.setString(3, lang);
-								bous.reset();
-								GZIPOutputStream gzout = new GZIPOutputStream(bous);
-								gzout.write(plainStr.getBytes("UTF-8"));
-								gzout.close();
-								final byte[] byteArray = bous.toByteArray();
-								insertPrep.setBytes(4, byteArray);
+								;insertPrep.setBytes(4, gzip(getShortDescr(plainStr)));
+								insertPrep.setBytes(5, gzip(plainStr));
 								addBatch();
 							} catch (SQLException e) {
 								throw new SAXException(e);
@@ -1495,6 +1470,39 @@ public class WikiDatabasePreparation {
 				throw new SAXException(e);
 			}
 		}
+
+		private byte[] gzip(String plainStr) throws IOException, UnsupportedEncodingException {
+			bous.reset();
+			GZIPOutputStream gzout = new GZIPOutputStream(bous);
+			gzout.write(plainStr.getBytes("UTF-8"));
+			gzout.close();
+			return bous.toByteArray();
+		}
+	}
+	
+	public static String getShortDescr(String content) {
+		if (content == null) {
+			return null;
+		}
+		int firstParagraphStart = content.indexOf(P_OPENED);
+		int firstParagraphEnd = content.indexOf(P_CLOSED);
+		firstParagraphEnd = firstParagraphEnd < firstParagraphStart ? content.indexOf(P_CLOSED, firstParagraphStart) : firstParagraphEnd;
+		if (firstParagraphStart == -1 || firstParagraphEnd == -1
+				|| firstParagraphEnd < firstParagraphStart) {
+			return null;
+		}
+		String firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
+		while (firstParagraphHtml.length() == (P_OPENED.length() + P_CLOSED.length())
+				&& (firstParagraphEnd + P_CLOSED.length()) < content.length()) {
+			firstParagraphStart = content.indexOf(P_OPENED, firstParagraphEnd);
+			firstParagraphEnd = firstParagraphStart == -1 ? -1 : content.indexOf(P_CLOSED, firstParagraphStart);
+			if (firstParagraphStart != -1 && firstParagraphEnd != -1) {
+				firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
+			} else {
+				break;
+			}
+		}
+		return firstParagraphHtml;
 	}
 
 	private static String generateHtmlArticle(StringBuilder contentText, String lang, String title, WikiImageUrlStorage imageUrlStorage)

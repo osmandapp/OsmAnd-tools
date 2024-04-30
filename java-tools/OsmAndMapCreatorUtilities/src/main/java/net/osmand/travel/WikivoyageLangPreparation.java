@@ -440,8 +440,6 @@ public class WikivoyageLangPreparation {
 		private PreparedStatement prepInsertPOI;
 		private int batch = 0;
 		private final static int BATCH_SIZE = 500;
-		private static final String P_OPENED = "<p>";
-		private static final String P_CLOSED = "</p>";
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
 		
@@ -940,7 +938,7 @@ public class WikivoyageLangPreparation {
 					}
 
 					// gpx_gz
-					String gpx = generateGpx(pois, title.toString(), lang, getShortDescr(plainStr), cInfo.wikidataId,
+					String gpx = generateGpx(pois, title.toString(), lang, WikiDatabasePreparation.getShortDescr(plainStr), cInfo.wikidataId,
 							cid, ll);
 					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 					if (uncompressed) {
@@ -968,31 +966,7 @@ public class WikivoyageLangPreparation {
 					msg);
 		}
 
-		private String getShortDescr(String content) {
-			if (content == null) {
-				return null;
-			}
-
-			int firstParagraphStart = content.indexOf(P_OPENED);
-			int firstParagraphEnd = content.indexOf(P_CLOSED);
-			firstParagraphEnd = firstParagraphEnd < firstParagraphStart ? content.indexOf(P_CLOSED, firstParagraphStart) : firstParagraphEnd;
-			if (firstParagraphStart == -1 || firstParagraphEnd == -1
-					|| firstParagraphEnd < firstParagraphStart) {
-				return null;
-			}
-			String firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
-			while (firstParagraphHtml.length() == (P_OPENED.length() + P_CLOSED.length())
-					&& (firstParagraphEnd + P_CLOSED.length()) < content.length()) {
-				firstParagraphStart = content.indexOf(P_OPENED, firstParagraphEnd);
-				firstParagraphEnd = firstParagraphStart == -1 ? -1 : content.indexOf(P_CLOSED, firstParagraphStart);
-				if (firstParagraphStart != -1 && firstParagraphEnd != -1) {
-					firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
-				} else {
-					break;
-				}
-			}
-			return firstParagraphHtml;
-		}
+		
 
 		public static String capitalizeFirstLetterAndLowercase(String s) {
 			if (s != null && s.length() > 1) {
