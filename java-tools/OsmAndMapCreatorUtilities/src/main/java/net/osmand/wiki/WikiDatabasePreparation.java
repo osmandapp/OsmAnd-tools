@@ -1321,7 +1321,7 @@ public class WikiDatabasePreparation {
 		private PreparedStatement insertPrep;
 		private PreparedStatement selectPrep;
 		private int batch = 0;
-		private final static int BATCH_SIZE = 1500;
+		private final static int BATCH_SIZE = 1000;
 		private static final long ARTICLES_BATCH = 1000;
 		private long testArticleId;
 
@@ -1435,6 +1435,7 @@ public class WikiDatabasePreparation {
 								if (rs.next()) {
 									wikiId = rs.getLong(1);
 								}
+								rs.close();
 								selectPrep.clearParameters();
 							}
 						} else {
@@ -1451,6 +1452,8 @@ public class WikiDatabasePreparation {
 						if (plainStr != null) {
 							if (++counter % ARTICLES_BATCH == 0) {
 								log.info("Article accepted " + cid + " " + title.toString());
+								log.info(String.format("Memory used : %d %d", Runtime.getRuntime().maxMemory() - Runtime.getRuntime().freeMemory(), 
+										Runtime.getRuntime().maxMemory()));
 							}
 							try {
 								insertPrep.setLong(1, wikiId);
