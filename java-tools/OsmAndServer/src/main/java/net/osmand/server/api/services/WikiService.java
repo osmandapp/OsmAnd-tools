@@ -56,8 +56,8 @@ public class WikiService {
 	
     
 	public FeatureCollection getImages(String northWest, String southEast) {
-		return getPoiData(northWest, southEast, " SELECT id, mediaId, type, namespace, imageTitle, imgLat, imgLon "
-				+ " FROM wikiimages WHERE imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
+		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
+				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
 				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon");
 	}
 	
