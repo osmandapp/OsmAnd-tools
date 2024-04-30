@@ -1456,7 +1456,7 @@ public class WikiDatabasePreparation {
 								insertPrep.setLong(1, wikiId);
 								insertPrep.setString(2, title.toString());
 								insertPrep.setString(3, lang);
-								;insertPrep.setBytes(4, gzip(getShortDescr(plainStr)));
+								insertPrep.setBytes(4, gzip(getShortDescr(plainStr)));
 								insertPrep.setBytes(5, gzip(plainStr));
 								addBatch();
 							} catch (SQLException e) {
@@ -1474,7 +1474,7 @@ public class WikiDatabasePreparation {
 		private byte[] gzip(String plainStr) throws IOException, UnsupportedEncodingException {
 			bous.reset();
 			GZIPOutputStream gzout = new GZIPOutputStream(bous);
-			gzout.write(plainStr.getBytes("UTF-8"));
+			gzout.write((plainStr == null ? "" : plainStr).getBytes("UTF-8"));
 			gzout.close();
 			return bous.toByteArray();
 		}
