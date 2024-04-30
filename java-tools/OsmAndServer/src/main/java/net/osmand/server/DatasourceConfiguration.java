@@ -76,4 +76,13 @@ public class DatasourceConfiguration {
 		return new JdbcTemplate(dataSource);
 	}
 	
+	@Bean
+	@Primary
+	public JdbcTemplate jdbcTemplate(@Qualifier("primaryDataSource") DataSource dataSource) {
+		if (dataSource == null) {
+			return null;
+		}
+		return new JdbcTemplate(dataSource);
+	}
+	
 }

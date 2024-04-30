@@ -32,6 +32,7 @@ import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.Algorithms;
+
 @Service
 public class WikiService {
 	
