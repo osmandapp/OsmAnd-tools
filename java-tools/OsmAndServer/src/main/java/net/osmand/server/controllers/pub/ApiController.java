@@ -303,8 +303,8 @@ public class ApiController {
 	@GetMapping(path = {"/wiki_place"})
 	@ResponseBody
 	public String geWikiPlace(@RequestParam(required = false) String article,
-	                        @RequestParam(required = false) String category) {
-		Set<String> images = wikiService.processWikiImages(article, category);
+	                        @RequestParam(required = false) String category, @RequestParam(required = false) String wiki) {
+		Set<String> images = wikiService.processWikiImages(article, category, wiki);
 		return gson.toJson(Collections.singletonMap("features", images));
 	}
 

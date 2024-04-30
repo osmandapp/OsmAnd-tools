@@ -27,7 +27,6 @@ import org.springframework.stereotype.Service;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.DatasourceConfiguration;
-import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
@@ -117,7 +116,7 @@ public class WikiService {
 		return new String[]{md5.substring(0, 1), md5.substring(0, 2)};
 	}
 	
-	public Set<String> processWikiImages(String articleId, String categoryName) {
+	public Set<String> processWikiImages(String articleId, String categoryName, String wiki) {
 		Set<String> images = new LinkedHashSet<>();
 		if (config.wikiInitialized()) {
 			RowCallbackHandler h = new RowCallbackHandler() {
@@ -142,7 +141,22 @@ public class WikiService {
 					}
 				}
 			};
+			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
+				String[] s = wiki.split(":");
+				String id;
+				if (s.length < 2) {
+					id = jdbcTemplate.queryForObject("SELECT id from wiki.wiki_mapping where title = ? ",
+							String.class, s[0]);
+				} else {
+					id = jdbcTemplate.queryForObject("SELECT id from wiki.wiki_mapping where lang = ? and title = ? ",
+							String.class, s[0], s[1]);
+				}		
+				if (id != null) {
+					articleId = "Q" + id;
+				}
+ 			}
 			if (!Algorithms.isEmpty(articleId) && articleId.startsWith("Q")) {
+				String aid = articleId;
 				jdbcTemplate.query(
 						"SELECT imageTitle from wiki.wikiimages where id = ? and namespace = 6 "
 								+ " order by type='P18' ? 0 : 1/(1+views) desc limit " + LIMITI_QUERY,
@@ -150,7 +164,7 @@ public class WikiService {
 
 							@Override
 							public void setValues(PreparedStatement ps) throws SQLException {
-								ps.setString(1, articleId.substring(1));
+								ps.setString(1, aid.substring(1));
 							}
 						}, h);
 			}
