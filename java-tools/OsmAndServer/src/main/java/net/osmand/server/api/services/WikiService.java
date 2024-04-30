@@ -62,7 +62,7 @@ public class WikiService {
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast) {
-		return getPoiData(northWest, southEast, " SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, lat, lon  "
+		return getPoiData(northWest, southEast, " SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, poitype, poisubtype, lat, lon "
 				+ " FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ " ORDER BY qrank desc LIMIT " + LIMIT_QUERY, "lat", "lon");
 	}
@@ -72,19 +72,19 @@ public class WikiService {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
-	    double north = Double.parseDouble(northWest.split(",")[0]);
-	    double west = Double.parseDouble(northWest.split(",")[1]);
-	    double south = Double.parseDouble(southEast.split(",")[0]);
-	    double east = Double.parseDouble(southEast.split(",")[1]);
-	    RowMapper<Feature> rowMapper = new RowMapper<GeojsonClasses.Feature>() {
-	    	List<String> columnNames = null;
-
+		double north = Double.parseDouble(northWest.split(",")[0]);
+		double west = Double.parseDouble(northWest.split(",")[1]);
+		double south = Double.parseDouble(southEast.split(",")[0]);
+		double east = Double.parseDouble(southEast.split(",")[1]);
+		RowMapper<Feature> rowMapper = new RowMapper<>() {
+			List<String> columnNames = null;
+			
 			@Override
 			public Feature mapRow(ResultSet rs, int rowNum) throws SQLException {
 				Feature f = new Feature(Geometry.point(new LatLon(rs.getDouble(lat), rs.getDouble(lon))));
 				f.properties.put("rowNum", rowNum);
 				if (columnNames == null) {
-					columnNames = new ArrayList<String>();
+					columnNames = new ArrayList<>();
 					ResultSetMetaData rsmd = rs.getMetaData();
 					for (int i = 1; i <= rsmd.getColumnCount(); i++) {
 						columnNames.add(rsmd.getColumnName(i));
@@ -102,16 +102,12 @@ public class WikiService {
 			}
 		};
 		List<Feature> stream = jdbcTemplate.query(query,
-	            new PreparedStatementSetter() {
-
-					@Override
-					public void setValues(PreparedStatement ps) throws SQLException {
-						ps.setDouble(1, south);
-						ps.setDouble(2, north);
-						ps.setDouble(3, west);
-						ps.setDouble(4, east);
-					}
-		}, rowMapper);
+				ps -> {
+					ps.setDouble(1, south);
+					ps.setDouble(2, north);
+					ps.setDouble(3, west);
+					ps.setDouble(4, east);
+				}, rowMapper);
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
 	}
 	
