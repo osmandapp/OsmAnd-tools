@@ -45,7 +45,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
 
-import info.bliki.wiki.filter.HTMLConverter;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.gpx.GPXFile;
@@ -796,7 +795,7 @@ public class WikivoyageLangPreparation {
 			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
 			List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
 			cInfo.title = title;
-			String text = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, pois, lang, title, dbBrowser);
+			String wikiText = WikiDatabasePreparation.removeMacroBlocks(cont, macroBlocks, pois, lang, title, dbBrowser);
 			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB) || 
 					macroBlocks.containsKey(WikivoyageTemplates.MONUMENT_TITLE)) {
 //				System.out.println("Skip disambiguation " + title); 
@@ -825,17 +824,16 @@ public class WikivoyageLangPreparation {
 						log.debug(String.format("Article accepted %d %s %s free: %s\n", cid, title, ll,
 								Runtime.getRuntime().freeMemory() / (1024 * 1024)));
 					}
-					final HTMLConverter converter = new HTMLConverter(false);
 					CustomWikiModel wikiModel = new CustomWikiModel(
-							// Images could be different compare... 
+							// Images could be different compare...
 							// https://upload.wikimedia.org/wikivoyage/de/thumb/d/d4/Museo_in_San_Juan_verkl.jpg/600px-Museo_in_San_Juan_verkl.jpg
 							// https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Percys_and_Kruis2.png/1300px-Percys_and_Kruis2.png
 							"https://upload.wikimedia.org/wikipedia/commons/${image}",
 							"https://" + lang + ".wikivoyage.org/wiki/${title}", imageUrlStorage, false);
-					String plainStr = wikiModel.render(converter, text);
-					plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
-							.replaceAll("<p>/div\n</p>", "</div>");
 
+					String plainStr = WikiDatabasePreparation.generateHtmlArticle(wikiText, wikiModel);
+					String contentsJson = wikiModel.getContentsJson();
+					String shortDescr = WikiDatabasePreparation.getShortDescr(wikiText, wikiModel);
 					if (DEBUG) {
 						String savePath = "/Users/plotva/Documents";
 						File myFile = new File(savePath, "page.html");
@@ -938,7 +936,7 @@ public class WikivoyageLangPreparation {
 					}
 
 					// gpx_gz
-					String gpx = generateGpx(pois, title.toString(), lang, WikiDatabasePreparation.getShortDescr(plainStr), cInfo.wikidataId,
+					String gpx = generateGpx(pois, title.toString(), lang, shortDescr, cInfo.wikidataId,
 							cid, ll);
 					prepInsert.setBytes(column++, stringToCompressedByteArray(bous, gpx));
 					if (uncompressed) {
@@ -948,7 +946,7 @@ public class WikivoyageLangPreparation {
 					prepInsert.setLong(column++, cInfo.wikidataId);
 					prepInsert.setLong(column++, cid);
 					prepInsert.setString(column++, lang);
-					prepInsert.setString(column++, wikiModel.getContentsJson());
+					prepInsert.setString(column++, contentsJson);
 					
 					addBatch();
 

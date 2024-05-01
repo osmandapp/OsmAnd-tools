@@ -68,6 +68,8 @@ import org.xwiki.rendering.syntax.Syntax;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
+import info.bliki.wiki.filter.PlainTextConverter;
+import info.bliki.wiki.model.WikiModel;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.impl.FileProgressImplementation;
@@ -87,8 +89,6 @@ public class WikiDatabasePreparation {
 	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
-	private static final String P_OPENED = "<p>";
-	private static final String P_CLOSED = "</p>";
 	
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT, ADDRESS, AREA_CODE,
@@ -954,76 +954,29 @@ public class WikiDatabasePreparation {
 		return EnumSet.noneOf(WikivoyageTemplates.class);
 	}
 
-	public static void mainTest(String[] args) throws ConversionException, ComponentLookupException, ParseException, IOException, SQLException {
-		EmbeddableComponentManager cm = new EmbeddableComponentManager();
-		cm.initialize(WikiDatabasePreparation.class.getClassLoader());
-		Parser parser = cm.getInstance(Parser.class, Syntax.MEDIAWIKI_1_0.toIdString());
-		FileReader fr = new FileReader(new File("/Users/victorshcherb/Documents/b.src.html"));
-		StringBuilder content = new StringBuilder();
-		String s;
-		BufferedReader br = new BufferedReader(fr);
-		while((s = br.readLine()) != null) {
-			content.append(s);
-		}
-		br.close();
-		//content = removeMacroBlocks(content, null, "en", null);
-		//for testing file.html after removeMacroBlocks and generating new file.html
-		String resContent = generateHtmlArticle(content, "en", "b", null);
-		String savePath = "/Users/plotva/Documents";
-		File myFile = new File(savePath, "page.html");
-		BufferedWriter htmlFileWriter = new BufferedWriter(new FileWriter(myFile, false));
-		htmlFileWriter.write(resContent);
-        htmlFileWriter.close();
-		
-		XDOM xdom = parser.parse(new StringReader(content.toString()));
-		        
-		// Find all links and make them italic
-		for (Block block : xdom.getBlocks(new ClassBlockMatcher(LinkBlock.class), Block.Axes.DESCENDANT)) {
-		    Block parentBlock = block.getParent();
-		    Block newBlock = new FormatBlock(Collections.<Block>singletonList(block), Format.ITALIC);
-		    parentBlock.replaceChild(newBlock, block);
-		}
-//		for (Block block : xdom.getBlocks(new ClassBlockMatcher(ParagraphBlock.class), Block.Axes.DESCENDANT)) {
-//			ParagraphBlock b = (ParagraphBlock) block;
-//			block.getParent().removeBlock(block);
-//		}
-		WikiPrinter printer = new DefaultWikiPrinter();
-//		BlockRenderer renderer = cm.getInstance(BlockRenderer.class, Syntax.XHTML_1_0.toIdString());
-//		renderer.render(xdom, printer);
-//		System.out.println(printer.toString());
-		
-		Converter converter = cm.getInstance(Converter.class);
-
-		// Convert input in XWiki Syntax 2.1 into XHTML. The result is stored in the printer.
-		printer = new DefaultWikiPrinter();
-		converter.convert(new FileReader(new File("/Users/victorshcherb/Documents/a.src.html")), Syntax.MEDIAWIKI_1_0, Syntax.XHTML_1_0, printer);
-
-		System.out.println(printer.toString());
-		
-//		final HTMLConverter nconverter = new HTMLConverter(false);
-//		String lang = "be";
-//		WikiModel wikiModel = new WikiModel("http://"+lang+".wikipedia.com/wiki/${image}", "http://"+lang+".wikipedia.com/wiki/${title}");
-//		String plainStr = wikiModel.render(nconverter, content);
-//		System.out.println(plainStr);
-//		downloadPage("https://be.m.wikipedia.org/wiki/%D0%93%D0%BE%D1%80%D0%B0%D0%B4_%D0%9C%D1%96%D0%BD%D1%81%D0%BA",
-//		"/Users/victorshcherb/Documents/a.wiki.html");
-	}
 	
 	public static void mainTestPage(String[] args) throws IOException, SQLException {
-		StringBuilder rs = Algorithms
+		StringBuilder input = Algorithms
 				.readFromInputStream(WikiDatabasePreparation.class.getResourceAsStream("/page.txt"));
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
-		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, pois, "de",  null, null);
-		System.out.println(text);
+		String lang = "de";
+		String title = "page";
+		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}", 
+				"http://" + lang + ".wikpedia.org/wiki/${title}", null, true);
+		String rawWikiText = WikiDatabasePreparation.removeMacroBlocks(input, macros, pois, lang,  title, null);
+		
+//		System.out.println(text);
+		
+		System.out.println(generateHtmlArticle(rawWikiText, wikiModel));
+		System.out.println(getShortDescr(rawWikiText, wikiModel));
 //		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
 //		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
 		List<String> lst = macros.get(WikivoyageTemplates.POI);
-		for(Map<PoiFieldType, Object> poi : pois) {
-//			System.out.println(poi.get(PoiFieldType.PHONE));
-			System.out.println(poi);
-			System.out.println("----");
-		}
+//		for(Map<PoiFieldType, Object> poi : pois) {
+//			System.out.println(poi);
+//			System.out.println("----");
+//		}
 		if(lst != null) {
 //			for (String l : lst) {
 //				System.out.println(l.trim());
@@ -1429,6 +1382,7 @@ public class WikiDatabasePreparation {
 					} else if (name.equals("text")) {
 						long wikiId = 0;
 						String plainStr = null;
+						String shortDescr = null;
 						if (testArticleId == 0) {
 							if (namespace == 0) {
 								selectPrep.setString(1, title.toString());
@@ -1446,7 +1400,11 @@ public class WikiDatabasePreparation {
 						}
 						if (wikiId != 0) {
 							try {
-								plainStr = generateHtmlArticle(ctext, lang, title.toString(), imageUrlStorage);
+								CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}", 
+										"http://" + lang + ".wikpedia.org/wiki/${title}", imageUrlStorage, true);
+								String rawWikiText = removeMacroBlocks(ctext, new HashMap<>(), null, lang, title.toString(), null);
+								plainStr = generateHtmlArticle(rawWikiText, wikiModel);
+								shortDescr = getShortDescr(rawWikiText, wikiModel);
 							} catch (RuntimeException e) {
 								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
 							}
@@ -1462,7 +1420,7 @@ public class WikiDatabasePreparation {
 								insertPrep.setLong(1, wikiId);
 								insertPrep.setString(2, title.toString());
 								insertPrep.setString(3, lang);
-								insertPrep.setBytes(4, gzip(getShortDescr(plainStr)));
+								insertPrep.setBytes(4, gzip(shortDescr));
 								insertPrep.setBytes(5, gzip(plainStr));
 								addBatch();
 							} catch (SQLException e) {
@@ -1486,37 +1444,25 @@ public class WikiDatabasePreparation {
 		}
 	}
 	
-	public static String getShortDescr(String content) {
-		if (content == null) {
-			return null;
-		}
-		int firstParagraphStart = content.indexOf(P_OPENED);
-		int firstParagraphEnd = content.indexOf(P_CLOSED);
-		firstParagraphEnd = firstParagraphEnd < firstParagraphStart ? content.indexOf(P_CLOSED, firstParagraphStart) : firstParagraphEnd;
-		if (firstParagraphStart == -1 || firstParagraphEnd == -1
-				|| firstParagraphEnd < firstParagraphStart) {
-			return null;
-		}
-		String firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
-		while (firstParagraphHtml.length() == (P_OPENED.length() + P_CLOSED.length())
-				&& (firstParagraphEnd + P_CLOSED.length()) < content.length()) {
-			firstParagraphStart = content.indexOf(P_OPENED, firstParagraphEnd);
-			firstParagraphEnd = firstParagraphStart == -1 ? -1 : content.indexOf(P_CLOSED, firstParagraphStart);
-			if (firstParagraphStart != -1 && firstParagraphEnd != -1) {
-				firstParagraphHtml = content.substring(firstParagraphStart, firstParagraphEnd + P_CLOSED.length());
-			} else {
-				break;
+	
+	public static String getShortDescr(String rawWikiText, CustomWikiModel wikiModel) throws IOException {
+		final PlainTextConverter converter = new PlainTextConverter(false);
+		String plainStr = wikiModel.render(converter, rawWikiText);
+		if (plainStr != null) {
+			plainStr = plainStr.trim();
+			int i = plainStr.indexOf('\n');
+			if (i > 0) {
+				plainStr = plainStr.substring(0, i).trim();
+				plainStr = plainStr.replace("[ˈ]", "");
+				plainStr = plainStr.replace("[]", "");
+				plainStr = plainStr.replace("()", "");
 			}
 		}
-		return firstParagraphHtml;
+		return plainStr;
 	}
 
-	private static String generateHtmlArticle(StringBuilder contentText, String lang, String title, WikiImageUrlStorage imageUrlStorage)
-			throws IOException, SQLException {
-		String text = removeMacroBlocks(contentText, new HashMap<>(), null, lang, title, null);
+	public static String generateHtmlArticle(String text, CustomWikiModel wikiModel) throws IOException {
 		final HTMLConverter converter = new HTMLConverter(false);
-		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
-				"http://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);
 		String plainStr = wikiModel.render(converter, text);
 		plainStr = plainStr.replaceAll("<p>div class=&#34;content&#34;", "<div class=\"content\">\n<p>")
 				.replaceAll("<p>/div\n</p>", "</div>");
