@@ -39,6 +39,7 @@ import java.util.zip.ZipInputStream;
 import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
+import net.osmand.router.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -87,22 +88,15 @@ import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
-import net.osmand.router.GeneralRouter;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
-import net.osmand.router.RouteCalculationProgress;
-import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
-import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
-import net.osmand.router.RouteSegmentResult;
-import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
-import net.osmand.router.RoutingContext;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -923,30 +917,34 @@ public class OsmAndMapsService {
 				return new ArrayList<RouteSegmentResult>();
 			}
 			RoutingContext ctx = prepareRouterContext(parseRouteParameters(routeMode), router, usedMapList);
-			route = approximate(ctx, router, props, polyline);
+			route = approximate(ctx, router, props, polyline, null);
 		} finally {
 			unlockReaders(usedMapList);
 		}
 		return route;
 	}
 
-
 	public List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
-			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
-		if(ctx.nativeLib != null || router.isUseNativeApproximation()) {
-			return approximateSyncNative(ctx, router, props, polyline);
+	                                            Map<String, Object> props, List<LatLon> polyline,
+	                                            @Nullable List<WptPt> sourcePoints)
+			throws IOException, InterruptedException {
+		if (ctx.nativeLib != null || router.isUseNativeApproximation()) {
+			return approximateSyncNative(ctx, router, props, polyline, sourcePoints);
 		}
-		return approximateInternal(ctx, router, props, polyline);
+		return approximateInternal(ctx, router, props, polyline, sourcePoints);
 	}
 
-
 	private synchronized List<RouteSegmentResult> approximateSyncNative(RoutingContext ctx, RoutePlannerFrontEnd router,
-			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
-		return approximateInternal(ctx, router, props, polyline);
+	                                                                    Map<String, Object> props, List<LatLon> polyline,
+	                                                                    List<WptPt> sourcePoints)
+			throws IOException, InterruptedException {
+		return approximateInternal(ctx, router, props, polyline, sourcePoints);
 	}
 
 	private synchronized List<RouteSegmentResult> approximateInternal(RoutingContext ctx, RoutePlannerFrontEnd router,
-			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+	                                                                  Map<String, Object> props, List<LatLon> polyline,
+	                                                                  List<WptPt> sourcePoints)
+			throws IOException, InterruptedException {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
 		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
 		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
@@ -955,6 +953,10 @@ public class OsmAndMapsService {
 			RouteResultPreparation preparation = new RouteResultPreparation();
 			// preparation.prepareTurnResults(gctx.ctx, route);
 			preparation.addTurnInfoDescriptions(route);
+		}
+		if (sourcePoints != null) {
+			// "Use external timestamps" implementation for RescueTrack online router
+			GpxSegmentsApproximation.updateFinalPointsWithExternalTimestamps(gctx.finalPoints, sourcePoints);
 		}
 		putResultProps(ctx, route, props);
 		return route;
@@ -1104,7 +1106,7 @@ public class OsmAndMapsService {
 		}
 
 		if (polyline.size() >= 2) {
-			return approximate(ctx, router, props, polyline);
+			return approximate(ctx, router, props, polyline, null);
 		}
 
 		return null;
@@ -1136,7 +1138,7 @@ public class OsmAndMapsService {
 		for (WptPt p : trkSegment.points) {
 			polyline.add(new LatLon(p.lat, p.lon));
 		}
-		routeRes = approximate(ctx, router, props, polyline);
+		routeRes = approximate(ctx, router, props, polyline, trkSegment.points);
 		return routeRes;
 	}
 
