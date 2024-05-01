@@ -73,7 +73,6 @@ import net.osmand.data.LatLon;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
-import net.osmand.travel.WikivoyageLangPreparation.WikivoyageHandler;
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
@@ -1455,9 +1454,9 @@ public class WikiDatabasePreparation {
 						if (plainStr != null) {
 							if (++counter % ARTICLES_BATCH == 0) {
 								log.info("Article accepted " + cid + " " + title.toString());
-								double GB = (1l << 30); 
-								log.info(String.format("Memory used : free %.2f GB of %.2f GB",
-										Runtime.getRuntime().freeMemory() / GB, Runtime.getRuntime().totalMemory() / GB));
+//								double GB = (1l << 30); 
+//								log.info(String.format("Memory used : free %.2f GB of %.2f GB",
+//										Runtime.getRuntime().freeMemory() / GB, Runtime.getRuntime().totalMemory() / GB));
 							}
 							try {
 								insertPrep.setLong(1, wikiId);

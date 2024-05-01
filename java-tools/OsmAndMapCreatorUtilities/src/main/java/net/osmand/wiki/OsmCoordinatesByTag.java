@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -118,23 +119,29 @@ public class OsmCoordinatesByTag {
 	}
 
 	public static void main(String[] args) throws IOException, SQLException, XmlPullParserException, InterruptedException {
-		File osmGz = new File("/Users/victorshcherb/Desktop/map.osm");
-		OsmCoordinatesByTag o = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
-				new String[] { "wikipedia:" }).parse(osmGz.getParentFile());
-		Iterator<Entry<String, OsmLatLonId>> it = o.coordinates.entrySet().iterator();
+		File osmGz = new File("/Users/victorshcherb/Desktop/");
+		OsmCoordinatesByTag otag = new OsmCoordinatesByTag(new String[]{"wikipedia", "wikidata"},
+				new String[] { "wikipedia:" }).parse(osmGz);
+		Iterator<Entry<String, OsmLatLonId>> it = otag.coordinates.entrySet().iterator();
 		while(it.hasNext()) {
 			Entry<String, OsmLatLonId> e = it.next();
 			System.out.println(e.getValue().toString(e.getKey()));
 		}
-		File wikidataDb = new File(osmGz.getParentFile(), "wikidata_osm.sqlitedb");
+		File wikidataDb = new File(osmGz, "wikidata_osm.sqlitedb");
 		OsmandRegions or = new OsmandRegions();
 		or.prepareFile();
-		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, o, or, 0);
+		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, otag, or, 0);
 		long testwid = 2051638;
-		StringBuilder sb = Algorithms.readFromInputStream(OsmCoordinatesByTag.class.getResourceAsStream("/Q"+testwid+".json"));
+		StringBuilder sb;
+		if(testwid > 0) { 
+			URL url = new URL("https://www.wikidata.org/w/api.php?action=wbgetentities&ids=Q2051638&format=json&props=labels");
+			sb = Algorithms.readFromInputStream(url.openStream());
+		} else {
+			sb = Algorithms.readFromInputStream(OsmCoordinatesByTag.class.getResourceAsStream("/Q"+testwid+".json"));
+		}
 		wdh.processJsonPage(testwid, sb.toString());
 		wdh.finish();
-		WikiDatabasePreparation.createOSMWikidataTable(wikidataDb, o);
+		WikiDatabasePreparation.createOSMWikidataTable(wikidataDb, otag);
 
 	}
 	
