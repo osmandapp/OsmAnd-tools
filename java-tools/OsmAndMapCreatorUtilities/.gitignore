@@ -1,2 +1,3 @@
 src/main/resources/resources
+src/main/resources/*.txt
 src/main/resources/map/fonts

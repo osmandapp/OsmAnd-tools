@@ -233,17 +233,18 @@ public class WikiDatabasePreparation {
 		int cursor = -1;
 		for (int i = 0; ; i++) {
 			if (cursor >= i) {
+				System.out.printf("BUG ! %d -> %d content parsing: %s %s \n ", cursor, i, lang, title);
 				i = cursor + 1; // loop detected
-				System.out.printf("BUG ! %d content parsing: %s %s \n ", cursor, lang, title);
 			}
 			cursor = i;
 			if (i >= text.length()) {
 				if (openCnt > 0) {
 					System.out.println("Error content braces {{ }}: " + lang + " " + title + " ..."
-							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 10)));
+							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20)));
 					// start over again
 					errorBracesCnt.add(beginInd);
 					beginInd = openCnt = i = 0;
+					cursor = -1;
 					blockResults.clear();
 				} else {
 					break;
@@ -568,13 +569,14 @@ public class WikiDatabasePreparation {
 		}
 		if (ind2 > 0) {
 			ind = ind == -1 ? ind2 : Math.min(ind2, ind);
-		} else if (ind == -1) {
+		} 
+		
+		int lastChar = text.indexOf(">", ind);
+		if (ind == -1 || lastChar == -1) {
 			System.out.printf("Error content tag (not closed) %s %s: %s\n", lang, title,
 					text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10)));
 			return indOpen + 1;
 		}
-		
-		int lastChar = text.indexOf(">", ind);
 		bld.append(text.substring(indOpen + 1, ind));
 //		System.out.println(" ...." + bld + "....");
 		return lastChar;
@@ -1014,9 +1016,9 @@ public class WikiDatabasePreparation {
 		TreeMap<WikivoyageTemplates, List<String>> macros = new TreeMap<WikivoyageTemplates, List<String>>();
 		List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, pois, "de",  null, null);
-//		System.out.println(text);
-		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
-		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
+		System.out.println(text);
+//		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
+//		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
 		List<String> lst = macros.get(WikivoyageTemplates.POI);
 		for(Map<PoiFieldType, Object> poi : pois) {
 //			System.out.println(poi.get(PoiFieldType.PHONE));
