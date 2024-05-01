@@ -230,8 +230,14 @@ public class WikiDatabasePreparation {
 		}
 		Set<Integer> errorBracesCnt = new TreeSet<Integer>();
 		String[] tagsRetrieve = {"maplink", "ref", "gallery"};
+		int cursor = -1;
 		for (int i = 0; ; i++) {
-			if (i == text.length()) {
+			if (cursor >= i) {
+				i = cursor + 1; // loop detected
+				System.out.printf("BUG ! %d content parsing: %s %s \n ", cursor, lang, title);
+			}
+			cursor = i;
+			if (i >= text.length()) {
 				if (openCnt > 0) {
 					System.out.println("Error content braces {{ }}: " + lang + " " + title + " ..."
 							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 10)));
@@ -244,7 +250,6 @@ public class WikiDatabasePreparation {
 				}
 			}
 			int leftChars = text.length() - i - 1;
-			
 			if (openCnt == 0 && text.charAt(i) == '<') {
 				boolean found = false;
 				for (String tag : tagsRetrieve) {
@@ -276,11 +281,10 @@ public class WikiDatabasePreparation {
 				if (openCnt == 0) {
 					continue;
 				}
-				if (openCnt > 1) {
-					openCnt--;
+				openCnt--;
+				if (openCnt > 0) {
 					continue;
 				}
-				openCnt--;
 				int endInd = i;
 				String val = text.substring(beginInd, endInd);
 				beginInd = 0;
@@ -321,9 +325,6 @@ public class WikiDatabasePreparation {
 					for (WikivoyageTemplates w : key) {
 						addToMap(blockResults, w, val);
 					}
-				}
-				if (text.charAt(i + 1) != ' ' && text.charAt(i) != '}') {
-					i--;
 				}
 				i++;
 			} else if (openCnt == 0) {
@@ -1014,13 +1015,13 @@ public class WikiDatabasePreparation {
 		List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
 		String text = WikiDatabasePreparation.removeMacroBlocks(rs, macros, pois, "de",  null, null);
 //		System.out.println(text);
-//		System.out.println(macros);
 		System.out.println(getLatLonFromGeoBlock(macros.get(WikivoyageTemplates.LOCATION), "", ""));
 		System.out.println(WikivoyageHandler.parsePartOfFromQuickFooter(macros.get(WikivoyageTemplates.QUICK_FOOTER), "", ""));
 		List<String> lst = macros.get(WikivoyageTemplates.POI);
 		for(Map<PoiFieldType, Object> poi : pois) {
-			System.out.println(poi.get(PoiFieldType.PHONE));
-//			System.out.println(poi);
+//			System.out.println(poi.get(PoiFieldType.PHONE));
+			System.out.println(poi);
+			System.out.println("----");
 		}
 		if(lst != null) {
 //			for (String l : lst) {
@@ -1452,8 +1453,9 @@ public class WikiDatabasePreparation {
 						if (plainStr != null) {
 							if (++counter % ARTICLES_BATCH == 0) {
 								log.info("Article accepted " + cid + " " + title.toString());
-								log.info(String.format("Memory used : %d %d", Runtime.getRuntime().maxMemory() - Runtime.getRuntime().freeMemory(), 
-										Runtime.getRuntime().maxMemory()));
+								double GB = (1l << 30); 
+								log.info(String.format("Memory used : free %.2f GB of %.2f GB",
+										Runtime.getRuntime().freeMemory() / GB, Runtime.getRuntime().totalMemory() / GB));
 							}
 							try {
 								insertPrep.setLong(1, wikiId);
