@@ -7,10 +7,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -61,14 +59,19 @@ public class WikiService {
 				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon");
 	}
 	
-	public FeatureCollection getWikidataData(String northWest, String southEast) {
-		return getPoiData(northWest, southEast, " SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, poitype, poisubtype, lat, lon "
-				+ " FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
-				+ " ORDER BY qrank desc LIMIT " + LIMIT_QUERY, "lat", "lon");
+	public FeatureCollection getWikidataData(String northWest, String southEast, Set<String> filters) {
+		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
+		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, poitype, poisubtype, lat, lon "
+				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
+				+ filterQuery
+				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
+		
+		return getPoiData(northWest, southEast, query, "lat", "lon");
 	}
-	//  String northWest = "50.5900, 30.2200";
-	//  String southEast = "50.2130, 30.8950";
+	
 	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon) {
+//		String northWest = "50.5900, 30.2200";
+//		String southEast = "50.2130, 30.8950";
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
