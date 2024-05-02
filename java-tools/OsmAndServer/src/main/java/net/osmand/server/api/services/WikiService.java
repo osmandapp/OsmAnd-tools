@@ -17,8 +17,10 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -157,13 +159,22 @@ public class WikiService {
 					title = s[1];
 					lang = s[0];
 				}
-				String id;
+				String id = null;
+				ResultSetExtractor<String> rse = new ResultSetExtractor<String>() {
+
+					@Override
+					public String extractData(ResultSet rs) throws SQLException, DataAccessException {
+						if(rs.next()) {
+							return rs.getString(1);
+						}
+						return null;
+					}
+				};
 				if (lang.length() == 0) {
-					id = jdbcTemplate.queryForObject("SELECT id from wiki.wiki_mapping where title = ? ", String.class,
-							title);
+					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where title = ? ", rse, title);
 				} else {
-					id = jdbcTemplate.queryForObject("SELECT id from wiki.wiki_mapping where lang = ? and title = ? ",
-							String.class, lang, title);
+					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where lang = ? and title = ? ", rse, lang,
+							title);
 				}
 				if (id != null) {
 					articleId = "Q" + id;
