@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -145,8 +146,8 @@ public class SearchController {
     
     @GetMapping(path = {"/get-wiki-data"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getWikiData(@RequestParam String northWest, @RequestParam String southEast) {
-        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast);
+    public ResponseEntity<String> getWikiData(@RequestParam String northWest, @RequestParam String southEast, @RequestParam Set<String> filters) {
+        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, filters);
         return ResponseEntity.ok(gson.toJson(collection));
     }
     
