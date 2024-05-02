@@ -4,18 +4,14 @@ import static java.util.EnumSet.of;
 import static net.osmand.util.Algorithms.stringsEqual;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -26,7 +22,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,26 +45,11 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
-import org.xwiki.component.embed.EmbeddableComponentManager;
 import org.xwiki.component.manager.ComponentLookupException;
-import org.xwiki.rendering.block.Block;
-import org.xwiki.rendering.block.FormatBlock;
-import org.xwiki.rendering.block.LinkBlock;
-import org.xwiki.rendering.block.XDOM;
-import org.xwiki.rendering.block.match.ClassBlockMatcher;
-import org.xwiki.rendering.converter.ConversionException;
-import org.xwiki.rendering.converter.Converter;
-import org.xwiki.rendering.listener.Format;
-import org.xwiki.rendering.parser.ParseException;
-import org.xwiki.rendering.parser.Parser;
-import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
-import org.xwiki.rendering.renderer.printer.WikiPrinter;
-import org.xwiki.rendering.syntax.Syntax;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.filter.PlainTextConverter;
-import info.bliki.wiki.model.WikiModel;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.impl.FileProgressImplementation;
@@ -1293,11 +1273,11 @@ public class WikiDatabasePreparation {
 			this.testArticleId = testArticleId;
 			conn = dialect.getDatabaseConnection(wikipediaSqlite.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
-			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, zipShortDesc blob, zipContent blob)");
+			conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, shortDescription text, zipContent blob)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
 			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
-			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, zipShortDesc, zipContent) VALUES (?, ?, ?, ?, ?)");
+			insertPrep = conn.prepareStatement("INSERT INTO wiki_content(id, title, lang, shortDescription, zipContent) VALUES (?, ?, ?, ?, ?)");
 			if (this.testArticleId == 0) {
 				selectPrep = conn.prepareStatement("SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
 			}
@@ -1420,7 +1400,7 @@ public class WikiDatabasePreparation {
 								insertPrep.setLong(1, wikiId);
 								insertPrep.setString(2, title.toString());
 								insertPrep.setString(3, lang);
-								insertPrep.setBytes(4, gzip(shortDescr));
+								insertPrep.setString(4, shortDescr);
 								insertPrep.setBytes(5, gzip(plainStr));
 								addBatch();
 							} catch (SQLException e) {
