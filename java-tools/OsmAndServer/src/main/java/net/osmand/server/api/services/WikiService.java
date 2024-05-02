@@ -145,19 +145,30 @@ public class WikiService {
 				}
 			};
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
-				String[] s = wiki.split(":");
+				String title = wiki;
+				String lang = "";
+				int url = title.indexOf(".wikipedia.org/wiki/");
+				if (url > 0) {
+					String prefix = title.substring(0, url);
+					lang = prefix.substring(prefix.lastIndexOf("/") + 1, prefix.length());
+					title = title.substring(url + ".wikipedia.org/wiki/".length());
+				} else if (title.indexOf(":") > 0) {
+					String[] s = wiki.split(":");
+					title = s[1];
+					lang = s[0];
+				}
 				String id;
-				if (s.length < 2) {
-					id = jdbcTemplate.queryForObject("SELECT id from wiki.wiki_mapping where title = ? ",
-							String.class, s[0]);
+				if (lang.length() == 0) {
+					id = jdbcTemplate.queryForObject("SELECT id from wiki.wiki_mapping where title = ? ", String.class,
+							title);
 				} else {
 					id = jdbcTemplate.queryForObject("SELECT id from wiki.wiki_mapping where lang = ? and title = ? ",
-							String.class, s[0], s[1]);
-				}		
+							String.class, lang, title);
+				}
 				if (id != null) {
 					articleId = "Q" + id;
 				}
- 			}
+			}
 			if (!Algorithms.isEmpty(articleId) && articleId.startsWith("Q")) {
 				String aid = articleId;
 				jdbcTemplate.query(
