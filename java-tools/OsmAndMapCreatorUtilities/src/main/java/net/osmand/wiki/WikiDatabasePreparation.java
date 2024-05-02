@@ -268,10 +268,12 @@ public class WikiDatabasePreparation {
 			} else if (leftChars > 0 && text.charAt(i) == '}' && text.charAt(i + 1) == '}') {
 				// Macroblock
 				if (openCnt == 0) {
+					i++;
 					continue;
 				}
 				openCnt--;
 				if (openCnt > 0) {
+					i++;
 					continue;
 				}
 				int endInd = i;
