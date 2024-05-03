@@ -269,9 +269,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		if ("stop_area".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
 			// save stop area relation members for future processing
-			String name = e.getTag(OSMTagKey.NAME);
-			if (name == null) return;
-
 			ctx.loadEntityRelation(e);
 			for (RelationMember entry : e.getMembers()) {
 				String role = entry.getRole();
