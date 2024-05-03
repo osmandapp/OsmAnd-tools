@@ -42,7 +42,7 @@ public class WikiService {
 	private static final String THUMB_PREFIX = "320px-";
 	protected static final boolean FILENAME = true;
 
-	private static final int LIMIT_QUERY = 100;
+	private static final int LIMIT_QUERY = 1000;
 	private static final int LIMITI_QUERY = 25;
 	@Value("${osmand.wiki.location}")
 	private String pathToWikiSqlite;
