@@ -1326,6 +1326,8 @@ public class WikiDatabasePreparation {
 			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
 			insertPrep = conn.prepareStatement(
 					"INSERT INTO wiki_content(id, title, lang, shortDescription, redirect, zipContent) VALUES (?, ?, ?, ?, ?, ?)");
+			selectPrep = conn.prepareStatement(
+					"SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
 			imageUrlStorage = new WikiImageUrlStorage(conn, wikipediaSqlite.getParent(), lang);
 			log.info("Tables are prepared");
 		}
@@ -1343,6 +1345,7 @@ public class WikiDatabasePreparation {
 			if (!conn.getAutoCommit()) {
 				conn.commit();
 			}
+			selectPrep.close();
 			insertPrep.close();
 			conn.close();
 		}
