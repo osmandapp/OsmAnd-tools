@@ -39,6 +39,7 @@ import java.util.zip.ZipInputStream;
 import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
+import net.osmand.router.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -87,22 +88,15 @@ import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
-import net.osmand.router.GeneralRouter;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
-import net.osmand.router.RouteCalculationProgress;
-import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
-import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
-import net.osmand.router.RouteSegmentResult;
-import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
-import net.osmand.router.RoutingContext;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -868,7 +862,7 @@ public class OsmAndMapsService {
 		List<GeocodingResult> complete;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "geocoding");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "geocoding");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -891,24 +885,24 @@ public class OsmAndMapsService {
 			return Collections.emptyList();
 		}
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		List<LatLon> polyline = new ArrayList<>(trkSegment.points.size());
-		for (WptPt p : trkSegment.points) {
-			polyline.add(new LatLon(p.lat, p.lon));
-		}
-		return approximateByPolyline(polyline, routeMode, props);
+		return approximateByWaypoints(trkSegment.points, routeMode, props);
 	}
 
 	public List<RouteSegmentResult> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
-		List<LatLon> polyline = new ArrayList<>(points.size());
+		List<WptPt> waypoints = new ArrayList<>();
 		for (WebGpxParser.Point p : points) {
-			polyline.add(new LatLon(p.lat, p.lng));
+			waypoints.add(new WptPt(p.lat, p.lng));
 		}
 		Map<String, Object> props = new HashMap<>();
-		return approximateByPolyline(polyline, routeMode, props);
+		return approximateByWaypoints(waypoints, routeMode, props);
 	}
 
-	private List<RouteSegmentResult> approximateByPolyline(List<LatLon> polyline, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
+	private List<RouteSegmentResult> approximateByWaypoints(List<WptPt> waypoints, String routeMode, Map<String, Object> props) throws IOException, InterruptedException {
 		List<RouteSegmentResult> route;
+		List<LatLon> polyline = new ArrayList<>();
+		for (WptPt wpt : waypoints) {
+			polyline.add(new LatLon(wpt.lat, wpt.lon));
+		}
 		QuadRect quadRect = points(polyline, null, null);
 		if (!validateAndInitConfig()) {
 			return Collections.emptyList();
@@ -916,40 +910,44 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0, "approximate");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0, "approximate");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
 				return new ArrayList<RouteSegmentResult>();
 			}
 			RoutingContext ctx = prepareRouterContext(parseRouteParameters(routeMode), router, usedMapList);
-			route = approximate(ctx, router, props, polyline);
+			route = approximate(ctx, router, props, waypoints, false);
 		} finally {
 			unlockReaders(usedMapList);
 		}
 		return route;
 	}
 
-
 	public List<RouteSegmentResult> approximate(RoutingContext ctx, RoutePlannerFrontEnd router,
-			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
-		if(ctx.nativeLib != null || router.isUseNativeApproximation()) {
-			return approximateSyncNative(ctx, router, props, polyline);
+	                                            Map<String, Object> props, List<WptPt> waypoints,
+	                                            boolean useExternalTimestamps)
+			throws IOException, InterruptedException {
+		if (ctx.nativeLib != null || router.isUseNativeApproximation()) {
+			return approximateSyncNative(ctx, router, props, waypoints, useExternalTimestamps);
 		}
-		return approximateInternal(ctx, router, props, polyline);
+		return approximateInternal(ctx, router, props, waypoints, useExternalTimestamps);
 	}
 
-
 	private synchronized List<RouteSegmentResult> approximateSyncNative(RoutingContext ctx, RoutePlannerFrontEnd router,
-			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
-		return approximateInternal(ctx, router, props, polyline);
+	                                                                    Map<String, Object> props, List<WptPt> waypoints,
+	                                                                    boolean useExternalTimestamps)
+			throws IOException, InterruptedException {
+		return approximateInternal(ctx, router, props, waypoints, useExternalTimestamps);
 	}
 
 	private synchronized List<RouteSegmentResult> approximateInternal(RoutingContext ctx, RoutePlannerFrontEnd router,
-			Map<String, Object> props, List<LatLon> polyline) throws IOException, InterruptedException {
+	                                                                  Map<String, Object> props, List<WptPt> waypoints,
+	                                                                  boolean useExternalTimestamps)
+			throws IOException, InterruptedException {
 		GpxRouteApproximation gctx = new GpxRouteApproximation(ctx);
-		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(polyline));
-		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
+		List<GpxPoint> gpxPoints = router.generateGpxPoints(gctx, new LocationsHolder(waypoints));
+		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null, useExternalTimestamps);
 		List<RouteSegmentResult> route = r.result;
 		if (router.isUseNativeApproximation()) {
 			RouteResultPreparation preparation = new RouteResultPreparation();
@@ -1081,7 +1079,7 @@ public class OsmAndMapsService {
 		url.append(String.join(";", points)); // points;points;points
 		url.append("?geometries=geojson&overview=full&steps=true"); // OSRM options
 
-		List<LatLon> polyline = new ArrayList<>();
+		List<WptPt> waypoints = new ArrayList<>();
 		try {
 			String body = new RestTemplate().getForObject(url.toString(), String.class);
 			if (body != null && body.contains("Ok") && body.contains("coordinates")) {
@@ -1095,7 +1093,7 @@ public class OsmAndMapsService {
 					JSONArray ll = coordinates.getJSONArray(i);
 					final double lon = ll.getDouble(0);
 					final double lat = ll.getDouble(1);
-					polyline.add(new LatLon(lat, lon));
+					waypoints.add(new WptPt(lat, lon));
 				}
 			}
 		} catch(RestClientException | JSONException error) {
@@ -1103,8 +1101,8 @@ public class OsmAndMapsService {
 			return null;
 		}
 
-		if (polyline.size() >= 2) {
-			return approximate(ctx, router, props, polyline);
+		if (waypoints.size() >= 2) {
+			return approximate(ctx, router, props, waypoints, false);
 		}
 
 		return null;
@@ -1132,11 +1130,7 @@ public class OsmAndMapsService {
 		String gpx = restTemplate.getForObject(url.toString(), String.class);
 		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-		for (WptPt p : trkSegment.points) {
-			polyline.add(new LatLon(p.lat, p.lon));
-		}
-		routeRes = approximate(ctx, router, props, polyline);
+		routeRes = approximate(ctx, router, props, trkSegment.points, true);
 		return routeRes;
 	}
 
@@ -1160,7 +1154,7 @@ public class OsmAndMapsService {
 			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheStr));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
+				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1510,7 +1504,7 @@ public class OsmAndMapsService {
 		List<File> res = new ArrayList<>();
 		HashSet<String> regions = getRegionsNameByBbox(bbox);
 		for (File f : filesToUse) {
-			OsmAndMapsService.BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+			BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
 			String name = ref.file.getName().toLowerCase().replace("_2.obf", "");
 			if (regions.contains(name)) {
 				res.add(f);

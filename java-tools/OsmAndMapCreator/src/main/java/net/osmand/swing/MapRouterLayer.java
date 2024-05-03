@@ -1204,7 +1204,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		if (DataExtractionSettings.getSettings().useNativeRouting()) {
 			router.setUseNativeApproximation(true);
 		}
-		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null);
+		GpxRouteApproximation r = router.searchGpxRoute(gctx, gpxPoints, null, false);
 		return new RouteCalcResult(r.result);
 	}
 
