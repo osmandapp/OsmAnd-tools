@@ -216,7 +216,7 @@ public class WikiDatabasePreparation {
 			}
 		}
 		Set<Integer> errorBracesCnt = new TreeSet<Integer>();
-		String[] tagsRetrieve = { "maplink", "ref", "gallery" };
+		String[] tagsRetrieve = { "maplink", "ref", "gallery", "noinclude" };
 		int cursor = -1;
 		for (int i = 0;; i++) {
 			if (cursor >= i) {
@@ -954,6 +954,27 @@ public class WikiDatabasePreparation {
 		}
 		return EnumSet.noneOf(WikivoyageTemplates.class);
 	}
+	
+	public static String getRedirect(StringBuilder ctext) {
+		String textStr = ctext.toString().trim().toLowerCase();
+		if (textStr.startsWith("#redirect") || textStr.startsWith("#weiterleitung")
+				|| textStr.startsWith("#перенаправление") || textStr.startsWith("#patrz")
+				|| textStr.startsWith("#перенаправлення") || textStr.startsWith("#doorverwijzing")
+				|| textStr.startsWith("__disambig_") || textStr.startsWith("#redirecionamento")
+				|| textStr.startsWith("#rinvia") || textStr.startsWith("#uudelleenohjaus")
+				|| textStr.startsWith("#redirección") || textStr.startsWith("#omdirigering")
+				|| textStr.startsWith("#ohjaus") || textStr.startsWith("#ανακατευθυνση")
+				|| textStr.startsWith("#تغییر_مسیر") || textStr.startsWith("#הפניה") || textStr.startsWith("#تغییرمسیر")
+				|| textStr.startsWith("#đổi") || textStr.startsWith("#重定向") || textStr.startsWith("#पुनर्प्रेषित")
+				|| textStr.startsWith("#अनुप्रेषित")) {
+			int l = textStr.indexOf("[[");
+			int e = textStr.indexOf("]]");
+			if (l > 0 && e > 0) {
+				return ctext.substring(l + 2, e).trim();
+			}
+		}
+		return null;
+	}
 
 	public static void mainTestPage(String[] args) throws IOException, SQLException {
 		StringBuilder input = Algorithms
@@ -1284,7 +1305,6 @@ public class WikiDatabasePreparation {
 		private int batch = 0;
 		private final static int BATCH_SIZE = 1000;
 		private static final long ARTICLES_BATCH = 1000;
-		private long testArticleId;
 
 		final ByteArrayOutputStream bous = new ByteArrayOutputStream(64000);
 		private String lang;
@@ -1296,21 +1316,16 @@ public class WikiDatabasePreparation {
 			this.lang = lang;
 			this.saxParser = saxParser;
 			this.progIS = progIS;
-			this.testArticleId = testArticleId;
 			conn = dialect.getDatabaseConnection(wikipediaSqlite.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute(
-					"CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, shortDescription text, zipContent blob)");
+					"CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, shortDescription text, redirect text, zipContent blob)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
 			conn.createStatement().execute("DELETE FROM wiki_content WHERE lang = '" + lang + "'");
 			insertPrep = conn.prepareStatement(
-					"INSERT INTO wiki_content(id, title, lang, shortDescription, zipContent) VALUES (?, ?, ?, ?, ?)");
-			if (this.testArticleId == 0) {
-				selectPrep = conn.prepareStatement(
-						"SELECT id FROM wiki_mapping WHERE wiki_mapping.title = ? AND wiki_mapping.lang = ?");
-			}
+					"INSERT INTO wiki_content(id, title, lang, shortDescription, redirect, zipContent) VALUES (?, ?, ?, ?, ?, ?)");
 			imageUrlStorage = new WikiImageUrlStorage(conn, wikipediaSqlite.getParent(), lang);
 			log.info("Tables are prepared");
 		}
@@ -1329,9 +1344,6 @@ public class WikiDatabasePreparation {
 				conn.commit();
 			}
 			insertPrep.close();
-			if (testArticleId == 0) {
-				selectPrep.close();
-			}
 			conn.close();
 		}
 
@@ -1393,20 +1405,15 @@ public class WikiDatabasePreparation {
 						long wikiId = 0;
 						String plainStr = null;
 						String shortDescr = null;
-						if (testArticleId == 0) {
-							if (namespace == 0) {
-								selectPrep.setString(1, title.toString());
-								selectPrep.setString(2, lang);
-								ResultSet rs = selectPrep.executeQuery();
-								if (rs.next()) {
-									wikiId = rs.getLong(1);
-								}
-								rs.close();
-								selectPrep.clearParameters();
+						if (namespace == 0) {
+							selectPrep.setString(1, title.toString());
+							selectPrep.setString(2, lang);
+							ResultSet rs = selectPrep.executeQuery();
+							if (rs.next()) {
+								wikiId = rs.getLong(1);
 							}
-						} else {
-							wikiId = testArticleId;
-							testArticleId++;
+							rs.close();
+							selectPrep.clearParameters();
 						}
 						if (wikiId != 0) {
 							try {
@@ -1418,11 +1425,11 @@ public class WikiDatabasePreparation {
 								plainStr = generateHtmlArticle(rawWikiText, wikiModel);
 								shortDescr = getShortDescr(rawWikiText, wikiModel);
 							} catch (RuntimeException e) {
-								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()),
-										e);
+								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
 							}
 						}
 						if (plainStr != null) {
+							String redirect = getRedirect(ctext);
 							if (++counter % ARTICLES_BATCH == 0) {
 								log.info("Article accepted " + cid + " " + title.toString());
 //								double GB = (1l << 30); 
@@ -1434,7 +1441,8 @@ public class WikiDatabasePreparation {
 								insertPrep.setString(2, title.toString());
 								insertPrep.setString(3, lang);
 								insertPrep.setString(4, shortDescr);
-								insertPrep.setBytes(5, gzip(plainStr));
+								insertPrep.setString(5, redirect);
+								insertPrep.setBytes(6, gzip(plainStr));
 								addBatch();
 							} catch (SQLException e) {
 								throw new SAXException(e);

@@ -757,24 +757,9 @@ public class WikivoyageLangPreparation {
 						ctext = null;
 					} else if (name.equals("text")) {
 						if (ctext != null) {
-							String textStr = ctext.toString().trim().toLowerCase();
-							if (textStr.startsWith("#redirect") || textStr.startsWith("#weiterleitung") ||
-									textStr.startsWith("#перенаправление") || textStr.startsWith("#patrz") ||
-									textStr.startsWith("#перенаправлення") || textStr.startsWith("#doorverwijzing")
-									|| textStr.startsWith("__disambig_") || textStr.startsWith("#redirecionamento")
-									|| textStr.startsWith("#rinvia") || textStr.startsWith("#uudelleenohjaus")
-									|| textStr.startsWith("#redirección") || textStr.startsWith("#omdirigering")
-									|| textStr.startsWith("#ohjaus") || textStr.startsWith("#ανακατευθυνση")
-									|| textStr.startsWith("#تغییر_مسیر") || textStr.startsWith("#הפניה")
-									|| textStr.startsWith("#تغییرمسیر")  || textStr.startsWith("#đổi") || textStr.startsWith("#重定向")
-									|| textStr.startsWith("#पुनर्प्रेषित") || textStr.startsWith("#अनुप्रेषित")) {
-								
-								// redirect
-								int l = ctext.indexOf("[[");
-								int e = ctext.indexOf("]]");
-								if (l > 0 && e > 0) {
-									redirects.put(title, trim(ctext.substring(l + 2, e)));
-								}
+							String red = WikiDatabasePreparation.getRedirect(ctext);
+							if (red != null) {
+								redirects.put(title, trim(red));
 							} else if (cInfo == null) {
 								// debug https://de.wikivoyage.org/wiki/Special:Export/Frankfurt_am_Main/Nordwesten
 								// possibly no wikidata id, no banner (so no properties) - de 116081
