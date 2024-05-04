@@ -1522,12 +1522,14 @@ public class AdminController {
 		List<DownloadServerRegion> regions = new ArrayList<>(dProps.getRegions());
 		regions.add(0, dProps.getGlobalRegion());
 		List<Object> regionResults = new ArrayList<Object>();
+		Set<String> types = new LinkedHashSet<>();
 		for (DownloadServerRegion region : regions) {
 			List<Map<String, Object>> servers = new ArrayList<>();
 			for (String serverName : region.getServers()) {
 				Map<String, Object> mo = new TreeMap<>();
 				mo.put("name", serverName);
 				for (DownloadServerType sp : dProps.getServerTypes()) {
+					types.add(sp.key);
 					mo.put(sp.key, String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
 							region.getPercent(sp, serverName)));
 				}
@@ -1535,7 +1537,7 @@ public class AdminController {
 			}
 			regionResults.add(Map.of("name", region.toString(), "servers", servers));
 		}
-		return Map.of("regions", regionResults, "types", PredefinedServerSpecialty.values(),
+		return Map.of("regions", regionResults, "types", types,
 				"freemaps", dProps.getFreemaps());
 	}
 	
