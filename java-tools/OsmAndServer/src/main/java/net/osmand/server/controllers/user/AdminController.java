@@ -52,7 +52,7 @@ import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import net.osmand.server.api.services.DownloadIndexesService.PredefinedServerSpecialty;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.ReportsController;
@@ -1526,8 +1526,8 @@ public class AdminController {
 			for (String serverName : region.getServers()) {
 				Map<String, Object> mo = new TreeMap<>();
 				mo.put("name", serverName);
-				for (DownloadServerSpecialty type : DownloadServerSpecialty.values()) {
-					DownloadServerSpecialty sp = (DownloadServerSpecialty) type;
+				for (PredefinedServerSpecialty type : PredefinedServerSpecialty.values()) {
+					PredefinedServerSpecialty sp = (PredefinedServerSpecialty) type;
 					mo.put(sp.name(), String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
 							region.getPercent(sp, serverName)));
 				}
@@ -1535,7 +1535,7 @@ public class AdminController {
 			}
 			regionResults.add(Map.of("name", region.toString(), "servers", servers));
 		}
-		return Map.of("regions", regionResults, "types", DownloadServerSpecialty.values(),
+		return Map.of("regions", regionResults, "types", PredefinedServerSpecialty.values(),
 				"freemaps", dProps.getFreemaps());
 	}
 	

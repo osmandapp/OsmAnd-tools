@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import net.osmand.server.api.services.DownloadIndexesService.PredefinedServerSpecialty;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 @Controller
@@ -210,6 +210,14 @@ public class DownloadIndexController {
 							  HttpServletResponse resp) throws IOException {
 		DownloadServerLoadBalancer servers = downloadService.getSettings();
 		InetSocketAddress inetHost = headers.getHost();
+		String userAgent = "";
+		List<String> list = headers.get(HttpHeaders.USER_AGENT);
+		if (list != null) {
+			for (String l : list) {
+				userAgent = l;
+				break;
+			}
+		}
 		if (inetHost == null) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid host name");
 			return;
@@ -234,21 +242,21 @@ public class DownloadIndexController {
 			}
 			String host = null;
 			boolean headerFound = false;
-			for (DownloadServerSpecialty dss : DownloadServerSpecialty.values()) {
+			loop: for (PredefinedServerSpecialty dss : PredefinedServerSpecialty.values()) {
 				for (DownloadType type : dss.types) {
 					for (String httpParam : type.getHeaders()) {
 						if (isContainAndEqual(httpParam, params)) {
 							headerFound = true;
-							host = servers.getServer(dss, remoteAddr);
+							host = servers.getServer(servers.getServerType(dss, userAgent), remoteAddr);
 							if (host != null) {
-								break;
+								break loop;
 							}
 						}
 					}
 				}
 			}
 			if (host == null && !headerFound) {
-				host = servers.getServer(DownloadServerSpecialty.MAIN, remoteAddr);
+				host = servers.getServer(servers.getServerType(PredefinedServerSpecialty.MAIN, userAgent), remoteAddr);
 			}
 			if (host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);

@@ -19,9 +19,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -195,9 +196,9 @@ public class DownloadIndexesService  {
 					return new ServerCommonFile(file, di);
 				}
 				DownloadServerLoadBalancer servers = getSettings();
-				DownloadServerSpecialty sp = DownloadServerSpecialty.getSpecialtyByDownloadType(di.getDownloadType());
+				PredefinedServerSpecialty sp = PredefinedServerSpecialty.getSpecialtyByDownloadType(di.getDownloadType());
 				if (sp != null) {
-					String host = servers.getServer(sp, null);
+					String host = servers.getServer(servers.getServerType(sp, ""), null);
 					if (!Algorithms.isEmpty(host)) {
 						try {
 							String pm = "";
@@ -525,7 +526,7 @@ public class DownloadIndexesService  {
 		DownloadServerLoadBalancer dp = gson.fromJson(new FileReader(new File(
 				System.getProperty("repo.location") + "/web-server-config/", DOWNLOAD_SETTINGS)), DownloadServerLoadBalancer.class);
 		dp.prepare();
-		DownloadServerSpecialty type = DownloadServerSpecialty.MAIN;
+		DownloadServerType type = dp.getServerType(PredefinedServerSpecialty.MAIN, "");
 		for(String serverName : dp.getServerNames()) {
 			System.out.println(serverName + " " + dp.getGlobalPercent(type, serverName)+"%");
 		}			
@@ -534,7 +535,7 @@ public class DownloadIndexesService  {
 			cnts.put(s, 0);
 		}
 		for(int i = 0; i < 1000; i ++) {
-			 String s = dp.getServer(type, "83.85.1.232"); // nl ip
+			String s = dp.getServer(type, "83.85.1.232"); // nl ip
 //			String s = dp.getServer(type, "217.85.4.23"); // german ip
 			cnts.put(s, cnts.get(s) + 1);
 		}
@@ -543,7 +544,8 @@ public class DownloadIndexesService  {
 		}
 		for (DownloadServerRegion reg : dp.getRegions()) {
 			for (String serverName : dp.getServerNames()) {
-				System.out.println(reg.getName() + " " + reg.getDownloadCounts(type, serverName));
+				System.out.println(reg.getName() + " " + reg.getDownloadCounts(
+						type , serverName));
 			}
 		}
 		System.out.println(cnts);
@@ -558,7 +560,13 @@ public class DownloadIndexesService  {
 		int[] percents;
 	}
 	
-	public enum DownloadServerSpecialty {
+	public static class DownloadServerType {
+		PredefinedServerSpecialty type;
+		String userAgent;
+		String key;
+	}
+		
+	public enum PredefinedServerSpecialty {
 		MAIN(DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
 		SRTM(DownloadType.SRTM_MAP),
 		HILLSHADE(DownloadType.HILLSHADE),
@@ -572,18 +580,18 @@ public class DownloadIndexesService  {
 		
 		public final DownloadType[] types;
 
-		DownloadServerSpecialty(DownloadType... tp) {
+		PredefinedServerSpecialty(DownloadType... tp) {
 			this.types = tp;
 		}
 		
 		
-		public static DownloadServerSpecialty getSpecialtyByDownloadType(DownloadType c) {
-			for(DownloadServerSpecialty s : values())  {
-				if(s.types == null) {
+		public static PredefinedServerSpecialty getSpecialtyByDownloadType(DownloadType c) {
+			for (PredefinedServerSpecialty s : values()) {
+				if (s.types == null) {
 					continue;
 				}
-				for(DownloadType t : s.types) {
-					if(t == c) {
+				for (DownloadType t : s.types) {
+					if (t == c) {
 						return s;
 					}
 				}
@@ -598,7 +606,8 @@ public class DownloadIndexesService  {
 		List<String> servers = new ArrayList<String>();
 		List<String> zones = new ArrayList<String>();
 		List<SubnetUtils> cidrZones = new ArrayList<>();
-		DownloadServerCategory[] specialties = new DownloadServerCategory[DownloadServerSpecialty.values().length];
+//		DownloadServerCategory[] specialties = new DownloadServerCategory[DownloadServerSpecialty.values().length];
+		Map<String, DownloadServerCategory> specialties = new TreeMap<>();
 		long ips = 0;
 		
 		public void prepare() {
@@ -639,9 +648,9 @@ public class DownloadIndexesService  {
 			return getName() + " " + cidrZones.size();
 		}
 
-		private void prepare(DownloadServerSpecialty tp, Map<String, Integer> mp) {
+		private void prepare(DownloadServerType tp, Map<String, Integer> mp) {
 			DownloadServerCategory cat = new DownloadServerCategory();
-			specialties[tp.ordinal()] = cat;
+			specialties.put(tp.key, cat);
 
 			cat.serverNames = new ArrayList<String>();
 			for (String serverName : mp.keySet()) {
@@ -668,25 +677,25 @@ public class DownloadIndexesService  {
 			}
 		}
 
-		private int getServerIndex(DownloadServerSpecialty type, String serverName) {
-			DownloadServerCategory s = specialties[type.ordinal()];
+		private int getServerIndex(DownloadServerType type, String serverName) {
+			DownloadServerCategory s = specialties.get(type.key);
 			if (s != null) {
 				return s.serverNames.indexOf(serverName);
 			}
 			return -1;
 		}
 
-		public int getDownloadCounts(DownloadServerSpecialty type, String serverName) {
+		public int getDownloadCounts(DownloadServerType type, String serverName) {
 			int ind = getServerIndex(type, serverName);
 			if (ind >= 0) {
-				return specialties[type.ordinal()].counts[ind];
+				return specialties.get(type.key).counts[ind];
 			}
 			return 0;
 		}
 		
 		public int getDownloadCounts(String serverName) {
 			int sum = 0;
-			for (DownloadServerCategory s : specialties) {
+			for (DownloadServerCategory s : specialties.values()) {
 				if (s != null) {
 					int i = s.serverNames.indexOf(serverName);
 					if (i >= 0) {
@@ -697,10 +706,10 @@ public class DownloadIndexesService  {
 			return sum;
 		}
 
-		public int getPercent(DownloadServerSpecialty type, String serverName) {
+		public int getPercent(DownloadServerType type, String serverName) {
 			int ind = getServerIndex(type, serverName);
-			if (ind >= 0 && specialties[type.ordinal()] != null) {
-				return specialties[type.ordinal()].percents[ind];
+			if (ind >= 0 && specialties.get(type.key) != null) {
+				return specialties.get(type.key).percents[ind];
 			}
 			return 0;
 		}
@@ -726,18 +735,42 @@ public class DownloadIndexesService  {
 		DownloadFreeMapsConfig freemaps = new DownloadFreeMapsConfig();
 		DownloadServerRegion globalRegion = new DownloadServerRegion();
 
-		
+		List<DownloadServerType> specialties = new ArrayList<DownloadServerType>();
 		
 		public DownloadFreeMapsConfig getFreemaps() {
 			return freemaps;
 		}
 		
+		public DownloadServerType getServerType(PredefinedServerSpecialty type, String userAgent) {
+			// TODO use userAgent
+			for (DownloadServerType c : specialties) {
+				if (c.type == type) {
+					return c;
+				}
+			}
+			return null;
+		}
+
 		public void prepare() {
 			for (DownloadServerRegion region : regions) {
 				region.prepare();
 			}
-			for (DownloadServerSpecialty s : DownloadServerSpecialty.values()) {
-				Map<String, Integer> mp = servers.get(s.name().toLowerCase());
+			specialties.clear();
+			for(PredefinedServerSpecialty p : PredefinedServerSpecialty.values()) {
+				DownloadServerType cs = new DownloadServerType();
+				cs.type = p;
+				cs.key = p.name().toLowerCase();
+				specialties.add(cs);
+			}
+				// TODO parse agent
+//			for(String key : servers.keySet()) {
+//				CustomDownloadServerSpecialty cs = new CustomDownloadServerSpecialty();
+//				cs.type = PredefinedServerSpecialty.valueOf(key.toUpperCase());
+//				cs.key = key;
+//				specialties.add(cs);
+//			}
+			for (DownloadServerType specialty : specialties) {
+				Map<String, Integer> mp = servers.get(specialty.key);
 				if (mp == null) {
 					mp = Collections.emptyMap();
 				}
@@ -746,9 +779,9 @@ public class DownloadIndexesService  {
 						globalRegion.servers.add(serverName);
 					}
 				}
-				globalRegion.prepare(s, mp);
+				globalRegion.prepare(specialty, mp);
 				for (DownloadServerRegion region : regions) {
-					region.prepare(s, mp);
+					region.prepare(specialty, mp);
 				}
 			}
 			
@@ -766,7 +799,7 @@ public class DownloadIndexesService  {
 			return globalRegion;
 		}
 		
-		public int getDownloadCounts(DownloadServerSpecialty type, String serverName) {
+		public int getDownloadCounts(DownloadServerType type, String serverName) {
 			int sum = globalRegion.getDownloadCounts(type, serverName);
 			for (DownloadServerRegion r : regions) {
 				sum += r.getDownloadCounts(type, serverName);
@@ -774,12 +807,12 @@ public class DownloadIndexesService  {
 			return sum;
 		}
 
-		public int getGlobalPercent(DownloadServerSpecialty type, String serverName) {
+		public int getGlobalPercent(DownloadServerType type, String serverName) {
 			return globalRegion.getPercent(type, serverName);
 			
 		}
 
-		public String getServer(DownloadServerSpecialty type, String remoteAddr) {
+		public String getServer(DownloadServerType type, String remoteAddr) {
 			DownloadServerRegion region = globalRegion;
 			// avoid IPv6 ~/:/ as incompatible with matchesIp()
 			if (remoteAddr != null && !remoteAddr.contains(":")) {
@@ -790,7 +823,7 @@ public class DownloadIndexesService  {
 					}
 				}
 			}
-			DownloadServerCategory cat = region.specialties[type.ordinal()];
+			DownloadServerCategory cat = region.specialties.get(type.key);
 			if (cat != null && cat.sum > 0) {
 				ThreadLocalRandom tlr = ThreadLocalRandom.current();
 				int val = tlr.nextInt(cat.sum);
