@@ -252,6 +252,7 @@ public class DownloadIndexController {
 			}
 			if (host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);
+				extraParam += "&self=true";
 				resp.setHeader(HttpHeaders.LOCATION, proto + "://" + host + "/download?" + req.getQueryString() + extraParam);
 			} else {
 				self = true;
