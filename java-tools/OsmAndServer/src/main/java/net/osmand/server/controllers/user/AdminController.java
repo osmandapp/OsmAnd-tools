@@ -52,6 +52,7 @@ import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerType;
 import net.osmand.server.api.services.DownloadIndexesService.PredefinedServerSpecialty;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
 import net.osmand.server.api.services.MotdService.MotdSettings;
@@ -999,7 +1000,7 @@ public class AdminController {
 		private double eurRate;
 	}
 	
-	private static class ExchangeRates {
+	protected static class ExchangeRates {
 		Map<String, List<ExchangeRate>> currencies = new LinkedHashMap<>();
 
 		public void add(String cur, long time, double eurRate) {
@@ -1526,9 +1527,8 @@ public class AdminController {
 			for (String serverName : region.getServers()) {
 				Map<String, Object> mo = new TreeMap<>();
 				mo.put("name", serverName);
-				for (PredefinedServerSpecialty type : PredefinedServerSpecialty.values()) {
-					PredefinedServerSpecialty sp = (PredefinedServerSpecialty) type;
-					mo.put(sp.name(), String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
+				for (DownloadServerType sp : dProps.getServerTypes()) {
+					mo.put(sp.key, String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
 							region.getPercent(sp, serverName)));
 				}
 				servers.add(mo);

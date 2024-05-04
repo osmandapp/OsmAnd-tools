@@ -20,9 +20,10 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -561,9 +562,8 @@ public class DownloadIndexesService  {
 	}
 	
 	public static class DownloadServerType {
-		PredefinedServerSpecialty type;
-		String userAgent;
-		String key;
+		public PredefinedServerSpecialty type;
+		public String key;
 	}
 		
 	public enum PredefinedServerSpecialty {
@@ -726,65 +726,92 @@ public class DownloadIndexesService  {
 		public List<String> namepatterns = new ArrayList<String>();
 	}
 	
+	public static class DownloadServerFilterByHeaders {
+		String specialty;
+		List<String> userAgents = new ArrayList<String>();
+		// after init
+		DownloadServerType mainType;
+	}
+	
 	public static class DownloadServerLoadBalancer {
 		public final static String SELF = "self";
 				
+		List<DownloadServerType> serverTypes = new ArrayList<DownloadServerType>();
+		
 		// provided from settings.json
+		Map<String, DownloadServerFilterByHeaders> filterTypes = new TreeMap<>();
 		Map<String, Map<String, Integer>> servers = new TreeMap<>();
 		List<DownloadServerRegion> regions = new ArrayList<>();
+		
 		DownloadFreeMapsConfig freemaps = new DownloadFreeMapsConfig();
 		DownloadServerRegion globalRegion = new DownloadServerRegion();
 
-		List<DownloadServerType> specialties = new ArrayList<DownloadServerType>();
 		
 		public DownloadFreeMapsConfig getFreemaps() {
 			return freemaps;
 		}
 		
 		public DownloadServerType getServerType(PredefinedServerSpecialty type, String userAgent) {
-			// TODO use userAgent
-			for (DownloadServerType c : specialties) {
+			for (DownloadServerFilterByHeaders filter : filterTypes.values()) {
+				if (filter.mainType.type == type) {
+					for (String us : filter.userAgents) {
+						if (userAgent.contains(us)) {
+							return filter.mainType;
+						}
+					}
+				}
+			}
+			for (DownloadServerType c : serverTypes) {
 				if (c.type == type) {
 					return c;
 				}
 			}
-			return null;
+			throw new IllegalStateException();
 		}
 
 		public void prepare() {
 			for (DownloadServerRegion region : regions) {
 				region.prepare();
 			}
-			specialties.clear();
+			serverTypes.clear();
 			for(PredefinedServerSpecialty p : PredefinedServerSpecialty.values()) {
-				DownloadServerType cs = new DownloadServerType();
-				cs.type = p;
-				cs.key = p.name().toLowerCase();
-				specialties.add(cs);
+				DownloadServerType serverType = new DownloadServerType();
+				serverType.type = p;
+				serverType.key = p.name().toLowerCase();
+				serverTypes.add(serverType);
 			}
-				// TODO parse agent
-//			for(String key : servers.keySet()) {
-//				CustomDownloadServerSpecialty cs = new CustomDownloadServerSpecialty();
-//				cs.type = PredefinedServerSpecialty.valueOf(key.toUpperCase());
-//				cs.key = key;
-//				specialties.add(cs);
-//			}
-			for (DownloadServerType specialty : specialties) {
-				Map<String, Integer> mp = servers.get(specialty.key);
-				if (mp == null) {
-					mp = Collections.emptyMap();
+			Iterator<Entry<String, DownloadServerFilterByHeaders>> it = filterTypes.entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<String, DownloadServerFilterByHeaders> e = it.next();
+				DownloadServerFilterByHeaders filter  = e.getValue();
+				PredefinedServerSpecialty ps = PredefinedServerSpecialty.valueOf(filter.specialty.toUpperCase());
+				DownloadServerType serverType = new DownloadServerType();
+				serverType.type = ps;
+				serverType.key = e.getKey();
+				filter.mainType = serverType;
+				serverTypes.add(serverType);
+				
+			}
+			for (DownloadServerType serverType : serverTypes) {
+				Map<String, Integer> numbers = servers.get(serverType.key);
+				if (numbers == null) {
+					numbers = Collections.emptyMap();
 				}
-				for (String serverName : mp.keySet()) {
+				for (String serverName : numbers.keySet()) {
 					if (!globalRegion.servers.contains(serverName)) {
 						globalRegion.servers.add(serverName);
 					}
 				}
-				globalRegion.prepare(specialty, mp);
+				globalRegion.prepare(serverType, numbers);
 				for (DownloadServerRegion region : regions) {
-					region.prepare(specialty, mp);
+					region.prepare(serverType, numbers);
 				}
 			}
 			
+		}
+		
+		public List<DownloadServerType> getServerTypes() {
+			return serverTypes;
 		}
 		
 		public List<DownloadServerRegion> getRegions() {
