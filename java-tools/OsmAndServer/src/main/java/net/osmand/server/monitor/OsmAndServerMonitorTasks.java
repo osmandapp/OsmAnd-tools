@@ -87,6 +87,8 @@ public class OsmAndServerMonitorTasks {
 	private static final double PERC_SMALL = 100 - PERC;
 
 
+	private static final String RED_MAIN_SERVER = "main";
+	private static final String RED_MAPTILE_SERVER = "maptile";
 	private static final String RED_STAT_PREFIX = "stat.";
 	private static final String RED_KEY_OSMAND_LIVE = "live_delay_time";
 	private static final String RED_KEY_TILE = "tile_time";
@@ -103,7 +105,6 @@ public class OsmAndServerMonitorTasks {
 
 	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
 
-	
 	@Value("${monitoring.enabled}")
 	private boolean enabled;
 	
@@ -175,7 +176,7 @@ public class OsmAndServerMonitorTasks {
 			live.lastCheckTimestamp = System.currentTimeMillis();
 			live.lastOsmAndLiveDelay = currentDelay;
 			if (updateStats) {
-				addStat(RED_KEY_OSMAND_LIVE, "main", currentDelay);
+				addStat(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, currentDelay);
 			}
 		} catch (Exception e) {
 			sendBroadcastMessage("Exception while checking the server live status.");
@@ -463,7 +464,7 @@ public class OsmAndServerMonitorTasks {
 		}
 		lastResponseTime = respTimeSum / count;
 		if (lastResponseTime > 0) {
-			addStat(RED_KEY_TILE, "maptile", lastResponseTime);
+			addStat(RED_KEY_TILE, RED_MAPTILE_SERVER, lastResponseTime);
 		}
 	}
 
@@ -577,7 +578,7 @@ public class OsmAndServerMonitorTasks {
 					@Override
 					public Boolean doInPreparedStatement(PreparedStatement ps) throws SQLException, DataAccessException {
 						ps.setDate(1, new java.sql.Date(System.currentTimeMillis()));
-						ps.setString(2, server);
+						ps.setString(2, convertServer(server));
 						ps.setString(3, RED_STAT_PREFIX + key);
 						ps.setDouble(4, score);
 						return ps.execute();
@@ -619,7 +620,7 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTileServerMessage() {
-		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
+		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, RED_MAPTILE_SERVER, 24);
 		String msg = String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
 				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec. %s",
 				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC), getTirexStatus());
@@ -637,17 +638,19 @@ public class OsmAndServerMonitorTasks {
 		return msg;
 	}
 
-	private DescriptiveStatistics readStats(String key, int hour) {
+	private DescriptiveStatistics readStats(String key, String server, int hour) {
+		
 		DescriptiveStatistics stats = new DescriptiveStatistics();
 //		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
-		jdbcTemplate.execute("SELECT value FROM servers.metrics WHERE name = ? and timestamp >= now() - interval ? hour "
+		jdbcTemplate.execute("SELECT value FROM servers.metrics WHERE name = ? and server = ? and timestamp >= now() - interval ? hour "
 						+ " ORDER BY timestamp asc", new PreparedStatementCallback<Boolean>() {
 
 							@Override
 							public Boolean doInPreparedStatement(PreparedStatement ps)
 									throws SQLException, DataAccessException {
 								ps.setString(1, RED_STAT_PREFIX + key);
-								ps.setInt(2, hour);
+								ps.setString(2, convertServer(server));
+								ps.setInt(3, hour);
 								ResultSet rs = ps.executeQuery();
 								while (rs.next()) {
 									stats.addValue(rs.getDouble(1));
@@ -656,6 +659,17 @@ public class OsmAndServerMonitorTasks {
 							}
 						});
 		return stats;
+	}
+
+	protected String convertServer(String server) {
+		server = server.replace(".osmand.net", "");
+		if (server.equals("download")) {
+			return RED_MAIN_SERVER;
+		}
+		if (server.equals("tile")) {
+			return RED_MAPTILE_SERVER;
+		}
+		return server;
 	}
 
 	public String refreshAll() {
@@ -704,11 +718,11 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getLiveDelayedMessage(long delay) {
-		DescriptiveStatistics live3Hours = readStats(RED_KEY_OSMAND_LIVE, 3);
-		DescriptiveStatistics live24Hours = readStats(RED_KEY_OSMAND_LIVE, 24);
-		DescriptiveStatistics live3Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 3);
-		DescriptiveStatistics live7Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 7);
-		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 30);
+		DescriptiveStatistics live3Hours = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 3);
+		DescriptiveStatistics live24Hours = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24);
+		DescriptiveStatistics live3Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 3);
+		DescriptiveStatistics live7Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 7);
+		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 30);
 		return String.format("<a href='https://creator.osmand.net/osm_live/'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
 				+ "Day stats: 3d %s (%s) h  · 7d — %s (%s) h · 30d — %s (%s) h",
 				delay < HOUR ? "OK" : "FAILED",
@@ -953,9 +967,9 @@ public class OsmAndServerMonitorTasks {
 		}
 
 		public String fullString(String urlFailedJava) {
-			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 1);
-			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
-			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD + host, 24);
+			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD, host, 1);
+			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD, host, 3);
+			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD, host, 24);
 			String name = host.substring(0, host.indexOf('.'));
 			String status = (lastSuccess ? "OK" : "FAILED");
 			if (urlFailedJava != null) {
