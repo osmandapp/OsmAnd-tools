@@ -577,7 +577,7 @@ public class OsmAndServerMonitorTasks {
 
 					@Override
 					public Boolean doInPreparedStatement(PreparedStatement ps) throws SQLException, DataAccessException {
-						ps.setDate(1, new java.sql.Date(System.currentTimeMillis()));
+						ps.setTimestamp(1, new java.sql.Timestamp(System.currentTimeMillis()));
 						ps.setString(2, convertServer(server));
 						ps.setString(3, RED_STAT_PREFIX + key);
 						ps.setDouble(4, score);
