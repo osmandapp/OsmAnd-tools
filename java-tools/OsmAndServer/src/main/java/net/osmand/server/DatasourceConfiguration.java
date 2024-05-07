@@ -21,6 +21,7 @@ public class DatasourceConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
 	private boolean wikiInitialzed;
+	private boolean monitorInitialzed;
 	
 	
     @Bean
@@ -36,6 +37,12 @@ public class DatasourceConfiguration {
         return new DataSourceProperties();
     }
     
+    @Bean
+	@ConfigurationProperties(prefix="spring.monitordatasource")
+    public DataSourceProperties monitorDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+    
 	@Bean
 	@Primary
 	public DataSource primaryDataSource() {
@@ -45,6 +52,11 @@ public class DatasourceConfiguration {
 	public boolean wikiInitialized() {
 		return wikiInitialzed;
 	}
+	
+	public boolean monitorInitialized() {
+		return monitorInitialzed;
+	}
+	
 	@Bean
 	public DataSource wikiDataSource() {
 		try {
@@ -53,6 +65,29 @@ public class DatasourceConfiguration {
 			return ds;
 		} catch (Exception e) {
 			LOG.warn("Warning - Wiki database not configured: " + e.getMessage());
+		}
+		return new AbstractDataSource() {
+			
+			@Override
+			public Connection getConnection(String username, String password) throws SQLException {
+				return null;
+			}
+			
+			@Override
+			public Connection getConnection() throws SQLException {
+				return null;
+			}
+		};
+	}
+	
+	@Bean
+	public DataSource monitorDataSource() {
+		try {
+			DataSource ds = monitorDataSourceProperties().initializeDataSourceBuilder().build();
+			monitorInitialzed = true;
+			return ds;
+		} catch (Exception e) {
+			LOG.warn("INFO - Monitor database not configured: " + e.getMessage());
 		}
 		return new AbstractDataSource() {
 			
@@ -79,6 +114,14 @@ public class DatasourceConfiguration {
 	@Bean
 	@Primary
 	public JdbcTemplate jdbcTemplate(@Qualifier("primaryDataSource") DataSource dataSource) {
+		if (dataSource == null) {
+			return null;
+		}
+		return new JdbcTemplate(dataSource);
+	}
+	
+	@Bean
+	public JdbcTemplate monitorJdbcTemplate(@Qualifier("monitorDataSource") DataSource dataSource) {
 		if (dataSource == null) {
 			return null;
 		}

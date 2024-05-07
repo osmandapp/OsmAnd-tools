@@ -8,6 +8,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -34,14 +37,18 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.PlatformUtil;
+import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.TelegramBotManager;
 import net.osmand.server.monitor.OsmAndServerMonitoringBot.Sender;
 import net.osmand.util.Algorithms;
@@ -54,7 +61,6 @@ public class OsmAndServerMonitorTasks {
 	private static final int SECOND = 1000;
 	private static final int MINUTE = 60 * SECOND;
 	private static final int HOUR = 60 * MINUTE;
-	private static final long DAY = 24l * HOUR;
 	private static final int LIVE_STATUS_MINUTES = 2;
 	private static final int DOWNLOAD_MAPS_MINITES = 5;
 	private static final int DOWNLOAD_TILE_MINUTES = 10;
@@ -63,7 +69,6 @@ public class OsmAndServerMonitorTasks {
 	private static final int TILEX_NUMBER = 268660;
 	private static final int TILEY_NUMBER = 175100;
 	private static final long INITIAL_TIMESTAMP_S = 1530840000;
-	private static final long METRICS_EXPIRE = 30l * DAY;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
@@ -82,9 +87,10 @@ public class OsmAndServerMonitorTasks {
 	private static final double PERC_SMALL = 100 - PERC;
 
 
+	private static final String RED_STAT_PREFIX = "stat.";
 	private static final String RED_KEY_OSMAND_LIVE = "live_delay_time";
 	private static final String RED_KEY_TILE = "tile_time";
-	private static final String RED_KEY_DOWNLOAD = "download_map.";
+	private static final String RED_KEY_DOWNLOAD = "download_map";
 
 	private static final SimpleDateFormat TIME_FORMAT_UTC = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 	static {
@@ -112,7 +118,11 @@ public class OsmAndServerMonitorTasks {
 	private List<FeedEntry> feed = new ArrayList<>();
 
 	@Autowired
-	private StringRedisTemplate redisTemplate;
+	@Qualifier("monitorJdbcTemplate")
+	JdbcTemplate jdbcTemplate;
+	
+	@Autowired
+	DatasourceConfiguration config;
 
 	// OsmAnd Live validation
 	LiveCheckInfo live = new LiveCheckInfo();
@@ -165,7 +175,7 @@ public class OsmAndServerMonitorTasks {
 			live.lastCheckTimestamp = System.currentTimeMillis();
 			live.lastOsmAndLiveDelay = currentDelay;
 			if (updateStats) {
-				addStat(RED_KEY_OSMAND_LIVE, currentDelay);
+				addStat(RED_KEY_OSMAND_LIVE, "main", currentDelay);
 			}
 		} catch (Exception e) {
 			sendBroadcastMessage("Exception while checking the server live status.");
@@ -453,7 +463,7 @@ public class OsmAndServerMonitorTasks {
 		}
 		lastResponseTime = respTimeSum / count;
 		if (lastResponseTime > 0) {
-			addStat(RED_KEY_TILE, lastResponseTime);
+			addStat(RED_KEY_TILE, "maptile", lastResponseTime);
 		}
 	}
 
@@ -557,11 +567,23 @@ public class OsmAndServerMonitorTasks {
 		return "Rendering service (tirex) is down!";
 	}
 
-	private void addStat(String key, double score) {
-		long now = System.currentTimeMillis();
-		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
-		// Long removed =
-		redisTemplate.opsForZSet().removeRangeByScore(key, 0, now - METRICS_EXPIRE);
+	private void addStat(String key, String server, double score) {
+		if (!config.monitorInitialized()) {
+			return;
+		}
+		jdbcTemplate.execute("INSERT INTO servers.metrics(timestamp, server, name, value) VALUES(?,?,?,?)",
+				new PreparedStatementCallback<Boolean>() {
+
+					@Override
+					public Boolean doInPreparedStatement(PreparedStatement ps) throws SQLException, DataAccessException {
+						ps.setDate(1, new java.sql.Date(System.currentTimeMillis()));
+						ps.setString(2, server);
+						ps.setString(3, RED_STAT_PREFIX + key);
+						ps.setDouble(4, score);
+						return ps.execute();
+					}
+				});
+//		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
 	}
 
 	private double estimateResponse(String tileUrl) {
@@ -615,14 +637,24 @@ public class OsmAndServerMonitorTasks {
 		return msg;
 	}
 
-	private DescriptiveStatistics readStats(String key, double hour) {
-		long now = System.currentTimeMillis();
+	private DescriptiveStatistics readStats(String key, int hour) {
 		DescriptiveStatistics stats = new DescriptiveStatistics();
-		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
-		for(String k : ls) {
-			double v = Double.parseDouble(k.substring(0, k.indexOf(':')));
-			stats.addValue(v);
-		}
+//		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
+		jdbcTemplate.execute("SELECT value FROM servers.metrics WHERE name = ? and timestamp >= now() - interval ? hour "
+						+ " ORDER BY timestamp asc", new PreparedStatementCallback<Boolean>() {
+
+							@Override
+							public Boolean doInPreparedStatement(PreparedStatement ps)
+									throws SQLException, DataAccessException {
+								ps.setString(1, RED_STAT_PREFIX + key);
+								ps.setInt(2, hour);
+								ResultSet rs = ps.executeQuery();
+								while (rs.next()) {
+									stats.addValue(rs.getDouble(1));
+								}
+								return true;
+							}
+						});
 		return stats;
 	}
 
@@ -909,7 +941,7 @@ public class OsmAndServerMonitorTasks {
 
 		public void addSpeedMeasurement(double spdMBPerSec) {
 			lastSpeed = spdMBPerSec;
-			addStat(RED_KEY_DOWNLOAD + host, spdMBPerSec);
+			addStat(RED_KEY_DOWNLOAD, host, spdMBPerSec);
 		}
 
 		@Override
@@ -921,7 +953,7 @@ public class OsmAndServerMonitorTasks {
 		}
 
 		public String fullString(String urlFailedJava) {
-			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 0.5);
+			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 1);
 			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
 			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD + host, 24);
 			String name = host.substring(0, host.indexOf('.'));
