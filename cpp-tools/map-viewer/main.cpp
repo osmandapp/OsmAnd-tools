@@ -640,7 +640,7 @@ int main(int argc, char** argv)
     renderer->setConfiguration(renderConfig);
 
     if (lastClickedLocationMarker)
-        lastClickedLocationMarker->setPosition(renderer->getState().target31);
+        lastClickedLocationMarker->setPosition(renderer->getState().fixedLocation31);
 
     bool ok = renderer->initializeRendering(true);
     assert(ok);
@@ -725,7 +725,7 @@ void mouseHandler(int button, int state, int x, int y)
         {
             dragInitX = x;
             dragInitY = y;
-            dragInitTarget = renderer->getState().target31;
+            dragInitTarget = renderer->getState().fixedLocation31;
 
             dragInitialized = true;
         }
@@ -741,7 +741,7 @@ void mouseHandler(int button, int state, int x, int y)
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "--------------- click (%d, %d) -------------------", x, y);
 
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
-            const auto delta = lastClickedLocation31 - renderer->getState().target31;
+            const auto delta = lastClickedLocation31 - renderer->getState().fixedLocation31;
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "@ %d %d (offset from target %d %d)", lastClickedLocation31.x, lastClickedLocation31.y, delta.x, delta.y);
 
 
@@ -918,7 +918,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'W':
     case 'w':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -926,7 +926,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'S':
     case 's':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.y += wasdStep / (key == 's' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -934,7 +934,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'A':
     case 'a':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -942,7 +942,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'D':
     case 'd':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -1081,13 +1081,13 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'T':
     case 't':
     {
-        renderer->setDetailedDistance(state.detailedDistance + (key == 'T' ? 10.0f : 1.0f));
+        renderer->setDetailedDistance(state.detailedDistance + (key == 'T' ? 1.0f : 0.1f));
         return;
     }
     case 'G':
     case 'g':
     {
-        renderer->setDetailedDistance(state.detailedDistance - (key == 'G' ? 10.0f : 1.0f));
+        renderer->setDetailedDistance(state.detailedDistance - (key == 'G' ? 1.0f : 0.1f));
         return;
     }
     case 'i':
@@ -1098,7 +1098,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         return;
     case 'o':
     {
-        auto position31 = renderer->getState().target31;
+        auto position31 = renderer->getState().fixedLocation31;
         OsmAnd::ReverseGeocoder reverseGeocoder{obfsCollection, roadLocator};
         OsmAnd::ReverseGeocoder::Criteria criteria;
         criteria.position31 = position31;
@@ -1114,11 +1114,11 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
     case 'l':
     {
-        auto latLon = OsmAnd::Utilities::convert31ToLatLon(state.target31);
+        auto latLon = OsmAnd::Utilities::convert31ToLatLon(state.fixedLocation31);
         auto text = inputDialog(QStringLiteral("Input coordinate"), QStringLiteral("Coordinate: "), latLon.toQString());
         latLon = OsmAnd::CoordinateSearch::search(text);
-        auto target31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
-        renderer->setMapTargetLocation(target31);
+        auto fixedLocation31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
+        renderer->setMapTargetLocation(fixedLocation31);
         return;
     }
     case 'c':
@@ -1623,7 +1623,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("target (keys w,a,s,d,l): %1 %2").arg(state.target31.x).arg(state.target31.y)));
+            QString("target (keys w,a,s,d,l): %1 %2").arg(state.fixedLocation31.x).arg(state.fixedLocation31.y)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
@@ -1638,7 +1638,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("visual zoom (+ shift)  : %1 + %2").arg(state.visualZoom).arg(state.visualZoomShift)));
+            QString("visual zoom (+ shift)  : %1 + %2").arg(state.surfaceVisualZoom).arg(state.visualZoomShift)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
