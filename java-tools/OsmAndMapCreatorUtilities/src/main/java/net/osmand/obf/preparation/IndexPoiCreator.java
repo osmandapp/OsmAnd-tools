@@ -188,6 +188,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
 		poiPreparedStatement.setInt(7, amenity.getOrder());
+		poiPreparedStatement.setString(8, amenity.getBrand());
 		addBatch(poiPreparedStatement);
 	}
 
@@ -279,7 +280,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Statement stat = poiConnection.createStatement();
 		stat.executeUpdate("create table " + IndexConstants.POI_TABLE + //$NON-NLS-1$
 				" (id bigint, x int, y int,"
-				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), priority int, "
+				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), priority int, brand varchar(2048), "
 				+ "primary key(id, type, subtype))");
 		stat.executeUpdate("create index poi_loc on poi (x, y, type, subtype)");
 		stat.executeUpdate("create index poi_id on poi (id, type, subtype)");
@@ -288,8 +289,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		// create prepared statment
 		poiPreparedStatement = poiConnection
-				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority) " + //$NON-NLS-1$//$NON-NLS-2$
-						"VALUES (?, ?, ?, ?, ?, ?, ?)");
+				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority, brand) " + //$NON-NLS-1$//$NON-NLS-2$
+						"VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 		pStatements.put(poiPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);
@@ -517,11 +518,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return null;
 	}
 
+	private HashSet<String> collectBrands() throws SQLException {
+		ResultSet rs;
+		rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, brand from poi where brand is not NULL group by brand having cnt > 50");
+		HashSet<String> brands = new HashSet<>();
+		while (rs.next()) {
+			brands.add(rs.getString(2));
+		}
+		return brands;
+	}
+
 	private void processPOIIntoTree(Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException {
 		ResultSet rs;
 		if (useInMemoryCreator) {
-			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags from poi ORDER BY id, priority");
+			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,brand from poi ORDER BY id, priority");
 		} else {
 			rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype from poi ORDER BY id, priority");
 		}
@@ -533,6 +544,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<PoiAdditionalType, String> additionalTags = new LinkedHashMap<PoiAdditionalType, String>();
 		PoiAdditionalType nameRuleType = retrieveAdditionalType("name");
 		PoiAdditionalType nameEnRuleType = retrieveAdditionalType("name:en");
+		HashSet<String> brands = collectBrands();
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
@@ -548,9 +560,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String type = rs.getString(3);
 			String subtype = rs.getString(4);
 			decodeAdditionalInfo(rs.getString(6), additionalTags);
+			String brand = rs.getString(7);
 
 			Tree<PoiTileBox> prevTree = rootZoomsTree;
 			rootZoomsTree.getNode().categories.addCategory(type, subtype, additionalTags);
+			if (brand != null && brands.contains(brand)) {
+				rootZoomsTree.getNode().categories.addCategory("brand", brand, additionalTags);
+			}
 			for (int i = zoomToStart; i <= ZOOM_TO_SAVE_END; i++) {
 				int xs = x >> (31 - i);
 				int ys = y >> (31 - i);
