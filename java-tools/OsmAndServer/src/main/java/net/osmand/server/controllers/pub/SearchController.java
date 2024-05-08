@@ -146,8 +146,11 @@ public class SearchController {
     
     @GetMapping(path = {"/get-wiki-data"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getWikiData(@RequestParam String northWest, @RequestParam String southEast, @RequestParam Set<String> filters) {
-        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, filters);
+    public ResponseEntity<String> getWikiData(@RequestParam String northWest,
+                                              @RequestParam String southEast,
+                                              @RequestParam String lang,
+                                              @RequestParam Set<String> filters) {
+        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, lang, filters);
         return ResponseEntity.ok(gson.toJson(collection));
     }
     

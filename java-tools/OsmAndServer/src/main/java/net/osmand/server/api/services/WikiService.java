@@ -3,10 +3,7 @@ package net.osmand.server.api.services;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -58,20 +55,20 @@ public class WikiService {
 	public FeatureCollection getImages(String northWest, String southEast) {
 		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
 				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
-				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon");
+				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon", null);
 	}
 	
-	public FeatureCollection getWikidataData(String northWest, String southEast, Set<String> filters) {
+	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
 		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
-		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, osmid, osmtype, poitype, poisubtype, lat, lon "
+		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon "
 				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ filterQuery
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
 		
-		return getPoiData(northWest, southEast, query, "lat", "lon");
+		return getPoiData(northWest, southEast, query, "lat", "lon", lang);
 	}
 	
-	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon) {
+	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon, String lang) {
 //		String northWest = "50.5900, 30.2200";
 //		String southEast = "50.2130, 30.8950";
 		if (!config.wikiInitialized()) {
@@ -100,9 +97,40 @@ public class WikiService {
 					if (col.equals(lat) || col.equals(lon)) {
 						continue;
 					}
-					f.properties.put(columnNames.get(i - 1), rs.getString(i));
+					if (lang != null) {
+						if (col.equals("wikiArticles")) {
+							Array array = rs.getArray(i);
+							if (array != null) {
+								Object[] wikiArticles = (Object[]) array.getArray();
+								for (Object article : wikiArticles) {
+									if (article instanceof List) {
+										List<?> articleList = (List<?>) article;
+										String langInArray = (String) articleList.get(0);
+										String title = articleList.get(1) != null ? (String) articleList.get(1) : null;
+										String shortDescription = articleList.get(2) != null ? (String) articleList.get(2) : null;
+										if (langInArray.equals(lang)) {
+											if (shortDescription != null) {
+												f.properties.put("wikiDesc", shortDescription);
+											}
+											if (title != null) {
+												f.properties.put("wikiTitle", title);
+											}
+											break;
+										}
+									}
+								}
+							}
+						} else if (col.equals("wikiTitle") && !f.properties.containsKey("wikiTitle")) {
+							f.properties.put("wikiTitle", rs.getString(i));
+						} else if (col.equals("wikiDesc") && !f.properties.containsKey("wikiDesc")) {
+							f.properties.put("wikiDesc", rs.getString(i));
+						} else {
+							f.properties.put(col, rs.getString(i));
+						}
+					} else {
+						f.properties.put(col, rs.getString(i));
+					}
 				}
-
 				return f;
 			}
 		};
