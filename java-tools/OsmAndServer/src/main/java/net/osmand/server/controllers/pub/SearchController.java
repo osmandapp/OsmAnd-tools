@@ -2,10 +2,7 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -159,5 +156,15 @@ public class SearchController {
     public ResponseEntity<String> getWikiImages(@RequestParam String northWest, @RequestParam String southEast) {
         FeatureCollection collection = wikiService.getImages(northWest, southEast);
         return ResponseEntity.ok(gson.toJson(collection));
+    }
+    
+    @GetMapping(path = {"/get-poi-by-coords"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getPoiByCoords(@RequestParam double lat,
+                                                 @RequestParam double lon,
+                                                 @RequestParam String type,
+                                                 @RequestParam long osmid) throws IOException {
+        Feature poi = searchService.searchPoiByLatlon(new LatLon(lat, lon), type, osmid);
+        return ResponseEntity.ok(gson.toJson(poi));
     }
 }

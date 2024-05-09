@@ -89,6 +89,15 @@ public class SearchService {
         }
     }
     
+    public List<LatLon> getBboxCoords(List<String> coords) {
+        List<LatLon> bbox = new ArrayList<>();
+        for (String coord : coords) {
+            String[] lanLonArr = coord.split(",");
+            bbox.add(new LatLon(Double.parseDouble(lanLonArr[0]), Double.parseDouble(lanLonArr[1])));
+        }
+        return bbox;
+    }
+    
     public List<SearchResult> search(double lat, double lon, String text) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
@@ -155,6 +164,38 @@ public class SearchService {
         } else {
             return null;
         }
+    }
+    
+    public Feature searchPoiByLatlon(LatLon loc, String type, long osmid) throws IOException {
+        List<LatLon> bbox = new ArrayList<>();
+        bbox.add(new LatLon(loc.getLatitude() + 0.0045, loc.getLongitude() - 0.0045));
+        bbox.add(new LatLon(loc.getLatitude() - 0.0045, loc.getLongitude() + 0.0045));
+        QuadRect searchBbox = getSearchBbox(bbox);
+        
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+        SearchResult res = null;
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
+            if (!mapList.isEmpty()) {
+                usedMapList = osmAndMapsService.getReaders(mapList, null);
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(type, searchBbox, 100, usedMapList);
+                if (resultCollection != null) {
+                    List<SearchResult> searchResults = resultCollection.getCurrentSearchResults();
+                    if (!searchResults.isEmpty()) {
+                        res = searchResults.stream()
+                                .filter(r -> r != null && r.location.equals(loc) && osmid == getOsmObjectId(r))
+                                .findAny()
+                                .orElse(null);
+                    }
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(usedMapList);
+        }
+        if (res != null) {
+            return getPoiFeature(res);
+        }
+        return null;
     }
     
     private boolean isContainsBbox(SearchService.PoiSearchData data) {
@@ -326,32 +367,37 @@ public class SearchService {
         return tags;
     }
     
-    private void saveSearchResult(List<SearchResult> res, List<Feature> features) throws IOException, InterruptedException {
+    private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
         for (SearchResult result : res) {
             if (result.objectType == ObjectType.POI) {
-                Amenity amenity = (Amenity) result.object;
-                PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-                Feature feature;
-                if (poiType != null) {
-                    feature = new Feature(Geometry.point(amenity.getLocation()))
-                            .prop("web_poi_id", amenity.getId())
-                            .prop("web_poi_name", amenity.getName())
-                            .prop("web_poi_color", amenity.getColor())
-                            .prop("web_poi_iconKeyName", poiType.getIconKeyName())
-                            .prop("web_poi_typeOsmTag", poiType.getOsmTag())
-                            .prop("web_poi_typeOsmValue", poiType.getOsmValue())
-                            .prop("web_poi_iconName", getIconName(poiType))
-                            .prop("web_poi_type", amenity.getType().getKeyName())
-                            .prop("web_poi_subType", amenity.getSubType())
-                            .prop("web_poi_osmUrl", getOsmUrl(result));
-                    Map<String, String> tags = amenity.getAmenityExtensions();
-                    for (Map.Entry<String, String> entry : tags.entrySet()) {
-                        feature.prop(entry.getKey(), entry.getValue());
-                    }
-                    features.add(feature);
-                }
+                Feature feature = getPoiFeature(result);
+                features.add(feature);
             }
         }
+    }
+    
+    private Feature getPoiFeature(SearchResult result) {
+        Amenity amenity = (Amenity) result.object;
+        PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+        Feature feature = null;
+        if (poiType != null) {
+            feature = new Feature(Geometry.point(amenity.getLocation()))
+                    .prop("web_poi_id", amenity.getId())
+                    .prop("web_poi_name", amenity.getName())
+                    .prop("web_poi_color", amenity.getColor())
+                    .prop("web_poi_iconKeyName", poiType.getIconKeyName())
+                    .prop("web_poi_typeOsmTag", poiType.getOsmTag())
+                    .prop("web_poi_typeOsmValue", poiType.getOsmValue())
+                    .prop("web_poi_iconName", getIconName(poiType))
+                    .prop("web_poi_type", amenity.getType().getKeyName())
+                    .prop("web_poi_subType", amenity.getSubType())
+                    .prop("web_poi_osmUrl", getOsmUrl(result));
+            Map<String, String> tags = amenity.getAmenityExtensions();
+            for (Map.Entry<String, String> entry : tags.entrySet()) {
+                feature.prop(entry.getKey(), entry.getValue());
+            }
+        }
+        return feature;
     }
     
     public String getPoiAddress(LatLon location) throws IOException, InterruptedException {
@@ -374,6 +420,15 @@ public class SearchService {
             return "https://www.openstreetmap.org/" + type.name().toLowerCase(Locale.US) + "/" + osmId;
         }
         return null;
+    }
+    
+    private long getOsmObjectId(SearchResult result) {
+        MapObject mapObject = (MapObject) result.object;
+        Entity.EntityType type = getOsmEntityType(mapObject);
+        if (type != null) {
+            return getOsmObjectId(mapObject);
+        }
+        return -1;
     }
     
     public static long getOsmObjectId(MapObject object) {
