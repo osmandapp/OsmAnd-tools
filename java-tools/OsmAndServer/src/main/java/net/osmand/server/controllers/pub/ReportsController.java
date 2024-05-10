@@ -48,6 +48,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -101,6 +102,10 @@ public class ReportsController {
 
 	@Autowired
 	private DataSource dataSource;
+	
+	@Autowired
+	@Qualifier("changesetDataSource")
+	private DataSource changesetDataSource;
 
 	private BtcTransactionReport btcTransactionReport = new BtcTransactionReport();
 
