@@ -53,6 +53,10 @@ public class WebGpxParser {
                     name = data.name;
                     data.name = null;
                 }
+                if (data.desc != null) {
+                    desc = data.desc;
+                    data.desc = null;
+                }
                 if (data.link != null) {
                     link = data.link;
                     data.link = null;
@@ -488,12 +492,10 @@ public class WebGpxParser {
                 gpxFile.metadata = trackData.metaData.ext;
             }
             gpxFile.metadata.name = trackData.metaData.name;
+            gpxFile.metadata.desc = trackData.metaData.desc;
             gpxFile.metadata.link = trackData.metaData.link;
             if (gpxFile.metadata.extensions == null) {
                 gpxFile.metadata.extensions = new LinkedHashMap<>();
-            }
-            if (trackData.metaData.desc != null) {
-                gpxFile.metadata.extensions.put(DESC_EXTENSION, trackData.metaData.desc);
             }
         }
         if (trackData.wpts != null) {
