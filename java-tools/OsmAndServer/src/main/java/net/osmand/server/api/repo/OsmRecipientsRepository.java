@@ -15,6 +15,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+
+// This needs to be refactored cause data source has cnaged to changeset
+@Deprecated
 public interface OsmRecipientsRepository extends JpaRepository<OsmRecipient, String> {
     
     @Transactional

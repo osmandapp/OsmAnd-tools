@@ -288,28 +288,15 @@ public class AdminController {
 	}
 	
 	@PostMapping(path = {"/delete-email"})
+	@Deprecated
 	public String deleteEmail(@RequestParam String email) {
-		emailSender.sendOsmRecipientsDeleteEmail(email);
-		emailService.deleteByEmail(email);
-		return "redirect:info#audience";
+		throw new IllegalStateException("sendOsmRecipientsDeleteEmail() is obsolete"); // a895722f1
 	}
 	
 	@PostMapping(path = {"/ban-by-osmids"})
+	@Deprecated
 	public String banByOsmids(@RequestParam String osmidList) {
-		
-		String[] osmids = Arrays.stream(osmidList.split("[, ]"))
-				.filter(s-> !s.equals(""))
-				.map(String::trim)
-				.toArray(String[]::new);
-		
-		for (String id : osmids) {
-			OsmRecipientsRepository.OsmRecipient recipient = emailService.getOsmRecipient(id);
-			if (recipient != null) {
-				emailSender.sendOsmRecipientsDeleteEmail(recipient.email);
-				emailService.deleteByOsmid(id);
-			}
-		}
-		return "redirect:info#audience";
+		throw new IllegalStateException("band by osmids is obsolete"); // a895722f1
 	}
 	
 	private String err(RedirectAttributes redirectAttrs, String string) {

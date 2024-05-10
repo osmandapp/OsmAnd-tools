@@ -73,9 +73,6 @@ public class EmailSenderService {
 		return ok;
     }
 	
-	public void sendOsmRecipientsDeleteEmail(String email) {
-		throw new IllegalStateException("sendOsmRecipientsDeleteEmail() is obsolete"); // a895722f1
-	}
 
 	public boolean isEmail(String comment) {
 		if (comment.contains(" ")) {

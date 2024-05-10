@@ -18,25 +18,12 @@ public class EmailRegistryService {
 	
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
-	@Autowired
-	private OsmRecipientsRepository recipientsRepository;
-	
-	public void deleteByEmail(String email) {
-		recipientsRepository.deleteOsmRecipientByEmail(email);
-	}
-	
-	public void deleteByOsmid(String osmid) {
-		recipientsRepository.deleteOsmRecipientByOsmId(osmid);
-	}
-	
-	public OsmRecipientsRepository.OsmRecipient getOsmRecipient(String osmid) {
-		return recipientsRepository.getOsmRecipientByOsmId(osmid);
-	}
 	
 	public List<EmailId> searchEmails(String emailPart) {
 		List<EmailId> searchEmails = new ArrayList<EmailId>();
 		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", "os", "email_free_users", "Free users (extra maps)"));
-		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", null, "osm_recipients", "OSM editors (OsmAnd Live)"));
+		// see OsmRecipientsRepository
+//		searchEmails.addAll(parseEmails(emailPart, "email", "updatetime", null, "osm_recipients", "OSM editors (OsmAnd Live)"));
 		searchEmails.addAll(parseEmails(emailPart, "useremail", null, null, "supporters", "OsmAnd Live subscriptions (Supporters)"));
 		searchEmails.addAll(parseEmails(emailPart, "email", "timestamp", null, "email_blocked", "Blocked (No emails sent!)"));
 		searchEmails.addAll(parseEmails(emailPart, "email", "timestamp", "channel", "email_unsubscribed","Unsubscribed (No emails sent by channel!)"));
@@ -75,7 +62,8 @@ public class EmailRegistryService {
 	public List<EmailReport> getEmailsDBReport() {
 		List<EmailReport> er = new ArrayList<EmailReport>();
 		addEmailReport(er, "Free users with 3 maps", "email_free_users", "email_free_users", "email");
-		addEmailReport(er, "OSM editors (OsmAnd Live)", "osm_recipients", "osm_recipients", "email");
+		// See OsmRecipientsRepository
+//		addEmailReport(er, "OSM editors (OsmAnd Live)", "osm_recipients", "osm_recipients", "email");
 		addEmailReport(er, "OsmAnd Live subscriptions", "supporters", "supporters", "useremail");
 		return er;
 	}
