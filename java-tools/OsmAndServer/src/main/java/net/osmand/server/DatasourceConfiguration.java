@@ -22,6 +22,7 @@ public class DatasourceConfiguration {
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
 	private boolean wikiInitialzed;
 	private boolean monitorInitialzed;
+	private boolean changesetInitialzed;
 	
 	
     @Bean
@@ -34,6 +35,12 @@ public class DatasourceConfiguration {
     @Bean
 	@ConfigurationProperties(prefix="spring.wikidatasource")
     public DataSourceProperties wikiDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+    
+    @Bean
+	@ConfigurationProperties(prefix="spring.changesetdatasource")
+    public DataSourceProperties changesetSourceProperties() {
         return new DataSourceProperties();
     }
     
@@ -57,6 +64,10 @@ public class DatasourceConfiguration {
 		return monitorInitialzed;
 	}
 	
+	public boolean changesetInitialized() {
+		return changesetInitialzed;
+	}
+	
 	@Bean
 	public DataSource wikiDataSource() {
 		try {
@@ -66,18 +77,7 @@ public class DatasourceConfiguration {
 		} catch (Exception e) {
 			LOG.warn("Warning - Wiki database not configured: " + e.getMessage());
 		}
-		return new AbstractDataSource() {
-			
-			@Override
-			public Connection getConnection(String username, String password) throws SQLException {
-				return null;
-			}
-			
-			@Override
-			public Connection getConnection() throws SQLException {
-				return null;
-			}
-		};
+		return emptyDataSource();
 	}
 	
 	@Bean
@@ -89,6 +89,24 @@ public class DatasourceConfiguration {
 		} catch (Exception e) {
 			LOG.warn("INFO - Monitor database not configured: " + e.getMessage());
 		}
+		return emptyDataSource();
+	}
+	
+	
+	@Bean
+	public DataSource changesetDataSource() {
+		try {
+			DataSource ds = changesetSourceProperties().initializeDataSourceBuilder().build();
+			changesetInitialzed = true;
+			return ds;
+		} catch (Exception e) {
+			LOG.warn("WARN - Changeset database not configured: " + e.getMessage());
+		}
+		return emptyDataSource();
+	}
+
+
+	private DataSource emptyDataSource() {
 		return new AbstractDataSource() {
 			
 			@Override
@@ -103,8 +121,10 @@ public class DatasourceConfiguration {
 		};
 	}
     
+	
 	@Bean
-	public JdbcTemplate wikiJdbcTemplate(@Qualifier("wikiDataSource") DataSource dataSource) {
+	@Primary
+	public JdbcTemplate jdbcTemplate(@Qualifier("primaryDataSource") DataSource dataSource) {
 		if (dataSource == null) {
 			return null;
 		}
@@ -112,8 +132,15 @@ public class DatasourceConfiguration {
 	}
 	
 	@Bean
-	@Primary
-	public JdbcTemplate jdbcTemplate(@Qualifier("primaryDataSource") DataSource dataSource) {
+	public JdbcTemplate wikiJdbcTemplate(@Qualifier("wikiDataSource") DataSource dataSource) {
+		if (dataSource == null) {
+			return null;
+		}
+		return new JdbcTemplate(dataSource);
+	}
+
+	@Bean
+	public JdbcTemplate changesetJdbcTemplate(@Qualifier("changesetDataSource") DataSource dataSource) {
 		if (dataSource == null) {
 			return null;
 		}
