@@ -53,7 +53,6 @@ import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerType;
-import net.osmand.server.api.services.DownloadIndexesService.PredefinedServerSpecialty;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.ReportsController;

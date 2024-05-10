@@ -262,15 +262,15 @@ public class SubscriptionController {
         } catch (Exception ex) {
             return error("Please validate osm user/pwd (couldn't authenticate): " + ex.getMessage());
         }
-        OsmRecipient recipient = new OsmRecipient();
-        recipient.osmId = osmUser;
-        recipient.email = email;
-        recipient.bitcoinAddress = bitcoinAddress;
-        recipient.updateTime = new Date();
-        recipient = osmRecipientsRepository.save(recipient);
-        String response = String.format("{\"osm_user\": \"%s\", \"bitcoin_addr\": \"%s\", \"time\": \"%s\"}",
-                recipient.osmId, recipient.bitcoinAddress, recipient.updateTime.getTime()+"");
-        return ResponseEntity.ok(response);
+        throw new UnsupportedOperationException();
+//        OsmRecipient recipient = new OsmRecipient();
+//        recipient.osmId = osmUser;
+//        recipient.email = email;
+//        recipient.bitcoinAddress = bitcoinAddress;
+//        recipient.updateTime = new Date();
+//        recipient = osmRecipientsRepository.save(recipient);
+//        String response = String.format("{\"osm_user\": \"%s\", \"bitcoin_addr\": \"%s\", \"time\": \"%s\"}",
+//                recipient.osmId, recipient.bitcoinAddress, recipient.updateTime.getTime()+"");
     }
 
     private boolean isEmpty(String s) {
