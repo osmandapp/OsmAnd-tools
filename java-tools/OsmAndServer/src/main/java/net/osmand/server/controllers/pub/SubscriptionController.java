@@ -49,8 +49,6 @@ import com.google.gson.JsonObject;
 
 import net.osmand.live.subscriptions.ReceiptValidationHelper;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.server.api.repo.OsmRecipientsRepository;
-import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
@@ -76,8 +74,6 @@ public class SubscriptionController {
     @Autowired
     private LotteryPlayService lotteryPlayService;
     
-    @Autowired
-    private OsmRecipientsRepository osmRecipientsRepository;
     
     @Autowired
     private DeviceSubscriptionsRepository subscriptionsRepository;

@@ -24,7 +24,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
-import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,11 +58,20 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.services.MotdService.MessageParams;
+import net.osmand.server.api.services.CameraPlace;
+import net.osmand.server.api.services.IpLocationService;
+import net.osmand.server.api.services.LotteryPlayService;
 import net.osmand.server.api.services.LotteryPlayService.LotteryResult;
+import net.osmand.server.api.services.MotdService;
+import net.osmand.server.api.services.MotdService.MessageParams;
+import net.osmand.server.api.services.PlacesService;
+import net.osmand.server.api.services.PluginsService;
+import net.osmand.server.api.services.PollsService;
 import net.osmand.server.api.services.PollsService.PollQuestion;
-import net.osmand.util.Algorithms;
+import net.osmand.server.api.services.PromoService;
+import net.osmand.server.api.services.WikiService;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
+import net.osmand.util.Algorithms;
 
 @Controller
 @RequestMapping("/api")
