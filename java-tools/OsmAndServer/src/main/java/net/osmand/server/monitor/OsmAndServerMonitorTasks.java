@@ -622,8 +622,8 @@ public class OsmAndServerMonitorTasks {
 	private String getTileServerMessage() {
 		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, RED_MAPTILE_SERVER, 24);
 		String msg = String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
-				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec. %s",
-				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC), getTirexStatus());
+				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec.",
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC));
 		String url ="https://maptile.osmand.net/routing/route?routeMode=car&points=51.063218,6.211030&points=51.179417,8.490871&maxDist=100";
 		String routingStatus = "OK";
 		long time = System.nanoTime();
@@ -633,8 +633,8 @@ public class OsmAndServerMonitorTasks {
 			LOG.info(e.getMessage(), e);
 			routingStatus = "FAILED";
 		}
-		msg += String.format("\n<a href='" + url + "'>routing</a>: " + "<b>%s</b>. Response time: %.1f sec. %s",
-				routingStatus, (System.nanoTime() - time) / 1.0e9, getRoutingStatus());
+		msg += String.format("\n<a href='" + url + "'>routing</a>: " + "<b>%s</b>. Response time: %.1f sec.",
+				routingStatus, (System.nanoTime() - time) / 1.0e9);
 		return msg;
 	}
 

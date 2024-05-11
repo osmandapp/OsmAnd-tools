@@ -428,7 +428,7 @@ public class ReportsController {
 	public String getReport(HttpServletRequest request, HttpServletResponse response,
 			@RequestParam(required = true) String report, @RequestParam(required = false) String month,
 			@RequestParam(required = false) String region) throws SQLException, IOException {
-		Connection conn = DataSourceUtils.getConnection(dataSource);
+		Connection conn = DataSourceUtils.getConnection(changesetDataSource);
 
 		try {
 			if (request.getServletPath().contains("_month_")) {
