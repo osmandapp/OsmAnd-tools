@@ -279,18 +279,30 @@ public class OsmAndGithubProjectMonitorTasks {
 		}
 		return content.getAsString();
 	}
+	
+	private static class DBConfig {
+		String table;
+		String url;
+		String usernamePwd;
+	}
+	
+	public DBConfig getConfig() {
+		DBConfig config = new DBConfig();
+		String[] dbConfig = projectdb.split("/");
+		config.table = dbConfig[1] + "." + DB_TABLE_NAME;
+		config.url = dbConfig[0];
+		config.usernamePwd = dbConfig[2];
+		return config;
+	}
 
 
 	private void insertIntoProject(List<ProjectItem> lst) throws IOException {
+		DBConfig cfg = getConfig();
 		for (int ind = 0; ind < lst.size();) {
-			String[] dbConfig = projectdb.split(":");
-			String DBNAME = dbConfig[1];
-			String URL = dbConfig[0];
-			String USERNAME_PWD = dbConfig[2];
-			String sql = "insert into " + DBNAME + "." + DB_TABLE_NAME + " FORMAT JSONEachRow";
-			URL url = new URL("http://" + URL + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+			String sql = "insert into " + cfg.table + " FORMAT JSONEachRow";
+			URL url = new URL("http://" + cfg.url + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 			HttpURLConnection http = (HttpURLConnection) url.openConnection();
-			String basicAuth = "Basic " + new String(Base64.getEncoder().encode(USERNAME_PWD.getBytes()));
+			String basicAuth = "Basic " + new String(Base64.getEncoder().encode(cfg.usernamePwd.getBytes()));
 			http.addRequestProperty("Authorization", basicAuth);
 			http.setDoInput(true);
 			http.setDoOutput(true);
@@ -311,18 +323,14 @@ public class OsmAndGithubProjectMonitorTasks {
 
 //		select * from main.githubProject M join (select max(timestamp) timestamp, id from main.githubProject group by id) S ON M.id = S.id where M.timestamp = S.timestamp limit 1 FORMAT JSON;
 	protected Map<String, ProjectItem> loadItemsFromSQLQuery() throws IOException {
-		String[] dbConfig = projectdb.split(":");
-		String DBNAME = dbConfig[1];
-		String URL = dbConfig[0];
-		String USERNAME_PWD = dbConfig[2];
-		String TABLE = DBNAME + "." + DB_TABLE_NAME;
-		String sql = "SELECT * from " + TABLE + " M join ";
-		sql += " (SELECT max(timestamp) timestamp, id from " + TABLE + " group by id) S ON M.id = S.id ";
+		DBConfig conf = getConfig();
+		String sql = "SELECT * from " + conf.table + " M join ";
+		sql += " (SELECT max(timestamp) timestamp, id from " + conf.table + " group by id) S ON M.id = S.id ";
 		sql += " WHERE M.timestamp = S.timestamp FORMAT JSONEachRow";
 		Map<String, ProjectItem> mp = new LinkedHashMap<>();
-		URL url = new URL("http://" + URL + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+		URL url = new URL("http://" + conf.url + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 		HttpURLConnection http = (HttpURLConnection) url.openConnection();
-		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(USERNAME_PWD.getBytes()));
+		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(conf.usernamePwd.getBytes()));
 		http.addRequestProperty("Authorization", basicAuth);
 		StringBuilder res = Algorithms.readFromInputStream(http.getInputStream());
 		BufferedReader br = new BufferedReader(new StringReader(res.toString()));
@@ -338,18 +346,18 @@ public class OsmAndGithubProjectMonitorTasks {
 		
 	protected void executeSimpleSQLQuery() throws IOException {
 		String sql = "select * from system.mutations FORMAT JSON";
-		String[] dbConfig = projectdb.split("/");
+		DBConfig conf = getConfig();
 
-		URL url = new URL("http://" + dbConfig[0] + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+		URL url = new URL("http://" + conf.url + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 		HttpURLConnection http = (HttpURLConnection) url.openConnection();
-		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(dbConfig[1].getBytes()));
+		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(conf.usernamePwd.getBytes()));
 		http.addRequestProperty("Authorization", basicAuth);
 		StringBuilder res = Algorithms.readFromInputStream(http.getInputStream());
 		System.out.println(res.toString());
 	}
 
 	// DB SCCHEMA
-//	CREATE TABLE main.githubProject	(
+//	CREATE TABLE servers.githubProject	(
 //			  `timestamp` DateTime, `version` UInt32,
 //		    `archived` Bool, `id` String, `repo` String, `num` String, `githubId` String, 
 //		    `title` String, `statusName` String, `statusId` String,
