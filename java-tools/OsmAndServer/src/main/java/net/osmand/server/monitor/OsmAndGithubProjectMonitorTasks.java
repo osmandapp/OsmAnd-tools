@@ -41,7 +41,7 @@ public class OsmAndGithubProjectMonitorTasks {
 
 	private static final int MAX_PAGES = 100;
 	private static final int BATCH_SIZE = 100; 
-	private static final String DB_TABLE_NAME = "main.githubProject";
+	private static final String DB_TABLE_NAME = "githubProject";
 
 	static SimpleDateFormat githubDateTime = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");// 2022-06-01T06:17:04Z
 	static SimpleDateFormat githubDate = new SimpleDateFormat("yyyy-MM-dd");// 2022-06-01
@@ -283,11 +283,14 @@ public class OsmAndGithubProjectMonitorTasks {
 
 	private void insertIntoProject(List<ProjectItem> lst) throws IOException {
 		for (int ind = 0; ind < lst.size();) {
-			String sql = "insert into " + DB_TABLE_NAME + " FORMAT JSONEachRow";
-			String[] dbConfig = projectdb.split("/");
-			URL url = new URL("http://" + dbConfig[0] + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+			String[] dbConfig = projectdb.split(":");
+			String DBNAME = dbConfig[1];
+			String URL = dbConfig[0];
+			String USERNAME_PWD = dbConfig[2];
+			String sql = "insert into " + DBNAME + "." + DB_TABLE_NAME + " FORMAT JSONEachRow";
+			URL url = new URL("http://" + URL + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 			HttpURLConnection http = (HttpURLConnection) url.openConnection();
-			String basicAuth = "Basic " + new String(Base64.getEncoder().encode(dbConfig[1].getBytes()));
+			String basicAuth = "Basic " + new String(Base64.getEncoder().encode(USERNAME_PWD.getBytes()));
 			http.addRequestProperty("Authorization", basicAuth);
 			http.setDoInput(true);
 			http.setDoOutput(true);
@@ -308,14 +311,18 @@ public class OsmAndGithubProjectMonitorTasks {
 
 //		select * from main.githubProject M join (select max(timestamp) timestamp, id from main.githubProject group by id) S ON M.id = S.id where M.timestamp = S.timestamp limit 1 FORMAT JSON;
 	protected Map<String, ProjectItem> loadItemsFromSQLQuery() throws IOException {
-		String sql = "SELECT * from " + DB_TABLE_NAME + " M join ";
-		sql += " (SELECT max(timestamp) timestamp, id from " + DB_TABLE_NAME + " group by id) S ON M.id = S.id ";
+		String[] dbConfig = projectdb.split(":");
+		String DBNAME = dbConfig[1];
+		String URL = dbConfig[0];
+		String USERNAME_PWD = dbConfig[2];
+		String TABLE = DBNAME + "." + DB_TABLE_NAME;
+		String sql = "SELECT * from " + TABLE + " M join ";
+		sql += " (SELECT max(timestamp) timestamp, id from " + TABLE + " group by id) S ON M.id = S.id ";
 		sql += " WHERE M.timestamp = S.timestamp FORMAT JSONEachRow";
-		String[] dbConfig = projectdb.split("/");
 		Map<String, ProjectItem> mp = new LinkedHashMap<>();
-		URL url = new URL("http://" + dbConfig[0] + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+		URL url = new URL("http://" + URL + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 		HttpURLConnection http = (HttpURLConnection) url.openConnection();
-		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(dbConfig[1].getBytes()));
+		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(USERNAME_PWD.getBytes()));
 		http.addRequestProperty("Authorization", basicAuth);
 		StringBuilder res = Algorithms.readFromInputStream(http.getInputStream());
 		BufferedReader br = new BufferedReader(new StringReader(res.toString()));
