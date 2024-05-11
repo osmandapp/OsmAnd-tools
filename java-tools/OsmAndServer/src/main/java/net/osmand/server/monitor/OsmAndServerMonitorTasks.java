@@ -699,7 +699,7 @@ public class OsmAndServerMonitorTasks {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
 		int failed = 0;
 		for (BuildServerCheckInfo buildServer : buildServers) {
-			if (buildServer.jobsFailed != null && buildServer.jobsFailed.isEmpty()) {
+			if (buildServer.jobsFailed != null && !buildServer.jobsFailed.isEmpty()) {
 				failed++;
 				msg += String.format("<a href='%s'>%s</a>: <b>FAILED</b>. Jobs: %s\n", buildServer.serverUrl,
 						buildServer.serverName, formatJobNamesAsHref(buildServer, buildServer.jobsFailed));
