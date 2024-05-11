@@ -82,6 +82,16 @@ public class OsmAndServerMonitorTasks {
 			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/" };
 
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
+	
+	// Build Server
+	List<BuildServerCheckInfo> buildServers = new ArrayList<>();
+	{
+		buildServers.add(new BuildServerCheckInfo("https://creator.osmand.net:8080", "creator"));
+		buildServers.add(new BuildServerCheckInfo("https://dl2.osmand.net:8080", "jenkins-dl2"));
+		buildServers.add(new BuildServerCheckInfo("https://osmand.net:8095", "jenkins-main"));
+		buildServers.add(new BuildServerCheckInfo("https://maptile.osmand.net:8080", "jenkins-maptile"));
+	}
+	
 
 	private static final double PERC = 95;
 	private static final double PERC_SMALL = 100 - PERC;
@@ -127,8 +137,7 @@ public class OsmAndServerMonitorTasks {
 
 	// OsmAnd Live validation
 	LiveCheckInfo live = new LiveCheckInfo();
-	// Build Server
-	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
+	
 	// Java servers check
 	JavaServerCheckInfo javaChecks = new JavaServerCheckInfo();
 	// Tile validation
@@ -249,41 +258,45 @@ public class OsmAndServerMonitorTasks {
 		if (!enabled) {
 			return;
 		}
-		try {
-			Set<String> jobsFailed = new TreeSet<String>();
-			URL url = new URL("https://creator.osmand.net:8080/api/json");
-			InputStream is = url.openConnection().getInputStream();
-			JSONObject object = new JSONObject(new JSONTokener(is));
-			JSONArray jsonArray = object.getJSONArray("jobs");
-			for (int i = 0; i < jsonArray.length(); i++) {
-				JSONObject jb = jsonArray.getJSONObject(i);
-				String name = jb.getString("name");
-				String color = jb.getString("color");
-				if (!color.equals("blue") && !color.equals("disabled") &&
-						!color.equals("notbuilt") && !color.equals("blue_anime")) {
-					jobsFailed.add(name);
+		for (BuildServerCheckInfo buildServer : buildServers) {
+			try {
+				Set<String> jobsFailed = new TreeSet<String>();
+				URL url = new URL(buildServer.serverUrl + "/api/json");
+				InputStream is = url.openConnection().getInputStream();
+				JSONObject object = new JSONObject(new JSONTokener(is));
+				JSONArray jsonArray = object.getJSONArray("jobs");
+				for (int i = 0; i < jsonArray.length(); i++) {
+					JSONObject jb = jsonArray.getJSONObject(i);
+					String name = jb.getString("name");
+					String color = jb.getString("color");
+					if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
+							&& !color.equals("blue_anime")) {
+						jobsFailed.add(name);
+					}
 				}
+				is.close();
+				if (buildServer.jobsFailed == null) {
+					buildServer.jobsFailed = jobsFailed;
+				} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
+					Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
+					jobsFailedCopy.removeAll(buildServer.jobsFailed);
+					if (!jobsFailedCopy.isEmpty()) {
+						sendBroadcastMessage(
+								"There are new failures on Build Server: " + formatJobNamesAsHref(buildServer, jobsFailedCopy));
+					}
+					Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
+					jobsRecoveredCopy.removeAll(jobsFailed);
+					if (!jobsRecoveredCopy.isEmpty()) {
+						sendBroadcastMessage(
+								"There are recovered jobs on Build Server: " + formatJobNamesAsHref(buildServer, jobsRecoveredCopy));
+					}
+					buildServer.jobsFailed = jobsFailed;
+				}
+				buildServer.lastCheckTimestamp = System.currentTimeMillis();
+			} catch (Exception e) {
+				sendBroadcastMessage("Exception while checking the build server status.");
+				LOG.error(e.getMessage(), e);
 			}
-			is.close();
-			if (buildServer.jobsFailed == null) {
-				buildServer.jobsFailed = jobsFailed;
-			} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
-				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
-				jobsFailedCopy.removeAll(buildServer.jobsFailed);
-				if (!jobsFailedCopy.isEmpty() ) {
-					sendBroadcastMessage("There are new failures on Build Server: " + formatJobNamesAsHref(jobsFailedCopy));
-				}
-				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
-				jobsRecoveredCopy.removeAll(jobsFailed);
-				if (!jobsRecoveredCopy.isEmpty() ) {
-					sendBroadcastMessage("There are recovered jobs on Build Server: " + formatJobNamesAsHref(jobsRecoveredCopy));
-				}
-				buildServer.jobsFailed = jobsFailed;
-			}
-			buildServer.lastCheckTimestamp = System.currentTimeMillis();
-		} catch (Exception e) {
-			sendBroadcastMessage("Exception while checking the build server status.");
-			LOG.error(e.getMessage(), e);
 		}
 	}
 
@@ -468,7 +481,7 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 
-	private String getRoutingStatus() {
+	protected String getRoutingStatus() {
 		try {
 			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/web-route-stats.txt").openStream()).toString();
 			res = prepareAccessStats(res);
@@ -479,7 +492,7 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 	
-	private String getTirexStatus() {
+	protected  String getTirexStatus() {
 		try {
 			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
 			res = prepareAccessStats(res);
@@ -684,10 +697,16 @@ public class OsmAndServerMonitorTasks {
 
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
-		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
-			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>OK</b>.\n";
-		} else {
-			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
+		int failed = 0;
+		for (BuildServerCheckInfo buildServer : buildServers) {
+			if (buildServer.jobsFailed != null && buildServer.jobsFailed.isEmpty()) {
+				failed++;
+				msg += String.format("<a href='%s'>%s</a>: <b>FAILED</b>. Jobs: %s\n", buildServer.serverUrl,
+						buildServer.serverName, formatJobNamesAsHref(buildServer, buildServer.jobsFailed));
+			}
+		}
+		if (failed == 0) {
+			msg += "<a href='https://creator.osmand.net:8080'>jenkins</a>: <b>OK</b>.\n";
 		}
 		for (String host: downloadTests.keySet()) {
 			DownloadTestResult r = downloadTests.get(host);
@@ -709,10 +728,10 @@ public class OsmAndServerMonitorTasks {
 		return String.format("%d:%d ago", h, m);
 	}
 
-	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
+	private Set<String> formatJobNamesAsHref(BuildServerCheckInfo buildServer, Set<String> jobNames) {
 		Set<String> formatted = new TreeSet<>();
 		for (String jobName : jobNames) {
-			formatted.add(String.format("<a href='https://creator.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
+			formatted.add(String.format("<a href='%s/job/%s/'>%s</a>", buildServer.serverUrl, jobName, jobName));
 		}
 		return formatted;
 	}
@@ -940,8 +959,15 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	protected static class BuildServerCheckInfo {
+		String serverUrl = "https://creator.osmand.net:8080";
+		String serverName = "creator";
 		Set<String> jobsFailed;
 		long lastCheckTimestamp = 0;
+		
+		public BuildServerCheckInfo(String serverName, String serverUrl) {
+			this.serverName = serverName;
+			this.serverUrl = serverUrl;
+		}
 	}
 
 	protected class DownloadTestResult {

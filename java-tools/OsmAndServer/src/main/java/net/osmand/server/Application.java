@@ -58,7 +58,7 @@ public class Application  {
 			System.out.println("Application has started");
 			configureImageIO();
 			
-			githubProject.syncGithubProject(); // to test
+//			githubProject.syncGithubProject(); // to test
 		};
 	}
 	
