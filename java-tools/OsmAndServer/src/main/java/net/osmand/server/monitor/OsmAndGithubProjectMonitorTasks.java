@@ -159,7 +159,7 @@ public class OsmAndGithubProjectMonitorTasks {
 
 
 	private Map<String, ProjectItem> loadGithubProjectItems() throws IOException, MalformedURLException, ParseException {
-		int ind = 0, pages = 0;
+		int pages = 0;
 //		StringBuilder projFieldsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectFields.graphql"));
 		StringBuilder projItemsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectItems.graphql"));
 		boolean hasNext = true;
