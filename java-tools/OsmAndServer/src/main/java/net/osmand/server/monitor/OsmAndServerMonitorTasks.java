@@ -964,7 +964,7 @@ public class OsmAndServerMonitorTasks {
 		Set<String> jobsFailed;
 		long lastCheckTimestamp = 0;
 		
-		public BuildServerCheckInfo(String serverName, String serverUrl) {
+		public BuildServerCheckInfo(String serverUrl, String serverName) {
 			this.serverName = serverName;
 			this.serverUrl = serverUrl;
 		}
