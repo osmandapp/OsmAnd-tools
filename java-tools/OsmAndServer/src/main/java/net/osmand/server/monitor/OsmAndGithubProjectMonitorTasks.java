@@ -41,7 +41,7 @@ public class OsmAndGithubProjectMonitorTasks {
 
 	private static final int MAX_PAGES = 100;
 	private static final int BATCH_SIZE = 100; 
-	private static final String DB_TABLE_NAME = "main.githubProject";
+	private static final String DB_TABLE_NAME = "githubProject";
 
 	static SimpleDateFormat githubDateTime = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");// 2022-06-01T06:17:04Z
 	static SimpleDateFormat githubDate = new SimpleDateFormat("yyyy-MM-dd");// 2022-06-01
@@ -159,7 +159,7 @@ public class OsmAndGithubProjectMonitorTasks {
 
 
 	private Map<String, ProjectItem> loadGithubProjectItems() throws IOException, MalformedURLException, ParseException {
-		int ind = 0, pages = 0;
+		int pages = 0;
 //		StringBuilder projFieldsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectFields.graphql"));
 		StringBuilder projItemsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectItems.graphql"));
 		boolean hasNext = true;
@@ -279,15 +279,30 @@ public class OsmAndGithubProjectMonitorTasks {
 		}
 		return content.getAsString();
 	}
+	
+	private static class DBConfig {
+		String table;
+		String url;
+		String usernamePwd;
+	}
+	
+	public DBConfig getConfig() {
+		DBConfig config = new DBConfig();
+		String[] dbConfig = projectdb.split("/");
+		config.table = dbConfig[1] + "." + DB_TABLE_NAME;
+		config.url = dbConfig[0];
+		config.usernamePwd = dbConfig[2];
+		return config;
+	}
 
 
 	private void insertIntoProject(List<ProjectItem> lst) throws IOException {
+		DBConfig cfg = getConfig();
 		for (int ind = 0; ind < lst.size();) {
-			String sql = "insert into " + DB_TABLE_NAME + " FORMAT JSONEachRow";
-			String[] dbConfig = projectdb.split("/");
-			URL url = new URL("http://" + dbConfig[0] + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+			String sql = "insert into " + cfg.table + " FORMAT JSONEachRow";
+			URL url = new URL("http://" + cfg.url + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 			HttpURLConnection http = (HttpURLConnection) url.openConnection();
-			String basicAuth = "Basic " + new String(Base64.getEncoder().encode(dbConfig[1].getBytes()));
+			String basicAuth = "Basic " + new String(Base64.getEncoder().encode(cfg.usernamePwd.getBytes()));
 			http.addRequestProperty("Authorization", basicAuth);
 			http.setDoInput(true);
 			http.setDoOutput(true);
@@ -308,14 +323,14 @@ public class OsmAndGithubProjectMonitorTasks {
 
 //		select * from main.githubProject M join (select max(timestamp) timestamp, id from main.githubProject group by id) S ON M.id = S.id where M.timestamp = S.timestamp limit 1 FORMAT JSON;
 	protected Map<String, ProjectItem> loadItemsFromSQLQuery() throws IOException {
-		String sql = "SELECT * from " + DB_TABLE_NAME + " M join ";
-		sql += " (SELECT max(timestamp) timestamp, id from " + DB_TABLE_NAME + " group by id) S ON M.id = S.id ";
+		DBConfig conf = getConfig();
+		String sql = "SELECT * from " + conf.table + " M join ";
+		sql += " (SELECT max(timestamp) timestamp, id from " + conf.table + " group by id) S ON M.id = S.id ";
 		sql += " WHERE M.timestamp = S.timestamp FORMAT JSONEachRow";
-		String[] dbConfig = projectdb.split("/");
 		Map<String, ProjectItem> mp = new LinkedHashMap<>();
-		URL url = new URL("http://" + dbConfig[0] + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+		URL url = new URL("http://" + conf.url + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 		HttpURLConnection http = (HttpURLConnection) url.openConnection();
-		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(dbConfig[1].getBytes()));
+		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(conf.usernamePwd.getBytes()));
 		http.addRequestProperty("Authorization", basicAuth);
 		StringBuilder res = Algorithms.readFromInputStream(http.getInputStream());
 		BufferedReader br = new BufferedReader(new StringReader(res.toString()));
@@ -331,18 +346,18 @@ public class OsmAndGithubProjectMonitorTasks {
 		
 	protected void executeSimpleSQLQuery() throws IOException {
 		String sql = "select * from system.mutations FORMAT JSON";
-		String[] dbConfig = projectdb.split("/");
+		DBConfig conf = getConfig();
 
-		URL url = new URL("http://" + dbConfig[0] + "?query=" + URLEncoder.encode(sql, "UTF-8"));
+		URL url = new URL("http://" + conf.url + "?query=" + URLEncoder.encode(sql, "UTF-8"));
 		HttpURLConnection http = (HttpURLConnection) url.openConnection();
-		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(dbConfig[1].getBytes()));
+		String basicAuth = "Basic " + new String(Base64.getEncoder().encode(conf.usernamePwd.getBytes()));
 		http.addRequestProperty("Authorization", basicAuth);
 		StringBuilder res = Algorithms.readFromInputStream(http.getInputStream());
 		System.out.println(res.toString());
 	}
 
 	// DB SCCHEMA
-//	CREATE TABLE main.githubProject	(
+//	CREATE TABLE servers.githubProject	(
 //			  `timestamp` DateTime, `version` UInt32,
 //		    `archived` Bool, `id` String, `repo` String, `num` String, `githubId` String, 
 //		    `title` String, `statusName` String, `statusId` String,

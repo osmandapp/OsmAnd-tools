@@ -304,7 +304,7 @@ public class EmailSenderMain {
         LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
     }
 
-    // 	email_free_users_android, email_free_users_ios, supporters, osm_recipients
+    // 	email_free_users_android, email_free_users_ios, supporters, osm_recipients (deprecated)
 	private static String buildQuery(boolean count, String mailingGroups, int daysSince) {
 		String[] groups = mailingGroups.split(",");
 		StringBuilder sb = new StringBuilder();
