@@ -5,10 +5,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.PoiCategory;
-import net.osmand.osm.PoiFilter;
-import net.osmand.osm.PoiType;
+import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.ObjectType;
@@ -21,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static net.osmand.data.Amenity.*;
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
@@ -166,7 +164,7 @@ public class SearchService {
         }
     }
     
-    public Feature searchPoiByLatlon(LatLon loc, String type, long osmid) throws IOException {
+    public Feature searchPoiByLatlon(LatLon loc, long osmid) throws IOException {
         List<LatLon> bbox = new ArrayList<>();
         bbox.add(new LatLon(loc.getLatitude() + 0.0045, loc.getLongitude() - 0.0045));
         bbox.add(new LatLon(loc.getLatitude() - 0.0045, loc.getLongitude() + 0.0045));
@@ -178,12 +176,12 @@ public class SearchService {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
             if (!mapList.isEmpty()) {
                 usedMapList = osmAndMapsService.getReaders(mapList, null);
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(type, searchBbox, 100, usedMapList);
+                SearchUICore.SearchResultCollection resultCollection = searchAllPoiByBbox(searchBbox, usedMapList);
                 if (resultCollection != null) {
                     List<SearchResult> searchResults = resultCollection.getCurrentSearchResults();
                     if (!searchResults.isEmpty()) {
                         res = searchResults.stream()
-                                .filter(r -> r != null && r.location.equals(loc) && osmid == getOsmObjectId(r))
+                                .filter(r -> r != null && osmid == getOsmObjectId(r))
                                 .findAny()
                                 .orElse(null);
                     }
@@ -257,6 +255,33 @@ public class SearchService {
             attempts++;
         }
         
+        return res;
+    }
+    
+    public SearchUICore.SearchResultCollection searchAllPoiByBbox(QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
+        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+        MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
+        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
+        
+        SearchSettings settings = searchUICore.getPhrase().getSettings();
+        settings.setRegions(osmandRegions);
+        settings.setOfflineIndexes(mapList);
+        
+        Set<String> types = mapPoiTypes.getCategories().stream()
+                .map(PoiCategory::getKeyName)
+                .collect(Collectors.toSet());
+        SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
+        
+        int attempts = 0;
+        while ((res == null || res.getCurrentSearchResults().isEmpty()) && attempts < 10) {
+            searchBbox = doubleBboxSize(searchBbox);
+            res = searchWithBbox(searchUICore, settings, searchBbox, types);
+            attempts++;
+        }
         return res;
     }
     
