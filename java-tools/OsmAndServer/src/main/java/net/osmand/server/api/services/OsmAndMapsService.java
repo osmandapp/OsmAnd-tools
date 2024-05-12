@@ -916,8 +916,9 @@ public class OsmAndMapsService {
 			if (incomplete[0]) {
 				return new ArrayList<RouteSegmentResult>();
 			}
-			RoutingContext ctx = prepareRouterContext(parseRouteParameters(routeMode), router, usedMapList);
-			route = approximate(ctx, router, props, waypoints, false);
+			RouteParameters rp = parseRouteParameters(routeMode);
+			RoutingContext ctx = prepareRouterContext(rp, router, usedMapList);
+			route = approximate(ctx, router, props, waypoints, rp.useExternalTimestamps);
 		} finally {
 			unlockReaders(usedMapList);
 		}
@@ -969,6 +970,7 @@ public class OsmAndMapsService {
 		boolean useOnlyHHRouting = false;
 		boolean useNativeApproximation = false;
 		boolean useGeometryBasedApproximation = false;
+		boolean useExternalTimestamps = false;
 		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
 		boolean noGlobalFile = false; // "noglobalfile"
 		RouteCalculationMode calcMode = null;
@@ -998,6 +1000,8 @@ public class OsmAndMapsService {
 				r.useNativeApproximation = Boolean.parseBoolean(value);
 			} else if (key.equals("geoapproximation")) {
 				r.useGeometryBasedApproximation = Boolean.parseBoolean(value);
+			} else if (key.equals("gpxtimestamps")) {
+				r.useExternalTimestamps = Boolean.parseBoolean(value);
 			} else if (key.equals("hhoff")) {
 				if (Boolean.parseBoolean(value)) {
 					r.disableHHRouting = true;
@@ -1050,14 +1054,15 @@ public class OsmAndMapsService {
 	@Nullable
 	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                               LatLon start, LatLon end, List<LatLon> intermediates)
+	                                               LatLon start, LatLon end, List<LatLon> intermediates,
+	                                               boolean useExternalTimestamps)
 			throws IOException, InterruptedException {
 
 		// OSRM by type, all others treated as "rescuetrack"
 		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
 			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
 		} else {
-			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end);
+			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end, useExternalTimestamps);
 		}
 	}
 
@@ -1110,7 +1115,7 @@ public class OsmAndMapsService {
 
 	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                               LatLon start, LatLon end)
+	                                               LatLon start, LatLon end, boolean useExternalTimestamps)
 			throws IOException, InterruptedException {
 
 		List<RouteSegmentResult> routeRes;
@@ -1130,7 +1135,7 @@ public class OsmAndMapsService {
 		String gpx = restTemplate.getForObject(url.toString(), String.class);
 		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		routeRes = approximate(ctx, router, props, trkSegment.points, true);
+		routeRes = approximate(ctx, router, props, trkSegment.points, useExternalTimestamps);
 		return routeRes;
 	}
 
@@ -1174,7 +1179,8 @@ public class OsmAndMapsService {
 			ctx.routingTime = 0;
 			ctx.calculationProgress = progress;
 			if (rp.onlineRouting != null) {
-				routeRes = onlineRouting(rp.onlineRouting, ctx, router, props, start, end, intermediates);
+				routeRes = onlineRouting(rp.onlineRouting, ctx, router, props, start, end, intermediates,
+						rp.useExternalTimestamps);
 			} else {
 				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
 						: router.searchRoute(ctx, start, end, intermediates, null);

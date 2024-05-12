@@ -119,24 +119,34 @@ public class RoutingController {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 //		RoutingParameter applyApproximation = new RoutingParameter("applyapproximation", "",
 //				"Attach to roads (OsmAnd)", true);
-		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
+		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Hidden",
 				"[Dev] Disable HH routing", false);
-		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
+		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Hidden",
 				"[Dev] Use C++ for routing", false);
-		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development",
+		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Hidden",
 				"[Dev] Use C++ approximation", false);
-		RoutingParameter geoApprox = new RoutingParameter("geoapproximation", "Development",
+		RoutingParameter geoApprox = new RoutingParameter("geoapproximation", "Hidden",
 				"[Dev] Use geo-based approximation", false);
 		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development",
 				"[Dev] Use separate maps", false);
 
-		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
+		RoutingParameter specialRoutingType = new RoutingParameter("placeholder_routing_type",
+				"Development", "[Dev] Routing type", false); // processed by JavaScript
+		RoutingParameter specialApproximationType = new RoutingParameter("placeholder_approximation_type",
+				"Development", "[Dev] GPX approximation", false); // processed by JavaScript
+
+		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps", "Development",
+				"[Dev] Use GPX timestamps (approximation)", false);
+		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps", "Development",
+				"[Dev] Use GPX timestamps (approximation)", true); // default enabled for rescuetrack
+
+		RoutingParameter calcMode = new RoutingParameter("calcmode", "A* mode",
 				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		calcMode.section = "Development";
+		calcMode.section = "Hidden";
 		calcMode.value = "";
-		calcMode.valueDescriptions = new String[] {"Optimal", "Basic", "Slow"};
-		calcMode.values = new String[] { RouteCalculationMode.COMPLEX.name(), RouteCalculationMode.BASE.name(),
-				RouteCalculationMode.NORMAL.name()
+		calcMode.valueDescriptions = new String[] {"normal", "2-phase", "basemap"};
+		calcMode.values = new String[] { RouteCalculationMode.NORMAL.name(), RouteCalculationMode.COMPLEX.name(),
+				RouteCalculationMode.BASE.name()
 		};
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
 		// internal profiles (build-in routers)
@@ -145,7 +155,8 @@ public class RoutingController {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
 				List<RoutingController.RoutingParameter> passParams =
-						new ArrayList<>(Arrays.asList(sepMaps, hhRouting, nativeRouting, nativeTrack, geoApprox));
+						new ArrayList<>(Arrays.asList(sepMaps, hhRouting, nativeRouting, nativeTrack, geoApprox,
+								specialRoutingType, specialApproximationType, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
 					if ("car".equals(e.getKey())) {
 						passParams.add(calcMode); // only for car & derived from car
@@ -169,7 +180,14 @@ public class RoutingController {
 
 			// reuse previously filled params using profile as key
 			if (rs.profile != null && routers.get(rs.profile) != null) {
-				routers.get(rs.profile).params.forEach((key, val) -> rm.params.put(key, val));
+				routers.get(rs.profile).params.forEach((key, val) -> {
+							if ("gpxtimestamps".equals(key) && rs.name.startsWith("rescuetrack")) {
+								rm.params.put(key, gpxTimestampsEnabled);
+							} else {
+								rm.params.put(key, val);
+							}
+						}
+				);
 			}
 
 			routers.put(rm.key, rm);
