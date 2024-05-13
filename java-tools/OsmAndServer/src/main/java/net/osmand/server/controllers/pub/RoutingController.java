@@ -133,24 +133,6 @@ public class RoutingController {
 		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development",
 				"Use separate maps", false);
 
-//		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Hidden",
-//				"[Dev] Disable HH routing", false);
-//		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Hidden",
-//				"[Dev] Use C++ for routing", false);
-//		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Hidden",
-//				"[Dev] Use C++ approximation", false);
-//		RoutingParameter geoApprox = new RoutingParameter("geoapproximation", "Hidden",
-//				"[Dev] Use geo-based approximation", false);
-
-//		RoutingParameter calcMode = new RoutingParameter("calcmode", "A* mode",
-//				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-//		calcMode.section = "Hidden";
-//		calcMode.value = "";
-//		calcMode.valueDescriptions = new String[] {"normal", "2-phase", "basemap"};
-//		calcMode.values = new String[] { RouteCalculationMode.NORMAL.name(), RouteCalculationMode.COMPLEX.name(),
-//				RouteCalculationMode.BASE.name()
-//		};
-
 		RoutingParameter selectRoutingTypeAll = new RoutingParameter("routing", "Routing type",
 				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
 		selectRoutingTypeAll.fillSelectList("Development", OsmAndMapsService.ServerRoutingTypes.getSelectList(false), "");
@@ -165,7 +147,7 @@ public class RoutingController {
 		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps",
 				"Development", "Use GPX timestamps", false);
 		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps",
-				"Development", "Use external timestamps", true); // rescuetrack
+				"Development", "Use external timestamps", true); // rescuetrack only
 
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
 		// internal profiles (build-in routers)
@@ -176,13 +158,8 @@ public class RoutingController {
 				RoutingParameter routingTypes = derivedProfiles != null && "car".equals(e.getKey())
 						? selectRoutingTypeCar : selectRoutingTypeAll;
 				List<RoutingController.RoutingParameter> passParams =
-//						new ArrayList<>(Arrays.asList(sepMaps, hhRouting, nativeRouting, nativeTrack, geoApprox,
-//								specialRoutingType, specialApproximationType, gpxTimestampsDisabled));
 						new ArrayList<>(Arrays.asList(sepMaps, routingTypes, selectApproximationType, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
-//					if ("car".equals(e.getKey())) {
-//						passParams.add(calcMode); // only for car & derived from car
-//					}
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);

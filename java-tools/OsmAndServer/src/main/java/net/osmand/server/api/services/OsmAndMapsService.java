@@ -1022,7 +1022,7 @@ public class OsmAndMapsService {
 		boolean useNativeApproximation = false;
 		boolean useGeometryBasedApproximation = false;
 		boolean useExternalTimestamps = false;
-		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
+		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
 		boolean noGlobalFile = false; // "noglobalfile"
 		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
@@ -1033,9 +1033,6 @@ public class OsmAndMapsService {
 	private RouteParameters parseRouteParameters(String routeMode) {
 		String[] props = routeMode.split("\\,");
 		RouteParameters r = new RouteParameters(props[0]);
-//		if (props.length > 0 && props[0].startsWith("rescuetrack")) {
-//			r.useGeometryBasedApproximation = true; // default
-//		}
 		for (int i = 1; i < props.length; i++) {
 			String p = props[i];
 			if (p.length() == 0) {
@@ -1048,28 +1045,6 @@ public class OsmAndMapsService {
 				key = p.substring(0, ind);
 				value = p.substring(ind + 1);
 			}
-//			if (key.equals("nativerouting")) {
-//				r.useNativeLib = Boolean.parseBoolean(value);
-//			} else if (key.equals("nativeapproximation")) {
-//				r.useNativeApproximation = Boolean.parseBoolean(value);
-//			} else if (key.equals("geoapproximation")) {
-//				r.useGeometryBasedApproximation = Boolean.parseBoolean(value);
-//			} else if (key.equals("gpxtimestamps")) {
-//				r.useExternalTimestamps = Boolean.parseBoolean(value);
-//			} else if (key.equals("hhoff")) {
-//				if (Boolean.parseBoolean(value)) {
-//					r.disableHHRouting = true;
-//				}
-//			} else if (key.equals("hhonly")) {
-//				if (Boolean.parseBoolean(value)) {
-//					r.useOnlyHHRouting = true;
-//				}
-//			} else if (key.equals("noglobalfile")) {
-//				r.noGlobalFile = true;
-//			} else if (key.equals("calcmode")) {
-//				if (value.length() > 0) {
-//					r.calcMode = RouteCalculationMode.valueOf(value.toUpperCase());
-//				}
 			if ("routing".equals(key)) {
 				ServerRoutingTypes type = value.isEmpty()
 						? ServerRoutingTypes.HH_JAVA // default
