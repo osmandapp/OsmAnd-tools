@@ -173,7 +173,7 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
         fi
       fi
       PIXEL_SIZE=$(printf "%.17g" $((40075016.68557848615314309804 / (2 ** $ZOOM * $TILE_SIZE))))
-      gdalwarp -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "PREDICTOR=2" -ot Float32 -co "SPARSE_OK=TRUE" \
+      gdalwarp -of GTiff -co "COMPRESS=LZW" -co "BIGTIFF=YES" -co "PREDICTOR=2" -ot Int16 -co "SPARSE_OK=TRUE" \
         -t_srs "+init=epsg:3857 +over" -r cubic -multi \
         -tr $PIXEL_SIZE $PIXEL_SIZE -tap \
         "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/${TYPE}_mercator.tif"
