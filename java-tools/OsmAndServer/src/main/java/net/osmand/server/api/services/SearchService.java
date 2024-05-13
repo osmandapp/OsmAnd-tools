@@ -166,8 +166,8 @@ public class SearchService {
     
     public Feature searchPoiByLatlon(LatLon loc, long osmid) throws IOException {
         List<LatLon> bbox = new ArrayList<>();
-        bbox.add(new LatLon(loc.getLatitude() + 0.0045, loc.getLongitude() - 0.0045));
-        bbox.add(new LatLon(loc.getLatitude() - 0.0045, loc.getLongitude() + 0.0045));
+        bbox.add(new LatLon(loc.getLatitude() + 0.0015, loc.getLongitude() - 0.0015));
+        bbox.add(new LatLon(loc.getLatitude() - 0.0015, loc.getLongitude() + 0.0015));
         QuadRect searchBbox = getSearchBbox(bbox);
         
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();

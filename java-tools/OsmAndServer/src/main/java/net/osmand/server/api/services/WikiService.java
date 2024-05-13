@@ -58,6 +58,13 @@ public class WikiService {
 				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon", null);
 	}
 	
+	public FeatureCollection getImagesById(long id) {
+		String query = String.format("SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon " +
+				"FROM wikigeoimages WHERE id = %d " +
+				"ORDER BY views DESC LIMIT " + LIMIT_QUERY, id);
+		return getPoiData(null, null, query, "imgLat", "imgLon", null);
+	}
+	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
 		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
 		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon "
@@ -74,10 +81,22 @@ public class WikiService {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
-		double north = Double.parseDouble(northWest.split(",")[0]);
-		double west = Double.parseDouble(northWest.split(",")[1]);
-		double south = Double.parseDouble(southEast.split(",")[0]);
-		double east = Double.parseDouble(southEast.split(",")[1]);
+		double north;
+		double south;
+		double east;
+		double west;
+		
+		if (northWest != null && southEast != null) {
+			north = Double.parseDouble(northWest.split(",")[0]);
+			west = Double.parseDouble(northWest.split(",")[1]);
+			south = Double.parseDouble(southEast.split(",")[0]);
+			east = Double.parseDouble(southEast.split(",")[1]);
+		} else {
+			east = 180.0;
+			west = -180.0;
+			north = 90.0;
+			south = -90.0;
+		}
 		RowMapper<Feature> rowMapper = new RowMapper<>() {
 			List<String> columnNames = null;
 			
@@ -136,10 +155,12 @@ public class WikiService {
 		};
 		List<Feature> stream = jdbcTemplate.query(query,
 				ps -> {
-					ps.setDouble(1, south);
-					ps.setDouble(2, north);
-					ps.setDouble(3, west);
-					ps.setDouble(4, east);
+					if (northWest != null && southEast != null) {
+						ps.setDouble(1, south);
+						ps.setDouble(2, north);
+						ps.setDouble(3, west);
+						ps.setDouble(4, east);
+					}
 				}, rowMapper);
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
 	}

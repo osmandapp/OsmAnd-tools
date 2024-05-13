@@ -166,4 +166,11 @@ public class SearchController {
         Feature poi = searchService.searchPoiByLatlon(new LatLon(lat, lon), osmid);
         return ResponseEntity.ok(gson.toJson(poi));
     }
+    
+    @GetMapping(path = {"/get-wiki-photos"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getWikiPhotosById(@RequestParam long id) {
+        FeatureCollection collection = wikiService.getImagesById(id);
+        return ResponseEntity.ok(gson.toJson(collection));
+    }
 }
