@@ -1,18 +1,29 @@
-#!/bin/bash -xe
+#!/bin/bash -x
 # # 2 #
 # This script is intended to combine hillshade/slope/tifheightmap tiles into single file for each region for OsmAnd.
 # Run prepare_tiles.sh first!
 # Regions are stored in OsmAnd-resources/regions.xml (regions.ocbf) in OsmAndMapCreator (always use latest version).
-# Edit TYPE, FILTER and paths if necessary
+# Edit paths if necessary
+# FILTER should be lowercase !!!
 
-TYPE=tifheightmap # hillshade/slope/tifheightmap
-FILTER=iceland # FILTER should be lowercase !!!
-SLOPE_INPUT=/home/xmd5a/sshfs/root@creator.osmand.net/mnt/hdd/relief-data/hillshade/slopes-tiles
-SLOPE_OUTPUT=/mnt/wd_2tb/ArticDEM/10m/slopes-regions
-HILLSHADE_INPUT=/home/xmd5a/sshfs/root@creator.osmand.net/mnt/hdd/relief-data/hillshade/hillshade-tiles
-HILLSHADE_OUTPUT=/mnt/wd_2tb/ArticDEM/10m/hillshade-regions
-TIFHEIGHTMAP_INPUT=/mnt/wd_2tb/ArticDEM/10m/tiffheightmap
-TIFHEIGHTMAP_OUTPUT=/mnt/wd_2tb/ArticDEM/10m/tiffheightmap_final
+while getopts ":t:f:" opt; do
+  case $opt in
+    t) TYPE="$OPTARG"
+    ;;
+    f) FILTER=$(tr [A-Z] [a-z] <<< "$OPTARG")
+    ;;
+    \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
+	echo Usage: ./combine_tiles.sh -t [hillshade/slope/tifheightmap] -f [filter like 'europe']
+    ;;
+  esac
+done
+
+SLOPE_INPUT=/mnt/wd_2tb/lidar/slope-tiles
+SLOPE_OUTPUT=/mnt/wd_2tb/lidar/slope-regions
+HILLSHADE_INPUT=/mnt/wd_2tb/lidar/hillshade-tiles
+HILLSHADE_OUTPUT=/mnt/wd_2tb/lidar/hillshade-regions
+TIFHEIGHTMAP_INPUT=/mnt/wd_2tb/lidar/tiffheightmap
+TIFHEIGHTMAP_OUTPUT=/mnt/wd_2tb/lidar/tiffheightmap-regions
 
 OSMANDMAPCREATOR_PATH=/home/xmd5a/utilites/OsmAndMapCreator-main
 SKIP_EXISTING=true
@@ -38,7 +49,7 @@ elif [[ "$TYPE" == "hillshade" ]]; then
  EXTENSION=.sqlitedb
 elif [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
  MINZOOM=9
- MAXZOOM=14
+ MAXZOOM=15
  PREFIX=Heightmap_
  INPUTFILE=$TIFHEIGHTMAP_INPUT
  OUTPUTDIR=$TIFHEIGHTMAP_OUTPUT
