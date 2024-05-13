@@ -112,55 +112,77 @@ public class RoutingController {
 			this.group = group;
 		}
 
+		public void fillSelectList(String section, Map<String, String> list, String value) {
+			this.section = section;
+			this.value = value;
+			this.values = new String[list.size()];
+			this.valueDescriptions = new String[list.size()];
+			int i = 0;
+			for (String key : list.keySet()) {
+				this.values[i] = key;
+				this.valueDescriptions[i] = list.get(key);
+				i++;
+			}
+		}
 	}
 
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
-//		RoutingParameter applyApproximation = new RoutingParameter("applyapproximation", "",
-//				"Attach to roads (OsmAnd)", true);
-		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Hidden",
-				"[Dev] Disable HH routing", false);
-		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Hidden",
-				"[Dev] Use C++ for routing", false);
-		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Hidden",
-				"[Dev] Use C++ approximation", false);
-		RoutingParameter geoApprox = new RoutingParameter("geoapproximation", "Hidden",
-				"[Dev] Use geo-based approximation", false);
+
 		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development",
-				"[Dev] Use separate maps", false);
+				"Use separate maps", false);
 
-		RoutingParameter specialRoutingType = new RoutingParameter("placeholder_routing_type",
-				"Development", "[Dev] Routing type", false); // processed by JavaScript
-		RoutingParameter specialApproximationType = new RoutingParameter("placeholder_approximation_type",
-				"Development", "[Dev] GPX approximation", false); // processed by JavaScript
+//		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Hidden",
+//				"[Dev] Disable HH routing", false);
+//		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Hidden",
+//				"[Dev] Use C++ for routing", false);
+//		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Hidden",
+//				"[Dev] Use C++ approximation", false);
+//		RoutingParameter geoApprox = new RoutingParameter("geoapproximation", "Hidden",
+//				"[Dev] Use geo-based approximation", false);
 
-		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps", "Development",
-				"[Dev] Use GPX timestamps (approximation)", false);
-		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps", "Development",
-				"[Dev] Use GPX timestamps (approximation)", true); // default enabled for rescuetrack
+//		RoutingParameter calcMode = new RoutingParameter("calcmode", "A* mode",
+//				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+//		calcMode.section = "Hidden";
+//		calcMode.value = "";
+//		calcMode.valueDescriptions = new String[] {"normal", "2-phase", "basemap"};
+//		calcMode.values = new String[] { RouteCalculationMode.NORMAL.name(), RouteCalculationMode.COMPLEX.name(),
+//				RouteCalculationMode.BASE.name()
+//		};
 
-		RoutingParameter calcMode = new RoutingParameter("calcmode", "A* mode",
-				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		calcMode.section = "Hidden";
-		calcMode.value = "";
-		calcMode.valueDescriptions = new String[] {"normal", "2-phase", "basemap"};
-		calcMode.values = new String[] { RouteCalculationMode.NORMAL.name(), RouteCalculationMode.COMPLEX.name(),
-				RouteCalculationMode.BASE.name()
-		};
+		RoutingParameter selectRoutingTypeAll = new RoutingParameter("routing", "Routing type",
+				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectRoutingTypeAll.fillSelectList("Development", OsmAndMapsService.ServerRoutingTypes.getSelectList(false), "");
+		RoutingParameter selectRoutingTypeCar = new RoutingParameter("routing", "Routing type",
+				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectRoutingTypeCar.fillSelectList("Development", OsmAndMapsService.ServerRoutingTypes.getSelectList(true), "");
+
+		RoutingParameter selectApproximationType = new RoutingParameter("approximation", "GPX approximation type",
+				"Algorithm and library for approximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectApproximationType.fillSelectList("Development", OsmAndMapsService.ServerApproximationTypes.getSelectList(), "");
+
+		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps",
+				"Development", "Use GPX timestamps", false);
+		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps",
+				"Development", "Use external timestamps", true); // rescuetrack
+
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
 		// internal profiles (build-in routers)
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
+				RoutingParameter routingTypes = derivedProfiles != null && "car".equals(e.getKey())
+						? selectRoutingTypeCar : selectRoutingTypeAll;
 				List<RoutingController.RoutingParameter> passParams =
-						new ArrayList<>(Arrays.asList(sepMaps, hhRouting, nativeRouting, nativeTrack, geoApprox,
-								specialRoutingType, specialApproximationType, gpxTimestampsDisabled));
+//						new ArrayList<>(Arrays.asList(sepMaps, hhRouting, nativeRouting, nativeTrack, geoApprox,
+//								specialRoutingType, specialApproximationType, gpxTimestampsDisabled));
+						new ArrayList<>(Arrays.asList(sepMaps, routingTypes, selectApproximationType, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
-					if ("car".equals(e.getKey())) {
-						passParams.add(calcMode); // only for car & derived from car
-					}
+//					if ("car".equals(e.getKey())) {
+//						passParams.add(calcMode); // only for car & derived from car
+//					}
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
