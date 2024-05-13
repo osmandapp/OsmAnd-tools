@@ -162,7 +162,7 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
     if [ ! -f "$WORK_PATH/${TYPE}_mercator.tif" ]; then
       echo "Re-projecting..."
       if [ -z "$ZOOM" ]; then
-          ZOOM="14"
+          ZOOM="15"
       else
         if (($ZOOM < 0)); then
           ZOOM="0"
