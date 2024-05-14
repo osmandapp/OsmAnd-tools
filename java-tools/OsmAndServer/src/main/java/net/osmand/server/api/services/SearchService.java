@@ -289,6 +289,7 @@ public class SearchService {
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
         SearchUICore.SearchResultCollection res = null;
         for (String type : types) {
+            type = type.replace("_", " ");
             if (res == null) {
                 res = searchUICore.immediateSearch(type, null);
             } else {
@@ -451,6 +452,7 @@ public class SearchService {
         MapObject mapObject = (MapObject) result.object;
         Entity.EntityType type = getOsmEntityType(mapObject);
         if (type != null) {
+            long osmId = getOsmObjectId(mapObject);
             return getOsmObjectId(mapObject);
         }
         return -1;
