@@ -144,6 +144,8 @@ public class WikiService {
 							if (array != null) {
 								Object[] wvLinks = (Object[]) array.getArray();
 								Map<Long, List<String>> result = new HashMap<>();
+								Map<Long, List<String>> enLinks = new HashMap<>();
+								Map<Long, List<String>> otherLinks = new HashMap<>();
 								for (Object linkInfo : wvLinks) {
 									if (linkInfo instanceof List) {
 										List<?> linkInfoList = (List<?>) linkInfo;
@@ -151,19 +153,23 @@ public class WikiService {
 										String langInArray = linkInfoList.get(1) != null ? (String) linkInfoList.get(1) : null;
 										String title = linkInfoList.get(2) != null ? (String) linkInfoList.get(2) : null;
 										String url = "https://" + langInArray + ".wikivoyage.org/wiki/" + title;
-										List<String> urlInfo = new ArrayList<>();
-										urlInfo.add(title);
-										urlInfo.add(url);
+										List<String> urlInfo = Arrays.asList(title, url);
 										if (langInArray != null) {
 											if (langInArray.equals(lang)) {
 												result.put(tripId, urlInfo);
 											} else if (langInArray.equals("en")) {
-												result.putIfAbsent(tripId, urlInfo);
+												enLinks.put(tripId, urlInfo);
 											} else {
-												result.putIfAbsent(tripId, urlInfo);
+												otherLinks.put(tripId, urlInfo);
 											}
 										}
 									}
+								}
+								for (Long tripId : enLinks.keySet()) {
+									result.putIfAbsent(tripId, enLinks.get(tripId));
+								}
+								for (Long tripId : otherLinks.keySet()) {
+									result.putIfAbsent(tripId, otherLinks.get(tripId));
 								}
 								if (!result.isEmpty()) {
 									f.properties.put("wvLinks", result);
