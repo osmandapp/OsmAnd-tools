@@ -130,24 +130,26 @@ public class RoutingController {
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 
-		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development",
-				"Use separate maps", false);
+		final String routingSection = "Routing (devel)";
+		final String approximationSection = "Approximation (devel)";
 
-		RoutingParameter selectRoutingTypeAll = new RoutingParameter("routing", "Routing type",
-				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		selectRoutingTypeAll.fillSelectList("Development", OsmAndMapsService.ServerRoutingTypes.getSelectList(false), "");
+		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", routingSection, "Use separate maps", false);
+
 		RoutingParameter selectRoutingTypeCar = new RoutingParameter("routing", "Routing type",
 				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		selectRoutingTypeCar.fillSelectList("Development", OsmAndMapsService.ServerRoutingTypes.getSelectList(true), "");
+		RoutingParameter selectRoutingTypeAll = new RoutingParameter("routing", "Routing type",
+				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectRoutingTypeCar.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(true), "");
+		selectRoutingTypeAll.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(false), "");
 
 		RoutingParameter selectApproximationType = new RoutingParameter("approximation", "GPX approximation type",
 				"Algorithm and library for approximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		selectApproximationType.fillSelectList("Development", OsmAndMapsService.ServerApproximationTypes.getSelectList(), "");
+		selectApproximationType.fillSelectList(approximationSection, OsmAndMapsService.ServerApproximationTypes.getSelectList(), "");
 
 		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps",
-				"Development", "Use GPX timestamps", false);
+				approximationSection, "Use GPX timestamps", false);
 		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps",
-				"Development", "Use external timestamps", true); // rescuetrack only
+				approximationSection, "Use external timestamps", true); // rescuetrack only
 
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
 		// internal profiles (build-in routers)
@@ -158,7 +160,7 @@ public class RoutingController {
 				RoutingParameter routingTypes = derivedProfiles != null && "car".equals(e.getKey())
 						? selectRoutingTypeCar : selectRoutingTypeAll;
 				List<RoutingController.RoutingParameter> passParams =
-						new ArrayList<>(Arrays.asList(sepMaps, routingTypes, selectApproximationType, gpxTimestampsDisabled));
+						new ArrayList<>(Arrays.asList(routingTypes, sepMaps, selectApproximationType, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
