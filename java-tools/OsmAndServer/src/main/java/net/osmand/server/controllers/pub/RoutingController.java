@@ -112,13 +112,15 @@ public class RoutingController {
 			this.group = group;
 		}
 
-		public void fillSelectList(String section, Map<String, String> list, String value) {
+		public void fillSelectList(String section, Map<String, String> list) {
 			this.section = section;
-			this.value = value;
 			this.values = new String[list.size()];
 			this.valueDescriptions = new String[list.size()];
 			int i = 0;
 			for (String key : list.keySet()) {
+				if (i == 0) {
+					this.value = key; // default
+				}
 				this.values[i] = key;
 				this.valueDescriptions[i] = list.get(key);
 				i++;
@@ -139,12 +141,12 @@ public class RoutingController {
 				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
 		RoutingParameter selectRoutingTypeAll = new RoutingParameter("routing", "Routing type",
 				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		selectRoutingTypeCar.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(true), "");
-		selectRoutingTypeAll.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(false), "");
+		selectRoutingTypeCar.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(true));
+		selectRoutingTypeAll.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(false));
 
 		RoutingParameter selectApproximationType = new RoutingParameter("approximation", "GPX approximation type",
 				"Algorithm and library for approximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		selectApproximationType.fillSelectList(approximationSection, OsmAndMapsService.ServerApproximationTypes.getSelectList(), "");
+		selectApproximationType.fillSelectList(approximationSection, OsmAndMapsService.ServerApproximationTypes.getSelectList());
 
 		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps",
 				approximationSection, "Use GPX timestamps", false);
