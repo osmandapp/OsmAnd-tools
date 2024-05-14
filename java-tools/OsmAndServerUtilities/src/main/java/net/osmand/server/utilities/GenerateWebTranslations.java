@@ -27,8 +27,8 @@ public class GenerateWebTranslations {
 	private static final String DEFAULT_LOCALE = "en";
 
 	public static void main(String[] args) throws IOException {
-		generateTranslations("../../../web/map/src/resources/translations/gen-translations-config.json", "../../../");
-		
+//		generateTranslations("../../../web/map/src/resources/translations/gen-translations-config.json", "../../../");
+		generateTranslations("../../../web/main/src/translations/translations-config.json", "../../../");
 	}
 	
 	/**
@@ -349,7 +349,8 @@ public class GenerateWebTranslations {
 			while ((line = br.readLine()) != null) {
 				oline += line.trim();
 				ln++;
-				if(oline.startsWith("//")) {
+				if (oline.startsWith("//")) {
+					oline = "";
 					continue;
 				} else if (oline.endsWith(";") && oline.substring(0, oline.length() - 1).trim().endsWith("\"")) {
 					if (!oline.equals(";")) {
