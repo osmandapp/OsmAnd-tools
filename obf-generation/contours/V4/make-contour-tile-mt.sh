@@ -12,7 +12,7 @@ threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
 threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
 
 export QT_LOGGING_RULES="qt5ct.debug=false"
-TMP_DIR="/var/tmp"
+TMP_DIR="/mnt/wd_2tb/tmp"
 isolines_step=10
 translation_script=contours.py
 function usage {

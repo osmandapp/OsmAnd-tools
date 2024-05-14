@@ -15,6 +15,8 @@ class PrivateLandsTranslation(ogr2osm.TranslationBase):
 			return
 		if 'PROPTYPE' in attrs and (attrs['PROPTYPE'].lower() == "row_road" or attrs['PROPTYPE'].lower() == "water"): # Vermont
 			return
+		if 'POLY_TYPE' in attrs and (attrs['POLY_TYPE'].lower() == "row" or attrs['POLY_TYPE'].lower() == "water" or attrs['POLY_TYPE'].lower() == "PRIV_ROW" or attrs['POLY_TYPE'].lower() == "RAIL_ROW"): # Massachusets
+			return
 
 #		if 'OWNERNME1' in attrs and attrs['OWNERNME1'].startsWith('USA ') or 'U S A' in attrs['OWNERNME1'] or attrs['OWNERNME1'].startswith('US ') or attrs['OWNERNME1'].startswith('U.S.') or ' STATE' in attrs['OWNERNME1'] or attrs['OWNERNME1'].startswith('USD') or attrs['OWNERNME1'] == 'STATE' or attrs['OWNERNME1'].startsWith('STATE ') or 'COUNTY' in attrs['OWNERNME1'] or 'WISCONSIN' in attrs['OWNERNME1'] or 'NATIONAL' in attrs['OWNERNME1'] or 'BRYLE RIVER LLC' in attrs['OWNERNME1'] or 'CONSERVANCY' in attrs['OWNERNME1'] or 'GOODMAN FOREST' in attrs['OWNERNME1'] or 'DEPT OF' in attrs['OWNERNME1'] or 'DNR' in attrs['OWNERNME1'] or 'NAT RESOURCES' in attrs['OWNERNME1'] or attrs['OWNERNME1'].startswith('CITY OF '): #'WIS-MICH POWER' in attrs['OWNERNME1'] or 'BLACK CREEK SOD' in attrs['OWNERNME1'] or attrs['OWNERNME1'].startswith('WOLF RIVER APT') or 'TIMBERLAND' in attrs['OWNERNME1'] or 'SAND VALLEY RESTORATION' in attrs['OWNERNME1'] or 'COOPERATIVE FORESTRY DIV' in attrs['OWNERNME1']  # Wisconsin
 #			return
@@ -32,6 +34,8 @@ class PrivateLandsTranslation(ogr2osm.TranslationBase):
 			tags['name'] = attrs['OWNERNME1'].strip().title()
 		if 'OWNER1' in attrs and attrs['OWNER1'].lower() != "null":
 			tags['name'] = attrs['OWNER1'].strip().title()
+		if 'NAMEKEY' in attrs and attrs['NAMEKEY'].lower() != "null":
+			tags['name'] = attrs['NAMEKEY'].strip().title()
 		if 'PSTLADRESS' in attrs and attrs['PSTLADRESS']:
 			tags['us_private_land_full_mailing_address'] = attrs['PSTLADRESS'].strip().title()
 		if 'OWN_TYPE' in attrs and attrs['OWN_TYPE']:
