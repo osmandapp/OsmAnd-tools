@@ -1,7 +1,10 @@
 package net.osmand.server.api.services;
 
 import net.osmand.NativeLibrary;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
@@ -12,7 +15,7 @@ import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
-import net.osmand.server.controllers.pub.RoutingController;
+import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +23,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static net.osmand.data.Amenity.*;
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
@@ -164,26 +166,58 @@ public class SearchService {
         }
     }
     
-    public Feature searchPoiByLatlon(LatLon loc, long osmid) throws IOException {
-        List<LatLon> bbox = new ArrayList<>();
-        bbox.add(new LatLon(loc.getLatitude() + 0.0015, loc.getLongitude() - 0.0015));
-        bbox.add(new LatLon(loc.getLatitude() - 0.0015, loc.getLongitude() + 0.0015));
+    public Feature searchPoiByOsmId(LatLon loc, long osmid) throws IOException {
+        final double SEARCH_POI_RADIUS_DEGREE = 0.0015;
+        LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
+        LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
+        List<LatLon> bbox = Arrays.asList(p1, p2);
         QuadRect searchBbox = getSearchBbox(bbox);
         
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         SearchResult res = null;
+        
+        BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+                MapUtils.get31TileNumberX(p1.getLongitude()),
+                MapUtils.get31TileNumberX(p2.getLongitude()),
+                MapUtils.get31TileNumberY(p1.getLatitude()),
+                MapUtils.get31TileNumberY(p2.getLatitude()),
+                15,
+                BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
+                new ResultMatcher<>() {
+                    @Override
+                    public boolean publish(Amenity amenity) {
+                        long id = (amenity.getId());
+                        if (id > 0) {
+                            id = id >> 1;
+                        }
+                        return id == osmid;
+                    }
+                    
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                });
+        
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
             if (!mapList.isEmpty()) {
                 usedMapList = osmAndMapsService.getReaders(mapList, null);
-                SearchUICore.SearchResultCollection resultCollection = searchAllPoiByBbox(searchBbox, usedMapList);
-                if (resultCollection != null) {
-                    List<SearchResult> searchResults = resultCollection.getCurrentSearchResults();
-                    if (!searchResults.isEmpty()) {
-                        res = searchResults.stream()
-                                .filter(r -> r != null && osmid == getOsmObjectId(r))
-                                .findAny()
-                                .orElse(null);
+                for (BinaryMapIndexReader map : usedMapList) {
+                    if (res != null) {
+                        break;
+                    }
+                    for (BinaryIndexPart indexPart : map.getIndexes()) {
+                        if (indexPart instanceof BinaryMapPoiReaderAdapter.PoiRegion) {
+                            BinaryMapPoiReaderAdapter.PoiRegion p = (BinaryMapPoiReaderAdapter.PoiRegion) indexPart;
+                            map.initCategories(p);
+                            List<Amenity> poiRes = map.searchPoi(p, req);
+                            if (!poiRes.isEmpty()) {
+                                res = new SearchResult();
+                                res.object = poiRes.get(0);
+                                break;
+                            }
+                        }
                     }
                 }
             }

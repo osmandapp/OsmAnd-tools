@@ -163,7 +163,7 @@ public class SearchController {
     public ResponseEntity<String> getPoiByCoords(@RequestParam double lat,
                                                  @RequestParam double lon,
                                                  @RequestParam long osmid) throws IOException {
-        Feature poi = searchService.searchPoiByLatlon(new LatLon(lat, lon), osmid);
+        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid);
         return ResponseEntity.ok(gson.toJson(poi));
     }
     
