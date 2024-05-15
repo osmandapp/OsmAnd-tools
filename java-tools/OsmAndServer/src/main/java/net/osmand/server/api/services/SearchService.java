@@ -455,16 +455,6 @@ public class SearchService {
         return null;
     }
     
-    private long getOsmObjectId(SearchResult result) {
-        MapObject mapObject = (MapObject) result.object;
-        Entity.EntityType type = getOsmEntityType(mapObject);
-        if (type != null) {
-            long osmId = getOsmObjectId(mapObject);
-            return getOsmObjectId(mapObject);
-        }
-        return -1;
-    }
-    
     public static long getOsmObjectId(MapObject object) {
         long originalId = -1;
         Long id = object.getId();
