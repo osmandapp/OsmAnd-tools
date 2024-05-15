@@ -7,6 +7,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.clickhouse.data.value.UnsignedLong;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -58,9 +59,16 @@ public class WikiService {
 				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon", null);
 	}
 	
+	public FeatureCollection getImagesById(long id) {
+		String query = String.format("SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon " +
+				"FROM wikigeoimages WHERE id = %d " +
+				"ORDER BY views DESC LIMIT " + LIMIT_QUERY, id);
+		return getPoiData(null, null, query, "imgLat", "imgLon", null);
+	}
+	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
 		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
-		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon "
+		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon, wvLinks "
 				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ filterQuery
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
@@ -69,15 +77,26 @@ public class WikiService {
 	}
 	
 	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon, String lang) {
-//		String northWest = "50.5900, 30.2200";
-//		String southEast = "50.2130, 30.8950";
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
-		double north = Double.parseDouble(northWest.split(",")[0]);
-		double west = Double.parseDouble(northWest.split(",")[1]);
-		double south = Double.parseDouble(southEast.split(",")[0]);
-		double east = Double.parseDouble(southEast.split(",")[1]);
+		
+		double north;
+		double south;
+		double east;
+		double west;
+		
+		if (northWest != null && southEast != null) {
+			north = Double.parseDouble(northWest.split(",")[0]);
+			west = Double.parseDouble(northWest.split(",")[1]);
+			south = Double.parseDouble(southEast.split(",")[0]);
+			east = Double.parseDouble(southEast.split(",")[1]);
+		} else {
+			east = 180.0;
+			west = -180.0;
+			north = 90.0;
+			south = -90.0;
+		}
 		RowMapper<Feature> rowMapper = new RowMapper<>() {
 			List<String> columnNames = null;
 			
@@ -120,10 +139,49 @@ public class WikiService {
 									}
 								}
 							}
+						} else if (col.equals("wvLinks")) {
+							Array array = rs.getArray(i);
+							if (array != null) {
+								Object[] wvLinks = (Object[]) array.getArray();
+								Map<Long, List<String>> result = new HashMap<>();
+								Map<Long, List<String>> enLinks = new HashMap<>();
+								Map<Long, List<String>> otherLinks = new HashMap<>();
+								for (Object linkInfo : wvLinks) {
+									if (linkInfo instanceof List) {
+										List<?> linkInfoList = (List<?>) linkInfo;
+										long tripId = ((UnsignedLong) linkInfoList.get(0)).longValue();
+										String langInArray = linkInfoList.get(1) != null ? (String) linkInfoList.get(1) : null;
+										String title = linkInfoList.get(2) != null ? (String) linkInfoList.get(2) : null;
+										String url = "https://" + langInArray + ".wikivoyage.org/wiki/" + title;
+										List<String> urlInfo = Arrays.asList(title, url);
+										if (langInArray != null) {
+											if (langInArray.equals(lang)) {
+												result.put(tripId, urlInfo);
+											} else if (langInArray.equals("en")) {
+												enLinks.put(tripId, urlInfo);
+											} else {
+												otherLinks.put(tripId, urlInfo);
+											}
+										}
+									}
+								}
+								for (Long tripId : enLinks.keySet()) {
+									result.putIfAbsent(tripId, enLinks.get(tripId));
+								}
+								for (Long tripId : otherLinks.keySet()) {
+									result.putIfAbsent(tripId, otherLinks.get(tripId));
+								}
+								if (!result.isEmpty()) {
+									f.properties.put("wvLinks", result);
+								}
+								break;
+							}
 						} else if (col.equals("wikiTitle") && !f.properties.containsKey("wikiTitle")) {
 							f.properties.put("wikiTitle", rs.getString(i));
 						} else if (col.equals("wikiDesc") && !f.properties.containsKey("wikiDesc")) {
 							f.properties.put("wikiDesc", rs.getString(i));
+						} else if (col.equals("wikiLang")) {
+							f.properties.put("wikiLang", lang);
 						} else {
 							f.properties.put(col, rs.getString(i));
 						}
@@ -136,10 +194,12 @@ public class WikiService {
 		};
 		List<Feature> stream = jdbcTemplate.query(query,
 				ps -> {
-					ps.setDouble(1, south);
-					ps.setDouble(2, north);
-					ps.setDouble(3, west);
-					ps.setDouble(4, east);
+					if (northWest != null && southEast != null) {
+						ps.setDouble(1, south);
+						ps.setDouble(2, north);
+						ps.setDouble(3, west);
+						ps.setDouble(4, east);
+					}
 				}, rowMapper);
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
 	}
