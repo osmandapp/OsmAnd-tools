@@ -274,8 +274,15 @@ public class SearchService {
         Set<String> types = mapPoiTypes.getCategories().stream()
                 .map(PoiCategory::getKeyName)
                 .collect(Collectors.toSet());
+        SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
         
-        return searchWithBbox(searchUICore, settings, searchBbox, types);
+        int attempts = 0;
+        while ((res == null || res.getCurrentSearchResults().isEmpty()) && attempts < 10) {
+            searchBbox = doubleBboxSize(searchBbox);
+            res = searchWithBbox(searchUICore, settings, searchBbox, types);
+            attempts++;
+        }
+        return res;
     }
     
     private SearchUICore.SearchResultCollection searchWithBbox(SearchUICore searchUICore, SearchSettings settings, QuadRect searchBbox, Set<String> types) {
