@@ -292,33 +292,6 @@ public class SearchService {
         return res;
     }
     
-    public SearchUICore.SearchResultCollection searchAllPoiByBbox(QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
-        if (!osmAndMapsService.validateAndInitConfig()) {
-            return null;
-        }
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-        MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
-        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
-        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
-        
-        SearchSettings settings = searchUICore.getPhrase().getSettings();
-        settings.setRegions(osmandRegions);
-        settings.setOfflineIndexes(mapList);
-        
-        Set<String> types = mapPoiTypes.getCategories().stream()
-                .map(PoiCategory::getKeyName)
-                .collect(Collectors.toSet());
-        SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
-        
-        int attempts = 0;
-        while ((res == null || res.getCurrentSearchResults().isEmpty()) && attempts < 10) {
-            searchBbox = doubleBboxSize(searchBbox);
-            res = searchWithBbox(searchUICore, settings, searchBbox, types);
-            attempts++;
-        }
-        return res;
-    }
-    
     private SearchUICore.SearchResultCollection searchWithBbox(SearchUICore searchUICore, SearchSettings settings, QuadRect searchBbox, Set<String> types) {
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
         SearchUICore.SearchResultCollection res = null;
