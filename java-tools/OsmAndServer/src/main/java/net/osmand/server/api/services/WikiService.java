@@ -68,7 +68,7 @@ public class WikiService {
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
 		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
-		String query = "SELECT * "
+		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon, wvLinks "
 				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ filterQuery
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;

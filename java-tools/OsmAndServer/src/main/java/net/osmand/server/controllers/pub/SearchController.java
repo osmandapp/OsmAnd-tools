@@ -158,9 +158,9 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(collection));
     }
     
-    @GetMapping(path = {"/get-poi-by-coords"}, produces = "application/json")
+    @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getPoiByCoords(@RequestParam double lat,
+    public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
                                                  @RequestParam double lon,
                                                  @RequestParam long osmid) throws IOException {
         Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid);
