@@ -1092,7 +1092,13 @@ public class OsmAndMapsService {
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		// setDirectionPoints(directionPointsFile).
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
-		RoutingConfiguration config =  cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
+		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
+
+		String minPointApproximationString = rp.routeParams.get("minPointApproximation");
+		if (minPointApproximationString != null) {
+			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
+		}
+
 		config.routeCalculationTime = System.currentTimeMillis();
 		final RoutingContext ctx = router.buildRoutingContext(config, rp.useNativeLib ? nativelib : null,
 				usedMapList.toArray(new BinaryMapIndexReader[0]), rp.calcMode);
