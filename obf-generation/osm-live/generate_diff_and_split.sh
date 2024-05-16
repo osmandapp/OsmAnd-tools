@@ -71,7 +71,8 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
         echo "### 3. Split files : $(date -u)"
         DATE_NAME=${BASENAME:0:8} #22_10_11
         TIME_NAME=${BASENAME:9:12} #20_30
-        $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME" --srtm="$SRTM_DIR"
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME"
+        #--srtm="$SRTM_DIR"
 
         gzip -c ${BASENAME}_diff.obf > $DATE_DIR/${BASENAME}.obf.gz
         # TESTONLY:
