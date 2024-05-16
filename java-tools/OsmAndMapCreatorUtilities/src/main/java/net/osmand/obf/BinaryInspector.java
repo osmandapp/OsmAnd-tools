@@ -100,6 +100,7 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
 //					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
+					"/Users/macmini/OsmAnd/maps/Poi_test2.obf"
 			});
 		} else {
 			in.inspector(args);

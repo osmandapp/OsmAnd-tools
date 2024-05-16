@@ -59,6 +59,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
+	private PoiData currentPoiData;
 
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
 	RelationTagsPropagation tagsTransform = new RelationTagsPropagation();
@@ -219,6 +220,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		for(String e : amenity.getAdditionalInfoKeys()) {
 			tempNames.put(e, amenity.getAdditionalInfo(e));
+		}
+		if (amenity.getBrand() != null) {
+			tempNames.put("brand", amenity.getBrand());
 		}
 		
 		StringBuilder b = new StringBuilder();
@@ -469,8 +473,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				for (PoiData poi : poiData) {
 					int x31 = poi.x;
 					int y31 = poi.y;
-					String type = poi.type;
-					String subtype = poi.subtype;
+					List<String> type = poi.types;
+					List<String> subtype = poi.subtypes;
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
@@ -487,18 +491,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				Map<PoiAdditionalType, String> mp = new HashMap<PoiAdditionalType, String>();
 				while (rset.next()) {
 					long id = rset.getLong(1);
-					int x31 = rset.getInt(2);
-					int y31 = rset.getInt(3);
-					int x24shift = (x31 >> 7) - (x << (24 - z));
-					int y24shift = (y31 >> 7) - (y << (24 - z));
-					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
-					String type = rset.getString(4);
-					String subtype = rset.getString(5);
-					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
-							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
-							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
+					if (currentPoiData == null || currentPoiData.id != id) {
+						if (currentPoiData != null) {
+							writeCurrentPoiData(writer, globalCategories, x, y, z);
+						}
+						currentPoiData = new PoiData();
+						currentPoiData.id = id;
+						currentPoiData.x = rset.getInt(2);
+						currentPoiData.y = rset.getInt(3);
+						currentPoiData.additionalTags = decodeAdditionalInfo(rset.getString(6), mp);
+					}
+					currentPoiData.types.add(rset.getString(4));
+					currentPoiData.subtypes.add(rset.getString(5));
 				}
 				rset.close();
+				//write last
+				writeCurrentPoiData(writer, globalCategories, x, y, z);
 			}
 			writer.endWritePoiData();
 		}
@@ -507,6 +515,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		writer.endWritePoiIndex();
 
+	}
+
+	private void writeCurrentPoiData(BinaryMapIndexWriter writer, PoiCreatorCategories globalCategories, int x, int y, int z) throws IOException {
+		int x31 = currentPoiData.x;
+		int y31 = currentPoiData.y;
+		List<String> type = currentPoiData.types;
+		List<String> subtype = currentPoiData.subtypes;
+		int x24shift = (x31 >> 7) - (x << (24 - z));
+		int y24shift = (y31 >> 7) - (y << (24 - z));
+		int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
+		writer.writePoiDataAtom(currentPoiData.id, x24shift, y24shift, type, subtype, currentPoiData.additionalTags,
+				globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
 	}
 
 	private PoiAdditionalType retrieveAdditionalType(String key) {
@@ -606,19 +626,32 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), 
 					namesIndex, otherNames);
 
+			long id = rs.getLong(5);
 			if (useInMemoryCreator) {
 				if (prevTree.getNode().poiData == null) {
 					prevTree.getNode().poiData = new ArrayList<PoiData>();
 				}
-				PoiData poiData = new PoiData();
-				poiData.x = x;
-				poiData.y = y;
-				poiData.type = type;
-				poiData.subtype = subtype;
-				poiData.id = rs.getLong(5);
-				poiData.additionalTags.putAll(additionalTags);
-				prevTree.getNode().poiData.add(poiData);
+				PoiData poiData;
+				boolean newPoi = currentPoiData == null || currentPoiData.id != id;
+				if (newPoi) {
+					poiData = new PoiData();
+					poiData.x = x;
+					poiData.y = y;
+					poiData.id = id;
+					poiData.additionalTags.putAll(additionalTags);
+				} else {
+					poiData = currentPoiData;
+				}
+				poiData.types.add(type);
+				poiData.subtypes.add(subtype);
 
+				if (newPoi) {
+					prevTree.getNode().poiData.add(poiData);
+				} else {
+					int i = prevTree.getNode().poiData.size() - 1;
+					prevTree.getNode().poiData.set(i, poiData);
+				}
+				currentPoiData = poiData;
 			}
 		}
 		log.info("Poi processing finished");
@@ -690,8 +723,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static class PoiData {
 		int x;
 		int y;
-		String type;
-		String subtype;
+		List<String> types = new ArrayList<>();
+		List<String> subtypes = new ArrayList<>();
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
 	}

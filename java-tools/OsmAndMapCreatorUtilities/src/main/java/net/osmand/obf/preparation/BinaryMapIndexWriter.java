@@ -1767,22 +1767,26 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift,
-			String type, String subtype, Map<PoiAdditionalType, String> additionalNames,
+			List<String> poi_types, List<String> poi_subtypes, Map<PoiAdditionalType, String> additionalNames,
 			PoiCreatorCategories globalCategories, int limitZip, int precisionXY) throws IOException {
 		checkPeekState(POI_DATA);
-		TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
 		OsmAndPoiBoxDataAtom.Builder builder = OsmandOdb.OsmAndPoiBoxDataAtom.newBuilder();
 		builder.setDx(x24shift);
 		builder.setDy(y24shift);
 		builder.setPrecisionXY(precisionXY);
-		for (int i = 0; i < types.size(); i++) {
-			int j = types.get(i);
-			builder.addCategories(j);
+		for (int k = 0; k < poi_types.size() && k < poi_subtypes.size(); k++) {
+			String type = poi_types.get(k);
+			String subtype = poi_subtypes.get(k);
+			TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
+			for (int i = 0; i < types.size(); i++) {
+				int j = types.get(i);
+				builder.addCategories(j);
+			}
 		}
 
 		builder.setId(id);
 
-		if (USE_DEPRECATED_POI_NAME_STRUCTURE) {
+		/*if (USE_DEPRECATED_POI_NAME_STRUCTURE) {
 			String name = retrieveAdditionalType("name", additionalNames);
 			if (!Algorithms.isEmpty(name)) {
 				builder.setName(name);
@@ -1811,7 +1815,7 @@ public class BinaryMapIndexWriter {
 			if (!Algorithms.isEmpty(description)) {
 				builder.setNote(description);
 			}
-		}
+		}*/
 
 		for (Map.Entry<PoiAdditionalType, String> rt : additionalNames.entrySet()) {
 			int targetPoiId = rt.getKey().getTargetId();
