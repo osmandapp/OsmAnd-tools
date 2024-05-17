@@ -125,7 +125,7 @@ public class OsmCoordinatesByTag {
 		Iterator<Entry<String, OsmLatLonId>> it = otag.coordinates.entrySet().iterator();
 		while(it.hasNext()) {
 			Entry<String, OsmLatLonId> e = it.next();
-			System.out.println(e.getValue().toString(e.getKey()));
+			System.out.println(e.getValue().toString(e.getKey()) + " " + e.getValue().lat + " " + e.getValue().lon);
 		}
 		File wikidataDb = new File(osmGz, "wikidata_osm.sqlitedb");
 		OsmandRegions or = new OsmandRegions();
@@ -133,7 +133,7 @@ public class OsmCoordinatesByTag {
 		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, otag, or, 0);
 		long testwid = 2051638;
 		StringBuilder sb;
-		if(testwid > 0) { 
+		if (testwid > 0) {
 			URL url = new URL("https://www.wikidata.org/w/api.php?action=wbgetentities&ids=Q2051638&format=json&props=labels");
 			sb = Algorithms.readFromInputStream(url.openStream());
 		} else {

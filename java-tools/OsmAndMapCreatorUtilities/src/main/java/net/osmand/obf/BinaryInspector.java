@@ -97,8 +97,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-//					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
-//					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
+					System.getProperty("maps.dir") + "Osm_wiki_map.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
