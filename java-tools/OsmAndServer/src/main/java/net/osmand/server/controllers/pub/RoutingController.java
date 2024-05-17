@@ -153,6 +153,18 @@ public class RoutingController {
 		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps",
 				approximationSection, "Use external timestamps", true); // rescuetrack only
 
+		RoutingParameter minPointApproximation = new RoutingParameter("minPointApproximation", "minPointApproximation (m)",
+				"ctx.config.minPointApproximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		List <String> values = new ArrayList<>();
+		for (int n = 0; n <= 100; n += 5) {
+			values.add(String.valueOf(n));
+		}
+		minPointApproximation.section = approximationSection;
+		minPointApproximation.values = values.toArray(new String[0]);
+		minPointApproximation.valueDescriptions = values.toArray(new String[0]);
+		int defaultMinPointApproximation = (int) new RoutingConfiguration().minPointApproximation;
+		minPointApproximation.value = String.valueOf(defaultMinPointApproximation); // do not consider xml for the web
+
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
 		// internal profiles (build-in routers)
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
@@ -161,8 +173,8 @@ public class RoutingController {
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
 				RoutingParameter routingTypes = derivedProfiles != null && "car".equals(e.getKey())
 						? selectRoutingTypeCar : selectRoutingTypeAll;
-				List<RoutingController.RoutingParameter> passParams =
-						new ArrayList<>(Arrays.asList(routingTypes, sepMaps, selectApproximationType, gpxTimestampsDisabled));
+				List<RoutingController.RoutingParameter> passParams = new ArrayList<>(Arrays.asList(
+						routingTypes, sepMaps, selectApproximationType, minPointApproximation, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
