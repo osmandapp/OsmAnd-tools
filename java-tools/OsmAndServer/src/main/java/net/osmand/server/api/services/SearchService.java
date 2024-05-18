@@ -167,7 +167,7 @@ public class SearchService {
     }
     
     public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
-        final double SEARCH_POI_RADIUS_DEGREE = type.equals("3") ? 0.0085 : 0.0001; // 3-relation,0.0085-900m,0.0001-11m
+        final double SEARCH_POI_RADIUS_DEGREE = type.equals("3") ? 0.0055 : 0.0001; // 3-relation,0.0055-600m,0.0001-11m
         final int mapZoom = 15;
         LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
         LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
