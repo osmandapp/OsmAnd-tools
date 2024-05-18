@@ -166,8 +166,9 @@ public class SearchService {
         }
     }
     
-    public Feature searchPoiByOsmId(LatLon loc, long osmid) throws IOException {
-        final double SEARCH_POI_RADIUS_DEGREE = 0.0015;
+    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
+        final double SEARCH_POI_RADIUS_DEGREE = type.equals("3") ? 0.0085 : 0.0001; // 3-relation,0.0085-900m,0.0001-11m
+        final int mapZoom = 15;
         LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
         LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
         List<LatLon> bbox = Arrays.asList(p1, p2);
@@ -181,16 +182,12 @@ public class SearchService {
                 MapUtils.get31TileNumberX(p2.getLongitude()),
                 MapUtils.get31TileNumberY(p1.getLatitude()),
                 MapUtils.get31TileNumberY(p2.getLatitude()),
-                15,
+                mapZoom,
                 BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
                 new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity amenity) {
-                        long id = (amenity.getId());
-                        if (id > 0) {
-                            id = id >> 1;
-                        }
-                        return id == osmid;
+                        return getOsmObjectId(amenity) == osmid;
                     }
                     
                     @Override
