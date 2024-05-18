@@ -128,6 +128,7 @@ public class WikiService {
 										String title = articleList.get(1) != null ? (String) articleList.get(1) : null;
 										String shortDescription = articleList.get(2) != null ? (String) articleList.get(2) : null;
 										if (langInArray.equals(lang)) {
+											f.properties.put("wikiLang", lang);
 											if (shortDescription != null) {
 												f.properties.put("wikiDesc", shortDescription);
 											}
@@ -180,8 +181,8 @@ public class WikiService {
 							f.properties.put("wikiTitle", rs.getString(i));
 						} else if (col.equals("wikiDesc") && !f.properties.containsKey("wikiDesc")) {
 							f.properties.put("wikiDesc", rs.getString(i));
-						} else if (col.equals("wikiLang")) {
-							f.properties.put("wikiLang", lang);
+						} else if (col.equals("wikiLang") && !f.properties.containsKey("wikiLang")) {
+							f.properties.put("wikiLang", rs.getString(i));
 						} else {
 							f.properties.put(col, rs.getString(i));
 						}
