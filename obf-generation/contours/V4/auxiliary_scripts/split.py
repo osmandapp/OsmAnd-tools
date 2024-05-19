@@ -15,27 +15,25 @@ from qgis.core import (
 )
 
 def main():
-	tileStartX = -180 # lon min +1 (W,E)   left
-	tileEndX = 180 # lon max +1 (W,E)     right
-	tileStartY = 84 # lat max +1 (N,S) top
-	tileEndY = 56 # lat min +1 (N,S)   bottom
-	targetBaseFolder = "/mnt/data/ArcticDEM/tiles_resized_2"
-	rasterLayer = "/mnt/data/ArcticDEM/tiles_resized/arcticdem.vrt"
+	targetBaseFolder = "/mnt/wd_2tb/lidar/split"
+	rasterLayer = "/mnt/wd_2tb/lidar/source/sonny_lidar_selected.vrt"
+
+	tileStartX = -33 # lon min +1 (W,E)   left
+	tileEndX = 36 # lon max +1 (W,E)     right
+	tileStartY = 82 # lat max +1 (N,S) top
+	tileEndY = 26 # lat min +1 (N,S)   bottom
+	bufferX = 0.000139
+	bufferY = 0.000139
 
 	stepX = 1
 	stepY = 1
-
 	width =  360
 	height = 180
-
 	iterationsX = int(width / stepX)
 	iterationsY = int(height / stepY)
 
 	print ("iterationsY " + str(iterationsY))
 	print ("iterationsX " + str(iterationsX))
-
-	bufferX = 0.000139
-	bufferY = 0.000139
 
 	j = 0
 	i = 0

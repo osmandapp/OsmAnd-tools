@@ -17,18 +17,8 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
@@ -154,6 +144,67 @@ public class OsmAndMapsService {
 
 	@Value("${tile-server.routeObf.location}")
 	String routeObfLocation;
+
+	public enum ServerRoutingTypes {
+		HH_JAVA("HH Java"),
+		HH_CPP("HH C++"),
+		ASTAR_NORMAL_JAVA("A* Normal Java"),
+		ASTAR_NORMAL_CPP("A* Normal C++"),
+		ASTAR_2PHASE_JAVA("A* 2-phase Java"),
+		ASTAR_2PHASE_CPP("A* 2-phase C++");
+		private final String description;
+		ServerRoutingTypes(String description) {
+			this.description = description;
+		}
+		public static Map<String, String> getSelectList(boolean car) {
+			Map<String, String> list = new LinkedHashMap<>();
+			for (ServerRoutingTypes type : ServerRoutingTypes.values()) {
+				if (!car && (type == ASTAR_2PHASE_JAVA || type == ASTAR_2PHASE_CPP)) {
+					continue;
+				}
+				list.put(type.name().toLowerCase(), type.description);
+			}
+			return list;
+		}
+
+		public boolean isUsingNativeLib() {
+			return this == HH_CPP || this == ASTAR_NORMAL_CPP || this == ASTAR_2PHASE_CPP;
+		}
+
+		public boolean isOldRouting() {
+			return this != HH_JAVA && this != HH_CPP;
+		}
+
+		public boolean is2phaseRouting() {
+			return this == ASTAR_2PHASE_JAVA || this == ASTAR_2PHASE_CPP;
+		}
+	}
+
+	public enum ServerApproximationTypes {
+		GEO_JAVA("Geometry-based Java"),
+		GEO_CPP("Geometry-based C++"),
+		ROUTING_JAVA("Routing-based Java"),
+		ROUTING_CPP("Routing-based C++");
+		private final String description;
+		ServerApproximationTypes(String description) {
+			this.description = description;
+		}
+		public static Map<String, String> getSelectList() {
+			Map<String, String> list = new LinkedHashMap<>();
+			for (ServerApproximationTypes type : ServerApproximationTypes.values()) {
+				list.put(type.name().toLowerCase(), type.description);
+			}
+			return list;
+		}
+
+		public boolean isGeometryBased() {
+			return this == GEO_JAVA || this == GEO_CPP;
+		}
+
+		public boolean isUsingNativeLib() {
+			return this == GEO_CPP || this == ROUTING_CPP;
+		}
+	}
 
 	public class RoutingCacheContext {
 		String profile;
@@ -916,8 +967,9 @@ public class OsmAndMapsService {
 			if (incomplete[0]) {
 				return new ArrayList<RouteSegmentResult>();
 			}
-			RoutingContext ctx = prepareRouterContext(parseRouteParameters(routeMode), router, usedMapList);
-			route = approximate(ctx, router, props, waypoints, false);
+			RouteParameters rp = parseRouteParameters(routeMode);
+			RoutingContext ctx = prepareRouterContext(rp, router, usedMapList);
+			route = approximate(ctx, router, props, waypoints, rp.useExternalTimestamps);
 		} finally {
 			unlockReaders(usedMapList);
 		}
@@ -969,7 +1021,8 @@ public class OsmAndMapsService {
 		boolean useOnlyHHRouting = false;
 		boolean useNativeApproximation = false;
 		boolean useGeometryBasedApproximation = false;
-		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB; // "nativerouting"
+		boolean useExternalTimestamps = false;
+		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
 		boolean noGlobalFile = false; // "noglobalfile"
 		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
@@ -992,26 +1045,26 @@ public class OsmAndMapsService {
 				key = p.substring(0, ind);
 				value = p.substring(ind + 1);
 			}
-			if (key.equals("nativerouting")) {
-				r.useNativeLib = Boolean.parseBoolean(value);
-			} else if (key.equals("nativeapproximation")) {
-				r.useNativeApproximation = Boolean.parseBoolean(value);
-			} else if (key.equals("geoapproximation")) {
-				r.useGeometryBasedApproximation = Boolean.parseBoolean(value);
-			} else if (key.equals("hhoff")) {
-				if (Boolean.parseBoolean(value)) {
-					r.disableHHRouting = true;
-				}
-			} else if (key.equals("hhonly")) {
-				if (Boolean.parseBoolean(value)) {
-					r.useOnlyHHRouting = true;
-				}
-			} else if (key.equals("noglobalfile")) {
-				r.noGlobalFile = true;
-			} else if (key.equals("calcmode")) {
-				if (value.length() > 0) {
-					r.calcMode = RouteCalculationMode.valueOf(value.toUpperCase());
-				}
+			if ("routing".equals(key)) {
+				ServerRoutingTypes type = value.isEmpty()
+						? ServerRoutingTypes.HH_JAVA // default
+						: ServerRoutingTypes.valueOf(value.toUpperCase());
+				r.disableHHRouting = type.isOldRouting();
+				r.useNativeLib = type.isUsingNativeLib();
+				r.calcMode = type.is2phaseRouting() ? RouteCalculationMode.COMPLEX : RouteCalculationMode.NORMAL;
+			} else if ("approximation".equals(key)) {
+				ServerApproximationTypes type = value.isEmpty()
+						? ServerApproximationTypes.GEO_JAVA // default
+						: ServerApproximationTypes.valueOf(value.toUpperCase());
+				r.useGeometryBasedApproximation = type.isGeometryBased();
+				r.useNativeApproximation = type.isUsingNativeLib();
+				r.useNativeLib = type.isUsingNativeLib();
+			} else if ("noglobalfile".equals(key)) {
+				r.noGlobalFile = Boolean.parseBoolean(value);
+			} else if ("hhonly".equals(key)) {
+				r.useOnlyHHRouting = Boolean.parseBoolean(value);
+			} else if ("gpxtimestamps".equals(key)) {
+				r.useExternalTimestamps = Boolean.parseBoolean(value);
 			} else {
 				r.routeParams.put(key, value);
 			}
@@ -1039,7 +1092,13 @@ public class OsmAndMapsService {
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		// setDirectionPoints(directionPointsFile).
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
-		RoutingConfiguration config =  cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
+		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
+
+		String minPointApproximationString = rp.routeParams.get("minPointApproximation");
+		if (minPointApproximationString != null) {
+			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
+		}
+
 		config.routeCalculationTime = System.currentTimeMillis();
 		final RoutingContext ctx = router.buildRoutingContext(config, rp.useNativeLib ? nativelib : null,
 				usedMapList.toArray(new BinaryMapIndexReader[0]), rp.calcMode);
@@ -1050,14 +1109,15 @@ public class OsmAndMapsService {
 	@Nullable
 	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                               LatLon start, LatLon end, List<LatLon> intermediates)
+	                                               LatLon start, LatLon end, List<LatLon> intermediates,
+	                                               boolean useExternalTimestamps)
 			throws IOException, InterruptedException {
 
 		// OSRM by type, all others treated as "rescuetrack"
 		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
 			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
 		} else {
-			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end);
+			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end, useExternalTimestamps);
 		}
 	}
 
@@ -1110,7 +1170,7 @@ public class OsmAndMapsService {
 
 	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                               LatLon start, LatLon end)
+	                                               LatLon start, LatLon end, boolean useExternalTimestamps)
 			throws IOException, InterruptedException {
 
 		List<RouteSegmentResult> routeRes;
@@ -1130,7 +1190,7 @@ public class OsmAndMapsService {
 		String gpx = restTemplate.getForObject(url.toString(), String.class);
 		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
 		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		routeRes = approximate(ctx, router, props, trkSegment.points, true);
+		routeRes = approximate(ctx, router, props, trkSegment.points, useExternalTimestamps);
 		return routeRes;
 	}
 
@@ -1174,7 +1234,8 @@ public class OsmAndMapsService {
 			ctx.routingTime = 0;
 			ctx.calculationProgress = progress;
 			if (rp.onlineRouting != null) {
-				routeRes = onlineRouting(rp.onlineRouting, ctx, router, props, start, end, intermediates);
+				routeRes = onlineRouting(rp.onlineRouting, ctx, router, props, start, end, intermediates,
+						rp.useExternalTimestamps);
 			} else {
 				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
 						: router.searchRoute(ctx, start, end, intermediates, null);

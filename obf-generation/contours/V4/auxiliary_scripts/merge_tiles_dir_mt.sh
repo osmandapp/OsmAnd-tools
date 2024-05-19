@@ -15,7 +15,7 @@ merge()
 	filename=$(basename $1)
 	if [[ ! -f "$outdir/$filename" ]] ; then
 		echo $filename
-		gdal_merge.py -of GTiff -co COMPRESS=LZW -co PREDICTOR=1 -o "$outdir/$filename" "$indir2/$filename" "$indir1/$filename"
+		gdal_merge.py -of GTiff -co COMPRESS=LZW -co PREDICTOR=2 -o "$outdir/$filename" "$indir2/$filename" "$indir1/$filename"
 	fi
 }
 export -f merge

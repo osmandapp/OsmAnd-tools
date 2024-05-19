@@ -1,28 +1,28 @@
 package net.osmand.server.api.services;
 
 import net.osmand.NativeLibrary;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.PoiCategory;
-import net.osmand.osm.PoiFilter;
-import net.osmand.osm.PoiType;
+import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
-import net.osmand.server.controllers.pub.RoutingController;
+import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
-import static net.osmand.data.Amenity.*;
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
@@ -87,6 +87,15 @@ public class SearchService {
             }
             return bbox;
         }
+    }
+    
+    public List<LatLon> getBboxCoords(List<String> coords) {
+        List<LatLon> bbox = new ArrayList<>();
+        for (String coord : coords) {
+            String[] lanLonArr = coord.split(",");
+            bbox.add(new LatLon(Double.parseDouble(lanLonArr[0]), Double.parseDouble(lanLonArr[1])));
+        }
+        return bbox;
     }
     
     public List<SearchResult> search(double lat, double lon, String text) throws IOException {
@@ -157,6 +166,67 @@ public class SearchService {
         }
     }
     
+    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
+        final double SEARCH_POI_RADIUS_DEGREE = type.equals("3") ? 0.0055 : 0.0001; // 3-relation,0.0055-600m,0.0001-11m
+        final int mapZoom = 15;
+        LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
+        LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
+        List<LatLon> bbox = Arrays.asList(p1, p2);
+        QuadRect searchBbox = getSearchBbox(bbox);
+        
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+        SearchResult res = null;
+        
+        BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+                MapUtils.get31TileNumberX(p1.getLongitude()),
+                MapUtils.get31TileNumberX(p2.getLongitude()),
+                MapUtils.get31TileNumberY(p1.getLatitude()),
+                MapUtils.get31TileNumberY(p2.getLatitude()),
+                mapZoom,
+                BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
+                new ResultMatcher<>() {
+                    @Override
+                    public boolean publish(Amenity amenity) {
+                        return getOsmObjectId(amenity) == osmid;
+                    }
+                    
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                });
+        
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
+            if (!mapList.isEmpty()) {
+                usedMapList = osmAndMapsService.getReaders(mapList, null);
+                for (BinaryMapIndexReader map : usedMapList) {
+                    if (res != null) {
+                        break;
+                    }
+                    for (BinaryIndexPart indexPart : map.getIndexes()) {
+                        if (indexPart instanceof BinaryMapPoiReaderAdapter.PoiRegion) {
+                            BinaryMapPoiReaderAdapter.PoiRegion p = (BinaryMapPoiReaderAdapter.PoiRegion) indexPart;
+                            map.initCategories(p);
+                            List<Amenity> poiRes = map.searchPoi(p, req);
+                            if (!poiRes.isEmpty()) {
+                                res = new SearchResult();
+                                res.object = poiRes.get(0);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(usedMapList);
+        }
+        if (res != null) {
+            return getPoiFeature(res);
+        }
+        return null;
+    }
+    
     private boolean isContainsBbox(SearchService.PoiSearchData data) {
         QuadRect searchBbox = getSearchBbox(data.bbox);
         QuadRect oldSearchBbox = getSearchBbox(data.savedBbox);
@@ -223,6 +293,7 @@ public class SearchService {
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
         SearchUICore.SearchResultCollection res = null;
         for (String type : types) {
+            type = type.replace("_", " ");
             if (res == null) {
                 res = searchUICore.immediateSearch(type, null);
             } else {
@@ -326,32 +397,37 @@ public class SearchService {
         return tags;
     }
     
-    private void saveSearchResult(List<SearchResult> res, List<Feature> features) throws IOException, InterruptedException {
+    private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
         for (SearchResult result : res) {
             if (result.objectType == ObjectType.POI) {
-                Amenity amenity = (Amenity) result.object;
-                PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-                Feature feature;
-                if (poiType != null) {
-                    feature = new Feature(Geometry.point(amenity.getLocation()))
-                            .prop("web_poi_id", amenity.getId())
-                            .prop("web_poi_name", amenity.getName())
-                            .prop("web_poi_color", amenity.getColor())
-                            .prop("web_poi_iconKeyName", poiType.getIconKeyName())
-                            .prop("web_poi_typeOsmTag", poiType.getOsmTag())
-                            .prop("web_poi_typeOsmValue", poiType.getOsmValue())
-                            .prop("web_poi_iconName", getIconName(poiType))
-                            .prop("web_poi_type", amenity.getType().getKeyName())
-                            .prop("web_poi_subType", amenity.getSubType())
-                            .prop("web_poi_osmUrl", getOsmUrl(result));
-                    Map<String, String> tags = amenity.getAmenityExtensions();
-                    for (Map.Entry<String, String> entry : tags.entrySet()) {
-                        feature.prop(entry.getKey(), entry.getValue());
-                    }
-                    features.add(feature);
-                }
+                Feature feature = getPoiFeature(result);
+                features.add(feature);
             }
         }
+    }
+    
+    private Feature getPoiFeature(SearchResult result) {
+        Amenity amenity = (Amenity) result.object;
+        PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+        Feature feature = null;
+        if (poiType != null) {
+            feature = new Feature(Geometry.point(amenity.getLocation()))
+                    .prop("web_poi_id", amenity.getId())
+                    .prop("web_poi_name", amenity.getName())
+                    .prop("web_poi_color", amenity.getColor())
+                    .prop("web_poi_iconKeyName", poiType.getIconKeyName())
+                    .prop("web_poi_typeOsmTag", poiType.getOsmTag())
+                    .prop("web_poi_typeOsmValue", poiType.getOsmValue())
+                    .prop("web_poi_iconName", getIconName(poiType))
+                    .prop("web_poi_type", amenity.getType().getKeyName())
+                    .prop("web_poi_subType", amenity.getSubType())
+                    .prop("web_poi_osmUrl", getOsmUrl(result));
+            Map<String, String> tags = amenity.getAmenityExtensions();
+            for (Map.Entry<String, String> entry : tags.entrySet()) {
+                feature.prop(entry.getKey(), entry.getValue());
+            }
+        }
+        return feature;
     }
     
     public String getPoiAddress(LatLon location) throws IOException, InterruptedException {

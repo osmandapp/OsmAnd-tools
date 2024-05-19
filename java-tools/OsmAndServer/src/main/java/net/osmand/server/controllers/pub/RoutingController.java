@@ -112,44 +112,70 @@ public class RoutingController {
 			this.group = group;
 		}
 
+		public void fillSelectList(String section, Map<String, String> list) {
+			this.section = section;
+			this.values = new String[list.size()];
+			this.valueDescriptions = new String[list.size()];
+			int i = 0;
+			for (String key : list.keySet()) {
+				if (i == 0) {
+					this.value = key; // default
+				}
+				this.values[i] = key;
+				this.valueDescriptions[i] = list.get(key);
+				i++;
+			}
+		}
 	}
 
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
-//		RoutingParameter applyApproximation = new RoutingParameter("applyapproximation", "",
-//				"Attach to roads (OsmAnd)", true);
-		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
-				"[Dev] Disable HH routing", false);
-		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
-				"[Dev] Use C++ for routing", false);
-		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development",
-				"[Dev] Use C++ approximation", false);
-		RoutingParameter geoApprox = new RoutingParameter("geoapproximation", "Development",
-				"[Dev] Use geo-based approximation", false);
-		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", "Development",
-				"[Dev] Use separate maps", false);
 
-		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
-				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		calcMode.section = "Development";
-		calcMode.value = "";
-		calcMode.valueDescriptions = new String[] {"Optimal", "Basic", "Slow"};
-		calcMode.values = new String[] { RouteCalculationMode.COMPLEX.name(), RouteCalculationMode.BASE.name(),
-				RouteCalculationMode.NORMAL.name()
-		};
+		final String routingSection = "Routing (devel)";
+		final String approximationSection = "Approximation (devel)";
+
+		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", routingSection, "Use separate maps", false);
+
+		RoutingParameter selectRoutingTypeCar = new RoutingParameter("routing", "Routing type",
+				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		RoutingParameter selectRoutingTypeAll = new RoutingParameter("routing", "Routing type",
+				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectRoutingTypeCar.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(true));
+		selectRoutingTypeAll.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(false));
+
+		RoutingParameter selectApproximationType = new RoutingParameter("approximation", "GPX approximation type",
+				"Algorithm and library for approximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectApproximationType.fillSelectList(approximationSection, OsmAndMapsService.ServerApproximationTypes.getSelectList());
+
+		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps",
+				approximationSection, "Use GPX timestamps", false);
+		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps",
+				approximationSection, "Use external timestamps", true); // rescuetrack only
+
+		RoutingParameter minPointApproximation = new RoutingParameter("minPointApproximation", "minPointApproximation (m)",
+				"ctx.config.minPointApproximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		List <String> values = new ArrayList<>();
+		for (int n = 0; n <= 100; n += 5) {
+			values.add(String.valueOf(n));
+		}
+		minPointApproximation.section = approximationSection;
+		minPointApproximation.values = values.toArray(new String[0]);
+		minPointApproximation.valueDescriptions = values.toArray(new String[0]);
+		int defaultMinPointApproximation = (int) new RoutingConfiguration().minPointApproximation;
+		minPointApproximation.value = String.valueOf(defaultMinPointApproximation); // do not consider xml for the web
+
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
 		// internal profiles (build-in routers)
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
-				List<RoutingController.RoutingParameter> passParams =
-						new ArrayList<>(Arrays.asList(sepMaps, hhRouting, nativeRouting, nativeTrack, geoApprox));
+				RoutingParameter routingTypes = derivedProfiles != null && "car".equals(e.getKey())
+						? selectRoutingTypeCar : selectRoutingTypeAll;
+				List<RoutingController.RoutingParameter> passParams = new ArrayList<>(Arrays.asList(
+						routingTypes, sepMaps, selectApproximationType, minPointApproximation, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
-					if ("car".equals(e.getKey())) {
-						passParams.add(calcMode); // only for car & derived from car
-					}
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
@@ -169,7 +195,14 @@ public class RoutingController {
 
 			// reuse previously filled params using profile as key
 			if (rs.profile != null && routers.get(rs.profile) != null) {
-				routers.get(rs.profile).params.forEach((key, val) -> rm.params.put(key, val));
+				routers.get(rs.profile).params.forEach((key, val) -> {
+							if ("gpxtimestamps".equals(key) && rs.name.startsWith("rescuetrack")) {
+								rm.params.put(key, gpxTimestampsEnabled);
+							} else {
+								rm.params.put(key, val);
+							}
+						}
+				);
 			}
 
 			routers.put(rm.key, rm);

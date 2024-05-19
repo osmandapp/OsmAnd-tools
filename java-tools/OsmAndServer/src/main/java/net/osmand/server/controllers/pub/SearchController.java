@@ -2,10 +2,7 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -158,6 +155,23 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> getWikiImages(@RequestParam String northWest, @RequestParam String southEast) {
         FeatureCollection collection = wikiService.getImages(northWest, southEast);
+        return ResponseEntity.ok(gson.toJson(collection));
+    }
+    
+    @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
+                                                 @RequestParam double lon,
+                                                 @RequestParam long osmid,
+                                                @RequestParam String type) throws IOException {
+        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type);
+        return ResponseEntity.ok(gson.toJson(poi));
+    }
+    
+    @GetMapping(path = {"/get-wiki-photos"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getWikiPhotosById(@RequestParam long id) {
+        FeatureCollection collection = wikiService.getImagesById(id);
         return ResponseEntity.ok(gson.toJson(collection));
     }
 }
