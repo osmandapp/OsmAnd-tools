@@ -83,9 +83,9 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
-//					"-vmap",// "-vmapobjects",
-//					"-vmapcoordinates",
+//					"-vpoi",
+					"-vmap", "-vmapobjects",
+					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
@@ -97,7 +97,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Osm_wiki_map.obf"
+//					System.getProperty("maps.dir") + "Osm_wiki_map.obf"
+					"/Users/victorshcherb/Downloads/livebak/Hungary_europe_24_05_16.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

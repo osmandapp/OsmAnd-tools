@@ -1,11 +1,11 @@
 package net.osmand.swing;
 
-import static net.osmand.router.RouteColorize.DARK_GREY;
-import static net.osmand.router.RouteColorize.GREEN;
-import static net.osmand.router.RouteColorize.LIGHT_GREY;
-import static net.osmand.router.RouteColorize.RED;
-import static net.osmand.router.RouteColorize.SLOPE_PALETTE;
-import static net.osmand.router.RouteColorize.YELLOW;
+import static net.osmand.ColorPalette.DARK_GREY;
+import static net.osmand.ColorPalette.GREEN;
+import static net.osmand.ColorPalette.LIGHT_GREY;
+import static net.osmand.ColorPalette.RED;
+import static net.osmand.ColorPalette.SLOPE_PALETTE;
+import static net.osmand.ColorPalette.YELLOW;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
