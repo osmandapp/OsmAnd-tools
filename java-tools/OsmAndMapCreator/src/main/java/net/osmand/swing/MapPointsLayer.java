@@ -1,11 +1,8 @@
 package net.osmand.swing;
 
 import static net.osmand.ColorPalette.DARK_GREY;
-import static net.osmand.ColorPalette.GREEN;
 import static net.osmand.ColorPalette.LIGHT_GREY;
-import static net.osmand.ColorPalette.RED;
 import static net.osmand.ColorPalette.SLOPE_PALETTE;
-import static net.osmand.ColorPalette.YELLOW;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -22,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.osmand.ColorPalette;
 import net.osmand.data.DataTileManager;
 import net.osmand.gpx.GPXFile;
 import net.osmand.osm.edit.Entity;
@@ -299,17 +297,16 @@ public class MapPointsLayer implements MapPanelLayer {
 			return;
 		}
 
-		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType);
-		double[][] palette;
+		
+		ColorPalette palette;
 		if (isGrey) {
-			palette = new double[][]{{routeColorize.minValue, LIGHT_GREY}, {routeColorize.maxValue, DARK_GREY}};
+			palette = ColorPalette.parsePalette(new double[][] { { 0, LIGHT_GREY }, { 1, DARK_GREY } });
+		} else if (colorizationType == ColorizationType.SLOPE) {
+			palette = SLOPE_PALETTE;
 		} else {
-			if (colorizationType == ColorizationType.SLOPE) {
-				palette = SLOPE_PALETTE;
-			} else {
-				palette = new double[][]{{routeColorize.minValue, GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, YELLOW}, {routeColorize.maxValue, RED}};
-			}
+			palette = ColorPalette.MIN_MAX_PALETTE;
 		}
+		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType, palette);
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		routeColorize.setPalette(palette);
