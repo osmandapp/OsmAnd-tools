@@ -100,7 +100,6 @@ public class OsmAndMapsService {
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 	private static final int ZOOM_EN_PREFERRED_LANG = 6;
 
-	private static final boolean DEFAULT_USE_ROUTING_NATIVE_LIB = false;
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
@@ -920,7 +919,7 @@ public class OsmAndMapsService {
 				return Collections.emptyList();
 			}
 			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-			RoutingContext ctx = prepareRouterContext(new RouteParameters("geocoding"), router, usedMapList);
+			RoutingContext ctx = prepareRouterContext(new RouteParameters("geocoding"), router, usedMapList, false);
 			GeocodingUtilities su = new GeocodingUtilities();
 			List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
 			complete = su.sortGeocodingResults(usedMapList, res);
@@ -968,7 +967,7 @@ public class OsmAndMapsService {
 				return new ArrayList<RouteSegmentResult>();
 			}
 			RouteParameters rp = parseRouteParameters(routeMode);
-			RoutingContext ctx = prepareRouterContext(rp, router, usedMapList);
+			RoutingContext ctx = prepareRouterContext(rp, router, usedMapList, true);
 			route = approximate(ctx, router, props, waypoints, rp.useExternalTimestamps);
 		} finally {
 			unlockReaders(usedMapList);
@@ -1022,7 +1021,7 @@ public class OsmAndMapsService {
 		boolean useNativeApproximation = false;
 		boolean useGeometryBasedApproximation = false;
 		boolean useExternalTimestamps = false;
-		boolean useNativeLib = DEFAULT_USE_ROUTING_NATIVE_LIB;
+		boolean useNativeRouting = false;
 		boolean noGlobalFile = false; // "noglobalfile"
 		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
@@ -1050,7 +1049,7 @@ public class OsmAndMapsService {
 						? ServerRoutingTypes.HH_JAVA // default
 						: ServerRoutingTypes.valueOf(value.toUpperCase());
 				r.disableHHRouting = type.isOldRouting();
-				r.useNativeLib = type.isUsingNativeLib();
+				r.useNativeRouting = type.isUsingNativeLib();
 				r.calcMode = type.is2phaseRouting() ? RouteCalculationMode.COMPLEX : RouteCalculationMode.NORMAL;
 			} else if ("approximation".equals(key)) {
 				ServerApproximationTypes type = value.isEmpty()
@@ -1058,7 +1057,6 @@ public class OsmAndMapsService {
 						: ServerApproximationTypes.valueOf(value.toUpperCase());
 				r.useGeometryBasedApproximation = type.isGeometryBased();
 				r.useNativeApproximation = type.isUsingNativeLib();
-				r.useNativeLib = type.isUsingNativeLib();
 			} else if ("noglobalfile".equals(key)) {
 				r.noGlobalFile = Boolean.parseBoolean(value);
 			} else if ("hhonly".equals(key)) {
@@ -1078,29 +1076,40 @@ public class OsmAndMapsService {
 		return r;
 	}
 
-	private RoutingContext prepareRouterContext(RouteParameters rp, RoutePlannerFrontEnd router, List<BinaryMapIndexReader> usedMapList) throws IOException, InterruptedException {
-		if (rp.disableHHRouting) {
-			router.disableHHRoutingConfig();
+	private RoutingContext prepareRouterContext(RouteParameters rp, RoutePlannerFrontEnd router,
+	                                            List<BinaryMapIndexReader> usedMapList,
+	                                            boolean approximation) throws IOException, InterruptedException {
+		boolean useNativeLib;
+
+		if (approximation) {
+			useNativeLib = rp.useNativeApproximation;
+			router.setUseNativeApproximation(rp.useNativeApproximation);
+			router.setUseGeometryBasedApproximation(rp.useGeometryBasedApproximation);
 		} else {
-			router.setHHRouteCpp(rp.useNativeLib);
-			router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
-			router.setDefaultHHRoutingConfig();
+			useNativeLib = rp.useNativeRouting;
+			router.CALCULATE_MISSING_MAPS = false;
+			if (rp.disableHHRouting) {
+				router.disableHHRoutingConfig();
+			} else {
+				router.setHHRouteCpp(rp.useNativeRouting);
+				router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+				router.setDefaultHHRoutingConfig();
+			}
 		}
-		router.CALCULATE_MISSING_MAPS = false;
-		router.setUseNativeApproximation(rp.useNativeApproximation);
-		router.setUseGeometryBasedApproximation(rp.useGeometryBasedApproximation);
+
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
-		// setDirectionPoints(directionPointsFile).
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
 
-		String minPointApproximationString = rp.routeParams.get("minPointApproximation");
-		if (minPointApproximationString != null) {
-			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
+		if (approximation) {
+			String minPointApproximationString = rp.routeParams.get("minPointApproximation");
+			if (minPointApproximationString != null) {
+				config.minPointApproximation = Float.parseFloat(minPointApproximationString);
+			}
 		}
 
 		config.routeCalculationTime = System.currentTimeMillis();
-		final RoutingContext ctx = router.buildRoutingContext(config, rp.useNativeLib ? nativelib : null,
+		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
 				usedMapList.toArray(new BinaryMapIndexReader[0]), rp.calcMode);
 		ctx.leftSideNavigation = false;
 		return ctx;
@@ -1220,7 +1229,7 @@ public class OsmAndMapsService {
 				if (incomplete[0]) {
 					return Collections.emptyList();
 				}
-				ctx = prepareRouterContext(rp, router, usedMapList);
+				ctx = prepareRouterContext(rp, router, usedMapList, false);
 			}
 			HashSet<Long> impassableRoads = new HashSet<>();
 			for (String s : avoidRoadsIds) {
@@ -1254,7 +1263,7 @@ public class OsmAndMapsService {
 		if (routeObfLocation == null || routeObfLocation.length() == 0) {
 			return null;
 		}
-		if (rp.useNativeLib || rp.useNativeApproximation || rp.noGlobalFile || rp.calcMode != null) {
+		if (rp.useNativeRouting || rp.useNativeApproximation || rp.noGlobalFile || rp.calcMode != null) {
 			return null;
 		}
 		RoutingCacheContext cache = lockRoutingCache(router, rp);
@@ -1309,7 +1318,7 @@ public class OsmAndMapsService {
 				if (rp.disableHHRouting) {
 					router.disableHHRoutingConfig();
 				} else {
-					router.setHHRouteCpp(rp.useNativeLib);
+					router.setHHRouteCpp(rp.useNativeRouting);
 					router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
 					router.setHHRoutingConfig(best.hhConfig); // after prepare
 				}
@@ -1348,7 +1357,7 @@ public class OsmAndMapsService {
 		}
 		BinaryMapIndexReader reader = cache.getReader(target, true);
 		cache.writeToFile(targetIndex);
-		cs.rCtx = prepareRouterContext(rp, router, Collections.singletonList(reader));
+		cs.rCtx = prepareRouterContext(rp, router, Collections.singletonList(reader), false);
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
 		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", cs.profile,
 				cs.routeParamsStr, sameProfileSize + 1);
