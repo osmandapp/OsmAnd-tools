@@ -1078,34 +1078,33 @@ public class OsmAndMapsService {
 
 	private RoutingContext prepareRouterContext(RouteParameters rp, RoutePlannerFrontEnd router,
 	                                            List<BinaryMapIndexReader> usedMapList,
-	                                            boolean approximation) throws IOException, InterruptedException {
-		boolean useNativeLib;
+	                                            boolean approximation) throws IOException, InterruptedException
+	{
+		boolean useNativeLib = approximation ? rp.useNativeApproximation : rp.useNativeRouting;
 
-		if (approximation) {
-			useNativeLib = rp.useNativeApproximation;
-			router.setUseNativeApproximation(rp.useNativeApproximation);
-			router.setUseGeometryBasedApproximation(rp.useGeometryBasedApproximation);
+		if (rp.onlineRouting != null && rp.useNativeApproximation) {
+			useNativeLib = true; // rescuetrack + approximation
+		}
+
+		router.setUseNativeApproximation(rp.useNativeApproximation);
+		router.setUseGeometryBasedApproximation(rp.useGeometryBasedApproximation);
+
+		router.CALCULATE_MISSING_MAPS = false;
+		if (rp.disableHHRouting) {
+			router.disableHHRoutingConfig();
 		} else {
-			useNativeLib = rp.useNativeRouting;
-			router.CALCULATE_MISSING_MAPS = false;
-			if (rp.disableHHRouting) {
-				router.disableHHRoutingConfig();
-			} else {
-				router.setHHRouteCpp(rp.useNativeRouting);
-				router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
-				router.setDefaultHHRoutingConfig();
-			}
+			router.setHHRouteCpp(rp.useNativeRouting);
+			router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+			router.setDefaultHHRoutingConfig();
 		}
 
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
 
-		if (approximation) {
-			String minPointApproximationString = rp.routeParams.get("minPointApproximation");
-			if (minPointApproximationString != null) {
-				config.minPointApproximation = Float.parseFloat(minPointApproximationString);
-			}
+		String minPointApproximationString = rp.routeParams.get("minPointApproximation");
+		if (minPointApproximationString != null) {
+			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
 		}
 
 		config.routeCalculationTime = System.currentTimeMillis();
