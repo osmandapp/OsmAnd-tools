@@ -66,8 +66,9 @@ class RandomRouteGenerator {
 								if (entry.profile.equals(param)) {
 									continue; // /profile/,param1,param2 -> param1,param2 (ignore profile in params)
 								}
-								if (param.startsWith("hhoff") || param.startsWith("hhonly") || param.startsWith("nativerouting") ||
-										param.startsWith("calcmode") || param.startsWith("noglobalfile")) {
+								if (param.startsWith("hhoff") || param.startsWith("hhonly") ||
+										param.startsWith("nativerouting") || param.startsWith("calcmode") ||
+										param.startsWith("noglobalfile") || param.startsWith("routing")) {
 									continue; // do not use mode-specific or web-specific params from url
 								}
 								entry.params.add(param);
