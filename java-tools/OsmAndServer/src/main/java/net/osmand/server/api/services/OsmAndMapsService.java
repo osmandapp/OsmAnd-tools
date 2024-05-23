@@ -99,7 +99,7 @@ public class OsmAndMapsService {
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 	private static final int ZOOM_EN_PREFERRED_LANG = 6;
 
-	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
+	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 32; // 32 = 8192 MB
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
 
