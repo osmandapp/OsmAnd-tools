@@ -399,7 +399,7 @@ public class EmailSenderTemplate {
 		private SendGrid sendGridClient;
 		private final int STATUS_CODE_ERROR = 500;
 		private final int STATUS_CODE_SENT = 202; // success code 202 comes originally from SendGrid
-		private final String SENDGRID_ENFORCED = ".*(@hotmail|@outlook|@live|@msn|@windowslive).*"; // temporarily
+		private final String SENDGRID_ENFORCED = null; // ".*(@hotmail|@outlook|@live|@msn|@windowslive).*"; // temporarily
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
 			this.smtpServer = smtpServer;
