@@ -35,7 +35,7 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.travel.WikivoyageLangPreparation.WikivoyageOSMTags;
+import net.osmand.wiki.WikivoyageOSMTags;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 

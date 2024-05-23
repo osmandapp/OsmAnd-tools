@@ -37,6 +37,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import net.osmand.wiki.WikivoyageOSMTags;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -92,28 +93,6 @@ public class WikivoyageLangPreparation {
 	}
 	private static final boolean DEBUG = false;
 	private static final String SUFFIX_EN_REDIRECT = "en:";
-	public enum WikivoyageOSMTags {
-		TAG_WIKIDATA ("wikidata"),
-		TAG_WIKIPEDIA ("wikipedia"),
-		TAG_OPENING_HOURS ("opening_hours"),
-		TAG_ADDRESS ("address"),
-		TAG_EMAIL ("email"),
-		TAG_FAX ("fax"),
-		TAG_DIRECTIONS ("directions"),
-		TAG_PRICE ("price"),
-		TAG_PHONE ("phone");
-
-		private final String tg;
-
-		private WikivoyageOSMTags(String tg) {
-			this.tg = tg;
-		}
-		
-		public String tag() {
-			return tg;
-		}
-	}
-	
 	public static final String EMAIL = "Email";
 	public static final String DIRECTIONS = "Directions";
 	public static final String WORKING_HOURS = "Working hours";
