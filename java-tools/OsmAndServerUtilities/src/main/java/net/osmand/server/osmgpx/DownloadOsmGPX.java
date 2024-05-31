@@ -123,7 +123,6 @@ public class DownloadOsmGPX {
 	private PreparedStatementWrapper[] preparedStatements = new PreparedStatementWrapper[PS_INSERT_GPX_DETAILS + 1];
 	
 	public DownloadOsmGPX() throws SQLException {
-		setupAccessToken();
 		initDBConnection();
 	}
 	
@@ -683,6 +682,7 @@ public class DownloadOsmGPX {
 	private HttpsURLConnection getHttpConnection(String url, int retry)
 			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException, OAuthMessageSignerException, OAuthExpectationFailedException, OAuthCommunicationException {
 		HttpsURLConnection con;
+		setupAccessToken();
 		try {
 			if (!sslInit) {
 				SSLContext ctx = SSLContext.getInstance("TLS");
@@ -821,7 +821,7 @@ public class DownloadOsmGPX {
 	private static void setupAccessToken() {
 		accessToken = System.getenv(ENV_OAUTH2_ACCESS_TOKEN); // unset this ENV if the token is dead
 		if (accessToken != null) {
-			System.err.println("Using " + ENV_OAUTH2_ACCESS_TOKEN + " for API requests");
+			// System.err.println("Using " + ENV_OAUTH2_ACCESS_TOKEN + " for API requests");
 			return; // success
 		}
 
@@ -896,5 +896,6 @@ public class DownloadOsmGPX {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+		// return; never reached (setup process always throws an exception)
 	}
 }
