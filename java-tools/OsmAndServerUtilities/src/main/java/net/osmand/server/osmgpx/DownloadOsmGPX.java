@@ -87,7 +87,6 @@ public class DownloadOsmGPX {
 	protected static final Log LOG = PlatformUtil.getLog(DownloadOsmGPX.class);
 	private static final String MAIN_GPX_API_ENDPOINT = "https://api.openstreetmap.org/api/0.6/gpx/";
 
-	private static String accessToken;
 	private static final String ENV_OAUTH2_AUTH_CODE = "OSM_OAUTH2_AUTH_CODE"; // setup-only
 	private static final String ENV_OAUTH2_CLIENT_ID = "OSM_OAUTH2_CLIENT_ID"; // setup-only
 	private static final String ENV_OAUTH2_CLIENT_SECRET = "OSM_OAUTH2_CLIENT_SECRET"; // setup-only
@@ -682,7 +681,6 @@ public class DownloadOsmGPX {
 	private HttpsURLConnection getHttpConnection(String url, int retry)
 			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException, OAuthMessageSignerException, OAuthExpectationFailedException, OAuthCommunicationException {
 		HttpsURLConnection con;
-		setupAccessToken();
 		try {
 			if (!sslInit) {
 				SSLContext ctx = SSLContext.getInstance("TLS");
@@ -707,6 +705,7 @@ public class DownloadOsmGPX {
 			con = (HttpsURLConnection) new URL(url).openConnection();
 
 			con.setConnectTimeout(HTTP_TIMEOUT);
+			String accessToken = setupAccessToken();
 			con.setRequestProperty("Authorization", "Bearer" + " " + accessToken); // oauth2
 
 			con.setHostnameVerifier(new HostnameVerifier() {
@@ -818,11 +817,11 @@ public class DownloadOsmGPX {
 		return vl == null || vl.equals("");
 	}
 
-	private static void setupAccessToken() {
-		accessToken = System.getenv(ENV_OAUTH2_ACCESS_TOKEN); // unset this ENV if the token is dead
+	private static String setupAccessToken() {
+		String accessToken = System.getenv(ENV_OAUTH2_ACCESS_TOKEN); // unset this ENV if the token is dead
 		if (accessToken != null) {
 			// System.err.println("Using " + ENV_OAUTH2_ACCESS_TOKEN + " for API requests");
-			return; // success
+			return accessToken; // success
 		}
 
 		final String APPLICATIONS_URL = "https://www.openstreetmap.org/oauth2/applications"; // manual
@@ -844,7 +843,8 @@ public class DownloadOsmGPX {
 				ENV_OAUTH2_CLIENT_ID, ENV_OAUTH2_CLIENT_SECRET, APPLICATIONS_URL, REDIRECT_INTERNAL, SCOPE);
 
 		if (clientId == null || clientSecret == null) {
-			throw new RuntimeException(errorClientIdSecret);
+			System.err.println(errorClientIdSecret);
+			System.exit(1);
 		}
 
 		final String errorAuthCode = String.format("\n\n" +
@@ -856,7 +856,8 @@ public class DownloadOsmGPX {
 				ENV_OAUTH2_AUTH_CODE, AUTHORIZE_URL, clientId, URLEncoder.encode(REDIRECT_INTERNAL), SCOPE);
 
 		if (authCode == null) {
-			throw new RuntimeException(errorAuthCode);
+			System.err.println(errorAuthCode);
+			System.exit(1);
 		}
 
 		List<NameValuePair> params = new ArrayList<>();
@@ -883,7 +884,8 @@ public class DownloadOsmGPX {
 									"Details: %s\n" +
 									"Try again: %s",
 							error, errorDescription, errorAuthCode);
-					throw new RuntimeException(errorAccessToken);
+					System.err.println(errorAccessToken);
+					System.exit(1);
 				}
 				final String successAccessToken = String.format("\n\n" +
 								"Setup finished 3/3...\n" +
@@ -891,11 +893,12 @@ public class DownloadOsmGPX {
 								"Save it as ENV %s and run again.\n" +
 								"%s\n\n",
 						ENV_OAUTH2_ACCESS_TOKEN, tokenToSave);
-				throw new RuntimeException(successAccessToken);
+				System.err.println(successAccessToken);
+				System.exit(1);
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		// return; never reached (setup process always throws an exception)
+		return accessToken; // never reached (setup process always exit)
 	}
 }
