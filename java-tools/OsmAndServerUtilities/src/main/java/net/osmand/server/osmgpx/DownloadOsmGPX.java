@@ -820,7 +820,7 @@ public class DownloadOsmGPX {
 	private static String setupAccessToken() {
 		String accessToken = System.getenv(ENV_OAUTH2_ACCESS_TOKEN); // unset this ENV if the token is dead
 		if (accessToken != null) {
-			// System.err.println("Using " + ENV_OAUTH2_ACCESS_TOKEN + " for API requests");
+			// System.out.println("Using " + ENV_OAUTH2_ACCESS_TOKEN + " for API requests");
 			return accessToken; // success
 		}
 
@@ -843,7 +843,7 @@ public class DownloadOsmGPX {
 				ENV_OAUTH2_CLIENT_ID, ENV_OAUTH2_CLIENT_SECRET, APPLICATIONS_URL, REDIRECT_INTERNAL, SCOPE);
 
 		if (clientId == null || clientSecret == null) {
-			System.err.println(errorClientIdSecret);
+			System.out.println(errorClientIdSecret);
 			System.exit(1);
 		}
 
@@ -856,7 +856,7 @@ public class DownloadOsmGPX {
 				ENV_OAUTH2_AUTH_CODE, AUTHORIZE_URL, clientId, URLEncoder.encode(REDIRECT_INTERNAL), SCOPE);
 
 		if (authCode == null) {
-			System.err.println(errorAuthCode);
+			System.out.println(errorAuthCode);
 			System.exit(1);
 		}
 
@@ -884,21 +884,21 @@ public class DownloadOsmGPX {
 									"Details: %s\n" +
 									"Try again: %s",
 							error, errorDescription, errorAuthCode);
-					System.err.println(errorAccessToken);
-					System.exit(1);
+					System.out.println(errorAccessToken);
+				} else {
+					final String successAccessToken = String.format("\n\n" +
+									"Setup finished 3/3...\n" +
+									"You have got the permanent accessToken!\n" +
+									"Save it as ENV %s and run again.\n" +
+									"%s\n\n",
+							ENV_OAUTH2_ACCESS_TOKEN, tokenToSave);
+					System.out.println(successAccessToken);
 				}
-				final String successAccessToken = String.format("\n\n" +
-								"Setup finished 3/3...\n" +
-								"You have got the permanent accessToken!\n" +
-								"Save it as ENV %s and run again.\n" +
-								"%s\n\n",
-						ENV_OAUTH2_ACCESS_TOKEN, tokenToSave);
-				System.err.println(successAccessToken);
 				System.exit(1);
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		return accessToken; // never reached (setup process always exit)
+		throw new RuntimeException(); // never reached
 	}
 }
