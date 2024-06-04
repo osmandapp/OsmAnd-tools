@@ -19,12 +19,16 @@ import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
+import static net.osmand.data.MapObject.unzipContent;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Service
@@ -424,7 +428,8 @@ public class SearchService {
                     .prop("web_poi_osmUrl", getOsmUrl(result));
             Map<String, String> tags = amenity.getAmenityExtensions();
             for (Map.Entry<String, String> entry : tags.entrySet()) {
-                feature.prop(entry.getKey(), entry.getValue());
+                String value = unzipContent(entry.getValue());
+                feature.prop(entry.getKey(), value);
             }
         }
         return feature;
