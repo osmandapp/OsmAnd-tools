@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -42,10 +43,20 @@ import javax.net.ssl.X509TrustManager;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLStreamException;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -64,10 +75,7 @@ import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.OsmRouteType;
-import net.osmand.osm.io.Base64;
 import net.osmand.util.Algorithms;
-import oauth.signpost.OAuthConsumer;
-import oauth.signpost.basic.DefaultOAuthConsumer;
 import oauth.signpost.exception.OAuthCommunicationException;
 import oauth.signpost.exception.OAuthExpectationFailedException;
 import oauth.signpost.exception.OAuthMessageSignerException;
@@ -78,7 +86,12 @@ public class DownloadOsmGPX {
 	private static final int BATCH_SIZE = 100;
 	protected static final Log LOG = PlatformUtil.getLog(DownloadOsmGPX.class);
 	private static final String MAIN_GPX_API_ENDPOINT = "https://api.openstreetmap.org/api/0.6/gpx/";
-	
+
+	private static final String ENV_OAUTH2_AUTH_CODE = "OSM_OAUTH2_AUTH_CODE"; // setup-only
+	private static final String ENV_OAUTH2_CLIENT_ID = "OSM_OAUTH2_CLIENT_ID"; // setup-only
+	private static final String ENV_OAUTH2_CLIENT_SECRET = "OSM_OAUTH2_CLIENT_SECRET"; // setup-only
+	private static final String ENV_OAUTH2_ACCESS_TOKEN = "OSM_OAUTH2_ACCESS_TOKEN"; // finally required
+
 	private static final int PS_UPDATE_GPX_DATA = 1;
 	private static final int PS_UPDATE_GPX_DETAILS = 2;
 	private static final int PS_INSERT_GPX_FILE = 3;
@@ -329,7 +342,6 @@ public class DownloadOsmGPX {
 		}
 	}
 
-	
 	private String downloadGpx(long id, String name)
 			throws Exception {
 		HttpsURLConnection httpFileConn = getHttpConnection(MAIN_GPX_API_ENDPOINT + id + "/data", MAX_RETRY_TIMEOUT);
@@ -554,8 +566,6 @@ public class DownloadOsmGPX {
 		commitAllStatements();
 	}
 
-
-
 	private GPXFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
 		if (gpxFile.error == null) {
@@ -570,8 +580,6 @@ public class DownloadOsmGPX {
 			return null;
 		}
 	}
-
-
 
 	private void errorReadingGpx(OsmGpxFile r, Throwable e) {
 		LOG.error(String.format("### ERROR while reading GPX %d - %s: %s", r.id, r.name,
@@ -624,8 +632,6 @@ public class DownloadOsmGPX {
 		wrapperFile.addBatch();
 	}
 
-
-
 	private void commitAllStatements() throws SQLException {
 		for(PreparedStatementWrapper w : preparedStatements) {
 			if(w != null && w.ps != null) {
@@ -638,8 +644,6 @@ public class DownloadOsmGPX {
 			}
 		}
 	}
-
-
 
 	private void initDBConnection() throws SQLException {
 		if (dbConn == null) {
@@ -658,7 +662,6 @@ public class DownloadOsmGPX {
 		}
 	}
 
-
 	private void executeSQL(String sql) throws SQLException {
 		Statement statement = dbConn.createStatement();
 		statement.execute(sql);
@@ -674,8 +677,6 @@ public class DownloadOsmGPX {
 		statement.close();
 		return null;
 	}
-
-
 
 	private HttpsURLConnection getHttpConnection(String url, int retry)
 			throws NoSuchAlgorithmException, KeyManagementException, IOException, MalformedURLException, OAuthMessageSignerException, OAuthExpectationFailedException, OAuthCommunicationException {
@@ -700,23 +701,12 @@ public class DownloadOsmGPX {
 				SSLContext.setDefault(ctx);
 				sslInit = true;
 			}
-			String name = System.getenv("OSM_USER");
-			String pwd = System.getenv("OSM_PASSWORD");
-			String accessToken = System.getenv("OSM_USER_ACCESS_TOKEN");
-			String accessTokenSecret = System.getenv("OSM_USER_ACCESS_TOKEN_SECRET");
-			String consumerKey = System.getenv("OSM_OAUTH_CONSUMER_KEY");
-			String consumerSecret = System.getenv("OSM_OAUTH_CONSUMER_SECRET");
-			
+
 			con = (HttpsURLConnection) new URL(url).openConnection();
+
 			con.setConnectTimeout(HTTP_TIMEOUT);
-			if (!Algorithms.isEmpty(accessToken)) {
-				OAuthConsumer consumer = new DefaultOAuthConsumer(consumerKey, consumerSecret);
-				consumer.setTokenWithSecret(accessToken, accessTokenSecret);
-				consumer.sign(con);
-//				con.setRequestProperty("Authorization", "Basic " + Base64.encode(name + ":" + pwd));
-			} else if (name != null && pwd != null) {
-				con.setRequestProperty("Authorization", "Basic " + Base64.encode(name + ":" + pwd));
-			}
+			String accessToken = setupAccessToken();
+			con.setRequestProperty("Authorization", "Bearer" + " " + accessToken); // oauth2
 
 			con.setHostnameVerifier(new HostnameVerifier() {
 			    @Override
@@ -740,7 +730,6 @@ public class DownloadOsmGPX {
 			}
 		}
 	}
-
 
 	private static OsmGpxFile parseGPXFiles(StringReader inputReader, List<OsmGpxFile> gpxFiles)
 			throws XmlPullParserException, IOException, ParseException {
@@ -816,8 +805,6 @@ public class DownloadOsmGPX {
 		}
 	}
 	
-	
-	
 	private static String getAttributeDoubleValue(XmlPullParser parser, String key) {
 		String vl = parser.getAttributeValue("", key);
 		if(isEmpty(vl)) {
@@ -830,6 +817,88 @@ public class DownloadOsmGPX {
 		return vl == null || vl.equals("");
 	}
 
-	
-	
+	private static String setupAccessToken() {
+		String accessToken = System.getenv(ENV_OAUTH2_ACCESS_TOKEN); // unset this ENV if the token is dead
+		if (accessToken != null) {
+			// System.out.println("Using " + ENV_OAUTH2_ACCESS_TOKEN + " for API requests");
+			return accessToken; // success
+		}
+
+		final String APPLICATIONS_URL = "https://www.openstreetmap.org/oauth2/applications"; // manual
+		final String AUTHORIZE_URL = "https://www.openstreetmap.org/oauth2/authorize"; // manual
+		final String ACCESS_TOKEN_URL = "https://www.openstreetmap.org/oauth2/token"; // auto
+		final String REDIRECT_INTERNAL = "urn:ietf:wg:oauth:2.0:oob";
+		final String SCOPE = "read_gpx";
+
+		final String authCode = System.getenv(ENV_OAUTH2_AUTH_CODE);
+		final String clientId = System.getenv(ENV_OAUTH2_CLIENT_ID);
+		final String clientSecret = System.getenv(ENV_OAUTH2_CLIENT_SECRET);
+
+		final String errorClientIdSecret = String.format("\n\n" +
+						"Setup step 1/3...\n" +
+						"Missing ENV vars: %s / %s\n" +
+						"Log in to %s and register App.\n" +
+						"Use Name (any) Redirect (%s) and Permissions (%s)\n" +
+						"Set ENV variables with the corresponding Client ID and Client Secret and run again.\n",
+				ENV_OAUTH2_CLIENT_ID, ENV_OAUTH2_CLIENT_SECRET, APPLICATIONS_URL, REDIRECT_INTERNAL, SCOPE);
+
+		if (clientId == null || clientSecret == null) {
+			System.out.println(errorClientIdSecret);
+			System.exit(1);
+		}
+
+		final String errorAuthCode = String.format("\n\n" +
+						"Setup step 2/3...\n" +
+						"Incorrect ENV var: %s\n" +
+						"Please follow URL and press Authorize Access:\n" +
+						"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s\n" +
+						"Set ENV variable with the corresponding Authorization code and run again.\n",
+				ENV_OAUTH2_AUTH_CODE, AUTHORIZE_URL, clientId, URLEncoder.encode(REDIRECT_INTERNAL), SCOPE);
+
+		if (authCode == null) {
+			System.out.println(errorAuthCode);
+			System.exit(1);
+		}
+
+		List<NameValuePair> params = new ArrayList<>();
+		params.add(new BasicNameValuePair("grant_type", "authorization_code"));
+		params.add(new BasicNameValuePair("redirect_uri", REDIRECT_INTERNAL));
+		params.add(new BasicNameValuePair("client_secret", clientSecret));
+		params.add(new BasicNameValuePair("client_id", clientId));
+		params.add(new BasicNameValuePair("code", authCode));
+
+		try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+			HttpPost post = new HttpPost(ACCESS_TOKEN_URL);
+			post.setEntity(new UrlEncodedFormEntity(params));
+			post.addHeader("Content-Type", "application/x-www-form-urlencoded");
+			try (CloseableHttpResponse response = httpClient.execute(post)) {
+				String jsonResponse = EntityUtils.toString(response.getEntity());
+				ObjectMapper mapper = new ObjectMapper();
+				JsonNode rootNode = mapper.readTree(jsonResponse);
+				String tokenToSave = rootNode.path("access_token").asText();
+				if (tokenToSave == null || tokenToSave.isEmpty()) {
+					String error = rootNode.path("error").asText();
+					String errorDescription = rootNode.path("error_description").asText();
+					final String errorAccessToken = String.format("\n\n" +
+									"ACCESS_TOKEN_REQUEST failed (%s)\n" +
+									"Details: %s\n" +
+									"Try again: %s",
+							error, errorDescription, errorAuthCode);
+					System.out.println(errorAccessToken);
+				} else {
+					final String successAccessToken = String.format("\n\n" +
+									"Setup finished 3/3...\n" +
+									"You have got the permanent accessToken!\n" +
+									"Save it as ENV %s and run again.\n" +
+									"%s\n\n",
+							ENV_OAUTH2_ACCESS_TOKEN, tokenToSave);
+					System.out.println(successAccessToken);
+				}
+				System.exit(1);
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+		throw new RuntimeException(); // never reached
+	}
 }
