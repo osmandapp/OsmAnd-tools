@@ -68,7 +68,7 @@ public class WikivoyageLangPreparation {
 	private static boolean uncompressed;
 	private final static Map<Long, Long> KNOWN_WIKIVOYAGE_MAIN = new HashMap<Long, Long>();
 	private static final long WID_TRAVEL_TOPICS = 14199938l;
-	private static final long WID_DESTINATIONS = 1200957l;
+	public static final long WID_DESTINATIONS = 1200957l;
 	private static final long WID_ITINERARIES = 1322323l;
 	private static final long WID_PHRASEBOOKS = 1599788l;
 	private static final long WID_CULTURAL_ATTRACTIONS = 11042l;
