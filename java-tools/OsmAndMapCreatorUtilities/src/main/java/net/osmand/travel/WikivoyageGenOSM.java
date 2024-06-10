@@ -39,6 +39,8 @@ import net.osmand.travel.WikivoyageLangPreparation.WikivoyageOSMTags;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
+import static net.osmand.travel.WikivoyageLangPreparation.WID_DESTINATIONS;
+
 public class WikivoyageGenOSM {
 	public static final String CAT_SEE = "see"; // 27%
 	public static final String CAT_NATURAL = "natural"; // new
@@ -183,6 +185,9 @@ public class WikivoyageGenOSM {
 			}
 			// exact match
 			if (combinedArticle.tripId > 0) {
+				if ((WID_DESTINATIONS + "").equals(combinedArticle.tripId + "")){
+					return true;
+				}
 				for (int tp = 0; tp < qids.size(); tp++) {
 					if (qids.get(tp).equals(combinedArticle.tripId + "")) {
 						return true;
