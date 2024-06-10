@@ -239,7 +239,7 @@ public class UserdataController {
 
 	@PostMapping(value = "/device-register")
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
-												 @RequestParam(name = "token", required = true) String token,
+												 @RequestParam(name = "token", required = false) String token,
 												 @RequestParam(name = "deviceid", required = false) String deviceId,
 												 @RequestParam(name = "brand", required = false) String brand,
 												 @RequestParam(name = "model", required = false) String model,
