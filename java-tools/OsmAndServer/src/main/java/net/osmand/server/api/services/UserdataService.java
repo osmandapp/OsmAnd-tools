@@ -376,16 +376,20 @@ public class UserdataService {
 
     public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken,
                                                     String lang, String brand, String model) {
+		if (Algorithms.isEmpty(email)) {
+			LOG.error("device-register: email is empty (" + email + ")");
+			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
+		}
         email = email.toLowerCase().trim();
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
         if (pu == null) {
-            LOG.error("device-register: email not found: " + email);
+            LOG.error("device-register: email is not found (" + email + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
                 - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
             wearOutToken(pu);
-            LOG.error("device-register: invalid token: " + token != null ? token : "(null)");
+            LOG.error("device-register: invalid token (" + token + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
         }
         if (pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
@@ -396,7 +400,7 @@ public class UserdataService {
         PremiumUserDevicesRepository.PremiumUserDevice sameDevice;
         while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
                 deviceId)) != null) {
-            LOG.error("device-register: delete-same-device: " + email);
+            LOG.error("device-register: call delete-same-device (" + email + ")");
             devicesRepository.delete(sameDevice);
         }
         device.lang = lang;
