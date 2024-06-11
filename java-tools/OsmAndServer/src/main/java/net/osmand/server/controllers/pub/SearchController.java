@@ -170,8 +170,8 @@ public class SearchController {
     
     @GetMapping(path = {"/get-wiki-photos"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getWikiPhotosById(@RequestParam long id) {
-        FeatureCollection collection = wikiService.getImagesById(id);
+    public ResponseEntity<String> getWikiPhotosById(@RequestParam long id, @RequestParam double lat, @RequestParam double lon) {
+        FeatureCollection collection = wikiService.getImagesById(id, lat, lon);
         return ResponseEntity.ok(gson.toJson(collection));
     }
 }
