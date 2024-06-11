@@ -59,11 +59,20 @@ public class WikiService {
 				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon", null);
 	}
 	
-	public FeatureCollection getImagesById(long id) {
-		String query = String.format("SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon " +
-				"FROM wikigeoimages WHERE id = %d " +
+	public FeatureCollection getImagesById(long id, double lat, double lon) {
+		String query = String.format("SELECT id, mediaId, imageTitle " +
+				"FROM wikiimages WHERE id = %d " +
 				"ORDER BY views DESC LIMIT " + LIMIT_QUERY, id);
-		return getPoiData(null, null, query, "imgLat", "imgLon", null);
+		
+		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
+			Feature f = new Feature(Geometry.point(new LatLon(lat, lon)));
+			f.properties.put("id", rs.getLong("id"));
+			f.properties.put("mediaId", rs.getLong("mediaId"));
+			f.properties.put("imageTitle", rs.getString("imageTitle"));
+			return f;
+		});
+		
+		return new FeatureCollection(features.toArray(new Feature[0]));
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
