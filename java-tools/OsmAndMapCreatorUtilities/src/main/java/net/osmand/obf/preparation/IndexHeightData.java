@@ -393,7 +393,8 @@ public class IndexHeightData {
 					if (Math.abs(prev.getLatitude() - n.getLatitude()) > MAX_LAT_LON_DIFFERENCE ||
 							Math.abs(prev.getLongitude() - n.getLongitude()) > MAX_LAT_LON_DIFFERENCE) {
 						int dist = (int)MapUtils.getDistance(prev.getLatLon(), n.getLatLon());
-						throw new RuntimeException("Distance " + dist/1000 + " km between node " + n.getId() + " and node " + prev.getId() + " is too big for way " + e.getId() + "(" + e.getId() / 64 + ")");
+						String coords = prev.getLatitude() + "," + prev.getLongitude() + " " + n.getLatitude() + "," + n.getLongitude();
+						throw new RuntimeException("Distance " + dist/1000 + " km between nodes (" + coords + ") is too big for way " + e.getId() + "(" + e.getId() / 64 + ")");
 					}
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
