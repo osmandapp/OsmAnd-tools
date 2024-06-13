@@ -87,7 +87,7 @@ class RandomRouteEntry {
 				(domain.contains("localhost") ? "http://" : "https://") + domain);
 
 		return String.format(
-				"%s/map/?start=%s&finish=%s%s%s&profile=%s%s%s#%s",
+				"%s/map/navigate/?start=%s&finish=%s%s%s&profile=%s%s%s#%s",
 				protoDomain, START, FINISH, hasVia, VIA, PROFILE, hasParams, PARAMS, GO
 		);
 	}
