@@ -67,7 +67,7 @@ public class IndexHeightData {
 
 	public static final int MAX_SRTM_COUNT_DOWNLOAD = 20000;
 	private int srtmCountDownload;
-	private static final int MAX_LAT_LON_DIFFERENCE = 5;
+	private static final double MAX_LAT_LON_DIFFERENCE = 5.0;
 	
 	public static final Set<String> ELEVATION_TAGS = new TreeSet<>(); 
 	
