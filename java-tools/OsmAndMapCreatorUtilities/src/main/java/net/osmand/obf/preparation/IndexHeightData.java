@@ -64,6 +64,9 @@ public class IndexHeightData {
 	public static final String ELE_ASC_TAG = "osmand_ele_asc";
 	public static final String ELE_DESC_TAG = "osmand_ele_desc";
 	public static final double INEXISTENT_HEIGHT = Double.MIN_VALUE;
+
+	public static final int MAX_SRTM_COUNT_DOWNLOAD = 5000;
+	private int srtmCountDownload;
 	
 	public static final Set<String> ELEVATION_TAGS = new TreeSet<>(); 
 	
@@ -574,6 +577,10 @@ public class IndexHeightData {
 				File missingFile = tileData.loadData(srtmDataUrl, srtmWorkingDir);
 				if (fileName != null && fileName.length > 0) {
 					fileName[0] = missingFile;
+				}
+				srtmCountDownload++;
+				if (srtmCountDownload > MAX_SRTM_COUNT_DOWNLOAD) {
+					throw new RuntimeException("Max count of download SRTM data " + MAX_SRTM_COUNT_DOWNLOAD);
 				}
 			} catch (IOException e) {
 				log.error(e.getMessage(), e);
