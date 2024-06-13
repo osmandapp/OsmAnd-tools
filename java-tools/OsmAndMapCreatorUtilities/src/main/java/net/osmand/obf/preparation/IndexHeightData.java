@@ -65,8 +65,9 @@ public class IndexHeightData {
 	public static final String ELE_DESC_TAG = "osmand_ele_desc";
 	public static final double INEXISTENT_HEIGHT = Double.MIN_VALUE;
 
-	public static final int MAX_SRTM_COUNT_DOWNLOAD = 5000;
+	public static final int MAX_SRTM_COUNT_DOWNLOAD = 20000;
 	private int srtmCountDownload;
+	private static final int MAX_LAT_LON_DIFFERENCE = 5;
 	
 	public static final Set<String> ELEVATION_TAGS = new TreeSet<>(); 
 	
@@ -389,6 +390,11 @@ public class IndexHeightData {
 						prev = n;
 					}
 				} else {
+					if (Math.abs(prev.getLatitude() - n.getLatitude()) > MAX_LAT_LON_DIFFERENCE ||
+							Math.abs(prev.getLongitude() - n.getLongitude()) > MAX_LAT_LON_DIFFERENCE) {
+						int dist = (int)MapUtils.getDistance(prev.getLatLon(), n.getLatLon());
+						throw new RuntimeException("Distance " + dist/1000 + " km between node " + n.getId() + " and node " + prev.getId() + " is too big for way " + e.getId() + "(" + e.getId() / 64 + ")");
+					}
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
 					if (segm > MINIMAL_DISTANCE && pointHeight != INEXISTENT_HEIGHT) {
