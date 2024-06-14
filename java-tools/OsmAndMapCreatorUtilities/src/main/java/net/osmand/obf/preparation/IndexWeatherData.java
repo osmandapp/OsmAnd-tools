@@ -27,14 +27,21 @@ public class IndexWeatherData {
 	// 1440, 721 - -180.125, 90.125 - 179.8750000, -90.1250000
 	public static final int REF_WIDTH = 1440;
 	public static final int REF_HEIGHT = 721;
-
+	private static final String ECWMF_WEATHER_TYPE = "ecmwf";
+	
 	public static class WeatherTiff {
-
+		
 		// it could vary base on files
+		// gfs
 		public double ORIGIN_LON = -180.125;
 		public double ORIGIN_LAT = 90.125;
 		public double PX_SIZE_LON = 0.25;
 		public double PX_SIZE_LAT = -0.25;
+		// ecmwf
+		public double ECMWF_ORIGIN_LON = -180.1999;
+		public double ECMWF_ORIGIN_LAT = 90.2000;
+		public double ECMWF_PX_SIZE_LON = 0.28;
+		public double ECMWF_PX_SIZE_LAT = -0.28;
 
 		public final File file;
 		private DataBufferFloat data;
@@ -102,17 +109,24 @@ public class IndexWeatherData {
 				bands = data.getSize() / width / height;
 			}
 		}
-
-		public double getValue(int band, double lat, double lon) {
-			double y = (lat - ORIGIN_LAT) / PX_SIZE_LAT;
-			double x = (lon - ORIGIN_LON) / PX_SIZE_LON;
+		
+		public double getValue(int band, double lat, double lon, String weatherType) {
+			double y;
+			double x;
+			if (weatherType.equals(ECWMF_WEATHER_TYPE)) {
+				y = (lat - ECMWF_ORIGIN_LAT) / ECMWF_PX_SIZE_LAT;
+				x = (lon - ECMWF_ORIGIN_LON) / ECMWF_PX_SIZE_LON;
+			} else {
+				y = (lat - ORIGIN_LAT) / PX_SIZE_LAT;
+				x = (lon - ORIGIN_LON) / PX_SIZE_LON;
+			}
 			if (y < 0 || y > height || x < 0 || x > width) {
 				return INEXISTENT_VALUE;
 			}
-			return getValue(band, x, y, null);
+			return getInterpolationValue(band, x, y, null);
 		}
 		
-		public double getValue(int band, double x, double y, double[] array) {
+		public double getInterpolationValue(int band, double x, double y, double[] array) {
 			if (data == null) {
 				return INEXISTENT_VALUE;
 			}
@@ -123,7 +137,6 @@ public class IndexWeatherData {
 			} else {
 				return nearestNeighboor(band, x, y);
 			}
-			// System.out.println(" --- " + (h1 - h2) + " " + h1 + " " + h2);
 		}
 		
 		protected double nearestNeighboor(int band, double x, double y) {
@@ -228,7 +241,7 @@ public class IndexWeatherData {
 			WeatherTiff td = new WeatherTiff(new File(folder, String.format(fmt, vl)));
 //			System.out.println(vl + ":00");
 			for (int j = 0; j < 5; j++) {
-				wth[j + 1][i] = td.getValue(j, lat, lon);
+				wth[j + 1][i] = td.getValue(j, lat, lon, ECWMF_WEATHER_TYPE);
 //				System.out.println(td.getElem(j, 740, 151));
 			}
 			wth[0][i] = vl;
