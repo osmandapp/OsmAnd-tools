@@ -124,6 +124,7 @@ public class WeatherController {
 	private Object[] normalizeValues(Object[] data, String weatherType, int increment) {
 		int precipIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 4 : 6;
 		int pressureIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 3 : 4;
+		increment = weatherType.equals(ECWMF_WEATHER_TYPE) ? increment : 1;
 		data[precipIndex] = ((double) data[precipIndex]) * 3600 / increment;
 		data[pressureIndex] = ((double) data[pressureIndex]) * 0.01;
 		
