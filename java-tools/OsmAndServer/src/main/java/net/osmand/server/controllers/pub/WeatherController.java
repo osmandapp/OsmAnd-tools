@@ -95,10 +95,10 @@ public class WeatherController {
 						data[1] = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
 						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl);
 						for (int i = 0; i < wt.getBands() && i < 5; i++) {
-							data[2 + i] = wt.getValue(i, lat, lon);
+							data[2 + i] = wt.getValue(i, lat, lon, weatherType);
 						}
 						data[7] = fl.lastModified();
-						dt.add(data);
+						dt.add(normalizeValues(data, weatherType, increment));
 					} catch (IOException e) {
 						LOGGER.warn(String.format("Error reading %s: %s", fl.getName(), e.getMessage()), e);
 					}
@@ -119,6 +119,16 @@ public class WeatherController {
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(dt));
+	}
+	
+	private Object[] normalizeValues(Object[] data, String weatherType, int increment) {
+		int precipIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 4 : 6;
+		int pressureIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 3 : 4;
+		increment = weatherType.equals(ECWMF_WEATHER_TYPE) ? increment : 1;
+		data[precipIndex] = ((double) data[precipIndex]) * 3600 / increment;
+		data[pressureIndex] = ((double) data[pressureIndex]) * 0.01;
+		
+		return data;
 	}
 	
 	static class AddressInfo {
