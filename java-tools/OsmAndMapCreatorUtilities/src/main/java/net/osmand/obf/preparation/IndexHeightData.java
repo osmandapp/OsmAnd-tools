@@ -392,8 +392,8 @@ public class IndexHeightData {
 					}
 				} else {
 					if (MapUtils.getDistance(prev.getLatLon(), n.getLatLon()) > MAX_LAT_LON_DIST) {
-						System.err.printf("Skip long line %d dist %.1f",
-								e.getId()/64, MapUtils.getDistance(prev.getLatLon(), n.getLatLon()));
+						System.err.printf("Skip long line %d dist %.1f km\n", e.getId() / 64,
+								MapUtils.getDistance(prev.getLatLon(), n.getLatLon()) / 1000);
 						return false;
 					}
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
