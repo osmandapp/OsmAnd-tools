@@ -131,7 +131,7 @@ public class ObfRegionSplitter {
  			int y = MapUtils.get31TileNumberY(obj.getLocation().getLatitude());
  			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
  			for (BinaryMapDataObject b : l) {
- 				if (osmandRegions.contain(b, x, y)) {
+ 				if (OsmandRegions.contain(b, x, y)) {
  					String dw = osmandRegions.getDownloadName(b);
  					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
  					if (dw == null || wr == null) {
@@ -161,18 +161,18 @@ public class ObfRegionSplitter {
 		for (List<Long> keys : sortedMap.values()) {
 			for (long key : keys) {
 				RouteDataObject obj = routingData.get(key);
+				if (isPossibleVandalism(obj)) {
+					continue;
+				}
 				if (heightData != null) {
-					boolean ok = attachElevationData(obj, heightData);
-					if (!ok) {
-						continue;
-					}
+					attachElevationData(obj, heightData);
 					count++;
 				}
 				int x = obj.getPoint31XTile(0);
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 				for (BinaryMapDataObject b : l) {
-					if (osmandRegions.contain(b, x, y)) {
+					if (OsmandRegions.contain(b, x, y)) {
 						String dw = osmandRegions.getDownloadName(b);
 						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
 						if (dw == null || wr == null) {
@@ -229,7 +229,7 @@ public class ObfRegionSplitter {
 		return sortedMap;
 	}
 
-	private boolean attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
+	private void attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
 
 		// Prepare Way with Nodes
 		List<Node> nodes = new ArrayList<>();
@@ -248,15 +248,12 @@ public class ObfRegionSplitter {
 			String tag = type.getTag();
 			if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
 				// already processed tags
-				return true;
+				return ;
 			}
 			// can put same tag with different values
 			restoredWay.putTag(tag, type.getValue());
 		}
-		boolean processed = heightData.proccess(simpleWay);
-		if (!processed) {
-			return false;
-		}
+		heightData.proccess(simpleWay);
 
 		// Write result to RouteDataObject
 		if (simpleWay.getTags().size() > 0) {
@@ -305,7 +302,6 @@ public class ObfRegionSplitter {
 				ind++;
 			}
 		}
-		return true;
 	}
 
 	private Map<String, TLongObjectHashMap<TransportStop>> splitRegionTransportData(ObfFileInMemory fl,
@@ -336,6 +332,34 @@ public class ObfRegionSplitter {
 		}
 		return result;
 	}
+	
+	private boolean isPossibleVandalism(BinaryMapDataObject b) {
+		if ("ferry".equals(b.getTagValue("route"))) {
+			return false;
+		}
+		for (int j = 1; j < b.getPointsLength(); j++) {
+			double dist = MapUtils.squareRootDist31(b.getPoint31XTile(j - 1), b.getPoint31YTile(j - 1),
+					b.getPoint31XTile(j), b.getPoint31YTile(j));
+			if (dist > IndexHeightData.MAX_LAT_LON_DIST) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean isPossibleVandalism(RouteDataObject b) {
+		if ("ferry".equals(b.getRoute())) {
+			return false;
+		}
+		for (int j = 1; j < b.getPointsLength(); j++) {
+			double dist = MapUtils.squareRootDist31(b.getPoint31XTile(j - 1), b.getPoint31YTile(j - 1),
+					b.getPoint31XTile(j), b.getPoint31YTile(j));
+			if (dist > IndexHeightData.MAX_LAT_LON_DIST) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	private Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> splitRegionMapData(ObfFileInMemory allMapObjects,
 			OsmandRegions osmandRegions) throws IOException {
@@ -347,6 +371,9 @@ public class ObfRegionSplitter {
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 				for (BinaryMapDataObject b : l) {
+					if (isPossibleVandalism(b)) {
+						continue;
+					}
 					if (OsmandRegions.contain(b, x, y)) {
 						String dw = osmandRegions.getDownloadName(b);
 						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
