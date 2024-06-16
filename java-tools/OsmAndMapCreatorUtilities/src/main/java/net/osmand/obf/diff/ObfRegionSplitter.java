@@ -161,6 +161,13 @@ public class ObfRegionSplitter {
 		for (List<Long> keys : sortedMap.values()) {
 			for (long key : keys) {
 				RouteDataObject obj = routingData.get(key);
+				if (heightData != null) {
+					boolean ok = attachElevationData(obj, heightData);
+					if (!ok) {
+						continue;
+					}
+					count++;
+				}
 				int x = obj.getPoint31XTile(0);
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
@@ -177,10 +184,7 @@ public class ObfRegionSplitter {
 								mp = new TLongObjectHashMap<>();
 								result.put(dw, mp);
 							}
-							if (heightData != null) {
-								attachElevationData(obj, heightData);
-								count++;
-							}
+							
 							mp.put(obj.getId(), obj);
 						}
 					}
@@ -225,7 +229,7 @@ public class ObfRegionSplitter {
 		return sortedMap;
 	}
 
-	private void attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
+	private boolean attachElevationData(RouteDataObject obj, IndexHeightData heightData) {
 
 		// Prepare Way with Nodes
 		List<Node> nodes = new ArrayList<>();
@@ -244,15 +248,15 @@ public class ObfRegionSplitter {
 			String tag = type.getTag();
 			if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
 				// already processed tags
-				return;
+				return true;
 			}
 			// can put same tag with different values
 			restoredWay.putTag(tag, type.getValue());
 		}
-		if (!IndexHeightData.isHeightDataNeeded(restoredWay)) {
-			return;
+		boolean processed = heightData.proccess(simpleWay);
+		if (!processed) {
+			return false;
 		}
-		heightData.proccess(simpleWay);
 
 		// Write result to RouteDataObject
 		if (simpleWay.getTags().size() > 0) {
@@ -301,6 +305,7 @@ public class ObfRegionSplitter {
 				ind++;
 			}
 		}
+		return true;
 	}
 
 	private Map<String, TLongObjectHashMap<TransportStop>> splitRegionTransportData(ObfFileInMemory fl,

@@ -67,7 +67,7 @@ public class IndexHeightData {
 
 	public static final int MAX_SRTM_COUNT_DOWNLOAD = 20000;
 	private int srtmCountDownload;
-	private static final double MAX_LAT_LON_DIFFERENCE = 5.0;
+	private static final double MAX_LAT_LON_DIST = 1000;
 	
 	public static final Set<String> ELEVATION_TAGS = new TreeSet<>(); 
 	
@@ -370,9 +370,10 @@ public class IndexHeightData {
 		}
 	}
 	
-	public void proccess(Way e) {
+	public boolean proccess(Way e) {
 		if (!isHeightDataNeeded(e)) {
-			return;
+			// true processed
+			return true;
 		}
 
 		WayHeightStats wh = new WayHeightStats();
@@ -390,11 +391,10 @@ public class IndexHeightData {
 						prev = n;
 					}
 				} else {
-					if (Math.abs(prev.getLatitude() - n.getLatitude()) > MAX_LAT_LON_DIFFERENCE ||
-							Math.abs(prev.getLongitude() - n.getLongitude()) > MAX_LAT_LON_DIFFERENCE) {
-						int dist = (int)MapUtils.getDistance(prev.getLatLon(), n.getLatLon());
-						String coords = prev.getLatitude() + "," + prev.getLongitude() + " " + n.getLatitude() + "," + n.getLongitude();
-						throw new RuntimeException("Distance " + dist/1000 + " km between nodes (" + coords + ") is too big for way " + e.getId() + "(" + e.getId() / 64 + ")");
+					if (MapUtils.getDistance(prev.getLatLon(), n.getLatLon()) > MAX_LAT_LON_DIST) {
+						System.err.printf("Skip long line %d dist %.1f",
+								e.getId()/64, MapUtils.getDistance(prev.getLatLon(), n.getLatLon()));
+						return false;
 					}
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
@@ -427,6 +427,7 @@ public class IndexHeightData {
 		// if(wh.desc >= 1){
 		// e.putTag(ELE_DESC_TAG, ((int)wh.desc)+"");
 		// }
+		return true;
 	}
 
 
