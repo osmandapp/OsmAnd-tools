@@ -7,20 +7,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.Stack;
-import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
@@ -1626,13 +1614,19 @@ public class BinaryMapIndexWriter {
 
 	}
 
-	public void writePoiSubtypesTable(PoiCreatorCategories cs) throws IOException {
+	public void writePoiSubtypesTable(PoiCreatorCategories cs, Map<String, HashSet<String>> topIndexAdditional) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		int subcatId = 0;
 		OsmAndSubtypesTable.Builder builder = OsmandOdb.OsmAndSubtypesTable.newBuilder();
 		Map<String, List<PoiAdditionalType>> groupAdditionalByTagName = new HashMap<String, List<PoiAdditionalType>>();
 		for (PoiAdditionalType rt : cs.additionalAttributes) {
 			if (!rt.isText()) {
+				if (topIndexAdditional.containsKey(rt.getTag())) {
+					HashSet<String> topIndexSet = topIndexAdditional.get(rt.getTag());
+					if (!topIndexSet.contains(rt.getValue())) {
+						continue;
+					}
+				}
 				if (!groupAdditionalByTagName.containsKey(rt.getTag())) {
 					groupAdditionalByTagName.put(rt.getTag(), new ArrayList<PoiAdditionalType>());
 				}
