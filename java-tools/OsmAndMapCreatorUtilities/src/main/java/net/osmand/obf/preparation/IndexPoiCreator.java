@@ -192,8 +192,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		int topIndex = 8;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
-			String val = amenity.getAdditionalInfo(entry.getKey());
+			String val = amenity.getAdditionalInfo(entry.getKey().replace(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX, ""));
 			poiPreparedStatement.setString(topIndex, val);
+			topIndex++;
 		}
 		addBatch(poiPreparedStatement);
 	}
@@ -241,8 +242,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				// avoid 0 (bug in jdk on macos)
 				b.append((char) ((rulType.getId()) + 1)).append(e.getValue());
 			}
-			if (poiTypes.topIndexPoiAdditional.containsKey(e.getKey())) {
-				rulType = getOrCreate(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + e.getKey(), e.getValue(), false);
+			String topIndexKey = MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + e.getKey();
+			if (poiTypes.topIndexPoiAdditional.containsKey(topIndexKey)) {
+				rulType = getOrCreate(topIndexKey, e.getValue(), false);
 				if (rulType.getValue() != null) {
 					if (b.length() > 0) {
 						b.append(SPECIAL_CHAR);
@@ -560,7 +562,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					break;
 				}
 			}
-			topIndexAdditional.put(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + column, set);
+			topIndexAdditional.put(column, set);
 		}
 		return;
 	}
