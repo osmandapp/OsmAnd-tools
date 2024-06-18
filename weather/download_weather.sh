@@ -256,7 +256,7 @@ get_raw_gfs_files() {
                         echo "Partial downloading success. Start gdal_translate"
                         mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
                         gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
-                        TZ=UTC touch -t "${DATE}${RNDHOURS}00" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff"
+                        # TZ=UTC touch -t "${DATE}${RNDHOURS}00" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" # use timestamp when it was updated
                     else
                         echo "Fatal Error: Partial downloaded data contains HTML content. May be we are blocked."
                         cat "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
