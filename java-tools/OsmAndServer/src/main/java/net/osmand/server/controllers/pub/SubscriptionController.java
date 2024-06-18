@@ -423,6 +423,11 @@ public class SubscriptionController {
 	}
 
 	
+	@PostMapping(path = {"/restore-purchased"})
+	public ResponseEntity<String> restorePurchased(HttpServletRequest request) {
+		return purchased(request);
+	}
+	
 	// Android sends
 	//	parameters.put("userid", userId);
 	//	parameters.put("sku", info.getSku());
