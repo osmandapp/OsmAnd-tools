@@ -339,7 +339,7 @@ join_tiff_files() {
             BANDS_RENAMING_COMMAND+='" '
         done
         eval $BANDS_RENAMING_COMMAND
-        touch -r $FILE_DATE_CP $TARGET_FILE
+        # touch -r $FILE_DATE_CP $TARGET_FILE # keep original timestamp of generation
 
         rm settings.txt
         rm bigtiff.vrt
