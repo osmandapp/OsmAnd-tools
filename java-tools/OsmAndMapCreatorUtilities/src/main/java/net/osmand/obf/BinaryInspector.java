@@ -83,9 +83,9 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
-					"-vmap", "-vmapobjects",
-					"-vmapcoordinates",
+					"-vpoi",
+//					"-vmap", "-vmapobjects",
+//					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
@@ -98,7 +98,7 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
 //					System.getProperty("maps.dir") + "Osm_wiki_map.obf"
-					"/Users/victorshcherb/Downloads/livebak/Hungary_europe_24_05_16.obf"
+					"/Users/macmini/OsmAnd/maps/Brooklin_osmand2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1469,9 +1469,23 @@ public class BinaryInspector {
 		}
 		println("\t\tSubtypes:");
 		List<PoiSubType> subtypes = p.getSubTypes();
+		Map<String, List<String>> topIndex = new HashMap<>();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
 			println("\t\t\t" + st.name + " " + (st.text ? "text" : (" encoded " + st.possibleValues.size())));
+			if (st.name.startsWith("top_index")) {
+				topIndex.put(st.name, st.possibleValues);
+			}
+		}
+		if (topIndex.size() > 0) {
+			println("");
+			println("\t\tTopindex (subtypes):");
+			for (Map.Entry<String, List<String>> e : topIndex.entrySet()) {
+				println("\t\t\t" + e.getKey() + ":");
+				for (String s : e.getValue()) {
+					println("\t\t\t\t" + s);
+				}
+			}
 		}
 //		req.poiTypeFilter = null;//for test only
 		index.searchPoi(p, req);
