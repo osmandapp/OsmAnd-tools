@@ -1014,6 +1014,19 @@ public class OsmAndMapsService {
 		Map<String, String> routeParams = new LinkedHashMap<String, String>();
 		public RouteParameters(String p) {
 			this.routeProfile = p;
+			updateRoutingType(defaultRoutingType);
+			updateApproximationType(defaultApproximationType);
+		}
+
+		public void updateRoutingType(ServerRoutingTypes type) {
+			this.disableHHRouting = type.isOldRouting();
+			this.useNativeRouting = type.isUsingNativeLib();
+			this.calcMode = type.is2phaseRouting() ? RouteCalculationMode.COMPLEX : RouteCalculationMode.NORMAL;
+		}
+
+		public void updateApproximationType(ServerApproximationTypes type) {
+			this.useGeometryBasedApproximation = type.isGeometryBased();
+			this.useNativeApproximation = type.isUsingNativeLib();
 		}
 
 		boolean useOnlyHHRouting = false;
@@ -1026,6 +1039,8 @@ public class OsmAndMapsService {
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
 
+		private final ServerRoutingTypes defaultRoutingType = ServerRoutingTypes.HH_JAVA;
+		private final ServerApproximationTypes defaultApproximationType = ServerApproximationTypes.GEO_JAVA;
 	}
 
 	private RouteParameters parseRouteParameters(String routeMode) {
@@ -1045,17 +1060,14 @@ public class OsmAndMapsService {
 			}
 			if ("routing".equals(key)) {
 				ServerRoutingTypes type = value.isEmpty()
-						? ServerRoutingTypes.HH_JAVA // default
+						? r.defaultRoutingType
 						: ServerRoutingTypes.valueOf(value.toUpperCase());
-				r.disableHHRouting = type.isOldRouting();
-				r.useNativeRouting = type.isUsingNativeLib();
-				r.calcMode = type.is2phaseRouting() ? RouteCalculationMode.COMPLEX : RouteCalculationMode.NORMAL;
+				r.updateRoutingType(type);
 			} else if ("approximation".equals(key)) {
 				ServerApproximationTypes type = value.isEmpty()
-						? ServerApproximationTypes.GEO_JAVA // default
+						? r.defaultApproximationType
 						: ServerApproximationTypes.valueOf(value.toUpperCase());
-				r.useGeometryBasedApproximation = type.isGeometryBased();
-				r.useNativeApproximation = type.isUsingNativeLib();
+				r.updateApproximationType(type);
 			} else if ("noglobalfile".equals(key)) {
 				r.noGlobalFile = Boolean.parseBoolean(value);
 			} else if ("hhonly".equals(key)) {
