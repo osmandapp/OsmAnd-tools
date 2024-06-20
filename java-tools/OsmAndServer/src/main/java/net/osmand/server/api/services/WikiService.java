@@ -60,7 +60,7 @@ public class WikiService {
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
-		String query = String.format("SELECT id, mediaId, imageTitle " +
+		String query = String.format("SELECT id, mediaId, imageTitle, date, author, license " +
 				"FROM wikiimages WHERE id = %d " +
 				"ORDER BY views DESC LIMIT " + LIMIT_QUERY, id);
 		
@@ -69,6 +69,9 @@ public class WikiService {
 			f.properties.put("id", rs.getLong("id"));
 			f.properties.put("mediaId", rs.getLong("mediaId"));
 			f.properties.put("imageTitle", rs.getString("imageTitle"));
+			f.properties.put("date", rs.getString("date"));
+			f.properties.put("author", rs.getString("author"));
+			f.properties.put("license", rs.getString("license"));
 			return f;
 		});
 		
