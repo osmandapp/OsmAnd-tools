@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+unset SESSION_MANAGER
 # This script it used to prepare some NFS, BLM and parcel data for use in OsmAnd
 # Data download link: https://data.fs.usda.gov/geodata/edw/datasets.php
 # https://github.com/osmandapp/OsmAnd-Issues/issues/2409
@@ -32,8 +33,12 @@ process_private_lands_maine=false
 process_private_lands_vermont=false
 process_private_lands_montana=false
 process_private_lands_newjersey=false
-process_private_lands_massachusets=true
-process_private_lands_maryland=true
+process_private_lands_massachusets=false
+process_private_lands_maryland=false
+process_private_lands_north_carolina=false
+process_private_lands_florida=false
+process_private_lands_arkansas=false
+process_private_lands_alaska=true
 
 trails_shp_filename="S_USA.TrailNFS_Publish"
 roads_shp_filename="S_USA.RoadCore_FS"
@@ -51,6 +56,9 @@ private_lands_montana_source_filename="MontanaCadastral_GDB"
 private_lands_newjersey_source_filename="New-Jersey_parcelsStatewide"
 private_lands_massachusets_source_filename="Massachusets_L3_AGGREGATE"
 private_lands_maryland_source_filename="Maryland_Parcel_Boundaries"
+private_lands_north_carolina_source_filename="nc-parcels-fgdb-most-recent"
+private_lands_florida_source_filename="parcels_florida"
+private_lands_arkansas_source_filename="PARCEL_POLYGON_CAMP"
 
 url_nfs_rec_area_activities="https://data.fs.usda.gov/geodata/edw/edw_resources/fc/S_USA.RECAREAACTIVITIES_V.gdb.zip"
 url_nfs_roads="https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.RoadCore_FS.zip"
@@ -65,6 +73,9 @@ url_montana="https://ftpgeoinfo.msl.mt.gov/Data/Spatial/MSDI/Cadastral/MontanaCa
 url_newjersey="https://geoapps.nj.gov/njgin/parcel/parcelsStatewide.gdb.zip"
 url_massachusets="https://s3.us-east-1.amazonaws.com/download.massgis.digital.mass.gov/shapefiles/l3parcels/L3_AGGREGATE_SHP_20240102.zip"
 url_maryland="https://opendata.arcgis.com/api/v3/datasets/b33e5f03d50844b8819a4046ecfe0d97_0/downloads/data?format=shp&spatialRefId=4326&where=1%3D1"
+url_north_carolina="https://dit-cgia-gis-data.s3.amazonaws.com/NCOM-data/parcels/nc-parcels-fgdb-most-recent.zip"
+url_florida="https://stg-arcgisazurecdataprod.az.arcgis.com/exportfiles-2554-21736/parcels_2021_v2_-7177355989058811337.zip?sv=2018-03-28&sr=b&sig=Ls40m555yFHHRC8wplu2115BxkYnHtGBlmBhleykqw4%3D&se=2024-05-28T07%3A26%3A54Z&sp=r"
+url_arkansas="https://geostor-vectors.s3.amazonaws.com/Planning_Cadastre/FGDB/PARCEL_POLYGON_CAMP.gdb.zip"
 
 mkdir -p $work_dir/$source_dir_name
 mkdir -p $work_dir/$source_original_dir_name
@@ -354,8 +365,95 @@ if [[ $process_private_lands_maryland == true ]]; then
 			wget $url_maryland -O $work_dir/$source_original_dir_name/$source_file_name.zip # https://data.imap.maryland.gov/datasets/b33e5f03d50844b8819a4046ecfe0d97_0/explore?location=39.714698%2C-78.159382%2C14.76    shp
 		fi
 		run_alg_fixgeometries $work_dir/$source_original_dir_name/$source_file_name.zip $work_dir/$tmp_dir || exit 1
-		run_alg_dissolve $work_dir/$tmp_dir/${source_file_name}_fixed.gpkg NAMEKEY $work_dir/$source_dir_name
+		run_alg_dissolve $work_dir/$tmp_dir/${source_file_name}_fixed.gpkg NAMEKEY $work_dir/$source_dir_name || exit 1
+		generate_osm_private_lands $work_dir/$source_dir_name/${source_file_name}_fixed_dissolved.gpkg $state_name || exit 1
+		generate_obf us_${state_name}_pl_northamerica.pbf
+	fi
+fi
+
+# Private lands North Carolina
+if [[ $process_private_lands_north_carolina == true ]]; then
+	state_name=north-carolina
+	source_file_name=$private_lands_north_carolina_source_filename
+	if [[ ! -f "$work_dir/$out_osm_dir/us_{$state_name}_pl_northamerica.osm" ]]; then
+		echo -e "\033[92m\e[44m Processing $source_file_name\e[49m\033[0m"
+		if [[ ! -f $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip ]]; then
+			wget $url_north_carolina -O $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip # https://www.nconemap.gov/pages/parcels
+		fi
+		ogr2ogr $work_dir/$tmp_dir/nc_parcels_poly.shp "/vsizip/$work_dir/$source_original_dir_name/${source_file_name}.gdb.zip/NC_Parcels_all.gdb/a0000000a.gdbtable" -explodecollections || exit 1
+		run_alg_fixgeometries $work_dir/$tmp_dir/nc_parcels_poly.shp $work_dir/$tmp_dir || exit 1
+		run_alg_dissolve $work_dir/$tmp_dir/nc_parcels_poly_fixed.gpkg ownname $work_dir/$source_dir_name || exit 1
+		generate_osm_private_lands $work_dir/$source_dir_name/nc_parcels_poly_fixed_dissolved.gpkg $state_name
+		generate_obf us_${state_name}_pl_northamerica.pbf
+	fi
+fi
+
+# Private lands Florida
+if [[ $process_private_lands_florida == true ]]; then
+	state_name=florida
+	source_file_name=$private_lands_florida_source_filename
+	if [[ ! -f "$work_dir/$out_osm_dir/us_{$state_name}_pl_northamerica.osm" ]]; then
+		echo -e "\033[92m\e[44m Processing $source_file_name\e[49m\033[0m"
+		if [[ ! -f $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip ]]; then
+			wget $url_florida -O $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip # https://hub.arcgis.com/datasets/957e7b45761343398f7ddf69e61168b0/explore
+		fi
+		run_alg_fixgeometries $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip $work_dir/$tmp_dir || exit 1
+		run_alg_dissolve $work_dir/$tmp_dir/${source_file_name}_fixed.gpkg ONAME $work_dir/$source_dir_name || exit 1
 		generate_osm_private_lands $work_dir/$source_dir_name/${source_file_name}_fixed_dissolved.gpkg $state_name
+		generate_obf us_${state_name}_pl_northamerica.pbf
+	fi
+fi
+
+# Private lands Arkansas
+if [[ $process_private_lands_arkansas == true ]]; then
+	state_name=arkansas
+	source_file_name=$private_lands_arkansas_source_filename
+	if [[ ! -f "$work_dir/$out_osm_dir/us_{$state_name}_pl_northamerica.osm" ]]; then
+		echo -e "\033[92m\e[44m Processing $source_file_name\e[49m\033[0m"
+		if [[ ! -f $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip ]]; then
+			wget $url_arkansas -O $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip # https://gis.arkansas.gov/product-category/data/planning-cadastre/
+		fi
+		run_alg_fixgeometries $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip $work_dir/$tmp_dir || exit 1
+		run_alg_dissolve $work_dir/$tmp_dir/${source_file_name}_fixed.gpkg OwnerName $work_dir/$source_dir_name || exit 1
+		generate_osm_private_lands $work_dir/$source_dir_name/${source_file_name}_fixed_dissolved.gpkg $state_name
+		generate_obf us_${state_name}_pl_northamerica.pbf
+	fi
+fi
+
+# Private lands Alaska
+if [[ $process_private_lands_alaska == true ]]; then
+	state_name=alaska
+	source_file_name="Alaska_parcels"
+	cd $work_dir/$tmp_dir
+	if [[ $? == 0 ]] ; then
+		rm -rf $work_dir/$tmp_dir/*.*
+	fi
+	if [[ ! -f "$work_dir/$out_osm_dir/us_{$state_name}_pl_northamerica.osm" ]]; then
+		echo -e "\033[92m\e[44m Processing $source_file_name\e[49m\033[0m"
+		if [[ ! -f $work_dir/$source_dir_name/$source_file_name.shp ]]; then
+			cd $dir
+			# Unalaska https://gis.data.alaska.gov/datasets/unalaska::parcels/explore?layer=0&location=53.876909%2C-166.541206%2C17.00
+			python3 -m dump_esri 'https://services7.arcgis.com/XYRnCwZ037YZHYH0/arcgis/rest/services/Parcels/FeatureServer/0' $work_dir/$tmp_dir/Unalaska.geojson
+			# Kenai Peninsula Borough https://gis.data.alaska.gov/datasets/c9617081ff4f4b45939af5bb359f79b6_0/explore?location=59.605007%2C-151.261142%2C7.10
+			python3 -m dump_esri 'https://services.arcgis.com/ba4DH9pIcqkXJVfl/arcgis/rest/services/Redacted_Parcels_view/FeatureServer/0' $work_dir/$tmp_dir/Kenai.geojson
+			run_alg_dissolve $work_dir/$tmp_dir/Kenai.geojson OWNER $work_dir/$tmp_dir || exit 1
+			rm $work_dir/$tmp_dir/Kenai.geojson
+			ogr2ogr $work_dir/$tmp_dir/Kenai.geojson $work_dir/$tmp_dir/Kenai_dissolved.gpkg -explodecollections
+			# Municipality of Anchorage https://gis.data.alaska.gov/maps/1fb6c5ac02d544728811c62038d8285f
+			python3 -m dump_esri 'https://services2.arcgis.com/Ce3DhLRthdwbHlfF/arcgis/rest/services/MOA_Parcels_Hosted/FeatureServer/0' $work_dir/$tmp_dir/Anchorage.geojson
+			# Yakutat ParcelsOnline https://gis.data.alaska.gov/datasets/5295b15b5c98420281dfb92d7e384def_0/explore?location=59.610248%2C-140.762900%2C7.60
+			python3 -m dump_esri 'https://services2.arcgis.com/gRKiTtxkoTx0gERB/ArcGIS/rest/services/ParcelsOnline/FeatureServer/0' $work_dir/$tmp_dir/Yakutat.geojson
+			# Sitka Parcel Layer https://gis.data.alaska.gov/datasets/6a82fee4cdb840039be6ab4e993e5c35_0/explore?location=57.325057%2C-135.467600%2C9.90
+			python3 -m dump_esri 'https://services7.arcgis.com/EozEvrS4g3SEhtG3/ArcGIS/rest/services/Parcel_Layer/FeatureServer/0' $work_dir/$tmp_dir/Sitka.geojson
+			# Haines Borough Parcels Online https://gis.data.alaska.gov/datasets/618b9fe2bbc94c6cae657d05b9a2815d_0/explore?location=58.942806%2C-135.416000%2C8.81
+			python3 -m dump_esri 'https://services3.arcgis.com/pMlUMMROURtJLUZt/ArcGIS/rest/services/ParcelsOnline/FeatureServer/0' $work_dir/$tmp_dir/Haines.geojson
+			# Ketchikan AK Tax Parcels https://gis.data.alaska.gov/datasets/743c0733b5a846c3a612178193847abc_0/explore?location=55.554617%2C-131.063050%2C8.71
+			python3 -m dump_esri 'https://services2.arcgis.com/65jtiGuzdaRB5FxF/ArcGIS/rest/services/KetchikanAKFeatures/FeatureServer/0' $work_dir/$tmp_dir/Ketchikan.geojson
+			time ogrmerge.py -single -overwrite_ds -f "ESRI Shapefile" -o $work_dir/$source_dir_name/$source_file_name.shp $work_dir/$tmp_dir/*.geojson
+		fi
+# 		run_alg_fixgeometries $work_dir/$source_original_dir_name/$source_file_name.shp $work_dir/$source_dir_name || exit 1
+# 		run_alg_dissolve $work_dir/$tmp_dir/${source_file_name}_fixed.gpkg OWNER $work_dir/$source_dir_name || exit 1
+		generate_osm_private_lands $work_dir/$source_dir_name/$source_file_name.shp $state_name
 		generate_obf us_${state_name}_pl_northamerica.pbf
 	fi
 fi

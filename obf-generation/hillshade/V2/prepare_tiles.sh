@@ -30,7 +30,7 @@ SQLITEDB_OUTPUT=/mnt/wd_2tb/lidar/${TYPE}-tiles
 GENERATE_TILE_SCRIPTS_PATH=/home/xmd5a/git/OsmAnd-tools/obf-generation/heightmap # see https://github.com/osmandapp/OsmAnd-tools/tree/master/obf-generation/heightmap
 
 if [[ $TYPE == tifheightmap ]]; then
-	ZOOM="14"
+	ZOOM="15"
 else
 	ZOOM="14"
 fi
