@@ -47,6 +47,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	private static final String NODE_NETWORK_TAG = "node_network_point";
 	private static final String NODE_NETWORK_MULTIPLE_VALUE = "multiple";
 	private static final boolean DELETE_AFTER_38_RELEASE = false;
+	private static final Map<String, String> OSMC_NO_NAME_FOREGROUND = Map.of(
+			"hiking", "black_hiker",
+			"bicycle", "black_bicycle",
+			"mtb", "black_bicycle",
+			"horse", "black_horse",
+			"fitness_trail", "black_runner",
+			"running", "black_runner"
+	);
 
 	private Map<String, TIntArrayList> socketTypes;
 
@@ -1359,6 +1367,18 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			OsmcSymbol osmcSymbol = new OsmcSymbol(value);
 			osmcSymbol.addOsmcNewTags(tags);
 
+		} else if (tags.containsKey("route") && !tags.containsKey("name") && !tags.containsKey("ref")) {
+			String route = tags.get("route");
+			String foreground = OSMC_NO_NAME_FOREGROUND.get(route);
+			if (foreground != null) {
+				OsmcSymbol osmcSymbol = new OsmcSymbol("white", "", "black");
+				osmcSymbol.setForeground(foreground);
+				String color = tags.containsKey("color") ? tags.get("color") : tags.get("colour");
+				if (color != null) {
+					osmcSymbol.setWaycolor(color);
+				}
+				osmcSymbol.addOsmcNewTags(tags);
+			}
 		} else if (tags.containsKey("route") && tags.get("route").equals("hiking")) {
 
 			if (tags.containsKey("ref")) {
