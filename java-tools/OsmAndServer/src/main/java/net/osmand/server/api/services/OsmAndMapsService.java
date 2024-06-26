@@ -1021,7 +1021,7 @@ public class OsmAndMapsService {
 		public void updateRoutingType(ServerRoutingTypes type) {
 			this.disableHHRouting = type.isOldRouting();
 			this.useNativeRouting = type.isUsingNativeLib();
-			this.calcMode = type.is2phaseRouting() ? RouteCalculationMode.COMPLEX : RouteCalculationMode.NORMAL;
+			this.calcMode = type.is2phaseRouting() ? null /* auto-COMPLEX-mode */ : RouteCalculationMode.NORMAL;
 		}
 
 		public void updateApproximationType(ServerApproximationTypes type) {
