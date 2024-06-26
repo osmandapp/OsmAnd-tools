@@ -174,7 +174,7 @@ public class OsmAndMapsService {
 		}
 
 		public boolean is2phaseRouting() {
-			return this == ASTAR_2PHASE_JAVA || this == ASTAR_2PHASE_CPP;
+			return this == ASTAR_2PHASE_JAVA || this == ASTAR_2PHASE_CPP || this == HH_JAVA || this == HH_CPP;
 		}
 	}
 
