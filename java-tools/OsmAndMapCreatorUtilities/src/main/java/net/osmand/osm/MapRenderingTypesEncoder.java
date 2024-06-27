@@ -1378,6 +1378,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 					osmcSymbol.setWaycolor(color);
 				}
 				osmcSymbol.addOsmcNewTags(tags);
+				tags.put("osmc_order", "1");
 			}
 		} else if (tags.containsKey("route") && tags.get("route").equals("hiking")) {
 
