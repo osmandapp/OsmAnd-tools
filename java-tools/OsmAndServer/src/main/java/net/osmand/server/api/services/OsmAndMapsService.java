@@ -174,7 +174,7 @@ public class OsmAndMapsService {
 		}
 
 		public boolean is2phaseRouting() {
-			return this == ASTAR_2PHASE_JAVA || this == ASTAR_2PHASE_CPP;
+			return this == ASTAR_2PHASE_JAVA || this == ASTAR_2PHASE_CPP || this == HH_JAVA || this == HH_CPP;
 		}
 	}
 
@@ -1021,7 +1021,7 @@ public class OsmAndMapsService {
 		public void updateRoutingType(ServerRoutingTypes type) {
 			this.disableHHRouting = type.isOldRouting();
 			this.useNativeRouting = type.isUsingNativeLib();
-			this.calcMode = type.is2phaseRouting() ? RouteCalculationMode.COMPLEX : RouteCalculationMode.NORMAL;
+			this.calcMode = type.is2phaseRouting() ? null /* auto-COMPLEX-mode */ : RouteCalculationMode.NORMAL;
 		}
 
 		public void updateApproximationType(ServerApproximationTypes type) {
