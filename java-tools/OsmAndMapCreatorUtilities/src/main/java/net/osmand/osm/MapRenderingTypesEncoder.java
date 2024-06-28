@@ -1380,7 +1380,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				osmcSymbol.addOsmcNewTags(tags);
 				tags.put("osmc_order", "1");
 			}
-		} else if (tags.containsKey("route") && (tags.get("route").equals("hiking") || tags.get("route").equals("mtb") || tags.get("route").equals("bicycle") || tags.get("route").equals("horse"))) {
+		} else if (tags.containsKey("route") && (tags.get("route").equals("hiking") || tags.get("route").equals("mtb") || tags.get("route").equals("bicycle") || tags.get("route").equals("horse") || tags.get("route").equals("running"))) {
 
 			if (tags.containsKey("ref")) {
 				tags = new LinkedHashMap<>(tags);
