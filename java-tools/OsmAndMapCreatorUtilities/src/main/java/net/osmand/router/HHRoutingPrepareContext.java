@@ -22,7 +22,7 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 
 public class HHRoutingPrepareContext {
 
-	static final int ROUTING_MEMORY_LIMIT = 2048;
+	static final int ROUTING_MEMORY_LIMIT = 3000;
 	static int MEMORY_RELOAD_TIMEOUT_SECONDS = 120;
 	static int MEMORY_RELOAD_MB = 1000; //
 	static long MEMEORY_LAST_RELOAD = System.currentTimeMillis();
