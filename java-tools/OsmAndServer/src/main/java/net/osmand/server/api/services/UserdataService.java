@@ -400,7 +400,7 @@ public class UserdataService {
         PremiumUserDevicesRepository.PremiumUserDevice sameDevice;
         while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
                 deviceId)) != null) {
-            LOG.error("device-register: call delete-same-device (" + email + ")");
+            LOG.error("device-register: call delete-same-device (" + email + ") old-token (" + sameDevice.accesstoken + ")");
             devicesRepository.delete(sameDevice);
         }
         device.lang = lang;
