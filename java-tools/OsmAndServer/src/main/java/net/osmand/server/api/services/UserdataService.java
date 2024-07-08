@@ -398,11 +398,15 @@ public class UserdataService {
         pu.tokenTime = null;
         PremiumUserDevicesRepository.PremiumUserDevice device = new PremiumUserDevicesRepository.PremiumUserDevice();
         PremiumUserDevicesRepository.PremiumUserDevice sameDevice;
-        while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
-                deviceId)) != null) {
-            LOG.error("device-register: call delete-same-device (" + email + ") old-token (" + sameDevice.accesstoken + ")");
-            devicesRepository.delete(sameDevice);
-        }
+	    if (Algorithms.isEmpty(deviceId)) {
+		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
+	    } else {
+		    while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
+				    deviceId)) != null) {
+			    LOG.error("device-register: call delete-same-device (" + email + ")");
+			    devicesRepository.delete(sameDevice);
+		    }
+	    }
         device.lang = lang;
         device.brand = brand;
         device.model = model;
