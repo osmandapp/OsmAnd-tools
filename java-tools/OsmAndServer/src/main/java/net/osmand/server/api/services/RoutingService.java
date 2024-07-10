@@ -182,6 +182,19 @@ public class RoutingService {
         }
     }
 
+    public void interpolateEmptyElevationSegments(List<LatLonEle> points) {
+        List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+        for (LatLonEle point : points) {
+            GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(point.getLatitude(), point.getLongitude());
+            waypoint.ele = point.getElevation();
+            waypoints.add(waypoint);
+        }
+        GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+        for (int i = 0; i < waypoints.size(); i++) {
+            points.get(i).setElevation((float)waypoints.get(i).ele);
+        }
+    }
+
     public void convertResultsWithElevation(List<LatLonEle> resListEle,
                                             List<Feature> features, List<RouteSegmentResult> res) {
         for (int i = 0; i < res.size(); i++) {
