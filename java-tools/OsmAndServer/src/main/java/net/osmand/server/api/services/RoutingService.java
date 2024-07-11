@@ -341,6 +341,17 @@ public class RoutingService {
                     getPoint(endInd, r, locations, heightArray, pointsRes);
                 }
             }
+
+            List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+            pointsRes.forEach(p -> {
+                    GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(p.lat, p.lng);
+                    waypoint.ele = p.ele;
+                    waypoints.add(waypoint);
+            });
+            GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+            for (int i = 0; i < waypoints.size(); i++) {
+                pointsRes.get(i).ele = waypoints.get(i).ele;
+            }
             return pointsRes;
         }
         return Collections.emptyList();
