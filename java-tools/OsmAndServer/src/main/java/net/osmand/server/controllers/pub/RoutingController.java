@@ -296,6 +296,7 @@ public class RoutingController {
 								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress);
 				if (res != null) {
 					routingService.convertResultsWithElevation(resListElevation, features, res);
+					routingService.interpolateEmptyElevationSegments(resListElevation);
 				}
 			} catch (IOException | InterruptedException | RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);

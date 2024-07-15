@@ -208,7 +208,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 
 	private long getConvertId(long id, int ord, long hash) {
-		if(id < 0) {
+		if(id < 0 && (shiftId > 0 || additionId > 0)) {
 			long lid = (id << shiftId) + additionId;
 			long fid = (lid << 2) + ord;
 			generatedIds.put(fid, lid);

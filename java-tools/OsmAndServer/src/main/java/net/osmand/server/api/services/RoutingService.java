@@ -182,6 +182,19 @@ public class RoutingService {
         }
     }
 
+    public void interpolateEmptyElevationSegments(List<LatLonEle> points) {
+        List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+        for (LatLonEle point : points) {
+            GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(point.getLatitude(), point.getLongitude());
+            waypoint.ele = point.getElevation();
+            waypoints.add(waypoint);
+        }
+        GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+        for (int i = 0; i < waypoints.size(); i++) {
+            points.get(i).setElevation((float)waypoints.get(i).ele);
+        }
+    }
+
     public void convertResultsWithElevation(List<LatLonEle> resListEle,
                                             List<Feature> features, List<RouteSegmentResult> res) {
         for (int i = 0; i < res.size(); i++) {
@@ -327,6 +340,17 @@ public class RoutingService {
                 if (routeSegmentResults.indexOf(r) == routeSegmentResults.size() - 1) {
                     getPoint(endInd, r, locations, heightArray, pointsRes);
                 }
+            }
+
+            List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+            pointsRes.forEach(p -> {
+                    GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(p.lat, p.lng);
+                    waypoint.ele = p.ele;
+                    waypoints.add(waypoint);
+            });
+            GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+            for (int i = 0; i < waypoints.size(); i++) {
+                pointsRes.get(i).ele = waypoints.get(i).ele;
             }
             return pointsRes;
         }
