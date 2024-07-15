@@ -69,6 +69,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 	private IndexCreatorSettings settings;
 	private Map<String, HashSet<String>> topIndexAdditional;
+	private Set<String> topIndexKeys = new HashSet<>();
 
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
@@ -244,6 +245,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			String topIndexKey = MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + e.getKey();
 			if (poiTypes.topIndexPoiAdditional.containsKey(topIndexKey)) {
+				topIndexKeys.add(topIndexKey);
 				rulType = getOrCreate(topIndexKey, e.getValue(), false);
 				if (rulType.getValue() != null) {
 					if (b.length() > 0) {
@@ -546,13 +548,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		topIndexAdditional = new HashMap<>();
 		ResultSet rs;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
+			if (!topIndexKeys.contains(entry.getKey())) {
+				continue;
+			}
 			String column = entry.getKey();
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
 			minCount = minCount > 0 ? minCount : PoiType.DEFAULT_MIN_COUNT;
 			maxPerMap = maxPerMap > 0 ? maxPerMap : PoiType.DEFAULT_MAX_PER_MAP;
-			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, " + column +
-					" from poi where " + column + " is not NULL group by " + column+ " having cnt > " + minCount +
+			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\"" +
+					" from poi where \"" + column + "\" is not NULL group by \"" + column+ "\" having cnt > " + minCount +
 					" order by cnt desc");
 			HashSet<String> set = new HashSet<>();
 			while (rs.next()) {
@@ -891,8 +896,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (poiTypes != null && poiTypes.topIndexPoiAdditional.size() > 0) {
 			String sql = "";
 			for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
-				sql += entry.getKey() + " varchar(2048), ";
+				sql += "\"" + entry.getKey() + "\" varchar(2048), ";
 			}
+			System.out.println(sql);
 			return sql;
 		}
 		return "";
@@ -902,7 +908,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (poiTypes != null && poiTypes.topIndexPoiAdditional.size() > 0) {
 			String sql = "";
 			for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
-				sql += " ," + entry.getKey();
+				sql += " ,\"" + entry.getKey() + "\"";
 			}
 			return sql;
 		}
