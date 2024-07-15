@@ -898,7 +898,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 				sql += "\"" + entry.getKey() + "\" varchar(2048), ";
 			}
-			System.out.println(sql);
 			return sql;
 		}
 		return "";
