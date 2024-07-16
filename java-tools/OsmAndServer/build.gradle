@@ -35,7 +35,7 @@ bootJar {
     dependsOn generateGitProperties
     launchScript()
 
-    baseName = 'osmand-server-boot'
+    archiveBaseName = 'osmand-server-boot'
     version =  version
     mainClass = 'net.osmand.server.Application'
 }

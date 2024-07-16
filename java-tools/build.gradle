@@ -19,7 +19,8 @@ subprojects {
 
 	group 'net.osmand'
 	version 'master-snapshot'
-	sourceCompatibility = 11
+	sourceCompatibility = 17
+	targetCompatibility = "17"
 	eclipse {
 			classpath {
 				file {
@@ -30,13 +31,16 @@ subprojects {
 		}
 	}
 
-
 	test {
 	        ignoreFailures = true
 
 		reports {
-			junitXml.enabled = true
-			html.enabled = false
+			junitXml {
+			   enabled
+			}
+			html {
+			  ! enabled 
+			}
 		}
 		systemProperty 'eyepiece', System.getProperty('eyepiece')
 		systemProperty 'openglTestResources', System.getProperty('openglTestResources')
@@ -50,7 +54,7 @@ subprojects {
 		if(project.hasProperty('mainClassAttribute')) {
 			manifest.attributes 'Main-Class': project.getProperty('mainClassAttribute');
 		}
-		archiveName "${project.name}.jar"
+		archiveFileName = "${project.name}.jar"
 		from {
 			configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
 		} 

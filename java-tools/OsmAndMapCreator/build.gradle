@@ -56,7 +56,7 @@ task buildDistribution(type: Zip) {
 		include 'logging.properties'
 	}
 
-	archiveName 'OsmAndMapCreator.zip'
+	archiveFileName = 'OsmAndMapCreator.zip'
 }
 
 compileJava {
