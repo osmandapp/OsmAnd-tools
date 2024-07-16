@@ -9,7 +9,6 @@ compileJava {
 	dependsOn collectTestResources
 }
 
-
 task collectMdpiIcons(type: Sync) {
 	from("../../../resources/rendering_styles/style-icons/map-shaders-png/drawable-mdpi")
 	from("../../../resources/rendering_styles/style-icons/map-icons-png/drawable-mdpi")
@@ -24,6 +23,11 @@ task collectFonts(type: Sync) {
 compileJava {
 	dependsOn collectMdpiIcons, collectFonts
 }
+
+processResources {
+        dependsOn collectMdpiIcons, collectFonts
+}
+
 
 configurations.all {
 	exclude group: 'xml-apis', module: 'xml-apis'
