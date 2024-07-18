@@ -317,8 +317,8 @@ public class MapPointsLayer implements MapPanelLayer {
 			int pixY1 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i - 1).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
 			int pixX2 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
 			int pixY2 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
-			GradientPaint gp = new GradientPaint(pixX1, pixY1, new Color(dataList.get(i - 1).color), pixX2, pixY2,
-					new Color(dataList.get(i).color), false);
+			GradientPaint gp = new GradientPaint(pixX1, pixY1, new Color(dataList.get(i - 1).primaryColor), pixX2, pixY2,
+					new Color(dataList.get(i).primaryColor), false);
 			g.setPaint(gp);
 			g.setStroke(new BasicStroke(10));
 			g.draw(new Line2D.Float(pixX1, pixY1, pixX2, pixY2));
