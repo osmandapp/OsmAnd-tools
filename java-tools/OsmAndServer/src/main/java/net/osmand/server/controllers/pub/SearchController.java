@@ -174,4 +174,11 @@ public class SearchController {
         FeatureCollection collection = wikiService.getImagesById(id, lat, lon);
         return ResponseEntity.ok(gson.toJson(collection));
     }
+    
+    @GetMapping(path = {"/get-wiki-content"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getWikiContent(@RequestParam String title, @RequestParam String lang) {
+        String content = wikiService.getWikipediaContent(title, lang);
+        return ResponseEntity.ok(gson.toJson(content));
+    }
 }

@@ -1,11 +1,13 @@
 package net.osmand.server.api.services;
 
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 
 import com.clickhouse.data.value.UnsignedLong;
 import org.apache.commons.codec.binary.Hex;
@@ -86,6 +88,45 @@ public class WikiService {
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
 		
 		return getPoiData(northWest, southEast, query, "lat", "lon", lang);
+	}
+	
+	
+	public String getWikipediaContent(String title, String lang) {
+		String query = "SELECT hex(zipContent) AS ziphex FROM wiki.wiki_content WHERE title = ? AND lang = ?";
+		return jdbcTemplate.query(query, ps -> {
+			ps.setString(1, title);
+			ps.setString(2, lang);
+		}, rs -> {
+			if (rs.next()) {
+				String contentHex = rs.getString("ziphex");
+				byte[] contentBytes = HexFormat.of().parseHex(contentHex);
+				if (contentBytes != null) {
+					return unzipContent(contentBytes);
+				}
+			}
+			return null;
+		});
+	}
+	
+	public String unzipContent(byte[] compressedContent) {
+		if (compressedContent == null || compressedContent.length == 0) {
+			return null;
+		}
+		
+		try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(compressedContent);
+		     GZIPInputStream gzipInputStream = new GZIPInputStream(byteArrayInputStream);
+		     InputStreamReader inputStreamReader = new InputStreamReader(gzipInputStream, StandardCharsets.UTF_8);
+		     BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
+			
+			StringBuilder output = new StringBuilder();
+			String line;
+			while ((line = bufferedReader.readLine()) != null) {
+				output.append(line);
+			}
+			return output.toString();
+		} catch (IOException e) {
+			return null;
+		}
 	}
 	
 	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon, String lang) {
