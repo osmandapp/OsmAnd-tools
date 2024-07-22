@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import static net.osmand.data.MapObject.unzipContent;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.DatasourceConfiguration;
@@ -93,6 +94,23 @@ public class WikiService {
 	
 	public String getWikipediaContent(String title, String lang) {
 		String query = "SELECT hex(zipContent) AS ziphex FROM wiki.wiki_content WHERE title = ? AND lang = ?";
+		return jdbcTemplate.query(query, ps -> {
+			ps.setString(1, title);
+			ps.setString(2, lang);
+		}, rs -> {
+			if (rs.next()) {
+				String contentHex = rs.getString("ziphex");
+				byte[] contentBytes = HexFormat.of().parseHex(contentHex);
+				if (contentBytes != null) {
+					return unzipContent(contentBytes);
+				}
+			}
+			return null;
+		});
+	}
+	
+	public String getWikivoyageContent(String title, String lang) {
+		String query = "SELECT hex(content_gz) AS ziphex FROM wiki.wikivoyage_articles WHERE title = ? AND lang = ?";
 		return jdbcTemplate.query(query, ps -> {
 			ps.setString(1, title);
 			ps.setString(2, lang);

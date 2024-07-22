@@ -177,8 +177,15 @@ public class SearchController {
     
     @GetMapping(path = {"/get-wiki-content"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getWikiContent(@RequestParam String title, @RequestParam String lang) {
+    public ResponseEntity<String> getWikipediaContent(@RequestParam String title, @RequestParam String lang) {
         String content = wikiService.getWikipediaContent(title, lang);
+        return ResponseEntity.ok(gson.toJson(content));
+    }
+    
+    @GetMapping(path = {"/get-wikivoyage-content"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getWikivoyageContent(@RequestParam String title, @RequestParam String lang) {
+        String content = wikiService.getWikivoyageContent(title, lang);
         return ResponseEntity.ok(gson.toJson(content));
     }
 }
