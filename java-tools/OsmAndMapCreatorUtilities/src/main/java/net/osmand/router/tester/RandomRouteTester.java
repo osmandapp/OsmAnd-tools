@@ -421,6 +421,8 @@ public class RandomRouteTester {
 						RoutePlannerFrontEnd.RouteCalculationMode.COMPLEX :
 						RoutePlannerFrontEnd.RouteCalculationMode.NORMAL;
 
+		config.routeCalculationTime = System.currentTimeMillis(); // ENABLE_TIME_CONDITIONAL_ROUTING
+
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
 				useNative ? nativeLibrary : null,
@@ -468,6 +470,8 @@ public class RandomRouteTester {
 				new RoutingConfiguration.RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
+
+		config.routeCalculationTime = System.currentTimeMillis(); // ENABLE_TIME_CONDITIONAL_ROUTING
 
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
