@@ -129,8 +129,9 @@ public class OsmGpxWriteContext {
 				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
+				addExtensionsTags(gpxTrackTags, gpxFile.extensions);
 				addAnalysisTags(gpxTrackTags, analysis);
-				seraizeTags(extraTrackTags, gpxTrackTags);
+				serializeTags(extraTrackTags, gpxTrackTags);
 				serializer.endTag(null, "node");
 			}
 		} else {
@@ -170,9 +171,10 @@ public class OsmGpxWriteContext {
 							GPXUtilities.TRAVEL_GPX_CONVERT_MULT_1, GPXUtilities.TRAVEL_GPX_CONVERT_MULT_2));
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
+					addExtensionsTags(gpxTrackTags, gpxFile.extensions);
 					addAnalysisTags(gpxTrackTags, analysis);
 					addElevationTags(gpxTrackTags, s);
-					seraizeTags(extraTrackTags, gpxTrackTags);
+					serializeTags(extraTrackTags, gpxTrackTags);
 					serializer.endTag(null, "way");
 				}
 			}
@@ -185,6 +187,22 @@ public class OsmGpxWriteContext {
 			}
 		}
 		tracks++;
+	}
+
+	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
+		if (extensions != null) {
+			// add all extensions tags but not all will be considered by rendering_types.xml
+			// OsmAnd ext "osmand:key" = "val" is already turned into "key" = "val"
+			gpxTrackTags.putAll(extensions);
+
+			// OsmAnd exports track-color as "osmand:color"
+			// prioritize OsmAnd color over std GPX color
+			if (extensions.containsKey("color")) {
+				gpxTrackTags.put("gpx_color", extensions.get("color")); // plain copy to pass "osmand:color" as is
+				gpxTrackTags.remove("colour_int");
+				gpxTrackTags.remove("colour");
+			}
+		}
 	}
 
 	private void addElevationTags(Map<String, String> gpxTrackTags, TrkSegment s) {
@@ -207,7 +225,7 @@ public class OsmGpxWriteContext {
 		}
 	}
 
-	private void seraizeTags(Map<String, String> extraTrackTags, Map<String, String> gpxTrackTags) throws IOException {
+	private void serializeTags(Map<String, String> extraTrackTags, Map<String, String> gpxTrackTags) throws IOException {
 		if (extraTrackTags != null) {
 			gpxTrackTags.putAll(extraTrackTags);
 		}
