@@ -47,51 +47,14 @@ public class SearchController {
     SearchService searchService;
     
     @RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
-    public ResponseEntity<String> search(@RequestParam double lat, @RequestParam double lon, @RequestParam String search) throws IOException, InterruptedException {
+    public ResponseEntity<String> search(@RequestParam double lat,
+                                         @RequestParam double lon,
+                                         @RequestParam String text) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
-        try {
-            List<SearchResult> res = searchService.search(lat, lon, search);
-            List<Feature> features = new ArrayList<>();
-            int pos = 0;
-            int posLoc = 0;
-            for (SearchResult sr : res) {
-                pos++;
-                if (sr.location != null) {
-                    posLoc++;
-                    double loc = MapUtils.getDistance(sr.location, lat, lon) / 1000.0;
-                    String typeString = "";
-                    if (!Algorithms.isEmpty(sr.localeRelatedObjectName)) {
-                        typeString += " " + sr.localeRelatedObjectName;
-                        if (sr.distRelatedObjectName != 0) {
-                            typeString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
-                        }
-                    }
-                    if (sr.objectType == ObjectType.HOUSE && (sr.relatedObject instanceof Street)) {
-                            typeString += " " + ((Street) sr.relatedObject).getCity().getName();
-                        
-                    }
-                    if (sr.objectType == ObjectType.LOCATION) {
-                        typeString += " " + osmAndMapsService.getOsmandRegions().getCountryName(sr.location);
-                    }
-                    if (sr.object instanceof Amenity) {
-                        typeString += " " + ((Amenity) sr.object).getSubType();
-                        if (((Amenity) sr.object).isClosed()) {
-                            typeString += " (CLOSED)";
-                        }
-                    }
-                    String r = String.format("%d. %s %s [%.2f km, %d, %s, %.2f] ", pos, sr.localeName, typeString, loc,
-                            sr.getFoundWordCount(), sr.objectType, sr.getUnknownPhraseMatchWeight());
-                    features.add(new Feature(Geometry.point(sr.location)).prop("description", r).
-                            prop("index", pos).prop("locindex", posLoc).prop("distance", loc).prop("type", sr.objectType));
-                }
-            }
-            return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
-        } catch (IOException | RuntimeException e) {
-            LOGGER.error(e.getMessage(), e);
-            throw e;
-        }
+        List<Feature> features = searchService.search(lat, lon, text);
+        return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
@@ -125,8 +88,8 @@ public class SearchController {
     
     @GetMapping(path = {"/search-poi-categories"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> searchPoiCategories(@RequestParam String search) throws IOException {
-        Map<String, Map<String, String>> res = searchService.searchPoiCategories(search);
+    public ResponseEntity<String> searchPoiCategories(@RequestParam String search, @RequestParam String locale) throws IOException {
+        Map<String, Map<String, String>> res = searchService.searchPoiCategories(search, locale);
         return ResponseEntity.ok(gson.toJson(res));
     }
     
