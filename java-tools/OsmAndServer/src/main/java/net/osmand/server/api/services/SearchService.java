@@ -45,7 +45,7 @@ public class SearchService {
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
-    private static final int TOTAL_LIMIT_POI = 400;
+    private static final int TOTAL_LIMIT_POI = 2000;
     
     private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 5;
     private static final String SEARCH_LOCALE = "en";
