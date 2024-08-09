@@ -15,10 +15,15 @@ import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
+import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.xmlpull.v1.XmlPullParserException;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -32,6 +37,9 @@ public class SearchService {
     
     @Autowired
     OsmAndMapsService osmAndMapsService;
+    
+    @Value("${osmand.android.translations.location}")
+    String andTranslationsLocation;
     
     OsmandRegions osmandRegions;
     
@@ -98,11 +106,11 @@ public class SearchService {
         return bbox;
     }
     
-    public List<Feature> search(double lat, double lon, String text) throws IOException {
+    public List<Feature> search(double lat, double lon, String text, String locale) throws IOException, XmlPullParserException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         searchUICore.setTotalLimit(1000);
         searchUICore.getSearchSettings().setRegions(osmandRegions);
         
@@ -138,7 +146,7 @@ public class SearchService {
         }
     }
     
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException, XmlPullParserException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -157,7 +165,7 @@ public class SearchService {
             usedMapList = osmAndMapsService.getReaders(mapList, null);
             for (String category : data.categories) {
                 int sumLimit = limit + leftoverLimit;
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList);
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList, locale);
                 List<SearchResult> res = new ArrayList<>();
                 if (resultCollection != null) {
                     res = resultCollection.getCurrentSearchResults();
@@ -259,11 +267,11 @@ public class SearchService {
         return List.of();
     }
     
-    public SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList) throws IOException {
-//        if (!osmAndMapsService.validateAndInitConfig()) {
-//            return null;
-//        }
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+    public SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList, String locale) throws IOException, XmlPullParserException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
         searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
@@ -350,9 +358,9 @@ public class SearchService {
     }
     
     
-    public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) throws IOException {
+    public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) throws IOException, XmlPullParserException {
         Map<String, Map<String, String>> searchRes = new HashMap<>();
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), locale, true);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, true);
         searchUICore.init();
         List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
                 .getCurrentSearchResults();
@@ -360,8 +368,8 @@ public class SearchService {
         return searchRes;
     }
     
-    public Map<String, List<String>> searchPoiCategories() {
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
+    public Map<String, List<String>> searchPoiCategories(String locale) throws XmlPullParserException, IOException {
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
         Map<String, List<String>> res = new HashMap<>();
         categoriesList.forEach(poiCategory -> {
@@ -373,6 +381,15 @@ public class SearchService {
             
         });
         return res;
+    }
+    
+    private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
+        MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
+        Map<String, String> phrases = Algorithms.parseStringsXml(new File(andTranslationsLocation + "values-" + locale + "/phrases.xml"));
+        Map<String, String> enPhrases = Algorithms.parseStringsXml(new File(andTranslationsLocation + "values/phrases.xml"));
+        mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(phrases, enPhrases));
+        
+        return mapPoiTypes;
     }
     
     private String getIconName(PoiType poiType) {

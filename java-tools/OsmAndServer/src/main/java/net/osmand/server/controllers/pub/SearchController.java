@@ -29,6 +29,8 @@ import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import org.xmlpull.v1.XmlPullParserException;
+
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Controller
 @RequestMapping("/routing/search")
@@ -49,25 +51,27 @@ public class SearchController {
     @RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<String> search(@RequestParam double lat,
                                          @RequestParam double lon,
-                                         @RequestParam String text) throws IOException {
+                                         @RequestParam String text,
+                                         @RequestParam String locale) throws IOException, XmlPullParserException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
-        List<Feature> features = searchService.search(lat, lon, text);
+        List<Feature> features = searchService.search(lat, lon, text, locale);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData) throws IOException, InterruptedException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData);
+    public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData,
+                                            @RequestParam String locale) throws IOException, XmlPullParserException {
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
     
     @GetMapping(path = {"/get-poi-categories"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getPoiCategories() {
-        Map<String, List<String>> categoriesNames = searchService.searchPoiCategories();
+    public ResponseEntity<String> getPoiCategories(@RequestParam String locale) throws XmlPullParserException, IOException {
+        Map<String, List<String>> categoriesNames = searchService.searchPoiCategories(locale);
         if (categoriesNames != null) {
             return ResponseEntity.ok(gson.toJson(categoriesNames));
         } else {
@@ -88,7 +92,8 @@ public class SearchController {
     
     @GetMapping(path = {"/search-poi-categories"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> searchPoiCategories(@RequestParam String search, @RequestParam String locale) throws IOException {
+    public ResponseEntity<String> searchPoiCategories(@RequestParam String search,
+                                                      @RequestParam String locale) throws IOException, XmlPullParserException {
         Map<String, Map<String, String>> res = searchService.searchPoiCategories(search, locale);
         return ResponseEntity.ok(gson.toJson(res));
     }
