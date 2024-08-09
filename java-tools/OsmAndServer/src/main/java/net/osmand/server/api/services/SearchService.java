@@ -385,7 +385,8 @@ public class SearchService {
     
     private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
         MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
-        Map<String, String> phrases = Algorithms.parseStringsXml(new File(andTranslationsLocation + "values-" + locale + "/phrases.xml"));
+        String localPath = locale.equals("en") ? "values" : "values-" + locale;
+        Map<String, String> phrases = Algorithms.parseStringsXml(new File(andTranslationsLocation + localPath + "/phrases.xml"));
         Map<String, String> enPhrases = Algorithms.parseStringsXml(new File(andTranslationsLocation + "values/phrases.xml"));
         mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(phrases, enPhrases));
         
