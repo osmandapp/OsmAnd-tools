@@ -112,8 +112,7 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
-        String validateLocale = validateLocale(locale);
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, false);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
         searchUICore.getSearchSettings().setRegions(osmandRegions);
         
@@ -150,7 +149,6 @@ public class SearchService {
     }
     
     public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException, XmlPullParserException {
-        String validateLocale = validateLocale(locale);
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -169,7 +167,7 @@ public class SearchService {
             usedMapList = osmAndMapsService.getReaders(mapList, null);
             for (String category : data.categories) {
                 int sumLimit = limit + leftoverLimit;
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList, validateLocale);
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList, locale);
                 List<SearchResult> res = new ArrayList<>();
                 if (resultCollection != null) {
                     res = resultCollection.getCurrentSearchResults();
@@ -275,8 +273,7 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
-        String validateLocale = validateLocale(locale);
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, false);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
         searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
@@ -365,8 +362,7 @@ public class SearchService {
     
     public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) throws IOException, XmlPullParserException {
         Map<String, Map<String, String>> searchRes = new HashMap<>();
-        String validateLocale = validateLocale(locale);
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, true);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, true);
         searchUICore.init();
         List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
                 .getCurrentSearchResults();
@@ -375,8 +371,7 @@ public class SearchService {
     }
     
     public Map<String, List<String>> searchPoiCategories(String locale) throws XmlPullParserException, IOException {
-        String validateLocale = validateLocale(locale);
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, false);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
         Map<String, List<String>> res = new HashMap<>();
         categoriesList.forEach(poiCategory -> {
@@ -392,12 +387,19 @@ public class SearchService {
     
     private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
         MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
-        String localPath = locale.equals("en") ? "values" : "values-" + locale;
+        String validLoc = validateLocale(locale);
+        String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
         
         InputStream phrasesStream = this.getClass().getResourceAsStream( AND_RES + localPath + "/phrases.xml");
-        Map<String, String> phrases = parseStringsXml(phrasesStream);
-        
+        if (phrasesStream == null) {
+            throw new IllegalArgumentException("Locale not found: " + locale);
+        }
         InputStream enPhrasesStream = this.getClass().getResourceAsStream(AND_RES + "values/phrases.xml");
+        if (enPhrasesStream == null) {
+            throw new IllegalArgumentException("Locale not found: en");
+        }
+        
+        Map<String, String> phrases = parseStringsXml(phrasesStream);
         Map<String, String> enPhrases = parseStringsXml(enPhrasesStream);
         
         mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(phrases, enPhrases));
