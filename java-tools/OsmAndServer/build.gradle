@@ -31,7 +31,7 @@ task generateGitProperties {
     }
 }
 tasks.register('copyAndroidResources', Copy) {
-    def fromPath = file("../../../../android/OsmAnd/res")
+    def fromPath = file("../../../android/OsmAnd/res")
     from(fromPath)
     def toPath = file("${project.getBuildDir()}/resources/androidResources")
     into(toPath)
