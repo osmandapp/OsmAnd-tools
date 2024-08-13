@@ -31,14 +31,8 @@ task generateGitProperties {
     }
 }
 tasks.register('copyAndroidResources', Copy) {
-    def fromPath = file("../../../android/OsmAnd/res")
-    from(fromPath)
-    def toPath = file("${project.getBuildDir()}/resources/androidResources")
-    into(toPath)
-    doLast {
-        logger.lifecycle("Copying from: ${fromPath.path}")
-        logger.lifecycle("Copying to: ${toPath.path}")
-    }
+    from("../../../android/OsmAnd/res")
+    into("${project.getBuildDir()}/resources/androidResources")
 }
 processResources.dependsOn(copyAndroidResources)
 
