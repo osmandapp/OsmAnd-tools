@@ -21,10 +21,13 @@ import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
@@ -38,9 +41,6 @@ public class SearchService {
     @Autowired
     OsmAndMapsService osmAndMapsService;
     
-    @Value("${osmand.android.res}")
-    String andTranslationsLocation;
-    
     OsmandRegions osmandRegions;
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
@@ -50,6 +50,7 @@ public class SearchService {
     
     private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 5;
     private static final String SEARCH_LOCALE = "en";
+    private static final String AND_RES = "/androidResources/";
     
     private static final int SHIFT_MULTIPOLYGON_IDS = 43;
     private static final int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
@@ -392,11 +393,52 @@ public class SearchService {
     private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
         MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
         String localPath = locale.equals("en") ? "values" : "values-" + locale;
-        Map<String, String> phrases = Algorithms.parseStringsXml(new File(andTranslationsLocation + localPath + "/phrases.xml"));
-        Map<String, String> enPhrases = Algorithms.parseStringsXml(new File(andTranslationsLocation + "values/phrases.xml"));
+        
+        InputStream phrasesStream = this.getClass().getResourceAsStream( AND_RES + localPath + "/phrases.xml");
+        Map<String, String> phrases = parseStringsXml(phrasesStream);
+        
+        InputStream enPhrasesStream = this.getClass().getResourceAsStream(AND_RES + "values/phrases.xml");
+        Map<String, String> enPhrases = parseStringsXml(enPhrasesStream);
+        
         mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(phrases, enPhrases));
         
         return mapPoiTypes;
+    }
+    
+    private Map<String, String> parseStringsXml(InputStream inputStream) throws XmlPullParserException, IOException {
+        Map<String, String> resultMap = new HashMap<>();
+        
+        XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+        XmlPullParser parser = factory.newPullParser();
+        parser.setInput(inputStream, "UTF-8");
+        
+        int eventType = parser.getEventType();
+        String key = null;
+        String value = null;
+        
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            String tagName = parser.getName();
+            switch (eventType) {
+                case XmlPullParser.START_TAG:
+                    if (tagName.equals("string")) {
+                        key = parser.getAttributeValue(null, "name");
+                    }
+                    break;
+                case XmlPullParser.TEXT:
+                    value = parser.getText();
+                    break;
+                case XmlPullParser.END_TAG:
+                    if (tagName.equals("string") && key != null && value != null) {
+                        resultMap.put(key, value);
+                        key = null;
+                        value = null;
+                    }
+                    break;
+            }
+            eventType = parser.next();
+        }
+        inputStream.close();
+        return resultMap;
     }
     
     private String validateLocale(String locale) {

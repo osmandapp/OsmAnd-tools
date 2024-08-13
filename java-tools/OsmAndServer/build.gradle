@@ -31,8 +31,11 @@ task generateGitProperties {
     }
 }
 tasks.register('copyAndroidResources', Copy) {
-    from("../../../android/OsmAnd/res")
-    into("${project.getBuildDir()}/resources/androidResources")
+    from("../../../android/OsmAnd/res") {
+        include "values/**"
+        include "values-*/**"
+    }
+    into("src/main/resources/androidResources")
 }
 processResources.dependsOn(copyAndroidResources)
 
