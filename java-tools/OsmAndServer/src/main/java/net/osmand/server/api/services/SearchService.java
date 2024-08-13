@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
@@ -42,6 +43,8 @@ public class SearchService {
     OsmAndMapsService osmAndMapsService;
     
     OsmandRegions osmandRegions;
+    
+    private ConcurrentHashMap<String, MapPoiTypes> translationsCache;
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
@@ -386,6 +389,12 @@ public class SearchService {
     }
     
     private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
+        if (translationsCache == null) {
+            translationsCache = new ConcurrentHashMap<>();
+        }
+        if (translationsCache.containsKey(locale)) {
+            return translationsCache.get(locale);
+        }
         MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
         String validLoc = validateLocale(locale);
         String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
@@ -403,6 +412,7 @@ public class SearchService {
         Map<String, String> enPhrases = parseStringsXml(enPhrasesStream);
         
         mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(phrases, enPhrases));
+        translationsCache.put(locale, mapPoiTypes);
         
         return mapPoiTypes;
     }
