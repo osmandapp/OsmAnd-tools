@@ -30,7 +30,7 @@ osmand:
   srtm.location: ${SRTM_LOCATION:}
   weather.location: ${WEATHER_LOCATION:}
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
-  android.translations.location: ${osmand.files.location}/android/OsmAnd/res/
+  android.res: ${user.dir}/OsmAndServer/build/resources/androidResources/
   
 server:
   port: 8080

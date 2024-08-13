@@ -38,7 +38,7 @@ public class SearchService {
     @Autowired
     OsmAndMapsService osmAndMapsService;
     
-    @Value("${osmand.android.translations.location}")
+    @Value("${osmand.android.res}")
     String andTranslationsLocation;
     
     OsmandRegions osmandRegions;

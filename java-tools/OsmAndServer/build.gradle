@@ -30,6 +30,11 @@ task generateGitProperties {
         }
     }
 }
+tasks.register('copyAndroidResources', Copy) {
+    from("${project.path}/../../../android/OsmAnd/res")
+    into("${project.getBuildDir()}/resources/androidResources")
+}
+processResources.dependsOn(copyAndroidResources)
 
 bootJar {
     dependsOn generateGitProperties
