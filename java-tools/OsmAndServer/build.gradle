@@ -34,6 +34,7 @@ tasks.register('copyAndroidResources', Copy) {
     def fromPath = file("${project.path}/../../../android/OsmAnd/res")
     def fromPath2 = file("../../../android/OsmAnd/res")
     from(fromPath)
+    from(fromPath2)
     def toPath = file("${project.getBuildDir()}/resources/androidResources")
     into(toPath)
     doLast {
