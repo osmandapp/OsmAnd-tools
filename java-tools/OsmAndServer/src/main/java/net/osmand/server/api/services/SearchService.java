@@ -46,6 +46,7 @@ public class SearchService {
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
     private static final int TOTAL_LIMIT_POI = 2000;
+    private static final int TOTAL_LIMIT_SEARCH_RESULTS = 1000;
     
     private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 5;
     private static final String SEARCH_LOCALE = "en";
@@ -110,8 +111,9 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
-        searchUICore.setTotalLimit(1000);
+        String validateLocale = validateLocale(locale);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, false);
+        searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
         searchUICore.getSearchSettings().setRegions(osmandRegions);
         
         QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
@@ -147,6 +149,7 @@ public class SearchService {
     }
     
     public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException, XmlPullParserException {
+        String validateLocale = validateLocale(locale);
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -165,7 +168,7 @@ public class SearchService {
             usedMapList = osmAndMapsService.getReaders(mapList, null);
             for (String category : data.categories) {
                 int sumLimit = limit + leftoverLimit;
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList, locale);
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList, validateLocale);
                 List<SearchResult> res = new ArrayList<>();
                 if (resultCollection != null) {
                     res = resultCollection.getCurrentSearchResults();
@@ -271,7 +274,8 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
+        String validateLocale = validateLocale(locale);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, false);
         MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
         searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
@@ -360,7 +364,8 @@ public class SearchService {
     
     public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) throws IOException, XmlPullParserException {
         Map<String, Map<String, String>> searchRes = new HashMap<>();
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, true);
+        String validateLocale = validateLocale(locale);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, true);
         searchUICore.init();
         List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
                 .getCurrentSearchResults();
@@ -369,7 +374,8 @@ public class SearchService {
     }
     
     public Map<String, List<String>> searchPoiCategories(String locale) throws XmlPullParserException, IOException {
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
+        String validateLocale = validateLocale(locale);
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(validateLocale), validateLocale, false);
         List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
         Map<String, List<String>> res = new HashMap<>();
         categoriesList.forEach(poiCategory -> {
@@ -391,6 +397,14 @@ public class SearchService {
         mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(phrases, enPhrases));
         
         return mapPoiTypes;
+    }
+    
+    private String validateLocale(String locale) {
+        if (locale == null || locale.isEmpty()) {
+            throw new IllegalArgumentException("Locale cannot be null or empty");
+        }
+        // Remove potentially dangerous characters such as '/'
+        return locale.replaceAll("[/\\\\]", "");
     }
     
     private String getIconName(PoiType poiType) {
