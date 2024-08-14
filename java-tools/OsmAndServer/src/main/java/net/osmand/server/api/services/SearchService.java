@@ -126,12 +126,15 @@ public class SearchService {
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0, "search");
             usedMapList = osmAndMapsService.getReaders(list, null);
-            searchUICore.getSearchSettings().setOfflineIndexes(usedMapList);
+            
+            SearchSettings settings = searchUICore.getPhrase().getSettings();
+            settings.setOfflineIndexes(usedMapList);
+            settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
+            searchUICore.updateSettings(settings);
+            
             searchUICore.init();
             searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
             
-            SearchSettings settings = searchUICore.getPhrase().getSettings();
-            searchUICore.updateSettings(settings.setRadiusLevel(SEARCH_RADIUS_LEVEL));
             SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text, new LatLon(lat, lon));
             List<SearchResult> res;
             if (resultCollection != null) {
@@ -492,9 +495,6 @@ public class SearchService {
                 tags.put(CATEGORY_ICON, category.getIconKeyName());
                 tags.put(CATEGORY_KEY_NAME, category.getKeyName());
             }
-        } else if (obj instanceof PoiCategory type) {
-            tags.put(KEY_NAME, type.getKeyName());
-            tags.put(ICON_NAME, type.getIconKeyName());
         } else if (obj instanceof PoiFilter type) {
             tags.put(KEY_NAME, type.getKeyName());
             PoiCategory category = type.getPoiCategory();
@@ -502,6 +502,9 @@ public class SearchService {
                 tags.put(CATEGORY_ICON, category.getIconKeyName());
                 tags.put(CATEGORY_KEY_NAME, category.getKeyName());
             }
+        } else if (obj instanceof AbstractPoiType type) {
+            tags.put(KEY_NAME, type.getKeyName());
+            tags.put(ICON_NAME, type.getIconKeyName());
         }
         return tags;
     }
