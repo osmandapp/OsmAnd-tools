@@ -102,11 +102,7 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> getPoiAddress(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
         String address = searchService.getPoiAddress(new LatLon(lat, lon));
-        if (address != null) {
-            return ResponseEntity.ok(gson.toJson(address));
-        } else {
-            return ResponseEntity.badRequest().body("Error get poi address!");
-        }
+        return ResponseEntity.ok(gson.toJson(address));
     }
     
     @GetMapping(path = {"/get-wiki-data"}, produces = "application/json")
