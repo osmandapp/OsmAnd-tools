@@ -395,9 +395,9 @@ public class SearchService {
         if (translationsCache == null) {
             translationsCache = new ConcurrentHashMap<>();
         }
-        if (translationsCache.containsKey(locale)) {
-            return translationsCache.get(locale);
-        }
+//        if (translationsCache.containsKey(locale)) {
+//            return translationsCache.get(locale);
+//        }
         MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
         String validLoc = validateLocale(locale);
         String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
