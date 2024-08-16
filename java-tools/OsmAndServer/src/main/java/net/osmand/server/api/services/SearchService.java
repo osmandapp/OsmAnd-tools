@@ -279,10 +279,10 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
-        MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
+        SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
-        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
+        searchUICore.registerAPI(searchAmenityTypesAPI);
         searchUICore.setTotalLimit(limit);
         
         SearchSettings settings = searchUICore.getPhrase().getSettings();
