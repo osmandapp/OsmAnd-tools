@@ -155,9 +155,9 @@ public class SearchService {
     }
     
     public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException, XmlPullParserException {
-//        if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
-//            return new PoiSearchResult(false, false, true, null);
-//        }
+        if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
+            return new PoiSearchResult(false, false, true, null);
+        }
         
         List<Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
