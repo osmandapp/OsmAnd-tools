@@ -155,9 +155,9 @@ public class SearchService {
     }
     
     public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException, XmlPullParserException {
-        if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
-            return new PoiSearchResult(false, false, true, null);
-        }
+//        if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
+//            return new PoiSearchResult(false, false, true, null);
+//        }
         
         List<Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
@@ -395,9 +395,9 @@ public class SearchService {
         if (translationsCache == null) {
             translationsCache = new ConcurrentHashMap<>();
         }
-//        if (translationsCache.containsKey(locale)) {
-//            return translationsCache.get(locale);
-//        }
+        if (translationsCache.containsKey(locale)) {
+            return translationsCache.get(locale);
+        }
         MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
         String validLoc = validateLocale(locale);
         String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
