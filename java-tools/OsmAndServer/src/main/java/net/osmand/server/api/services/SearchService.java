@@ -282,7 +282,7 @@ public class SearchService {
         MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
-        searchUICore.registerAPI(searchAmenityTypesAPI);
+        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
         searchUICore.setTotalLimit(limit);
         
         SearchSettings settings = searchUICore.getPhrase().getSettings();
