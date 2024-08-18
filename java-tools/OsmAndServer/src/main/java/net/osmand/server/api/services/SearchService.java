@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.data.MapObject.unzipContent;
+import static net.osmand.osm.MapPoiTypes.setDefault;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Service
@@ -125,7 +126,7 @@ public class SearchService {
         List<Feature> features = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0, "search");
-            usedMapList = osmAndMapsService.getReaders(list, null);
+            usedMapList = osmAndMapsService.getReaders(list,null, locale);
             
             SearchSettings settings = searchUICore.getPhrase().getSettings();
             settings.setOfflineIndexes(usedMapList);
@@ -159,6 +160,11 @@ public class SearchService {
             return new PoiSearchResult(false, false, true, null);
         }
         
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale, new MapPoiTypes(null));
+        setDefault(mapPoiTypes);
+        
+        SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
+        
         List<Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
         int limit = TOTAL_LIMIT_POI / data.categories.size();
@@ -170,10 +176,12 @@ public class SearchService {
             if (mapList.isEmpty()) {
                 return new PoiSearchResult(false, true, false, null);
             }
-            usedMapList = osmAndMapsService.getReaders(mapList, null);
+            
+            usedMapList = osmAndMapsService.getReaders(mapList, null, locale);
+            
             for (String category : data.categories) {
                 int sumLimit = limit + leftoverLimit;
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(category, searchBbox, sumLimit, usedMapList, locale);
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(searchUICore, category, searchBbox, sumLimit, usedMapList, locale);
                 List<SearchResult> res = new ArrayList<>();
                 if (resultCollection != null) {
                     res = resultCollection.getCurrentSearchResults();
@@ -187,7 +195,7 @@ public class SearchService {
                 leftoverLimit = limit - res.size();
             }
         } finally {
-            osmAndMapsService.unlockReaders(usedMapList);
+            osmAndMapsService.unlockReaders(usedMapList, locale);
         }
         if (!features.isEmpty()) {
             return new PoiSearchResult(useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
@@ -265,8 +273,6 @@ public class SearchService {
     
     private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException {
         if (searchBbox != null) {
-            SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-            searchUICore.getSearchSettings().setRegions(osmandRegions);
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, MAX_NUMBER_OF_MAP_SEARCH_POI, "search");
             if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
                 return list;
@@ -275,20 +281,21 @@ public class SearchService {
         return List.of();
     }
     
-    public SearchUICore.SearchResultCollection searchPoiByCategory(String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList, String locale) throws IOException, XmlPullParserException {
+    public SearchUICore.SearchResultCollection searchPoiByCategory(SearchUICore searchUICore, String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList, String locale) throws IOException, XmlPullParserException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
-        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
-        SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
-        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
-        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
-        searchUICore.setTotalLimit(limit);
         
         SearchSettings settings = searchUICore.getPhrase().getSettings();
-        settings.setRegions(osmandRegions);
+        settings.setRegions(new OsmandRegions());
+        
         settings.setOfflineIndexes(mapList);
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+        
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(searchUICore.getPoiTypes());
+        SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(searchUICore.getPoiTypes(), searchAmenityTypesAPI);
+        searchUICore.registerAPI(searchAmenityByTypesAPI);
+        searchUICore.setTotalLimit(limit);
         
         return searchUICore.immediateSearch(text, null);
     }
@@ -391,14 +398,13 @@ public class SearchService {
         return res;
     }
     
-    private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
+    private MapPoiTypes getMapPoiTypes(String locale, MapPoiTypes mapPoiTypes) throws XmlPullParserException, IOException {
         if (translationsCache == null) {
             translationsCache = new ConcurrentHashMap<>();
         }
         if (translationsCache.containsKey(locale)) {
             return translationsCache.get(locale);
         }
-        MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
         String validLoc = validateLocale(locale);
         String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
         
@@ -418,6 +424,10 @@ public class SearchService {
         translationsCache.put(locale, mapPoiTypes);
         
         return mapPoiTypes;
+    }
+    
+    private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
+        return getMapPoiTypes(locale, MapPoiTypes.getDefault());
     }
     
     private Map<String, String> parseStringsXml(InputStream inputStream) throws XmlPullParserException, IOException {

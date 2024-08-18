@@ -231,92 +231,94 @@ public class OsmAndMapsService {
 	public class BinaryMapIndexReaderReference {
 		File file;
 		private static final int WAIT_LOCK_CHECK = 10;
-		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
+		Map<String, ConcurrentHashMap<BinaryMapIndexReader, Boolean>> readersByLocale = new LinkedHashMap<>();
 		public FileIndex fileIndex;
-
-		private synchronized void closeUnusedReaders() {
-			readers.forEach((reader, open) -> {
-				if (Boolean.TRUE.equals(open)) {
-					try {
-						reader.close();
-						readers.remove(reader);
-					} catch (IOException e) {
-						LOGGER.error(e.getMessage(), e);
+		
+		private synchronized void closeUnusedReaders(String locale) {
+			ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = readersByLocale.get(locale);
+			if (readers != null) {
+				readers.forEach((reader, open) -> {
+					if (Boolean.TRUE.equals(open)) {
+						try {
+							reader.close();
+							readers.remove(reader);
+						} catch (IOException e) {
+							LOGGER.error(e.getMessage(), e);
+						}
 					}
-				}
-			});
+				});
+			}
 		}
-
-		private synchronized BinaryMapIndexReader lockReader() {
-			for (Entry<BinaryMapIndexReader, Boolean> r : readers.entrySet()) {
-				if (Boolean.TRUE.equals(r.getValue())) {
-					r.setValue(false);
-					return r.getKey();
+		
+		private synchronized BinaryMapIndexReader lockReader(String locale) {
+			Map<BinaryMapIndexReader, Boolean> readers = readersByLocale.get(locale);
+			if (readers != null) {
+				for (Entry<BinaryMapIndexReader, Boolean> r : readers.entrySet()) {
+					if (Boolean.TRUE.equals(r.getValue())) {
+						r.setValue(false);
+						return r.getKey();
+					}
 				}
 			}
 			return null;
 		}
-
-		public void unlockReader(BinaryMapIndexReader reader) {
-			if (reader != null && !readers.isEmpty()) {
-				readers.computeIfPresent(reader, (key, value) -> true);
-			}
-		}
-
-		public BinaryMapIndexReader getReader(CachedOsmandIndexes cacheFiles, int maxWaitMs) throws IOException, InterruptedException {
-			BinaryMapIndexReader resReader = lockReader();
+		
+		public BinaryMapIndexReader getReader(CachedOsmandIndexes cacheFiles, String locale, int maxWaitMs) throws IOException, InterruptedException {
+			BinaryMapIndexReader resReader = lockReader(locale);
 			if (resReader != null) {
 				return resReader;
 			}
-			if (readers.size() < MAX_SAME_FILE_OPEN) {
+			if (readersByLocale.getOrDefault(locale, new ConcurrentHashMap<>()).size() < MAX_SAME_FILE_OPEN) {
 				if (cacheFiles == null) {
 					initObfReaders();
 				}
-				BinaryMapIndexReader newReader = createReader();
+				BinaryMapIndexReader newReader = createReader(locale);
 				if (newReader != null) {
-					readers.put(newReader, true);
+					readersByLocale.computeIfAbsent(locale, k -> new ConcurrentHashMap<>()).put(newReader, true);
 				}
 			}
 			int ms = 0;
 			while (ms < maxWaitMs) {
 				Thread.sleep(WAIT_LOCK_CHECK);
 				ms += WAIT_LOCK_CHECK;
-				resReader = lockReader();
+				resReader = lockReader(locale);
 				if (resReader != null) {
 					return resReader;
 				}
 			}
-			LOGGER.info("Failed to get a reader for the file " + file.getName());
+			LOGGER.info("Failed to get a reader for the file " + file.getName() + " with locale " + locale);
 			return null;
 		}
-
-		private BinaryMapIndexReader createReader() throws IOException {
+		
+		private BinaryMapIndexReader createReader(String locale) throws IOException {
 			if (cacheFiles != null) {
 				RandomAccessFile raf = new RandomAccessFile(file, "r");
-				BinaryMapIndexReader reader = cacheFiles.initReaderFromFileIndex(fileIndex, raf, file);
-				return reader;
+				return cacheFiles.initReaderFromFileIndex(fileIndex, raf, file);
 			}
-			LOGGER.info("Failed to create a reader for the file " + file.getName());
+			LOGGER.info("Failed to create a reader for the file " + file.getName() + " with locale " + locale);
 			return null;
 		}
-
-		public int getOpenFiles() {
+		
+		public int getOpenFiles(String locale) {
 			int cnt = 0;
-			for (Boolean b : readers.values()) {
-				if (Boolean.TRUE.equals(b)) {
-					cnt++;
+			Map<BinaryMapIndexReader, Boolean> readers = readersByLocale.get(locale);
+			if (readers != null) {
+				for (Boolean b : readers.values()) {
+					if (Boolean.TRUE.equals(b)) {
+						cnt++;
+					}
 				}
 			}
 			return cnt;
 		}
 	}
-
-	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
+	
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag, String locale) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : refs) {
 			BinaryMapIndexReader reader = null;
 			try {
-				reader = ref.getReader(cacheFiles, 1000);
+				reader = ref.getReader(cacheFiles, locale, 1000);
 			} catch (IOException | InterruptedException e) {
 				LOGGER.error(e.getMessage(), e);
 			}
@@ -325,19 +327,41 @@ public class OsmAndMapsService {
 			} else if (incompleteFlag != null) {
 				incompleteFlag[0] = true;
 			}
-		};
+		}
 		return res;
 	}
-
-	public void unlockReaders(List<BinaryMapIndexReader> mapsReaders) {
-		obfFiles.values().forEach(ref -> mapsReaders.forEach(ref::unlockReader));
+	
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
+		return getReaders(refs, incompleteFlag, "en");
 	}
-
-	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
+	
+	public void unlockReaders(List<BinaryMapIndexReader> mapsReaders, String locale) {
+		for (BinaryMapIndexReader reader : mapsReaders) {
+			BinaryMapIndexReaderReference ref = obfFiles.get(reader.getFile().getAbsolutePath());
+			if (ref != null) {
+				synchronized (ref) {
+					ref.readersByLocale.computeIfPresent(locale, (k, v) -> {
+						v.computeIfPresent(reader, (k1, v1) -> true);
+						return v;
+					});
+				}
+			}
+		}
+	}
+	
+	public void unlockReaders(List<BinaryMapIndexReader> mapsReaders) {
+		unlockReaders(mapsReaders, "en");
+	}
+	
+	@Scheduled(fixedRate = 15 * 60 * 1000)
 	public void closeMapReaders() {
 		obfFiles.forEach((name, ref) -> {
-			if (!ref.readers.isEmpty()) {
-				ref.closeUnusedReaders();
+			if (!ref.readersByLocale.isEmpty()) {
+				ref.readersByLocale.forEach((loc, readers) -> {
+					if (!readers.isEmpty()) {
+						ref.closeUnusedReaders(loc);
+					}
+				});
 			}
 		});
 	}
@@ -393,12 +417,15 @@ public class OsmAndMapsService {
 		public String name;
 		public String profile = "car";
 	}
-
-
+	
+	
 	public int getCurrentOpenJavaFiles() {
 		int cnt = 0;
-		for(BinaryMapIndexReaderReference r: obfFiles.values()) {
-			cnt+= r.getOpenFiles();
+		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
+			// Iterate over all readers in obfFiles and count open Java files
+			for (String locale : ref.readersByLocale.keySet()) {
+				cnt += ref.getOpenFiles(locale);
+			}
 		}
 		return cnt;
 	}
@@ -649,7 +676,7 @@ public class OsmAndMapsService {
 			return new File(cfg.cacheLocation, loc.toString());
 		}
 	}
-
+	
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void checkZippedFiles() throws IOException {
 		if (config != null && !Algorithms.isEmpty(config.obfZipLocation) && !Algorithms.isEmpty(config.obfLocation)) {
@@ -683,7 +710,7 @@ public class OsmAndMapsService {
 						zis.close();
 						LOGGER.info("Unzip new obf file " + target.getName() + " " + (System.currentTimeMillis() - val)
 								+ " ms");
-						initNewObfFiles(target, targetTemp);
+						initNewObfFiles(target, targetTemp, "en");
 					}
 				}
 			}
@@ -1458,40 +1485,60 @@ public class OsmAndMapsService {
 		}
 		return upd;
 	}
-
-
-	private void initNewObfFiles(File target, File targetTemp) throws IOException {
+	
+	
+	private void initNewObfFiles(File target, File targetTemp, String locale) throws IOException {
 		initObfReaders();
-		long val = System.currentTimeMillis();
+		long startTime = System.currentTimeMillis();
+		
+		// Get the BinaryMapIndexReaderReference from obfFiles
 		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
-		if(ref == null) {
+		
+		if (ref == null) {
 			ref = new BinaryMapIndexReaderReference();
 			ref.file = target;
 			obfFiles.put(target.getAbsolutePath(), ref);
 		}
-		if (ref.fileIndex != null) {
-			ref.fileIndex = null;
+		
+		// Close old readers for all locales
+		if (!ref.readersByLocale.isEmpty()) {
+			ref.readersByLocale.forEach((loc, readers) -> {
+				readers.forEach((reader, isLocked) -> {
+					try {
+						reader.close();
+					} catch (IOException e) {
+						LOGGER.error(e.getMessage(), e);
+					}
+				});
+				readers.clear();
+			});
 		}
-
-		if (!ref.readers.isEmpty()) {
-			for (Entry<BinaryMapIndexReader, Boolean> r : ref.readers.entrySet()) {
-				r.getKey().close();
-			}
-		}
+		
+		// Close the map file in the native library if it's open
 		if (nativelib != null) {
 			nativelib.closeMapFile(target.getAbsolutePath());
 		}
+		
+		// Move the temporary file to the target location
 		target.delete();
 		targetTemp.renameTo(target);
+		
+		// Create a new reader and add it to the cache for the specified locale
 		RandomAccessFile raf = new RandomAccessFile(target, "r");
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
-		ref.readers.put(reader, true);
+		ref.readersByLocale.computeIfAbsent(locale, k -> new ConcurrentHashMap<>()).put(reader, true);
+		
+		// Add the reader to the locale-specific cache
 		ref.fileIndex = cacheFiles.addToCache(reader, target);
+		
+		// Update the cache file on disk
 		cacheFiles.writeToFile(new File(config.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
+		
+		// Initialize the map file in the native library if necessary
 		if (nativelib != null) {
 			nativelib.initMapFile(target.getAbsolutePath(), false);
 		}
-		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
+		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - startTime) + " ms");
 	}
 
 	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps, String reason) throws IOException {
