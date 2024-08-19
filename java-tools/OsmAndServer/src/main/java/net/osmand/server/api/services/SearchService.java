@@ -160,20 +160,11 @@ public class SearchService {
             return new PoiSearchResult(false, false, true, null);
         }
         
-        MapPoiTypes mapPoiTypes;
-        if (mapTypeCache == null) {
-            mapTypeCache = new ConcurrentHashMap<>();
-        }
-        if (mapTypeCache.containsKey(locale)) {
-            mapPoiTypes = mapTypeCache.get(locale);
-        } else {
-            mapPoiTypes = getMapPoiTypes(locale,new MapPoiTypes(null));
-            mapTypeCache.put(locale, mapPoiTypes);
-        }
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale, new MapPoiTypes(null));
         setDefault(mapPoiTypes);
-        
+
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
-        
+
         List<Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
         int limit = TOTAL_LIMIT_POI / data.categories.size();
