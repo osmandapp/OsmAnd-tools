@@ -44,7 +44,7 @@ public class SearchService {
     OsmAndMapsService osmAndMapsService;
     
     OsmandRegions osmandRegions;
-    private ConcurrentHashMap<String, MapPoiTypes> mapTypeCache;
+    
     private ConcurrentHashMap<String, MapPoiTypes> translationsCache;
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
@@ -160,19 +160,13 @@ public class SearchService {
             return new PoiSearchResult(false, false, true, null);
         }
         
-        MapPoiTypes mapPoiTypes;
-        if (mapTypeCache == null) {
-            mapTypeCache = new ConcurrentHashMap<>();
-        }
-        if (mapTypeCache.containsKey(locale)) {
-            mapPoiTypes = mapTypeCache.get(locale);
-        } else {
-            mapPoiTypes = getMapPoiTypes(locale,new MapPoiTypes(null));
-            mapTypeCache.put(locale, mapPoiTypes);
-        }
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale,new MapPoiTypes(null));
         setDefault(mapPoiTypes);
         
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(searchUICore.getPoiTypes());
+        SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(searchUICore.getPoiTypes(), searchAmenityTypesAPI);
+        searchUICore.registerAPI(searchAmenityByTypesAPI);
         
         List<Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
@@ -188,9 +182,14 @@ public class SearchService {
             
             usedMapList = osmAndMapsService.getReaders(mapList, null);
             
+            SearchSettings settings = searchUICore.getPhrase().getSettings();
+            settings.setRegions(osmandRegions);
+            settings.setOfflineIndexes(usedMapList);
+            searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+            
             for (String category : data.categories) {
                 int sumLimit = limit + leftoverLimit;
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(searchUICore, category, searchBbox, sumLimit, usedMapList, locale);
+                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(searchUICore, category, sumLimit);
                 List<SearchResult> res = new ArrayList<>();
                 if (resultCollection != null) {
                     res = resultCollection.getCurrentSearchResults();
@@ -290,21 +289,12 @@ public class SearchService {
         return List.of();
     }
     
-    public SearchUICore.SearchResultCollection searchPoiByCategory(SearchUICore searchUICore, String text, QuadRect searchBbox, int limit, List<BinaryMapIndexReader> mapList, String locale) throws IOException, XmlPullParserException {
+    public SearchUICore.SearchResultCollection searchPoiByCategory(SearchUICore searchUICore, String text, int limit) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
         
-        SearchSettings settings = searchUICore.getPhrase().getSettings();
-        settings.setRegions(osmandRegions);
-        settings.setOfflineIndexes(mapList);
-        searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-        
-        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(searchUICore.getPoiTypes());
-        SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(searchUICore.getPoiTypes(), searchAmenityTypesAPI);
-        searchUICore.registerAPI(searchAmenityByTypesAPI);
         searchUICore.setTotalLimit(limit);
-        
         return searchUICore.immediateSearch(text, null);
     }
     
