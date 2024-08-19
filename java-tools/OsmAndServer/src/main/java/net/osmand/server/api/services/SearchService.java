@@ -44,7 +44,7 @@ public class SearchService {
     OsmAndMapsService osmAndMapsService;
     
     OsmandRegions osmandRegions;
-    
+    private ConcurrentHashMap<String, MapPoiTypes> mapTypeCache;
     private ConcurrentHashMap<String, MapPoiTypes> translationsCache;
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
@@ -160,7 +160,16 @@ public class SearchService {
             return new PoiSearchResult(false, false, true, null);
         }
         
-        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale, new MapPoiTypes(null));
+        MapPoiTypes mapPoiTypes;
+        if (mapTypeCache == null) {
+            mapTypeCache = new ConcurrentHashMap<>();
+        }
+        if (mapTypeCache.containsKey(locale)) {
+            mapPoiTypes = mapTypeCache.get(locale);
+        } else {
+            mapPoiTypes = getMapPoiTypes(locale,new MapPoiTypes(null));
+            mapTypeCache.put(locale, mapPoiTypes);
+        }
         setDefault(mapPoiTypes);
         
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
@@ -287,8 +296,7 @@ public class SearchService {
         }
         
         SearchSettings settings = searchUICore.getPhrase().getSettings();
-        settings.setRegions(new OsmandRegions());
-        
+        settings.setRegions(osmandRegions);
         settings.setOfflineIndexes(mapList);
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
         
