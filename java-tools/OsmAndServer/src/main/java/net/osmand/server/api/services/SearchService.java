@@ -45,7 +45,7 @@ public class SearchService {
     
     OsmandRegions osmandRegions;
     
-    private ConcurrentHashMap<String, MapPoiTypes> translationsCache;
+    private ConcurrentHashMap<String, Map<String, String>> translationsCache;
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
@@ -155,12 +155,12 @@ public class SearchService {
         }
     }
     
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException, XmlPullParserException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
         
-        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale,new MapPoiTypes(null));
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
         setDefault(mapPoiTypes);
         
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
@@ -371,7 +371,7 @@ public class SearchService {
     }
     
     
-    public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) throws IOException, XmlPullParserException {
+    public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) throws IOException {
         Map<String, Map<String, String>> searchRes = new HashMap<>();
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, true);
         searchUICore.init();
@@ -381,7 +381,7 @@ public class SearchService {
         return searchRes;
     }
     
-    public Map<String, List<String>> searchPoiCategories(String locale) throws XmlPullParserException, IOException {
+    public Map<String, List<String>> searchPoiCategories(String locale) {
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
         Map<String, List<String>> res = new HashMap<>();
@@ -396,35 +396,37 @@ public class SearchService {
         return res;
     }
     
-    private MapPoiTypes getMapPoiTypes(String locale, MapPoiTypes mapPoiTypes) throws XmlPullParserException, IOException {
+    private Map<String, String> getTranslations(String locale) {
         if (translationsCache == null) {
             translationsCache = new ConcurrentHashMap<>();
         }
-        if (translationsCache.containsKey(locale)) {
-            return translationsCache.get(locale);
-        }
-        String validLoc = validateLocale(locale);
-        String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
         
-        InputStream phrasesStream = this.getClass().getResourceAsStream( AND_RES + localPath + "/phrases.xml");
-        if (phrasesStream == null) {
-            throw new IllegalArgumentException("Locale not found: " + locale);
-        }
-        InputStream enPhrasesStream = this.getClass().getResourceAsStream(AND_RES + "values/phrases.xml");
-        if (enPhrasesStream == null) {
-            throw new IllegalArgumentException("Locale not found: en");
-        }
+        return translationsCache.computeIfAbsent(locale, loc -> {
+            try {
+                String validLoc = validateLocale(loc);
+                String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
+                
+                InputStream phrasesStream = this.getClass().getResourceAsStream(AND_RES + localPath + "/phrases.xml");
+                if (phrasesStream == null) {
+                    throw new IllegalArgumentException("Locale not found: " + loc);
+                }
+                
+                return parseStringsXml(phrasesStream);
+            } catch (XmlPullParserException | IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+    
+    private MapPoiTypes getMapPoiTypes(String locale, MapPoiTypes mapPoiTypes) {
+        Map<String, String> translations = getTranslations(locale);
+        Map<String, String> enTranslations = getTranslations("en");
         
-        Map<String, String> phrases = parseStringsXml(phrasesStream);
-        Map<String, String> enPhrases = parseStringsXml(enPhrasesStream);
-        
-        mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(phrases, enPhrases));
-        translationsCache.put(locale, mapPoiTypes);
-        
+        mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(translations, enTranslations));
         return mapPoiTypes;
     }
     
-    private MapPoiTypes getMapPoiTypes(String locale) throws XmlPullParserException, IOException {
+    private MapPoiTypes getMapPoiTypes(String locale) {
         return getMapPoiTypes(locale, MapPoiTypes.getDefault());
     }
     
