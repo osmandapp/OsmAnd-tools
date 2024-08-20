@@ -3,7 +3,7 @@ project(':OsmAnd-java').projectDir = new File(settingsDir, '../../android/OsmAnd
 
 include ':OsmAnd-shared'
 project(':OsmAnd-shared').projectDir = new File(settingsDir, '../../android/OsmAnd-shared')
-project(":OsmAnd-shared").buildFileName = "build.gradle"
+project(":OsmAnd-shared").buildFileName = "jvm.build.gradle"
 //project(":OsmAnd-shared").buildFileName = "jvm.build.gradle.kts"
 
 
