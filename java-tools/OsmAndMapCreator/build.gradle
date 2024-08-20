@@ -2,8 +2,7 @@ jar {
 	doFirst {
 		manifest {
 			attributes('Main-Class': project.getProperty('mainClassAttribute'),
-				   'Class-Path': configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join(' ')
-				   )
+				   'Class-Path': configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join(' '))
 		}
 	}
 }

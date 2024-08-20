@@ -38,10 +38,12 @@ configurations.all {
 	exclude group: 'xml-apis', module: 'xml-apis'
 }
 
+
+
 dependencies {
 	testImplementation group: 'junit', name: 'junit', version: '4.12'
 
-    implementation project(':OsmAnd-shared')
+	implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
 
 	implementation project(':OsmAnd-java'), {
 		// TODO exclude for java 11
@@ -50,8 +52,8 @@ dependencies {
 		// xmlpull
 		// xml-apis
 		// xwiki...rendering-xml
-           exclude module:'gnu.trove.osmand'
-        }
+		exclude module:'gnu.trove.osmand'
+	}
 
 	testImplementation project(':OsmAnd-java')
 	//testImplementation files(project(':OsmAnd-java').sourceSets.test.output.classesDirs.filter {  } )
