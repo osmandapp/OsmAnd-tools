@@ -26,10 +26,10 @@ task downloadCoreJni(type: Download)  {
 
 task buildDistribution(type: Zip) {
 	dependsOn jar
-	// from(configurations.runtimeClasspath.allArtifacts.files) {
-	// 	rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
-	// //	into '.'
-	// }
+	from(configurations.runtimeClasspath.allArtifacts.files) {
+		rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
+		into '.'
+	}
 	from('build/libs/OsmAndMapCreator-master-snapshot.jar') {
 		into '.'
 		rename { 'OsmAndMapCreator.jar' }
