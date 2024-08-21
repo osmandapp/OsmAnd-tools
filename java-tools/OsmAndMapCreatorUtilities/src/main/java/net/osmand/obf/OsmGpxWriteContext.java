@@ -219,8 +219,8 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("avg_ele__start", String.valueOf((int) (wgs.sumEle / wgs.eleCount) - st));
 			gpxTrackTags.put("min_ele__start", String.valueOf((int) wgs.minEle - st));
 			gpxTrackTags.put("max_ele__start", String.valueOf((int) wgs.maxEle - st));
-			gpxTrackTags.put("diff_ele_up", String.valueOf((int) wgs.up));
-			gpxTrackTags.put("diff_ele_down", String.valueOf((int) wgs.down));
+			gpxTrackTags.putIfAbsent("diff_ele_up", String.valueOf((int) wgs.up)); // prefer GPXTrackAnalysis
+			gpxTrackTags.putIfAbsent("diff_ele_down", String.valueOf((int) wgs.down)); // prefer GPXTrackAnalysis
 			gpxTrackTags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wgs.step, wgs.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
 		}
 	}
