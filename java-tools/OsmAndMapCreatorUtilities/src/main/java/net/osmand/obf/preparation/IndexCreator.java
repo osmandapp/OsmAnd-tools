@@ -76,6 +76,7 @@ public class IndexCreator {
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
 	PropagateToNodes propagateToNodes;
+	CityDataStorage cityDataStorage;
 
 	private File dbFile;
 	private File mapFile;
@@ -744,6 +745,7 @@ public class IndexCreator {
 						// indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries
 						// !!!
 						indexAddressCreator.indexBoundariesRelation(e, ctx);
+						cityDataStorage = indexAddressCreator.getCityDataStorage();
 					}
 					if (settings.indexMap) {
 						if (!settings.keepOnlyRouteRelationObjects) {
