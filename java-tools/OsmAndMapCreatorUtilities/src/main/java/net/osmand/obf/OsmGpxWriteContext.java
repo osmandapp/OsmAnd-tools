@@ -191,16 +191,17 @@ public class OsmGpxWriteContext {
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
 		if (extensions != null) {
-			// add all extensions tags but not all will be considered by rendering_types.xml
-			// OsmAnd ext "osmand:key" = "val" is already turned into "key" = "val"
-			gpxTrackTags.putAll(extensions);
-
-			// OsmAnd exports track-color as "osmand:color"
-			// prioritize OsmAnd color over std GPX color
 			if (extensions.containsKey("color")) {
-				gpxTrackTags.put("gpx_color", extensions.get("color")); // plain copy to pass "osmand:color" as is
+				gpxTrackTags.put("color", extensions.get("color")); // osmand:color
+				// prioritize osmand:color over GPX color
 				gpxTrackTags.remove("colour_int");
 				gpxTrackTags.remove("colour");
+			}
+			if (extensions.containsKey("width")) {
+				gpxTrackTags.put("width", extensions.get("width")); // osmand:width
+			}
+			for (String key : extensions.keySet()) {
+				gpxTrackTags.put("gpx_" + key, extensions.get(key)); // enlist required tags in poi_types.xml
 			}
 		}
 	}
