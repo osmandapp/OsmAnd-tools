@@ -103,7 +103,7 @@ dependencies {
 
     implementation group: 'de.grundid.opendatalab', name: 'geojson-jackson', version: '1.0'
 
-    implementation project(':OsmAnd-shared')
+    implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
     implementation project(':OsmAnd-java')
     implementation project(':OsmAndMapCreatorUtilities')
     
