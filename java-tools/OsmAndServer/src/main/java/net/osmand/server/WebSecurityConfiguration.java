@@ -10,19 +10,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.sql.DataSource;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpHeaders;
@@ -31,11 +26,13 @@ import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
+// TODO deprecated - https://stackoverflow.com/questions/74666596/how-to-fix-error-of-websecurityconfigureradapter-when-upgrade-to-spring-boot-3-0
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -157,9 +154,9 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		}).csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
     	http.cors().configurationSource(corsConfigurationSource());
     	
-    	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
-    							.antMatchers("/mapapi/auth/**").permitAll()
-    							.antMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
+    	http.authorizeRequests().requestMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
+    							.requestMatchers("/mapapi/auth/**").permitAll()
+    							.requestMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
     							.anyRequest().permitAll();
     	http.oauth2Login().userInfoEndpoint().userService(oauthGithubUserService());
 
@@ -168,6 +165,8 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 //		http.formLogin().loginPage("/mapapi/auth/loginForm").
 //				loginProcessingUrl("/mapapi/auth/loginProcess").defaultSuccessUrl("/map/loginSuccess");
 		LoginUrlAuthenticationEntryPoint mapLogin = new LoginUrlAuthenticationEntryPoint("/map/loginForm");
+
+		// TODO getApplicationContext from spring6 has other params
 		if (getApplicationContext().getEnvironment().acceptsProfiles(Profiles.of("production"))) {
 			mapLogin.setForceHttps(true);
 		}
@@ -219,6 +218,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				ResponseEntity<Map<String, Object>> res = restTemplate.exchange(request, 
 						new ParameterizedTypeReference<Map<String, Object>>() {});
 				if (!res.getStatusCode().is2xxSuccessful()) {
+					// TODO name() no more exists ?
 					LOG.warn("Result status code from github: " + res.getStatusCode().name() + " " + res.getBody());
 					return null;
 				}
@@ -232,6 +232,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	@Bean("authenticationManager")
 	@Override
 	public AuthenticationManager authenticationManagerBean() throws Exception {
+		// TODO deprecated ?
 		return super.authenticationManagerBean();
 	}
     

@@ -21,8 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.URIException;
@@ -39,8 +39,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.context.WebContext;
-import org.thymeleaf.spring5.SpringTemplateEngine;
-
+import org.thymeleaf.spring6.SpringTemplateEngine;
 import net.osmand.server.api.services.PollsService;
 
 @Controller
@@ -154,6 +153,7 @@ public class WebController {
 				File targetFile = new File(genLocation, file);
 				gr.staticResource = new FileSystemResource(targetFile);
 				gr.template = template;
+				// TODO WebContext should be migrated to new params scheme
 				final IContext ctx = new WebContext(request, response, request.getServletContext(), locale, variables);
 				String content = templateEngine.process(template, ctx);
 				writeToFileSync(targetFile, content);
@@ -434,6 +434,7 @@ public class WebController {
 			return;
 		}
 		Pattern pt = Pattern.compile(" (\\w*)=\\\"([^\\\"]*)\\\"");
+		// TODO WebContext should be migrated to new params scheme
 		final IContext ctx = new WebContext(request, response, request.getServletContext());
 		String cssItem = templateEngine.process("pub/rss_item.css.html", ctx);
 
