@@ -43,7 +43,7 @@ configurations.all {
 dependencies {
 	testImplementation group: 'junit', name: 'junit', version: '4.12'
 
-	implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
+	// implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
 
 	implementation project(':OsmAnd-java'), {
 		// TODO exclude for java 11
