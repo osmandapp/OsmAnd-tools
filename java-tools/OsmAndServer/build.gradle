@@ -105,6 +105,7 @@ dependencies {
 
     implementation project(':OsmAnd-java')
     implementation project(':OsmAndMapCreatorUtilities')
+    implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
     
     // potential conflict google oauth jetty & spring boot jetty / tomcat libs
     implementation (project(':OsmAndServerUtilities'));
