@@ -130,6 +130,7 @@ public class OsmGpxWriteContext {
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 				addExtensionsTags(gpxTrackTags, gpxFile.extensions);
+				addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 				addAnalysisTags(gpxTrackTags, analysis);
 				serializeTags(extraTrackTags, gpxTrackTags);
 				serializer.endTag(null, "node");
@@ -172,6 +173,7 @@ public class OsmGpxWriteContext {
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 					addExtensionsTags(gpxTrackTags, gpxFile.extensions);
+					addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 					addAnalysisTags(gpxTrackTags, analysis);
 					addElevationTags(gpxTrackTags, s);
 					serializeTags(extraTrackTags, gpxTrackTags);
@@ -187,6 +189,24 @@ public class OsmGpxWriteContext {
 			}
 		}
 		tracks++;
+	}
+
+	private void addPointGroupsTags(Map<String, String> gpxTrackTags, Map<String, GPXUtilities.PointsGroup> pointsGroups) {
+		List<String> pgNames = new ArrayList<>();
+		List<String> pgIcons = new ArrayList<>();
+		List<String> pgColors = new ArrayList<>();
+		List<String> pgBackgrounds = new ArrayList<>();
+		for (String name : pointsGroups.keySet()) {
+			pgNames.add(name);
+			pgIcons.add(pointsGroups.get(name).iconName);
+			pgBackgrounds.add(pointsGroups.get(name).backgroundType);
+			pgColors.add(Algorithms.colorToString(pointsGroups.get(name).color));
+		}
+		final String DELIMITER = "~~~";
+		gpxTrackTags.put("points_groups_names", String.join(DELIMITER, pgNames));
+		gpxTrackTags.put("points_groups_icons", String.join(DELIMITER, pgIcons));
+		gpxTrackTags.put("points_groups_colors", String.join(DELIMITER, pgColors));
+		gpxTrackTags.put("points_groups_backgrounds", String.join(DELIMITER, pgBackgrounds));
 	}
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
@@ -329,6 +349,7 @@ public class OsmGpxWriteContext {
 		}
 		if (!Algorithms.isEmpty(p.category)) {
 			tagValue(serializer, "category", p.category);
+			tagValue(serializer, "points_groups_category", p.category);
 		}
 		if (!Algorithms.isEmpty(p.comment)) {
 			tagValue(serializer, "note", p.comment);
