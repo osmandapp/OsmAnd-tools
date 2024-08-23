@@ -377,7 +377,11 @@ public class SearchService {
         searchUICore.init();
         List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
                 .getCurrentSearchResults();
-        results.forEach(res -> searchRes.put(res.localeName, getPoiTypeFields(res.object)));
+        results.forEach(res -> {
+            if (!(res.object instanceof PoiFilter)) {
+                searchRes.put(res.localeName, getPoiTypeFields(res.object));
+            }
+        });
         return searchRes;
     }
     
