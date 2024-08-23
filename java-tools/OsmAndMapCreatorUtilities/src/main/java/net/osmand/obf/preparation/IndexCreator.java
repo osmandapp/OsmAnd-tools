@@ -1,24 +1,5 @@
 package net.osmand.obf.preparation;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.Iterator;
-import java.util.zip.GZIPInputStream;
-
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.xmlpull.v1.XmlPullParserException;
-
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
@@ -36,7 +17,19 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.util.Algorithms;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.xmlpull.v1.XmlPullParserException;
 import rtree.RTreeException;
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import java.io.*;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.zip.GZIPInputStream;
 
 /**
  * http://wiki.openstreetmap.org/wiki/OSM_tags_for_routing#Is_inside.2Foutside
@@ -76,7 +69,6 @@ public class IndexCreator {
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
 	PropagateToNodes propagateToNodes;
-	CityDataStorage cityDataStorage;
 
 	private File dbFile;
 	private File mapFile;
@@ -745,7 +737,6 @@ public class IndexCreator {
 						// indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries
 						// !!!
 						indexAddressCreator.indexBoundariesRelation(e, ctx);
-						cityDataStorage = indexAddressCreator.getCityDataStorage();
 					}
 					if (settings.indexMap) {
 						if (!settings.keepOnlyRouteRelationObjects) {
@@ -802,6 +793,10 @@ public class IndexCreator {
 				});
 
 				indexAddressCreator.commitToPutAllCities();
+			}
+
+			if (settings.indexAddress && settings.indexPOI) {
+				indexPoiCreator.storeCities(indexAddressCreator.getCityDataStorage());
 			}
 		}
 	}

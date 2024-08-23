@@ -9,8 +9,8 @@ import java.util.*;
 
 public class CityDataStorage {
 
-    private Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
-    private Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
+    public Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
+    public Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
     private static final double CITY_VILLAGE_DIST = 10000;
     private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
     private static final double CITY_DIST = 50000;

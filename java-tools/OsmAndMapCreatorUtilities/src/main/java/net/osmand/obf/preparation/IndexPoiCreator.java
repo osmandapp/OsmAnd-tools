@@ -1,40 +1,14 @@
 package net.osmand.obf.preparation;
 
-import java.io.File;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.data.Amenity;
+import net.osmand.data.*;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.*;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
-import net.osmand.osm.PoiType;
-import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
@@ -42,6 +16,14 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.sql.*;
+import java.util.*;
+import java.util.Map.Entry;
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
@@ -70,11 +52,61 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private IndexCreatorSettings settings;
 	private Map<String, HashSet<String>> topIndexAdditional;
 	private Set<String> topIndexKeys = new HashSet<>();
+	private QuadTree<Multipolygon> cityQuadTree;
+	private Map<Multipolygon, List<PoiCreatorTagGroup>> cityTagsGroup;
 
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
+	}
+
+	public void storeCities(CityDataStorage cityDataStorage) {
+		if (cityDataStorage != null) {
+			cityQuadTree = new QuadTree<Multipolygon>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE),
+					8, 0.55f);
+			for (Map.Entry<Boundary, List<City>> entry : cityDataStorage.boundaryToContainingCities.entrySet()) {
+				Boundary b = entry.getKey();
+				Multipolygon m = b.getMultipolygon();
+				QuadRect bboxLatLon = m.getLatLonBbox();
+				int left = MapUtils.get31TileNumberX(bboxLatLon.left);
+				int right = MapUtils.get31TileNumberX(bboxLatLon.right);
+				int top = MapUtils.get31TileNumberY(bboxLatLon.top);
+				int bottom = MapUtils.get31TileNumberY(bboxLatLon.bottom);
+				QuadRect bbox = new QuadRect(left, top, right, bottom);
+				cityQuadTree.insert(m, bbox);
+			}
+
+			cityTagsGroup = new HashMap<>();
+			int id = 1;
+			Set<String> allLanguages =new HashSet<>(Arrays.asList(MapRenderingTypes.langs));
+			for (Map.Entry<City, Boundary> entry : cityDataStorage.cityBoundaries.entrySet()) {
+				City city = entry.getKey();
+				Boundary boundary = entry.getValue();
+				List<String> tags = new ArrayList<>();
+				String name = city.getName();
+				if (!Algorithms.isEmpty(name)) {
+					tags.add("addr:city");
+					tags.add(name);
+				}
+				Map<String, String> otherNames = city.getNamesMap(true);
+				for (Map.Entry<String, String> nameEntry : otherNames.entrySet()) {
+					if (allLanguages.contains(nameEntry.getKey())) {
+						tags.add("addr:city:" + nameEntry.getKey());
+						tags.add(nameEntry.getValue());
+					}
+				}
+
+				if (tags.isEmpty()) {
+					continue;
+				}
+
+				PoiCreatorTagGroup poiCreatorTagGroup = new PoiCreatorTagGroup(id, tags);
+				List<PoiCreatorTagGroup> tagGroups = cityTagsGroup.computeIfAbsent(boundary.getMultipolygon(), s -> new ArrayList<>());
+				tagGroups.add(poiCreatorTagGroup);
+				id++;
+			}
+		}
 	}
 
 	public void setPoiTypes(MapPoiTypes poiTypes) {
@@ -333,6 +365,34 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int maxX = 0;
 		int minY = Integer.MAX_VALUE;
 		int maxY = 0;
+	}
+
+	public static class PoiCreatorTagGroup {
+		int id;
+		List<String> tagValues;
+
+		PoiCreatorTagGroup(int id, List<String> tagValues) {
+			this.id = id;
+			this.tagValues = tagValues;
+		}
+	}
+
+	public static class PoiCreatorTagGroups {
+		HashSet<Integer> ids;
+		HashSet<PoiCreatorTagGroup> tagGroups;
+
+		public void addTagGroup(List<PoiCreatorTagGroup> poiCreatorTagGroups) {
+			for (PoiCreatorTagGroup poiCreatorTagGroup : poiCreatorTagGroups) {
+				if (ids == null) {
+					ids = new HashSet<>();
+					tagGroups = new HashSet<>();
+				}
+				if (!ids.contains(poiCreatorTagGroup.id)) {
+					ids.add(poiCreatorTagGroup.id);
+					tagGroups.add(poiCreatorTagGroup);
+				}
+			}
+		}
 	}
 
 	public static class PoiCreatorCategories {
@@ -613,8 +673,30 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String subtype = rs.getString(4);
 			decodeAdditionalInfo(rs.getString(6), additionalTags);
 
+			List<PoiCreatorTagGroup> tagGroups = new ArrayList<>();
+			if (cityQuadTree != null) {
+				List<Multipolygon> result = new ArrayList<>();
+				cityQuadTree.queryInBox(new QuadRect(x, y, x, y), result);
+				if (result.size() > 0) {
+					LatLon latLon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
+					for (Multipolygon multipolygon : result) {
+						if (multipolygon.containsPoint(latLon)) {
+							if (!cityTagsGroup.containsKey(multipolygon)) {
+								log.error("Multipolygon for POI is not found!!! " + type + " " + subtype + " " + latLon.toString());
+							} else {
+								List<PoiCreatorTagGroup> list = cityTagsGroup.get(multipolygon);
+								tagGroups.addAll(list);
+							}
+						}
+					}
+				}
+			}
+
 			Tree<PoiTileBox> prevTree = rootZoomsTree;
 			rootZoomsTree.getNode().categories.addCategory(type, subtype, additionalTags);
+			if (tagGroups.size() > 0) {
+				rootZoomsTree.getNode().tagGroups.addTagGroup(tagGroups);
+			}
 			for (int i = zoomToStart; i <= ZOOM_TO_SAVE_END; i++) {
 				int xs = x >> (31 - i);
 				int ys = y >> (31 - i);
@@ -636,6 +718,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					prevTree.addSubTree(subtree);
 				}
 				subtree.getNode().categories.addCategory(type, subtype, additionalTags);
+				subtree.getNode().tagGroups.addTagGroup(tagGroups);
 
 				prevTree = subtree;
 			}
@@ -727,6 +810,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			writer.writePoiCategories(boxCats);
 		}
 
+		PoiCreatorTagGroups tagGroups = tree.getNode().tagGroups;
+		writer.writePoiTagGroups(tagGroups);
+
 		if (!end) {
 			for (Tree<PoiTileBox> subTree : tree.getSubtrees()) {
 				writePoiBoxes(writer, subTree, startFpPoiIndex, fpToWriteSeeks, globalCategories);
@@ -750,6 +836,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int zoom;
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
+		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
 
 		public int getX() {
 			return x;
