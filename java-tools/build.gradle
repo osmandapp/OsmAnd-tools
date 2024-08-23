@@ -7,7 +7,7 @@ buildscript {
 }
 
 plugins {
-        id "de.undercouch.download" version "4.1.1"
+		id "de.undercouch.download" version "4.1.1"
 }
 
 
@@ -17,10 +17,17 @@ subprojects {
 	apply plugin: 'eclipse'
 	apply plugin: 'idea'
 
+	configurations {
+		jvmPublicConfig { 
+			extendsFrom(runtimeClasspath)
+		}
+	}
+
 	group 'net.osmand'
 	version 'master-snapshot'
 	sourceCompatibility = 17
 	targetCompatibility = "17"
+	
 	eclipse {
 			classpath {
 				file {
@@ -31,8 +38,20 @@ subprojects {
 		}
 	}
 
+	repositories {
+		maven {
+			url "https://maven.geotoolkit.org"
+		}
+		maven {
+			url "https://maven.geo-solutions.it/"
+		}
+		mavenCentral()
+		jcenter()
+		google()
+	}
+
 	test {
-	        ignoreFailures = true
+			ignoreFailures = true
 
 		reports {
 			junitXml {
@@ -46,12 +65,12 @@ subprojects {
 		systemProperty 'openglTestResources', System.getProperty('openglTestResources')
 	}
 
+	// HELPER TASKS
 	task fatJar(type: Jar) {
-
 		manifest.from jar.manifest
 		dependsOn configurations.runtimeClasspath
 		duplicatesStrategy  DuplicatesStrategy.EXCLUDE
-		if(project.hasProperty('mainClassAttribute')) {
+		if (project.hasProperty('mainClassAttribute')) {
 			manifest.attributes 'Main-Class': project.getProperty('mainClassAttribute');
 		}
 		archiveFileName = "${project.name}.jar"
@@ -67,15 +86,25 @@ subprojects {
 	}
 
 
-	repositories {
-		maven {
-			url "https://maven.geotoolkit.org"
-		}
-		maven {
-			url "https://maven.geo-solutions.it/"
-		}
-		mavenCentral()
-		jcenter()
-		google()
+	task printRuntimeClasspath {
+		  doFirst {
+			println(configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join('\n'))
+		  }
 	}
+	
+	task listConfigurations {
+		doLast {
+			configurations.each { config ->
+				println "Configuration: ${config.name}"
+				println " - Transitive: ${config.transitive}"
+				println " - Visible: ${config.visible}"
+				println " - Can be resolved: ${config.canBeResolved}"
+				println " - Can be consumed: ${config.canBeConsumed}"
+				println " - Extends from: ${config.extendsFrom.collect { it.toString() }}"
+				println " - Dependencies: ${config.dependencies.collect { it.toString() }}"
+				println()
+			}
+		}
+	}
+
 }

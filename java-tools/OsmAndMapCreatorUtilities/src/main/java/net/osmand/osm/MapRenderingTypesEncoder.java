@@ -1453,8 +1453,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			result += 9;
 			result_bicycle_routing += 9;
 		} else if ("grass".equals(surface)) {
-			result += 10;
-			result_bicycle_routing += 10;
+			result += 12;
+			result_bicycle_routing += 12;
 		} else if ("cobblestone".equals(surface)) {
 			result += 11;
 			result_bicycle_routing += 11;

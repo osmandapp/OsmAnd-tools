@@ -543,7 +543,7 @@ public class ApiController {
 								  @RequestParam() Long finishDate,
 								  @RequestParam() Integer nd,
 								  @RequestParam() Integer ns,
-								  @RequestParam() String aid,
+								  @RequestParam(required = false) String aid,
 								  @RequestParam() String version,
 								  @RequestParam() String lang,
 								  @RequestParam() MultipartFile file) throws IOException, SQLException {

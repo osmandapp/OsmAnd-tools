@@ -12,8 +12,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import net.osmand.router.tester.RandomRouteTester;
-import net.osmand.wiki.CommonsWikimediaPreparation;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -47,6 +45,7 @@ import net.osmand.router.HHRoutingShortcutCreator;
 import net.osmand.router.HHRoutingSubGraphCreator;
 import net.osmand.router.HHRoutingTopGraphCreator;
 import net.osmand.router.TestHHRouting;
+import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -141,6 +140,8 @@ public class MainUtilities {
 				HHRoutingShortcutCreator.main(subArgsArray);
 			} else if (utl.equals("hh-routing-obf-write")) {
 				HHRoutingOBFWriter.main(subArgsArray);
+			} else if (utl.equals("test-shared-lib")) {
+				TestSharedLib.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
 				TestHHRouting.main(subArgsArray);
 			} else if (utl.equals("random-route-tester")) {
