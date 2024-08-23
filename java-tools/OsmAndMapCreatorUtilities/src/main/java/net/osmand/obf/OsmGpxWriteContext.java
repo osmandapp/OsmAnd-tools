@@ -4,6 +4,13 @@ import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
+import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
+import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_DELIMITER;
+import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_NAMES;
+import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_ICONS;
+import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_COLORS;
+import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_BACKGROUNDS;
+import static net.osmand.shared.gpx.primitives.GpxExtensions.OBF_GPX_EXTENSION_TAG_PREFIX;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -202,11 +209,11 @@ public class OsmGpxWriteContext {
 			pgBackgrounds.add(pointsGroups.get(name).backgroundType);
 			pgColors.add(Algorithms.colorToString(pointsGroups.get(name).color));
 		}
-		final String DELIMITER = "~~~";
-		gpxTrackTags.put("points_groups_names", String.join(DELIMITER, pgNames));
-		gpxTrackTags.put("points_groups_icons", String.join(DELIMITER, pgIcons));
-		gpxTrackTags.put("points_groups_colors", String.join(DELIMITER, pgColors));
-		gpxTrackTags.put("points_groups_backgrounds", String.join(DELIMITER, pgBackgrounds));
+		final String delimiter = OBF_POINTS_GROUPS_DELIMITER;
+		gpxTrackTags.put(OBF_POINTS_GROUPS_NAMES, String.join(delimiter, pgNames));
+		gpxTrackTags.put(OBF_POINTS_GROUPS_ICONS, String.join(delimiter, pgIcons));
+		gpxTrackTags.put(OBF_POINTS_GROUPS_COLORS, String.join(delimiter, pgColors));
+		gpxTrackTags.put(OBF_POINTS_GROUPS_BACKGROUNDS, String.join(delimiter, pgBackgrounds));
 	}
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
@@ -221,7 +228,7 @@ public class OsmGpxWriteContext {
 				gpxTrackTags.put("width", extensions.get("width")); // osmand:width
 			}
 			for (String key : extensions.keySet()) {
-				gpxTrackTags.put("gpx_" + key, extensions.get(key)); // enlist required tags in poi_types.xml
+				gpxTrackTags.put(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key));
 			}
 		}
 	}
@@ -349,7 +356,7 @@ public class OsmGpxWriteContext {
 		}
 		if (!Algorithms.isEmpty(p.category)) {
 			tagValue(serializer, "category", p.category);
-			tagValue(serializer, "points_groups_category", p.category);
+			tagValue(serializer, OBF_POINTS_GROUPS_CATEGORY, p.category);
 		}
 		if (!Algorithms.isEmpty(p.comment)) {
 			tagValue(serializer, "note", p.comment);
