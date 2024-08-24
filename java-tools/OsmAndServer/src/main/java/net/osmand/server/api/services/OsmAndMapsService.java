@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
 import net.osmand.router.*;
+import net.osmand.shared.gpx.GpxFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -1670,7 +1671,7 @@ public class OsmAndMapsService {
 		return osmandRegions;
 	}
 
-	public File getObf(Map<String, GPXFile> files)
+	public File getObf(Map<String, GpxFile> files)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		File tmpOsm = File.createTempFile("gpx_obf", ".osm.gz");
 		File tmpFolder = new File(tmpOsm.getParentFile(), String.valueOf(System.currentTimeMillis()));
