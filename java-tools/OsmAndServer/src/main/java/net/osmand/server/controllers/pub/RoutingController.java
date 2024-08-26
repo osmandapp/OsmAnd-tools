@@ -40,7 +40,6 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.router.RouteCalculationProgress;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -295,8 +294,11 @@ public class RoutingController {
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
 								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress);
 				if (res != null) {
-					routingService.convertResultsWithElevation(resListElevation, features, res);
+					resListElevation = routingService.getElevationsBySegments(resListElevation, features, res);
 					routingService.interpolateEmptyElevationSegments(resListElevation);
+					List<Double> eleDiff = routingService.calculateElevationDiffsFromResList(resListElevation);
+					props.put("diffElevationUp", eleDiff.get(0));
+					props.put("diffElevationDown", eleDiff.get(1));
 				}
 			} catch (IOException | InterruptedException | RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);
