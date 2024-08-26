@@ -248,7 +248,7 @@ public class RoutingService {
         return resListEle;
     }
     
-    public List<Double> calculateElevationDiffsFromResList(List<LatLonEle> resListEle) {
+    public List<Double> calculateElevationDiffs(List<LatLonEle> resListEle) {
         List<Double> distancesList = new ArrayList<>();
         List<Double> elevationsList = new ArrayList<>();
         
