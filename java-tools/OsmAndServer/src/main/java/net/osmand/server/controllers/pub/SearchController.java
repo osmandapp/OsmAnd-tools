@@ -93,7 +93,7 @@ public class SearchController {
     @GetMapping(path = {"/search-poi-categories"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> searchPoiCategories(@RequestParam String search,
-                                                      @RequestParam String locale) throws IOException, XmlPullParserException {
+                                                      @RequestParam String locale) {
         Map<String, Map<String, String>> res = searchService.searchPoiCategories(search, locale);
         return ResponseEntity.ok(gson.toJson(res));
     }
