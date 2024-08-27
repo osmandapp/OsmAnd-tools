@@ -284,27 +284,19 @@ public class WikiService {
 	public Set<String> processWikiImages(String articleId, String categoryName, String wiki) {
 		Set<String> images = new LinkedHashSet<>();
 		if (config.wikiInitialized()) {
-			RowCallbackHandler h = new RowCallbackHandler() {
-
-				@Override
-				public void processRow(ResultSet rs) throws SQLException {
-					if (FILENAME) {
-						images.add(WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + rs.getString(1));
-					} else {
-						String imageTitle = rs.getString(1);
-						try {
-							imageTitle = URLDecoder.decode(imageTitle, "UTF-8");
-							String[] hash = getHash(imageTitle);
-							imageTitle = URLEncoder.encode(imageTitle, "UTF-8");
-							String prefix = THUMB_PREFIX;
-							String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
-							images.add(IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/"
-									+ prefix + imageTitle + suffix);
-						} catch (UnsupportedEncodingException e) {
-							System.err.println(e.getMessage());
-						}
-					}
-				}
+			RowCallbackHandler h = rs -> {
+				if (FILENAME) {
+					images.add(WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + rs.getString(1));
+				} else {
+					String imageTitle = rs.getString(1);
+                    imageTitle = URLDecoder.decode(imageTitle, StandardCharsets.UTF_8);
+                    String[] hash = getHash(imageTitle);
+                    imageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+                    String prefix = THUMB_PREFIX;
+                    String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
+                    images.add(IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/"
+                            + prefix + imageTitle + suffix);
+                }
 			};
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
 				String title = wiki;
@@ -319,18 +311,14 @@ public class WikiService {
 					title = s[1];
 					lang = s[0];
 				}
-				String id = null;
-				ResultSetExtractor<String> rse = new ResultSetExtractor<String>() {
-
-					@Override
-					public String extractData(ResultSet rs) throws SQLException, DataAccessException {
-						if(rs.next()) {
-							return rs.getString(1);
-						}
-						return null;
+				String id;
+				ResultSetExtractor<String> rse = rs -> {
+					if (rs.next()) {
+						return rs.getString(1);
 					}
+					return null;
 				};
-				if (lang.length() == 0) {
+				if (lang.isEmpty()) {
 					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where title = ? ", rse, title);
 				} else {
 					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where lang = ? and title = ? ", rse, lang,
@@ -345,28 +333,16 @@ public class WikiService {
 				jdbcTemplate.query(
 						"SELECT imageTitle from wiki.wikiimages where id = ? and namespace = 6 "
 								+ " order by type='P18' ? 0 : 1/(1+views) desc limit " + LIMITI_QUERY,
-						new PreparedStatementSetter() {
-
-							@Override
-							public void setValues(PreparedStatement ps) throws SQLException {
-								ps.setString(1, aid.substring(1));
-							}
-						}, h);
+						ps -> ps.setString(1, aid.substring(1)), h);
 			}
 			if (!Algorithms.isEmpty(categoryName)) {
-				jdbcTemplate.query("SELECT imageTitle from wiki.wikiimages where id = "
-						+ " (select any(id) from wiki.wikiimages where imageTitle = ? and namespace = 14) "
-						+ " and type='P373' and namespace = 6 order by views asc limit " + LIMITI_QUERY,
-						new PreparedStatementSetter() {
-
-							@Override
-							public void setValues(PreparedStatement ps) throws SQLException {
-								ps.setString(1, categoryName.replace(' ', '_'));
-							}
-						}, h);
+				jdbcTemplate.query(
+						"SELECT imageTitle FROM wiki.wikiimages WHERE id = " +
+								" (SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
+								" AND type = 'P373' AND namespace = 6 ORDER BY views ASC LIMIT " + LIMITI_QUERY,
+						ps -> ps.setString(1, categoryName.replace(' ', '_')), h);
 			}
 		}
-		
 		return images;
 	}
 
