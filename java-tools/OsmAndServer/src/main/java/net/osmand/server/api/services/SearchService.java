@@ -371,17 +371,23 @@ public class SearchService {
     }
     
     
-    public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) throws IOException {
+    public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) {
         Map<String, Map<String, String>> searchRes = new HashMap<>();
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, true);
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
+        
+        SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, true);
+        
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
+        List<AbstractPoiType> topFilters = searchUICore.getPoiTypes().getTopVisibleFilters();
+        List<String> filterOrder = topFilters.stream().map(AbstractPoiType::getKeyName).toList();
+        searchAmenityTypesAPI.setActivePoiFiltersByOrder(filterOrder);
+        searchUICore.registerAPI(searchAmenityTypesAPI);
+        
         searchUICore.init();
-        List<SearchResult> results = searchUICore.shallowSearch(SearchCoreFactory.SearchAmenityTypesAPI.class, search, null)
-                .getCurrentSearchResults();
-        results.forEach(res -> {
-            if (res.object instanceof PoiType) {
-                searchRes.put(res.localeName, getPoiTypeFields(res.object));
-            }
-        });
+        
+        List<SearchResult> results = searchUICore.immediateSearch(search, null).getCurrentSearchResults();
+        
+        results.forEach(res -> searchRes.put(res.localeName, getPoiTypeFields(res.object)));
         return searchRes;
     }
     
