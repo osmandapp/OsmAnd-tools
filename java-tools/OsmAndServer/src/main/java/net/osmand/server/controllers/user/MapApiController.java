@@ -178,6 +178,9 @@ public class MapApiController {
 	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials,
 	                                        HttpServletRequest request,
 	                                        java.security.Principal user) throws ServletException {
+		final String EMAIL_ERROR = "error_email";
+		final String PASSWORD_ERROR = "error_password";
+		
 		if (user != null) {
 			request.logout();
 		}
@@ -189,14 +192,14 @@ public class MapApiController {
 		
 		ResponseEntity<String> response = userdataService.checkUserEmail(username);
 		if (response.getStatusCodeValue() != 200) {
-			return response;
+			return ResponseEntity.badRequest().body(EMAIL_ERROR);
 		}
 		
 		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(username, password);
 		try {
 			authManager.authenticate(pwt);
 		} catch (AuthenticationException e) {
-			return ResponseEntity.badRequest().body("error_password");
+			return ResponseEntity.badRequest().body(PASSWORD_ERROR);
 		}
 		request.login(username, password);
 
