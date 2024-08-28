@@ -463,11 +463,11 @@ public class OsmGpxWriteContext {
 			KFile file = new KFile(subArgs.get(0));
 			if (file.isDirectory() || file.name().endsWith(GPX_FILE_EXT) || file.name().endsWith(".gpx.gz")) {
 				OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
-				qp.osmFile = File.createTempFile(KAlgorithms.INSTANCE.getFileNameWithoutExtension(file), ".osm");
+				qp.osmFile = File.createTempFile(file.getFileNameWithoutExtension(), ".osm");
 				OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
 				File dir = new File(file.isDirectory() ? file.name() : file.parent().name());
 				File tmpFolder = new File(dir, String.valueOf(System.currentTimeMillis()));
-				File targetObf = new File(dir, KAlgorithms.INSTANCE.getFileNameWithoutExtension(file) + BINARY_MAP_INDEX_EXT);
+				File targetObf = new File(dir, file.getFileNameWithoutExtension() + BINARY_MAP_INDEX_EXT);
 				List<KFile> files = new ArrayList<>();
 				if (file.isDirectory()) {
 					files = Arrays.asList(Objects.requireNonNull(file.listFiles()));
@@ -475,7 +475,7 @@ public class OsmGpxWriteContext {
 					files.add(file);
 				}
 				if (!files.isEmpty()) {
-					ctx.writeObf(null, files, tmpFolder, KAlgorithms.INSTANCE.getFileNameWithoutExtension(file), targetObf);
+					ctx.writeObf(null, files, tmpFolder, file.getFileNameWithoutExtension(), targetObf);
 				}
 				if (!qp.osmFile.delete()) {
 					qp.osmFile.deleteOnExit();
