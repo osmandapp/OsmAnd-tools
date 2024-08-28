@@ -173,9 +173,11 @@ public class MapApiController {
 	private ResponseEntity<String> okStatus() {
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
 	}
-
-	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
+	
+	@PostMapping(path = {"/auth/login"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials,
+	                                        HttpServletRequest request,
+	                                        java.security.Principal user) throws ServletException {
 		if (user != null) {
 			request.logout();
 		}
@@ -184,11 +186,17 @@ public class MapApiController {
 		if (username == null || password == null) {
 			return ResponseEntity.badRequest().body("Username and password are required");
 		}
+		
+		ResponseEntity<String> response = userdataService.checkUserEmail(username);
+		if (response.getStatusCodeValue() != 200) {
+			return response;
+		}
+		
 		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(username, password);
 		try {
 			authManager.authenticate(pwt);
 		} catch (AuthenticationException e) {
-			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", username));
+			return ResponseEntity.badRequest().body("error_password");
 		}
 		request.login(username, password);
 

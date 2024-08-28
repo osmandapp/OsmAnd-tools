@@ -349,6 +349,14 @@ public class UserdataService {
 		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		return ok();
 	}
+    
+    public ResponseEntity<String> checkUserEmail(String email) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("error_email");
+        }
+        return ok();
+    }
 
     public ResponseEntity<String> ok() {
         return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
