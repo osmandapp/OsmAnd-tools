@@ -220,7 +220,8 @@ public class MapApiController {
 	}
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials,
+	                                              HttpServletRequest request) throws ServletException {
 		String username = credentials.username;
 		String password = credentials.password;
 		String token = credentials.token;
@@ -243,7 +244,7 @@ public class MapApiController {
 	}
 
 	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) throws IOException {
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) {
 		String username = credentials.username;
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username is required");

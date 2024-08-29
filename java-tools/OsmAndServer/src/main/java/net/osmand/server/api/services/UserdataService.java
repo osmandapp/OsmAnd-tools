@@ -323,30 +323,22 @@ public class UserdataService {
         return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password), lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
     }
 
-	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email,
-	                                              @RequestParam(name = "lang", required = false) String lang)
-			throws IOException {
-		// allow to register only with small case
+	public ResponseEntity<String> webUserRegister(String email, String lang) {
 		email = email.toLowerCase().trim();
 		if (!email.contains("@")) {
-			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+            return ResponseEntity.badRequest().body("Email is not valid.");
 		}
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
-		if (pu == null) {
-			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+		if (pu != null) {
+            pu.tokendevice = TOKEN_DEVICE_WEB;
+            if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
+                pu.token = (new Random().nextInt(8999) + 1000) + "";
+            }
+            pu.tokenTime = new Date();
+            usersRepository.saveAndFlush(pu);
+            emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		}
-		// we don't validate cause there are free users
-//		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-//		if (errorMsg != null) {
-//			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-//		}
-		pu.tokendevice = TOKEN_DEVICE_WEB;
-		if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-			pu.token = (new Random().nextInt(8999) + 1000) + "";
-		}
-		pu.tokenTime = new Date();
-		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
+  
 		return ok();
 	}
     
