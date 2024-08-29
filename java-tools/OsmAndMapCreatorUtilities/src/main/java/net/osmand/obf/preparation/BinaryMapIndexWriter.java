@@ -66,9 +66,6 @@ import java.util.zip.GZIPOutputStream;
 
 public class BinaryMapIndexWriter {
 
-	private static final boolean USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE = false;
-	private static final boolean USE_DEPRECATED_POI_NAME_STRUCTURE = false;
-
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
 
@@ -1658,7 +1655,7 @@ public class BinaryMapIndexWriter {
 			return;
 		}
 		checkPeekState(POI_BOX);
-		codedOutStream.writeTag(OsmandOdb.OsmAndPoiBox.TAGGROUPS_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+		codedOutStream.writeTag(OsmandOdb.OsmAndPoiBox.TAGGROUPS_FIELD_NUMBER, WireFormat.FieldType.MESSAGE.getWireType());
 
 		OsmandOdb.OsmAndPoiTagGroups.Builder groupsBuilder = OsmandOdb.OsmAndPoiTagGroups.newBuilder();
 
@@ -1757,8 +1754,8 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift,
-			String type, String subtype, Map<PoiAdditionalType, String> additionalNames,
-			PoiCreatorCategories globalCategories, int limitZip, int precisionXY) throws IOException {
+								 String type, String subtype, Map<PoiAdditionalType, String> additionalNames,
+								 PoiCreatorCategories globalCategories, int limitZip, int precisionXY, List<Integer> tagGroupsIds) throws IOException {
 		checkPeekState(POI_DATA);
 		TIntArrayList types = globalCategories.buildTypeIds(type, subtype);
 		OsmAndPoiBoxDataAtom.Builder builder = OsmandOdb.OsmAndPoiBoxDataAtom.newBuilder();
@@ -1771,36 +1768,8 @@ public class BinaryMapIndexWriter {
 		}
 
 		builder.setId(id);
-
-		if (USE_DEPRECATED_POI_NAME_STRUCTURE) {
-			String name = retrieveAdditionalType("name", additionalNames);
-			if (!Algorithms.isEmpty(name)) {
-				builder.setName(name);
-			}
-			String nameEn = retrieveAdditionalType("name:en", additionalNames);
-			if (!Algorithms.isEmpty(nameEn)) {
-				builder.setNameEn(nameEn);
-			}
-		}
-
-		if (USE_DEPRECATED_POI_NAME_ADD_INFO_STRUCTURE) {
-			String openingHours = retrieveAdditionalType("opening_hours", additionalNames);
-			String site = retrieveAdditionalType("website", additionalNames);
-			String phone = retrieveAdditionalType("phone", additionalNames);
-			String description = retrieveAdditionalType("description", additionalNames);
-
-			if (!Algorithms.isEmpty(openingHours)) {
-				builder.setOpeningHours(openingHours);
-			}
-			if (!Algorithms.isEmpty(site)) {
-				builder.setSite(site);
-			}
-			if (!Algorithms.isEmpty(phone)) {
-				builder.setPhone(phone);
-			}
-			if (!Algorithms.isEmpty(description)) {
-				builder.setNote(description);
-			}
+		for (int tagGroupId : tagGroupsIds) {
+			builder.addTagGroups(tagGroupId);
 		}
 
 		for (Map.Entry<PoiAdditionalType, String> rt : additionalNames.entrySet()) {

@@ -54,6 +54,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Set<String> topIndexKeys = new HashSet<>();
 	private QuadTree<Multipolygon> cityQuadTree;
 	private Map<Multipolygon, List<PoiCreatorTagGroup>> cityTagsGroup;
+	private Map<Long, List<Integer>> poiTagGroups = new HashMap<>();
 
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
@@ -567,7 +568,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
-							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
+							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, poi.tagGroups);
 				}
 
 			} else {
@@ -586,9 +587,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
+					List<Integer> tagGroupIds = poiTagGroups.get(id);
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
-							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
+							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, tagGroupIds);
 				}
 				rset.close();
 			}
@@ -737,6 +739,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), 
 					namesIndex, otherNames);
 
+			List<Integer> tagGroupIds = new ArrayList<>();
+			for (PoiCreatorTagGroup p : tagGroups) {
+				tagGroupIds.add(p.id);
+			}
 			if (useInMemoryCreator) {
 				if (prevTree.getNode().poiData == null) {
 					prevTree.getNode().poiData = new ArrayList<PoiData>();
@@ -748,8 +754,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.subtype = subtype;
 				poiData.id = rs.getLong(5);
 				poiData.additionalTags.putAll(additionalTags);
+				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);
 
+			} else {
+				poiTagGroups.put(rs.getLong(5), tagGroupIds);
 			}
 		}
 		log.info("Poi processing finished");
@@ -828,6 +837,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		String subtype;
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
+		List<Integer> tagGroups = new ArrayList<>();
 	}
 
 	public static class PoiTileBox {
