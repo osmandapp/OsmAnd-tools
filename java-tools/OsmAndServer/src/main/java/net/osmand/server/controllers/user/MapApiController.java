@@ -242,14 +242,30 @@ public class MapApiController {
 		request.logout();
 		return okStatus();
 	}
-
-	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) {
+	
+	@PostMapping(path = {"/auth/register"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials,
+	                                              @RequestParam String lang,
+	                                              @RequestParam boolean isNew,
+	                                              HttpServletRequest request) {
 		String username = credentials.username;
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username is required");
 		}
-		return userdataService.webUserRegister(username, lang);
+		return userdataService.webUserRegister(username, lang, isNew, request);
+	}
+	
+	@PostMapping(path = {"/auth/validate-token"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials) {
+		String username = credentials.username;
+		String token = credentials.token;
+		if (username == null) {
+			return ResponseEntity.badRequest().body("Username and token are required");
+		}
+		if (token == null) {
+			return ResponseEntity.badRequest().body("Token are required");
+		}
+		return userdataService.validateToken(username, token);
 	}
 
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {

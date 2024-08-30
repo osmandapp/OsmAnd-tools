@@ -5,6 +5,7 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
@@ -34,6 +35,7 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -129,6 +131,34 @@ public class UserdataService {
     public static final String INFO_EXT = ".info";
 
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
+    
+    private static final int MAX_ATTEMPTS_PER_DAY = 100;
+    private final Map<String, EmailRequestData> emailRequestTracker = new ConcurrentHashMap<>();
+    
+    private static class EmailRequestData {
+        public int checkCount;
+        public long lastCheckTime;
+        
+        public EmailRequestData(int checkCount, long lastCheckTime) {
+            this.checkCount = checkCount;
+            this.lastCheckTime = lastCheckTime;
+        }
+    }
+    
+    private ResponseEntity<String> trackEmailRequest(HttpServletRequest request) {
+        String ipAddress = request.getRemoteAddr();
+        EmailRequestData checkData = emailRequestTracker.getOrDefault(ipAddress, new EmailRequestData(0, System.currentTimeMillis()));
+        if (System.currentTimeMillis() - checkData.lastCheckTime > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
+            checkData.checkCount = 0;
+        }
+        if (checkData.checkCount >= MAX_ATTEMPTS_PER_DAY) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Too many requests. Try again later.");
+        }
+        checkData.checkCount++;
+        checkData.lastCheckTime = System.currentTimeMillis();
+        emailRequestTracker.put(ipAddress, checkData);
+        return null;
+    }
 
     public void validateUserForUpload(PremiumUserDevicesRepository.PremiumUserDevice dev, String type, long fileSize) {
     	PremiumUser user = usersRepository.findById(dev.userid);
@@ -317,18 +347,31 @@ public class UserdataService {
     }
 
     public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
-        if (password.length() < 6) {
-            throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
+        if (password.length() < 8) {
+            throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 8 symbols");
         }
         return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password), lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
     }
 
-	public ResponseEntity<String> webUserRegister(String email, String lang) {
+	public ResponseEntity<String> webUserRegister(String email, String lang, boolean isNew, HttpServletRequest request) {
 		email = email.toLowerCase().trim();
 		if (!email.contains("@")) {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        if (isNew) {
+            if (pu != null) {
+                List<PremiumUserDevicesRepository.PremiumUserDevice> devices = devicesRepository.findByUserid(pu.id);
+                if (devices != null && !devices.isEmpty()) {
+                    trackEmailRequest(request);
+                    return ResponseEntity.badRequest().body("An account is already registered with this email address.");
+                }
+            } else {
+                pu = new PremiumUsersRepository.PremiumUser();
+                pu.email = email;
+                pu.regTime = new Date();
+            }
+        }
 		if (pu != null) {
             pu.tokendevice = TOKEN_DEVICE_WEB;
             if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
@@ -341,6 +384,19 @@ public class UserdataService {
   
 		return ok();
 	}
+    
+    public ResponseEntity<String> validateToken(String email, String token) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("error_email");
+        }
+        if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
+                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
+            wearOutToken(pu);
+            return ResponseEntity.badRequest().body("error_token");
+        }
+        return ok();
+    }
     
     public ResponseEntity<String> checkUserEmail(String email) {
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
