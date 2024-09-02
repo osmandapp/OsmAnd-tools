@@ -449,11 +449,12 @@ public class HHRoutingShortcutCreator {
 			MultiFinalRouteSegment frs;
 			try { 
 				frs = (MultiFinalRouteSegment) routePlanner.searchRouteInternal(ctx, s, null, segments);
-			} catch(RuntimeException e) {
+			} catch (RuntimeException e) {
 				System.err.printf("Error calculating %d (start=%d) \n", s.getRoad().getId(), s.getSegmentStart());
 				// rerun to see logs
 				BinaryRoutePlanner.TRACE_ROUTING = true;
 				frs = (MultiFinalRouteSegment) routePlanner.searchRouteInternal(ctx, s, null, segments);
+				System.out.println("-----------");
 			}
 			if (frs != null) {
 				for (RouteSegment o : frs.all) {
