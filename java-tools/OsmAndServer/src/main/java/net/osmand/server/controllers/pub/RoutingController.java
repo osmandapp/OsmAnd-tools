@@ -297,8 +297,10 @@ public class RoutingController {
 					resListElevation = routingService.getElevationsBySegments(resListElevation, features, res);
 					routingService.interpolateEmptyElevationSegments(resListElevation);
 					List<Double> eleDiff = routingService.calculateElevationDiffs(resListElevation);
-					props.put("diffElevationUp", eleDiff.get(0));
-					props.put("diffElevationDown", eleDiff.get(1));
+					if (!Double.isNaN(eleDiff.get(0)) && !Double.isNaN(eleDiff.get(1))) {
+						props.put("diffElevationUp", eleDiff.get(0));
+						props.put("diffElevationDown", eleDiff.get(1));
+					}
 				}
 			} catch (IOException | InterruptedException | RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);
