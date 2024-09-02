@@ -181,7 +181,7 @@ public class MapApiController {
 		final String EMAIL_ERROR = "error_email";
 		final String PASSWORD_ERROR = "error_password";
 		
-		if (user != null) {
+		if (user != null && !user.getName().equals(credentials.username)) {
 			request.logout();
 		}
 		String username = credentials.username;
