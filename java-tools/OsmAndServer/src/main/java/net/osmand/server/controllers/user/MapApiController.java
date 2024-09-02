@@ -220,8 +220,7 @@ public class MapApiController {
 	}
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials,
-	                                              HttpServletRequest request) throws ServletException {
+	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials) {
 		String username = credentials.username;
 		String password = credentials.password;
 		String token = credentials.token;
@@ -230,8 +229,6 @@ public class MapApiController {
 		}
 		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password, credentials.lang);
 		if (res.getStatusCodeValue() < 300) {
-			request.logout();
-			request.login(username, password);
 			return okStatus();
 		}
 		return res;
