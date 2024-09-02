@@ -446,8 +446,16 @@ public class HHRoutingShortcutCreator {
 			ctx.unloadAllData(); // needed for proper multidijsktra work
 			ctx.calculationProgress = new RouteCalculationProgress();
 			ctx.config.penaltyForReverseDirection = -1;
-			MultiFinalRouteSegment frs = (MultiFinalRouteSegment) routePlanner.searchRouteInternal(ctx, s,
-					null, segments);
+			MultiFinalRouteSegment frs;
+			try { 
+				frs = (MultiFinalRouteSegment) routePlanner.searchRouteInternal(ctx, s, null, segments);
+			} catch (RuntimeException e) {
+				System.err.printf("Error calculating %d (start=%d) \n", s.getRoad().getId(), s.getSegmentStart());
+				// rerun to see logs
+				BinaryRoutePlanner.TRACE_ROUTING = true;
+				frs = (MultiFinalRouteSegment) routePlanner.searchRouteInternal(ctx, s, null, segments);
+				System.out.println("-----------");
+			}
 			if (frs != null) {
 				for (RouteSegment o : frs.all) {
 					// duplicates are possible as alternative routes
