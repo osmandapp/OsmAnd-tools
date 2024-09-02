@@ -5,7 +5,6 @@ import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
@@ -20,6 +19,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.controllers.user.MapApiController;
@@ -34,13 +35,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -133,30 +131,34 @@ public class UserdataService {
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
     private static final int MAX_ATTEMPTS_PER_DAY = 100;
-    private final Map<String, EmailRequestData> emailRequestTracker = new ConcurrentHashMap<>();
+    private final Cache<String, RequestData> requestTracker = CacheBuilder.newBuilder()
+            .expireAfterWrite(24, TimeUnit.HOURS)
+            .build();
     
-    private static class EmailRequestData {
+    private static class RequestData {
         public int checkCount;
         public long lastCheckTime;
         
-        public EmailRequestData(int checkCount, long lastCheckTime) {
+        public RequestData(int checkCount, long lastCheckTime) {
             this.checkCount = checkCount;
             this.lastCheckTime = lastCheckTime;
         }
     }
     
-    private ResponseEntity<String> trackEmailRequest(HttpServletRequest request) {
+    private ResponseEntity<String> trackRequest(HttpServletRequest request) {
         String ipAddress = request.getRemoteAddr();
-        EmailRequestData checkData = emailRequestTracker.getOrDefault(ipAddress, new EmailRequestData(0, System.currentTimeMillis()));
-        if (System.currentTimeMillis() - checkData.lastCheckTime > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
-            checkData.checkCount = 0;
+        RequestData checkData = requestTracker.getIfPresent(ipAddress);
+        
+        if (checkData == null) {
+            checkData = new RequestData(0, System.currentTimeMillis());
         }
         if (checkData.checkCount >= MAX_ATTEMPTS_PER_DAY) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Too many requests. Try again later.");
         }
         checkData.checkCount++;
         checkData.lastCheckTime = System.currentTimeMillis();
-        emailRequestTracker.put(ipAddress, checkData);
+        requestTracker.put(ipAddress, checkData);
+        
         return null;
     }
 
@@ -354,6 +356,11 @@ public class UserdataService {
     }
 
 	public ResponseEntity<String> webUserRegister(String email, String lang, boolean isNew, HttpServletRequest request) {
+        ResponseEntity<String> response = trackRequest(request);
+        if (response != null) {
+            return response;
+        }
+        
 		email = email.toLowerCase().trim();
 		if (!email.contains("@")) {
             return ResponseEntity.badRequest().body("Email is not valid.");
@@ -363,7 +370,6 @@ public class UserdataService {
             if (pu != null) {
                 List<PremiumUserDevicesRepository.PremiumUserDevice> devices = devicesRepository.findByUserid(pu.id);
                 if (devices != null && !devices.isEmpty()) {
-                    trackEmailRequest(request);
                     return ResponseEntity.badRequest().body("An account is already registered with this email address.");
                 }
             } else {
