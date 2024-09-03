@@ -2,6 +2,9 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import okio.GzipSource;
+import okio.Okio;
+
 import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -29,6 +32,8 @@ import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.util.Algorithms;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
@@ -628,12 +633,12 @@ public class MapApiController {
 		FileInputStream fis = null;
 		File targetObf = null;
 		try (OutputStream os = response.getOutputStream()) {
-			Map<String, GPXFile> files = new HashMap<>();
+			Map<String, GpxFile> files = new HashMap<>();
 			for (String name : names) {
 				UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
 				if (userFile != null) {
 					is = userdataService.getInputStream(dev, userFile);
-					GPXFile file = GPXUtilities.loadGPXFile(new GZIPInputStream(is), null, false);
+					GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
 					files.put(name, file);
 				}
 			}

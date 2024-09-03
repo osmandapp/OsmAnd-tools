@@ -497,6 +497,9 @@ public class MapRouterLayer implements MapPanelLayer {
 							DataExtractionSettings.getSettings().getLastUsedDir());
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
+//						GpxUtilities gpxUtilities = GpxUtilities.INSTANCE;
+//						GpxFile gfile = gpxUtilities.loadGpxFile(new KFile(file.getAbsolutePath()));
+//						System.out.println(gfile.getTracksCount() + " " + gfile.getAllPoints().size());
 						DataExtractionSettings.getSettings().setLastUsedDir(file.getParent());
 						selectedGPXFile = GPXUtilities.loadGPXFile(file);
 						displayGpxFiles();

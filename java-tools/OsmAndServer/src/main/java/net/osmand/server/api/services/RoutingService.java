@@ -9,6 +9,7 @@ import java.util.TreeMap;
 
 import net.osmand.data.LatLonEle;
 import net.osmand.router.*;
+import net.osmand.shared.gpx.ElevationDiffsCalculator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -195,7 +196,7 @@ public class RoutingService {
         }
     }
 
-    public void convertResultsWithElevation(List<LatLonEle> resListEle,
+    public List<LatLonEle> getElevationsBySegments(List<LatLonEle> resListEle,
                                             List<Feature> features, List<RouteSegmentResult> res) {
         for (int i = 0; i < res.size(); i++) {
             RouteSegmentResult r = res.get(i);
@@ -244,8 +245,60 @@ public class RoutingService {
                 features.add(f);
             }
         }
+        return resListEle;
     }
-
+    
+    public List<Double> calculateElevationDiffs(List<LatLonEle> resListEle) {
+        List<Double> distancesList = new ArrayList<>();
+        List<Double> elevationsList = new ArrayList<>();
+        
+        double totalDist = 0;
+        
+        for (int i = 0; i < resListEle.size(); i++) {
+            LatLonEle currentPoint = resListEle.get(i);
+            double dist = 0;
+            if (i > 0) {
+                LatLonEle prevPoint = resListEle.get(i - 1);
+                dist = MapUtils.getDistance(prevPoint.getLatitude(), prevPoint.getLongitude(),
+                        currentPoint.getLatitude(), currentPoint.getLongitude());
+            }
+            distancesList.add(totalDist);
+            elevationsList.add(currentPoint.getElevation());
+            
+            totalDist += dist;
+        }
+        
+        double[] distances = distancesList.stream().mapToDouble(Double::doubleValue).toArray();
+        double[] elevations = elevationsList.stream().mapToDouble(Double::doubleValue).toArray();
+        
+        ElevationDiffsCalculator elevationDiffsCalc = getElevationDiffsCalculator(distances, elevations);
+        elevationDiffsCalc.calculateElevationDiffs();
+        
+        double diffElevationUp = elevationDiffsCalc.getDiffElevationUp();
+        double diffElevationDown = elevationDiffsCalc.getDiffElevationDown();
+        
+        return List.of(diffElevationUp, diffElevationDown);
+    }
+    
+    private ElevationDiffsCalculator getElevationDiffsCalculator(final double[] distances, final double[] elevations) {
+        return new ElevationDiffsCalculator() {
+            @Override
+            public double getPointDistance(int index) {
+                return distances[index];
+            }
+            
+            @Override
+            public double getPointElevation(int index) {
+                return elevations[index];
+            }
+            
+            @Override
+            public int getPointsCount() {
+                return distances.length;
+            }
+        };
+    }
+    
     public void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
         LatLon last = null;
         for (RouteSegmentResult r : res) {

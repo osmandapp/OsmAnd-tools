@@ -46,6 +46,8 @@ class PrivateLandsTranslation(ogr2osm.TranslationBase):
 				return
 			if attrs['OwnerName'].lower() != "":
 				tags['name'] = attrs['OwnerName'].strip().title()
+		if 'OWNERNAME' in attrs and attrs['OWNERNAME']:
+			tags['name'] = attrs['OWNERNAME'].strip().lower().title()
 		if 'OWNERNME1' in attrs and attrs['OWNERNME1'].lower() != "null" and 'OWNERSHIP INFORMATION' not in attrs['OWNERNME1'] and attrs['OWNERNME1']:
 			tags['name'] = attrs['OWNERNME1'].strip().title()
 		if 'OWNER1' in attrs and attrs['OWNER1'].lower() != "null" and attrs['OWNER1']:

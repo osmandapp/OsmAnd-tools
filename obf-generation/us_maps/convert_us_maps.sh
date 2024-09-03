@@ -39,7 +39,7 @@ process_private_lands_north_carolina=false
 process_private_lands_florida=false
 process_private_lands_arkansas=false
 process_private_lands_alaska=false
-process_private_lands_california=true
+process_private_lands_mississipi=true
 
 trails_shp_filename="S_USA.TrailNFS_Publish"
 roads_shp_filename="S_USA.RoadCore_FS"
@@ -62,6 +62,7 @@ private_lands_florida_source_filename="parcels_florida"
 private_lands_arkansas_source_filename="PARCEL_POLYGON_CAMP"
 private_lands_alaska_source_filename="Alaska_parcels"
 private_lands_california_source_filename="California_parcels"
+private_lands_mississipi_source_filename="Mississipi_parcels"
 
 url_nfs_rec_area_activities="https://data.fs.usda.gov/geodata/edw/edw_resources/fc/S_USA.RECAREAACTIVITIES_V.gdb.zip"
 url_nfs_roads="https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.RoadCore_FS.zip"
@@ -79,7 +80,8 @@ url_maryland="https://opendata.arcgis.com/api/v3/datasets/b33e5f03d50844b8819a40
 url_north_carolina="https://dit-cgia-gis-data.s3.amazonaws.com/NCOM-data/parcels/nc-parcels-fgdb-most-recent.zip"
 url_florida="https://stg-arcgisazurecdataprod.az.arcgis.com/exportfiles-2554-21736/parcels_2021_v2_-7177355989058811337.zip?sv=2018-03-28&sr=b&sig=Ls40m555yFHHRC8wplu2115BxkYnHtGBlmBhleykqw4%3D&se=2024-05-28T07%3A26%3A54Z&sp=r"
 url_arkansas="https://geostor-vectors.s3.amazonaws.com/Planning_Cadastre/FGDB/PARCEL_POLYGON_CAMP.gdb.zip"
-url_california="https://services.gis.ca.gov/arcgis/rest/services/Boundaries/UCD_Parcels/MapServer/0"
+#url_california="https://services.gis.ca.gov/arcgis/rest/services/Boundaries/UCD_Parcels/MapServer/0"
+url_mississipi="https://www.gisonline.ms.gov/arcgis/rest/services/MDEQ/Download/MapServer/57"
 
 mkdir -p $work_dir/$source_dir_name
 mkdir -p $work_dir/$source_original_dir_name
@@ -462,21 +464,20 @@ if [[ $process_private_lands_alaska == true ]]; then
 	fi
 fi
 
-# Private lands California
-if [[ $process_private_lands_california == true ]]; then
-	state_name=california
-	source_file_name=$private_lands_california_source_filename
+# Private lands Mississipi
+if [[ $process_private_lands_mississipi == true ]]; then
+	state_name=mississipi
+	source_file_name=$private_lands_mississipi_source_filename
 	if [[ ! -f "$work_dir/$out_osm_dir/us_{$state_name}_pl_northamerica.osm" ]]; then
 		echo -e "\033[92m\e[44m Processing $source_file_name\e[49m\033[0m"
-		if [[ ! -f $work_dir/$source_original_dir_name/${source_file_name}.geojson ]]; then
+		if [[ ! -f $work_dir/$source_original_dir_name/$source_file_name.geojson ]]; then
 			cd $dir
-			python3 -m dump_esri $url_california $work_dir/$source_original_dir_name/$source_file_name.geojson # https://services.gis.ca.gov/arcgis/rest/services/Boundaries/UCD_Parcels/MapServer
-			echo "Done cal"
-			sleep 1000000
+			python3 -m dump_esri $url_mississipi $work_dir/$source_original_dir_name/$source_file_name.geojson
 		fi
-		run_alg_fixgeometries $work_dir/$source_original_dir_name/${source_file_name}.gdb.zip $work_dir/$tmp_dir || exit 1
-		run_alg_dissolve $work_dir/$tmp_dir/${source_file_name}_fixed.gpkg OwnerName $work_dir/$source_dir_name || exit 1
-		generate_osm_private_lands $work_dir/$source_dir_name/${source_file_name}_fixed_dissolved.gpkg $state_name
+		ogr2ogr $work_dir/$tmp_dir/$source_file_name.gpkg $work_dir/$source_original_dir_name/$source_file_name.geojson -explodecollections
+# 		run_alg_fixgeometries $work_dir/$tmp_dir/${source_file_name}.gpkg $work_dir/$source_dir_name || exit 1
+# 		run_alg_dissolve $work_dir/$tmp_dir/${source_file_name}_fixed.gpkg OWNERNAME $work_dir/$source_dir_name || exit 1
+		generate_osm_private_lands $work_dir/$tmp_dir/$source_file_name.gpkg $state_name
 		generate_obf us_${state_name}_pl_northamerica.pbf
 	fi
 fi

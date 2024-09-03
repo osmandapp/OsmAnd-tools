@@ -1,5 +1,6 @@
 include ':OsmAnd-java'
 project(':OsmAnd-java').projectDir = new File(settingsDir, '../../android/OsmAnd-java')
+gradle.ext.java_shared_conf = 'jvmPublicConfig'
 
 include ':OsmAnd-shared'
 project(':OsmAnd-shared').projectDir = new File(settingsDir, '../../android/OsmAnd-shared')
