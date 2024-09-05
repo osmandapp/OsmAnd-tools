@@ -81,19 +81,32 @@ public class SearchService {
     
     public static class PoiSearchData {
         
-        public PoiSearchData(List<String> categories, String northWest, String southEast, String savedNorthWest, String savedSouthEast, int prevCategoriesCount) {
+        public PoiSearchData(List<String> categories,
+                             String northWest,
+                             String southEast,
+                             String savedNorthWest,
+                             String savedSouthEast,
+                             int prevCategoriesCount,
+                             String prevSearchRes,
+                             String prevSearchCategory) {
             this.categories = categories;
             this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
             if (savedNorthWest != null && savedSouthEast != null) {
                 this.savedBbox = getBboxCoords(Arrays.asList(savedNorthWest, savedSouthEast));
             }
             this.prevCategoriesCount = prevCategoriesCount;
+            if (prevSearchRes != null && prevSearchCategory != null) {
+                this.prevSearchRes = prevSearchRes;
+                this.prevSearchCategory = prevSearchCategory;
+            }
         }
         
         public List<String> categories;
         public List<LatLon> bbox;
         public List<LatLon> savedBbox;
         public int prevCategoriesCount;
+        public String prevSearchRes;
+        public String prevSearchCategory;
         
         private static List<LatLon> getBboxCoords(List<String> coords) {
             List<LatLon> bbox = new ArrayList<>();
@@ -157,7 +170,7 @@ public class SearchService {
         }
     }
     
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon loc, String prevSearchRes, String prevSearchCategory) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon loc) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -191,9 +204,9 @@ public class SearchService {
             searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
             
             for (String category : data.categories) {
-                if (prevSearchRes != null && prevSearchCategory.equals(category)) {
+                if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
                     SearchResult prevResult = new SearchResult();
-                    prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(prevSearchRes, false);
+                    prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
                     prevResult.localeName = category;
                     prevResult.objectType = ObjectType.POI_TYPE;
                     searchUICore.resetPhrase(prevResult);
