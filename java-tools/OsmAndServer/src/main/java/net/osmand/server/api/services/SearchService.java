@@ -504,6 +504,8 @@ public class SearchService {
         final String ICON_NAME = "web_iconKeyName";
         final String CATEGORY_ICON = "web_categoryIcon";
         final String CATEGORY_KEY_NAME = "web_categoryKeyName";
+        final String POI_ADD_CATEGORY_NAME = "web_poiAdditionalCategory";
+        final String POI_FILTER_NAME = "web_poiFilterName";
         Map<String, String> tags = new HashMap<>();
         if (obj instanceof PoiType type) {
             tags.put(KEY_NAME, type.getKeyName());
@@ -522,6 +524,17 @@ public class SearchService {
                 tags.put(CATEGORY_ICON, category.getIconKeyName());
                 tags.put(CATEGORY_KEY_NAME, category.getKeyName());
             }
+        } else if (obj instanceof SearchCoreFactory.PoiAdditionalCustomFilter type) {
+            tags.put(KEY_NAME, type.getKeyName());
+            tags.put(ICON_NAME, type.getIconKeyName());
+            type.additionalPoiTypes.stream().findFirst().ifPresent(poiType -> {
+                tags.put(ICON_NAME, getIconName(poiType));
+                tags.put(POI_FILTER_NAME, poiType.getFilter().getKeyName());
+                String additionalCategory = poiType.getPoiAdditionalCategory();
+                if (additionalCategory != null) {
+                    tags.put(POI_ADD_CATEGORY_NAME, additionalCategory);
+                }
+            });
         } else if (obj instanceof AbstractPoiType type) {
             tags.put(KEY_NAME, type.getKeyName());
             tags.put(ICON_NAME, type.getIconKeyName());
