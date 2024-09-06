@@ -23,8 +23,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import javax.xml.stream.XMLStreamException;
-
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
@@ -92,6 +90,7 @@ public class HHRoutingShortcutCreator {
 		File obfFile = args.length == 0 ? sourceFile() : new File(args[0]);
 		 
 		boolean onlyCompact = false;
+		boolean debug = false;
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
 				ROUTING_PROFILE = a.substring("--routing_profile=".length());
@@ -103,6 +102,8 @@ public class HHRoutingShortcutCreator {
 				CLEAN = true;
 			} else if (a.equals("--onlycompact")) {
 				onlyCompact = true;
+			} else if (a.equals("--debug")) {
+				debug = true;
 			}
 		}
 		String prefixName = new File(".").getCanonicalFile().getName();
@@ -135,10 +136,6 @@ public class HHRoutingShortcutCreator {
 			if (CLEAN && dbFile.exists()) {
 				networkDB.recreateSegments();
 			}
-			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
-			createOSMNetworkPoints(new File(name + "-pnts.osm"), totalPnts);
-			System.out.printf("Loaded %,d points\n", totalPnts.size());
-			
 			for (String routingParam : params) {
 				routingParam =routingParam .trim(); 
 				prepareContext = new HHRoutingPrepareContext(obfFile, routeProfile, routingParam.split(","));
@@ -150,7 +147,9 @@ public class HHRoutingShortcutCreator {
 				System.out.printf("Calculating segments for routing (%s) - existing segments %,d \n", routingParam,
 						segments);
 				Collection<Entity> objects = proc.buildNetworkShortcuts(pnts, networkDB, routingProfile);
-				saveOsmFile(objects, new File(name + "-hh.osm"));
+				if (debug) {
+					saveOsmFile(objects, new File(name + "-hh.osm"));
+				}
 			}
 			networkDB.close();
 			File compactFile = new File(name + HHRoutingDB.CEXT);
@@ -161,14 +160,6 @@ public class HHRoutingShortcutCreator {
 	}
 	
 	
-	public static void createOSMNetworkPoints(File osm, TLongObjectHashMap<NetworkDBPoint> pnts) throws XMLStreamException, IOException {
-		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<Entity>();
-		for(NetworkDBPoint p : pnts.valueCollection()) {
-			HHRoutingUtilities.addNode(osmObjects, p, null, "highway", "stop");
-		}
-		HHRoutingUtilities.saveOsmFile(osmObjects.valueCollection(), osm);
-	}
-
 	
 	private static class BuildNetworkShortcutResult {
 		List<NetworkDBPoint> points = new ArrayList<>();

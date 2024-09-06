@@ -28,6 +28,8 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeSet;
 
+import javax.xml.stream.XMLStreamException;
+
 import org.apache.commons.logging.Log;
 
 import gnu.trove.iterator.TIntIntIterator;
@@ -43,8 +45,10 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.osm.edit.Entity;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkBorderPoint;
 import net.osmand.router.HHRoutingPreparationDB.NetworkLongRoad;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
@@ -147,7 +151,7 @@ public class HHRoutingSubGraphCreator {
 
 	public static void main(String[] args) throws Exception {
 		CLEAN = false;
-		boolean merge = false;
+		boolean onlymerge = false;
 		File obfFile = args.length == 0 ? testData() : new File(args[0]);
 		for (String a : args) {
 			if (a.startsWith("--routing_profile=")) {
@@ -161,7 +165,7 @@ public class HHRoutingSubGraphCreator {
 			} else if (a.equals("--clean")) {
 				CLEAN = true;
 			} else if (a.equals("--merge")) {
-				merge = true;
+				onlymerge = true;
 			} else if (a.equals("--debug")) {
 				DEBUG_VERBOSE_LEVEL = 1;
 				DEBUG_STORE_ALL_ROADS = 1;
@@ -193,18 +197,30 @@ public class HHRoutingSubGraphCreator {
 		try {
 			ctx.networkDB.loadNetworkPoints(ctx.networkPointToDbInd);
 			ctx.longRoads = ctx.networkDB.loadNetworkLongRoads();
-			if (merge) {
+			if (onlymerge) {
 				proc.mergeConnectedPoints(ctx);
 			} else { 
 				proc.collectNetworkPoints(ctx);
 			}
+			TLongObjectHashMap<NetworkDBPoint> totalPnts = networkDB.loadNetworkPoints((short) 0, NetworkDBPoint.class);
+			createOSMNetworkPoints(new File(name + "-pnts.osm"), totalPnts);
+			System.out.printf("Profile has %,d points\n", totalPnts.size());
 		} finally {
 			if (ctx.visualClusters.size() > 0) {
 				saveOsmFile(visualizeClusters(ctx.visualClusters), new File(name + ".osm"));
 			}
+			
+			
 			networkDB.close();
 		}
-			
+	}
+	
+	public static void createOSMNetworkPoints(File osm, TLongObjectHashMap<NetworkDBPoint> pnts) throws XMLStreamException, IOException {
+		TLongObjectHashMap<Entity> osmObjects = new TLongObjectHashMap<Entity>();
+		for(NetworkDBPoint p : pnts.valueCollection()) {
+			HHRoutingUtilities.addNode(osmObjects, p, null, "highway", "stop");
+		}
+		HHRoutingUtilities.saveOsmFile(osmObjects.valueCollection(), osm);
 	}
 
 	private int compareRect(QuadRect q1, QuadRect q2) {
