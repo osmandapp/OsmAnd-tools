@@ -62,6 +62,8 @@ public class SearchService {
     public static final long RELATION_BIT = 1L << SHIFT_MULTIPOLYGON_IDS - 1; //According IndexPoiCreator SHIFT_MULTIPOLYGON_IDS
     public static final long SPLIT_BIT = 1L << SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
     
+    private static final String DELIMITER = " ";
+    
     public static class PoiSearchResult {
         
         public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound, FeatureCollection features) {
@@ -79,19 +81,32 @@ public class SearchService {
     
     public static class PoiSearchData {
         
-        public PoiSearchData(List<String> categories, String northWest, String southEast, String savedNorthWest, String savedSouthEast, int prevCategoriesCount) {
+        public PoiSearchData(List<String> categories,
+                             String northWest,
+                             String southEast,
+                             String savedNorthWest,
+                             String savedSouthEast,
+                             int prevCategoriesCount,
+                             String prevSearchRes,
+                             String prevSearchCategory) {
             this.categories = categories;
             this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
             if (savedNorthWest != null && savedSouthEast != null) {
                 this.savedBbox = getBboxCoords(Arrays.asList(savedNorthWest, savedSouthEast));
             }
             this.prevCategoriesCount = prevCategoriesCount;
+            if (prevSearchRes != null && prevSearchCategory != null) {
+                this.prevSearchRes = prevSearchRes;
+                this.prevSearchCategory = prevSearchCategory;
+            }
         }
         
         public List<String> categories;
         public List<LatLon> bbox;
         public List<LatLon> savedBbox;
         public int prevCategoriesCount;
+        public String prevSearchRes;
+        public String prevSearchCategory;
         
         private static List<LatLon> getBboxCoords(List<String> coords) {
             List<LatLon> bbox = new ArrayList<>();
@@ -136,7 +151,7 @@ public class SearchService {
             searchUICore.init();
             searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
             
-            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text, new LatLon(lat, lon));
+            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text + DELIMITER, new LatLon(lat, lon));
             List<SearchResult> res;
             if (resultCollection != null) {
                 res = resultCollection.getCurrentSearchResults();
@@ -155,7 +170,7 @@ public class SearchService {
         }
     }
     
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon loc) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -182,12 +197,22 @@ public class SearchService {
             
             usedMapList = osmAndMapsService.getReaders(mapList, null);
             
-            SearchSettings settings = searchUICore.getPhrase().getSettings();
+            SearchSettings settings = searchUICore.getSearchSettings().setSearchTypes(ObjectType.POI);
+            settings = settings.setOriginalLocation(loc);
             settings.setRegions(osmandRegions);
             settings.setOfflineIndexes(usedMapList);
             searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
             
             for (String category : data.categories) {
+                if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
+                    SearchResult prevResult = new SearchResult();
+                    prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
+                    prevResult.localeName = category;
+                    prevResult.objectType = ObjectType.POI_TYPE;
+                    searchUICore.resetPhrase(prevResult);
+                } else {
+                    searchUICore.resetPhrase();
+                }
                 int sumLimit = limit + leftoverLimit;
                 SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(searchUICore, category, sumLimit);
                 List<SearchResult> res = new ArrayList<>();
@@ -293,9 +318,8 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
-        
         searchUICore.setTotalLimit(limit);
-        return searchUICore.immediateSearch(text, null);
+        return searchUICore.immediateSearch(text  + DELIMITER, null);
     }
     
     public SearchUICore.SearchResultCollection searchCitiesByBbox(QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
@@ -504,6 +528,8 @@ public class SearchService {
         final String ICON_NAME = "web_iconKeyName";
         final String CATEGORY_ICON = "web_categoryIcon";
         final String CATEGORY_KEY_NAME = "web_categoryKeyName";
+        final String POI_ADD_CATEGORY_NAME = "web_poiAdditionalCategory";
+        final String POI_FILTER_NAME = "web_poiFilterName";
         Map<String, String> tags = new HashMap<>();
         if (obj instanceof PoiType type) {
             tags.put(KEY_NAME, type.getKeyName());
@@ -522,6 +548,20 @@ public class SearchService {
                 tags.put(CATEGORY_ICON, category.getIconKeyName());
                 tags.put(CATEGORY_KEY_NAME, category.getKeyName());
             }
+        } else if (obj instanceof SearchCoreFactory.PoiAdditionalCustomFilter type) {
+            tags.put(KEY_NAME, type.getKeyName());
+            tags.put(ICON_NAME, type.getIconKeyName());
+            type.additionalPoiTypes.stream().findFirst().ifPresent(poiType -> {
+                tags.put(ICON_NAME, getIconName(poiType));
+                PoiFilter poiFilter = poiType.getFilter();
+                if (poiFilter != null) {
+                    tags.put(POI_FILTER_NAME, poiFilter.getKeyName());
+                }
+                String additionalCategory = poiType.getPoiAdditionalCategory();
+                if (additionalCategory != null) {
+                    tags.put(POI_ADD_CATEGORY_NAME, additionalCategory);
+                }
+            });
         } else if (obj instanceof AbstractPoiType type) {
             tags.put(KEY_NAME, type.getKeyName());
             tags.put(ICON_NAME, type.getIconKeyName());

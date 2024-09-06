@@ -63,8 +63,10 @@ public class SearchController {
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData,
-                                            @RequestParam String locale) throws IOException, XmlPullParserException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale);
+                                            @RequestParam String locale,
+                                            @RequestParam double lat,
+                                            @RequestParam double lon) throws IOException {
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon));
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
     
