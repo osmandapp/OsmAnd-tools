@@ -173,10 +173,15 @@ public class MapApiController {
 	private ResponseEntity<String> okStatus() {
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
 	}
-
-	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
-		if (user != null) {
+	
+	@PostMapping(path = {"/auth/login"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials,
+	                                        HttpServletRequest request,
+	                                        java.security.Principal user) throws ServletException {
+		final String EMAIL_ERROR = "error_email";
+		final String PASSWORD_ERROR = "error_password";
+		
+		if (user != null && !user.getName().equals(credentials.username)) {
 			request.logout();
 		}
 		String username = credentials.username;
@@ -184,11 +189,17 @@ public class MapApiController {
 		if (username == null || password == null) {
 			return ResponseEntity.badRequest().body("Username and password are required");
 		}
+		
+		ResponseEntity<String> response = userdataService.checkUserEmail(username);
+		if (response.getStatusCodeValue() != 200) {
+			return ResponseEntity.badRequest().body(EMAIL_ERROR);
+		}
+		
 		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(username, password);
 		try {
 			authManager.authenticate(pwt);
 		} catch (AuthenticationException e) {
-			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", username));
+			return ResponseEntity.badRequest().body(PASSWORD_ERROR);
 		}
 		request.login(username, password);
 
@@ -209,17 +220,21 @@ public class MapApiController {
 	}
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials) {
 		String username = credentials.username;
 		String password = credentials.password;
 		String token = credentials.token;
-		if (username == null || password == null || token == null) {
-			return ResponseEntity.badRequest().body("Username, password and token are required");
+		if (username == null || password == null) {
+			return ResponseEntity.badRequest().body("Username and password are required");
 		}
+		
+		ResponseEntity<String> validRes = userdataService.validateToken(username, token);
+		if (validRes.getStatusCodeValue() != 200) {
+			return validRes;
+		}
+		
 		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password, credentials.lang);
 		if (res.getStatusCodeValue() < 300) {
-			request.logout();
-			request.login(username, password);
 			return okStatus();
 		}
 		return res;
@@ -230,14 +245,30 @@ public class MapApiController {
 		request.logout();
 		return okStatus();
 	}
-
-	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) throws IOException {
+	
+	@PostMapping(path = {"/auth/register"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials,
+	                                              @RequestParam String lang,
+	                                              @RequestParam boolean isNew,
+	                                              HttpServletRequest request) {
 		String username = credentials.username;
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username is required");
 		}
-		return userdataService.webUserRegister(username, lang);
+		return userdataService.webUserRegister(username, lang, isNew, request);
+	}
+	
+	@PostMapping(path = {"/auth/validate-token"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials) {
+		String username = credentials.username;
+		String token = credentials.token;
+		if (username == null) {
+			return ResponseEntity.badRequest().body("Username and token are required");
+		}
+		if (token == null) {
+			return ResponseEntity.badRequest().body("Token are required");
+		}
+		return userdataService.validateToken(username, token);
 	}
 
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
