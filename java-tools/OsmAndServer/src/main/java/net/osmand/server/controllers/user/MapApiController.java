@@ -224,9 +224,15 @@ public class MapApiController {
 		String username = credentials.username;
 		String password = credentials.password;
 		String token = credentials.token;
-		if (username == null || password == null || token == null) {
-			return ResponseEntity.badRequest().body("Username, password and token are required");
+		if (username == null || password == null) {
+			return ResponseEntity.badRequest().body("Username and password are required");
 		}
+		
+		ResponseEntity<String> validRes = userdataService.validateToken(username, token);
+		if (validRes.getStatusCodeValue() != 200) {
+			return validRes;
+		}
+		
 		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password, credentials.lang);
 		if (res.getStatusCodeValue() < 300) {
 			return okStatus();

@@ -362,7 +362,7 @@ public class UserdataService {
         }
         
 		email = email.toLowerCase().trim();
-		if (!email.contains("@")) {
+		if (!emailSender.isEmail(email)) {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
         PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
@@ -386,7 +386,9 @@ public class UserdataService {
             pu.tokenTime = new Date();
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
-		}
+		} else {
+            return ResponseEntity.badRequest().body("error_email");
+        }
   
 		return ok();
 	}
