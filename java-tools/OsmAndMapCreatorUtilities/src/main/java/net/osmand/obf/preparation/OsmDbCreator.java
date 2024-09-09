@@ -3,6 +3,7 @@ package net.osmand.obf.preparation;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.*;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
@@ -13,6 +14,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.data.City.CityType;
+import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -369,13 +371,30 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			}
 			long id = convertId(e);
 			if (propagateToNodes != null && e instanceof Way) {
-				TLongArrayList propagatedNodeIds = propagateToNodes.propagateTagsFromWays((Way) e);
+				List<PropagateFromWayToNode> propagatedNodeIds = propagateToNodes.propagateTagsFromWays((Way) e);
 				if (propagatedNodeIds != null) {
 					for (int i = 0; i < propagatedNodeIds.size(); i++) {
-						long nodeId = propagatedNodeIds.get(i);
-						prepPropagateNode.setLong(1, nodeId);
-						prepPropagateNode.addBatch();
-						propagateCount++;
+						PropagateFromWayToNode pn = propagatedNodeIds.get(i);
+						if (pn.id < 0) {
+							pn.id = generatedId--;
+							prepNode.setLong(1, id);
+							prepNode.setDouble(2, pn.latlon.getLatitude());
+							prepNode.setDouble(3, pn.latlon.getLongitude());
+							prepNode.setBytes(4, new ByteArrayOutputStream().toByteArray());
+							prepNode.setBoolean(5, true);
+							prepNode.addBatch();
+							currentCountNode++;
+						} else {
+							prepPropagateNode.setLong(1, pn.id);
+							prepPropagateNode.addBatch();
+							propagateCount++;	
+						}
+						propagateToNodes.registerNode(pn);
+					}
+					if (currentCountNode >= BATCH_SIZE_OSM) {
+						prepNode.executeBatch();
+						dbConn.commit(); // clear memory
+						currentCountNode = 0;
 					}
 					if (propagateCount >= BATCH_SIZE_OSM) {
 						prepPropagateNode.executeBatch();

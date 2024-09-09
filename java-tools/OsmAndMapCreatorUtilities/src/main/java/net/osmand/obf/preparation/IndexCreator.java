@@ -9,6 +9,7 @@ import java.io.RandomAccessFile;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 import javax.imageio.ImageIO;
@@ -24,8 +25,10 @@ import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
+import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -512,7 +515,7 @@ public class IndexCreator {
 		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
-		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
+		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 
@@ -716,6 +719,27 @@ public class IndexCreator {
 		accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+				Way w = (Way) e;
+				for (long nodeId : w.getNodeIds().toArray()) {
+					List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getLinkedPropagate(nodeId, true);
+					if (linkedPropagate != null) {
+						boolean hasBorder = false;
+						boolean selfWay = false;
+						for (PropagateFromWayToNode p : linkedPropagate) {
+							if (p.wayId == w.getId()) {
+								selfWay = true;
+							}
+							if (p.type == PropagateToNodesType.BORDER) {
+								hasBorder = true;
+							}
+						}
+						if (hasBorder && !selfWay) {
+							for (PropagateFromWayToNode p : linkedPropagate) {
+								p.ignoreBorderPoint = true;
+							}
+						}
+					}
+				}
 				iterateMainEntity(e, ctx, icc);
 			}
 		});

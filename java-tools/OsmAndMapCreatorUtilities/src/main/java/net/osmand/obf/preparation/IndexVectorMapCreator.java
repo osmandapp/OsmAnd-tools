@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.*;
+import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -106,13 +108,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private static boolean VALIDATE_DUPLICATE = false;
     private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
     private BasemapProcessor checkSeaTile;
+	private PropagateToNodes propagateToNodes;
 
     public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
-            IndexCreatorSettings settings) {
+            IndexCreatorSettings settings, PropagateToNodes propagateToNodes) {
         this.logMapDataWarn = logMapDataWarn;
         this.mapZooms = mapZooms;
         this.settings = settings;
         this.renderingTypes = renderingTypes;
+		this.propagateToNodes = propagateToNodes;
         lowLevelWays = -1;
     }
 
@@ -721,7 +725,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             for (int level = 0; level < mapZooms.size(); level++) {
                 processMainEntity(e, originalId, assignedId, level, tags);
             }
-
             createCenterNodeForSmallIsland(e, tags, originalId);
         }
     }
@@ -920,6 +923,18 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                 // = ?");
                 ResultSet rs = selectData.executeQuery();
                 if (rs.next()) {
+                	List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getLinkedPropagate(id, false);
+					if (linkedPropagate != null) {
+						boolean skipPoint = false;
+						for (PropagateFromWayToNode p : linkedPropagate) {
+							if (p.ignoreBorderPoint) {
+								skipPoint = true;
+							}
+						}
+						if (skipPoint) {
+							continue;
+						}
+					}
                     long cid = convertGeneratedIdToObfWrite(id);
                     if (dataBlock == null) {
                         baseId = cid;
