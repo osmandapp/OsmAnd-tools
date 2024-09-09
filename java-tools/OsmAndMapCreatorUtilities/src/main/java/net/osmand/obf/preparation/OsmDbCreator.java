@@ -408,6 +408,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				if (!e.getTags().isEmpty()) {
 					allNodes++;
 				}
+				// TODO insert node itself after PropagateFromWayToNode
 				prepNode.setLong(1, id);
 				prepNode.setDouble(2, ((Node) e).getLatitude());
 				prepNode.setDouble(3, ((Node) e).getLongitude());
