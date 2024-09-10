@@ -470,7 +470,7 @@ public class OsmGpxWriteContext {
 				File targetObf = new File(dir, file.getFileNameWithoutExtension() + BINARY_MAP_INDEX_EXT);
 				List<KFile> files = new ArrayList<>();
 				if (file.isDirectory()) {
-					files = Arrays.asList(Objects.requireNonNull(file.listFiles()));
+					files = file.listFiles();
 				} else {
 					files.add(file);
 				}
