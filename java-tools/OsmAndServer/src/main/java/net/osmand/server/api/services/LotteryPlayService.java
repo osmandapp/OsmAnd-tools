@@ -90,7 +90,7 @@ public class LotteryPlayService {
 
 	public LotteryUser participate(String remoteAddr, String email, String series) throws IOException {
 		LotteryUser usr = new LotteryUsersRepository.LotteryUser();
-		if (Algorithms.isEmpty(email) || !mapUsers.existsByEmail(email)) {
+		if (Algorithms.isEmpty(email) || !mapUsers.existsByEmailIgnoreCase(email)) {
 			usr.message = String.format("User with email '%s' is not subscribed", email);
 			return usr;
 		}
@@ -259,7 +259,7 @@ public class LotteryPlayService {
 		Map<String, Object> res = new TreeMap<>();
 		res.put("email", mapUser.email);
 		res.put("time", mapUser.updateTime.getTime());
-		List<MapUser> ex = mapUsers.findByEmail(email);
+		List<MapUser> ex = mapUsers.findByEmailIgnoreCase(email);
 		for (MapUser u : ex) {
 			if (Algorithms.stringsEqual(os, u.os)) {
 				res.put("message", "You have already subscribed to giveaways with email '" + mapUser.email + "'.");

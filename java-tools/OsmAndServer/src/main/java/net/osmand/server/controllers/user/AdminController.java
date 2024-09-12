@@ -242,7 +242,7 @@ public class AdminController {
 		deviceSub.valid = false;
 		
 		if (emailSender.isEmail(identifier)) {
-			PremiumUser pu = usersRepository.findByEmail(identifier);
+			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
 			if (pu != null) {
 				String suffix = pu.orderid != null ? " (pro email)" : " (osmand start)";
 				deviceSub.sku = identifier + suffix;

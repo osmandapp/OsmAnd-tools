@@ -115,7 +115,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     	auth.userDetailsService(new UserDetailsService() {
     	    @Override
 			public UserDetails loadUserByUsername(String username) {
-				PremiumUser pu = usersRepository.findByEmail(username);
+				PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
 				if (pu == null) {
 					throw new UsernameNotFoundException(username);
 				}

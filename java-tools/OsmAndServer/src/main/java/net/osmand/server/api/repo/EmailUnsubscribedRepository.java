@@ -22,7 +22,7 @@ import org.springframework.stereotype.Repository;
 public interface EmailUnsubscribedRepository extends JpaRepository<EmailUnsubscribed, EmailUnsubscribedKey> {
 
 	@Transactional
-	void deleteAllByEmail(String email);
+	void deleteAllByEmailIgnoreCase(String email);
 	
 	@Entity
 	@Table(name = "email_unsubscribed")
