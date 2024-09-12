@@ -124,6 +124,13 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(collection));
     }
     
+    @RequestMapping(path = {"/parse-image-info"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> parseImageInfo(@RequestBody String data) {
+        Map<String, String> info = wikiService.parseImageInfo(data);
+        return ResponseEntity.ok(gson.toJson(info));
+    }
+    
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,

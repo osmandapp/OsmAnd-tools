@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 import com.clickhouse.data.value.UnsignedLong;
+import net.osmand.shared.util.WikiImagesUtil;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -79,6 +80,10 @@ public class WikiService {
 		});
 		
 		return new FeatureCollection(features.toArray(new Feature[0]));
+	}
+	
+	public Map<String, String> parseImageInfo(String data) {
+		return WikiImagesUtil.INSTANCE.parseWikiText(data);
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
