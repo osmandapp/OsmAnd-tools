@@ -63,7 +63,7 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
 //					System.getProperty("maps.dir") + "Osm_wiki_map.obf"
-					"/Users/macmini/OsmAnd/maps/Malta_europe.obf"
+					"/Users/macmini/Downloads/Ukraine_khmelnytskyy_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1405,7 +1405,7 @@ public class BinaryInspector {
 						if(id > 0) {
 							id = id >> 1;
 						}
-						/*Map<Integer, List<TagValuePair>> tagGroups = amenity.getTagGroups();
+						Map<Integer, List<TagValuePair>> tagGroups = amenity.getTagGroups();
 						if (tagGroups != null) {
 							s += " cities:";
 							for (Map.Entry<Integer, List<TagValuePair>> entry : tagGroups.entrySet()) {
@@ -1415,7 +1415,7 @@ public class BinaryInspector {
 								}
 								s += "]";
 							}
-						}*/
+						}
 						println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
 								" " + amenity.getLocation() + " osmid=" + id + " " + s);
 						return false;
