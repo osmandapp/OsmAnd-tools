@@ -365,7 +365,7 @@ public class UserdataService {
 		if (!emailSender.isEmail(email)) {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (isNew) {
             if (pu != null) {
                 List<PremiumUserDevicesRepository.PremiumUserDevice> devices = devicesRepository.findByUserid(pu.id);
@@ -394,7 +394,7 @@ public class UserdataService {
 	}
     
     public ResponseEntity<String> validateToken(String email, String token) {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             return ResponseEntity.badRequest().body("error_email");
         }
@@ -407,7 +407,7 @@ public class UserdataService {
     }
     
     public ResponseEntity<String> checkUserEmail(String email) {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             return ResponseEntity.badRequest().body("error_email");
         }
@@ -445,7 +445,7 @@ public class UserdataService {
 			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
 		}
         email = email.toLowerCase().trim();
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             LOG.error("device-register: email is not found (" + email + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
@@ -1017,7 +1017,7 @@ public class UserdataService {
             wearOutToken(pu);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
-                    int numOfUsersDelete = usersRepository.deleteByEmail(pu.email);
+                    int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
@@ -1081,7 +1081,7 @@ public class UserdataService {
         if (token == null) {
             return ResponseEntity.badRequest().body("Token is not valid");
         }
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(username);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
@@ -1109,7 +1109,7 @@ public class UserdataService {
 
     public ResponseEntity<String> changeEmail(String username, String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         // validate new email
-        PremiumUsersRepository.PremiumUser tempUser = usersRepository.findByEmail(username);
+        PremiumUsersRepository.PremiumUser tempUser = usersRepository.findByEmailIgnoreCase(username);
         if (tempUser == null) {
             return ResponseEntity.badRequest().body("Something went wrong with your new email");
         }

@@ -532,7 +532,7 @@ public class ApiController {
 			}
 			email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
 		}
-    	unsubscribedRepo.deleteAllByEmail(email);
+    	unsubscribedRepo.deleteAllByEmailIgnoreCase(email);
     	return "pub/email/subscribe";
     }
 

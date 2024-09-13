@@ -159,7 +159,7 @@ public class UserdataController {
 			@RequestParam(name = "deviceid", required = false) String deviceId,
 			@RequestParam(name = "orderid", required = false) String orderid,
 			HttpServletRequest request) throws IOException {
-		PremiumUser pu = usersRepository.findByEmail(email);
+		PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
@@ -190,7 +190,7 @@ public class UserdataController {
 	                                           HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
-		PremiumUser pu = usersRepository.findByEmail(email);
+		PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (!email.contains("@")) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
