@@ -63,7 +63,7 @@ public class WikiService {
 	public FeatureCollection getImages(String northWest, String southEast) {
 		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
 				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
-				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon", null);
+				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, null,"imgLat", "imgLon", null);
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
@@ -86,7 +86,12 @@ public class WikiService {
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
-		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
+		String filterQuery = "";
+		List<Object> filterParams = new ArrayList<>();
+		if (!filters.isEmpty()) {
+			filterQuery = "AND poitype IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
+			filterParams.addAll(filters);
+		}
 		
 		Set<String> excludedPoiTypes = getExcludedTypes(EXCLUDED_POI_TYPES_BY_ZOOM, zoom);
 		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
@@ -105,7 +110,7 @@ public class WikiService {
 				+ " " + subtypeFilter
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
 		
-		return getPoiData(northWest, southEast, query, "lat", "lon", lang);
+		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
 	}
 	
 	private static Set<String> getExcludedTypes(Map<Integer, Set<String>> map, int zoom) {
@@ -171,7 +176,7 @@ public class WikiService {
 		}
 	}
 	
-	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon, String lang) {
+	public FeatureCollection getPoiData(String northWest, String southEast, String query, List<Object> filterParams, String lat, String lon, String lang) {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
@@ -295,6 +300,9 @@ public class WikiService {
 						ps.setDouble(2, north);
 						ps.setDouble(3, west);
 						ps.setDouble(4, east);
+					}
+					for (int i = 0; i < filterParams.size(); i++) {
+						ps.setObject(5 + i, filterParams.get(i));
 					}
 				}, rowMapper);
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
