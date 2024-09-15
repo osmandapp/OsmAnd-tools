@@ -763,7 +763,7 @@ public class MapApiController {
 				return response;
 			}
 			// check if new email is not registered
-			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
 			if (pu != null) {
 				return ResponseEntity.badRequest().body("User was already registered with such email");
 			}

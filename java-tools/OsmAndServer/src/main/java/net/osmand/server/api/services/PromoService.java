@@ -46,7 +46,7 @@ public class PromoService {
 			String key = "promo_" + promoCampaign.name;
 			Date expireTime = getExpirationDate(promoCampaign);
 			PromoResponse resp = createPromoSubscription(email, key, expireTime);
-			PremiumUsersRepository.PremiumUser existingUser = usersRepository.findByEmail(email);
+			PremiumUsersRepository.PremiumUser existingUser = usersRepository.findByEmailIgnoreCase(email);
 			if (existingUser != null && !resp.error) {
 				promoCampaign.used++;
 				promoCampaign.lastUsers = getLastUsers(promoCampaign);
@@ -118,7 +118,7 @@ public class PromoService {
 		}
 		boolean error = false;
 		if (emailSender.isEmail(email)) {
-			PremiumUsersRepository.PremiumUser existingUser = usersRepository.findByEmail(email);
+			PremiumUsersRepository.PremiumUser existingUser = usersRepository.findByEmailIgnoreCase(email);
 			if (existingUser == null) {
 				PremiumUsersRepository.PremiumUser pu = new PremiumUsersRepository.PremiumUser();
 				pu.email = email;
