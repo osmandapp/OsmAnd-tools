@@ -106,7 +106,7 @@ public class WikiService {
 		
 		String osmidCondition = "";
 		if (zoom < FILTER_ZOOM_LEVEL) {
-			osmidCondition = "AND osmid IN (SELECT osmid FROM wikidata GROUP BY osmid HAVING COUNT(*) < 4)";
+			osmidCondition = "AND osmid != 0";
 		}
 		
 		String subtypeFilter = "";
