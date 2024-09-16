@@ -105,8 +105,10 @@ public class WikiService {
 		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
 		
 		String osmidCondition = "";
+		String osmcntFilter = "";
 		if (zoom < FILTER_ZOOM_LEVEL) {
-			osmidCondition = "AND osmid != 0";
+			osmidCondition = "AND osmid != 0 ";
+			osmcntFilter = "AND osmcnt < 4 ";
 		}
 		
 		String subtypeFilter = "";
@@ -119,6 +121,7 @@ public class WikiService {
 				+ filterQuery
 				+ zoomCondition
 				+ osmidCondition
+				+ osmcntFilter
 				+ " " + subtypeFilter
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
 		
