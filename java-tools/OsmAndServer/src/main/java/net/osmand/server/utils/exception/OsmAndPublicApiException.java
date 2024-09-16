@@ -7,6 +7,7 @@ public class OsmAndPublicApiException extends RuntimeException {
     public OsmAndPublicApiException(int errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
+        System.err.printf("OsmAndPublicApiException (%d):\n%s\n", errorCode, message);
     }
     
     public int getErrorCode() {
