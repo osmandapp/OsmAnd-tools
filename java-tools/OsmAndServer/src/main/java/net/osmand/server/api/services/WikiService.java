@@ -46,6 +46,10 @@ public class WikiService {
 	private static final int LIMIT_QUERY = 1000;
 	private static final int LIMITI_QUERY = 25;
 	
+	private static final int FILTER_ZOOM_LEVEL = 15;
+	
+	private static final Map<Integer, Set<String>> EXCLUDED_POI_SUBTYPES_BY_ZOOM = Map.of(FILTER_ZOOM_LEVEL, Set.of("commercial", "battlefield"));
+	
 	
 	@Value("${osmand.wiki.location}")
 	private String pathToWikiSqlite;
@@ -92,17 +96,32 @@ public class WikiService {
 		}
 		
 		String zoomCondition = "";
-		if (zoom < 13) {
+		if (zoom < FILTER_ZOOM_LEVEL) {
 			zoomCondition = "AND wlat != 0 AND wlon != 0 ";
+		}
+		
+		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
+		
+		String subtypeFilter = "";
+		if (!excludedPoiSubtypes.isEmpty()) {
+			subtypeFilter += "AND poisubtype NOT IN (" + excludedPoiSubtypes.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ") ";
 		}
 		
 		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon, wvLinks "
 				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ filterQuery
 				+ zoomCondition
+				+ " " + subtypeFilter
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
 		
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
+	}
+	
+	private static Set<String> getExcludedTypes(Map<Integer, Set<String>> map, int zoom) {
+		return map.entrySet().stream()
+				.filter(entry -> entry.getKey() >= zoom)
+				.flatMap(entry -> entry.getValue().stream())
+				.collect(Collectors.toSet());
 	}
 	
 	public String getWikipediaContent(String title, String lang) {
