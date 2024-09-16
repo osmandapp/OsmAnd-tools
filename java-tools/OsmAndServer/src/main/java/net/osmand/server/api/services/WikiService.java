@@ -104,6 +104,11 @@ public class WikiService {
 		
 		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
 		
+		String osmidCondition = "";
+		if (zoom < FILTER_ZOOM_LEVEL) {
+			osmidCondition = "AND osmid IN (SELECT osmid FROM wikidata GROUP BY osmid HAVING COUNT(*) < 4)";
+		}
+		
 		String subtypeFilter = "";
 		if (!excludedPoiSubtypes.isEmpty()) {
 			subtypeFilter += "AND poisubtype NOT IN (" + excludedPoiSubtypes.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ") ";
@@ -113,6 +118,7 @@ public class WikiService {
 				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ filterQuery
 				+ zoomCondition
+				+ osmidCondition
 				+ " " + subtypeFilter
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
 		
