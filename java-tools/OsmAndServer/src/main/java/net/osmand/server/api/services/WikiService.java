@@ -97,7 +97,9 @@ public class WikiService {
 		
 		String zoomCondition = "";
 		if (zoom < FILTER_ZOOM_LEVEL) {
-			zoomCondition = "AND wlat != 0 AND wlon != 0 ";
+			zoomCondition = "AND wlat != 0 AND wlon != 0 "
+					+ "AND ROUND(lat, 3) = ROUND(wlat, 3) "
+					+ "AND ROUND(lon, 3) = ROUND(wlon, 3) ";
 		}
 		
 		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
