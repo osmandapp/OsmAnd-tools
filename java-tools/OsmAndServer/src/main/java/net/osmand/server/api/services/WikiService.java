@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 import com.clickhouse.data.value.UnsignedLong;
+import net.osmand.shared.util.WikiImagesUtil;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -85,6 +86,10 @@ public class WikiService {
 		});
 		
 		return new FeatureCollection(features.toArray(new Feature[0]));
+	}
+	
+	public Map<String, String> parseImageInfo(String data) {
+		return WikiImagesUtil.INSTANCE.parseWikiText(data);
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
@@ -331,65 +336,96 @@ public class WikiService {
 		Set<String> images = new LinkedHashSet<>();
 		if (config.wikiInitialized()) {
 			RowCallbackHandler h = rs -> {
-				if (FILENAME) {
-					images.add(WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + rs.getString(1));
-				} else {
-					String imageTitle = rs.getString(1);
-                    imageTitle = URLDecoder.decode(imageTitle, StandardCharsets.UTF_8);
-                    String[] hash = getHash(imageTitle);
-                    imageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
-                    String prefix = THUMB_PREFIX;
-                    String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
-                    images.add(IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/"
-                            + prefix + imageTitle + suffix);
-                }
+				String imageTitle = rs.getString("imageTitle");
+				images.add(createImageUrl(imageTitle));
 			};
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
-				String title = wiki;
-				String lang = "";
-				int url = title.indexOf(".wikipedia.org/wiki/");
-				if (url > 0) {
-					String prefix = title.substring(0, url);
-					lang = prefix.substring(prefix.lastIndexOf("/") + 1, prefix.length());
-					title = title.substring(url + ".wikipedia.org/wiki/".length());
-				} else if (title.indexOf(":") > 0) {
-					String[] s = wiki.split(":");
-					title = s[1];
-					lang = s[0];
-				}
-				String id;
-				ResultSetExtractor<String> rse = rs -> {
-					if (rs.next()) {
-						return rs.getString(1);
-					}
-					return null;
-				};
-				if (lang.isEmpty()) {
-					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where title = ? ", rse, title);
-				} else {
-					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where lang = ? and title = ? ", rse, lang,
-							title);
-				}
-				if (id != null) {
-					articleId = "Q" + id;
-				}
+				articleId = retrieveArticleIdFromWikiUrl(wiki);
 			}
-			if (!Algorithms.isEmpty(articleId) && articleId.startsWith("Q")) {
-				String aid = articleId;
-				jdbcTemplate.query(
-						"SELECT imageTitle from wiki.wikiimages where id = ? and namespace = 6 "
-								+ " order by type='P18' ? 0 : 1/(1+views) desc limit " + LIMITI_QUERY,
-						ps -> ps.setString(1, aid.substring(1)), h);
-			}
-			if (!Algorithms.isEmpty(categoryName)) {
-				jdbcTemplate.query(
-						"SELECT imageTitle FROM wiki.wikiimages WHERE id = " +
-								" (SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
-								" AND type = 'P373' AND namespace = 6 ORDER BY views ASC LIMIT " + LIMITI_QUERY,
-						ps -> ps.setString(1, categoryName.replace(' ', '_')), h);
-			}
+			handleArticleAndCategoryQueries(articleId, categoryName, h);
 		}
 		return images;
 	}
-
+	
+	
+	public Set<Map<String, Object>> processWikiImagesWithDetails(String articleId, String categoryName, String wiki) {
+		Set<Map<String, Object>> imagesWithDetails = new LinkedHashSet<>();
+		
+		if (config.wikiInitialized()) {
+			RowCallbackHandler h = rs -> {
+				Map<String, Object> imageDetails = new HashMap<>();
+				String imageTitle = rs.getString("imageTitle");
+				
+				imageDetails.put("image", createImageUrl(imageTitle));
+				imageDetails.put("date", rs.getString("date"));
+				imageDetails.put("author", rs.getString("author"));
+				imageDetails.put("license", rs.getString("license"));
+				
+				imagesWithDetails.add(imageDetails);
+			};
+			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
+				articleId = retrieveArticleIdFromWikiUrl(wiki);
+			}
+			handleArticleAndCategoryQueries(articleId, categoryName, h);
+		}
+		return imagesWithDetails;
+	}
+	
+	private String createImageUrl(String imageTitle) {
+		if (FILENAME) {
+			return WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + imageTitle;
+		} else {
+			imageTitle = URLDecoder.decode(imageTitle, StandardCharsets.UTF_8);
+			String[] hash = getHash(imageTitle);
+			imageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+			String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
+			return IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/" + THUMB_PREFIX + imageTitle + suffix;
+		}
+	}
+	
+	private void processImageQuery(String query, PreparedStatementSetter pss, RowCallbackHandler rowCallbackHandler) {
+		jdbcTemplate.query(query, pss, rowCallbackHandler);
+	}
+	
+	private void handleArticleAndCategoryQueries(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
+		if (articleId != null && !Algorithms.isEmpty(articleId) && articleId.startsWith("Q")) {
+			processImageQuery(
+					"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = ? AND namespace = 6 " +
+							"ORDER BY type = 'P18' ? 0 : 1/(1 + views) DESC LIMIT " + LIMITI_QUERY,
+					ps -> ps.setString(1, articleId.substring(1)),
+					rowCallbackHandler);
+		}
+		
+		if (categoryName != null && !Algorithms.isEmpty(categoryName)) {
+			processImageQuery(
+					"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = " +
+							"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
+							"AND type = 'P373' AND namespace = 6 ORDER BY views ASC LIMIT " + LIMITI_QUERY,
+					ps -> ps.setString(1, categoryName.replace(' ', '_')),
+					rowCallbackHandler);
+		}
+	}
+	
+	private String retrieveArticleIdFromWikiUrl(String wiki) {
+		String title = wiki;
+		String lang = "";
+		int urlIndex = title.indexOf(".wikipedia.org/wiki/");
+		if (urlIndex > 0) {
+			String prefix = title.substring(0, urlIndex);
+			lang = prefix.substring(prefix.lastIndexOf("/") + 1);
+			title = title.substring(urlIndex + ".wikipedia.org/wiki/".length());
+		} else if (title.indexOf(":") > 0) {
+			String[] s = wiki.split(":");
+			title = s[1];
+			lang = s[0];
+		}
+		
+		String id;
+		if (lang.isEmpty()) {
+			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE title = ?", String.class, title);
+		} else {
+			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ?", String.class, lang, title);
+		}
+		return id;
+	}
 }
