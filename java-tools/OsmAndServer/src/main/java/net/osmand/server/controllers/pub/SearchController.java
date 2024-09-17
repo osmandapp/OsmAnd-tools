@@ -112,8 +112,9 @@ public class SearchController {
     public ResponseEntity<String> getWikiData(@RequestParam String northWest,
                                               @RequestParam String southEast,
                                               @RequestParam String lang,
+                                              @RequestParam int zoom,
                                               @RequestParam Set<String> filters) {
-        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, lang, filters);
+        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, lang, filters, zoom);
         return ResponseEntity.ok(gson.toJson(collection));
     }
     

@@ -46,6 +46,12 @@ public class WikiService {
 
 	private static final int LIMIT_QUERY = 1000;
 	private static final int LIMITI_QUERY = 25;
+	
+	private static final int FILTER_ZOOM_LEVEL = 15;
+	
+	private static final Map<Integer, Set<String>> EXCLUDED_POI_SUBTYPES_BY_ZOOM = Map.of(FILTER_ZOOM_LEVEL, Set.of("commercial", "battlefield"));
+	
+	
 	@Value("${osmand.wiki.location}")
 	private String pathToWikiSqlite;
 	
@@ -60,7 +66,7 @@ public class WikiService {
 	public FeatureCollection getImages(String northWest, String southEast) {
 		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
 				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
-				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon", null);
+				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, null,"imgLat", "imgLon", null);
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
@@ -86,16 +92,53 @@ public class WikiService {
 		return WikiImagesUtil.INSTANCE.parseWikiText(data);
 	}
 	
-	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
-		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
+	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
+		String filterQuery = "";
+		List<Object> filterParams = new ArrayList<>();
+		if (!filters.isEmpty()) {
+			filterQuery = "AND poitype IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
+			filterParams.addAll(filters);
+		}
+		
+		String zoomCondition = "";
+		if (zoom < FILTER_ZOOM_LEVEL) {
+			zoomCondition = "AND wlat != 0 AND wlon != 0 "
+					+ "AND ROUND(lat, 3) = ROUND(wlat, 3) "
+					+ "AND ROUND(lon, 3) = ROUND(wlon, 3) ";
+		}
+		
+		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
+		
+		String osmidCondition = "";
+		String osmcntFilter = "";
+		if (zoom < FILTER_ZOOM_LEVEL) {
+			osmidCondition = "AND osmid != 0 ";
+			osmcntFilter = "AND osmcnt < 4 ";
+		}
+		
+		String subtypeFilter = "";
+		if (!excludedPoiSubtypes.isEmpty()) {
+			subtypeFilter += "AND poisubtype NOT IN (" + excludedPoiSubtypes.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ") ";
+		}
+		
 		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon, wvLinks "
 				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ filterQuery
+				+ zoomCondition
+				+ osmidCondition
+				+ osmcntFilter
+				+ " " + subtypeFilter
 				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
 		
-		return getPoiData(northWest, southEast, query, "lat", "lon", lang);
+		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
 	}
 	
+	private static Set<String> getExcludedTypes(Map<Integer, Set<String>> map, int zoom) {
+		return map.entrySet().stream()
+				.filter(entry -> entry.getKey() >= zoom)
+				.flatMap(entry -> entry.getValue().stream())
+				.collect(Collectors.toSet());
+	}
 	
 	public String getWikipediaContent(String title, String lang) {
 		String query = "SELECT hex(zipContent) AS ziphex FROM wiki.wiki_content WHERE title = ? AND lang = ?";
@@ -152,7 +195,7 @@ public class WikiService {
 		}
 	}
 	
-	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon, String lang) {
+	public FeatureCollection getPoiData(String northWest, String southEast, String query, List<Object> filterParams, String lat, String lon, String lang) {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
@@ -276,6 +319,9 @@ public class WikiService {
 						ps.setDouble(2, north);
 						ps.setDouble(3, west);
 						ps.setDouble(4, east);
+					}
+					for (int i = 0; i < filterParams.size(); i++) {
+						ps.setObject(5 + i, filterParams.get(i));
 					}
 				}, rowMapper);
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
