@@ -221,7 +221,7 @@ else
       gdaldem color-relief -alpha "$WORK_PATH/base_composite_hillshade.tif" "$SRC_PATH/color/$COLOR_SCHEME.txt" "$WORK_PATH/hillshade-color.tif" -co "COMPRESS=LZW" -co "PREDICTOR=2"
       gdal_translate -b 1 -b 4 -colorinterp_1 gray "$WORK_PATH/hillshade-color.tif" "$WORK_PATH/hillshade.tif" -co "COMPRESS=LZW" -co "PREDICTOR=2"
 
-    elif [ "$TYPE" = "slopes" ]; then
+    elif [ "$TYPE" = "slope" ]; then
       COLOR_SCHEME="${COLOR_SCHEME:-slopes_main}"
       ZOOM_RANGE=4-11
       TARGET_FILE=slope.tif

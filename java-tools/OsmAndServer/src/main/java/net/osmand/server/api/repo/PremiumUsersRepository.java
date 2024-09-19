@@ -1,6 +1,7 @@
 package net.osmand.server.api.repo;
 
 import java.util.Date;
+import java.util.List;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -20,11 +21,13 @@ import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long> {
 	
 	
-	PremiumUser findByEmail(String email);
+	PremiumUser findByEmailIgnoreCase(String email);
     
-    int deleteByEmail(String email);
+    int deleteByEmailIgnoreCase(String email);
 	
 	PremiumUser findByOrderid(String orderid);
+    
+    List<PremiumUser> findPremiumUsersByOrderidAndTokendevice(String orderid, String tokendevice);
 	
 	PremiumUser findById(int id);
 	

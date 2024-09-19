@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.LatLonEle;
+import net.osmand.shared.gpx.ElevationApproximator;
 import net.osmand.router.*;
+import net.osmand.shared.gpx.ElevationDiffsCalculator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +27,7 @@ import net.osmand.util.MapUtils;
 
 import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
-
+import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Service
 public class RoutingService {
 
@@ -182,8 +184,21 @@ public class RoutingService {
         }
     }
 
-    public void convertResultsWithElevation(List<LatLonEle> resListEle,
-                                            List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+    public void interpolateEmptyElevationSegments(List<LatLonEle> points) {
+        List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+        for (LatLonEle point : points) {
+            GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(point.getLatitude(), point.getLongitude());
+            waypoint.ele = point.getElevation();
+            waypoints.add(waypoint);
+        }
+        GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+        for (int i = 0; i < waypoints.size(); i++) {
+            points.get(i).setElevation((float)waypoints.get(i).ele);
+        }
+    }
+
+    public List<LatLonEle> getElevationsBySegments(List<LatLonEle> resListEle,
+                                            List<Feature> features, List<RouteSegmentResult> res) {
         for (int i = 0; i < res.size(); i++) {
             RouteSegmentResult r = res.get(i);
 
@@ -213,34 +228,93 @@ public class RoutingService {
             // process (segment/turn) description
             String description = r.getDescription(true);
             if (description != null && description.length() > 0) {
-                RoutingController.Geometry point;
+                Geometry point;
 
                 if (isHeightsValid) {
                     float ele = heightArray[start * 2 + 1];
                     double lat = r.getStartPoint().getLatitude();
                     double lon = r.getStartPoint().getLongitude();
-                    point = RoutingController.Geometry.pointElevation(new LatLonEle(lat, lon, ele));
+                    point = Geometry.pointElevation(new LatLonEle(lat, lon, ele));
                 } else {
-                    point = RoutingController.Geometry.point(r.getStartPoint());
+                    point = Geometry.point(r.getStartPoint());
                 }
 
-                RoutingController.Feature f = new RoutingController.Feature(point);
+                Feature f = new Feature(point);
                 f.prop("description", description).prop("routingTime", r.getRoutingTime())
                         .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
                         .prop("roadId", r.getObject().getId());
                 features.add(f);
             }
         }
+        return resListEle;
     }
-
-    public void convertResults(List<LatLon> resList, List<RoutingController.Feature> features, List<RouteSegmentResult> res) {
+    
+    public List<Double> calculateElevationDiffs(List<LatLonEle> points) {
+        ElevationApproximator approximator = getElevationApproximator(points);
+        approximator.approximate();
+        final double[] distances = approximator.getDistances();
+        final double[] elevations = approximator.getElevations();
+        if (distances != null && elevations != null) {
+            ElevationDiffsCalculator elevationDiffsCalc = getElevationDiffsCalculator(distances, elevations);
+            elevationDiffsCalc.calculateElevationDiffs();
+            double diffElevationUp = elevationDiffsCalc.getDiffElevationUp();
+            double diffElevationDown = elevationDiffsCalc.getDiffElevationDown();
+            return List.of(diffElevationUp, diffElevationDown);
+        }
+        return Collections.emptyList();
+    }
+    
+    private ElevationDiffsCalculator getElevationDiffsCalculator(final double[] distances, final double[] elevations) {
+        return new ElevationDiffsCalculator() {
+            @Override
+            public double getPointDistance(int index) {
+                return distances[index];
+            }
+            
+            @Override
+            public double getPointElevation(int index) {
+                return elevations[index];
+            }
+            
+            @Override
+            public int getPointsCount() {
+                return distances.length;
+            }
+        };
+    }
+    
+    private ElevationApproximator getElevationApproximator(List<LatLonEle> points) {
+        return new ElevationApproximator() {
+            @Override
+            public double getPointLatitude(int index) {
+                return points.get(index).getLatitude();
+            }
+            
+            @Override
+            public double getPointLongitude(int index) {
+                return points.get(index).getLongitude();
+            }
+            
+            @Override
+            public double getPointElevation(int index) {
+                return points.get(index).getElevation();
+            }
+            
+            @Override
+            public int getPointsCount() {
+                return points.size();
+            }
+        };
+    }
+    
+    public void convertResults(List<LatLon> resList, List<Feature> features, List<RouteSegmentResult> res) {
         LatLon last = null;
         for (RouteSegmentResult r : res) {
             int i;
             int dir = r.isForwardDirection() ? 1 : -1;
             String description = r.getDescription(true);
             if (!Algorithms.isEmpty(description)) {
-                RoutingController.Feature f = new RoutingController.Feature(RoutingController.Geometry.point(r.getStartPoint()));
+                Feature f = new Feature(Geometry.point(r.getStartPoint()));
                 f.prop("description", description).prop("routingTime", r.getRoutingTime())
                         .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
                         .prop("roadId", r.getObject().getId());
@@ -327,6 +401,17 @@ public class RoutingService {
                 if (routeSegmentResults.indexOf(r) == routeSegmentResults.size() - 1) {
                     getPoint(endInd, r, locations, heightArray, pointsRes);
                 }
+            }
+
+            List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+            pointsRes.forEach(p -> {
+                    GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(p.lat, p.lng);
+                    waypoint.ele = p.ele;
+                    waypoints.add(waypoint);
+            });
+            GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+            for (int i = 0; i < waypoints.size(); i++) {
+                pointsRes.get(i).ele = waypoints.get(i).ele;
             }
             return pointsRes;
         }

@@ -39,7 +39,7 @@ resize ()
 		echo "----------------------------------------------"
 		echo "Processing "$1
 		echo "----------------------------------------------"
-		gdalwarp -ts 3602 3602 -r cubicspline -of GTiff -ot Int16 -co "COMPRESS=LZW" $indir/$filename.$ext_in $outdir/$filename.tmp
+		gdalwarp -ts 3601 3601 -r cubicspline -of GTiff -ot Int16 -co "COMPRESS=LZW" -co "PREDICTOR=2" $indir/$filename.$ext_in $outdir/$filename.tmp
 		mv $outdir/$filename.tmp $outdir/$filename.tif
 	else echo "Skipping "$1 "(already processed)"
 	fi

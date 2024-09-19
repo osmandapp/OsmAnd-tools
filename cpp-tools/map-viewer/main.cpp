@@ -313,9 +313,6 @@ int main(int argc, char** argv)
 
     //OsmAnd::Logger::get()->setSeverityLevelThreshold(OsmAnd::LogSeverityLevel::Error);
 
-    // Fix parsing SVG with SkParse
-    setlocale(LC_NUMERIC, "C");
-
     //////////////////////////////////////////////////////////////////////////
     OsmAnd::ValueAnimator valueAnimator;
     valueAnimator.animateValueTo<float>(
@@ -1192,7 +1189,7 @@ void keyboardHandler(unsigned char key, int x, int y)
                 binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
             mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
 
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u));
+            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u, nullptr, false, true));
             renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
         }
         return;

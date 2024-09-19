@@ -11,14 +11,18 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.sql.DataSource;
 
-import net.osmand.server.api.services.UserdataService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +31,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -63,6 +68,7 @@ import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.services.UserdataService;
 import net.osmand.util.Algorithms;
 
 @Configuration
@@ -86,8 +92,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	@Autowired
 	UserdataService userdataService;
     
-    
-    
+
 	public static class OsmAndProUser extends User {
 
 		private static final long serialVersionUID = -881322456618342435L;
@@ -110,7 +115,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     	auth.userDetailsService(new UserDetailsService() {
     	    @Override
 			public UserDetails loadUserByUsername(String username) {
-				PremiumUser pu = usersRepository.findByEmail(username);
+				PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
 				if (pu == null) {
 					throw new UsernameNotFoundException(username);
 				}

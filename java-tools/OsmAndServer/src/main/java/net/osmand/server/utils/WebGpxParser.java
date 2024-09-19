@@ -12,6 +12,7 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.util.Algorithms.colorToString;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
@@ -52,6 +53,10 @@ public class WebGpxParser {
                 if (data.name != null) {
                     name = data.name;
                     data.name = null;
+                }
+                if (data.desc != null) {
+                    desc = data.desc;
+                    data.desc = null;
                 }
                 if (data.link != null) {
                     link = data.link;
@@ -271,6 +276,7 @@ public class WebGpxParser {
     
     public void addRoutePoints(GPXFile gpxFile, TrackData gpxData) {
         Map<Integer, List<Point>> trackPointsMap = new HashMap<>();
+        AtomicBoolean skip = new AtomicBoolean(false);
         gpxFile.routes.forEach(route -> {
             List<Point> routePoints = new ArrayList<>();
             int index = gpxFile.routes.indexOf(route);
@@ -287,6 +293,10 @@ public class WebGpxParser {
                     boolean isLastPoint = route.points.indexOf(p) == route.points.size() - 1;
                     Point routePoint = new Point(p);
                     int currTrkPointInd;
+                    if (routePoint.geometry == null && routePoint.geometrySize == 0) {
+                        skip.set(true);
+                        return;
+                    }
                     if (routePoint.geometrySize == -1) {
                         currTrkPointInd = findNearestPoint(trackPoints, routePoint);
                     } else {
@@ -298,6 +308,9 @@ public class WebGpxParser {
                     }
                     prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
                 }
+                if (skip.get()) {
+                    return;
+                }
                 int indTrack = getTrackBySegmentIndex(gpxData, index);
                 List<Point> routeP = trackPointsMap.get(indTrack);
                 if (routeP != null) {
@@ -307,6 +320,9 @@ public class WebGpxParser {
                 }
             }
         });
+        if (skip.get()) {
+            return;
+        }
         gpxData.tracks.forEach(track -> track.points = trackPointsMap.get(gpxData.tracks.indexOf(track)));
     }
     
@@ -488,12 +504,10 @@ public class WebGpxParser {
                 gpxFile.metadata = trackData.metaData.ext;
             }
             gpxFile.metadata.name = trackData.metaData.name;
+            gpxFile.metadata.desc = trackData.metaData.desc;
             gpxFile.metadata.link = trackData.metaData.link;
             if (gpxFile.metadata.extensions == null) {
                 gpxFile.metadata.extensions = new LinkedHashMap<>();
-            }
-            if (trackData.metaData.desc != null) {
-                gpxFile.metadata.extensions.put(DESC_EXTENSION, trackData.metaData.desc);
             }
         }
         if (trackData.wpts != null) {
@@ -650,18 +664,18 @@ public class WebGpxParser {
             
             if (point.segment != null) {
                 GPXUtilities.RouteSegment seg = point.segment.ext;
-                int ind = Integer.parseInt(seg.startTrackPointIndex);
-                if (ind == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
+                int segStartInd = seg.startTrackPointIndex != null ? Integer.parseInt(seg.startTrackPointIndex) : points.indexOf(point);
+                if (segStartInd == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
                     int currentLength = Integer.parseInt(lastPointWithSeg.segment.ext.length);
                     //fix approximate results
                     int segmentLength = currentLength == 1 ? 1 : currentLength - 1;
-                    
-                    lastStartTrkptIdx = segmentLength + Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex);
+                    int lastPointWithSegStartInd = lastPointWithSeg.segment.ext.startTrackPointIndex != null ? Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex) : points.indexOf(lastPointWithSeg);
+                    lastStartTrkptIdx = segmentLength + lastPointWithSegStartInd;
                     prevTypesSize += lastPointWithSeg.segment.routeTypes.size();
                     segment.routeTypes.addAll(point.segment.routeTypes);
                 }
-                seg.startTrackPointIndex = Integer.toString(ind + lastStartTrkptIdx);
-    
+                seg.startTrackPointIndex = Integer.toString(segStartInd + lastStartTrkptIdx);
+                
                 seg.types = prepareTypes(seg.types, prevTypesSize);
                 seg.pointTypes = prepareTypes(seg.pointTypes, prevTypesSize);
                 seg.names = prepareTypes(seg.names, prevTypesSize);

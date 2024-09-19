@@ -12,6 +12,7 @@ import java.util.*;
 
 import net.osmand.router.*;
 import net.osmand.NativeLibrary;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 
 import net.osmand.binary.BinaryMapIndexReader;
@@ -261,7 +262,7 @@ public class RandomRouteTester {
 	private void reportResult() throws IOException {
 		long runTime = System.currentTimeMillis() - started;
 		RandomRouteReport report = new RandomRouteReport(runTime, obfReaders.size(), testList.size(),
-				config.DEVIATION_RED, config.DEVIATION_YELLOW, optHtmlDomain);
+				config.DEVIATION_RED, config.DEVIATION_YELLOW, optHtmlDomain, config.CAR_2PHASE_MODE);
 
 		for (int i = 0; i < testList.size(); i++) {
 			report.entryOpen(i + 1);
@@ -287,7 +288,7 @@ public class RandomRouteTester {
 		obfDirectory = new File(optMapsDir);
 
 		if (obfDirectory.isDirectory()) {
-			for (File f : obfDirectory.listFiles()) {
+			for (File f : Algorithms.getSortedFilesVersions(obfDirectory)) {
 				if (f.isFile() && f.getName().endsWith(".obf") && f.getName().startsWith(optObfPrefix)) {
 					obfFiles.add(f);
 				}
@@ -295,9 +296,6 @@ public class RandomRouteTester {
 		} else {
 			obfFiles.add(obfDirectory);
 		}
-
-		// sort files by name to improve pseudo-random reproducibility
-		obfFiles.sort((f1, f2) -> f1.getName().compareTo(f2.getName()));
 
 		for (File source : obfFiles) {
 			System.out.printf("Use OBF %s...\n", source.getName());
@@ -409,6 +407,7 @@ public class RandomRouteTester {
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		fe.setHHRoutingConfig(null); // hhoff=true
+		fe.CALCULATE_MISSING_MAPS = false;
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
@@ -421,6 +420,8 @@ public class RandomRouteTester {
 				(this.config.CAR_2PHASE_MODE && "car".equals(entry.profile)) ?
 						RoutePlannerFrontEnd.RouteCalculationMode.COMPLEX :
 						RoutePlannerFrontEnd.RouteCalculationMode.NORMAL;
+
+		config.routeCalculationTime = System.currentTimeMillis(); // ENABLE_TIME_CONDITIONAL_ROUTING
 
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
@@ -454,7 +455,12 @@ public class RandomRouteTester {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
+		HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1;
+		HHRouteDataStructure.HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
+		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
+
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+		fe.CALCULATE_MISSING_MAPS = false;
 		fe.setDefaultHHRoutingConfig();
 		fe.setUseOnlyHHRouting(true);
 
@@ -464,6 +470,8 @@ public class RandomRouteTester {
 				new RoutingConfiguration.RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
+
+		config.routeCalculationTime = System.currentTimeMillis(); // ENABLE_TIME_CONDITIONAL_ROUTING
 
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,

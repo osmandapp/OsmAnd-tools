@@ -51,7 +51,7 @@ public class CalculateOsmChangesets {
 	private static final long INITIAL_CHANGESET = 60714185l;
 	private static final Log LOG = PlatformUtil.getLog(CalculateOsmChangesets.class);
 	private static final int MAX_QUERIES = 50;
-	private static final int MAX_QUERY_1 = 99;
+	private static final int MAX_QUERY_1 = 49;
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
@@ -137,6 +137,7 @@ public class CalculateOsmChangesets {
 					}
 					url += toQuery.remove(0);
 				}
+				Thread.sleep(500);
 				LOG.info("Query " + url);
 				HttpsURLConnection con = (HttpsURLConnection) new URL(url).openConnection();
 				con.setHostnameVerifier(new HostnameVerifier() {
@@ -146,6 +147,7 @@ public class CalculateOsmChangesets {
 					}
 				});
 				con.setRequestProperty("User-Agent", "OsmAndDownloadChangesets");
+				con.setConnectTimeout(90000);//90sec.
 				StringBuilder sb = Algorithms.readFromInputStream(con.getInputStream());
 				XmlPullParser parser = PlatformUtil.newXMLPullParser();
 				parser.setInput(new StringReader(sb.toString()));

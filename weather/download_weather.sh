@@ -17,7 +17,7 @@ ECMWF_BANDS_FULL_NAMES=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:sur
 ECMWF_BANDS_SHORT_NAMES_ORIG=("2t" "msl" "tp" "10u" "10v")
 ECMWF_BANDS_SHORT_NAMES_SAVING=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
 
-MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-1800} # 30 hours
+MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-3600} # 60 hours (temporary due ECMWF old data available, default 1800 - 30 hours)
 HOURS_1H_TO_DOWNLOAD=${HOURS_1H_TO_DOWNLOAD:-36}
 HOURS_3H_TO_DOWNLOAD=${HOURS_3H_TO_DOWNLOAD:-192}
 
@@ -256,7 +256,7 @@ get_raw_gfs_files() {
                         echo "Partial downloading success. Start gdal_translate"
                         mkdir -p "../$TIFF_TEMP_FOLDER/$FILETIME"
                         gdal_translate "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" -ot Float32 -stats  || echo "Error of gdal_translate"
-                        TZ=UTC touch -t "${DATE}${RNDHOURS}00" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff"
+                        # TZ=UTC touch -t "${DATE}${RNDHOURS}00" "../$TIFF_TEMP_FOLDER/$FILETIME/${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.tiff" # use timestamp when it was updated
                     else
                         echo "Fatal Error: Partial downloaded data contains HTML content. May be we are blocked."
                         cat "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt"
@@ -339,7 +339,7 @@ join_tiff_files() {
             BANDS_RENAMING_COMMAND+='" '
         done
         eval $BANDS_RENAMING_COMMAND
-        touch -r $FILE_DATE_CP $TARGET_FILE
+        # touch -r $FILE_DATE_CP $TARGET_FILE # keep original timestamp of generation
 
         rm settings.txt
         rm bigtiff.vrt
@@ -409,9 +409,9 @@ find_latest_ecmwf_forecat_date() {
             CHECKING_FORECAST_TIME="240"
         fi
 
-        # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.index
-        # https://data.ecmwf.int/forecasts/20220909/12z/0p4-beta/oper/20220909000000-0h-oper-fc.index
-        local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/0p4-beta/oper/"$SEARCHING_DATE$SEARCHING_RND_HOURS"0000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
+        # https://data.ecmwf.int/forecasts/20220909/00z/ifs/0p4-beta/oper/20220909000000-0h-oper-fc.index
+        # https://data.ecmwf.int/forecasts/20220909/12z/ifs/0p4-beta/oper/20220909000000-0h-oper-fc.index
+        local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/ifs/0p4-beta/oper/"$SEARCHING_DATE$SEARCHING_RND_HOURS"0000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
         local HEAD_RESPONSE=$(curl -s -I -L $CHECKING_FILE_URL | head -1)
 
         if [[ $HEAD_RESPONSE =~ "200" ]]; then
@@ -452,7 +452,7 @@ get_raw_ecmwf_files() {
         else
             FILETIME=$(TZ=GMT date -d "${FORECAST_DATE} ${FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
         fi
-        local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/0p4-beta/oper/"$FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
+        local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/ifs/0p4-beta/oper/"$FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
 
         # Download index file
         local INDEX_FILE_URL="$FORECAST_URL_BASE.index"
@@ -468,7 +468,7 @@ get_raw_ecmwf_files() {
                 local BYTE_END=$(($BYTE_START + $BYTE_LENGTH)) 
 
                 # Make partial download for needed band data only
-                # https://data.ecmwf.int/forecasts/20220909/00z/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
+                # https://data.ecmwf.int/forecasts/20220909/00z/ifs/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
                 local SAVING_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$FILETIME"
                 download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
                 GRIB_SIZE=$(wc -c "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" | awk '{print $1}')
@@ -483,9 +483,9 @@ get_raw_ecmwf_files() {
                 local PREV_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$PREV_FILETIME"
                 if [ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "precip" ] && [ -n "$PREV_FILETIME" ] && [ -f "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" ]; then
                     echo "Calculate precipitation"
-                    gdal_calc.py -A "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" -B "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="(A-B)/10" --overwrite
+                    gdal_calc.py -A "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" -B "$DOWNLOAD_FOLDER/$PREV_FILENAME.grib1" --co COMPRESS=NONE --type=Float32 --outfile="$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" --calc="(A-B)" --overwrite
                 else
-                    gdal_translate "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats  || echo "gdal_translate error"
+                    gdal_translate -outsize 1440 721 -r cubic "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff" -ot Float32 -stats -colorinterp_1 undefined || echo "gdal_translate error"
                 fi
                 if [[ ${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]} == "temperature" ]] ; then
                     echo "Converting tmp from K to C"

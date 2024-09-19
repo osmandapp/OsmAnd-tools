@@ -12,9 +12,10 @@ ECMWF_BANDS=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD
 ECMWF_BANDS_NAMES=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
 
 TILES_FOLDER=tiles
-TILES_ZOOM_GEN=3
-TILES_ZOOM_RES=5
-PARALLEL_TO_TILES=2
+
+TILES_ZOOM_GEN="${TILES_ZOOM_GEN:-3}"
+TILES_ZOOM_RES="${TILES_ZOOM_RES:-5}"
+PARALLEL_TO_TILES="${PARALLEL_TO_TILES:-2}"
 OS=$(uname -a)
 
 

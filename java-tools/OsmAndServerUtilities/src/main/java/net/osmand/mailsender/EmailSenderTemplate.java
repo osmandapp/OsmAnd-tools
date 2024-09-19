@@ -23,6 +23,7 @@ Environment:
 	SMTP_SERVER - address of smtp-server
 	EMAIL_TEMPLATES - path to templates directory
 	SENDGRID_KEY - SendGrid API key (optional for fallback)
+	EMAIL_DELAY - optional delay before each send (in seconds)
 	TEST_EMAIL_COPY - copy each email to this address (testing)
 
 Template files structure:
@@ -104,17 +105,17 @@ public class EmailSenderTemplate {
 		final String templates = System.getenv("EMAIL_TEMPLATES");
 		if (templates != null) {
 			this.defaultTemplatesDirectory = templates;
-			LOG.info("Using env EMAIL_TEMPLATES: " + templates);
+			// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
 		}
 
 		final String smtpServer = System.getenv("SMTP_SERVER");
 		if (smtpServer != null) {
-			LOG.info("Using env SMTP_SERVER: " + smtpServer);
+			// LOG.info("Using env SMTP_SERVER: " + smtpServer);
 		}
 
 		final String apiKey = System.getenv("SENDGRID_KEY");
 		if (apiKey != null) {
-			LOG.info("Using env SENDGRID_KEY: qwerty :-)");
+			// LOG.info("Using env SENDGRID_KEY: qwerty :-)");
 		}
 
 		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
@@ -124,6 +125,15 @@ public class EmailSenderTemplate {
 
 	public EmailSenderTemplate send() {
 		validateLoadedTemplates(); // final validation before send
+
+		final String seconds = System.getenv("EMAIL_DELAY");
+		if (seconds != null) {
+			try {
+				Thread.sleep(Integer.parseInt(seconds) * 1000);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+		}
 
 		for (String to : toList) {
 			setVarsByTo(to);
@@ -147,7 +157,7 @@ public class EmailSenderTemplate {
 					sentEmails++;
 				}
 			} catch (Exception e) {
-				LOG.warn(e.getMessage(), e);
+				LOG.error(e.getMessage(), e);
 			}
 		}
 		return this;
@@ -389,6 +399,7 @@ public class EmailSenderTemplate {
 		private SendGrid sendGridClient;
 		private final int STATUS_CODE_ERROR = 500;
 		private final int STATUS_CODE_SENT = 202; // success code 202 comes originally from SendGrid
+		private final String SENDGRID_ENFORCED = null; // ".*(@hotmail|@outlook|@live|@msn|@windowslive).*"; // temporarily
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
 			this.smtpServer = smtpServer;
@@ -398,12 +409,16 @@ public class EmailSenderTemplate {
 				sendGridClient = new SendGrid(null) {
 					@Override
 					public Response api(Request request) throws IOException {
-						LOG.info("SendGrid sender is not configured: " + request.getBody());
+						LOG.error("SendGrid sender is not configured: " + request.getBody());
 						return error();
 					}
 				};
-				LOG.warn("SendGrid sender is not configured");
+				LOG.error("SendGrid sender is not configured");
 			}
+		}
+
+		private boolean enforceViaSendGrid(String to) {
+			return SENDGRID_ENFORCED != null && to.matches(SENDGRID_ENFORCED);
 		}
 
 		private Mail mail;
@@ -425,6 +440,7 @@ public class EmailSenderTemplate {
 				return first;
 			}
 
+			LOG.warn("SMTP failed (" + first.getStatusCode() + ") - fallback to SendGrid");
 			return sendWithSendGrid(); // fallback
 		}
 
@@ -439,7 +455,14 @@ public class EmailSenderTemplate {
 
 		private Response sendWithSmtp() {
 			if (smtpServer == null) {
-				LOG.warn("SMTP_SERVER is not configured");
+				LOG.error("SMTP_SERVER is not configured");
+				return error();
+			}
+
+			String to = getTo();
+
+			if (enforceViaSendGrid(to)) {
+				LOG.warn(to.replaceFirst(".....", ".....") + ": domain goes via SendGrid");
 				return error();
 			}
 
@@ -464,7 +487,6 @@ public class EmailSenderTemplate {
 				String from = mail.getFrom().getEmail();
 				String subject = mail.getSubject();
 				String body = mail.getContent().get(0).getValue(); // html content
-				String to = getTo();
 
 				for (String key : headers.keySet()) {
 					String val = fill(headers.get(key));
@@ -479,7 +501,7 @@ public class EmailSenderTemplate {
 				smtp.send();
 
 			} catch(EmailException e) {
-				LOG.warn("SMTP error: " + e.getMessage() + " (" + e.getCause().getMessage() + ")");
+				LOG.error("SMTP error: " + e.getMessage() + " (" + e.getCause().getMessage() + ")");
 				return error();
 			}
 

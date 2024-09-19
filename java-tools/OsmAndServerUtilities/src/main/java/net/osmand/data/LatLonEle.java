@@ -15,10 +15,14 @@ public class LatLonEle extends LatLon {
 		return elevation;
 	}
 
+	public void setElevation(float elevation) {
+		this.elevation = elevation;
+	}
+
 	@Override
 	public String toString() {
 		return String.format("Lat %.6f Lon %.6f Ele %.2f", getLatitude(), getLongitude(), getElevation());
 	}
 
-	private final float elevation;
+	private float elevation;
 }

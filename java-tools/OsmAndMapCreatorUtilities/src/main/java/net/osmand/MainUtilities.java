@@ -12,8 +12,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import net.osmand.router.tester.RandomRouteTester;
-import net.osmand.wiki.CommonsWikimediaPreparation;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -47,6 +45,7 @@ import net.osmand.router.HHRoutingShortcutCreator;
 import net.osmand.router.HHRoutingSubGraphCreator;
 import net.osmand.router.HHRoutingTopGraphCreator;
 import net.osmand.router.TestHHRouting;
+import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -141,6 +140,8 @@ public class MainUtilities {
 				HHRoutingShortcutCreator.main(subArgsArray);
 			} else if (utl.equals("hh-routing-obf-write")) {
 				HHRoutingOBFWriter.main(subArgsArray);
+			} else if (utl.equals("test-shared-lib")) {
+				TestSharedLib.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
 				TestHHRouting.main(subArgsArray);
 			} else if (utl.equals("random-route-tester")) {
@@ -197,13 +198,17 @@ public class MainUtilities {
 			} else if (utl.equals("generate-wikivoyage-raw-lang")) {
 				WikivoyageLangPreparation.main(subArgsArray);
 			} else if (utl.equals("process-wikivoyage")) {
+				List<String> genOsm = new ArrayList<String>();
 				for (String s : subArgsArray) {
 					if (s.startsWith("--generate-osm=")) {
-						WikivoyageGenOSM.genWikivoyageOsm(new File(subArgsArray[0]), new File(s.substring("--generate-osm=".length())), -1);
-						return;
+						genOsm.add(s.substring("--generate-osm=".length()));
 					}
 				}
-				WikivoyageDataGenerator.main(subArgsArray);
+				if(genOsm.size() > 0) {
+					WikivoyageGenOSM.genWikivoyageOsm(new File(subArgsArray[0]), genOsm);
+				} else {
+					WikivoyageDataGenerator.main(subArgsArray);
+				}
 			} else if (utl.equals("generate-obf-extract-script")) {
 				GenerateExtractScript.main(subArgsArray);
 			} else if (utl.equals("generate-address")) {
@@ -250,8 +255,6 @@ public class MainUtilities {
 				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
 			} else if (utl.equals("add-owner-to-obf")) {
 				BinaryMerger.signObfFile(subArgsArray);
-			} else if (utl.equals("parse-commonswiki")) {
-				CommonsWikimediaPreparation.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}

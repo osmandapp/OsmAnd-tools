@@ -68,10 +68,7 @@ public class TravelGuideCreatorMain {
             System.exit(1);
         }
         Map<String, List<File>> mapping = getFileMapping(files);
-        WikivoyageDataGenerator dataGenerator = new WikivoyageDataGenerator();
         generateTravelSqlite(mapping, conn);
-        dataGenerator.generateSearchTable(conn);
-        createPopularArticlesTable(conn);
         conn.close();
         File osmFile = new File(directory, TRAVEL_GUIDE_NAME + OSM_GZ_EXT);
         WikivoyageGenOSM.genWikivoyageOsm(sqliteFile, osmFile, -1);
@@ -83,22 +80,22 @@ public class TravelGuideCreatorMain {
         ic.generateIndexes(osmFile, new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types, LOG);
         osmFile.delete();
         sqliteFile.delete();
-        new File("regions.ocbf").delete();
     }
+    
+    private void addColumn(Connection conn, String col) {
+      	 try {
+               conn.createStatement().execute(String.format("ALTER TABLE travel_articles ADD COLUMN %s", col));
+           } catch (Exception e) {
+               System.err.printf("Column %s already exists\n", col);
+           }
+      }
 
-    private void createPopularArticlesTable(Connection conn) throws SQLException {
-        conn.createStatement().execute("CREATE TABLE popular_articles(title text, trip_id long,"
-                + " population long, order_index long, popularity_index long, lat double, lon double, lang text)");
-    }
 
     private void generateTravelSqlite(Map<String,List<File>> mapping, Connection conn) throws SQLException, IOException {
-    	WikivoyageLangPreparation.createInitialDbStructure(conn, false);
-        try {
-            conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN aggregated_part_of");
-            conn.createStatement().execute("ALTER TABLE travel_articles ADD COLUMN is_parent_of");
-        } catch (Exception e) {
-            System.err.println("Column aggregated_part_of already exists");
-        }
+		WikivoyageLangPreparation.createInitialDbStructure(conn, "en", false);
+		addColumn(conn, "aggregated_part_of");
+		addColumn(conn, "agg_part_of_wid");
+		addColumn(conn, "is_parent_of");
         PreparedStatement prep = WikivoyageLangPreparation.generateInsertPrep(conn, false);
         int count = 0;
         int batch = 0;

@@ -1,11 +1,8 @@
 package net.osmand.swing;
 
-import static net.osmand.router.RouteColorize.DARK_GREY;
-import static net.osmand.router.RouteColorize.GREEN;
-import static net.osmand.router.RouteColorize.LIGHT_GREY;
-import static net.osmand.router.RouteColorize.RED;
-import static net.osmand.router.RouteColorize.SLOPE_PALETTE;
-import static net.osmand.router.RouteColorize.YELLOW;
+import static net.osmand.ColorPalette.DARK_GREY;
+import static net.osmand.ColorPalette.LIGHT_GREY;
+import static net.osmand.ColorPalette.SLOPE_PALETTE;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -22,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.osmand.ColorPalette;
 import net.osmand.data.DataTileManager;
 import net.osmand.gpx.GPXFile;
 import net.osmand.osm.edit.Entity;
@@ -299,17 +297,16 @@ public class MapPointsLayer implements MapPanelLayer {
 			return;
 		}
 
-		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType);
-		double[][] palette;
+		
+		ColorPalette palette;
 		if (isGrey) {
-			palette = new double[][]{{routeColorize.minValue, LIGHT_GREY}, {routeColorize.maxValue, DARK_GREY}};
+			palette = ColorPalette.parsePalette(new double[][] { { 0, LIGHT_GREY }, { 1, DARK_GREY } });
+		} else if (colorizationType == ColorizationType.SLOPE) {
+			palette = SLOPE_PALETTE;
 		} else {
-			if (colorizationType == ColorizationType.SLOPE) {
-				palette = SLOPE_PALETTE;
-			} else {
-				palette = new double[][]{{routeColorize.minValue, GREEN}, {(routeColorize.maxValue + routeColorize.minValue) / 2, YELLOW}, {routeColorize.maxValue, RED}};
-			}
+			palette = ColorPalette.MIN_MAX_PALETTE;
 		}
+		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType, palette);
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		routeColorize.setPalette(palette);
@@ -320,8 +317,8 @@ public class MapPointsLayer implements MapPanelLayer {
 			int pixY1 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i - 1).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
 			int pixX2 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
 			int pixY2 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
-			GradientPaint gp = new GradientPaint(pixX1, pixY1, new Color(dataList.get(i - 1).color), pixX2, pixY2,
-					new Color(dataList.get(i).color), false);
+			GradientPaint gp = new GradientPaint(pixX1, pixY1, new Color(dataList.get(i - 1).primaryColor), pixX2, pixY2,
+					new Color(dataList.get(i).primaryColor), false);
 			g.setPaint(gp);
 			g.setStroke(new BasicStroke(10));
 			g.draw(new Line2D.Float(pixX1, pixY1, pixX2, pixY2));

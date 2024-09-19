@@ -30,6 +30,12 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
 	UserFile findTopByUseridAndNameAndTypeAndUpdatetime(int userid, String name, String type, Date updatetime);
 	
+	UserFile findTopByUseridAndNameAndTypeAndUpdatetimeLessThanOrderByUpdatetimeDesc(int userid, String name, String type, Date updatetime);
+	
+	UserFile findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(int userid, String name, String type, Date updatetime);
+	
+	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
+	
 	Iterable<UserFile> findAllByUserid(int userid);
 	
 	@Query("SELECT uf FROM UserFile uf " +
@@ -126,6 +132,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 		public long zipSize;
 		public String storage;
 		public JsonObject details;
+		private String deviceInfo;
 		
 		public UserFileNoData(UserFile c) {
 			this.userid = c.userid;
@@ -141,6 +148,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
 			this.details = c.details;
 			this.storage = c.storage;
+			this.deviceInfo = null;
 		}
 		
 		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
@@ -163,6 +171,15 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
 			this.details = details;
 			this.storage = storage;
+			this.deviceInfo = null;
+		}
+		
+		public String getDeviceInfo() {
+			return deviceInfo;
+		}
+		
+		public void setDeviceInfo(String deviceInfo) {
+			this.deviceInfo = deviceInfo;
 		}
 	}
 	

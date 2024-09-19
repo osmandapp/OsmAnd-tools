@@ -49,7 +49,7 @@ class RandomRouteGenerator {
 							double lat = Double.parseDouble(v.split(",")[0]);
 							double lon = Double.parseDouble(v.split(",")[1]);
 							entry.start = new LatLon(lat, lon);
-						} else if ("finish".equals(k) && v.contains(",")) { // finish=L,L
+						} else if (("finish".equals(k) || "end".equals(k)) && v.contains(",")) { // finish=L,L end=L,L
 							double lat = Double.parseDouble(v.split(",")[0]);
 							double lon = Double.parseDouble(v.split(",")[1]);
 							entry.finish = new LatLon(lat, lon);
@@ -63,8 +63,13 @@ class RandomRouteGenerator {
 							}
 						} else if ("params".equals(k)) { // params=string,string...
 							for (String param : v.split(",")) {
-								if (entry.profile.equals(param)) { // /profile/,param1,param2 -> param1,param2
-									continue;
+								if (entry.profile.equals(param)) {
+									continue; // /profile/,param1,param2 -> param1,param2 (ignore profile in params)
+								}
+								if (param.startsWith("hhoff") || param.startsWith("hhonly") ||
+										param.startsWith("nativerouting") || param.startsWith("calcmode") ||
+										param.startsWith("noglobalfile") || param.startsWith("routing")) {
+									continue; // do not use mode-specific or web-specific params from url
 								}
 								entry.params.add(param);
 							}
@@ -170,6 +175,14 @@ class RandomRouteGenerator {
 		}
 	}
 
+	// cut down LatLon precision via %f
+	private LatLon roundLatLonViaString(LatLon ll) {
+		String str = String.format("%f,%f", ll.getLatitude(), ll.getLongitude());
+		double lat = Double.parseDouble(str.split(",")[0]);
+		double lon = Double.parseDouble(str.split(",")[1]);
+		return new LatLon(lat, lon);
+	}
+
 	private void generateRandomTests() throws IOException {
 		List<LatLon> randomPoints = new ArrayList<>();
 		Set<LatLon> avoidDupes = new HashSet<>();
@@ -198,7 +211,7 @@ class RandomRouteGenerator {
 			// 2) select start
 			for (int j = 0; j < randomPoints.size(); j++) {
 				int startIndex = fixedRandom(randomPoints.size(), RandomActions.GET_START, i, j);
-				entry.start = randomPoints.get(startIndex);
+				entry.start = roundLatLonViaString(randomPoints.get(startIndex));
 				if (!avoidDupes.contains(entry.start)) {
 					break;
 				}
@@ -218,7 +231,7 @@ class RandomRouteGenerator {
 				boolean pointFound = false;
 				for (int j = 0; j < randomPoints.size(); j++) {
 					int pointIndex = fixedRandom(randomPoints.size(), RandomActions.GET_POINTS, i, nNextPoints + j);
-					point = randomPoints.get(pointIndex);
+					point = roundLatLonViaString(randomPoints.get(pointIndex));
 					double km = MapUtils.getDistance(prevPoint, point) / 1000;
 					if (km >= minDistanceKm && km <= maxDistanceKm && !avoidDupes.contains(point)) {
 						pointFound = true;
@@ -260,7 +273,7 @@ class RandomRouteGenerator {
 						double shift = meters / 111_000F; // enough approx meters to lat/lon
 						double lat = ll.getLatitude() + shift;
 						double lon = ll.getLongitude() + shift;
-						return new LatLon(lat, lon);
+						return roundLatLonViaString(new LatLon(lat, lon));
 					}
 				}
 				int n = 0;

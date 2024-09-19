@@ -6,9 +6,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -35,14 +37,18 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.kxml2.io.KXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.PlatformUtil;
+import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.TelegramBotManager;
 import net.osmand.server.monitor.OsmAndServerMonitoringBot.Sender;
 import net.osmand.util.Algorithms;
@@ -55,7 +61,6 @@ public class OsmAndServerMonitorTasks {
 	private static final int SECOND = 1000;
 	private static final int MINUTE = 60 * SECOND;
 	private static final int HOUR = 60 * MINUTE;
-	private static final long DAY = 24l * HOUR;
 	private static final int LIVE_STATUS_MINUTES = 2;
 	private static final int DOWNLOAD_MAPS_MINITES = 5;
 	private static final int DOWNLOAD_TILE_MINUTES = 10;
@@ -64,7 +69,6 @@ public class OsmAndServerMonitorTasks {
 	private static final int TILEX_NUMBER = 268660;
 	private static final int TILEY_NUMBER = 175100;
 	private static final long INITIAL_TIMESTAMP_S = 1530840000;
-	private static final long METRICS_EXPIRE = 30l * DAY;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
@@ -75,17 +79,30 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
 			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/",
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
-			"https://tile.osmand.net:8080/job/UpdateOsmAndServer/" };
+			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/" };
 
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
+	
+	// Build Server
+	List<BuildServerCheckInfo> buildServers = new ArrayList<>();
+	{
+		buildServers.add(new BuildServerCheckInfo("https://creator.osmand.net:8080", "creator"));
+		buildServers.add(new BuildServerCheckInfo("https://dl2.osmand.net:8080", "jenkins-dl2"));
+		buildServers.add(new BuildServerCheckInfo("https://osmand.net:8095", "jenkins-main"));
+		buildServers.add(new BuildServerCheckInfo("https://maptile.osmand.net:8080", "jenkins-maptile"));
+	}
+	
 
 	private static final double PERC = 95;
 	private static final double PERC_SMALL = 100 - PERC;
 
 
+	private static final String RED_MAIN_SERVER = "main";
+	private static final String RED_MAPTILE_SERVER = "maptile";
+	private static final String RED_STAT_PREFIX = "stat.";
 	private static final String RED_KEY_OSMAND_LIVE = "live_delay_time";
 	private static final String RED_KEY_TILE = "tile_time";
-	private static final String RED_KEY_DOWNLOAD = "download_map.";
+	private static final String RED_KEY_DOWNLOAD = "download_map";
 
 	private static final SimpleDateFormat TIME_FORMAT_UTC = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 	static {
@@ -98,7 +115,6 @@ public class OsmAndServerMonitorTasks {
 
 	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
 
-	
 	@Value("${monitoring.enabled}")
 	private boolean enabled;
 	
@@ -113,12 +129,15 @@ public class OsmAndServerMonitorTasks {
 	private List<FeedEntry> feed = new ArrayList<>();
 
 	@Autowired
-	private StringRedisTemplate redisTemplate;
+	@Qualifier("monitorJdbcTemplate")
+	JdbcTemplate jdbcTemplate;
+	
+	@Autowired
+	DatasourceConfiguration config;
 
 	// OsmAnd Live validation
 	LiveCheckInfo live = new LiveCheckInfo();
-	// Build Server
-	BuildServerCheckInfo buildServer = new BuildServerCheckInfo();
+	
 	// Java servers check
 	JavaServerCheckInfo javaChecks = new JavaServerCheckInfo();
 	// Tile validation
@@ -166,7 +185,7 @@ public class OsmAndServerMonitorTasks {
 			live.lastCheckTimestamp = System.currentTimeMillis();
 			live.lastOsmAndLiveDelay = currentDelay;
 			if (updateStats) {
-				addStat(RED_KEY_OSMAND_LIVE, currentDelay);
+				addStat(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, currentDelay);
 			}
 		} catch (Exception e) {
 			sendBroadcastMessage("Exception while checking the server live status.");
@@ -239,41 +258,45 @@ public class OsmAndServerMonitorTasks {
 		if (!enabled) {
 			return;
 		}
-		try {
-			Set<String> jobsFailed = new TreeSet<String>();
-			URL url = new URL("https://creator.osmand.net:8080/api/json");
-			InputStream is = url.openConnection().getInputStream();
-			JSONObject object = new JSONObject(new JSONTokener(is));
-			JSONArray jsonArray = object.getJSONArray("jobs");
-			for (int i = 0; i < jsonArray.length(); i++) {
-				JSONObject jb = jsonArray.getJSONObject(i);
-				String name = jb.getString("name");
-				String color = jb.getString("color");
-				if (!color.equals("blue") && !color.equals("disabled") &&
-						!color.equals("notbuilt") && !color.equals("blue_anime")) {
-					jobsFailed.add(name);
+		for (BuildServerCheckInfo buildServer : buildServers) {
+			try {
+				Set<String> jobsFailed = new TreeSet<String>();
+				URL url = new URL(buildServer.serverUrl + "/api/json");
+				InputStream is = url.openConnection().getInputStream();
+				JSONObject object = new JSONObject(new JSONTokener(is));
+				JSONArray jsonArray = object.getJSONArray("jobs");
+				for (int i = 0; i < jsonArray.length(); i++) {
+					JSONObject jb = jsonArray.getJSONObject(i);
+					String name = jb.getString("name");
+					String color = jb.getString("color");
+					if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
+							&& !color.equals("blue_anime")) {
+						jobsFailed.add(name);
+					}
 				}
+				is.close();
+				if (buildServer.jobsFailed == null) {
+					buildServer.jobsFailed = jobsFailed;
+				} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
+					Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
+					jobsFailedCopy.removeAll(buildServer.jobsFailed);
+					if (!jobsFailedCopy.isEmpty()) {
+						sendBroadcastMessage(
+								"There are new failures on Build Server: " + formatJobNamesAsHref(buildServer, jobsFailedCopy));
+					}
+					Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
+					jobsRecoveredCopy.removeAll(jobsFailed);
+					if (!jobsRecoveredCopy.isEmpty()) {
+						sendBroadcastMessage(
+								"There are recovered jobs on Build Server: " + formatJobNamesAsHref(buildServer, jobsRecoveredCopy));
+					}
+					buildServer.jobsFailed = jobsFailed;
+				}
+				buildServer.lastCheckTimestamp = System.currentTimeMillis();
+			} catch (Exception e) {
+				sendBroadcastMessage("Exception while checking the build server status.");
+				LOG.error(e.getMessage(), e);
 			}
-			is.close();
-			if (buildServer.jobsFailed == null) {
-				buildServer.jobsFailed = jobsFailed;
-			} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
-				Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
-				jobsFailedCopy.removeAll(buildServer.jobsFailed);
-				if (!jobsFailedCopy.isEmpty() ) {
-					sendBroadcastMessage("There are new failures on Build Server: " + formatJobNamesAsHref(jobsFailedCopy));
-				}
-				Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
-				jobsRecoveredCopy.removeAll(jobsFailed);
-				if (!jobsRecoveredCopy.isEmpty() ) {
-					sendBroadcastMessage("There are recovered jobs on Build Server: " + formatJobNamesAsHref(jobsRecoveredCopy));
-				}
-				buildServer.jobsFailed = jobsFailed;
-			}
-			buildServer.lastCheckTimestamp = System.currentTimeMillis();
-		} catch (Exception e) {
-			sendBroadcastMessage("Exception while checking the build server status.");
-			LOG.error(e.getMessage(), e);
 		}
 	}
 
@@ -454,11 +477,22 @@ public class OsmAndServerMonitorTasks {
 		}
 		lastResponseTime = respTimeSum / count;
 		if (lastResponseTime > 0) {
-			addStat(RED_KEY_TILE, lastResponseTime);
+			addStat(RED_KEY_TILE, RED_MAPTILE_SERVER, lastResponseTime);
 		}
 	}
 
-	private String getTirexStatus() {
+	protected String getRoutingStatus() {
+		try {
+			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/web-route-stats.txt").openStream()).toString();
+			res = prepareAccessStats(res);
+			return res;
+		} catch (Exception e) {
+			LOG.warn(e.getMessage(), e);
+			return "Error: " + e.getMessage();
+		}
+	}
+	
+	protected  String getTirexStatus() {
 		try {
 			String res = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/access_stats.txt").openStream()).toString();
 			res = prepareAccessStats(res);
@@ -467,7 +501,7 @@ public class OsmAndServerMonitorTasks {
 			res += prepareRenderdResult(rs.toString());
 			StringBuilder date = Algorithms.readFromInputStream(new URL("https://maptile.osmand.net/osmupdate/state.txt").openStream());
 			long t = TIMESTAMP_FORMAT_OPR.parse(date.toString()).getTime();
-			res += String.format("\n<a href='https://tile.osmand.net:8080/'>Tile Postgis DB</a>: %s", timeAgo(t));
+			res += String.format("\n<a href='https://maptile.osmand.net:8080/'>Tile Postgis DB</a>: %s", timeAgo(t));
 			return res;
 		} catch (Exception e) {
 			LOG.warn(e.getMessage(), e);
@@ -479,8 +513,8 @@ public class OsmAndServerMonitorTasks {
 		String[] spl = lns.split("\n");
 		if (spl.length >= 2) {
 			String result = "\n";
-			String[] percents = spl[0].split("\\s+");
-			String[] timings = spl[1].split("\\s+");
+			String[] percents = spl[spl.length - 2].split("\\s+");
+			String[] timings = spl[spl.length - 1].split("\\s+");
 			for (int i = 1; i < timings.length && i < percents.length; i++) {
 				double d = Double.parseDouble(timings[i].trim());
 				result += String.format("%.2fs (%s) ", d, percents[i]);
@@ -547,11 +581,23 @@ public class OsmAndServerMonitorTasks {
 		return "Rendering service (tirex) is down!";
 	}
 
-	private void addStat(String key, double score) {
-		long now = System.currentTimeMillis();
-		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
-		// Long removed =
-		redisTemplate.opsForZSet().removeRangeByScore(key, 0, now - METRICS_EXPIRE);
+	private void addStat(String key, String server, double score) {
+		if (!config.monitorInitialized()) {
+			return;
+		}
+		jdbcTemplate.execute("INSERT INTO servers.metrics(timestamp, server, name, value) VALUES(?,?,?,?)",
+				new PreparedStatementCallback<Boolean>() {
+
+					@Override
+					public Boolean doInPreparedStatement(PreparedStatement ps) throws SQLException, DataAccessException {
+						ps.setTimestamp(1, new java.sql.Timestamp(System.currentTimeMillis()));
+						ps.setString(2, convertServer(server));
+						ps.setString(3, RED_STAT_PREFIX + key);
+						ps.setDouble(4, score);
+						return ps.execute();
+					}
+				});
+//		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
 	}
 
 	private double estimateResponse(String tileUrl) {
@@ -587,21 +633,56 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	private String getTileServerMessage() {
-		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, 24);
-		return String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
-				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec. %s",
-				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC), getTirexStatus());
+		DescriptiveStatistics tile24Hours = readStats(RED_KEY_TILE, RED_MAPTILE_SERVER, 24);
+		String msg = String.format("<a href='https://tile.osmand.net/hd/3/4/2.png'>tile</a>: "
+				+ "<b>%s</b>. Response time: 24h — %.1f sec · 95th 24h — %.1f sec.",
+				lastResponseTime < 60 ? "OK" : "FAILED", tile24Hours.getMean(), tile24Hours.getPercentile(PERC));
+		String url ="https://maptile.osmand.net/routing/route?routeMode=car&points=51.063218,6.211030&points=51.179417,8.490871&maxDist=100";
+		String routingStatus = "OK";
+		long time = System.nanoTime();
+		try {
+			Algorithms.readFromInputStream(new URL(url).openStream()).toString();
+		} catch (Exception e) {
+			LOG.info(e.getMessage(), e);
+			routingStatus = "FAILED";
+		}
+		msg += String.format("\n<a href='" + url + "'>routing</a>: " + "<b>%s</b>. Response time: %.1f sec.",
+				routingStatus, (System.nanoTime() - time) / 1.0e9);
+		return msg;
 	}
 
-	private DescriptiveStatistics readStats(String key, double hour) {
-		long now = System.currentTimeMillis();
+	private DescriptiveStatistics readStats(String key, String server, int hour) {
+		
 		DescriptiveStatistics stats = new DescriptiveStatistics();
-		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
-		for(String k : ls) {
-			double v = Double.parseDouble(k.substring(0, k.indexOf(':')));
-			stats.addValue(v);
-		}
+//		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
+		jdbcTemplate.execute("SELECT value FROM servers.metrics WHERE name = ? and server = ? and timestamp >= now() - interval ? hour "
+						+ " ORDER BY timestamp asc", new PreparedStatementCallback<Boolean>() {
+
+							@Override
+							public Boolean doInPreparedStatement(PreparedStatement ps)
+									throws SQLException, DataAccessException {
+								ps.setString(1, RED_STAT_PREFIX + key);
+								ps.setString(2, convertServer(server));
+								ps.setInt(3, hour);
+								ResultSet rs = ps.executeQuery();
+								while (rs.next()) {
+									stats.addValue(rs.getDouble(1));
+								}
+								return true;
+							}
+						});
 		return stats;
+	}
+
+	protected String convertServer(String server) {
+		server = server.replace(".osmand.net", "");
+		if (server.equals("download")) {
+			return RED_MAIN_SERVER;
+		}
+		if (server.equals("tile")) {
+			return RED_MAPTILE_SERVER;
+		}
+		return server;
 	}
 
 	public String refreshAll() {
@@ -616,10 +697,16 @@ public class OsmAndServerMonitorTasks {
 
 	public String getStatusMessage() {
 		String msg = getLiveDelayedMessage(live.lastOsmAndLiveDelay) + "\n";
-		if (buildServer.jobsFailed == null || buildServer.jobsFailed.isEmpty()) {
-			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>OK</b>.\n";
-		} else {
-			msg += "<a href='https://creator.osmand.net:8080'>creator</a>: <b>FAILED</b>. Jobs: " + formatJobNamesAsHref(buildServer.jobsFailed) + "\n";
+		int failed = 0;
+		for (BuildServerCheckInfo buildServer : buildServers) {
+			if (buildServer.jobsFailed != null && !buildServer.jobsFailed.isEmpty()) {
+				failed++;
+				msg += String.format("<a href='%s'>%s</a>: <b>FAILED</b>. Jobs: %s\n", buildServer.serverUrl,
+						buildServer.serverName, formatJobNamesAsHref(buildServer, buildServer.jobsFailed));
+			}
+		}
+		if (failed == 0) {
+			msg += "<a href='https://creator.osmand.net:8080'>jenkins</a>: <b>OK</b>.\n";
 		}
 		for (String host: downloadTests.keySet()) {
 			DownloadTestResult r = downloadTests.get(host);
@@ -641,21 +728,21 @@ public class OsmAndServerMonitorTasks {
 		return String.format("%d:%d ago", h, m);
 	}
 
-	private Set<String> formatJobNamesAsHref(Set<String> jobNames) {
+	private Set<String> formatJobNamesAsHref(BuildServerCheckInfo buildServer, Set<String> jobNames) {
 		Set<String> formatted = new TreeSet<>();
 		for (String jobName : jobNames) {
-			formatted.add(String.format("<a href='https://creator.osmand.net:8080/job/%1$s/'>%1$s</a>", jobName));
+			formatted.add(String.format("<a href='%s/job/%s/'>%s</a>", buildServer.serverUrl, jobName, jobName));
 		}
 		return formatted;
 	}
 
 	private String getLiveDelayedMessage(long delay) {
-		DescriptiveStatistics live3Hours = readStats(RED_KEY_OSMAND_LIVE, 3);
-		DescriptiveStatistics live24Hours = readStats(RED_KEY_OSMAND_LIVE, 24);
-		DescriptiveStatistics live3Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 3);
-		DescriptiveStatistics live7Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 7);
-		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, 24 * 30);
-		return String.format("<a href='osmand.net/osm_live'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
+		DescriptiveStatistics live3Hours = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 3);
+		DescriptiveStatistics live24Hours = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24);
+		DescriptiveStatistics live3Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 3);
+		DescriptiveStatistics live7Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 7);
+		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 30);
+		return String.format("<a href='https://creator.osmand.net/osm_live/'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
 				+ "Day stats: 3d %s (%s) h  · 7d — %s (%s) h · 30d — %s (%s) h",
 				delay < HOUR ? "OK" : "FAILED",
 						formatTime(delay), formatTime(live3Hours.getPercentile(PERC)),
@@ -872,8 +959,15 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	protected static class BuildServerCheckInfo {
+		String serverUrl = "https://creator.osmand.net:8080";
+		String serverName = "creator";
 		Set<String> jobsFailed;
 		long lastCheckTimestamp = 0;
+		
+		public BuildServerCheckInfo(String serverUrl, String serverName) {
+			this.serverName = serverName;
+			this.serverUrl = serverUrl;
+		}
 	}
 
 	protected class DownloadTestResult {
@@ -887,7 +981,7 @@ public class OsmAndServerMonitorTasks {
 
 		public void addSpeedMeasurement(double spdMBPerSec) {
 			lastSpeed = spdMBPerSec;
-			addStat(RED_KEY_DOWNLOAD + host, spdMBPerSec);
+			addStat(RED_KEY_DOWNLOAD, host, spdMBPerSec);
 		}
 
 		@Override
@@ -899,9 +993,9 @@ public class OsmAndServerMonitorTasks {
 		}
 
 		public String fullString(String urlFailedJava) {
-			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD + host, 0.5);
-			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD + host, 3);
-			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD + host, 24);
+			DescriptiveStatistics last = readStats(RED_KEY_DOWNLOAD, host, 1);
+			DescriptiveStatistics speed3Hours = readStats(RED_KEY_DOWNLOAD, host, 3);
+			DescriptiveStatistics speed24Hours = readStats(RED_KEY_DOWNLOAD, host, 24);
 			String name = host.substring(0, host.indexOf('.'));
 			String status = (lastSuccess ? "OK" : "FAILED");
 			if (urlFailedJava != null) {

@@ -10,6 +10,9 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
+import javax.validation.Valid;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
@@ -33,7 +36,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -47,7 +52,7 @@ import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
-import net.osmand.server.api.services.DownloadIndexesService.DownloadServerSpecialty;
+import net.osmand.server.api.services.DownloadIndexesService.DownloadServerType;
 import net.osmand.server.api.services.LogsAccessService.LogsPresentation;
 import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.ReportsController;
@@ -120,6 +125,9 @@ public class AdminController {
 	
 	@Autowired
 	private PromoCampaignRepository promoCampaignRepository;
+	
+	@Autowired
+	private PluginsService pluginsService;
 	
 	@Autowired
 	PromoService promoService;
@@ -234,7 +242,7 @@ public class AdminController {
 		deviceSub.valid = false;
 		
 		if (emailSender.isEmail(identifier)) {
-			PremiumUser pu = usersRepository.findByEmail(identifier);
+			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
 			if (pu != null) {
 				String suffix = pu.orderid != null ? " (pro email)" : " (osmand start)";
 				deviceSub.sku = identifier + suffix;
@@ -279,28 +287,15 @@ public class AdminController {
 	}
 	
 	@PostMapping(path = {"/delete-email"})
+	@Deprecated
 	public String deleteEmail(@RequestParam String email) {
-		emailSender.sendOsmRecipientsDeleteEmail(email);
-		emailService.deleteByEmail(email);
-		return "redirect:info#audience";
+		throw new IllegalStateException("sendOsmRecipientsDeleteEmail() is obsolete"); // a895722f1
 	}
 	
 	@PostMapping(path = {"/ban-by-osmids"})
+	@Deprecated
 	public String banByOsmids(@RequestParam String osmidList) {
-		
-		String[] osmids = Arrays.stream(osmidList.split("[, ]"))
-				.filter(s-> !s.equals(""))
-				.map(String::trim)
-				.toArray(String[]::new);
-		
-		for (String id : osmids) {
-			OsmRecipientsRepository.OsmRecipient recipient = emailService.getOsmRecipient(id);
-			if (recipient != null) {
-				emailSender.sendOsmRecipientsDeleteEmail(recipient.email);
-				emailService.deleteByOsmid(id);
-			}
-		}
-		return "redirect:info#audience";
+		throw new IllegalStateException("band by osmids is obsolete"); // a895722f1
 	}
 	
 	private String err(RedirectAttributes redirectAttrs, String string) {
@@ -447,7 +442,7 @@ public class AdminController {
 	
 	
 	@RequestMapping("/info")
-	public String index(Model model) throws SQLException {
+	public String index(Model model) throws SQLException, IOException {
 		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
 		model.addAttribute("server_commit", serverCommit);
 		String commit = runCmd(GIT_LOG_CMD, new File(websiteLocation), null);
@@ -476,7 +471,7 @@ public class AdminController {
 		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, AdminGenericSubReport.MONTH));
 		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, AdminGenericSubReport.DAY));
 		
-		
+		model.addAttribute("plugins", pluginsService.getPluginsAdminInfo());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
 		model.addAttribute("emailsReport", emailService.getEmailsDBReport());
 		model.addAttribute("btc", getBitcoinReport());
@@ -485,6 +480,25 @@ public class AdminController {
 		model.addAttribute("promoSku", PROMO_WEBSITE);
 		
 		return "admin/info";
+	}
+	
+	@PostMapping(path = { "/upload-plugin-file" }, produces = "application/json")
+	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file)
+			throws IOException {
+		Map<String, ?> res = pluginsService.uploadFile(file);
+		return ResponseEntity.ok().body(gson.toJson(res));
+	}
+	
+	@PostMapping(path = {"/delete-plugin-version"})
+	public String deletePlugin(@RequestParam String plugin, @RequestParam String version) throws IOException {
+		pluginsService.deletePluginVersion(plugin, version);
+		return "redirect:info#plugins";
+	}
+	
+	@PostMapping(path = {"/publish-plugin-version"})
+	public String publish(@RequestParam String plugin, @RequestParam String version) throws IOException {
+		pluginsService.publish(plugin, version);
+		return "redirect:info#plugins";
 	}
 	
 	private BtcTransactionReport getBitcoinReport() {
@@ -972,7 +986,7 @@ public class AdminController {
 		private double eurRate;
 	}
 	
-	private static class ExchangeRates {
+	protected static class ExchangeRates {
 		Map<String, List<ExchangeRate>> currencies = new LinkedHashMap<>();
 
 		public void add(String cur, long time, double eurRate) {
@@ -1364,7 +1378,8 @@ public class AdminController {
 			if (this.introCycles > 0) {
 				this.introPriceEurMillis = defPriceEurMillis / 2;
 			}
-			double rate = rts.getEurRate(pricecurrency, startPeriodTime); 
+			// TOO old
+			double rate = 0;//rts.getEurRate(pricecurrency, startPeriodTime); 
 			if (introPriceMillis >= 0 && priceMillis > 0 && rate == 0) {
 				rate = priceMillis * 1.0 / defPriceEurMillis;
 			}
@@ -1493,21 +1508,22 @@ public class AdminController {
 		List<DownloadServerRegion> regions = new ArrayList<>(dProps.getRegions());
 		regions.add(0, dProps.getGlobalRegion());
 		List<Object> regionResults = new ArrayList<Object>();
+		Set<String> types = new LinkedHashSet<>();
 		for (DownloadServerRegion region : regions) {
 			List<Map<String, Object>> servers = new ArrayList<>();
 			for (String serverName : region.getServers()) {
 				Map<String, Object> mo = new TreeMap<>();
 				mo.put("name", serverName);
-				for (DownloadServerSpecialty type : DownloadServerSpecialty.values()) {
-					DownloadServerSpecialty sp = (DownloadServerSpecialty) type;
-					mo.put(sp.name(), String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
+				for (DownloadServerType sp : dProps.getServerTypes()) {
+					types.add(sp.key);
+					mo.put(sp.key, String.format("%d (%d%%)", region.getDownloadCounts(sp, serverName),
 							region.getPercent(sp, serverName)));
 				}
 				servers.add(mo);
 			}
 			regionResults.add(Map.of("name", region.toString(), "servers", servers));
 		}
-		return Map.of("regions", regionResults, "types", DownloadServerSpecialty.values(),
+		return Map.of("regions", regionResults, "types", types,
 				"freemaps", dProps.getFreemaps());
 	}
 	

@@ -1,29 +1,8 @@
 package net.osmand.obf;
 
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.text.DecimalFormat;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
-
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.iterator.TLongIterator;
 import gnu.trove.list.array.TIntArrayList;
@@ -33,40 +12,26 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.IndexConstants;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
+import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CitiesBlock;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapIndexReader.MapIndex;
-import net.osmand.binary.BinaryMapIndexReader.MapObjectStat;
-import net.osmand.binary.BinaryMapIndexReader.MapRoot;
-import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
-import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
-import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.binary.BinaryMapIndexReader.*;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiSubType;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
-import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.data.Amenity;
-import net.osmand.data.Building;
-import net.osmand.data.City;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.QuadRect;
-import net.osmand.data.Street;
-import net.osmand.data.TransportRoute;
-import net.osmand.data.TransportSchedule;
-import net.osmand.data.TransportStop;
+import net.osmand.data.*;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.MapUtils;
+
+import java.io.*;
+import java.text.DecimalFormat;
+import java.text.MessageFormat;
+import java.util.*;
 
 public class BinaryInspector {
 
@@ -83,22 +48,22 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
+					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-					"-latlon=50.868332,15.24471",
+//					"-latlon=50.868332,15.24471",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
-					"/Users/victorshcherb/Desktop/hh-routing_pedestrian.obf",
-//					System.getProperty("maps.dir") + "Germany_brandenburg_europe_2.road.obf"
-//					System.getProperty("maps.dir") + "Czech-republic_europe_2.road.obf"
+//					"-c",
+//					System.getProperty("maps.dir") + "Osm_wiki_map.obf"
+					"/Users/macmini/Downloads/Ukraine_khmelnytskyy_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -289,8 +254,8 @@ public class BinaryInspector {
 		if (f.charAt(0) == '-') {
 			// command
 			if (f.equals("-c") || f.equals("-combine")) {
-				if (args.length < 4) {
-					printUsage("Too few parameters to extract (require minimum 4)");
+				if (args.length < 3) {
+					printUsage("Too few parameters to extract (require minimum 3)");
 				} else {
 					List<FileExtractFrom> parts = new ArrayList<>();
 					FileExtractFrom lastPart = null;
@@ -352,6 +317,13 @@ public class BinaryInspector {
 										lastPart.from.add(ch);
 									}
 								}
+								Collections.sort(lastPart.from, new Comparator<File>() {
+
+									@Override
+									public int compare(File o1, File o2) {
+										return o1.getName().compareTo(o2.getName());
+									}
+								});
 							} else {
 								lastPart.from.add(file);
 							}
@@ -600,8 +572,12 @@ public class BinaryInspector {
 
 	}
 
+	/**
+	 * @param ri
+	 */
 	private void printRouteEncodingRules(RouteRegion ri) {
 		Map<String, Integer> mp = new HashMap<String, Integer>();
+		int ind = 0;
 		for (RouteTypeRule rtr : ri.routeEncodingRules) {
 			if (rtr == null) {
 				continue;
@@ -610,6 +586,7 @@ public class BinaryInspector {
 			if (t.contains(":")) {
 				t = t.substring(0, t.indexOf(":"));
 			}
+			t += "-" + ind++;
 			if (mp.containsKey(t)) {
 				mp.put(t, mp.get(t) + 1);
 			} else {
@@ -632,7 +609,11 @@ public class BinaryInspector {
 	
 	private void printMapEncodingRules(MapIndex ri) {
 		Map<String, Integer> mp = new HashMap<String, Integer>();
-		for (TagValuePair rtr : ri.decodingRules.valueCollection()) {
+		TIntObjectIterator<TagValuePair> it = ri.decodingRules.iterator();
+		while(it.hasNext()) {
+//		for (TagValuePair rtr : ri.decodingRules.valueCollection()) {
+			it.advance();
+			TagValuePair rtr = it.value();
 			if (rtr == null) {
 				continue;
 			}
@@ -640,6 +621,7 @@ public class BinaryInspector {
 			if (t.contains(":")) {
 				t = t.substring(0, t.indexOf(":"));
 			}
+			t += "-" + it.key();
 			if (mp.containsKey(t)) {
 				mp.put(t, mp.get(t) + 1);
 			} else {
@@ -1423,6 +1405,17 @@ public class BinaryInspector {
 						if(id > 0) {
 							id = id >> 1;
 						}
+						Map<Integer, List<TagValuePair>> tagGroups = amenity.getTagGroups();
+						if (tagGroups != null) {
+							s += " cities:";
+							for (Map.Entry<Integer, List<TagValuePair>> entry : tagGroups.entrySet()) {
+								s += "[";
+								for (TagValuePair p : entry.getValue()) {
+									s += p.tag + "=" + p.value + " ";
+								}
+								s += "]";
+							}
+						}
 						println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
 								" " + amenity.getLocation() + " osmid=" + id + " " + s);
 						return false;
@@ -1452,9 +1445,23 @@ public class BinaryInspector {
 		}
 		println("\t\tSubtypes:");
 		List<PoiSubType> subtypes = p.getSubTypes();
+		Map<String, List<String>> topIndex = new HashMap<>();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
 			println("\t\t\t" + st.name + " " + (st.text ? "text" : (" encoded " + st.possibleValues.size())));
+			if (st.name.startsWith("top_index")) {
+				topIndex.put(st.name, st.possibleValues);
+			}
+		}
+		if (topIndex.size() > 0) {
+			println("");
+			println("\t\tTopindex (subtypes):");
+			for (Map.Entry<String, List<String>> e : topIndex.entrySet()) {
+				println("\t\t\t" + e.getKey() + ":");
+				for (String s : e.getValue()) {
+					println("\t\t\t\t" + s);
+				}
+			}
 		}
 //		req.poiTypeFilter = null;//for test only
 		index.searchPoi(p, req);

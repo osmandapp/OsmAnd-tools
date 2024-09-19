@@ -225,4 +225,12 @@ public class OsmcSymbol {
 		foreground = foregroundIndex != -1 ? tokens[foregroundIndex] : foreground;
 		foreground2 = foregraundIndex2 != -1 ? tokens[foregraundIndex2] : foreground2;
 	}
+
+	public void setForeground(String foreground) {
+		 this.foreground = foreground;
+	}
+
+	public void setWaycolor(String waycolor) {
+		this.waycolor = waycolor;
+	}
 }

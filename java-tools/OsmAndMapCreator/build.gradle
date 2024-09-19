@@ -2,8 +2,7 @@ jar {
 	doFirst {
 		manifest {
 			attributes('Main-Class': project.getProperty('mainClassAttribute'),
-				   'Class-Path': configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join(' ')
-				   )
+				   'Class-Path': configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join(' '))
 		}
 	}
 }
@@ -16,21 +15,27 @@ task collectFonts(type: Sync) {
 
 
 task downloadCoreJni(type: Download)  {
-        src 'https://creator.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
-        dest 'lib-gl/OsmAndCore_jni.jar'
-        onlyIfModified true
+		src 'https://creator.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
+		dest 'lib-gl/OsmAndCore_jni.jar'
+		onlyIfModified true
 }
 
 // https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCoreWithJNI_standalone.so lib-native/
 // https://builder.osmand.net/binaries/amd64-linux-clang/libOsmAndCore_ResourcesBundle_shared.so lib-native/
 
+
 task buildDistribution(type: Zip) {
 	dependsOn jar
 	from(configurations.runtimeClasspath.allArtifacts.files) {
 		rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
-	//	into '.'
+		into '.'
 	}
-
+	from('build/libs/OsmAndMapCreator-master-snapshot.jar') {
+		into '.'
+		rename { 'OsmAndMapCreator.jar' }
+		// rename 'OsmAndMapCreator-master-snapshot.jar' 'OsmAndMapCreator.jar'
+	}
+	
 	from('lib-native') {
 		into 'lib'
 	}
@@ -50,7 +55,7 @@ task buildDistribution(type: Zip) {
 		include 'logging.properties'
 	}
 
-	archiveName 'OsmAndMapCreator.zip'
+	archiveFileName = 'OsmAndMapCreator.zip'
 }
 
 compileJava {
@@ -61,6 +66,7 @@ dependencies {
 	testImplementation group: 'junit', name: 'junit', version: '4.12'
 
 	implementation project(':OsmAnd-java')
+	implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
 	implementation project(':OsmAndMapCreatorUtilities')
 
 	implementation group: 'commons-logging', name: 'commons-logging', version: '1.2'

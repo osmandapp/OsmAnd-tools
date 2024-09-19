@@ -1,31 +1,47 @@
 package net.osmand.obf.preparation;
 
+import net.osmand.PlatformUtil;
+import org.apache.commons.logging.Log;
+
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferFloat;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Iterator;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 public class IndexWeatherData {
+	
+	private static final Log log = PlatformUtil.getLog(IndexWeatherData.class);
 	public static final int NEAREST_NEIGHBOOR_INTERPOLATION = 0;
 	public static final int BILINEAR_INTERPOLATION = 1;
 	public static final int BICUBIC_INTERPOLATION = 2;
-	public static int INTERPOLATION = BICUBIC_INTERPOLATION;
-
-
+	// BILINEAR_INTERPOLATION is used instead of BICUBIC_INTERPOLATION for precipitation and cloud data
+	// to avoid the issue of negative values.
+	public static int INTERPOLATION = BILINEAR_INTERPOLATION;
 	public static final double INEXISTENT_VALUE = Double.MIN_VALUE;
 	// 1440, 721 - -180.125, 90.125 - 179.8750000, -90.1250000
 	public static final int REF_WIDTH = 1440;
 	public static final int REF_HEIGHT = 721;
-
+	private static final String ECWMF_WEATHER_TYPE = "ecmwf";
+	
 	public static class WeatherTiff {
-
+		
 		// it could vary base on files
+		// gfs
 		public double ORIGIN_LON = -180.125;
 		public double ORIGIN_LAT = 90.125;
 		public double PX_SIZE_LON = 0.25;
 		public double PX_SIZE_LAT = -0.25;
+		// ecmwf
+		public double ECMWF_ORIGIN_LON = -180.1999;
+		public double ECMWF_ORIGIN_LAT = 90.2000;
+		public double ECMWF_PX_SIZE_LON = 0.28;
+		public double ECMWF_PX_SIZE_LAT = -0.28;
 
 		public final File file;
 		private DataBufferFloat data;
@@ -41,31 +57,76 @@ public class IndexWeatherData {
 		public int getBands() {
 			return bands;
 		}
-
-
-		private BufferedImage readFile(File file) throws IOException {
+		
+		
+		private BufferedImage readFile(File file) {
 			BufferedImage img = null;
 			if (file.exists()) {
-				img = ImageIO.read(file);
+				img = iterativeReadData(file);
+			}
+			return img;
+		}
+		
+		private BufferedImage iterativeReadData(File file) {
+			boolean readSuccess = false;
+			BufferedImage img = null;
+			Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("tiff");
+			ImageInputStream iis = null;
+			while (readers.hasNext() && !readSuccess) {
+				ImageReader reader = readers.next();
+				if (reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader) {
+					try {
+						iis = ImageIO.createImageInputStream(file);
+						reader.setInput(iis, true);
+						img = reader.read(0);
+						readWeatherData(img);
+						readSuccess = true;
+					} catch (IOException e) {
+						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+					} finally {
+						reader.dispose();
+						if (iis != null) {
+							try {
+								iis.close();
+							} catch (IOException e) {
+								log.error("Error closing ImageInputStream: " + e.getMessage());
+							}
+						}
+					}
+				}
+			}
+			if (!readSuccess) {
+				log.error("Failed to read TIFF file with all available readers.");
+			}
+			return img;
+		}
+		
+		private void readWeatherData(BufferedImage img) {
+			if (img != null) {
 				width = img.getWidth();
 				height = img.getHeight();
 				data = (DataBufferFloat) img.getRaster().getDataBuffer();
 				bands = data.getSize() / width / height;
 			}
-			return img;
 		}
-
-
-		public double getValue(int band, double lat, double lon) {
-			double y = (lat - ORIGIN_LAT) / PX_SIZE_LAT;
-			double x = (lon - ORIGIN_LON) / PX_SIZE_LON;
+		
+		public double getValue(int band, double lat, double lon, String weatherType) {
+			double y;
+			double x;
+			if (weatherType.equals(ECWMF_WEATHER_TYPE)) {
+				y = (lat - ECMWF_ORIGIN_LAT) / ECMWF_PX_SIZE_LAT;
+				x = (lon - ECMWF_ORIGIN_LON) / ECMWF_PX_SIZE_LON;
+			} else {
+				y = (lat - ORIGIN_LAT) / PX_SIZE_LAT;
+				x = (lon - ORIGIN_LON) / PX_SIZE_LON;
+			}
 			if (y < 0 || y > height || x < 0 || x > width) {
 				return INEXISTENT_VALUE;
 			}
-			return getValue(band, x, y, null);
+			return getInterpolationValue(band, x, y, null);
 		}
 		
-		public double getValue(int band, double x, double y, double[] array) {
+		public double getInterpolationValue(int band, double x, double y, double[] array) {
 			if (data == null) {
 				return INEXISTENT_VALUE;
 			}
@@ -76,7 +137,6 @@ public class IndexWeatherData {
 			} else {
 				return nearestNeighboor(band, x, y);
 			}
-			// System.out.println(" --- " + (h1 - h2) + " " + h1 + " " + h2);
 		}
 		
 		protected double nearestNeighboor(int band, double x, double y) {
@@ -181,7 +241,7 @@ public class IndexWeatherData {
 			WeatherTiff td = new WeatherTiff(new File(folder, String.format(fmt, vl)));
 //			System.out.println(vl + ":00");
 			for (int j = 0; j < 5; j++) {
-				wth[j + 1][i] = td.getValue(j, lat, lon);
+				wth[j + 1][i] = td.getValue(j, lat, lon, ECWMF_WEATHER_TYPE);
 //				System.out.println(td.getElem(j, 740, 151));
 			}
 			wth[0][i] = vl;

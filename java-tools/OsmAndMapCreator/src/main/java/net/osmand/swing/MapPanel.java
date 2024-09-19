@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
@@ -61,6 +62,7 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
+import net.osmand.NativeLibrary;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -176,7 +178,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	private int yStartingImage = 0;
 
 	private MapTileDownloader downloader = MapTileDownloader.getInstance(MapCreatorVersion.APP_MAP_CREATOR_VERSION); // FIXME no commit
-	Map<String, Image> cache = new HashMap<String, Image>();
+	Map<String, Image> cache = new ConcurrentHashMap<String, Image>();
 
 	private final JPopupMenu popupMenu;
 	private Point popupMenuPoint;
@@ -483,12 +485,14 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	@Override
 	protected void paintComponent(Graphics g) {
-		if(nativeLibRendering != null) {
+		if (nativeLibRendering != null) {
 			if (nativeRect != null && zoom == nativeRect.nativeZoom) {
-                double xTileLeft = getXTile() - getWidth() / (2.0d * getTileSize());
-                double yTileUp = getYTile() - getHeight() / (2.0d * getTileSize());
-				int shx = (int) (-xTileLeft * getTileSize() + (nativeRect.left31)/ (MapUtils.getPowZoom(31 - zoom - 8) /mapDensity)) ;
-				int shy = (int) (-yTileUp * getTileSize() + (nativeRect.top31) / (MapUtils.getPowZoom(31 - zoom - 8) /mapDensity))  ;
+				double xTileLeft = getXTile() - getWidth() / (2.0d * getTileSize());
+				double yTileUp = getYTile() - getHeight() / (2.0d * getTileSize());
+				int shx = (int) (-xTileLeft * getTileSize()
+						+ (nativeRect.left31) / (MapUtils.getPowZoom(31 - zoom - 8) / mapDensity));
+				int shy = (int) (-yTileUp * getTileSize()
+						+ (nativeRect.top31) / (MapUtils.getPowZoom(31 - zoom - 8) / mapDensity));
 				g.drawImage(nativeRenderingImg, shx, shy, this);
 			}
 		} else if (images != null) {
@@ -735,15 +739,15 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	@Override
 	public void tileDownloaded(DownloadRequest request) {
-		if(request == null){
+		if (request == null) {
 			prepareRasterImage(false);
 			return;
 		}
 		double tileSize = getTileSize();
 		double xTileLeft = getXTile() - getSize().width / (2.0d * tileSize);
 		double yTileUp = getYTile() - getSize().height / (2.0d * tileSize);
-		int i = request.xTile - (int)xTileLeft;
-		int j = request.yTile - (int)yTileUp;
+		int i = request.xTile - (int) xTileLeft;
+		int j = request.yTile - (int) yTileUp;
 		if (request.zoom == this.zoom && (i >= 0 && i < images.length) && (j >= 0 && j < images[i].length)) {
 			try {
 				images[i][j] = getImageFor(request.xTile, request.yTile, zoom, false);
@@ -1184,7 +1188,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			if (nativeRenderer.getQueue().isEmpty()) {
 				try {
 					lastContext = new RenderingImageContext(sleft, sright, stop, sbottom, zoom);
-					nativeRenderingImg = nativeLibRendering.renderImage(lastContext);
+					NativeJavaRendering.RenderingImageResult result = nativeLibRendering.renderImage(lastContext);
+					nativeRenderingImg = result.getImage();
 					Rect rect = new Rect();
 					rect.left31 = sleft;
 					rect.top31 = stop;

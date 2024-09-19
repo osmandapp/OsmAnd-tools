@@ -1,5 +1,6 @@
 build/
 .gradle
+.kotlin
 */out
 */.classpath
 */.gradle
@@ -13,3 +14,5 @@ build/
 .idea
 *.iml
 regions.ocbf
+.attach_*
+OsmAndMapCreatorUtilities/src/main/resources/page.txt

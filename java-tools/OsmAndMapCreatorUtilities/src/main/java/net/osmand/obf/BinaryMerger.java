@@ -84,14 +84,8 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					System.getProperty("maps.dir") + "Switzerland_europe_merge.obf",
-					System.getProperty("maps.dir") + "Switzerland_basel_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_bern_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_central_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_eastern_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_lake-geneva_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_ticino_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_zurich_europe_2.obf_",
+					System.getProperty("maps.dir") + "Ukraine_europe_2.owiki.obf",
+					System.getProperty("maps.dir") + "Ukraine_europe_2.wiki.obf"
 			});
 		} else {
 			in.merger(args);
@@ -199,7 +193,7 @@ public class BinaryMerger {
 		boolean skipExisting = false;
 		boolean ignoreFailures = true;
 		String filter = null;
-		for(String arg : args) {
+		for (String arg : args) {
 			String val = null;
 			String[] s = arg.split("=");
 			String key = s[0];
@@ -209,7 +203,8 @@ public class BinaryMerger {
 			if (key.equals("--map")) {
 				mapFiles = true;
 				roadFiles = false;
-			} if (key.equals("--road")) {
+			}
+			if (key.equals("--road")) {
 				roadFiles = true;
 				mapFiles = false;
 			} else if (key.equals("--filter")) {
@@ -250,6 +245,9 @@ public class BinaryMerger {
 				sargs.add("--poi");
 				sargs.add("--hhindex");
 				for (CountryRegion reg : list) {
+					if (!reg.map) {
+						continue;
+					}
 					File fl = getExistingFile(pathWithGeneratedMapZips, reg, road ? roadExt : mapExt);
 					if (!fl.exists() && road) {
 						fl = getExistingFile(pathWithGeneratedMapZips, reg, mapExt);
@@ -353,11 +351,19 @@ public class BinaryMerger {
 	}
 
 	private List<String> extractCountryAndRegionNames(BinaryMapIndexReader index) {
-		return new ArrayList<String>(Arrays.asList(index.getRegionNames().get(0).split("_")));
+		List<String> name = index.getRegionNames();
+		if (name.size() > 0) {
+			return Arrays.asList(name.get(0).split("_"));
+		}
+		return Collections.emptyList();
 	}
 
 	private String extractCountryName(BinaryMapIndexReader index) {
-		return extractCountryAndRegionNames(index).get(0);
+		List<String> lst = extractCountryAndRegionNames(index);
+		if (lst.size() > 0) {
+			return lst.get(0);
+		}
+		return null;
 	}
 
 	private String extractRegionName(BinaryMapIndexReader index) {
@@ -455,8 +461,11 @@ public class BinaryMerger {
 			throws IOException {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		Set<String> attributeTagsTableSet = new TreeSet<String>();
-		for (int i = 0; i != addressRegions.length; i++) {
+		for (int i = 0; i < addressRegions.length; i++) {
 			AddressRegion region = addressRegions[i];
+			if (region == null) {
+				continue;
+			}
 			attributeTagsTableSet.addAll(region.getAttributeTagsTable());
 		}
 		writer.startWriteAddressIndex(name, attributeTagsTableSet);
@@ -473,6 +482,9 @@ public class BinaryMerger {
 			Map<Long, City> cityIds = new HashMap<Long, City>();
 			for (int i = 0; i < addressRegions.length; i++) {
 				AddressRegion region = addressRegions[i];
+				if (region == null) {
+					continue;
+				}
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
 					normalizePostcode(city, extractCountryName(index));

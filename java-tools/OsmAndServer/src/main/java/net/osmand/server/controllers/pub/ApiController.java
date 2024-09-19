@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -17,12 +18,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
-import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,11 +58,20 @@ import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.services.MotdService.MessageParams;
+import net.osmand.server.api.services.CameraPlace;
+import net.osmand.server.api.services.IpLocationService;
+import net.osmand.server.api.services.LotteryPlayService;
 import net.osmand.server.api.services.LotteryPlayService.LotteryResult;
+import net.osmand.server.api.services.MotdService;
+import net.osmand.server.api.services.MotdService.MessageParams;
+import net.osmand.server.api.services.PlacesService;
+import net.osmand.server.api.services.PluginsService;
+import net.osmand.server.api.services.PollsService;
 import net.osmand.server.api.services.PollsService.PollQuestion;
-import net.osmand.util.Algorithms;
+import net.osmand.server.api.services.PromoService;
+import net.osmand.server.api.services.WikiService;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
+import net.osmand.util.Algorithms;
 
 @Controller
 @RequestMapping("/api")
@@ -112,6 +122,9 @@ public class ApiController {
 	
 	@Autowired
 	LotteryPlayService lotteryPlayService;
+	
+	@Autowired
+	PluginsService pluginsService;
 	
 	@Autowired
 	PromoService promoService;
@@ -215,6 +228,15 @@ public class ApiController {
 		}
 		return gson.toJson(pollsService.getPoll(channel));
 	}
+	
+	
+	@RequestMapping(path = { "/purchase-complete" }, produces = "application/json")
+	@ResponseBody
+	public String purchaseComplete(@RequestParam(required = false) String purchaseId,
+			@RequestParam(required = false) String os, @RequestParam(required = false) String purchaseType) {
+		// here we could validate purchase in fiture
+		return "{\"status\":\"OK\"}";
+	}
     
     
     @PostMapping(path = {"/missing_search"}, produces = "application/json")
@@ -278,20 +300,29 @@ public class ApiController {
 		return "<pre>" + refreshAll + "</pre>";
 	}
     
-    @GetMapping(path = {"/cm_place.php", "/cm_place"})
+    @GetMapping(path = {"/cm_place", "/cm_place"})
 	public void getCmPlace(@RequestParam("lat") double lat, @RequestParam("lon") double lon,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
 		placesService.processPlacesAround(headers, request, response, gson, lat, lon);
 	}
 
-	@GetMapping(path = {"/wiki_place.php", "/wiki_place"})
-	public void geWikiPlace(@RequestParam(required = false) String article,
-	                        @RequestParam(required = false) String category,
-	                        @RequestHeader HttpHeaders headers, HttpServletRequest request, HttpServletResponse response) {
-		wikiService.processWikiImages(request, response, gson);
-	}
+    // /api/wiki_place?category=Sora%20(Italy)
+    // /api/wiki_place?article=Q51838 
+    @GetMapping(path = {"/wiki_place"})
+    @ResponseBody
+    public String geWikiPlace(@RequestParam(required = false) String article,
+                              @RequestParam(required = false) String category,
+                              @RequestParam(required = false) String wiki,
+                              @RequestParam(required = false, defaultValue = "false") boolean addMetaData) {
+	    if (addMetaData) {
+		    Set<Map<String, Object>> imagesWithDetails = wikiService.processWikiImagesWithDetails(article, category, wiki);
+		    return gson.toJson(Collections.singletonMap("features-v2", imagesWithDetails));
+	    }
+	    Set<String> images = wikiService.processWikiImages(article, category, wiki);
+	    return gson.toJson(Collections.singletonMap("features", images));
+    }
 
-    @GetMapping(path = {"/mapillary/get_photo.php", "/mapillary/get_photo"})
+    @GetMapping(path = {"/mapillary/get_photo"})
     @ResponseBody
     public void getPhoto(@RequestParam("photo_id") String photoId,
                          @RequestParam(value = "hires", required = false) boolean hires,
@@ -310,7 +341,7 @@ public class ApiController {
 		}
     }
 
-    @GetMapping(path = {"/mapillary/photo-viewer.php", "/mapillary/photo-viewer"})
+    @GetMapping(path = {"/mapillary/photo-viewer"})
     public String getPhotoViewer(@RequestParam("photo_id") String photoId, Model model) {
         model.addAttribute("photoId", photoId);
         return "mapillary/photo-viewer";
@@ -507,7 +538,7 @@ public class ApiController {
 			}
 			email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
 		}
-    	unsubscribedRepo.deleteAllByEmail(email);
+    	unsubscribedRepo.deleteAllByEmailIgnoreCase(email);
     	return "pub/email/subscribe";
     }
 
@@ -518,7 +549,7 @@ public class ApiController {
 								  @RequestParam() Long finishDate,
 								  @RequestParam() Integer nd,
 								  @RequestParam() Integer ns,
-								  @RequestParam() String aid,
+								  @RequestParam(required = false) String aid,
 								  @RequestParam() String version,
 								  @RequestParam() String lang,
 								  @RequestParam() MultipartFile file) throws IOException, SQLException {
@@ -607,4 +638,11 @@ public class ApiController {
 		}
 	}
     
+	
+	@GetMapping(path = {"/plugins/list"}, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public String pluginsList(@RequestParam(required = false) String version, 
+			@RequestParam(required = false) boolean nightly, @RequestParam(required = false) String os) throws IOException {
+		return gson.toJson(pluginsService.getPluginsInfo(os, version, nightly));
+	}
 }

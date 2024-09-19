@@ -260,7 +260,7 @@ public class RouteRelationExtractor {
 					wptPt.lat = node.getLatitude();
 					wptPt.lon = node.getLongitude();
 					wptPt.getExtensionsToWrite().putAll(node.getTags());
-					wptPt.setExtensionsWriter(serializer -> {
+					wptPt.setExtensionsWriter("TODO", serializer -> {
 						for (Map.Entry<String, String> entry1 : wptPt.getExtensionsToWrite().entrySet()) {
 							String key = entry1.getKey().replace(":", "_-_");
 							if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {

@@ -29,7 +29,7 @@ import net.osmand.util.Algorithms;
 public class SvgMapLegendGenerator {
 
 	static int defaultZoomLevel = 19; // Most of the icons on this zoom are visible
-	static int canvasWidth = 40;
+	static int canvasWidth = 300;
 	static int canvasHeight = 40;
 	static int defaultShieldSize = 40;
 	static int defaultIconSize = 24;
@@ -289,10 +289,22 @@ public class SvgMapLegendGenerator {
 			content += "</svg>";
 			return content;
 		}
-
-		private static String getIconPath(String iconName) {
-			return System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/map-icons-svg/" + "mx_"
-					+ iconName + ".svg";
+		
+		private static String getIconPath(String iconName) throws Exception {
+			String basePath = System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/map-icons-svg/";
+			String filePath = basePath + "mx_" + iconName + ".svg";
+			
+			File file = new File(filePath);
+			if (file.exists()) {
+				return filePath;
+			}
+			String coloredIconFilePath = basePath + "c_mx_" + iconName + ".svg";
+			file = new File(coloredIconFilePath);
+			if (file.exists()) {
+				return coloredIconFilePath;
+			} else {
+				throw new Exception("File not found " + filePath);
+			}
 		}
 
 		private static String geBackgroundRect(String color, float opacity) {
@@ -333,6 +345,13 @@ public class SvgMapLegendGenerator {
 						if (name.equals("svg")) {
 							parsedSvg.width = Double.parseDouble(parser.getAttributeValue("", "width"));
 							parsedSvg.height = Double.parseDouble(parser.getAttributeValue("", "height"));
+							String viewBoxStr = parser.getAttributeValue(null, "viewBox");
+							if (viewBoxStr != null) {
+								String[] parts = viewBoxStr.split(" ");
+								for (int i = 0; i < parts.length; i++) {
+									parsedSvg.viewBox[i] = Double.parseDouble(parts[i]);
+								}
+							}
 						}
 					}
 				}
@@ -393,14 +412,22 @@ public class SvgMapLegendGenerator {
 				throw new Exception("ERROR: getSvgInnerContent() failed to process file " + filePath);
 			}
 		}
-
+		
+		/**
+		 * Using viewBox for scaling calculations instead of the width and height attributes
+		 * ensures that the SVG content is scaled based on its intended visual representation. This approach
+		 * preserves the aspect ratio and relative positioning within the SVG, making it adaptable and
+		 * consistent across different container sizes, enhancing flexibility and scalability.
+		 */
 		private static String moveToCenterAndResize(SvgDTO svg, int newSize) {
-			double rescalingRatio = newSize / svg.width;
-			double xOffset = canvasWidth / 2 - newSize / 2;
-			double yOffset = canvasHeight / 2 - newSize / 2;
-			String resultContent = String.format(Locale.US, "\n<g transform=\"translate(%f, %f) scale(%f %f) \"> \n",
+			double originalMaxSize = Math.max(svg.viewBox[2], svg.viewBox[3]);
+			double rescalingRatio = newSize / originalMaxSize;
+			double xOffset = (double) canvasWidth / 2 - (double) newSize / 2;
+			double yOffset = (double) canvasHeight / 2 - (double) newSize / 2;
+			String resultContent = String.format(Locale.US, "%n<g transform=\"translate(%f, %f) scale(%f %f) \"> %n",
 					xOffset, yOffset, rescalingRatio, rescalingRatio);
-			resultContent += svg.content + "</g>\n\n";
+			resultContent += svg.content + "</g>%n%n";
+			
 			return resultContent;
 		}
 
@@ -423,6 +450,7 @@ public class SvgMapLegendGenerator {
 			String content = null;
 			double width = -1;
 			double height = -1;
+			double[] viewBox = new double[4]; // [minX, minY, width, height]
 		}
 	}
 

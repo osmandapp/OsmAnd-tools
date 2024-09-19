@@ -49,8 +49,6 @@ import com.google.gson.JsonObject;
 
 import net.osmand.live.subscriptions.ReceiptValidationHelper;
 import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.server.api.repo.OsmRecipientsRepository;
-import net.osmand.server.api.repo.OsmRecipientsRepository.OsmRecipient;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
@@ -76,8 +74,6 @@ public class SubscriptionController {
     @Autowired
     private LotteryPlayService lotteryPlayService;
     
-    @Autowired
-    private OsmRecipientsRepository osmRecipientsRepository;
     
     @Autowired
     private DeviceSubscriptionsRepository subscriptionsRepository;
@@ -262,15 +258,15 @@ public class SubscriptionController {
         } catch (Exception ex) {
             return error("Please validate osm user/pwd (couldn't authenticate): " + ex.getMessage());
         }
-        OsmRecipient recipient = new OsmRecipient();
-        recipient.osmId = osmUser;
-        recipient.email = email;
-        recipient.bitcoinAddress = bitcoinAddress;
-        recipient.updateTime = new Date();
-        recipient = osmRecipientsRepository.save(recipient);
-        String response = String.format("{\"osm_user\": \"%s\", \"bitcoin_addr\": \"%s\", \"time\": \"%s\"}",
-                recipient.osmId, recipient.bitcoinAddress, recipient.updateTime.getTime()+"");
-        return ResponseEntity.ok(response);
+        throw new UnsupportedOperationException();
+//        OsmRecipient recipient = new OsmRecipient();
+//        recipient.osmId = osmUser;
+//        recipient.email = email;
+//        recipient.bitcoinAddress = bitcoinAddress;
+//        recipient.updateTime = new Date();
+//        recipient = osmRecipientsRepository.save(recipient);
+//        String response = String.format("{\"osm_user\": \"%s\", \"bitcoin_addr\": \"%s\", \"time\": \"%s\"}",
+//                recipient.osmId, recipient.bitcoinAddress, recipient.updateTime.getTime()+"");
     }
 
     private boolean isEmpty(String s) {
@@ -426,6 +422,11 @@ public class SubscriptionController {
 		return null;
 	}
 
+	
+	@PostMapping(path = {"/restore-purchased"})
+	public ResponseEntity<String> restorePurchased(HttpServletRequest request) {
+		return purchased(request);
+	}
 	
 	// Android sends
 	//	parameters.put("userid", userId);

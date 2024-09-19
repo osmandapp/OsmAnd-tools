@@ -25,12 +25,12 @@ public class ObfRegionSplitter {
 	
 	public static void main(String[] args) throws IOException {
 		if(args.length == 1 && args[0].equals("test")) {
-			args = new String[6];
-			args[0] = "/Users/macmini/OsmAnd/overpass/23_03_09_24_00.obf";
-			args[1] = "/Users/macmini/OsmAnd/overpass/split_obf/";
+			args = new String[4];
+			args[0] = "~/24_08_04_21_40.obf";
+			args[1] = "~/Desktop/split/";
 			args[2] = "";
-			args[3] = "_23_03_10";
-			args[4] = "--srtm=/Users/macmini/OsmAnd/overpass/srtm/";
+			args[3] = "_24_08_04_21_40";
+//			args[4] = "--srtm=/Users/macmini/OsmAnd/overpass/srtm/";
 		}
 		if (args.length <= 3) {
 			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix> --srtm=<folder with srtm>");
@@ -131,7 +131,7 @@ public class ObfRegionSplitter {
  			int y = MapUtils.get31TileNumberY(obj.getLocation().getLatitude());
  			List<BinaryMapDataObject> l = osmandRegions.query(x, y);
  			for (BinaryMapDataObject b : l) {
- 				if (osmandRegions.contain(b, x, y)) {
+ 				if (OsmandRegions.contain(b, x, y)) {
  					String dw = osmandRegions.getDownloadName(b);
  					WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
  					if (dw == null || wr == null) {
@@ -161,11 +161,18 @@ public class ObfRegionSplitter {
 		for (List<Long> keys : sortedMap.values()) {
 			for (long key : keys) {
 				RouteDataObject obj = routingData.get(key);
+				if (isPossibleVandalism(obj)) {
+					continue;
+				}
+				if (heightData != null) {
+					attachElevationData(obj, heightData);
+					count++;
+				}
 				int x = obj.getPoint31XTile(0);
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 				for (BinaryMapDataObject b : l) {
-					if (osmandRegions.contain(b, x, y)) {
+					if (OsmandRegions.contain(b, x, y)) {
 						String dw = osmandRegions.getDownloadName(b);
 						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);
 						if (dw == null || wr == null) {
@@ -177,10 +184,7 @@ public class ObfRegionSplitter {
 								mp = new TLongObjectHashMap<>();
 								result.put(dw, mp);
 							}
-							if (heightData != null) {
-								attachElevationData(obj, heightData);
-								count++;
-							}
+							
 							mp.put(obj.getId(), obj);
 						}
 					}
@@ -244,13 +248,10 @@ public class ObfRegionSplitter {
 			String tag = type.getTag();
 			if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
 				// already processed tags
-				return;
+				return ;
 			}
 			// can put same tag with different values
 			restoredWay.putTag(tag, type.getValue());
-		}
-		if (!IndexHeightData.isHeightDataNeeded(restoredWay)) {
-			return;
 		}
 		heightData.proccess(simpleWay);
 
@@ -331,6 +332,34 @@ public class ObfRegionSplitter {
 		}
 		return result;
 	}
+	
+	private boolean isPossibleVandalism(BinaryMapDataObject b) {
+		if ("ferry".equals(b.getTagValue("route"))) {
+			return false;
+		}
+		for (int j = 1; j < b.getPointsLength(); j++) {
+			double dist = MapUtils.squareRootDist31(b.getPoint31XTile(j - 1), b.getPoint31YTile(j - 1),
+					b.getPoint31XTile(j), b.getPoint31YTile(j));
+			if (dist > IndexHeightData.MAX_LAT_LON_DIST) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean isPossibleVandalism(RouteDataObject b) {
+		if ("ferry".equals(b.getRoute())) {
+			return false;
+		}
+		for (int j = 1; j < b.getPointsLength(); j++) {
+			double dist = MapUtils.squareRootDist31(b.getPoint31XTile(j - 1), b.getPoint31YTile(j - 1),
+					b.getPoint31XTile(j), b.getPoint31YTile(j));
+			if (dist > IndexHeightData.MAX_LAT_LON_DIST) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	private Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> splitRegionMapData(ObfFileInMemory allMapObjects,
 			OsmandRegions osmandRegions) throws IOException {
@@ -338,6 +367,9 @@ public class ObfRegionSplitter {
 		for (MapZoomPair p : allMapObjects.getZooms()) {
 			TLongObjectHashMap<BinaryMapDataObject> objects = allMapObjects.get(p);
 			for (BinaryMapDataObject obj : objects.valueCollection()) {
+				if (isPossibleVandalism(obj)) {
+					continue;
+				}
 				int x = obj.getPoint31XTile(0);
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);

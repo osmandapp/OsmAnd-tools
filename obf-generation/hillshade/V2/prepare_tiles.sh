@@ -5,20 +5,35 @@
 # Edit TYPE, TILE_RANGE and paths
 # After that run combine_tiles.sh
 
+while getopts ":t:r:" opt; do
+  case $opt in
+    t) TYPE="$OPTARG" # hillshade/slope/tifheightmap # Type of tiles to generate
+    ;;
+    r) TILE_RANGE="$OPTARG" # "N25-80W000-030"
+    ;;
+    \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
+	echo Usage: ./prepare_tiles.sh -t [hillshade/slope/tifheightmap]
+    ;;
+  esac
+done
+
+echo $TILE_RANGE
 ## DELETE ALL TILES VRT
 rm -f allheighttiles.vrt
 rm -f allheighttiles_hillshade.vrt
 rm -f allheighttiles_slope.vrt
 rm -f allheighttiles_tifheightmap.vrt
 
-TILE_RANGE="N63-66W010-030"
-TYPE=tifheightmap # hillshade/slope/tifheightmap # Type of tiles to generate
-TERRAIN=/mnt/wd_2tb/ArticDEM/10m/tiles_fiiled # path to folder with terrain tiles
-TIFFHEIGHTMAP_OUTPUT=/mnt/wd_2tb/ArticDEM/10m/tiffheightmap
-SQLITEDB_OUTPUT=/mnt/wd_2tb/ArticDEM/10m/${TYPE}-tiles
+TERRAIN=/mnt/wd_2tb/lidar/split # path to folder with terrain tiles
+TIFFHEIGHTMAP_OUTPUT=/mnt/wd_2tb/lidar/tiffheightmap
+SQLITEDB_OUTPUT=/mnt/wd_2tb/lidar/${TYPE}-tiles
 GENERATE_TILE_SCRIPTS_PATH=/home/xmd5a/git/OsmAnd-tools/obf-generation/heightmap # see https://github.com/osmandapp/OsmAnd-tools/tree/master/obf-generation/heightmap
 
-ZOOM="14"
+if [[ $TYPE == tifheightmap ]]; then
+	ZOOM="15"
+else
+	ZOOM="14"
+fi
 VERBOSE="true"
 
 

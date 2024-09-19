@@ -269,9 +269,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		if ("stop_area".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT))) {
 			// save stop area relation members for future processing
-			String name = e.getTag(OSMTagKey.NAME);
-			if (name == null) return;
-
 			ctx.loadEntityRelation(e);
 			for (RelationMember entry : e.getMembers()) {
 				String role = entry.getRole();
@@ -519,7 +516,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				transStopsStat.setDouble(3, s.getLocation().getLongitude());
 				transStopsStat.setString(4, s.getName());
 				transStopsStat.setString(5, s.getEnName(false));
-				transStopsStat.setString(6, gson.toJson(s.getNamesMap(false)));
+				Map<String, String> namesMap = s.getNamesMap(false);
+				transStopsStat.setString(6, namesMap.size() > 0 ? gson.toJson(namesMap) : "{}");
 				transStopsStat.setString(7, gson.toJson(s.getDeletedRoutesIds()));
 				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
 				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
@@ -1164,7 +1162,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 			if(replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
-				if(!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
+				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
 				}
 			}

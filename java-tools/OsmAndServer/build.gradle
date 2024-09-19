@@ -11,7 +11,7 @@ buildscript {
 
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
-
+ext['kotlin.version'] = '2.0.0'
 
 task generateGitProperties {
     doLast {
@@ -22,7 +22,7 @@ task generateGitProperties {
             // def timestamp = revision ? new java.util.Date(java.util.concurrent.TimeUnit.SECONDS.toMillis(revision.split(' ').first() as long)).format("yyyy-MM-dd'T'HH:mm:ssZ") : null
             def commit = 'git log -1 --pretty=format:"%h%x09%an%x09%ad%x09%s"'.execute().text.trim()
             File propertiesFile = new File(project.getBuildDir(), '/resources/main/git.properties')
-            if(commit) {
+            if (commit) {
                 propertiesFile.text = """git.commit.format=$commit"""
             }
         } catch (e) {
@@ -30,16 +30,23 @@ task generateGitProperties {
         }
     }
 }
+tasks.register('copyAndroidResources', Copy) {
+    from("../../../android/OsmAnd/res") {
+        include "values/**"
+        include "values-*/**"
+    }
+    into("src/main/resources/androidResources")
+}
+processResources.dependsOn(copyAndroidResources)
 
 bootJar {
     dependsOn generateGitProperties
     launchScript()
 
-    baseName = 'osmand-server-boot'
+    archiveBaseName = 'osmand-server-boot'
     version =  version
     mainClass = 'net.osmand.server.Application'
 }
-
 
 dependencies {
     // make optional for release run
@@ -55,7 +62,7 @@ dependencies {
     implementation "org.javassist:javassist:3.25.0-GA"
     implementation "javax.xml.bind:jaxb-api:2.3.1"
     implementation "javax.activation:activation:1.1"
-    implementation "org.glassfish.jaxb:jaxb-runtime:2.3.0"
+    implementation "org.glassfish.jaxb:jaxb-runtime:2.3.5"
     
     implementation 'com.sendgrid:sendgrid-java:4.2.1'
     implementation group: 'net.sf.trove4j', name: 'trove4j', version: '3.0.3'
@@ -95,6 +102,7 @@ dependencies {
 
     implementation group: 'de.grundid.opendatalab', name: 'geojson-jackson', version: '1.0'
 
+    implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
     implementation project(':OsmAnd-java')
     implementation project(':OsmAndMapCreatorUtilities')
     
@@ -114,4 +122,15 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
     testImplementation "com.github.tomakehurst:wiremock-standalone:2.18.0"
+
+    implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.10.1'
+    implementation 'com.twelvemonkeys.imageio:imageio-core:3.10.1'
+    implementation 'it.geosolutions.imageio-ext:imageio-ext-tiff:1.4.9'
+
+    implementation 'com.clickhouse:clickhouse-jdbc:0.6.0'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.3.1'
+    implementation 'org.lz4:lz4-java:1.8.0'
+
+//    implementation 'com.clickhouse:clickhouse-http-client:0.6.0'
+
 }

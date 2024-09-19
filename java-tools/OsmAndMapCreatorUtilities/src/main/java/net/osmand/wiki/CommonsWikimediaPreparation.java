@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+@Deprecated
 public class CommonsWikimediaPreparation {
 
     public static final String COMMONSWIKI_ARTICLES_GZ = "commonswiki-latest-pages-articles.xml.gz";

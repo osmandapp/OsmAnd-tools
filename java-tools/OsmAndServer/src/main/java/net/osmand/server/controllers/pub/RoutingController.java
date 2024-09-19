@@ -1,9 +1,14 @@
 
 package net.osmand.server.controllers.pub;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
@@ -16,7 +21,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -30,12 +40,14 @@ import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.router.RouteCalculationProgress;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.RoutingServerConfigEntry;
 import net.osmand.server.api.services.RoutingService;
+import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
+import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
+import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -45,99 +57,21 @@ import net.osmand.util.MapUtils;
 public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
-	
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
-	
+
 	@Autowired
 	RoutingService routingService;
-	
+
 	@Autowired
 	UserSessionResources session;
-	
+
 	Gson gson = new Gson();
-	
+
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
-	public static class FeatureCollection {
-		public String type = "FeatureCollection";
-		public List<Feature> features = new ArrayList<>();
-		
-		public FeatureCollection(Feature... features) {
-			this.features.addAll(Arrays.asList(features));
-		}
-	}
-	
-	public static class Feature {
-		public Map<String, Object> properties = new LinkedHashMap<>();
-		public String type = "Feature";
-		public final Geometry geometry;
-		
-		public Feature(Geometry geometry) {
-			this.geometry = geometry;
-		}
-		
-		public Feature prop(String key, Object vl) {
-			properties.put(key, vl);
-			return this;
-		}
-	}
-	
-	public static class Geometry {
-		public final String type;
-		public Object coordinates;
-		
-		public Geometry(String type) {
-			this.type = type;
-		}
 
-		public static Geometry lineString(List<LatLon> lst) {
-			Geometry gm = new Geometry("LineString");
-			float[][] coordinates = new float[lst.size()][];
-			for (int i = 0; i < lst.size(); i++) {
-				coordinates[i] = new float[]{(float) lst.get(i).getLongitude(), (float) lst.get(i).getLatitude()};
-			}
-			gm.coordinates = coordinates;
-			return gm;
-		}
-
-		public static Geometry lineStringElevation(List<LatLonEle> lst) {
-			Geometry gm = new Geometry("LineString");
-			float[][] coordinates = new float[lst.size()][];
-			for (int i = 0; i < lst.size(); i++) {
-				float lat = (float) lst.get(i).getLatitude();
-				float lon = (float) lst.get(i).getLongitude();
-				float ele = (float) lst.get(i).getElevation();
-				if (Float.isNaN(ele)) {
-					coordinates[i] = new float[]{lon, lat}; // GeoJSON [] longitude first, then latitude
-				} else {
-					coordinates[i] = new float[]{lon, lat, ele}; // https://www.rfc-editor.org/rfc/rfc7946 3.1.1
-				}
-			}
-			gm.coordinates = coordinates;
-			return gm;
-		}
-
-		public static Geometry point(LatLon pnt) {
-			Geometry gm = new Geometry("Point");
-			gm.coordinates = new float[]{(float) pnt.getLongitude(), (float) pnt.getLatitude()};
-			return gm;
-		}
-
-		public static Geometry pointElevation(LatLonEle pnt) {
-			Geometry gm = new Geometry("Point");
-			float lat = (float) pnt.getLatitude();
-			float lon = (float) pnt.getLongitude();
-			float ele = (float) pnt.getElevation();
-			if (Double.isNaN(ele)) {
-				gm.coordinates = new float[]{lon, lat};
-			} else {
-				gm.coordinates = new float[]{lon, lat, ele};
-			}
-			return gm;
-		}
-	}
-	
 	public static class RoutingMode {
 		public String key;
 		public String name;
@@ -148,7 +82,7 @@ public class RoutingController {
 			name = Algorithms.capitalizeFirstLetter(key).replace('_', ' ');
 		}
 	}
-	
+
 	public static class RoutingParameter {
 		public String key;
 		public String label;
@@ -159,7 +93,7 @@ public class RoutingController {
 		public Object value;
 		public String[] valueDescriptions;
 		public Object[] values;
-		
+
 		public RoutingParameter(String key, String section, String name, boolean defValue) {
 			this.key = key;
 			this.label = name;
@@ -168,7 +102,7 @@ public class RoutingController {
 			this.section = section;
 			this.value = defValue;
 		}
-		
+
 		public RoutingParameter(String key,  String name, String description, String group, String type) {
 			this.key = key;
 			this.label = name;
@@ -176,48 +110,81 @@ public class RoutingController {
 			this.type = type;
 			this.group = group;
 		}
-		
+
+		public void fillSelectList(String section, Map<String, String> list) {
+			this.section = section;
+			this.values = new String[list.size()];
+			this.valueDescriptions = new String[list.size()];
+			int i = 0;
+			for (String key : list.keySet()) {
+				if (i == 0) {
+					this.value = key; // default
+				}
+				this.values[i] = key;
+				this.valueDescriptions[i] = list.get(key);
+				i++;
+			}
+		}
 	}
-	
+
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<?> routingParams() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
-//		RoutingParameter applyApproximation = new RoutingParameter("applyapproximation", "",
-//				"Attach to roads (OsmAnd)", true);
-		RoutingParameter hhRouting = new RoutingParameter("hhoff", "Development",
-				"[Dev] Disable HH routing", false);
-		RoutingParameter nativeRouting = new RoutingParameter("nativerouting", "Development",
-				"[Dev] Use C++ for routing", false);
-		RoutingParameter nativeTrack = new RoutingParameter("nativeapproximation", "Development", 
-				"[Dev] Use C++ to runNativeSearchGpxRoute", false);
-		RoutingParameter calcMode = new RoutingParameter("calcmode", "Mode (old)",
-				"Algorithm to calculate route", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
-		calcMode.section = "Development";
-		calcMode.value = "";
-		calcMode.valueDescriptions = new String[] {"Optimal", "Basic", "Slow"};
-		calcMode.values = new String[] {RouteCalculationMode.COMPLEX.name(),
-				RouteCalculationMode.BASE.name(),
-				RouteCalculationMode.NORMAL.name()
-		};
+
+		final String routingSection = "Routing (devel)";
+		final String approximationSection = "Approximation (devel)";
+
+		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", routingSection, "Use separate maps", false);
+
+		RoutingParameter selectRoutingTypeCar = new RoutingParameter("routing", "Routing type",
+				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		RoutingParameter selectRoutingTypeAll = new RoutingParameter("routing", "Routing type",
+				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectRoutingTypeCar.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(true));
+		selectRoutingTypeAll.fillSelectList(routingSection, OsmAndMapsService.ServerRoutingTypes.getSelectList(false));
+
+		RoutingParameter selectApproximationType = new RoutingParameter("approximation", "GPX approximation type",
+				"Algorithm and library for approximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		selectApproximationType.fillSelectList(approximationSection, OsmAndMapsService.ServerApproximationTypes.getSelectList());
+
+		RoutingParameter gpxTimestampsDisabled = new RoutingParameter("gpxtimestamps",
+				approximationSection, "Use GPX timestamps", false);
+		RoutingParameter gpxTimestampsEnabled = new RoutingParameter("gpxtimestamps",
+				approximationSection, "Use external timestamps", true); // rescuetrack only
+
+		RoutingParameter minPointApproximation = new RoutingParameter("minPointApproximation", "minPointApproximation (m)",
+				"ctx.config.minPointApproximation", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
+		List <String> values = new ArrayList<>();
+		for (int n = 0; n <= 100; n += 5) {
+			values.add(String.valueOf(n));
+		}
+		minPointApproximation.section = approximationSection;
+		minPointApproximation.values = values.toArray(new String[0]);
+		minPointApproximation.valueDescriptions = values.toArray(new String[0]);
+		int defaultMinPointApproximation = (int) new RoutingConfiguration().minPointApproximation;
+		minPointApproximation.value = String.valueOf(defaultMinPointApproximation); // do not consider xml for the web
+
 		RoutingParameter shortWay = new RoutingParameter("short_way", null, "Short way", false);
 		// internal profiles (build-in routers)
 		for (Map.Entry<String, GeneralRouter> e : RoutingConfiguration.getDefault().getAllRouters().entrySet()) {
 			if (!e.getKey().equals("geocoding") && !e.getKey().equals("public_transport")) {
 				RoutingMode rm;
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
+				RoutingParameter routingTypes = derivedProfiles != null && "car".equals(e.getKey())
+						? selectRoutingTypeCar : selectRoutingTypeAll;
+				List<RoutingController.RoutingParameter> passParams = new ArrayList<>(Arrays.asList(
+						routingTypes, sepMaps, selectApproximationType, minPointApproximation, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
 						rm = new RoutingMode("default".equals(profile) ? e.getKey() : profile);
 						routers.put(rm.key, rm);
-						routingService.fillRoutingModeParams(
-								Arrays.asList(hhRouting, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
+						routingService.fillRoutingModeParams(passParams, shortWay, e, rm);
 					}
 				} else {
 					rm = new RoutingMode(e.getKey());
 					routers.put(rm.key, rm);
-					routingService.fillRoutingModeParams(
-							Arrays.asList(hhRouting, nativeRouting, nativeTrack, calcMode), shortWay, e, rm);
+					routingService.fillRoutingModeParams(passParams, shortWay, e, rm);
 				}
 			}
 		}
@@ -225,12 +192,16 @@ public class RoutingController {
 		for (RoutingServerConfigEntry rs : osmAndMapsService.getRoutingConfig().config.values()) {
 			RoutingMode rm = new RoutingMode(rs.name);
 
-			// apply approximation by default for all external profiles
-//			rm.params.put(applyApproximation.key, applyApproximation);
-
 			// reuse previously filled params using profile as key
-			if (rs.profile !=null && routers.get(rs.profile) !=null) {
-				routers.get(rs.profile).params.forEach((key, val) -> rm.params.put(key, val));
+			if (rs.profile != null && routers.get(rs.profile) != null) {
+				routers.get(rs.profile).params.forEach((key, val) -> {
+							if ("gpxtimestamps".equals(key) && rs.name.startsWith("rescuetrack")) {
+								rm.params.put(key, gpxTimestampsEnabled);
+							} else {
+								rm.params.put(key, val);
+							}
+						}
+				);
 			}
 
 			routers.put(rm.key, rm);
@@ -263,7 +234,7 @@ public class RoutingController {
 			return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[features.size()]))));
 		}
 	}
-	
+
 	@RequestMapping(path = "/geocoding", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<String> geocoding(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -284,7 +255,7 @@ public class RoutingController {
 			throw e;
 		}
 	}
-	
+
 	@RequestMapping(path = "/route", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<String> routing(HttpSession session,
 			@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode,
@@ -292,9 +263,6 @@ public class RoutingController {
 	                                 @RequestParam(defaultValue = "production") String limits) throws IOException {
 		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
-		if (!osmAndMapsService.validateAndInitConfig()) {
-			return osmAndMapsService.errorConfig();
-		}
 		List<LatLon> list = new ArrayList<>();
 		double lat = 0;
 		int k = 0;
@@ -326,7 +294,13 @@ public class RoutingController {
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
 								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress);
 				if (res != null) {
-					routingService.convertResultsWithElevation(resListElevation, features, res);
+					resListElevation = routingService.getElevationsBySegments(resListElevation, features, res);
+					routingService.interpolateEmptyElevationSegments(resListElevation);
+					List<Double> eleDiff = routingService.calculateElevationDiffs(resListElevation);
+					if (!eleDiff.isEmpty() && !Double.isNaN(eleDiff.get(0)) && !Double.isNaN(eleDiff.get(1))) {
+						props.put("diffElevationUp", eleDiff.get(0));
+						props.put("diffElevationDown", eleDiff.get(1));
+					}
 				}
 			} catch (IOException | InterruptedException | RuntimeException e) {
 				LOGGER.error(e.getMessage(), e);
@@ -381,14 +355,14 @@ public class RoutingController {
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/get-route"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> getRoute(@RequestBody List<WebGpxParser.Point> points) throws IOException, InterruptedException {
 		List<WebGpxParser.Point> res = routingService.getRoute(points);
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", res)));
 	}
-	
+
 	@PostMapping(path = {"/approximate"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> approximateRoute(@RequestBody List<WebGpxParser.Point> points, @RequestParam String routeMode) throws IOException, InterruptedException {

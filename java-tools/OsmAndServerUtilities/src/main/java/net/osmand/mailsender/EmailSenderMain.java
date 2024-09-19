@@ -297,12 +297,14 @@ public class EmailSenderMain {
             String address = resultSet.getString(1);
             if (!unsubscribed.contains(address) && address != null) {
                 sendMail(address, p);
+            } else {
+                LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
             }
         }
         LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
     }
 
-    // 	email_free_users_android, email_free_users_ios, supporters, osm_recipients
+    // 	email_free_users_android, email_free_users_ios, supporters, osm_recipients (deprecated)
 	private static String buildQuery(boolean count, String mailingGroups, int daysSince) {
 		String[] groups = mailingGroups.split(",");
 		StringBuilder sb = new StringBuilder();
@@ -456,6 +458,7 @@ public class EmailSenderMain {
 			p.sentFailed++;
 		}
 
-		LOGGER.info("Sending mail to: " + mailTo.replaceFirst(".....", ".....") + " (" + ok + ")");
+		LOGGER.info("Sending mail to: " + mailTo.replaceFirst(".....", ".....") + " (" + ok + ") " +
+				String.format("[%d success, %d failed]", p.sentSuccess, p.sentFailed));
 	}
 }

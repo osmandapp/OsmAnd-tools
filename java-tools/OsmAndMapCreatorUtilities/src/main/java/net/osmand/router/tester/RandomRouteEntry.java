@@ -1,8 +1,10 @@
 package net.osmand.router.tester;
 
+import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingContext;
+import net.osmand.util.MapUtils;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -37,10 +39,10 @@ class RandomRouteEntry {
 	}
 
 	String toURL(String type) {
-		return toURL(type, "test.osmand.net");
+		return toURL(type, "test.osmand.net", false);
 	}
 
-	String toURL(String type, String domain) {
+	String toURL(String type, String domain, boolean car2phase) {
 		String START = String.format("%f,%f", start.getLatitude(), start.getLongitude());
 		String FINISH = String.format("%f,%f", finish.getLatitude(), finish.getLongitude());
 
@@ -73,6 +75,9 @@ class RandomRouteEntry {
 		if ("hh-cpp".equals(TYPE)) {
 			typeParams.add("hhonly:true,nativerouting:true");
 		}
+		if (TYPE.startsWith("brp") && "car".equals(PROFILE)) {
+			typeParams.add("calcmode:" + (car2phase ? "COMPLEX" : "NORMAL"));
+		}
 
 		String hasParams = typeParams.size() > 0 ? "&params=" : "";
 		String PARAMS = String.join(",", typeParams); // site will fix it to "profile,params"
@@ -81,12 +86,9 @@ class RandomRouteEntry {
 		String protoDomain = domain.contains("://") ? domain : (
 				(domain.contains("localhost") ? "http://" : "https://") + domain);
 
-		// finally
-		TYPE = "osmand";
-
 		return String.format(
-				"%s/map/?start=%s&finish=%s%s%s&type=%s&profile=%s%s%s#%s",
-				protoDomain, START, FINISH, hasVia, VIA, TYPE, PROFILE, hasParams, PARAMS, GO
+				"%s/map/navigate/?start=%s&finish=%s%s%s&profile=%s%s%s#%s",
+				protoDomain, START, FINISH, hasVia, VIA, PROFILE, hasParams, PARAMS, GO
 		);
 	}
 }
@@ -96,7 +98,7 @@ class RandomRouteResult {
 	double cost;
 	long runTime; // ms
 	int visitedSegments;
-	double distance; // meters
+	float distance; // meters
 	RandomRouteEntry entry; // ref to the parent: start, finish, etc
 
 	RandomRouteResult(String type, RandomRouteEntry entry, long runTime,
@@ -110,18 +112,42 @@ class RandomRouteResult {
 		this.visitedSegments = ctx.calculationProgress.visitedSegments;
 
 		if (segments != null) {
+			float untrustedDistance = 0;
 			for (RouteSegmentResult r : segments) {
-				this.distance += r.getDistance();
+				untrustedDistance += r.getDistance();
+				this.distance += calcSegmentDistance(r);
+			}
+			if (Float.compare(this.distance, untrustedDistance) != 0) {
+				System.err.printf("WARN: %s got different distance (%f != %f)\n", type, this.distance, untrustedDistance);
 			}
 		}
+	}
+
+	private float calcSegmentDistance(RouteSegmentResult rr) {
+		int next;
+		double distance = 0;
+		RouteDataObject road = rr.getObject();
+		boolean plus = rr.getStartPointIndex() < rr.getEndPointIndex();
+		for (int j = rr.getStartPointIndex(); j != rr.getEndPointIndex(); j = next) {
+			next = plus ? j + 1 : j - 1;
+			double d = measuredDist(road.getPoint31XTile(j), road.getPoint31YTile(j),
+					road.getPoint31XTile(next), road.getPoint31YTile(next));
+			distance += d;
+		}
+		return (float) distance;
+	}
+
+	private double measuredDist(int x1, int y1, int x2, int y2) {
+		return MapUtils.getDistance(MapUtils.get31LatitudeY(y1), MapUtils.get31LongitudeX(x1),
+				MapUtils.get31LatitudeY(y2), MapUtils.get31LongitudeX(x2));
 	}
 
 	public String toString() {
 		return entry.toURL(type);
 	}
 
-	public String toURL(String domain) {
-		return entry.toURL(type, domain);
+	public String toURL(String domain, boolean car2phase) {
+		return entry.toURL(type, domain, car2phase);
 	}
 }
 
@@ -129,18 +155,20 @@ class RandomRouteReport {
 	private String text;
 	private String html;
 	private String htmlDomain;
+	private boolean car2phase;
 	private double deviationRed;
 	private double deviationYellow;
 
-	RandomRouteReport(long runTime, int nObf, int nRoutes, double red, double yellow, String htmlDomain) {
+	RandomRouteReport(long runTime, int nObf, int nRoutes, double red, double yellow, String htmlDomain, boolean car2phase) {
 		this.deviationRed = red;
 		this.deviationYellow = yellow;
 		this.htmlDomain = htmlDomain;
+		this.car2phase = car2phase;
 
 		String dt = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(Calendar.getInstance().getTime());
 
-		this.text = String.format("%s Random Route Tester (%d obf files, %d routes, %d seconds)\n\n",
-				dt, nObf, nRoutes, runTime / 1000);
+		this.text = String.format("%s Random Route Tester (%d obf files, %d routes, %d seconds) %s\n\n",
+				dt, nObf, nRoutes, runTime / 1000, car2phase ? "[car_2phase_mode]" : "");
 
 		this.html = "<html><head><style>" + "table, th, td { border: 1px solid silver; border-collapse: collapse; }" +
 				"</style></head><body>\n" + this.text + "<br><table border=1>\n";
@@ -172,7 +200,7 @@ class RandomRouteReport {
 
 		String start = String.format("%f,%f", primary.entry.start.getLatitude(), primary.entry.start.getLongitude());
 		String finish = String.format("%f,%f", primary.entry.finish.getLatitude(), primary.entry.finish.getLongitude());
-		String url = primary.toURL(htmlDomain);
+		String url = primary.toURL(htmlDomain, car2phase);
 
 		String sCost = primary.cost > 0 ? String.format("%.2f", primary.cost) : "zero";
 		String colorCost = costDistHtmlColor(primary.cost);
@@ -200,17 +228,17 @@ class RandomRouteReport {
 	}
 
 	void resultCompare(int n, RandomRouteResult result, RandomRouteResult primary) {
-		String url = result.toURL(htmlDomain);
+		String url = result.toURL(htmlDomain, car2phase);
 
 		double dCost = primary.cost > 0 ? (result.cost / primary.cost - 1) * 100 : 0;
-		String sCost = Math.abs(dCost) < deviationYellow ? "ok"
+		String sCost = Math.abs(dCost) < deviationYellow && result.cost > 0 ? "ok"
 				: (result.cost > 0 ? String.format("%s%.2f%%", dCost > 0 ? "+" : "", dCost) : "zero");
-		String colorCost = deviationHtmlColor(dCost);
+		String colorCost = deviationHtmlColor(dCost, result.cost);
 
 		double dDistance = primary.distance > 0 ? (result.distance / primary.distance - 1) * 100 : 0;
-		String sDistance = Math.abs(dDistance) < deviationYellow ? "ok"
+		String sDistance = Math.abs(dDistance) < deviationYellow && result.distance > 0 ? "ok"
 				: (result.distance > 0 ? String.format("%s%.2f%%", dDistance > 0 ? "+" : "", dDistance) : "zero");
-		String colorDistance = deviationHtmlColor(dDistance);
+		String colorDistance = deviationHtmlColor(dDistance, result.distance);
 
 		html += "<tr align=center>" +
 				String.format("<td><a href=\"%s\" target=_blank>%s</a></td>", url, result.type) + // 1
@@ -254,7 +282,10 @@ class RandomRouteReport {
 		return n > 0 ? "green" : "red";
 	}
 
-	private String deviationHtmlColor(double percent) {
+	private String deviationHtmlColor(double percent, double value) {
+		if (value <= 0) {
+			return "red";
+		}
 		if (Math.abs(percent) >= deviationRed) {
 			return "red";
 		} else if (Math.abs(percent) >= deviationYellow) {

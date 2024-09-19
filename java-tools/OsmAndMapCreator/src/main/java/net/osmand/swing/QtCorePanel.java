@@ -34,6 +34,8 @@ import net.osmand.core.jni.OsmAndCore;
 import net.osmand.core.jni.PointI;
 import net.osmand.core.jni.QStringStringHash;
 import net.osmand.core.jni.ResolvedMapStyle;
+import net.osmand.core.jni.QIODeviceLogSink;
+import net.osmand.core.jni.Logger;
 import net.osmand.data.LatLon;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -306,6 +308,8 @@ public class QtCorePanel implements GLEventListener {
 			OsmAndCore.ReleaseCore();
 			System.exit(0);
 		}
+		QIODeviceLogSink logSink = QIODeviceLogSink.createFileLogSink(OsmExtractionUI.getUserLogDirectoryPath() + "/osmandcore.log");
+		Logger.get().addLogSink(logSink);
 
 		MapRendererSetupOptions rendererSetupOptions = new MapRendererSetupOptions();
 		rendererSetupOptions.setGpuWorkerThreadEnabled(false);

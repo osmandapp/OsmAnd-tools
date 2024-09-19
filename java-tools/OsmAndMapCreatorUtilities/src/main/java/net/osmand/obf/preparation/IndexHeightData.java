@@ -2,12 +2,9 @@ package net.osmand.obf.preparation;
 
 import java.awt.Shape;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferFloat;
 import java.awt.image.DataBufferShort;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,6 +18,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
@@ -65,6 +64,10 @@ public class IndexHeightData {
 	public static final String ELE_ASC_TAG = "osmand_ele_asc";
 	public static final String ELE_DESC_TAG = "osmand_ele_desc";
 	public static final double INEXISTENT_HEIGHT = Double.MIN_VALUE;
+
+	public static final int MAX_SRTM_COUNT_DOWNLOAD = 20000;
+	private int srtmCountDownload;
+	public static final double MAX_LAT_LON_DIST = 500 * 1000; // 500 km
 	
 	public static final Set<String> ELEVATION_TAGS = new TreeSet<>(); 
 	
@@ -103,15 +106,13 @@ public class IndexHeightData {
 			File f = loadFile(getFileName() + ".tif", srtmDataUrl, workDir);
 			BufferedImage img;
 			if (f.exists()) {
-				try {
-					img = ImageIO.read(f);
+				try (FileInputStream fis = new FileInputStream(f)) {
+					img = ImageIO.read(fis);
+					readSRTMData(img);
 				} catch (Exception e) {
-					log.error("Error reading tif file " + getFileName() + " " + e.getMessage(), e);
-					return null;
+					iterativeReadData(f);
 				}
-				width = img.getWidth();
-				height = img.getHeight();
-				data = (DataBufferShort) img.getRaster().getDataBuffer();
+				
 				// remove all downloaded files to save disk space
 				if (!srtmDataUrl.startsWith("/") && !srtmDataUrl.startsWith(".")) {
 					f.delete();
@@ -119,6 +120,49 @@ public class IndexHeightData {
 				return null;
 			}
 			return f;
+		}
+		
+		private BufferedImage iterativeReadData(File file) {
+			boolean readSuccess = false;
+			BufferedImage img = null;
+			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("tiff");
+			ImageInputStream iis = null;
+			while (readers.hasNext() && !readSuccess) {
+				ImageReader reader = readers.next();
+				if (!(reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader)) {
+					try {
+						iis = ImageIO.createImageInputStream(file);
+						reader.setInput(iis, true);
+						img = reader.read(0);
+						readSRTMData(img);
+						readSuccess = true;
+					} catch (IOException e) {
+						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+					} finally {
+						reader.dispose();
+						if (iis != null) {
+							try {
+								iis.close();
+							} catch (IOException e) {
+								log.error("Error closing ImageInputStream: " + e.getMessage());
+							}
+						}
+					}
+				}
+			}
+			
+			if (!readSuccess) {
+				log.error("Failed to read TIFF file with all available readers.");
+			}
+			return img;
+		}
+		
+		private void readSRTMData(BufferedImage img) {
+			if (img != null) {
+				width = img.getWidth();
+				height = img.getHeight();
+				data = (DataBufferShort) img.getRaster().getDataBuffer();
+			}
 		}
 		
 
@@ -326,9 +370,10 @@ public class IndexHeightData {
 		}
 	}
 	
-	public void proccess(Way e) {
+	public boolean proccess(Way e) {
 		if (!isHeightDataNeeded(e)) {
-			return;
+			// true processed
+			return true;
 		}
 
 		WayHeightStats wh = new WayHeightStats();
@@ -346,6 +391,11 @@ public class IndexHeightData {
 						prev = n;
 					}
 				} else {
+					if (MapUtils.getDistance(prev.getLatLon(), n.getLatLon()) > MAX_LAT_LON_DIST) {
+						System.err.printf("Skip long line %d dist %.1f km\n", e.getId() / 64,
+								MapUtils.getDistance(prev.getLatLon(), n.getLatLon()) / 1000);
+						return false;
+					}
 					double segm = MapUtils.getDistance(prev.getLatitude(), prev.getLongitude(), n.getLatitude(),
 							n.getLongitude());
 					if (segm > MINIMAL_DISTANCE && pointHeight != INEXISTENT_HEIGHT) {
@@ -377,6 +427,7 @@ public class IndexHeightData {
 		// if(wh.desc >= 1){
 		// e.putTag(ELE_DESC_TAG, ((int)wh.desc)+"");
 		// }
+		return true;
 	}
 
 
@@ -456,7 +507,7 @@ public class IndexHeightData {
 		wg.dist = wg.dists.get(wg.dists.size() - 1);
 		double prevUpDownDist = 0;
 		double prevUpDownH = 0;
-		
+
 		double prevGraphDist = 0;
 		double prevGraphH = 0;
 		for (int i = 0; i < wg.dists.size(); i++) {
@@ -473,6 +524,7 @@ public class IndexHeightData {
 					wg.sumEle += h;
 					wg.eleCount++;
 				}
+
 				if (sumdist >= prevUpDownDist + DIST_STEP) {
 					if (h > prevUpDownH) {
 						wg.up += (h - prevUpDownH);
@@ -480,6 +532,7 @@ public class IndexHeightData {
 						wg.down += (prevUpDownH - h);
 					}
 					prevUpDownDist = sumdist;
+					prevUpDownH = h;
 				}
 				
 				while (sumdist >= prevGraphDist + DIST_STEP) {
@@ -534,6 +587,10 @@ public class IndexHeightData {
 				File missingFile = tileData.loadData(srtmDataUrl, srtmWorkingDir);
 				if (fileName != null && fileName.length > 0) {
 					fileName[0] = missingFile;
+				}
+				srtmCountDownload++;
+				if (srtmCountDownload > MAX_SRTM_COUNT_DOWNLOAD) {
+					throw new RuntimeException("Max count of download SRTM data " + MAX_SRTM_COUNT_DOWNLOAD);
 				}
 			} catch (IOException e) {
 				log.error(e.getMessage(), e);
