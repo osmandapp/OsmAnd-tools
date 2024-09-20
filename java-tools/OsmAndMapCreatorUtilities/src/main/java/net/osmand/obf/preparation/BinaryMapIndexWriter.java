@@ -1768,9 +1768,9 @@ public class BinaryMapIndexWriter {
 		}
 
 		builder.setId(id);
-		for (int tagGroupId : tagGroupsIds) {
+		/*for (int tagGroupId : tagGroupsIds) {
 			builder.addTagGroups(tagGroupId);
-		}
+		}*/
 
 		for (Map.Entry<PoiAdditionalType, String> rt : additionalNames.entrySet()) {
 			int targetPoiId = rt.getKey().getTargetId();
