@@ -819,8 +819,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			writer.writePoiCategories(boxCats);
 		}
 
-		PoiCreatorTagGroups tagGroups = tree.getNode().tagGroups;
-		writer.writePoiTagGroups(tagGroups);
+//		PoiCreatorTagGroups tagGroups = tree.getNode().tagGroups;
+//		writer.writePoiTagGroups(tagGroups);
 
 		if (!end) {
 			for (Tree<PoiTileBox> subTree : tree.getSubtrees()) {
