@@ -18,18 +18,17 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Set;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+
+import okio.GzipSource;
+import okio.Okio;
 
 import net.osmand.shared.io.KFile;
 import org.xmlpull.v1.XmlPullParserException;
@@ -409,23 +408,18 @@ public class OsmGpxWriteContext {
 				writeFile(gpxFile, entry.getKey());
 			}
 		} else if (files != null) {
-//			for (File gf : files) {
-//				InputStream fis = new FileInputStream(gf);
-//				if (gf.getName().endsWith(".gz")) {
-//					fis = new GZIPInputStream(fis);
-//				} else if (gf.getName().endsWith(".bz2")) {
-//					fis = new BZip2CompressorInputStream(fis);
-//				}
-//				GPXFile gpxFile = GPXUtilities.loadGPXFile(fis, null, false);
-//				fis.close();
-//				writeFile(gpxFile, gf.getName());
-//		    }
 			for (KFile gf : files) {
-				if (gf.name().endsWith(".gz") || gf.name().endsWith(".bz2")) {
-					throw new RuntimeException("unsupported input file extension");
+				if (gf.name().endsWith(".bz2")) {
+					throw new RuntimeException("writeObf: unsupported input file extension: " + gf.name());
 				}
-				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(gf, null, false);
-				writeFile(gpxFile, gf.name());
+				if (gf.name().endsWith(".gz")) {
+					InputStream fis = new FileInputStream(gf.absolutePath());
+					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(fis)), null, false);
+					writeFile(gpxFile, gf.name());
+				} else {
+					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(gf, null, false);
+					writeFile(gpxFile, gf.name());
+				}
 			}
 		}
 		endDocument();

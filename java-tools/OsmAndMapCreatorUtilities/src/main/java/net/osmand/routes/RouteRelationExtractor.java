@@ -5,6 +5,7 @@ import net.osmand.IProgress;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.OsmDbAccessor;
 import net.osmand.obf.preparation.OsmDbAccessorContext;
@@ -17,6 +18,9 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.shared.io.KFile;
+import net.osmand.util.Algorithms;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -91,28 +95,66 @@ public class RouteRelationExtractor {
 	};
 
 	public static void main(String[] args) {
-
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
-			s.add("source.osm");
-			s.add("result.osm");
+//			s.add("andorra-latest.osm.bz2");
+//			s.add("slovakia-latest.osm.bz2");
+			s.add("germany-latest.osm.bz2");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
-			System.out.println("Usage: <path source.osm|.gz|.pbf file> " +
-					"<path result.osm|.gz|.bz2 file> ");
+			System.err.println("Usage: country.osm(|.gz|.bz2|.pbf) [result.osm(|.gz|.bz2)] [result.travel.obf]");
 			System.exit(1);
 		}
 
 		String sourceFilePath = args[0];
-		String resultFilePath = args[1];
+
+		String resultFilePath = args.length > 1 ? args[1]
+				: sourceFilePath.replace(".osm", ".relations.osm").replace(".pbf", "");
+
+		String obfFilePath = args.length > 2 ? args[2]
+				: sourceFilePath.replace(".osm", ".travel.obf")
+				.replace(".pbf", "").replace(".gz", "").replace(".bz2", "");
 
 		try {
 			RouteRelationExtractor rdg = new RouteRelationExtractor();
 			File sourceFile = new File(sourceFilePath);
 			File resultFile = new File(resultFilePath);
 			rdg.extractRoutes(sourceFile, resultFile);
+			rdg.gpxDirectoryToObfFile(getGpxDirectory(resultFile), new File(obfFilePath));
 		} catch (SQLException | IOException | XmlPullParserException | XMLStreamException | InterruptedException e) {
 			log.error("Extract routes error: ", e);
+		}
+	}
+
+	private static File getGpxDirectory(File sourceFile) {
+		return new File(sourceFile.getPath()
+				.replace(".relations", ".gpx.files")
+				.replace(".osm", "")
+				.replace(".pbf", "")
+				.replace(".bz2", "")
+				.replace(".gz", ""));
+	}
+
+	private void gpxDirectoryToObfFile(File gpxDirectory, File obfFile) throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		if (gpxDirectory.isDirectory()) {
+			List<KFile> kFiles = new ArrayList<>();
+			for (File file : gpxDirectory.listFiles()) {
+				if (file.getAbsolutePath().endsWith(GPX_GZ_FILE_EXT)) {
+					kFiles.add(new KFile(file.getAbsolutePath()));
+				}
+			}
+			if (kFiles.isEmpty()) {
+				throw new RuntimeException("No GPX-gz files in directory: " + gpxDirectory.getAbsolutePath());
+			}
+			String osmFileName = Algorithms.getFileNameWithoutExtension(obfFile) + ".osm";
+			OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
+			qp.osmFile = new File(osmFileName);
+			OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
+			File tmpFolder = new File(gpxDirectory, "tmp");
+			ctx.writeObf(null, kFiles, tmpFolder, osmFileName, obfFile);
+			// TODO remove osmFileName finally?
+		} else {
+			throw new RuntimeException("Wrong GPX directory: " + gpxDirectory.getAbsolutePath());
 		}
 	}
 
@@ -124,6 +166,8 @@ public class RouteRelationExtractor {
 		InputStream sourceIs;
 		if (sourceFile.getName().endsWith(".gz")) {
 			sourceIs = new GZIPInputStream(new FileInputStream(sourceFile));
+		} else if (sourceFile.getName().endsWith(".bz2")) {
+				sourceIs = new BZip2CompressorInputStream(new FileInputStream(sourceFile));
 		} else {
 			sourceIs = new FileInputStream(sourceFile);
 		}
@@ -218,10 +262,10 @@ public class RouteRelationExtractor {
 		gpxFile.metadata.name = e.getTag("name");
 		gpxFile.metadata.desc = String.valueOf(e.getId());
 		gpxFile.metadata.getExtensionsToWrite().putAll(e.getTags());
-		File tmp = new File(resultFile.getParentFile(), "tmp");
+		File gpxDir = getGpxDirectory(resultFile);
 		try {
-			if (!tmp.exists()) {
-				Files.createDirectory(tmp.toPath());
+			if (!gpxDir.exists()) {
+				Files.createDirectory(gpxDir.toPath());
 			}
 		} catch (IOException ex) {
 			throw new RuntimeException(ex);
@@ -278,7 +322,7 @@ public class RouteRelationExtractor {
 			}
 		}
 
-		File outFile = new File(tmp, e.getId() + GPX_GZ_FILE_EXT);
+		File outFile = new File(gpxDir, e.getId() + GPX_GZ_FILE_EXT);
 		try {
 			OutputStream outputStream = new FileOutputStream(outFile);
 			outputStream = new GZIPOutputStream(outputStream);
