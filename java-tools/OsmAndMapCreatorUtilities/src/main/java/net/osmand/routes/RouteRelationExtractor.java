@@ -98,8 +98,7 @@ public class RouteRelationExtractor {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
 //			s.add("andorra-latest.osm.bz2");
-//			s.add("slovakia-latest.osm.bz2");
-			s.add("germany-latest.osm.bz2");
+			s.add("malta-latest.osm.bz2");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
 			System.err.println("Usage: country.osm(|.gz|.bz2|.pbf) [result.osm(|.gz|.bz2)] [result.travel.obf]");
@@ -303,9 +302,8 @@ public class RouteRelationExtractor {
 					GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
 					wptPt.lat = node.getLatitude();
 					wptPt.lon = node.getLongitude();
-					wptPt.getExtensionsToWrite().putAll(node.getTags());
-					wptPt.setExtensionsWriter("route_relation_node", serializer -> { // TODO route_relation_node?
-						for (Map.Entry<String, String> entry1 : wptPt.getExtensionsToWrite().entrySet()) {
+					wptPt.setExtensionsWriter("route_relation_node", serializer -> {
+						for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
 							String key = entry1.getKey().replace(":", "_-_");
 							if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
 								key = OSMAND_EXTENSIONS_PREFIX + key;
