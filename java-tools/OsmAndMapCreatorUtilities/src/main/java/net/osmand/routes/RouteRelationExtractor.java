@@ -97,7 +97,7 @@ public class RouteRelationExtractor {
 	public static void main(String[] args) {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
-//			s.add("andorra-latest.osm.bz2");
+//			s.add("slovakia-latest.osm.bz2");
 			s.add("malta-latest.osm.bz2");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
@@ -258,9 +258,10 @@ public class RouteRelationExtractor {
 
 	private void saveGpx(Entity e, Map<EntityId, Entity> additionalEntities, File resultFile) {
 		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
-		gpxFile.metadata.name = e.getTag("name");
-		gpxFile.metadata.desc = String.valueOf(e.getId());
+		gpxFile.metadata.name = Objects.requireNonNullElse(e.getTag("name"), String.valueOf(e.getId()));
+		gpxFile.metadata.desc = e.getTag("description"); // nullable
 		gpxFile.metadata.getExtensionsToWrite().putAll(e.getTags());
+		gpxFile.metadata.getExtensionsToWrite().put("osmid", String.valueOf(e.getId()));
 		File gpxDir = getGpxDirectory(resultFile);
 		try {
 			if (!gpxDir.exists()) {
@@ -270,13 +271,13 @@ public class RouteRelationExtractor {
 			throw new RuntimeException(ex);
 		}
 
-		GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
+		GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment(); // TODO useless instance? track.segments.add?
 		Node last = new Node(0, 0, 0);
 		GPXUtilities.Track track = new GPXUtilities.Track();
 		track.name = gpxFile.metadata.name;
 		gpxFile.tracks.add(track);
 		for (Map.Entry<EntityId, Entity> entry : additionalEntities.entrySet()) {
-
+			// TODO detect reverse-directed ways (to avoid useless trkseg breaks)
 			if (entry.getKey().getType() == Entity.EntityType.WAY) {
 				countWays++;
 				Way way = (Way) entry.getValue();
@@ -287,6 +288,7 @@ public class RouteRelationExtractor {
 				}
 				if (!first.compareNode(last)) {
 					trkSegment = new GPXUtilities.TrkSegment();
+					trkSegment.getExtensionsToWrite().put("osmid", String.valueOf(entry.getValue().getId()));
 					track.segments.add(trkSegment);
 				}
 				for (Node n : way.getNodes()) {
@@ -303,6 +305,7 @@ public class RouteRelationExtractor {
 					GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
 					wptPt.lat = node.getLatitude();
 					wptPt.lon = node.getLongitude();
+					wptPt.getExtensionsToWrite().put("osmid", String.valueOf(entry.getValue().getId()));
 					wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 						for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
 							String key = entry1.getKey().replace(":", "_-_");

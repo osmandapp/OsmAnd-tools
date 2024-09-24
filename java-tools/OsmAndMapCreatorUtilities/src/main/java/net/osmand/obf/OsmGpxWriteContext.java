@@ -17,16 +17,11 @@ import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.shared.gpx.primitives.Metadata;
 import okio.GzipSource;
 import okio.Okio;
 
@@ -110,10 +105,22 @@ public class OsmGpxWriteContext {
 			String routeIdPrefix)
 			throws IOException, SQLException {
 		Map<String, String> gpxTrackTags = new LinkedHashMap<String, String>();
+
+		if (gpxFile.getMetadata() != null) {
+			Map <String, String> metaExtensions = gpxFile.getMetadata().getExtensionsToRead();
+			gpxInfo.updateName(metaExtensions.get("name"));
+			gpxInfo.updateRef(metaExtensions.get("ref"));
+			if (metaExtensions.get("osmid") != null) {
+				gpxInfo.id = Long.parseLong(metaExtensions.get("osmid"));
+			}
+		}
+
 		if (qp.details < QueryParams.DETAILS_TRACKS) {
 			boolean validTrack = false;
 			for (Track t : gpxFile.getTracks()) {
+				gpxInfo.updateName(t.getName());
 				for (TrkSegment s : t.getSegments()) {
+					gpxInfo.updateName(s.getName());
 					if (s.getPoints().isEmpty()) {
 						continue;
 					}
@@ -135,7 +142,8 @@ public class OsmGpxWriteContext {
 				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
-				addExtensionsTags(gpxTrackTags, gpxFile.getExtensions());
+				addMetadataTags(gpxTrackTags, gpxFile.getMetadata());
+				addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead());
 				addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 				addAnalysisTags(gpxTrackTags, analysis);
 				serializeTags(extraTrackTags, gpxTrackTags);
@@ -143,7 +151,9 @@ public class OsmGpxWriteContext {
 			}
 		} else {
 			for (Track t : gpxFile.getTracks()) {
+				gpxInfo.updateName(t.getName());
 				for (TrkSegment s : t.getSegments()) {
+					gpxInfo.updateName(s.getName());
 					if (s.getPoints().isEmpty()) {
 						continue;
 					}
@@ -178,7 +188,8 @@ public class OsmGpxWriteContext {
 							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2));
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
-					addExtensionsTags(gpxTrackTags, gpxFile.getExtensions());
+					addMetadataTags(gpxTrackTags, gpxFile.getMetadata());
+					addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead());
 					addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 					addAnalysisTags(gpxTrackTags, analysis);
 					addElevationTags(gpxTrackTags, s);
@@ -216,19 +227,30 @@ public class OsmGpxWriteContext {
 	}
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
+		final String[] unprefixOsmAndTags = {
+				"width",
+				"color",
+				"network"
+		};
 		if (extensions != null) {
 			if (extensions.containsKey("color")) {
-				gpxTrackTags.put("color", extensions.get("color")); // osmand:color
 				// prioritize osmand:color over GPX color
 				gpxTrackTags.remove("colour_int");
 				gpxTrackTags.remove("colour");
 			}
-			if (extensions.containsKey("width")) {
-				gpxTrackTags.put("width", extensions.get("width")); // osmand:width
+			for (String unprefix : unprefixOsmAndTags) {
+				if (extensions.containsKey(unprefix)) {
+					gpxTrackTags.put(unprefix, extensions.get(unprefix));
+				}
 			}
 			for (String key : extensions.keySet()) {
 				gpxTrackTags.put(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key));
 			}
+		}
+	}
+	private void addMetadataTags(Map<String, String> gpxTrackTags, Metadata metadata) {
+		if (metadata != null) {
+			addExtensionsTags(gpxTrackTags, metadata.getExtensionsToRead());
 		}
 	}
 
@@ -292,12 +314,14 @@ public class OsmGpxWriteContext {
 	private void addGpxInfoTags(Map<String, String> gpxTrackTags, OsmGpxFile gpxInfo, String routeIdPrefix) {
 		if (gpxInfo != null) {
 			gpxTrackTags.put("route_id", routeIdPrefix + gpxInfo.id);
-			gpxTrackTags.put("ref", gpxInfo.id % 1000 + "");
+			gpxTrackTags.put("ref", Objects.requireNonNullElse(gpxInfo.ref, gpxInfo.id % 1000 + ""));
 			gpxTrackTags.put("name", gpxInfo.name);
 			gpxTrackTags.put("route_name", gpxInfo.name);
 			gpxTrackTags.put("user", gpxInfo.user);
-			gpxTrackTags.put("date", gpxInfo.timestamp.toString());
 			gpxTrackTags.put("description", gpxInfo.description);
+			if (gpxInfo.timestamp.getTime() > 0) {
+				gpxTrackTags.put("date", gpxInfo.timestamp.toString());
+			}
 			OsmRouteType activityType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
 			for (String tg : gpxInfo.tags) {
 				gpxTrackTags.put("tag_" + tg, tg);
@@ -493,6 +517,7 @@ public class OsmGpxWriteContext {
 
 		public static final double ERROR_NUMBER = -1000;
 		public long id;
+		public String ref;
 		public String name;
 		public Date timestamp;
 		public boolean pending;
@@ -510,6 +535,18 @@ public class OsmGpxWriteContext {
 		public String[] tags;
 		public String gpx;
 		public byte[] gpxGzip;
+
+		public void updateName(String name) {
+			if (name != null) {
+				this.name = name;
+			}
+		}
+
+		public void updateRef(String ref) {
+			if (ref != null) {
+				this.ref = ref;
+			}
+		}
 	}
 
 	public static class QueryParams {
