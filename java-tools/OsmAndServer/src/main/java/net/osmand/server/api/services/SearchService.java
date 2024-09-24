@@ -50,7 +50,8 @@ public class SearchService {
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
     private static final int TOTAL_LIMIT_POI = 2000;
-    private static final int TOTAL_LIMIT_SEARCH_RESULTS = 1000;
+    private static final int TOTAL_LIMIT_SEARCH_RESULTS = 10000;
+    private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
     
     private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 5;
     private static final String SEARCH_LOCALE = "en";
@@ -156,6 +157,7 @@ public class SearchService {
             if (resultCollection != null) {
                 res = resultCollection.getCurrentSearchResults();
                 if (!res.isEmpty()) {
+                    res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
                     saveSearchResult(res, features);
                 }
             }
