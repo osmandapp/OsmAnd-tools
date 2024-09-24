@@ -273,6 +273,7 @@ public class RouteRelationExtractor {
 		GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
 		Node last = new Node(0, 0, 0);
 		GPXUtilities.Track track = new GPXUtilities.Track();
+		track.name = gpxFile.metadata.name;
 		gpxFile.tracks.add(track);
 		for (Map.Entry<EntityId, Entity> entry : additionalEntities.entrySet()) {
 
@@ -315,6 +316,7 @@ public class RouteRelationExtractor {
 							}
 						}
 					});
+					wptPt.name = node.getTags().get("name");
 					gpxFile.addPoint(wptPt);
 				}
 			}
