@@ -56,7 +56,7 @@ public class OsmGpxWriteContext {
 	public final QueryParams qp;
 	public int tracks = 0;
 	public int segments = 0;
-	long id = -10;
+	long ordinalId = -10;
 
 	XmlSerializer serializer = null;
 	OutputStream outputStream = null;
@@ -110,8 +110,9 @@ public class OsmGpxWriteContext {
 			Map <String, String> metaExtensions = gpxFile.getMetadata().getExtensionsToRead();
 			gpxInfo.updateName(metaExtensions.get("name"));
 			gpxInfo.updateRef(metaExtensions.get("ref"));
-			if (metaExtensions.get("osmid") != null) {
-				gpxInfo.id = Long.parseLong(metaExtensions.get("osmid"));
+			String osmId = metaExtensions.get("osmid");
+			if (osmId != null) {
+				gpxInfo.id = Long.parseLong(osmId);
 			}
 		}
 
@@ -132,7 +133,7 @@ public class OsmGpxWriteContext {
 			}
 			if (validTrack) {
 				serializer.startTag(null, "node");
-				serializer.attribute(null, "id", id-- + "");
+				serializer.attribute(null, "id", ordinalId-- + "");
 				serializer.attribute(null, "action", "modify");
 				serializer.attribute(null, "version", "1");
 				serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().getLat()));
@@ -161,18 +162,24 @@ public class OsmGpxWriteContext {
 						continue;
 					}
 					segments++;
-					long idStart = id;
+					long idStart = ordinalId;
 					double dlon = s.getPoints().get(0).getLon();
 					double dlat = s.getPoints().get(0).getLat();
 					KQuadRect qr = new KQuadRect(dlon, dlat, dlon, dlat);
 					for (WptPt p : s.getPoints()) {
-						long nid = id--;
+						long nid = ordinalId--;
 						GpxUtilities.INSTANCE.updateQR(qr, p, dlat, dlon);
 						writePoint(nid, p, null, null, null);
 					}
-					long endid = id;
+					long endid = ordinalId;
 					serializer.startTag(null, "way");
-					serializer.attribute(null, "id", id-- + "");
+					String osmId = s.getExtensionsToRead().get("osmid");
+					if (osmId != null) {
+						long negWayId = -Long.parseLong(osmId);
+						serializer.attribute(null, "id", negWayId + "");
+					} else {
+						serializer.attribute(null, "id", ordinalId-- + "");
+					}
 					serializer.attribute(null, "action", "modify");
 					serializer.attribute(null, "version", "1");
 
@@ -199,7 +206,8 @@ public class OsmGpxWriteContext {
 			}
 
 			for (WptPt p : gpxFile.getPointsList()) {
-				long nid = id--;
+				String osmId = p.getExtensionsToRead().get("osmid");
+				long nid = osmId != null ? -Long.parseLong(osmId) : ordinalId--;
 				if (gpxInfo != null) {
 					writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
 				}
