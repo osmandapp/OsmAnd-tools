@@ -50,7 +50,7 @@ public class RouteRelationExtractor {
 	int countWays;
 	int countNodes;
 	DBDialect osmDBdialect = DBDialect.SQLITE;
-	private final double precisionLatLonEquals = 0.00001;
+	private final double precisionLatLonEquals = 1e-5;
 	private final String[] filteredTags = {
 			"-bus",
 			"-road",

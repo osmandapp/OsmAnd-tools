@@ -274,7 +274,7 @@ public class OsmGpxWriteContext {
 			wgs.dists.add(p.getDistance());
 		}
 		IndexHeightData.calculateEleStats(wgs, (int) DIST_STEP);
-		if (wgs.eleCount > 0) {
+		if (wgs.eleCount > 0 && !Double.isNaN(wgs.startEle) && !Double.isNaN(wgs.endEle)) {
 			int st = (int) wgs.startEle;
 			gpxTrackTags.put("start_ele", String.valueOf((int) wgs.startEle));
 			gpxTrackTags.put("end_ele__start", String.valueOf((int) wgs.endEle - st));
