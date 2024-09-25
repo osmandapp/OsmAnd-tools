@@ -222,16 +222,21 @@ public class OsmGpxWriteContext {
 		List<String> pgColors = new ArrayList<>();
 		List<String> pgBackgrounds = new ArrayList<>();
 		for (String name : pointsGroups.keySet()) {
-			pgNames.add(name);
-			pgIcons.add(pointsGroups.get(name).getIconName());
-			pgBackgrounds.add(pointsGroups.get(name).getBackgroundType());
-			pgColors.add(KAlgorithms.INSTANCE.colorToString(pointsGroups.get(name).getColor()));
+			PointsGroup pg = pointsGroups.get(name);
+			if (pg.getIconName() != null || pg.getBackgroundType() != null || pg.getColor() != 0) {
+				pgNames.add(name);
+				pgIcons.add(pg.getIconName());
+				pgBackgrounds.add(pg.getBackgroundType());
+				pgColors.add(KAlgorithms.INSTANCE.colorToString(pg.getColor()));
+			}
 		}
-		final String delimiter = OBF_POINTS_GROUPS_DELIMITER;
-		gpxTrackTags.put(OBF_POINTS_GROUPS_NAMES, String.join(delimiter, pgNames));
-		gpxTrackTags.put(OBF_POINTS_GROUPS_ICONS, String.join(delimiter, pgIcons));
-		gpxTrackTags.put(OBF_POINTS_GROUPS_COLORS, String.join(delimiter, pgColors));
-		gpxTrackTags.put(OBF_POINTS_GROUPS_BACKGROUNDS, String.join(delimiter, pgBackgrounds));
+		if (!pgNames.isEmpty()) {
+			final String delimiter = OBF_POINTS_GROUPS_DELIMITER;
+			gpxTrackTags.put(OBF_POINTS_GROUPS_NAMES, String.join(delimiter, pgNames));
+			gpxTrackTags.put(OBF_POINTS_GROUPS_ICONS, String.join(delimiter, pgIcons));
+			gpxTrackTags.put(OBF_POINTS_GROUPS_COLORS, String.join(delimiter, pgColors));
+			gpxTrackTags.put(OBF_POINTS_GROUPS_BACKGROUNDS, String.join(delimiter, pgBackgrounds));
+		}
 	}
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
