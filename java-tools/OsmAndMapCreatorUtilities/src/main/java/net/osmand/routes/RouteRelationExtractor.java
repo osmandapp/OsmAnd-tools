@@ -20,6 +20,7 @@ import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.shared.io.KFile;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.apache.commons.logging.Log;
@@ -48,6 +49,7 @@ public class RouteRelationExtractor {
 	int countWays;
 	int countNodes;
 	DBDialect osmDBdialect = DBDialect.SQLITE;
+	private final double precisionLatLonEquals = 0.00001;
 	private final String[] filteredTags = {
 			"-bus",
 			"-road",
@@ -97,10 +99,12 @@ public class RouteRelationExtractor {
 	public static void main(String[] args) {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
-//			s.add("slovakia-latest.osm.bz2");
-			s.add("malta-latest.osm.bz2");
+			s.add("germany-latest.osm.gz");
+//			s.add("slovakia-latest.osm.gz");
+//			s.add("malta-latest.osm.gz");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
+			// TODO specify source file, tmp folder, result file // finally clean up the folder
 			System.err.println("Usage: country.osm(|.gz|.bz2|.pbf) [result.osm(|.gz|.bz2)] [result.travel.obf]");
 			System.exit(1);
 		}
@@ -263,6 +267,7 @@ public class RouteRelationExtractor {
 		gpxFile.metadata.getExtensionsToWrite().putAll(e.getTags());
 		gpxFile.metadata.getExtensionsToWrite().put("osmid", String.valueOf(e.getId()));
 		File gpxDir = getGpxDirectory(resultFile);
+
 		try {
 			if (!gpxDir.exists()) {
 				Files.createDirectory(gpxDir.toPath());
@@ -271,58 +276,26 @@ public class RouteRelationExtractor {
 			throw new RuntimeException(ex);
 		}
 
-		GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment(); // TODO useless instance? track.segments.add?
-		Node last = new Node(0, 0, 0);
 		GPXUtilities.Track track = new GPXUtilities.Track();
 		track.name = gpxFile.metadata.name;
 		gpxFile.tracks.add(track);
+
+		List<Way> waysToJoin = new ArrayList<>();
 		for (Map.Entry<EntityId, Entity> entry : additionalEntities.entrySet()) {
-			// TODO detect reverse-directed ways (to avoid useless trkseg breaks)
 			if (entry.getKey().getType() == Entity.EntityType.WAY) {
-				countWays++;
-				Way way = (Way) entry.getValue();
-				Node first = way.getFirstNode();
-				if (first == null) {
-					log.info("==== First node Null " + e.getId());
-					continue;
-				}
-				if (!first.compareNode(last)) {
-					trkSegment = new GPXUtilities.TrkSegment();
-					trkSegment.getExtensionsToWrite().put("osmid", String.valueOf(entry.getValue().getId()));
-					track.segments.add(trkSegment);
-				}
-				for (Node n : way.getNodes()) {
-					GPXUtilities.WptPt pt = new GPXUtilities.WptPt();
-					pt.lat = n.getLatitude();
-					pt.lon = n.getLongitude();
-					trkSegment.points.add(pt);
-				}
-				last = way.getLastNode();
+				waysToJoin.add((Way) entry.getValue());
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
-				countNodes++;
-				Node node = (Node) entry.getValue();
-				if (node != null) {
-					GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
-					wptPt.lat = node.getLatitude();
-					wptPt.lon = node.getLongitude();
-					wptPt.getExtensionsToWrite().put("osmid", String.valueOf(entry.getValue().getId()));
-					wptPt.setExtensionsWriter("route_relation_node", serializer -> {
-						for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
-							String key = entry1.getKey().replace(":", "_-_");
-							if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
-								key = OSMAND_EXTENSIONS_PREFIX + key;
-							}
-							try {
-								writeNotNullText(serializer, key, entry1.getValue());
-							} catch (IOException ex) {
-								throw new RuntimeException(ex);
-							}
-						}
-					});
-					wptPt.name = node.getTags().get("name");
-					gpxFile.addPoint(wptPt);
-				}
+				addNode(gpxFile, (Node) entry.getValue());
 			}
+		}
+
+		GPXUtilities.TrkSegment[] currentSegment = {null};
+		double[] lastLatLon = {Double.NaN, Double.NaN};
+		boolean considerPreviousWay = true;
+		for (int i = 0; i < waysToJoin.size(); i++) {
+			considerPreviousWay = addAndJoinWay(track, currentSegment, lastLatLon, waysToJoin.get(i),
+					i > 0 && considerPreviousWay ? waysToJoin.get(i - 1) : null,
+					i < waysToJoin.size() - 1 ? waysToJoin.get(i + 1) : null);
 		}
 
 		File outFile = new File(gpxDir, e.getId() + GPX_GZ_FILE_EXT);
@@ -337,6 +310,95 @@ public class RouteRelationExtractor {
 		countFiles++;
 		if (countFiles % 100 == 0) {
 			log.info(countFiles + " File " + outFile.getName() + " saved ");
+		}
+	}
+
+	private boolean shouldReversePoints(Way current, Way prev, Way next) {
+		if (prev == null && next != null && !next.getNodes().isEmpty()) {
+			// the current is very first node - compare its first point with next's first/last points
+			Node currentFirst = current.getFirstNode();
+			Node nextFirst = next.getFirstNode();
+			Node nextLast = next.getLastNode();
+			if (MapUtils.areLatLonEqual(currentFirst.getLatLon(), nextFirst.getLatLon(), precisionLatLonEquals)
+					|| MapUtils.areLatLonEqual(currentFirst.getLatLon(), nextLast.getLatLon(), precisionLatLonEquals)
+			) {
+				return true;
+			}
+		} else if (prev != null && !prev.getNodes().isEmpty()) {
+			// the current in the middle - compare its last point with prev's first/last points
+			Node currentLast = current.getLastNode();
+			Node prevFirst = prev.getFirstNode();
+			Node prevLast = prev.getLastNode();
+			if (MapUtils.areLatLonEqual(currentLast.getLatLon(), prevFirst.getLatLon(), precisionLatLonEquals)
+					|| MapUtils.areLatLonEqual(currentLast.getLatLon(), prevLast.getLatLon(), precisionLatLonEquals)
+			) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean addAndJoinWay(GPXUtilities.Track track, GPXUtilities.TrkSegment[] currentSegment, double[] lastLatLon,
+	                              Way current, Way prev, Way next) {
+		boolean joined = true;
+
+		if (current.getNodes().isEmpty()) {
+			log.info("==== Empty Nodes in the Way " + current.getId());
+			return false;
+		}
+
+		boolean reverse = shouldReversePoints(current, prev, next);
+
+		List<GPXUtilities.WptPt> points = new ArrayList<>();
+
+		for (Node n : current.getNodes()) {
+			points.add(new GPXUtilities.WptPt(n.getLatitude(), n.getLongitude()));
+		}
+
+		if (reverse) {
+			Collections.reverse(points);
+		}
+
+		if (!MapUtils.areLatLonEqual(lastLatLon[0], lastLatLon[1],
+				points.get(0).getLatitude(), points.get(0).getLongitude(), precisionLatLonEquals)) {
+			GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
+			trkSegment.getExtensionsToWrite().put("osmid", String.valueOf(current.getId()));
+			track.segments.add(trkSegment);
+			currentSegment[0] = trkSegment;
+			joined = Double.isNaN(lastLatLon[0]); // true for very first segment, false for others
+		}
+
+		lastLatLon[0] = points.get(points.size() - 1).getLatitude();
+		lastLatLon[1] = points.get(points.size() - 1).getLongitude();
+
+		currentSegment[0].points.addAll(points);
+		countWays++;
+
+		return joined;
+	}
+
+	private void addNode(GPXFile gpxFile, Node node) {
+		if (node != null) {
+			GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
+			wptPt.lat = node.getLatitude();
+			wptPt.lon = node.getLongitude();
+			wptPt.getExtensionsToWrite().put("osmid", String.valueOf(node.getId()));
+			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
+				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
+					String key = entry1.getKey().replace(":", "_-_");
+					if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
+						key = OSMAND_EXTENSIONS_PREFIX + key;
+					}
+					try {
+						writeNotNullText(serializer, key, entry1.getValue());
+					} catch (IOException ex) {
+						throw new RuntimeException(ex);
+					}
+				}
+			});
+			wptPt.name = node.getTags().get("name");
+			gpxFile.addPoint(wptPt);
+			countNodes++;
 		}
 	}
 
