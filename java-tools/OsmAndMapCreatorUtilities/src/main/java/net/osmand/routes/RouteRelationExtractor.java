@@ -267,6 +267,10 @@ public class RouteRelationExtractor {
 		gpxFile.metadata.desc = e.getTag("description"); // nullable
 		gpxFile.metadata.getExtensionsToWrite().putAll(e.getTags());
 		gpxFile.metadata.getExtensionsToWrite().put("osmid", String.valueOf(e.getId()));
+		if (e.getTags().get("colour") != null) {
+			gpxFile.metadata.getExtensionsToWrite().remove("colour");
+			gpxFile.metadata.getExtensionsToWrite().put("color", e.getTags().get("colour"));
+		}
 		File gpxDir = getGpxDirectory(resultFile);
 
 //		DEBUG = e.getId() == 16676577; // TODO remove debug
