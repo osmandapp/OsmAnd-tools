@@ -272,6 +272,9 @@ public class RouteRelationExtractor {
 			gpxFile.metadata.getExtensionsToWrite().remove("colour");
 			gpxFile.metadata.getExtensionsToWrite().put("color", e.getTags().get("colour"));
 		}
+//		if (e.getTags().get("width") == null) {
+//			gpxFile.metadata.getExtensionsToWrite().put("width", "medium"); // default (bad) TODO
+//		}
 		File gpxDir = getGpxDirectory(resultFile);
 
 //		DEBUG = e.getId() == 16676577; // TODO remove debug
