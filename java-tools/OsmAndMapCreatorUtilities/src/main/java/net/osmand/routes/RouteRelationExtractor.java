@@ -266,6 +266,7 @@ public class RouteRelationExtractor {
 		gpxFile.metadata.name = Objects.requireNonNullElse(e.getTag("name"), String.valueOf(e.getId()));
 		gpxFile.metadata.desc = e.getTag("description"); // nullable
 		gpxFile.metadata.getExtensionsToWrite().putAll(e.getTags());
+		gpxFile.metadata.getExtensionsToWrite().put("relation_gpx", "yes");
 		gpxFile.metadata.getExtensionsToWrite().put("osmid", String.valueOf(e.getId()));
 		if (e.getTags().get("colour") != null) {
 			gpxFile.metadata.getExtensionsToWrite().remove("colour");
@@ -364,6 +365,7 @@ public class RouteRelationExtractor {
 		if (!MapUtils.areLatLonEqual(lastLatLon[0], lastLatLon[1],
 				points.get(0).getLatitude(), points.get(0).getLongitude(), precisionLatLonEquals)) {
 			GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
+			trkSegment.getExtensionsToWrite().put("relation_track", "yes");
 			trkSegment.getExtensionsToWrite().put("osmid", String.valueOf(current.getId()));
 			track.segments.add(trkSegment);
 			currentSegment[0] = trkSegment;
@@ -377,10 +379,11 @@ public class RouteRelationExtractor {
 	}
 
 	private void addNode(GPXFile gpxFile, Node node) {
-		if (node != null) {
+		if (node != null && !node.getTags().isEmpty()) {
 			GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
 			wptPt.lat = node.getLatitude();
 			wptPt.lon = node.getLongitude();
+			wptPt.getExtensionsToWrite().put("relation_point", "yes");
 			wptPt.getExtensionsToWrite().put("osmid", String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {

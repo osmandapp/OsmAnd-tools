@@ -407,7 +407,7 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "gpx_bg", p.getBackgroundType());
 		}
 		int color = p.getColor(0);
-		if(color != 0) {
+		if (color != 0) {
 			tagValue(serializer, "colour", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
 			tagValue(serializer, "colour_int", Algorithms.colorToString(color));
 		}
