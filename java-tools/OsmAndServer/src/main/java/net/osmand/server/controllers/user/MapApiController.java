@@ -473,8 +473,8 @@ public class MapApiController {
 	private boolean analysisPresentFavorites(String tag, JsonObject details) {
 		return details != null
 				&& details.has(tag + DONE_SUFFIX)
-				&& (!details.has(FAV_POINT_GROUPS)
-				|| jsonParser.parse(details.get(FAV_POINT_GROUPS).getAsString()).getAsJsonObject().size() > 0)
+				&& details.has(FAV_POINT_GROUPS)
+				&& !details.get(FAV_POINT_GROUPS).getAsString().equals("{}")
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 
