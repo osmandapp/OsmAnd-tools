@@ -80,6 +80,7 @@ public class MapApiController {
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
+	private static final String FAV_POINT_GROUPS = "pointGroups";
 
 	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
 
@@ -407,7 +408,7 @@ public class MapApiController {
 								groupInfo.put("hidden", String.valueOf(isHidden(group)));
 								pointGroupsAnalysis.put(k, groupInfo);
 							});
-							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
+							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
 					}
 					saveAnalysis(ANALYSIS, uf, analysis);
@@ -470,7 +471,10 @@ public class MapApiController {
 	}
 
 	private boolean analysisPresentFavorites(String tag, JsonObject details) {
-		return details != null && details.has(tag + DONE_SUFFIX)
+		return details != null
+				&& details.has(tag + DONE_SUFFIX)
+				&& (!details.has(FAV_POINT_GROUPS)
+				|| jsonParser.parse(details.get(FAV_POINT_GROUPS).getAsString()).getAsJsonObject().size() > 0)
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 
