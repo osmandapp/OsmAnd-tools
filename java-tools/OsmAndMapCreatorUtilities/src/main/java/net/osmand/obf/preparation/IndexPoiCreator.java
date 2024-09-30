@@ -68,6 +68,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					8, 0.55f);
 			for (Map.Entry<Boundary, List<City>> entry : cityDataStorage.boundaryToContainingCities.entrySet()) {
 				Boundary b = entry.getKey();
+				if (b.getCityType() == null || !b.getCityType().storedAsSeparateAdminEntity()) {
+					continue;
+				}
 				Multipolygon m = b.getMultipolygon();
 				QuadRect bboxLatLon = m.getLatLonBbox();
 				int left = MapUtils.get31TileNumberX(bboxLatLon.left);
