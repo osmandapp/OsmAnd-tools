@@ -87,13 +87,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				List<String> tags = new ArrayList<>();
 				String name = city.getName();
 				if (!Algorithms.isEmpty(name)) {
-					tags.add("addr:city");
+					tags.add("name");
 					tags.add(name);
 				}
 				Map<String, String> otherNames = city.getNamesMap(true);
 				for (Map.Entry<String, String> nameEntry : otherNames.entrySet()) {
 					if (allLanguages.contains(nameEntry.getKey())) {
-						tags.add("addr:city:" + nameEntry.getKey());
+						tags.add("name:" + nameEntry.getKey());
 						tags.add(nameEntry.getValue());
 					}
 				}
