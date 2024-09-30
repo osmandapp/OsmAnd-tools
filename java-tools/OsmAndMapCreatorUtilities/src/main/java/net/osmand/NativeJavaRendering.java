@@ -576,5 +576,30 @@ public class NativeJavaRendering extends NativeLibrary {
 		return defaultLoadedLibrary;
 	}
 
-
+	public BufferedImage getGeotiffImage(String tilePath, String outColorFilename, String midColorFilename,
+		int type, int size, int zoom, int x, int y) throws IOException {
+		ByteBuffer geotiffBuffer =
+			NativeLibrary.getGeotiffTile(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
+		InputStream inputStream = new InputStream() {
+			int nextInd = 0;
+			@Override
+			public int read() {
+				if(nextInd >= geotiffBuffer.capacity()) {
+					return -1;
+				}
+				byte b = geotiffBuffer.get(nextInd++) ;
+				if(b < 0) {
+					return b + 256;
+				} else {
+					return b;
+				}
+			}
+		};
+		Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("png");
+		ImageReader reader = readers.next();
+		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
+		BufferedImage img = reader.read(0);
+		AllocationUtil.freeDirectBuffer(geotiffBuffer);
+		return img;
+	}
 }
