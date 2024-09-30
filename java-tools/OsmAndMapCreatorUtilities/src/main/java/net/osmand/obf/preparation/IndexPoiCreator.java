@@ -99,7 +99,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 
 				tags.add("place");
-				tags.add(city.getType().name());
+				tags.add(city.getType().name().toLowerCase());
 
 				if (tags.isEmpty()) {
 					continue;
