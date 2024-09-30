@@ -39,7 +39,19 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.util.Algorithms;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.xmlpull.v1.XmlPullParserException;
 import rtree.RTreeException;
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import java.io.*;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.zip.GZIPInputStream;
 
 /**
  * http://wiki.openstreetmap.org/wiki/OSM_tags_for_routing#Is_inside.2Foutside
@@ -824,6 +836,10 @@ public class IndexCreator {
 				});
 
 				indexAddressCreator.commitToPutAllCities();
+			}
+
+			if (settings.indexAddress && settings.indexPOI) {
+				indexPoiCreator.storeCities(indexAddressCreator.getCityDataStorage());
 			}
 		}
 	}

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.LatLonEle;
+import net.osmand.shared.gpx.ElevationApproximator;
 import net.osmand.router.*;
 import net.osmand.shared.gpx.ElevationDiffsCalculator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -248,36 +249,19 @@ public class RoutingService {
         return resListEle;
     }
     
-    public List<Double> calculateElevationDiffs(List<LatLonEle> resListEle) {
-        List<Double> distancesList = new ArrayList<>();
-        List<Double> elevationsList = new ArrayList<>();
-        
-        double totalDist = 0;
-        
-        for (int i = 0; i < resListEle.size(); i++) {
-            LatLonEle currentPoint = resListEle.get(i);
-            double dist = 0;
-            if (i > 0) {
-                LatLonEle prevPoint = resListEle.get(i - 1);
-                dist = MapUtils.getDistance(prevPoint.getLatitude(), prevPoint.getLongitude(),
-                        currentPoint.getLatitude(), currentPoint.getLongitude());
-            }
-            distancesList.add(totalDist);
-            elevationsList.add(currentPoint.getElevation());
-            
-            totalDist += dist;
+    public List<Double> calculateElevationDiffs(List<LatLonEle> points) {
+        ElevationApproximator approximator = getElevationApproximator(points);
+        approximator.approximate();
+        final double[] distances = approximator.getDistances();
+        final double[] elevations = approximator.getElevations();
+        if (distances != null && elevations != null) {
+            ElevationDiffsCalculator elevationDiffsCalc = getElevationDiffsCalculator(distances, elevations);
+            elevationDiffsCalc.calculateElevationDiffs();
+            double diffElevationUp = elevationDiffsCalc.getDiffElevationUp();
+            double diffElevationDown = elevationDiffsCalc.getDiffElevationDown();
+            return List.of(diffElevationUp, diffElevationDown);
         }
-        
-        double[] distances = distancesList.stream().mapToDouble(Double::doubleValue).toArray();
-        double[] elevations = elevationsList.stream().mapToDouble(Double::doubleValue).toArray();
-        
-        ElevationDiffsCalculator elevationDiffsCalc = getElevationDiffsCalculator(distances, elevations);
-        elevationDiffsCalc.calculateElevationDiffs();
-        
-        double diffElevationUp = elevationDiffsCalc.getDiffElevationUp();
-        double diffElevationDown = elevationDiffsCalc.getDiffElevationDown();
-        
-        return List.of(diffElevationUp, diffElevationDown);
+        return Collections.emptyList();
     }
     
     private ElevationDiffsCalculator getElevationDiffsCalculator(final double[] distances, final double[] elevations) {
@@ -295,6 +279,30 @@ public class RoutingService {
             @Override
             public int getPointsCount() {
                 return distances.length;
+            }
+        };
+    }
+    
+    private ElevationApproximator getElevationApproximator(List<LatLonEle> points) {
+        return new ElevationApproximator() {
+            @Override
+            public double getPointLatitude(int index) {
+                return points.get(index).getLatitude();
+            }
+            
+            @Override
+            public double getPointLongitude(int index) {
+                return points.get(index).getLongitude();
+            }
+            
+            @Override
+            public double getPointElevation(int index) {
+                return points.get(index).getElevation();
+            }
+            
+            @Override
+            public int getPointsCount() {
+                return points.size();
             }
         };
     }

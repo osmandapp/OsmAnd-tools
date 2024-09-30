@@ -63,8 +63,10 @@ public class SearchController {
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData,
-                                            @RequestParam String locale) throws IOException, XmlPullParserException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale);
+                                            @RequestParam String locale,
+                                            @RequestParam double lat,
+                                            @RequestParam double lon) throws IOException {
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon));
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
     
@@ -110,8 +112,9 @@ public class SearchController {
     public ResponseEntity<String> getWikiData(@RequestParam String northWest,
                                               @RequestParam String southEast,
                                               @RequestParam String lang,
+                                              @RequestParam int zoom,
                                               @RequestParam Set<String> filters) {
-        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, lang, filters);
+        FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, lang, filters, zoom);
         return ResponseEntity.ok(gson.toJson(collection));
     }
     
@@ -120,6 +123,13 @@ public class SearchController {
     public ResponseEntity<String> getWikiImages(@RequestParam String northWest, @RequestParam String southEast) {
         FeatureCollection collection = wikiService.getImages(northWest, southEast);
         return ResponseEntity.ok(gson.toJson(collection));
+    }
+    
+    @RequestMapping(path = {"/parse-image-info"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> parseImageInfo(@RequestBody String data) {
+        Map<String, String> info = wikiService.parseImageInfo(data);
+        return ResponseEntity.ok(gson.toJson(info));
     }
     
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
