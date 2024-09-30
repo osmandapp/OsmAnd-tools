@@ -211,7 +211,6 @@ public class IndexCreator {
 			}
 		}
 		if (propagateToNodes != null && e instanceof Node) {
-			System.out.println(e.getId() + "---");
 			propagateToNodes.propagateTagsToNode((Node) e);
 		}
 		if (settings.indexPOI) {
