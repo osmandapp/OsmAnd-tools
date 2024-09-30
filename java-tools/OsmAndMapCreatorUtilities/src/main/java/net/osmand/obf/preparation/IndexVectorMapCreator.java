@@ -905,8 +905,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     }
 
     public void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer,
-            PreparedStatement selectData,
-            TLongObjectHashMap<BinaryFileReference> bounds, Map<String, Integer> tempStringTable,
+            PreparedStatement selectData, TLongObjectHashMap<BinaryFileReference> bounds, Map<String, Integer> tempStringTable,
             LinkedHashMap<MapRulType, String> tempNames, MapZoomPair level)
             throws IOException, RTreeException, SQLException {
         Element[] e = parent.getAllElements();
@@ -919,23 +918,25 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                 long id = e[i].getPtr();
                 selectData.setLong(1, id);
                 // selectData = mapConnection.prepareStatement("SELECT area, coordinates,
-                // innerPolygons, types, additionalTypes, name FROM binary_map_objects WHERE id
-                // = ?");
+                // innerPolygons, types, additionalTypes, name FROM binary_map_objects WHERE id = ?");
                 ResultSet rs = selectData.executeQuery();
                 if (rs.next()) {
-                	List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getLinkedPropagate(id, false);
-					if (linkedPropagate != null) {
+                	long cid = convertGeneratedIdToObfWrite(id);
+					if (cid % 2 == 0 && propagateToNodes.getPropagateByNodeId(cid >> 1) != null) {
+						List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByNodeId(cid >> 1);
 						boolean skipPoint = false;
+						// TODO osmand_change=delete should be added? or not???
 						for (PropagateFromWayToNode p : linkedPropagate) {
 							if (p.ignoreBorderPoint) {
 								skipPoint = true;
+								break;
 							}
 						}
 						if (skipPoint) {
 							continue;
 						}
 					}
-                    long cid = convertGeneratedIdToObfWrite(id);
+                    
                     if (dataBlock == null) {
                         baseId = cid;
                         dataBlock = writer.createWriteMapDataBlock(baseId);
@@ -1153,17 +1154,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         stat.close();
     }
 
-    private PreparedStatement createStatementMapBinaryInsert(Connection conn) throws SQLException {
-        return conn
-                .prepareStatement(
-                        "insert into binary_map_objects(id, area, coordinates, innerPolygons, types, additionalTypes, name, labelCoordinates) values(?, ?, ?, ?, ?, ?, ?, ?)");
-    }
+	private PreparedStatement createStatementMapBinaryInsert(Connection conn) throws SQLException {
+		return conn.prepareStatement(
+				"insert into binary_map_objects(id, area, coordinates, innerPolygons, types, additionalTypes, name, labelCoordinates) values(?, ?, ?, ?, ?, ?, ?, ?)");
+	}
 
-    private PreparedStatement createStatementLowLevelMapBinaryInsert(Connection conn) throws SQLException {
-        return conn
-                .prepareStatement(
-                        "insert into low_level_map_objects(id, start_node, end_node, name, nodes, type, addType, level) values(?, ?, ?, ?, ?, ?, ?, ?)");
-    }
+	private PreparedStatement createStatementLowLevelMapBinaryInsert(Connection conn) throws SQLException {
+		return conn.prepareStatement(
+				"insert into low_level_map_objects(id, start_node, end_node, name, nodes, type, addType, level) values(?, ?, ?, ?, ?, ?, ?, ?)");
+	}
 
     private void insertLowLevelMapBinaryObject(int level, int zoom, TIntArrayList types, TIntArrayList addTypes,
             long id, List<Node> in, TreeMap<MapRulType, String> namesUse)

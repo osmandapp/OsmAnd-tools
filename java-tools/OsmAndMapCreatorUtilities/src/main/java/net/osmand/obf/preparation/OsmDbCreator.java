@@ -3,7 +3,6 @@ package net.osmand.obf.preparation;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.*;
-import java.util.List;
 import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
@@ -16,6 +15,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
+import net.osmand.obf.preparation.PropagateToNodes.PropagateWayWithNodes;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -377,41 +377,51 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			}
 			long id = convertId(e);
 			if (propagateToNodes != null && e instanceof Way) {
-				boolean empty = propagateToNodes.isEmpty();
-				List<PropagateFromWayToNode> propagatedNodeIds = propagateToNodes.propagateTagsFromWays((Way) e);
-				if (propagatedNodeIds != null) {
-					if (empty) {
-						executeNodesBatch(true); // commit for proper select
+				boolean firstIteration = propagateToNodes.isNoRegisteredNodes();
+				PropagateWayWithNodes pnodes = propagateToNodes.propagateTagsFromWays((Way) e);
+				if (pnodes != null && !pnodes.empty) {
+					if (firstIteration) {
+						executeNodesBatch(true); // commit for proper select node ide
 					}
-					for (int i = 0; i < propagatedNodeIds.size(); i++) {
-						PropagateFromWayToNode pn = propagatedNodeIds.get(i);
-						if (pn.id < 0) {
-							LatLon latLon = pn.getLatLon(getNode(((Way) e).getNodeIds().get(pn.start)),
-									getNode(((Way) e).getNodeIds().get(pn.end)));
+					TLongArrayList nodeIds = ((Way) e).getNodeIds();
+					TLongArrayList oldNodeIds = new TLongArrayList(nodeIds);
+					nodeIds.clear();
+					for (int i = 0; i < pnodes.points.length; i++) {
+						PropagateFromWayToNode pn = pnodes.points[i];
+						if (i % 2 == 0) {
+							nodeIds.add(oldNodeIds.get(i / 2));
+							if (pn != null) {
+								prepPropagateNode.setLong(1, pn.id);
+								prepPropagateNode.addBatch();
+								propagateCount++;
+								propagateToNodes.registerNode(pn);
+							}
+						} else if (pnodes.points[i] != null) { // in between points
+							LatLon latLon = pn.getLatLon(getNode(oldNodeIds.get(pn.start)),getNode(oldNodeIds.get(pn.end)));
 							if (latLon == null) {
 								continue;
-							}	
-							pn.id = generatedId--;
+							}
+							// TODO fix overlap with multipolygons (constants)
+							pn.id = ((e.getId() << 10l) + pn.start) << SHIFT_ID; // 6 to compensate geohash
+//							System.out.println("Way -- " + e.getId()+ " " + pn.start + " --- " + pn.id);
+							currentCountNode++;
 							prepNode.setLong(1, pn.id);
 							prepNode.setDouble(2, latLon.getLatitude());
 							prepNode.setDouble(3, latLon.getLongitude());
 							prepNode.setBytes(4, new ByteArrayOutputStream().toByteArray());
 							prepNode.setBoolean(5, true);
 							prepNode.addBatch();
-							currentCountNode++;
-						} else {
-							prepPropagateNode.setLong(1, pn.id);
-							prepPropagateNode.addBatch();
-							propagateCount++;	
+
+							nodeIds.add(pn.id);
+							propagateToNodes.registerNode(pn);
+							executeNodesBatch(false);
 						}
-						propagateToNodes.registerNode(pn);
 					}
-					executeNodesBatch(false);
-					if (propagateCount >= BATCH_SIZE_OSM) {
-						prepPropagateNode.executeBatch();
-						dbConn.commit(); // clear memory
-						propagateCount = 0;
-					}
+				}
+				if (propagateCount >= BATCH_SIZE_OSM) {
+					prepPropagateNode.executeBatch();
+					dbConn.commit(); // clear memory
+					propagateCount = 0;
 				}
 			}
 			if (e instanceof Node) {

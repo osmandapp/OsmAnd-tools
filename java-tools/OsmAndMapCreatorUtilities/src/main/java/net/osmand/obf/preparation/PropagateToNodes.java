@@ -1,18 +1,18 @@
 package net.osmand.obf.preparation;
 
-import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TLongObjectHashMap;
-import net.osmand.data.LatLon;
-import net.osmand.osm.MapRenderingTypes;
-import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import net.osmand.data.LatLon;
+import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 
 public class PropagateToNodes {
 
@@ -21,6 +21,17 @@ public class PropagateToNodes {
     private TLongObjectHashMap<List<PropagateFromWayToNode>> propagateTagsByOsmNodeId = new TLongObjectHashMap<>();
     private Map<String, List<PropagateRule>> propagateRulesByTag = new HashMap<>();
 
+    
+    public static class PropagateWayWithNodes {
+    	
+    	PropagateFromWayToNode[] points;
+    	boolean empty = true;
+    	
+		public PropagateWayWithNodes(int oldNodes) {
+			points = new PropagateFromWayToNode[2 *oldNodes - 1];
+		}
+    }
+    
 	public static class PropagateFromWayToNode {
 		public long id; // negative ids - artificial node
 		public long osmId; // first point (main point)
@@ -54,6 +65,9 @@ public class PropagateToNodes {
 		public void addTag(String tag, String value, PropagateToNodesType type) {
 			tags.put(tag, value);
 			this.type = type;
+			if (type == PropagateToNodesType.BORDER) {
+				ignoreBorderPoint = true;
+			}
 		}
 	}
 
@@ -62,7 +76,7 @@ public class PropagateToNodes {
 		initPropagateToNodes();
 	}
 	
-	public boolean isEmpty() {
+	public boolean isNoRegisteredNodes() {
 		return propagateTagsByNodeId.isEmpty();
 	}
 
@@ -77,15 +91,16 @@ public class PropagateToNodes {
 		lst = propagateTagsByOsmNodeId.get(node.osmId);
 		if (lst == null) {
 			lst = new ArrayList<PropagateToNodes.PropagateFromWayToNode>();
-			propagateTagsByOsmNodeId.put(node.id, lst);
+			propagateTagsByOsmNodeId.put(node.osmId, lst);
 		}
 		lst.add(node);
 	}
+	
+	public List<PropagateFromWayToNode> getPropagateByEndpoint(long nodeId) {
+		return propagateTagsByOsmNodeId.get(nodeId);
+	}
 
-	public List<PropagateFromWayToNode> getLinkedPropagate(long nodeId, boolean osmId) {
-		if (osmId) {
-			return propagateTagsByOsmNodeId.get(nodeId);
-		}
+	public List<PropagateFromWayToNode> getPropagateByNodeId(long nodeId) {
 		return propagateTagsByNodeId.get(nodeId);
 	}
 
@@ -109,18 +124,15 @@ public class PropagateToNodes {
 		}
 	}
 
-	public PropagateFromWayToNode getNode(List<PropagateFromWayToNode> resultIds, Way way, int start, int end) {
-		for (PropagateFromWayToNode w : resultIds) {
-			if (w.start == start && w.end == end) {
-				return w;
-			}
+	public PropagateFromWayToNode getNode(PropagateWayWithNodes rWay, Way way, int start, int end) {
+		if (rWay.points[start + end] == null) {
+			rWay.points[start + end] = new PropagateFromWayToNode(way, start, end);
 		}
-		PropagateFromWayToNode pwn = new PropagateFromWayToNode(way, start, end);
-		resultIds.add(pwn);
-		return pwn;
+		rWay.empty = false;
+		return rWay.points[start + end];
 	}
 
-	public List<PropagateFromWayToNode> propagateTagsFromWays(Way w) {
+	public PropagateWayWithNodes propagateTagsFromWays(Way w) {
 		List<PropagateRule> rulesToApply = getRulesToApply(w);
 		if (rulesToApply == null) {
 			return null;
@@ -130,7 +142,7 @@ public class PropagateToNodes {
 			return null;
 		}
 
-		List<PropagateFromWayToNode> resultIds = new ArrayList<>();
+		PropagateWayWithNodes resultWay = new PropagateWayWithNodes(allIds.size());
 		for (PropagateRule rule : rulesToApply) {
 			String propagateTag = rule.tag;
 			if (rule.tagPrefix != null) {
@@ -139,32 +151,32 @@ public class PropagateToNodes {
 			switch (rule.type) {
 			case ALL:
 				for (int i = 0; i < w.getNodes().size(); i++) {
-					getNode(resultIds, w, i, i).addTag(propagateTag, rule.value, rule.type);
+					getNode(resultWay, w, i, i).addTag(propagateTag, rule.value, rule.type);
 				}
 				break;
 			case START:
-				getNode(resultIds, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
+				getNode(resultWay, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
 				break;
 			case END:
-				getNode(resultIds, w, allIds.size() - 2, allIds.size() - 1).addTag(propagateTag, rule.value, rule.type);
+				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).addTag(propagateTag, rule.value, rule.type);
 				break;
 			case CENTER:
 				if (allIds.size() == 2) {
-					getNode(resultIds, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
+					getNode(resultWay, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
 				} else {
-					getNode(resultIds, w, allIds.size() / 2, allIds.size() / 2).addTag(propagateTag, rule.value,
+					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).addTag(propagateTag, rule.value,
 							rule.type);
 				}
 				break;
 			case BORDER:
-				getNode(resultIds, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
-				getNode(resultIds, w, allIds.size() - 1, allIds.size() - 2).addTag(propagateTag, rule.value, rule.type);
+				getNode(resultWay, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
+				getNode(resultWay, w, allIds.size() - 1, allIds.size() - 2).addTag(propagateTag, rule.value, rule.type);
 				break;
 			case NONE:
 				break;
 			}
 		}
-		return resultIds;
+		return resultWay;
 	}
 
 	private List<PropagateRule> getRulesToApply(Way w) {

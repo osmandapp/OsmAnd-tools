@@ -721,21 +721,23 @@ public class IndexCreator {
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 				Way w = (Way) e;
 				for (long nodeId : w.getNodeIds().toArray()) {
-					List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getLinkedPropagate(nodeId, true);
+					List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByEndpoint(nodeId);
 					if (linkedPropagate != null) {
-						boolean hasBorder = false;
-						boolean selfWay = false;
+						boolean thisWayPartOfBorder = false;
 						for (PropagateFromWayToNode p : linkedPropagate) {
-							if (p.wayId == w.getId()) {
-								selfWay = true;
-							}
-							if (p.type == PropagateToNodesType.BORDER) {
-								hasBorder = true;
+							if (p.wayId == w.getId() >> OsmDbCreator.SHIFT_ID && p.type == PropagateToNodesType.BORDER) {
+								thisWayPartOfBorder = true;
 							}
 						}
-						if (hasBorder && !selfWay) {
+						String hwTag = w.getTag("highway");
+						String access = w.getTag("access"); // TODO but with 2 points
+						if (!thisWayPartOfBorder && hwTag != null && !"private".equals(access) &&
+								!hwTag.equals("service")) {
+							// TODO check only && highway >= residential
 							for (PropagateFromWayToNode p : linkedPropagate) {
-								p.ignoreBorderPoint = true;
+								if (p.type == PropagateToNodesType.BORDER) {
+									p.ignoreBorderPoint = false;
+								}
 							}
 						}
 					}
