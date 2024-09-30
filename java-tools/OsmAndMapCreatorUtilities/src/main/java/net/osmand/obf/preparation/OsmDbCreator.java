@@ -14,6 +14,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.data.City.CityType;
+import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -43,6 +44,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int currentCountNode = 0;
 	private PreparedStatement prepNode;
 	int allNodes = 0;
+	private PreparedStatement selectNode;
 
 	int currentRelationsCount = 0;
 	private PreparedStatement prepRelations;
@@ -54,6 +56,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	int propagateCount = 0;
 	private PreparedStatement prepPropagateNode;
+	
+	
 
 	
 	// not used for now
@@ -81,6 +85,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private long generatedId = -100;
 
 	private PropagateToNodes propagateToNodes;
+
 
 
 	public OsmDbCreator(int additionId, int shiftId) {
@@ -259,6 +264,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		prepWays = dbConn.prepareStatement("replace into ways(id, node, ord, tags, boundary) values (?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		prepRelations = dbConn.prepareStatement("replace into relations(id, member, type, role, ord, tags) values (?, ?, ?, ?, ?, ?)"); //$NON-NLS-1$
 		prepPropagateNode = dbConn.prepareStatement("update node set propagate=1 where id=?");
+		selectNode = dbConn.prepareStatement("select latitude, longitude from node where id=?"); //$NON-NLS-1$
 		dbConn.setAutoCommit(false);
 	}
 
@@ -375,11 +381,16 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				if (propagatedNodeIds != null) {
 					for (int i = 0; i < propagatedNodeIds.size(); i++) {
 						PropagateFromWayToNode pn = propagatedNodeIds.get(i);
+						LatLon latLon = pn.getLatLon(getNode(((Way) e).getNodeIds().get(pn.start)),
+								getNode(((Way) e).getNodeIds().get(pn.start)));
+						if (latLon == null) {
+							continue;
+						}
 						if (pn.id < 0) {
 							pn.id = generatedId--;
 							prepNode.setLong(1, id);
-							prepNode.setDouble(2, pn.latlon.getLatitude());
-							prepNode.setDouble(3, pn.latlon.getLongitude());
+							prepNode.setDouble(2, latLon.getLatitude());
+							prepNode.setDouble(3, latLon.getLongitude());
 							prepNode.setBytes(4, new ByteArrayOutputStream().toByteArray());
 							prepNode.setBoolean(5, true);
 							prepNode.addBatch();
@@ -474,6 +485,15 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 
 
+
+	private Node getNode(long l) throws SQLException {
+		selectNode.setLong(1, l);
+		ResultSet q = selectNode.executeQuery();
+		if(q.next()) {
+			return new Node(q.getDouble(1), q.getDouble(2), l);
+		}
+		return null;
+	}
 
 	public int getAllNodes() {
 		return allNodes;

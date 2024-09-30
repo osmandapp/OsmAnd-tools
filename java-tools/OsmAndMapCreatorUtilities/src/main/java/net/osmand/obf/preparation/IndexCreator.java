@@ -27,8 +27,8 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -39,19 +39,7 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.util.Algorithms;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.xmlpull.v1.XmlPullParserException;
 import rtree.RTreeException;
-
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import java.io.*;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.Iterator;
-import java.util.zip.GZIPInputStream;
 
 /**
  * http://wiki.openstreetmap.org/wiki/OSM_tags_for_routing#Is_inside.2Foutside
@@ -883,8 +871,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "../temp/Diff-end.osm";
-		String file = rootFolder + "../temp/map.osm";
+		String file = rootFolder + "../temp/andorra_europe.pbf";
+//		String file = rootFolder + "../temp/map.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";

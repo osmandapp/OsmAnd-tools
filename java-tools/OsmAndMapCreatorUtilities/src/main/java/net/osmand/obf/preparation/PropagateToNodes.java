@@ -24,7 +24,6 @@ public class PropagateToNodes {
 	public static class PropagateFromWayToNode {
 		public long id; // negative ids - artificial node
 		public long osmId; // first point (main point)
-		public LatLon latlon = null;
 		public Map<String, String> tags = new HashMap<>();
 		public long wayId;
 		public PropagateToNodesType type;
@@ -35,16 +34,21 @@ public class PropagateToNodes {
 		public PropagateFromWayToNode(Way way, int start, int end) {
 			this.end = end;
 			this.start = start;
-			Node st = way.getNodes().get(start);
-			Node en = way.getNodes().get(end);
-			latlon = new LatLon(st.getLatitude() / 2 + en.getLatitude() / 2, st.getLongitude() / 2 + en.getLongitude() / 2);
 			wayId = way.getId();
-			osmId = st.getId();
+			osmId = way.getNodeIds().get(start);
 			if (start == end) {
-				this.id = st.getId();
+				this.id = osmId;
 			} else {
 				this.id = -1;
 			}
+		}
+		
+		public LatLon getLatLon(Node st, Node en) {
+			if (st == null || en == null) {
+				return null;
+			}
+			return new LatLon(st.getLatitude() / 2 + en.getLatitude() / 2,
+					st.getLongitude() / 2 + en.getLongitude() / 2);
 		}
 
 		public void addTag(String tag, String value, PropagateToNodesType type) {
